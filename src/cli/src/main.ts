@@ -249,8 +249,8 @@ function readHookPayload(): Record<string, unknown> | null {
  *
  * @param payloadCwd - the payload's `cwd` field; the process cwd if not a string.
  * @param file - the payload's `tool_input.file_path`, absolute or relative to cwd.
- * @returns the file as written (Python names modules after that path), the
- *   real cwd and the real project root; undefined when the file is outside the
+ * @returns the file and cwd as written (Python names modules after that
+ *   path) and the real project root; undefined when the file is outside the
  *   project, missing, or not a regular file.
  */
 function hookTarget(
@@ -266,7 +266,9 @@ function hookTarget(
   const lexical = resolve(lexicalCwd, file);
   const real = realpath(lexical);
   if (real && isInside(project, real) && statSync(real).isFile()) {
-    return { file: lexical, cwd, project };
+    // Report paths against the cwd as written: on macOS /var is a link to
+    // /private/var, and mixing the two spellings gives ../../var/... paths.
+    return { file: lexical, cwd: resolve(lexicalCwd), project };
   }
   return undefined;
 }

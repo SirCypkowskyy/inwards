@@ -169,4 +169,13 @@ describe("inwards hook claude-code", () => {
     expect(code).toBe(2);
     expect(JSON.parse(stderr).diagnostics[0].code).toBe("INW000");
   });
+
+  test("paths stay relative when the project is reached through a symlink (macOS /var)", () => {
+    const real = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
+    const link = `${real}-link`;
+    symlinkSync(real, link);
+    const input = payload("post-write-order", link);
+    const { stderr } = inwards(["hook", "claude-code"], { cwd: real, stdin: input });
+    expect(JSON.parse(stderr).diagnostics[0].file).toBe("shop/domain/order.py");
+  });
 });
