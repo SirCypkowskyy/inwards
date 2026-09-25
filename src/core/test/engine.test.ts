@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, declaresInwards, parseConfig, render } from "../src/index.ts";
+import { ConfigError, declaresInwards, parseConfig, RULES, render } from "../src/index.ts";
 import { engine, file } from "./helpers.ts";
 
 describe("INW001 layer-dependency", () => {
@@ -245,5 +245,25 @@ describe("encoding declarations CPython honours (review of round 2)", () => {
     expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
       "INW000",
     ]);
+  });
+});
+
+describe("rule registry", () => {
+  test("SARIF lists exactly the registered rules, with their default level", () => {
+    const sarif = JSON.parse(render({ diagnostics: [], filesChecked: 0, durationMs: 0 }, "sarif"));
+    const { rules } = sarif.runs[0].tool.driver;
+    expect(rules.map((r: { id: string }) => r.id)).toEqual(Object.keys(RULES));
+    expect(rules[0].defaultConfiguration.level).toBe(RULES.INW000.severity);
+  });
+
+  test("every diagnostic the engine emits comes from a registered rule", () => {
+    const found = [
+      ...engine.checkFile(file("shop/domain/a.py", "import shop.api\n")),
+      ...engine.checkFile(file("shop/domain/b.py", "# coding: utf-7\n")),
+    ];
+    for (const d of found) {
+      const rule = Object.values(RULES).find((r) => r.code === d.code);
+      expect([d.rule, d.docs]).toEqual([rule?.name ?? "missing", rule?.docs ?? "missing"]);
+    }
   });
 });
