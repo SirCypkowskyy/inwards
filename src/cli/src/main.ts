@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import {
   ConfigError,
@@ -52,7 +52,7 @@ async function main(argv: string[]): Promise<number> {
   const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : [root];
   const files = collectPythonFiles(targets).map(
     (abs): SourceFile => ({
-      path: relative(process.cwd(), abs),
+      path: posix(relative(process.cwd(), abs)),
       text: readFileSync(abs, "utf8"),
       ...moduleNameFor(relative(root, abs)),
     }),
@@ -78,6 +78,9 @@ function findConfig(dir: string): string | undefined {
     if (dirname(d) === d) return undefined;
   }
 }
+
+/** Diagnostics and SARIF use forward slashes on every OS, so output is identical everywhere. */
+const posix = (path: string) => path.split(sep).join("/");
 
 function print(message: string, code: number): number {
   (code === 2 ? console.error : console.log)(message);

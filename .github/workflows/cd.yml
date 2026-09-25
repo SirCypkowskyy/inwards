@@ -57,6 +57,7 @@ jobs:
           - { os: ubuntu-latest, bin: inwards-linux-x64 }
           - { os: ubuntu-24.04-arm, bin: inwards-linux-arm64 }
           - { os: macos-latest, bin: inwards-darwin-arm64 }
+          - { os: macos-15-intel, bin: inwards-darwin-x64 }
           - { os: windows-latest, bin: inwards-windows-x64.exe }
     runs-on: ${{ matrix.os }}
     steps:
@@ -71,3 +72,21 @@ jobs:
           chmod +x "dist/${{ matrix.bin }}" || true
           "dist/${{ matrix.bin }}" --version
           "dist/${{ matrix.bin }}" check --format json
+
+  verify-musl:
+    name: Run on Alpine (musl)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: inwards-${{ github.ref_name }}
+          path: dist
+      - name: Binary starts and lints the example app
+        run: |
+          chmod +x dist/inwards-linux-x64-musl
+          docker run --rm -v "$PWD:/w" -w /w alpine:3 sh -euc '
+            apk add --no-cache libstdc++ libgcc >/dev/null
+            dist/inwards-linux-x64-musl --version
+            dist/inwards-linux-x64-musl check --format json'

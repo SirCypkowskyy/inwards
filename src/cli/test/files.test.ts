@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { collectPythonFiles } from "../src/files.ts";
 
 test("walks build/dist/site inside packages, skips venvs and hidden dirs", () => {
@@ -17,6 +17,6 @@ test("walks build/dist/site inside packages, skips venvs and hidden dirs", () =>
   put("env/lib/y.py");
   writeFileSync(join(root, "env/pyvenv.cfg"), "");
   put(".git/hooks/z.py");
-  const found = collectPythonFiles([root]).map((f) => f.slice(root.length + 1));
+  const found = collectPythonFiles([root]).map((f) => relative(root, f).split(sep).join("/"));
   expect(found).toEqual(["shop/dist/x.py", "shop/domain/build/leak.py"]);
 });
