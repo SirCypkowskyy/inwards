@@ -126,6 +126,28 @@ bun test                # unit + CLI + E2E snapshots
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
 tests against the compiled binary on Linux, macOS and Windows.
 
+## Before pushing to a PR
+
+Run the CI jobs locally in Docker with [`act`](https://github.com/nektos/act)
+(0.2.89 or newer) before you push, so CI confirms a green run instead of
+finding the bug. `.actrc` maps the runner labels to
+`catthehacker/ubuntu:act-24.04` (there is no 26.04 image for act yet).
+
+```sh
+act pull_request -W .github/workflows/ci.yml -j engine                        # lint, typecheck, fallow, prescan
+act pull_request -W .github/workflows/ci.yml -j test --matrix os:ubuntu-26.04  # tests against the compiled Linux binary
+act pull_request -W .github/workflows/ci.yml -j docs                          # strict docs build
+act push -W .github/workflows/cd.yml -n                                       # CD: dry run, validates the workflow only
+```
+
+- **Changed a workflow?** Run the jobs you touched with `act` first. For
+  jobs that can't run (see below), `act -n` at least validates them.
+- **What act can't do:** the macOS and Windows matrix rows, OIDC and
+  attestations, releases, and Pages deploys. Those run only on GitHub, so CI
+  stays the gate.
+- **Parallel agents:** run `act` in your own worktree only. Each run gets
+  its own container. The first run pulls a 2.3 GB image.
+
 ## Code rules
 
 - **Strict typing, no escape hatches** (tsc, Biome). No `any`, no non-null `!`,
