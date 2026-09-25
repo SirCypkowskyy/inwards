@@ -30,6 +30,7 @@ Inwards turns those wiki rules into a check that runs in milliseconds and talks 
 [tool.inwards]
 root = "src"
 required-version = "0.0.1"  # oldest Inwards allowed; `inwards init` sets it
+ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
 layers = [
   { name = "domain",         modules = ["shop.domain"] },
   { name = "application",    modules = ["shop.application"] },
@@ -43,7 +44,7 @@ layers = [
   <figcaption>The example app as shipped: every import points inward.</figcaption>
 </figure>
 
-Layers are listed innermost first. A module may import its own layer and anything listed before it. `required-version` makes an older binary (or a shim that isn't Inwards) fail with exit 2 instead of checking the project with rules it may not know. Modules that match no layer (scripts, tests, migrations) are not checked today. An agent could use that gap by putting new code in a package outside every layer, so INW006, planned for 0.1, will flag unassigned first-party packages. When the domain imports infrastructure, you get this (abridged, one diagnostic out of the `diagnostics` array):
+Layers are listed innermost first. A module may import its own layer and anything listed before it. `required-version` makes an older binary (or a shim that isn't Inwards) fail with exit 2 instead of checking the project with rules it may not know. Code outside every layer isn't checked, so INW006 makes that gap visible: importing first-party code that belongs to no layer from a layer is an error (so is importing from the package above the layers, whose `__init__.py` no layer owns), a package outside every layer (unless `ignore` names it) gets a warning, and a prefix that matches no module is reported against `pyproject.toml`. `ignore` entries match whole name segments anywhere, so `migrations` covers `shop.orders.migrations`. Unknown keys and a prefix listed in two layers are config errors (exit 2). Warnings don't change the exit code. When the domain imports infrastructure, you get this (abridged, one diagnostic out of the `diagnostics` array):
 
 ```json
 {
@@ -111,4 +112,4 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 | [7. Glossary](07-Glossary.md) | The vocabulary, from "port" to "import skeleton" |
 
 !!! info "Status"
-    Pre-alpha (0.0.1). Two rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, and each `v*` tag drafts a GitHub Release with binaries for six platforms. Everything marked :material-progress-clock: in these docs is planned, not built.
+    Pre-alpha (0.0.1). Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, with a Stop gate that checks what the session changed, and each `v*` tag drafts a GitHub Release with binaries for six platforms. Everything marked :material-progress-clock: in these docs is planned, not built.

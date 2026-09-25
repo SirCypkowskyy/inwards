@@ -1,11 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   type Diagnostic as CoreDiagnostic,
   Engine,
+  type ModuleLookup,
   moduleNameFor,
   parseConfig,
+  probeLookup,
 } from "@inwards/core";
 import {
   createConnection,
@@ -18,7 +20,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
-let state: { engine: Engine; root: string } | undefined;
+let state: { engine: Engine; root: string; ownerOf: ModuleLookup } | undefined;
 
 connection.onInitialize(async (params) => {
   const folder = params.workspaceFolders?.[0]?.uri;
@@ -30,7 +32,8 @@ connection.onInitialize(async (params) => {
         { runtime: wasm("web-tree-sitter.wasm"), python: wasm("tree-sitter-python.wasm") },
         config,
       );
-      state = { engine, root: resolve(dirname(configPath), config.root) };
+      const root = resolve(dirname(configPath), config.root);
+      state = { engine, root, ownerOf: probeLookup((rel) => pathKind(root, rel)) };
     } catch (err) {
       connection.console.warn(`Inwards disabled: ${String(err)}`);
     }
@@ -44,13 +47,31 @@ documents.onDidChangeContent(({ document }) => {
     return;
   }
   const path = fileURLToPath(document.uri);
-  const found = state.engine.checkFile({
-    path: relative(state.root, path),
-    text: document.getText(),
-    ...moduleNameFor(relative(state.root, path)),
-  });
+  const found = state.engine.checkFile(
+    {
+      path: relative(state.root, path),
+      text: document.getText(),
+      ...moduleNameFor(relative(state.root, path)),
+    },
+    state.ownerOf,
+  );
   connection.sendDiagnostics({ uri: document.uri, diagnostics: found.map(toLsp) });
 });
+
+/**
+ * Tells what is at a path under the config root, for the INW006 module probe.
+ *
+ * @param root - the config root.
+ * @param rel - a forward-slash path relative to it.
+ * @returns "file", "dir", or undefined when nothing is there.
+ */
+function pathKind(root: string, rel: string): "file" | "dir" | undefined {
+  const stat = statSync(join(root, rel), { throwIfNoEntry: false });
+  if (stat?.isDirectory()) {
+    return "dir";
+  }
+  return stat?.isFile() ? "file" : undefined;
+}
 
 /**
  * Reads one grammar file shipped next to dist/server.js.

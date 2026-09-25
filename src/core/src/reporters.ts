@@ -81,7 +81,7 @@ const PLAIN: Paint = { bold: String, dim: String, red: String, green: String, cy
 function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint): string {
   const lines = diagnostics.map((d) =>
     [
-      `${c.bold(`${d.file}:${d.line}:${d.column}:`)} ${c.red(c.bold(d.code))} ${d.message}`,
+      `${c.bold(`${d.file}:${d.line}:${d.column}:`)} ${codeLabel(d, c)} ${d.message}`,
       `  ${c.green("fix:")} ${d.fix.summary}`,
       ...d.fix.steps.map((s, i) => `    ${c.cyan(`${i + 1}.`)} ${s}`),
       `  ${c.dim(`docs: ${d.docs}`)}`,
@@ -89,11 +89,36 @@ function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint)
   );
   const ms = c.dim(`(${durationMs.toFixed(1)} ms)`);
   const files = plural(filesChecked, "file");
+  const { errors, warnings } = counts(diagnostics);
+  const warned = warnings === 0 ? "" : `, ${plural(warnings, "warning")}`;
   const tail =
-    diagnostics.length === 0
-      ? `${c.green(c.bold("All clear:"))} ${files}, 0 violations ${ms}.`
-      : `${c.red(c.bold("Found"))} ${plural(diagnostics.length, "violation")} in ${files} ${ms}.`;
+    errors === 0
+      ? `${c.green(c.bold("All clear:"))} ${files}, 0 violations${warned} ${ms}.`
+      : `${c.red(c.bold("Found"))} ${plural(errors, "violation")}${warned} in ${files} ${ms}.`;
   return [...lines, tail].join("\n\n");
+}
+
+/**
+ * Labels a diagnostic's code: an error in red, a warning marked as one.
+ *
+ * @param d - the diagnostic.
+ * @param c - the palette.
+ * @returns the styled label.
+ */
+function codeLabel(d: Diagnostic, c: Paint): string {
+  return d.severity === "error" ? c.red(c.bold(d.code)) : c.bold(`${d.code} (warning)`);
+}
+
+/**
+ * Counts errors and warnings. `violations` in every report means errors,
+ * which are what the exit code follows.
+ *
+ * @param diagnostics - the diagnostics.
+ * @returns how many are errors and how many warnings.
+ */
+function counts(diagnostics: readonly Diagnostic[]): { errors: number; warnings: number } {
+  const errors = diagnostics.filter((d) => d.severity === "error").length;
+  return { errors, warnings: diagnostics.length - errors };
 }
 
 /**
@@ -122,7 +147,8 @@ function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: 
       schema: "inwards/diagnostics@1",
       summary: {
         filesChecked,
-        violations: diagnostics.length,
+        violations: counts(diagnostics).errors,
+        warnings: counts(diagnostics).warnings,
         durationMs: Math.round(durationMs * 10) / 10,
       },
       diagnostics,

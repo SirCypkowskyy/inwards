@@ -3,14 +3,17 @@
  * and a check run over them. The engine does no I/O (ADR-006), so all file
  * reading happens here.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkPrefixes,
   Engine,
   type InwardsConfig,
+  type ModuleLookup,
   moduleNameFor,
   type ProjectIndex,
   parseConfig,
+  probeLookup,
   type Report,
   type SourceFile,
 } from "@inwards/core";
@@ -21,6 +24,10 @@ import { isInside, posix, realpath } from "./paths.ts";
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
   engine: Engine;
+  config: InwardsConfig;
+  /** The pyproject.toml, as found and as text, for findings about the config itself. */
+  configPath: string;
+  configText: string;
   /** The config root as written. */
   lexicalRoot: string;
   /** The config root with symlinks resolved. */
@@ -37,10 +44,14 @@ interface Project {
  * @throws {ConfigError} when the config is invalid.
  */
 async function openProject(configPath: string): Promise<Project> {
-  const config = parseConfig(readFileSync(configPath, "utf8"));
+  const configText = readFileSync(configPath, "utf8");
+  const config = parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
   return {
     engine: await Engine.create(await loadGrammars(), config),
+    config,
+    configPath,
+    configText,
     lexicalRoot,
     realRoot: realpath(lexicalRoot) ?? lexicalRoot,
     layerDirs: layerDirs(configPath, config),
@@ -48,9 +59,10 @@ async function openProject(configPath: string): Promise<Project> {
 }
 
 /**
- * Finds the directory of every layer prefix that is a package on disk, e.g.
- * `<root>/shop/domain` for `shop.domain`. The file walk skips nothing inside
- * them, so a virtualenv marker or a node_modules name can't hide layer code.
+ * Finds the top-level package directory of every layer prefix, e.g.
+ * `<root>/shop` for `shop.domain`. The file walk skips nothing inside them,
+ * so a virtualenv marker or a node_modules name can't hide layer code, nor
+ * code moved out of a layer next to it.
  *
  * @param configPath - absolute path of the pyproject.toml.
  * @param config - its parsed config.
@@ -61,7 +73,9 @@ export function layerDirs(configPath: string, config: InwardsConfig): string[] {
   return config.layers
     .flatMap((layer) => layer.modules)
     .flatMap((prefix) => {
-      const dir = join(root, ...prefix.split("."));
+      // The whole top-level package: code moved from shop/domain to a
+      // disguised shop/core must still be seen.
+      const dir = join(root, prefix.split(".")[0] ?? prefix);
       const real = realpath(dir);
       return real === undefined ? [] : [...new Set([dir, real])];
     });
@@ -99,8 +113,26 @@ function loadSources(project: Project, targets: string[] | undefined, base: stri
 }
 
 /**
+ * Finds first-party modules on disk under the config root, for INW006.
+ *
+ * @param root - the config root.
+ * @returns a lookup over the files and directories under it.
+ */
+function moduleLookup(root: string): ModuleLookup {
+  return probeLookup((rel) => {
+    const stat = statSync(join(root, rel), { throwIfNoEntry: false });
+    if (stat?.isDirectory()) {
+      return "dir";
+    }
+    return stat?.isFile() ? "file" : undefined;
+  });
+}
+
+/**
  * Loads the config and engine, then checks the Python files under the targets.
- * The duration covers config, grammar loading, reading and checking.
+ * A whole-project run (no targets) also checks the layer prefixes against the
+ * modules found (INW006). The duration covers config, grammar loading,
+ * reading and checking.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param targets - absolute files or directories; undefined means the config root.
@@ -116,7 +148,12 @@ export async function runCheck(
   const started = performance.now();
   const project = await openProject(configPath);
   const files = loadSources(project, targets, base);
-  const diagnostics = project.engine.checkFiles(files);
+  const diagnostics = project.engine.checkFiles(files, moduleLookup(project.lexicalRoot));
+  if (targets === undefined) {
+    const modules = new Set(files.map((file) => file.module));
+    const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
+    diagnostics.unshift(...checkPrefixes(project.config, modules, pyproject));
+  }
   return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
 }
 

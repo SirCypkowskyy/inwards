@@ -48,3 +48,35 @@ describe("required-version", () => {
     expect(() => parseConfig(withVersion(">=0.1"))).toThrow(MALFORMED);
   });
 });
+
+describe("config integrity (INW006)", () => {
+  const layer = '{ name = "domain", modules = ["shop.domain"] }';
+  test.each([
+    [
+      "an unknown table key",
+      `[tool.inwards]\nlayer = []\nlayers = [${layer}]\n`,
+      "tool.inwards.layer",
+    ],
+    [
+      "an unknown layer key",
+      '[tool.inwards]\nlayers = [{ name = "d", module = ["x"], modules = ["x"] }]\n',
+      "tool.inwards.layers[0].module",
+    ],
+    [
+      "a prefix in two layers",
+      `[tool.inwards]\nlayers = [${layer}, { name = "app", modules = ["shop.domain"] }]\n`,
+      '"shop.domain" is in two layers',
+    ],
+    [
+      "an ignore that isn't a list",
+      `[tool.inwards]\nignore = "tests"\nlayers = [${layer}]\n`,
+      "ignore",
+    ],
+  ])("%s is a config error", (_, text, message) => {
+    expect(() => parseConfig(text)).toThrow(message);
+  });
+
+  test("ignore is absent unless set", () => {
+    expect(parseConfig(`[tool.inwards]\nlayers = [${layer}]\n`).ignore).toBeUndefined();
+  });
+});

@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
-import { parseConfig, VERSION } from "@inwards/core";
+import { type InwardsConfig, parseConfig, VERSION } from "@inwards/core";
 import { isOurHook } from "./claude-settings.ts";
 import { lineDiff } from "./diff.ts";
 import { print } from "./output.ts";
@@ -43,6 +43,8 @@ const CLAUDE_HOOKS: readonly [event: string, matcher: string | undefined][] = [
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
 const PRERELEASE = /-.*$/u;
+/** What `init` puts in `ignore`: tooling that belongs to no layer. */
+const DEFAULT_IGNORE = ["tests", "scripts", "migrations", "conftest"];
 const LINE_BREAK = /\r?\n/u;
 const SECTION_BEGIN = "<!-- inwards:begin -->";
 const SECTION_END = "<!-- inwards:end -->";
@@ -73,7 +75,7 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
   }
   const project = dirname(configPath);
   const exec = inwardsExec();
-  const changes: Change[] = [requiredVersion(configPath)];
+  const changes: Change[] = [pinDefaults(configPath)];
   if (agent === "aider") {
     const cmd = [exec.command, ...exec.args].map(shellQuote).join(" ");
     print(
@@ -149,40 +151,59 @@ function shellQuote(word: string): string {
 }
 
 /**
- * Pins `required-version` to this release in `[tool.inwards]`, unless already set.
- * The result is parsed again and kept only if the key landed in the table and
- * nothing else changed; otherwise init warns and leaves the file alone.
+ * Adds the keys `init` pins to `[tool.inwards]` when they are missing:
+ * `required-version` (this release) and `ignore` (tests, scripts, migrations,
+ * conftest, so INW006 doesn't warn about tooling). The result is parsed again
+ * and kept only if the keys landed in the table and nothing else changed;
+ * otherwise init warns and leaves the file alone.
  *
  * @param configPath - the project's pyproject.toml.
- * @returns the change (unchanged text when the key exists or can't be placed safely).
+ * @returns the change (unchanged text when nothing is missing or it can't be placed safely).
  */
-function requiredVersion(configPath: string): Change {
+function pinDefaults(configPath: string): Change {
   const before = readFileSync(configPath, "utf8");
   const config = parseConfig(before);
   const unchanged = { path: configPath, before, after: before };
-  if (config.requiredVersion !== undefined) {
+  const want = {
+    requiredVersion: config.requiredVersion ?? VERSION.replace(PRERELEASE, ""),
+    ignore: config.ignore ?? DEFAULT_IGNORE,
+  };
+  const lines = [
+    config.requiredVersion === undefined ? `required-version = "${want.requiredVersion}"` : "",
+    config.ignore === undefined ? `ignore = ${JSON.stringify(DEFAULT_IGNORE)}` : "",
+  ].filter((line) => line !== "");
+  if (lines.length === 0) {
     return unchanged;
   }
-  const version = VERSION.replace(PRERELEASE, "");
   const header = TABLE_HEADER.exec(before);
   const eol = before.includes("\r\n") ? "\r\n" : "\n";
   const at = header ? header.index + header[0].length : -1;
-  const after =
-    at === -1
-      ? before
-      : `${before.slice(0, at)}${eol}required-version = "${version}"${before.slice(at)}`;
+  const added = lines.map((line) => `${eol}${line}`).join("");
+  const after = at === -1 ? before : `${before.slice(0, at)}${added}${before.slice(at)}`;
   const check = after === before ? undefined : safeParse(after);
   const landed =
-    check?.requiredVersion === version &&
-    JSON.stringify({ ...check, requiredVersion: undefined }) === JSON.stringify(config);
+    check?.requiredVersion === want.requiredVersion &&
+    JSON.stringify(check.ignore) === JSON.stringify(want.ignore) &&
+    unpinned(check) === unpinned(config);
   if (!landed) {
+    const keys = lines.map((line) => line.split(" ")[0]).join(" and ");
     print(
-      `inwards init: warning: could not add required-version to ${configPath}; add \`required-version = "${version}"\` under [tool.inwards] by hand.`,
+      `inwards init: warning: could not add ${keys} to ${configPath}; add these lines under [tool.inwards] by hand:\n  ${lines.join("\n  ")}`,
       0,
     );
     return unchanged;
   }
   return { path: configPath, before, after };
+}
+
+/**
+ * Serialises a config without the keys `init` pins, to compare the rest.
+ *
+ * @param config - a parsed config.
+ * @returns its JSON, minus `requiredVersion` and `ignore`.
+ */
+function unpinned(config: InwardsConfig): string {
+  return JSON.stringify({ ...config, requiredVersion: undefined, ignore: undefined });
 }
 
 /**

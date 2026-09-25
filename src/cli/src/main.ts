@@ -9,7 +9,7 @@ import { print } from "./output.ts";
 import { findConfig } from "./paths.ts";
 import { runCheck } from "./project.ts";
 
-// Exit codes follow Ruff: 0 clean, 1 violations, 2 usage or config error.
+// Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml]
@@ -25,7 +25,7 @@ Checks Python imports against the layers declared in [tool.inwards].`;
  * makes parseArgs throw, which the caller at the bottom turns into exit 2.
  *
  * @param argv - arguments after the executable and script path.
- * @returns the process exit code: 0 clean, 1 violations, 2 usage or config error.
+ * @returns the process exit code: 0 clean or warnings only, 1 errors, 2 usage or config error.
  */
 async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
@@ -84,7 +84,7 @@ function isFormat(value: string): value is Format {
  * @param paths - files or directories to check; empty means the config root.
  * @param format - the `--format` value, validated here.
  * @param config - the `--config` path, if given.
- * @returns 0 when clean, 1 with violations, 2 for a bad format or no config.
+ * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad format or no config.
  */
 async function checkCommand(
   paths: string[],
@@ -107,7 +107,7 @@ async function checkCommand(
   const pretty = process.stdout.isTTY === true;
   const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
   process.stdout.write(`${render(report, format, { pretty, color })}\n`);
-  return report.diagnostics.length > 0 ? 1 : 0;
+  return report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
 }
 
 // exitCode, not exit(): Node-style exit() may drop writes still queued for a

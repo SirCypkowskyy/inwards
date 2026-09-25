@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { engine, file, found } from "./helpers.ts";
+import { check, file, found } from "./helpers.ts";
 
 describe("INW011: edge cases", () => {
   test.each([
@@ -61,7 +61,7 @@ describe("INW011: edge cases", () => {
 
   test("bytes that declare a codec Inwards can't read are reported, not skipped", () => {
     const src = "exec(b'# coding: utf-7\\n+AGk-mport shop.infrastructure')\n";
-    const [d, ...rest] = engine.checkFile(file("shop/domain/order.py", src));
+    const [d, ...rest] = check(file("shop/domain/order.py", src));
     expect(rest).toEqual([]);
     expect(d?.code).toBe("INW011");
     expect(d?.message).toContain('declare encoding "utf-7"');
@@ -70,6 +70,6 @@ describe("INW011: edge cases", () => {
 
   test("unreadable bytes outside every layer are not reported", () => {
     const src = "exec(b'# coding: utf-7\\n+AGk-mport shop.infrastructure')\n";
-    expect(engine.checkFile(file("scripts/seed.py", src))).toEqual([]);
+    expect(check(file("scripts/seed.py", src))).toEqual([]);
   });
 });

@@ -22,7 +22,7 @@ export interface RuleMeta {
 const CATALOGUE = `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`;
 
 /** Codes of every registered rule. */
-type RuleCode = "INW000" | "INW001" | "INW011";
+type RuleCode = "INW000" | "INW001" | "INW006" | "INW011";
 
 /** Each entry's `code` must equal its key, so the registry can't drift. */
 export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: Code } } = {
@@ -38,6 +38,13 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     name: "layer-dependency",
     severity: "error",
     summary: "Dependencies must point toward inner layers.",
+    docs: CATALOGUE,
+  },
+  INW006: {
+    code: "INW006",
+    name: "unassigned-module",
+    severity: "error",
+    summary: "First-party code must belong to a layer, and every layer prefix must match modules.",
     docs: CATALOGUE,
   },
   INW011: {
@@ -56,6 +63,8 @@ export interface Finding {
   /** What is wrong, in one or two sentences. */
   message: string;
   fix: Fix;
+  /** Overrides the rule's default severity, e.g. INW006 warns about a lone dead prefix. */
+  severity?: Severity;
 }
 
 /**
@@ -67,11 +76,11 @@ export interface Finding {
  * @returns the complete diagnostic.
  */
 export function diagnostic(rule: RuleMeta, file: SourceFile, finding: Finding): Diagnostic {
-  const { span, message, fix } = finding;
+  const { span, message, fix, severity = rule.severity } = finding;
   return {
     code: rule.code,
     rule: rule.name,
-    severity: rule.severity,
+    severity,
     file: file.path,
     module: file.module,
     line: span.line,

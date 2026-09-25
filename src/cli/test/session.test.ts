@@ -64,7 +64,10 @@ describe("session state", () => {
       "pkg/pyproject.toml",
       "pyproject.toml",
     ]);
-    expect(Object.keys(state?.start.manifest ?? {})).toEqual(["shop/domain/order.py"]);
+    expect(Object.keys(state?.start.manifest ?? {})).toEqual([
+      "shop/domain/order.py",
+      "shop/infrastructure/db.py",
+    ]);
     expect(state?.start.head).toBeNull(); // not a git repo
   });
 
@@ -130,7 +133,7 @@ describe("session state", () => {
     writeFileSync(join(root, "shop/domain/new.py"), "Y = 2\n");
     start(root, ID, "resume");
     const manifest = readSession(realpathSync(root), ID)?.start.manifest ?? {};
-    expect(Object.keys(manifest)).toEqual(["shop/domain/order.py"]);
+    expect(Object.keys(manifest)).toEqual(["shop/domain/order.py", "shop/infrastructure/db.py"]);
   });
 
   test("a symlinked .inwards pointing outside the project is refused", () => {
@@ -192,7 +195,7 @@ describe("session state", () => {
     start(root);
     hook(root, payload("session-start", root, { session_id: "no-source", source: undefined }));
     const manifest = readSession(realpathSync(root), ID)?.start.manifest ?? {};
-    expect(Object.keys(manifest)).toEqual(["shop/domain/order.py"]);
+    expect(Object.keys(manifest)).toEqual(["shop/domain/order.py", "shop/infrastructure/db.py"]);
     expect(readSession(realpathSync(root), "no-source")).toBeUndefined();
   });
 });
