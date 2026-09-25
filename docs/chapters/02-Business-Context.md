@@ -195,7 +195,7 @@ flowchart LR
 |---|---|---|---|---|
 | UC1 | Declare layers | Architect edits `[tool.inwards]` | Config validates, and errors name the offending key | :white_check_mark: |
 | UC2 | Check after each edit | Agent writes a `.py` file; a PostToolUse hook runs `inwards check <file> --format json` | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: engine, :material-progress-clock: installer |
-| UC3 | Gate before "done" | Agent tries to finish; a Stop hook runs a full check | The agent can't declare victory while the build is red | :material-progress-clock: |
+| UC3 | Gate before "done" | Agent tries to finish; the Stop gate checks every file the session changed, however it changed | The agent can't declare victory with a violation it introduced, and a legacy repo's old violations don't block it | :white_check_mark: |
 | UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: scaffold |
 | UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template |
 | UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :material-progress-clock: |

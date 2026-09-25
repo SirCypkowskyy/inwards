@@ -4,9 +4,10 @@
  * reading happens here.
  */
 import { readFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import {
   Engine,
+  type InwardsConfig,
   moduleNameFor,
   type ProjectIndex,
   parseConfig,
@@ -24,6 +25,8 @@ interface Project {
   lexicalRoot: string;
   /** The config root with symlinks resolved. */
   realRoot: string;
+  /** Real paths of the layer package directories, walked without skips. */
+  layerDirs: string[];
 }
 
 /**
@@ -40,7 +43,25 @@ async function openProject(configPath: string): Promise<Project> {
     engine: await Engine.create(await loadGrammars(), config),
     lexicalRoot,
     realRoot: realpath(lexicalRoot) ?? lexicalRoot,
+    layerDirs: layerDirs(configPath, config),
   };
+}
+
+/**
+ * Finds the directory of every layer prefix that is a package on disk, e.g.
+ * `<root>/shop/domain` for `shop.domain`. The file walk skips nothing inside
+ * them, so a virtualenv marker or a node_modules name can't hide layer code.
+ *
+ * @param configPath - absolute path of the pyproject.toml.
+ * @param config - its parsed config.
+ * @returns real paths of the existing layer package directories.
+ */
+export function layerDirs(configPath: string, config: InwardsConfig): string[] {
+  const root = resolve(dirname(configPath), config.root);
+  return config.layers
+    .flatMap((layer) => layer.modules)
+    .map((prefix) => realpath(join(root, ...prefix.split("."))))
+    .filter((dir) => dir !== undefined);
 }
 
 /**
@@ -58,7 +79,7 @@ function loadSources(project: Project, targets: string[] | undefined, base: stri
   const { lexicalRoot, realRoot } = project;
   const files: SourceFile[] = [];
   const seen = new Set<string>();
-  for (const abs of collectPythonFiles(targets ?? [lexicalRoot])) {
+  for (const abs of collectPythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
     const text = readFileSync(abs, "utf8");
     const real = realpath(abs) ?? abs;
     for (const { rel, shown } of moduleNames(abs, lexicalRoot, realRoot)) {

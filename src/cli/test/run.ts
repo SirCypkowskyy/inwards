@@ -17,6 +17,8 @@ const ENV: Record<string, string | undefined> = {
   ),
   NO_COLOR: "",
   FORCE_COLOR: "1",
+  // The user-level Claude settings of whoever runs the tests must not leak in.
+  CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), "inwards-claude-user-")),
 };
 
 /** What one run of the CLI produced. */

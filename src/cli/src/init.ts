@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { parseConfig, VERSION } from "@inwards/core";
+import { isOurHook } from "./claude-settings.ts";
 import { lineDiff } from "./diff.ts";
 import { print } from "./output.ts";
 import { findConfig } from "./paths.ts";
@@ -31,17 +32,17 @@ interface Exec {
 /**
  * Claude Code hook events Inwards handles, with the tool matcher each needs.
  * Only events the hook implements are installed, so init never swaps a
- * working setup for a no-op: the Stop gate (#20) and the config guard's
- * PreToolUse (#23) add their entries here, and re-running init installs them.
+ * working setup for a no-op: the config guard's PreToolUse (#23) adds its
+ * entry here, and re-running init installs it.
  */
 const CLAUDE_HOOKS: readonly [event: string, matcher: string | undefined][] = [
   ["SessionStart", undefined],
   ["PostToolUse", "Edit|Write|MultiEdit"],
+  ["Stop", undefined],
 ];
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
 const PRERELEASE = /-.*$/u;
-const INWARDS_BINARY = /^inwards/iu;
 const LINE_BREAK = /\r?\n/u;
 const SECTION_BEGIN = "<!-- inwards:begin -->";
 const SECTION_END = "<!-- inwards:end -->";
@@ -249,26 +250,6 @@ function withoutOurHook(group: unknown): unknown {
   }
   const others = group["hooks"].filter((entry) => !isOurHook(entry));
   return others.length === 0 ? undefined : { ...group, hooks: others };
-}
-
-/**
- * Recognises an entry init wrote: exec form, ending in `hook claude-code`, run
- * by a binary named inwards or by Bun with a main.ts. A user's own script that
- * happens to take the same arguments is left alone.
- *
- * @param entry - one hook entry.
- * @returns true for an Inwards entry.
- */
-function isOurHook(entry: unknown): boolean {
-  if (!(isRecord(entry) && typeof entry["command"] === "string" && Array.isArray(entry["args"]))) {
-    return false;
-  }
-  const args: unknown[] = entry["args"];
-  const tail = args.slice(-HOOK_ARGS.length);
-  const runsHook = tail.length === HOOK_ARGS.length && tail.every((a, i) => a === HOOK_ARGS[i]);
-  const binary = basename(entry["command"]).replace(EXE_SUFFIX, "");
-  const viaSource = binary === "bun" && typeof args[0] === "string" && args[0].endsWith("main.ts");
-  return runsHook && (INWARDS_BINARY.test(binary) || viaSource);
 }
 
 /**

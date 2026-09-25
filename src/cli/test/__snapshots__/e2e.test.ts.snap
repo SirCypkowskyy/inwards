@@ -64,8 +64,13 @@ exports[`hook claude-code < session-start 1`] = `
 
 exports[`hook claude-code < stop 1`] = `
 {
-  "code": 0,
-  "stderr": "",
+  "code": 2,
+  "stderr": 
+"inwards: The Inwards SessionStart and PostToolUse hooks are missing from every Claude Code settings file. Restore them (\`inwards init --agent claude\`) or ask the user.
+{"schema":"inwards/diagnostics@1","summary":{"filesChecked":1,"violations":1,"durationMs":0},"diagnostics":[{"code":"INW001","rule":"layer-dependency","severity":"error","file":"shop/domain/order.py","module":"shop.domain.order","line":1,"column":8,"endLine":1,"endColumn":30,"message":"Layer \\"domain\\" imports \\"shop.infrastructure.db\\" from outer layer \\"infrastructure\\". Allowed direction: domain <- infrastructure.","fix":{"summary":"Depend on an abstraction owned by \\"domain\\" instead of \\"shop.infrastructure.db\\".","steps":["Delete \`import shop.infrastructure.db\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.","Declare a typing.Protocol in \`shop.domain\` (for example \`shop.domain.ports\`) that describes only what this module needs from \`db\`.","Type this module against that Protocol and receive the implementation through a constructor or function parameter.","Make the class in \\"infrastructure\\" satisfy the Protocol, and wire it in the outermost layer (the composition root)."]},"docs":"https://sircypkowskyy.github.io/inwards/03-Architecture-C4/#rule-catalogue"}]}
+
+"
+,
   "stdout": "",
 }
 `;
