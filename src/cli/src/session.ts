@@ -172,6 +172,17 @@ export function recordPass(project: string, id: string): void {
 }
 
 /**
+ * Reads only a session's start record, which is cheaper than the whole log.
+ *
+ * @param project - the real project root.
+ * @param id - a session id that passed `isSessionId`.
+ * @returns the start record, or undefined when missing or unreadable.
+ */
+export function readSessionStart(project: string, id: string): SessionStart | undefined {
+  return readStart(join(statePath(project), `${id}.start.json`));
+}
+
+/**
  * Reads a session's state.
  * Returns undefined when the start file is missing or unreadable, so callers
  * can fail closed: a session whose history is gone can't prove it is clean.

@@ -7,8 +7,9 @@
  *
  * Claude Code reloads hooks when a settings file changes, so an agent that
  * deletes the Stop hook switches the gate off at once; this check can't see
- * that. It catches the hooks the gate depends on (SessionStart, PostToolUse)
- * going missing, and the config guard (#23) is what stops the edit itself.
+ * that. It catches the hooks the gate depends on (SessionStart, PreToolUse,
+ * PostToolUse) going missing, and the config guard (`guard.ts`) is what stops
+ * the edit itself.
  * It matches names, not programs: an entry that runs some other `inwards`
  * binary or `main.ts` passes, so it proves the configuration, not what runs.
  */
@@ -28,9 +29,12 @@ const INWARDS_BINARY = /^inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-mu
 const SHELL_FORM =
   /^\s*(?:"(?:[^"]*[\\/])?inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?(?:\.exe)?"|(?:[^\s"'#;&|$`]*[\\/])?inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?(?:\.exe)?)\s+hook\s+claude-code\s*$/iu;
 /** Events whose Inwards hook must stay installed for the gate to trust the session. */
-const REQUIRED_EVENTS = ["SessionStart", "PostToolUse"];
-/** Tools whose writes the PostToolUse hook must see. */
-const EDIT_TOOLS = ["Edit", "Write", "MultiEdit"];
+const REQUIRED_EVENTS = ["SessionStart", "PreToolUse", "PostToolUse"];
+/** Tools each tool event's matcher must still cover. */
+const REQUIRED_TOOLS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["PreToolUse", ["Edit", "Write", "MultiEdit", "Bash"]],
+  ["PostToolUse", ["Edit", "Write", "MultiEdit"]],
+]);
 /** A matcher of only these characters is a list of exact tool names, not a regex. */
 const EXACT_MATCHER = /^[\w\s,|-]*$/u;
 const MATCHER_LIST = /\s*[|,]\s*/u;
@@ -82,7 +86,8 @@ export function settingsProblem(project: string): string | undefined {
     return undefined;
   }
   const hooks = missing.length === 1 ? "hook is" : "hooks are";
-  return `The Inwards ${missing.join(" and ")} ${hooks} missing from every Claude Code settings file.`;
+  const names = new Intl.ListFormat("en", { type: "conjunction" }).format(missing);
+  return `The Inwards ${names} ${hooks} missing from every Claude Code settings file.`;
 }
 
 /**
@@ -91,7 +96,7 @@ export function settingsProblem(project: string): string | undefined {
  * @param settings - a parsed settings file, or undefined when absent.
  * @param event - a hook event name.
  * @returns true when an entry for that event is an Inwards hook, in exec or
- *   shell form, in a group whose matcher still covers the edit tools.
+ *   shell form, in a group whose matcher still covers the tools it must see.
  */
 function hasInwardsHook(settings: Record<string, unknown> | undefined, event: string): boolean {
   const hooks = settings?.["hooks"];
@@ -101,17 +106,52 @@ function hasInwardsHook(settings: Record<string, unknown> | undefined, event: st
   }
   return groups.some((group: unknown) => {
     const entries = isRecord(group) && Array.isArray(group["hooks"]) ? group["hooks"] : [];
-    if (event === "PostToolUse" && !EDIT_TOOLS.every((tool) => matches(group, tool))) {
+    if (!(REQUIRED_TOOLS.get(event) ?? []).every((tool) => matches(group, tool))) {
       return false;
     }
-    return entries.some(
-      (entry: unknown) =>
-        isOurHook(entry) ||
-        (isRecord(entry) &&
-          typeof entry["command"] === "string" &&
-          SHELL_FORM.test(entry["command"])),
-    );
+    return entries.some(runsInwards);
   });
+}
+
+/**
+ * Tells whether a hook entry runs Inwards, in exec form (as `init` writes it)
+ * or in the documented shell form.
+ *
+ * @param entry - one hook entry.
+ * @returns true for an Inwards hook.
+ */
+function runsInwards(entry: unknown): boolean {
+  return (
+    isOurHook(entry) ||
+    (isRecord(entry) && typeof entry["command"] === "string" && SHELL_FORM.test(entry["command"]))
+  );
+}
+
+/**
+ * Tells whether settings text holds any Inwards hook, for any event.
+ *
+ * @param text - a settings file's text.
+ * @returns true when some hook entry runs Inwards; false for other or unparseable text.
+ */
+export function holdsInwardsHooks(text: string): boolean {
+  let settings: unknown;
+  try {
+    settings = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  const hooks = isRecord(settings) ? settings["hooks"] : undefined;
+  return (
+    isRecord(hooks) &&
+    Object.values(hooks).some(
+      (groups) =>
+        Array.isArray(groups) &&
+        groups.some(
+          (group: unknown) =>
+            isRecord(group) && Array.isArray(group["hooks"]) && group["hooks"].some(runsInwards),
+        ),
+    )
+  );
 }
 
 /**

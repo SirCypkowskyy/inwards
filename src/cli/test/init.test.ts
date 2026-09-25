@@ -56,7 +56,15 @@ describe("inwards init --agent claude", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
     expect(init(root, "--agent", "claude").code).toBe(0);
     const settings: Settings = JSON.parse(read(root, SETTINGS));
-    expect(Object.keys(settings.hooks).sort()).toEqual(["PostToolUse", "SessionStart", "Stop"]);
+    expect(Object.keys(settings.hooks).sort()).toEqual([
+      "PostToolUse",
+      "PreToolUse",
+      "SessionStart",
+      "Stop",
+    ]);
+    expect(settings.permissions).toEqual({
+      deny: ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"],
+    });
     const entry = ourEntry(root);
     expect(entry.args?.slice(-2)).toEqual(["hook", "claude-code"]);
     expect(read(root, ".gitignore")).toContain(".inwards/");
@@ -80,7 +88,10 @@ describe("inwards init --agent claude", () => {
     });
     init(root, "--agent", "claude");
     const settings: Settings = JSON.parse(read(root, SETTINGS));
-    expect(settings.permissions).toEqual({ allow: ["Bash(ls)"] });
+    expect(settings.permissions).toEqual({
+      allow: ["Bash(ls)"],
+      deny: ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"],
+    });
     expect(settings.hooks["PostToolUse"]?.[0]).toEqual({ matcher: "Edit", hooks: [own] });
     expect(settings.hooks["PostToolUse"]).toHaveLength(2);
   });

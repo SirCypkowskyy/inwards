@@ -64,6 +64,24 @@ export function declaresInwards(pyprojectText: string): boolean {
 }
 
 /**
+ * Reads the raw `[tool.inwards]` table, unvalidated, so two versions of a file
+ * can be compared: the config guard denies an edit that changes it.
+ *
+ * @param pyprojectText - the full text of a `pyproject.toml` file.
+ * @returns the table as parsed, undefined when absent, null when the TOML is invalid.
+ */
+export function inwardsTable(pyprojectText: string): unknown {
+  let doc: unknown;
+  try {
+    doc = parse(pyprojectText);
+  } catch {
+    return null;
+  }
+  const tool = isRecord(doc) ? doc["tool"] : undefined;
+  return isRecord(tool) ? tool["inwards"] : undefined;
+}
+
+/**
  * Reads `[tool.inwards]` from the text of a `pyproject.toml`.
  * Validates every field the engine relies on and throws a ConfigError that
  * names the bad key, so adapters can show the message as is.
