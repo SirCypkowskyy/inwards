@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -12,7 +12,8 @@ export function inwards(args: string[], opts: { cwd: string; stdin?: string }) {
   const p = Bun.spawnSync([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: opts.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
-    env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "" },
+    // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
+    env: { ...process.env, NO_COLOR: "", FORCE_COLOR: "1" },
   });
   return { code: p.exitCode, stdout: p.stdout.toString(), stderr: p.stderr.toString() };
 }
@@ -32,4 +33,12 @@ export function project(files: Record<string, string>): string {
     writeFileSync(join(root, rel), text);
   }
   return root;
+}
+
+/** A recorded Claude Code payload with `{{ROOT}}/a/b` turned into a native path under `root`. */
+export function payload(name: string, root: string, patch: Record<string, unknown> = {}): string {
+  const text = readFileSync(join(import.meta.dir, "fixtures/claude-code", `${name}.json`), "utf8");
+  const rooted = (_: string, v: unknown) =>
+    typeof v === "string" && v.startsWith("{{ROOT}}") ? join(root, v.slice(8)) : v;
+  return JSON.stringify({ ...JSON.parse(text, rooted), ...patch });
 }

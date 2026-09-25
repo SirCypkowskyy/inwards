@@ -50,7 +50,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
             "hooks": [
               {
                 "type": "command",
-                "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.py) inwards check \"$f\" --format json >&2 || exit 2;; esac"
+                "command": "inwards hook claude-code"
               }
             ]
           }
@@ -66,14 +66,20 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     }
     ```
 
-    Here is the same logic as a script, fed the JSON that Claude Code sends after an `Edit`:
+    `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote:
+
+    - **Violation:** compact JSON diagnostics on stderr, exit code 2.
+    - **Clean file, non-Python file, or any other hook event:** exit 0, no output.
+    - **Missing or broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it.
+    - **Unreadable payload:** exit 1. Claude Code shows that to the user, not the model.
+    - **File outside the project:** skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.
 
     <figure markdown="span">
       ![Claude Code hook returning exit code 2 with INW001](assets/screens/claude-code-hook.svg){ loading=lazy }
       <figcaption>Exit code 2 tells Claude Code to show the hook's stderr to the model. <code>seen-by-claude.json</code> is exactly what Claude reads.</figcaption>
     </figure>
 
-    The one-liner works today, but it needs `jq` and a POSIX shell, so it won't run on Windows as written. The planned `inwards hook claude-code` command will replace it. It reads the hook JSON from stdin itself, skips non-Python files, writes the run log described in [chapter 2](02-Business-Context.md#the-hypothesis), and handles escalation (below).
+    The `Stop` entry above is still a plain `inwards check`, and it needs a POSIX shell. A session-scoped stop gate that only blocks on violations the session introduced, together with the run log and escalation described below, is planned for v0.1.
 
 === ":material-console: Aider"
 

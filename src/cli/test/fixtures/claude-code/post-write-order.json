@@ -1,0 +1,23 @@
+{
+  "session_id": "7a425a88-4adc-4ad6-a778-fc6f1ceb87ac",
+  "transcript_path": "{{ROOT}}/.transcript.jsonl",
+  "cwd": "{{ROOT}}",
+  "prompt_id": "6dbd31b5-4e90-40eb-a81c-65f7ad2a5a54",
+  "permission_mode": "acceptEdits",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "{{ROOT}}/shop/domain/order.py",
+    "content": "import shop.infrastructure.db\n"
+  },
+  "tool_response": {
+    "type": "create",
+    "filePath": "{{ROOT}}/shop/domain/order.py",
+    "content": "import shop.infrastructure.db\n",
+    "structuredPatch": [],
+    "originalFile": null,
+    "userModified": false
+  },
+  "tool_use_id": "toolu_01NPcZEYmiQZYsCWmrqV64ye",
+  "duration_ms": 10
+}

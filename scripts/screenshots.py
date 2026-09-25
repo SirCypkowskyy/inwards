@@ -13,7 +13,6 @@ import re
 import shutil
 import subprocess
 import sys
-import sysconfig
 import tempfile
 from pathlib import Path
 
@@ -35,12 +34,16 @@ layers = [
 ]
 """
 
-HOOK = """#!/bin/sh
-# .claude/settings.json -> hooks.PostToolUse, matcher "Edit|Write"
-f=$(jq -r '.tool_input.file_path // empty')
-case "$f" in
-  *.py) inwards check "$f" --format json >&2 || exit 2 ;;
-esac
+SETTINGS = """{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
+      }
+    ]
+  }
+}
 """
 
 BAD_IMPORT = "from shop.infrastructure.sql_orders import SqlOrderRepository\n"
@@ -85,9 +88,8 @@ def main() -> None:
         (bindir / "inwards").symlink_to(BINARY)
         shutil.copytree(REPO / "examples" / "clean-app", work / "clean-app")
         (work / "pyproject.toml").write_text(CONFIG)
-        hooks = work / ".claude" / "hooks"
-        hooks.mkdir(parents=True)
-        (hooks / "inwards.sh").write_text(HOOK)
+        (work / ".claude").mkdir()
+        (work / ".claude" / "settings.json").write_text(SETTINGS)
 
         bun = Path.home() / ".bun" / "bin"
         env = {**os.environ, "PATH": f"{bindir}:{bun}:{os.environ['PATH']}", "FORCE_COLOR": "1"}
@@ -118,15 +120,15 @@ def main() -> None:
             work,
             env,
         )
-        hook_input = """'{"tool_name":"Edit","tool_input":{"file_path":"clean-app/shop/domain/order.py"}}'"""
+        hook_input = """'{"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"clean-app/shop/domain/order.py"}}'"""
         shoot(
             "claude-code-hook",
             "Claude Code PostToolUse hook",
             [
-                ("cat .claude/hooks/inwards.sh", "cat .claude/hooks/inwards.sh"),
+                ("cat .claude/settings.json", "cat .claude/settings.json"),
                 (
-                    f"echo {hook_input} | sh .claude/hooks/inwards.sh 2> seen-by-claude.json; echo \"hook exit: $?\"",
-                    f"echo {hook_input} | sh .claude/hooks/inwards.sh 2> seen-by-claude.json; echo \"hook exit: $?\"",
+                    f"echo {hook_input} | inwards hook claude-code 2> seen-by-claude.json; echo \"hook exit: $?\"",
+                    f"echo {hook_input} | inwards hook claude-code 2> seen-by-claude.json; echo \"hook exit: $?\"",
                 ),
                 (
                     "jq '.diagnostics[0] | {code, line, fix: .fix.summary}' seen-by-claude.json",
@@ -151,7 +153,8 @@ def main() -> None:
             env,
         )
 
-    stdlib = sysconfig.get_paths()["stdlib"]  # /usr/lib64/python3.14 on the machine that made the docs
+    # Not sysconfig: under `uv run` that is uv's trimmed Python, not the system stdlib the docs quote.
+    stdlib = "/usr/lib64/python3.14"
     shoot(
         "prescan-diff",
         "prescan differential test",

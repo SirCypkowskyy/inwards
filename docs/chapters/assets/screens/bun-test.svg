@@ -15,72 +15,72 @@
         font-weight: 700;
     }
 
-    .terminal-360762501-matrix {
+    .terminal-3045772587-matrix {
         font-family: Fira Code, monospace;
         font-size: 20px;
         line-height: 24.4px;
         font-variant-east-asian: full-width;
     }
 
-    .terminal-360762501-title {
+    .terminal-3045772587-title {
         font-size: 18px;
         font-weight: bold;
         font-family: arial;
     }
 
-    .terminal-360762501-r1 { fill: #98a84b;font-weight: bold }
-.terminal-360762501-r2 { fill: #c5c8c6;font-weight: bold }
-.terminal-360762501-r3 { fill: #c5c8c6 }
-.terminal-360762501-r4 { fill: #868887 }
-.terminal-360762501-r5 { fill: #98a84b }
-.terminal-360762501-r6 { fill: #868887;font-weight: bold }
+    .terminal-3045772587-r1 { fill: #98a84b;font-weight: bold }
+.terminal-3045772587-r2 { fill: #c5c8c6;font-weight: bold }
+.terminal-3045772587-r3 { fill: #c5c8c6 }
+.terminal-3045772587-r4 { fill: #868887 }
+.terminal-3045772587-r5 { fill: #98a84b }
+.terminal-3045772587-r6 { fill: #868887;font-weight: bold }
     </style>
 
     <defs>
-    <clipPath id="terminal-360762501-clip-terminal">
+    <clipPath id="terminal-3045772587-clip-terminal">
       <rect x="0" y="0" width="1438.6" height="194.2" />
     </clipPath>
-    <clipPath id="terminal-360762501-line-0">
+    <clipPath id="terminal-3045772587-line-0">
     <rect x="0" y="1.5" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-360762501-line-1">
+<clipPath id="terminal-3045772587-line-1">
     <rect x="0" y="25.9" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-360762501-line-2">
+<clipPath id="terminal-3045772587-line-2">
     <rect x="0" y="50.3" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-360762501-line-3">
+<clipPath id="terminal-3045772587-line-3">
     <rect x="0" y="74.7" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-360762501-line-4">
+<clipPath id="terminal-3045772587-line-4">
     <rect x="0" y="99.1" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-360762501-line-5">
+<clipPath id="terminal-3045772587-line-5">
     <rect x="0" y="123.5" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-360762501-line-6">
+<clipPath id="terminal-3045772587-line-6">
     <rect x="0" y="147.9" width="1439.6" height="24.65"/>
             </clipPath>
     </defs>
 
-    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1456" height="243.2" rx="8"/><text class="terminal-360762501-title" fill="#c5c8c6" text-anchor="middle" x="728" y="27">bun&#160;test</text>
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1456" height="243.2" rx="8"/><text class="terminal-3045772587-title" fill="#c5c8c6" text-anchor="middle" x="728" y="27">bun&#160;test</text>
             <g transform="translate(26,22)">
             <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
             <circle cx="22" cy="0" r="7" fill="#febc2e"/>
             <circle cx="44" cy="0" r="7" fill="#28c840"/>
             </g>
         
-    <g transform="translate(9, 41)" clip-path="url(#terminal-360762501-clip-terminal)">
+    <g transform="translate(9, 41)" clip-path="url(#terminal-3045772587-clip-terminal)">
     
-    <g class="terminal-360762501-matrix">
-    <text class="terminal-360762501-r1" x="0" y="20" textLength="24.4" clip-path="url(#terminal-360762501-line-0)">$&#160;</text><text class="terminal-360762501-r2" x="24.4" y="20" textLength="280.6" clip-path="url(#terminal-360762501-line-0)">bun&#160;test&#160;2&gt;&amp;1&#160;|&#160;tail&#160;-6</text><text class="terminal-360762501-r3" x="1439.6" y="20" textLength="12.2" clip-path="url(#terminal-360762501-line-0)">
-</text><text class="terminal-360762501-r2" x="0" y="44.4" textLength="109.8" clip-path="url(#terminal-360762501-line-1)">bun&#160;test&#160;</text><text class="terminal-360762501-r4" x="109.8" y="44.4" textLength="219.6" clip-path="url(#terminal-360762501-line-1)">v1.4.2&#160;(744846f84)</text><text class="terminal-360762501-r3" x="1439.6" y="44.4" textLength="12.2" clip-path="url(#terminal-360762501-line-1)">
-</text><text class="terminal-360762501-r3" x="1439.6" y="68.8" textLength="12.2" clip-path="url(#terminal-360762501-line-2)">
-</text><text class="terminal-360762501-r5" x="0" y="93.2" textLength="97.6" clip-path="url(#terminal-360762501-line-3)">&#160;15&#160;pass</text><text class="terminal-360762501-r3" x="1439.6" y="93.2" textLength="12.2" clip-path="url(#terminal-360762501-line-3)">
-</text><text class="terminal-360762501-r4" x="0" y="117.6" textLength="85.4" clip-path="url(#terminal-360762501-line-4)">&#160;0&#160;fail</text><text class="terminal-360762501-r3" x="1439.6" y="117.6" textLength="12.2" clip-path="url(#terminal-360762501-line-4)">
-</text><text class="terminal-360762501-r3" x="0" y="142" textLength="219.6" clip-path="url(#terminal-360762501-line-5)">&#160;23&#160;expect()&#160;calls</text><text class="terminal-360762501-r3" x="1439.6" y="142" textLength="12.2" clip-path="url(#terminal-360762501-line-5)">
-</text><text class="terminal-360762501-r3" x="0" y="166.4" textLength="341.6" clip-path="url(#terminal-360762501-line-6)">Ran&#160;15&#160;tests&#160;across&#160;1&#160;file.&#160;</text><text class="terminal-360762501-r4" x="341.6" y="166.4" textLength="12.2" clip-path="url(#terminal-360762501-line-6)">[</text><text class="terminal-360762501-r6" x="353.8" y="166.4" textLength="85.4" clip-path="url(#terminal-360762501-line-6)">36.00ms</text><text class="terminal-360762501-r4" x="439.2" y="166.4" textLength="12.2" clip-path="url(#terminal-360762501-line-6)">]</text><text class="terminal-360762501-r3" x="1439.6" y="166.4" textLength="12.2" clip-path="url(#terminal-360762501-line-6)">
-</text><text class="terminal-360762501-r3" x="1439.6" y="190.8" textLength="12.2" clip-path="url(#terminal-360762501-line-7)">
+    <g class="terminal-3045772587-matrix">
+    <text class="terminal-3045772587-r1" x="0" y="20" textLength="24.4" clip-path="url(#terminal-3045772587-line-0)">$&#160;</text><text class="terminal-3045772587-r2" x="24.4" y="20" textLength="280.6" clip-path="url(#terminal-3045772587-line-0)">bun&#160;test&#160;2&gt;&amp;1&#160;|&#160;tail&#160;-6</text><text class="terminal-3045772587-r3" x="1439.6" y="20" textLength="12.2" clip-path="url(#terminal-3045772587-line-0)">
+</text><text class="terminal-3045772587-r2" x="0" y="44.4" textLength="109.8" clip-path="url(#terminal-3045772587-line-1)">bun&#160;test&#160;</text><text class="terminal-3045772587-r4" x="109.8" y="44.4" textLength="219.6" clip-path="url(#terminal-3045772587-line-1)">v1.4.2&#160;(744846f84)</text><text class="terminal-3045772587-r3" x="1439.6" y="44.4" textLength="12.2" clip-path="url(#terminal-3045772587-line-1)">
+</text><text class="terminal-3045772587-r3" x="1439.6" y="68.8" textLength="12.2" clip-path="url(#terminal-3045772587-line-2)">
+</text><text class="terminal-3045772587-r5" x="0" y="93.2" textLength="97.6" clip-path="url(#terminal-3045772587-line-3)">&#160;32&#160;pass</text><text class="terminal-3045772587-r3" x="1439.6" y="93.2" textLength="12.2" clip-path="url(#terminal-3045772587-line-3)">
+</text><text class="terminal-3045772587-r4" x="0" y="117.6" textLength="85.4" clip-path="url(#terminal-3045772587-line-4)">&#160;0&#160;fail</text><text class="terminal-3045772587-r3" x="1439.6" y="117.6" textLength="12.2" clip-path="url(#terminal-3045772587-line-4)">
+</text><text class="terminal-3045772587-r3" x="0" y="142" textLength="219.6" clip-path="url(#terminal-3045772587-line-5)">&#160;51&#160;expect()&#160;calls</text><text class="terminal-3045772587-r3" x="1439.6" y="142" textLength="12.2" clip-path="url(#terminal-3045772587-line-5)">
+</text><text class="terminal-3045772587-r3" x="0" y="166.4" textLength="353.8" clip-path="url(#terminal-3045772587-line-6)">Ran&#160;32&#160;tests&#160;across&#160;4&#160;files.&#160;</text><text class="terminal-3045772587-r4" x="353.8" y="166.4" textLength="12.2" clip-path="url(#terminal-3045772587-line-6)">[</text><text class="terminal-3045772587-r6" x="366" y="166.4" textLength="97.6" clip-path="url(#terminal-3045772587-line-6)">442.00ms</text><text class="terminal-3045772587-r4" x="463.6" y="166.4" textLength="12.2" clip-path="url(#terminal-3045772587-line-6)">]</text><text class="terminal-3045772587-r3" x="1439.6" y="166.4" textLength="12.2" clip-path="url(#terminal-3045772587-line-6)">
+</text><text class="terminal-3045772587-r3" x="1439.6" y="190.8" textLength="12.2" clip-path="url(#terminal-3045772587-line-7)">
 </text>
     </g>
     </g>
