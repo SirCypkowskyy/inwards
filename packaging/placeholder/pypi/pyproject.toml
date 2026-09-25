@@ -1,0 +1,13 @@
+[project]
+name = "inwards"
+version = "0.0.0"
+description = "Name reservation for Inwards, an architecture linter for Python. Get the binary from GitHub Releases."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+urls = { Homepage = "https://github.com/SirCypkowskyy/inwards" }
+scripts = { inwards = "inwards:main" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

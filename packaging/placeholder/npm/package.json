@@ -1,0 +1,17 @@
+{
+  "name": "inwards",
+  "version": "0.0.0",
+  "description": "Name reservation for Inwards, an architecture linter for Python. Get the binary from GitHub Releases.",
+  "bin": {
+    "inwards": "bin.js"
+  },
+  "files": [
+    "bin.js",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SirCypkowskyy/inwards.git"
+  },
+  "license": "MIT"
+}
