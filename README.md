@@ -9,7 +9,7 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha (0.1.0). Four rules (INW001 layer direction, INW011 literal dynamic imports,
+Status: pre-alpha (0.1.0<!-- x-release-please-version -->). Four rules (INW001 layer direction, INW011 literal dynamic imports,
 INW006 code outside every layer, INW000 encodings that could hide imports) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
 a config guard and escalation to the user.
@@ -42,4 +42,4 @@ binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform
 (`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its native
 runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
 `SHA256SUMS`. Publish the draft by hand. A release candidate is a hand-pushed tag with a
-suffix (`v0.2.0-rc.1`). Build provenance attestations switch on once the repo is public.
+suffix (`v0.2.0-rc.1`) on the release PR's branch, which already holds the new version. Build provenance attestations switch on once the repo is public.

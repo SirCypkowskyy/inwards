@@ -170,6 +170,12 @@ body. Commits inside a branch can say anything.
   push tags. release-please keeps the release PR (ADR-016); the owner merges
   it and publishes the draft release. `scripts/check-version.sh` fails CI when
   version fields disagree.
+- The PR description is the commit body, and release-please reads it too.
+  Don't start a paragraph with `fix:`, `feat:` or another type, because each
+  one becomes an extra changelog entry. `Release-As: 0.N.0` only counts in the
+  description's **last paragraph**.
+- A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
+  `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with
   a `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block.
 

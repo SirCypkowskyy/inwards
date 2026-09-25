@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, declaresInwards, parseConfig } from "../src/index.ts";
+import { ConfigError, declaresInwards, parseConfig, VERSION } from "../src/index.ts";
 
-const NEWER = /requires Inwards 0\.2\.0 or newer; this is 0\.1\.0/u;
+/** This release without a pre-release suffix, and a version always newer (built so a release PR's bump can't break the tests). */
+const CURRENT = VERSION.replace(/-.*$/u, "");
+const LATER = `${Number(CURRENT.split(".")[0]) + 1}.0.0`;
+const NEWER = new RegExp(
+  `requires Inwards ${LATER} or newer; this is ${VERSION}`.replaceAll(".", "\\."),
+  "u",
+);
 const MALFORMED = /must look like/u;
 
 describe("config", () => {
@@ -35,13 +41,13 @@ function withVersion(v: string): string {
 
 describe("required-version", () => {
   test("an equal or older requirement passes", () => {
-    expect(parseConfig(withVersion("0.1.0")).requiredVersion).toBe("0.1.0");
+    expect(parseConfig(withVersion(CURRENT)).requiredVersion).toBe(CURRENT);
     expect(parseConfig(withVersion("0.0.0")).requiredVersion).toBe("0.0.0");
   });
 
   test("a newer requirement is a config error naming both versions", () => {
-    expect(() => parseConfig(withVersion("0.2.0"))).toThrow(NEWER);
-    expect(() => parseConfig(withVersion("1.0.0"))).toThrow(ConfigError);
+    expect(() => parseConfig(withVersion(LATER))).toThrow(NEWER);
+    expect(() => parseConfig(withVersion(`${LATER.split(".")[0]}.1.0`))).toThrow(ConfigError);
   });
 
   test("a malformed requirement is a config error", () => {

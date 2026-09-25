@@ -19,5 +19,6 @@ check src/core/src/meta.ts "$(sed -nE 's/^export const VERSION = "([^"]*)";$/\1/
 for f in src/core/package.json src/cli/package.json src/vscode-extension/package.json; do
   check "$f" "$(jq -r .version "$f")"
 done
-check pyproject.toml "$(sed -nE '/^\[project\]/,/^\[/{s/^version = "([^"]*)".*/\1/p}' pyproject.toml)"
+check pyproject.toml "$(sed -nE '/^\[project\]/,/^\[/{s/^version = "([^"]*)".*/\1/p;}' pyproject.toml)"
+check uv.lock "$(awk '/^\[\[package\]\]/{n=""} /^name = /{n=$3} n=="\"inwards\"" && /^version = /{gsub(/"/,"",$3); print $3; exit}' uv.lock)"
 exit "$bad"
