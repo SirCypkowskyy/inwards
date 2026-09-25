@@ -1,6 +1,7 @@
 import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "./config.ts";
-import { checkLayers } from "./layers.ts";
+import { checkEncoding } from "./encoding.ts";
+import { checkLayers, layerIndexOf } from "./layers.ts";
 import { skeletonImports } from "./prescan.ts";
 import {
   createPythonParser,
@@ -47,13 +48,21 @@ export class Engine {
    * parse runs only to confirm one (or when the prescan declines the file).
    *
    * The text is normalised first (BOM dropped, lone \r turned into \n), so
-   * reported lines and columns match what an editor shows.
+   * reported lines and columns match what an editor shows. A file in a layer
+   * that declares an encoding Inwards can't read faithfully gets one INW000
+   * diagnostic instead of a check (see `encoding.ts`).
    *
    * @param file - the source file as read by the adapter.
    * @returns the violations found, empty when the file is clean.
    */
   checkFile(file: SourceFile): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
+    if (layerIndexOf(src.module, this.config.layers) !== -1) {
+      const unreadable = checkEncoding(src);
+      if (unreadable) {
+        return [unreadable];
+      }
+    }
     const fast = skeletonImports(this.parser, src);
     if (fast) {
       const found = checkLayers(src, fast, this.config.layers);

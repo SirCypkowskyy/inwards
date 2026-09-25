@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import {
   ConfigError,
+  declaresInwards,
   Engine,
   type Format,
   moduleNameFor,
@@ -129,22 +130,41 @@ async function runCheck(
   const started = performance.now();
   const config = parseConfig(readFileSync(configPath, "utf8"));
   const lexicalRoot = resolve(dirname(configPath), config.root);
-  // Module names come from real paths on both sides, so a symlinked root or
-  // file can neither hide a module nor rename it.
-  const root = realpath(lexicalRoot) ?? lexicalRoot;
+  const realRoot = realpath(lexicalRoot) ?? lexicalRoot;
   const engine = await Engine.create(await loadGrammars(), config);
-  const files = collectPythonFiles(targets ?? [lexicalRoot])
-    .map((abs) => ({ abs, real: realpath(abs) ?? abs }))
-    .filter(({ real }) => isInside(root, real))
-    .map(
-      ({ abs, real }): SourceFile => ({
+  const files: SourceFile[] = [];
+  for (const abs of collectPythonFiles(targets ?? [lexicalRoot])) {
+    const module = moduleRelPath(abs, lexicalRoot, realRoot);
+    if (module !== undefined) {
+      files.push({
         path: posix(relative(base, abs)),
         text: readFileSync(abs, "utf8"),
-        ...moduleNameFor(relative(root, real)),
-      }),
-    );
+        ...moduleNameFor(module),
+      });
+    }
+  }
   const diagnostics = engine.checkFiles(files);
   return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
+}
+
+/**
+ * Works out the path a module name is built from, the way Python finds it.
+ * Python names a module after the path it was imported through, so a
+ * symlinked `shop/domain/order.py` is `shop.domain.order` wherever its target
+ * lives. When the path isn't under the root as written (a hook payload may
+ * name the real location of a symlinked root), the real path decides.
+ *
+ * @param abs - the file as found.
+ * @param lexicalRoot - the config root as written.
+ * @param realRoot - the config root with symlinks resolved.
+ * @returns the path relative to the root, or undefined when the file is outside it.
+ */
+function moduleRelPath(abs: string, lexicalRoot: string, realRoot: string): string | undefined {
+  if (isInside(lexicalRoot, abs)) {
+    return relative(lexicalRoot, abs);
+  }
+  const real = realpath(abs);
+  return real !== undefined && isInside(realRoot, real) ? relative(realRoot, real) : undefined;
 }
 
 const PYTHON_FILE = /\.pyi?$/u;
@@ -182,9 +202,10 @@ async function hookClaudeCode(): Promise<number> {
     return 0;
   }
 
-  // The nearest config above the file, so each package in a monorepo uses its own.
-  // No config at all means this project doesn't use Inwards (the hook may be user-wide).
-  const configPath = findConfig(dirname(target.file));
+  // The nearest config above the file, so each package in a monorepo uses its own,
+  // and only one that really lives inside the project. No config at all means this
+  // project doesn't use Inwards (the hook may be user-wide).
+  const configPath = findConfig(dirname(target.file), target.project);
   if (!configPath) {
     return 0;
   }
@@ -221,28 +242,31 @@ function readHookPayload(): Record<string, unknown> | null {
 
 /**
  * Resolves the file named in a hook payload and checks it may be linted.
- * The payload is agent-controlled, so both the file and the project boundary
- * go through realpath: `..` and symlinks cannot reach outside the project.
- * The boundary is CLAUDE_PROJECT_DIR when set, else the payload's cwd.
+ * The payload is agent-controlled, so containment is decided on real paths:
+ * `..` and symlinks cannot reach outside the project. The boundary is
+ * CLAUDE_PROJECT_DIR, else the process cwd (Claude Code runs hooks in the
+ * project), never the payload's own `cwd`.
  *
  * @param payloadCwd - the payload's `cwd` field; the process cwd if not a string.
  * @param file - the payload's `tool_input.file_path`, absolute or relative to cwd.
- * @returns the real file path and cwd, or undefined when the file is outside
- *   the project, missing, or not a regular file.
+ * @returns the file as written (Python names modules after that path), the
+ *   real cwd and the real project root; undefined when the file is outside the
+ *   project, missing, or not a regular file.
  */
-function hookTarget(payloadCwd: unknown, file: string): { file: string; cwd: string } | undefined {
-  // The payload is agent-controlled. Compare real paths, so `..` and symlinks
-  // can't reach a file outside the project, and check regular files only.
-  const cwd = realpath(typeof payloadCwd === "string" ? payloadCwd : process.cwd());
-  if (!cwd) {
+function hookTarget(
+  payloadCwd: unknown,
+  file: string,
+): { file: string; cwd: string; project: string } | undefined {
+  const lexicalCwd = typeof payloadCwd === "string" ? payloadCwd : process.cwd();
+  const cwd = realpath(lexicalCwd);
+  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
+  if (!(cwd && project)) {
     return undefined;
   }
-  // The boundary comes from the host (Claude Code sets CLAUDE_PROJECT_DIR and
-  // runs hooks in the project), never from the payload's own `cwd`.
-  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
-  const abs = realpath(resolve(cwd, file));
-  if (abs && project && isInside(project, abs) && statSync(abs).isFile()) {
-    return { file: abs, cwd };
+  const lexical = resolve(lexicalCwd, file);
+  const real = realpath(lexical);
+  if (real && isInside(project, real) && statSync(real).isFile()) {
+    return { file: lexical, cwd, project };
   }
   return undefined;
 }
@@ -286,17 +310,23 @@ function isInside(dir: string, file: string): boolean {
 }
 
 /**
- * Finds the nearest pyproject.toml with a `[tool.inwards]` table.
- * Walks up from `dir` to the file system root. The table test is a substring
- * match on `[tool.inwards`, so `[tool.inwards.x]` counts too.
+ * Finds the nearest pyproject.toml that configures Inwards.
+ * Walks up from `dir` to the file system root. Whether a file configures
+ * Inwards is decided on the parsed TOML (`declaresInwards`), so any valid
+ * spelling of the table counts. With `within`, a candidate whose real path is
+ * outside that directory is ignored, so a hook never reads a config (or its
+ * text, via an error message) from outside the project.
  *
  * @param dir - the directory to start from.
+ * @param within - optional real directory every accepted config must be inside.
  * @returns the config path, or undefined when no ancestor has one.
  */
-function findConfig(dir: string): string | undefined {
+function findConfig(dir: string, within?: string): string | undefined {
   for (let d = dir; ; d = dirname(d)) {
     const candidate = resolve(d, "pyproject.toml");
-    if (existsSync(candidate) && readFileSync(candidate, "utf8").includes("[tool.inwards")) {
+    const real = realpath(candidate);
+    const allowed = real !== undefined && (within === undefined || isInside(within, real));
+    if (allowed && declaresInwards(readFileSync(real, "utf8"))) {
       return candidate;
     }
     if (dirname(d) === d) {

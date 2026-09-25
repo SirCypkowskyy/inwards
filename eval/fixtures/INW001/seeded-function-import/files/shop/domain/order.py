@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from shop.domain.ports import OrderRepository
-from shop.infrastructure.sql_orders import SqlOrderRepository
 
 
 @dataclass
@@ -15,4 +14,6 @@ def place(order: Order, repo: OrderRepository) -> None:
 
 
 def place_default(order: Order) -> None:
+    from shop.infrastructure.sql_orders import SqlOrderRepository
+
     place(order, SqlOrderRepository())

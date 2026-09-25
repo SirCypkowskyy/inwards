@@ -135,4 +135,38 @@ describe("inwards hook claude-code", () => {
     const { code } = hook(root, at(root, join(root, "src/shop/domain/order.py")));
     expect(code).toBe(2);
   });
+
+  test("a symlinked file is checked under the name Python imports it by", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shared/order.py": LEAK });
+    mkdirSync(join(root, "shop/domain"), { recursive: true });
+    symlinkSync(join(root, "shared/order.py"), join(root, "shop/domain/order.py"));
+    const { code, stderr } = hook(root, at(root, join(root, "shop/domain/order.py")));
+    expect(code).toBe(2);
+    expect(JSON.parse(stderr).diagnostics[0].module).toBe("shop.domain.order");
+  });
+
+  test("a config outside the project is never read", () => {
+    const outside = project({ "pyproject.toml": "[tool.inwards\nSECRET = 1\n" });
+    const root = project({ "shop/domain/order.py": LEAK });
+    symlinkSync(join(outside, "pyproject.toml"), join(root, "pyproject.toml"));
+    expect(hook(root, payload("post-write-order", root))).toEqual(SILENT);
+  });
+
+  test("any valid TOML spelling of the table turns the hook on", () => {
+    const root = project({
+      "pyproject.toml": LAYERS.replace("[tool.inwards]", '["tool"."inwards"]'),
+      "shop/domain/order.py": LEAK,
+    });
+    expect(hook(root, payload("post-write-order", root)).code).toBe(2);
+  });
+
+  test("a file declaring an unsafe encoding is reported, not passed", () => {
+    const root = project({
+      "pyproject.toml": LAYERS,
+      "shop/domain/order.py": "# coding: unicode_escape\n#\\u000aimport shop.infrastructure.db\n",
+    });
+    const { code, stderr } = hook(root, payload("post-write-order", root));
+    expect(code).toBe(2);
+    expect(JSON.parse(stderr).diagnostics[0].code).toBe("INW000");
+  });
 });

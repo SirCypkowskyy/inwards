@@ -1,4 +1,11 @@
-export { ConfigError, type InwardsConfig, type LayerSpec, parseConfig } from "./config.ts";
+export {
+  ConfigError,
+  declaresInwards,
+  type InwardsConfig,
+  type LayerSpec,
+  parseConfig,
+} from "./config.ts";
+export { ENCODING_RULE } from "./encoding.ts";
 export { Engine } from "./engine.ts";
 export { checkLayers, LAYER_RULE, layerIndexOf } from "./layers.ts";
 export { DOCS_BASE, VERSION } from "./meta.ts";

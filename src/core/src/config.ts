@@ -17,6 +17,29 @@ export class ConfigError extends Error {
   override name = "ConfigError";
 }
 
+/** Any mention of the tool, used only when the TOML can't be parsed. */
+const INWARDS_WORD = /\binwards\b/u;
+
+/**
+ * Tells whether a `pyproject.toml` is meant to configure Inwards.
+ * Decided on the parsed TOML, so `[ tool.inwards ]` and `["tool"."inwards"]`
+ * count, which a substring search would miss. A file that isn't valid TOML
+ * counts when it mentions `inwards`, so its error is reported, not skipped.
+ *
+ * @param pyprojectText - the full text of the `pyproject.toml` file.
+ * @returns true when the file has a `tool.inwards` table, or is broken TOML that mentions it.
+ */
+export function declaresInwards(pyprojectText: string): boolean {
+  let doc: unknown;
+  try {
+    doc = parse(pyprojectText);
+  } catch {
+    return INWARDS_WORD.test(pyprojectText);
+  }
+  const tool = isRecord(doc) ? doc["tool"] : undefined;
+  return isRecord(tool) && "inwards" in tool;
+}
+
 /**
  * Reads `[tool.inwards]` from the text of a `pyproject.toml`.
  * Validates every field the engine relies on and throws a ConfigError that

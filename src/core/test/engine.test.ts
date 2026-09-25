@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, parseConfig, render } from "../src/index.ts";
+import { ConfigError, declaresInwards, parseConfig, render } from "../src/index.ts";
 import { engine, file } from "./helpers.ts";
 
 describe("INW001 layer-dependency", () => {
@@ -188,4 +188,47 @@ test("SARIF URIs keep #, ? and spaces inside the path", () => {
   expect(decodeURIComponent(new URL(uri, "file:///repo/").pathname.slice(6))).toBe(
     "shop/domain/order#1 ?.py",
   );
+});
+
+describe("source encodings (Astra review, round 2)", () => {
+  test.each([
+    ["unicode_escape", "# coding: unicode_escape\n#\\u000aimport shop.infrastructure.db\n"],
+    ["utf-7 on line 2", "#!/usr/bin/env python\n# -*- coding: utf-7 -*-\nx = 1\n"],
+  ])("%s gets INW000 instead of a silent pass", (_, src) => {
+    const found = engine.checkFile(file("shop/domain/order.py", src));
+    expect(found.map((d) => d.code)).toEqual(["INW000"]);
+  });
+
+  test.each(["utf-8", "UTF8", "latin-1", "iso-8859-2", "ascii"])(
+    "%s is read as usual",
+    (encoding) => {
+      const src = `# coding: ${encoding}\nimport shop.infrastructure.db\n`;
+      expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
+        "INW001",
+      ]);
+    },
+  );
+
+  test("a declaration on line 2 counts only after a comment or blank line 1", () => {
+    const src = "x = 1\n# coding: unicode_escape\n";
+    expect(engine.checkFile(file("shop/domain/order.py", src))).toEqual([]);
+  });
+
+  test("files outside every layer are not reported", () => {
+    const src = "# coding: unicode_escape\n";
+    expect(engine.checkFile(file("scripts/tool.py", src))).toEqual([]);
+  });
+});
+
+describe("declaresInwards", () => {
+  test.each([
+    ["[tool.inwards]\nlayers = []\n", true],
+    ["[ tool.inwards ]\nlayers = []\n", true],
+    ['["tool"."inwards"]\nlayers = []\n', true],
+    ["[tool.inwards\n", true],
+    ["[project]\nname = 'x'\n", false],
+    ["[tool.ruff]\n", false],
+  ])("%j -> %p", (text, expected) => {
+    expect(declaresInwards(text)).toBe(expected);
+  });
 });
