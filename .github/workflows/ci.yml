@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
+      - name: CLAUDE.md only imports AGENTS.md (edit AGENTS.md instead)
+        run: test "$(cat CLAUDE.md)" = "@AGENTS.md"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
