@@ -44,6 +44,9 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     ```json title=".claude/settings.json"
     {
       "hooks": {
+        "SessionStart": [
+          { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
+        ],
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
@@ -75,6 +78,8 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     - **File outside the project** (`CLAUDE_PROJECT_DIR`, or the directory Claude Code runs the hook in; never the payload's own `cwd`): skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.
     - **Monorepos:** the nearest `pyproject.toml` with `[tool.inwards]` above the edited file applies, as long as it lies inside the project. A config above `CLAUDE_PROJECT_DIR` is ignored, so open the session at the directory that holds the config.
     - **Symlinks:** a file reached through a symlinked alias is checked under every name Python could import it by, so an alias can't move it out of its layer.
+
+    The hook also keeps a small per-session log in `.inwards/state/<session_id>.jsonl`, always on and never sent anywhere. At `SessionStart` it records the HEAD commit, the `[tool.inwards]` table and a hash of every Python file under the root. After each edit it records the file and a fingerprint of each violation it reported (rule, module, message). The Stop gate and escalation below read this log to tell violations the session introduced from ones that were already there. Hooks run in parallel, so every event is one appended line and nothing is ever rewritten. A session whose log has lost its start record counts as unknown, and the Stop gate treats unknown as not clean. Logs older than a week, or beyond the newest 50, are pruned when a session starts.
 
     <figure markdown="span">
       ![Claude Code hook returning exit code 2 with INW001](assets/screens/claude-code-hook.svg){ loading=lazy }
