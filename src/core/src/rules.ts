@@ -22,9 +22,10 @@ export interface RuleMeta {
 const CATALOGUE = `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`;
 
 /** Codes of every registered rule. */
-export type RuleCode = "INW000" | "INW001";
+type RuleCode = "INW000" | "INW001";
 
-export const RULES: Readonly<Record<RuleCode, RuleMeta>> = {
+/** Each entry's `code` must equal its key, so the registry can't drift. */
+export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: Code } } = {
   INW000: {
     code: "INW000",
     name: "unsupported-encoding",

@@ -264,7 +264,9 @@ src/
 │   │   ├── config.ts      # [tool.inwards] parsing and validation
 │   │   ├── prescan.ts     # import skeleton fast path
 │   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
+│   │   ├── rules.ts       # rule registry: code, name, severity, docs
 │   │   ├── layers.ts      # INW001 + fix composer
+│   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / json / sarif
 │   │   ├── engine.ts      # facade
 │   │   └── meta.ts        # VERSION, DOCS_BASE

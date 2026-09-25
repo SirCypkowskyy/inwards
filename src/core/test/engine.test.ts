@@ -252,8 +252,17 @@ describe("rule registry", () => {
   test("SARIF lists exactly the registered rules, with their default level", () => {
     const sarif = JSON.parse(render({ diagnostics: [], filesChecked: 0, durationMs: 0 }, "sarif"));
     const { rules } = sarif.runs[0].tool.driver;
-    expect(rules.map((r: { id: string }) => r.id)).toEqual(Object.keys(RULES));
-    expect(rules[0].defaultConfiguration.level).toBe(RULES.INW000.severity);
+    const levels = rules.map((r: { id: string; defaultConfiguration: { level: string } }) => [
+      r.id,
+      r.defaultConfiguration.level,
+    ]);
+    expect(levels).toEqual(Object.values(RULES).map((r) => [r.code, r.severity]));
+  });
+
+  test("each registry key is its rule's code", () => {
+    for (const [key, rule] of Object.entries(RULES)) {
+      expect(rule.code === key).toBe(true);
+    }
   });
 
   test("every diagnostic the engine emits comes from a registered rule", () => {
