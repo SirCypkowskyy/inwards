@@ -22,7 +22,7 @@ jobs:
       url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
       # Zensical asks for clean builds on CI while its cache format settles.
       - run: uv run zensical build -f docs/zensical.toml --clean --strict
       - id: deploy
