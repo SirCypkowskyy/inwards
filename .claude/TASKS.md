@@ -44,11 +44,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] Bun 1.4.2 installed globally (~/.bun, PATH added to ~/.zshrc)
 - [x] Coloured CLI output (TTY / FORCE_COLOR / NO_COLOR) + tests
 - [x] Console screenshots: scripts/screenshots.py -> docs/chapters/assets/screens/*.svg, embedded in 5 chapters
-- [~] Private GitHub repo, Cloudflare secrets, first push, docs deploy
-- [ ] Update DOCS_BASE to the real workers.dev URL, regenerate screenshots
+- [x] Private repo SirCypkowskyy/stratum, secrets set, pushed; CI green
+- [!] Docs deploy: token from ~/qv-cloudflare.env is Tunnel-scoped, Cloudflare answers "No access" on Workers deploy
+- [!] Update DOCS_BASE to the real workers.dev URL (needs a working token), then regenerate screenshots
 
 ## Blocked on the user
-- Cloudflare secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID; final docs domain (DOCS_BASE in src/core/src/meta.ts)
-- GitHub remote / org name (no repo URL in manifests yet)
-- First commit: repo was `git init`-ed, nothing committed
+- Cloudflare API token with Account > Workers Scripts > Edit (template "Edit Cloudflare Workers"); then DOCS_BASE in src/core/src/meta.ts
+- Name decision (see recommendation in chat)
 - Design partners for the business-hypothesis metrics

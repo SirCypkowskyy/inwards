@@ -24,8 +24,9 @@ You declare your layers in `pyproject.toml`. `stratum check` fails when an impor
         2. Declare a typing.Protocol in `shop.domain` (for example `shop.domain.ports`) that describes only what this module needs from `SqlOrderRepository`.
         3. Type this module against that Protocol and receive the implementation through a constructor or function parameter.
         4. Make the class in "infrastructure" satisfy the Protocol, and wire it in the outermost layer (the composition root).
+      docs: https://stratum-docs.workers.dev/rules/STR001
 
-    Found 1 violation in 1 file (16.5 ms).
+    Found 1 violation in 1 file (23.8 ms).
     ```
 
 ```mermaid
