@@ -1,5 +1,5 @@
 import { type Dirent, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 // Only names that can never hold first-party code. `build/` or `dist/` inside a
 // package is still Python the agent can import, so those are walked.
@@ -9,22 +9,27 @@ const SKIP = new Set(["node_modules", "__pycache__"]);
  * Lists the Python files under each path.
  * A path that is a file is kept as is, whatever its extension. Directories
  * are walked; hidden entries, node_modules, __pycache__ and virtualenvs
- * (any directory holding pyvenv.cfg) are skipped. Symlinks are followed,
- * because Python imports through them: a package that is a symlinked
- * directory is still a package. Each real directory is walked once, so a
- * link cycle ends. Paths keep the spelling they were found under.
+ * (any directory holding pyvenv.cfg) are skipped.
+ *
+ * Symlinks are followed, because Python imports through them, but only when
+ * their target stays inside the directory the walk started from: a link to
+ * `/` or `$HOME` is not part of the project. A file reachable under two
+ * names (a symlinked alias of a package) is listed under both, since Python
+ * can import it as either. Only a real cycle stops the walk, detected on the
+ * chain of directories above the current one; unreadable directories are
+ * skipped.
  *
  * @param paths - files or directories.
  * @returns unique paths, sorted.
  */
 export function collectPythonFiles(paths: string[]): string[] {
   const out = new Set<string>();
-  const seen = new Set<string>();
   for (const p of paths) {
-    if (statSync(p).isDirectory()) {
-      walk(p, out, seen);
-    } else {
+    const top = statSync(p).isDirectory() ? realOrUndefined(p) : undefined;
+    if (top === undefined) {
       out.add(p);
+    } else {
+      walk(p, out, { top, chain: new Set<string>() });
     }
   }
   return [...out].sort();
@@ -35,26 +40,49 @@ export function collectPythonFiles(paths: string[]): string[] {
  *
  * @param dir - the directory to walk, as reached (possibly through a symlink).
  * @param out - the collected paths, written in place.
- * @param seen - real paths of directories already walked, written in place.
+ * @param scope - the real start directory, and the real paths of the
+ *   directories above this one (a cycle guard, updated in place).
  */
-function walk(dir: string, out: Set<string>, seen: Set<string>): void {
+function walk(dir: string, out: Set<string>, scope: { top: string; chain: Set<string> }): void {
   const real = realOrUndefined(dir);
-  if (real === undefined || seen.has(real)) {
+  if (real === undefined || scope.chain.has(real) || !isWithin(scope.top, real)) {
     return;
   }
-  seen.add(real);
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return; // unreadable: nothing Python could import from here either
+  }
+  scope.chain.add(real);
+  for (const entry of entries) {
     if (entry.name.startsWith(".") || SKIP.has(entry.name)) {
       continue;
     }
     const full = join(dir, entry.name);
     const kind = entryKind(entry, full);
-    if (kind === "file" && isPythonFile(entry.name)) {
+    if (kind === "file" && isPythonFile(entry.name) && isWithin(scope.top, realOrUndefined(full))) {
       out.add(full);
     } else if (kind === "dir" && !existsSync(join(full, "pyvenv.cfg"))) {
-      walk(full, out, seen);
+      walk(full, out, scope);
     }
   }
+  scope.chain.delete(real);
+}
+
+/**
+ * Tells whether a real path is the start directory or below it.
+ *
+ * @param top - the real start directory.
+ * @param real - a real path, or undefined for a dangling one.
+ * @returns true when `real` is `top` or inside it.
+ */
+function isWithin(top: string, real: string | undefined): boolean {
+  if (real === undefined) {
+    return false;
+  }
+  const rel = relative(top, real);
+  return rel === "" || (rel.split(sep)[0] !== ".." && !isAbsolute(rel));
 }
 
 /**

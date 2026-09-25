@@ -178,4 +178,17 @@ describe("inwards hook claude-code", () => {
     const { stderr } = inwards(["hook", "claude-code"], { cwd: real, stdin: input });
     expect(JSON.parse(stderr).diagnostics[0].file).toBe("shop/domain/order.py");
   });
+
+  test("an alias path in the payload is checked under the real layer too", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
+    symlinkSync(join(root, "shop/domain"), join(root, "alias"));
+    expect(hook(root, at(root, join(root, "alias/order.py"))).code).toBe(2);
+  });
+
+  test("dlink/../x.py resolves through the link, as the OS does", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
+    symlinkSync(join(root, "shop/domain"), join(root, "dlink"));
+    // Physically dlink/.. is shop/, so this names shop/domain/order.py.
+    expect(hook(root, at(root, "dlink/../domain/order.py")).code).toBe(2);
+  });
 });

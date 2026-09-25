@@ -8,3 +8,5 @@ order = Order("7", 100)
 got = receipt(order)
 assert got == {"id": "7"}, got
 assert post_order("7", 100) == got
+
+print("INWARDS-CHECK-PASSED")

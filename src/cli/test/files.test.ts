@@ -26,15 +26,22 @@ test("walks build/dist/site inside packages, skips venvs and hidden dirs", () =>
   expect(found).toEqual(["shop/dist/x.py", "shop/domain/build/leak.py"]);
 });
 
-test("follows symlinked packages once, even through a link cycle", () => {
+test("lists a file under every name Python could import it by, and survives a cycle", () => {
   const root = mkdtempSync(join(tmpdir(), "inwards-files-"));
   mkdirSync(join(root, "real/pkg"), { recursive: true });
   writeFileSync(join(root, "real/pkg/mod.py"), "");
   mkdirSync(join(root, "shop"));
   symlinkSync(join(root, "real/pkg"), join(root, "shop/pkg"));
   symlinkSync(join(root, "shop"), join(root, "real/pkg/loop"));
-  const found = collectPythonFiles([join(root, "shop")]).map((f) =>
-    relative(root, f).split(sep).join("/"),
-  );
-  expect(found).toEqual(["shop/pkg/mod.py"]);
+  const found = collectPythonFiles([root]).map((f) => relative(root, f).split(sep).join("/"));
+  expect(found).toEqual(["real/pkg/mod.py", "shop/pkg/mod.py"]);
+});
+
+test("never follows a link out of the directory it was asked to walk", () => {
+  const outside = mkdtempSync(join(tmpdir(), "inwards-outside-"));
+  writeFileSync(join(outside, "secret.py"), "");
+  const root = mkdtempSync(join(tmpdir(), "inwards-files-"));
+  symlinkSync(outside, join(root, "home"));
+  symlinkSync(join(outside, "secret.py"), join(root, "linked.py"));
+  expect(collectPythonFiles([root])).toEqual([]);
 });

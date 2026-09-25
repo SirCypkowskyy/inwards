@@ -17,10 +17,14 @@ export const ENCODING_RULE = {
   docs: `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`,
 } as const;
 
+// The `s` flag matters: without it `.` stops at \r, U+2028 and U+2029, which
+// CPython treats as ordinary characters inside a comment.
 /** The declaration CPython's tokenizer looks for on line 1 or 2. */
-const CODING = /^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-\w.]+)/u;
+const CODING = /^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-\w.]+)/su;
 /** Line 1 must be blank or a comment for line 2 to count. */
-const BLANK_OR_COMMENT = /^[ \t\f]*(?:#.*)?$/u;
+const BLANK_OR_COMMENT = /^[ \t\f]*(?:#.*)?\r?$/su;
+/** A line break as CPython counts it after normalisation: \n or \r\n. */
+const LINE_BREAK = /\r?\n/u;
 /** ASCII-compatible codecs whose bytes read as UTF-8 can't hide an import. */
 const SAFE =
   /^(?:utf-?8(?:-.*)?|ascii|us-ascii|latin-?1|iso-latin-1|iso-?8859-\d+|cp125\d|windows-125\d)$/u;
@@ -33,7 +37,7 @@ const SAFE =
  * @returns the declared codec name, lower-cased with `_` as `-`, or null if none.
  */
 function declaredEncoding(text: string): string | null {
-  const [first = "", second = ""] = text.split("\n", 2);
+  const [first = "", second = ""] = text.split(LINE_BREAK, 2);
   const declared =
     CODING.exec(first) ?? (BLANK_OR_COMMENT.test(first) ? CODING.exec(second) : null);
   const name = declared?.groups?.["name"];

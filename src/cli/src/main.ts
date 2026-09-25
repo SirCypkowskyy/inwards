@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { readFileSync, realpathSync, statSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import {
@@ -133,14 +133,20 @@ async function runCheck(
   const realRoot = realpath(lexicalRoot) ?? lexicalRoot;
   const engine = await Engine.create(await loadGrammars(), config);
   const files: SourceFile[] = [];
+  // One entry per (module, file): a file reached through an alias and through
+  // its real path has the same real name, and must not be reported twice.
+  const seen = new Set<string>();
   for (const abs of collectPythonFiles(targets ?? [lexicalRoot])) {
-    const module = moduleRelPath(abs, lexicalRoot, realRoot);
-    if (module !== undefined) {
-      files.push({
-        path: posix(relative(base, abs)),
-        text: readFileSync(abs, "utf8"),
-        ...moduleNameFor(module),
-      });
+    const text = readFileSync(abs, "utf8");
+    const real = realpath(abs) ?? abs;
+    for (const { rel, shown } of moduleNames(abs, lexicalRoot, realRoot)) {
+      const named = moduleNameFor(rel);
+      // Keyed on the real file too: order.py and order.pyi are one module, two files.
+      const key = `${named.module}\u0000${real}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        files.push({ path: posix(relative(base, shown)), text, ...named });
+      }
     }
   }
   const diagnostics = engine.checkFiles(files);
@@ -148,23 +154,34 @@ async function runCheck(
 }
 
 /**
- * Works out the path a module name is built from, the way Python finds it.
- * Python names a module after the path it was imported through, so a
- * symlinked `shop/domain/order.py` is `shop.domain.order` wherever its target
- * lives. When the path isn't under the root as written (a hook payload may
- * name the real location of a symlinked root), the real path decides.
+ * Lists every module name Python could import a file by.
+ * Python names a module after the path it was imported through, so a file
+ * reached through a symlinked alias has two names: the alias path and the
+ * real path. Both are checked, so an alias can't hide a file from its layer.
+ * Names that fall outside the config root are dropped.
  *
  * @param abs - the file as found.
  * @param lexicalRoot - the config root as written.
  * @param realRoot - the config root with symlinks resolved.
- * @returns the path relative to the root, or undefined when the file is outside it.
+ * @returns each name as a root-relative path, with the path to show for it.
  */
-function moduleRelPath(abs: string, lexicalRoot: string, realRoot: string): string | undefined {
+function moduleNames(
+  abs: string,
+  lexicalRoot: string,
+  realRoot: string,
+): { rel: string; shown: string }[] {
+  const names: { rel: string; shown: string }[] = [];
   if (isInside(lexicalRoot, abs)) {
-    return relative(lexicalRoot, abs);
+    names.push({ rel: relative(lexicalRoot, abs), shown: abs });
   }
   const real = realpath(abs);
-  return real !== undefined && isInside(realRoot, real) ? relative(realRoot, real) : undefined;
+  if (real !== undefined && isInside(realRoot, real)) {
+    const rel = relative(realRoot, real);
+    if (!names.some((n) => n.rel === rel)) {
+      names.push({ rel, shown: real });
+    }
+  }
+  return names;
 }
 
 const PYTHON_FILE = /\.pyi?$/u;
@@ -263,14 +280,49 @@ function hookTarget(
   if (!(cwd && project)) {
     return undefined;
   }
-  const lexical = resolve(lexicalCwd, file);
-  const real = realpath(lexical);
-  if (real && isInside(project, real) && statSync(real).isFile()) {
+  const real = physicalRealpath(lexicalCwd, file);
+  // With `..` in the path, the name as written is not where the file is.
+  const lexical = PATH_SEPARATORS[Symbol.split](file).includes("..")
+    ? real
+    : resolve(lexicalCwd, file);
+  if (real && lexical && isInside(project, real) && statSync(real).isFile()) {
     // Report paths against the cwd as written: on macOS /var is a link to
     // /private/var, and mixing the two spellings gives ../../var/... paths.
     return { file: lexical, cwd: resolve(lexicalCwd), project };
   }
   return undefined;
+}
+
+const PATH_SEPARATORS = /[\\/]/u;
+
+/**
+ * Resolves a path the way the OS does when it opens it.
+ * `path.resolve` (and Bun's realpath) fold `dlink/..` away as text, but the
+ * OS follows `dlink` first, so `dlink/../x.py` can be a different file. Each
+ * `..` is applied to the real path of what comes before it.
+ *
+ * @param base - directory a relative `file` is resolved against.
+ * @param file - the path as given, absolute or relative.
+ * @returns the real path, or undefined when it does not exist.
+ */
+function physicalRealpath(base: string, file: string): string | undefined {
+  const root = isAbsolute(file) ? parse(file).root : "";
+  let current = root === "" ? base : root;
+  for (const segment of PATH_SEPARATORS[Symbol.split](file.slice(root.length))) {
+    if (segment === "" || segment === ".") {
+      continue;
+    }
+    if (segment === "..") {
+      const resolved = realpath(current);
+      if (resolved === undefined) {
+        return undefined;
+      }
+      current = dirname(resolved);
+    } else {
+      current = join(current, segment);
+    }
+  }
+  return realpath(current);
 }
 
 /**

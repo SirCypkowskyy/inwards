@@ -13,3 +13,5 @@ except ValueError:
 else:
     raise AssertionError("negative total accepted")
 handle("2", 100, Repo())
+
+print("INWARDS-CHECK-PASSED")

@@ -232,3 +232,18 @@ describe("declaresInwards", () => {
     expect(declaresInwards(text)).toBe(expected);
   });
 });
+
+describe("encoding declarations CPython honours (review of round 2)", () => {
+  test.each([
+    [
+      "CRLF with a shebang on line 1",
+      "#!/usr/bin/env python\r\n# coding: unicode_escape\r\nx = 1\r\n",
+    ],
+    ["CRLF with a blank line 1", "\r\n# coding: unicode_escape\r\nx = 1\r\n"],
+    ["U+2028 inside the comment", "# note  coding: unicode_escape\nx = 1\n"],
+  ])("%s gets INW000", (_, src) => {
+    expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
+      "INW000",
+    ]);
+  });
+});
