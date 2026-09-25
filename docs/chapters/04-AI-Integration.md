@@ -148,6 +148,7 @@ A model under pressure to finish will try the cheapest thing that turns the chec
 | Hide it behind `TYPE_CHECKING` | `if TYPE_CHECKING: from shop.infrastructure...` | Checked too. If a domain signature mentions an infrastructure type, the domain can't be understood or reused without it, whether or not the import runs | :white_check_mark: |
 | Import the package, not the module | `from shop import infrastructure` | Resolved to `shop.infrastructure` | :white_check_mark: |
 | Use a relative import | `from ..infrastructure import db` | Resolved against the file's package | :white_check_mark: |
+| Put new code outside every layer | Create `shop/persistence/` and import it from the domain | INW006 flags first-party packages that belong to no layer | :material-progress-clock: |
 | Import dynamically | `importlib.import_module("shop.infrastructure.db")` | INW011 flags dynamic imports in inner layers | :material-progress-clock: |
 | Suppress it | `# inwards: ignore` | Suppressions will need a code and a reason, show up in the summary, and can be rejected in hooks | :material-progress-clock: |
 | Loosen the config | Move `shop.infrastructure` into the domain layer | A `PreToolUse` guard denies agent edits to `[tool.inwards]`; CODEOWNERS covers humans | :material-progress-clock: |

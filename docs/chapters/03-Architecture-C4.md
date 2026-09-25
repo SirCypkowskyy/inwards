@@ -239,6 +239,7 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 - Implicit namespace packages (no `__init__.py`) work for naming, but relative imports inside them resolve as if the directory were a regular package.
 - Layer membership is by module prefix only. Glob patterns (`shop.*.domain`) for vertical slices are planned together with INW002.
 - Dynamic imports (`importlib.import_module("shop.infrastructure")`) are invisible today. INW011 will flag them in inner layers.
+- Modules that belong to no layer are unchecked, and so are imports into them. A new `shop/persistence/` package escapes every rule, and a mistyped prefix silently matches nothing. INW006 and stricter config validation close this in 0.1.
 
 ## Rule catalogue
 
@@ -248,6 +249,7 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 | INW002 | `context-independence` | One bounded context or vertical slice importing another's internals | :material-progress-clock: |
 | INW003 | `public-api-only` | Importing past a context's public module (`__init__` or `api.py`) | :material-progress-clock: |
 | INW004 | `no-cycles` | Import cycles between modules or contexts | :material-progress-clock: needs the graph |
+| INW006 | `unassigned-module` | A first-party package that belongs to no layer, or an import into one; also dead or overlapping layer prefixes | :material-progress-clock: 0.1 |
 | INW005 | `pure-domain` | The domain layer importing frameworks or I/O libraries (`sqlalchemy`, `fastapi`, `requests`...) | :material-progress-clock: |
 | INW010 | `unknown-first-party` | Importing a first-party module that doesn't exist, the typical agent hallucination | :material-progress-clock: needs the module index |
 | INW011 | `dynamic-import` | `importlib.import_module` / `__import__` in inner layers, a common way to dodge INW001 | :material-progress-clock: |

@@ -1,0 +1,1243 @@
+# Inwards backlog: source of truth for GitHub issues, epics and milestones.
+# One epic = one milestone. Issues reference each other by `key`; scripts/sync-backlog.py
+# turns keys into issue numbers and native sub-issue / dependency links.
+# Revised after review rounds 1, 2 and 3 (2026-09-25).
+docs: https://sircypkowskyy.github.io/inwards
+labels:
+- name: type:epic
+  color: 5319e7
+  description: Aggregates a milestone's issues
+- name: type:feature
+  color: 1d76db
+  description: User-visible capability
+- name: type:chore
+  color: c5def5
+  description: Tooling, CI, maintenance
+- name: type:spike
+  color: fbca04
+  description: Time-boxed investigation with a written outcome
+- name: type:docs
+  color: 0075ca
+  description: Documentation only
+- name: area:engine
+  color: 7e57c2
+  description: src/core
+- name: area:cli
+  color: 7e57c2
+  description: src/cli
+- name: area:lsp
+  color: 7e57c2
+  description: Language server and VS Code extension
+- name: area:agent-kit
+  color: 7e57c2
+  description: Hooks, installers, MCP, agent-facing output
+- name: area:rules
+  color: 7e57c2
+  description: INWxxx rule semantics
+- name: area:perf
+  color: 7e57c2
+  description: Latency and throughput
+- name: area:distribution
+  color: 7e57c2
+  description: Releases, wheels, marketplace
+- name: area:ci
+  color: 7e57c2
+  description: GitHub Actions
+- name: area:docs
+  color: 7e57c2
+  description: docs/ site
+- name: priority:P0
+  color: b60205
+  description: Milestone can't close without it
+- name: priority:P1
+  color: d93f0b
+  description: Should land in the milestone
+- name: priority:P2
+  color: fbca04
+  description: Nice to have; may slip
+- name: size:S
+  color: c2e0c6
+  description: About a day
+- name: size:M
+  color: 0e8a16
+  description: Two to three days
+- name: size:L
+  color: 006b75
+  description: About a week
+- name: area:product
+  color: 7e57c2
+  description: Hypothesis, partners, go/no-go decisions
+epics:
+- key: E0
+  title: Ship a binary
+  milestone: M0 · Ship a binary (v0.0.x)
+  goal: Anyone can download a verified `inwards` binary from a GitHub Release on Linux, macOS or Windows, and `inwards hook
+    claude-code` works with recorded Claude Code payloads on all three.
+  exit_criteria:
+  - A `v0.0.x` tag produces a GitHub Release with six binaries, SHA256SUMS and attestations that `gh attestation verify` accepts
+  - CI runs unit and E2E tests on Linux, macOS and Windows
+  - The `inwards` name is held on PyPI and npm
+  - CI is green on the Ubuntu 26 runner image
+  - The INW001 eval report exists and at least 5 partner teams have agreed to try v0.1
+  docs:
+  - 05-ADR/#adr-003-ship-a-bun-single-file-executable
+  issues:
+  - key: E0-partners
+    title: Recruit design partners
+    type: chore
+    area:
+    - product
+    priority: P0
+    size: M
+    why: The hypothesis needs five partner repos and recruiting is the slowest step; it has to start now, not when M2 is done.
+    scope:
+    - Shortlist about 15 FastAPI/Django teams using agents heavily, including Tach users
+    - Consent for hook runs and log sharing; tracking sheet with status and dates
+    acceptance:
+    - At least 5 teams have agreed to try v0.1, with names and dates recorded
+    blocked_by: []
+  - key: E0-names
+    title: Reserve the `inwards` name on PyPI and npm
+    type: chore
+    area:
+    - distribution
+    priority: P0
+    size: S
+    why: Both names were free on 2026-09-25 (ADR-011). Losing them before 0.1 would force another rename.
+    scope:
+    - 'Publish minimal but working placeholder packages (PyPI and npm both reclaim empty squats): `inwards --version` points
+      to the releases; every other command exits 2 so a ''dependency bump'' to the placeholder can''t disable checks'
+    - Document who holds the credentials
+    acceptance:
+    - '`pip index versions inwards` and `npm view inwards` show packages owned by the project account'
+    docs:
+    - 05-ADR/#adr-011-rename-stratum-to-inwards
+    blocked_by: []
+  - key: E0-xplat
+    title: 'Cross-platform CI: Windows and macOS jobs, POSIX paths, CRLF/BOM'
+    type: chore
+    area:
+    - ci
+    - cli
+    priority: P0
+    size: M
+    why: CI runs on Ubuntu only; SARIF and diagnostic paths use `relative()` and will contain backslashes on Windows; musl
+      and darwin-x64 binaries are built but never run.
+    scope:
+    - Windows and macOS jobs in ci.yml for unit and E2E tests
+    - Normalise diagnostic and SARIF paths to POSIX
+    - CRLF and BOM fixtures
+    - Hook `file_path` outside the repo root is ignored and treated as untrusted
+    - Verify matrix gains Alpine (musl) and macOS x64
+    acceptance:
+    - CI green on three OSes
+    - SARIF from Windows validates with forward slashes
+    blocked_by: []
+  - key: E0-adversarial
+    title: Adversarial import spellings in the prescan differential test
+    type: chore
+    area:
+    - engine
+    - ci
+    priority: P0
+    size: S
+    why: Review round 3 found `from x \` + newline + `import y` slipping past the prescan; the stdlib corpus contains none
+      of these forms. The prescan fix shipped; the generator makes sure the next one is found by CI, not by an agent.
+    scope:
+    - 'Generator of import spellings: backslash and parenthesised continuations, semicolons, `if`/`try` one-liners, comments
+      and strings around imports, CRLF, tabs'
+    - Run it inside prescan-diff in CI
+    acceptance:
+    - Generator covers every form listed in scope
+    - CI fails if the skeleton misses any generated import
+    docs:
+    - 05-ADR/#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse
+    blocked_by: []
+  - key: E0-hook
+    title: '`inwards hook claude-code`: native hook command (no jq, works on Windows)'
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P0
+    size: M
+    why: The jq one-liner in chapter 4 needs jq and a POSIX shell. The hook is the main channel of the product, so it has
+      to be a first-class command.
+    scope:
+    - Read the hook JSON from stdin; handle PostToolUse (Edit, Write, MultiEdit) and ignore non-Python files
+    - 'Violations: JSON diagnostics on stderr, exit 2. Clean: exit 0, no output'
+    - Config errors are surfaced to the agent, not swallowed
+    - Paths from the hook payload are resolved against the repo root; anything outside it is ignored
+    acceptance:
+    - Works on Linux, macOS and Windows in CI (see E0-xplat)
+    - Unit tests with recorded Claude Code payloads
+    - Chapter 4 updated to use the command instead of the one-liner
+    docs:
+    - 04-AI-Integration/#integrations-by-agent
+    blocked_by:
+    - E0-xplat
+  - key: E0-e2e
+    title: End-to-end hook tests in CI with recorded agent payloads
+    type: chore
+    area:
+    - ci
+    - agent-kit
+    priority: P0
+    size: S
+    why: The hook contract is the product surface. Fixtures must exist while the hook is built, not after.
+    scope:
+    - Fixtures for Claude Code SessionStart, PostToolUse, PreToolUse and Stop payloads, built together with E0-hook
+    - Run the compiled binary on Linux, macOS and Windows
+    acceptance:
+    - CI fails on any change in exit codes or output schema
+    blocked_by:
+    - E0-xplat
+  - key: E0-release
+    title: GitHub Releases with binaries, SHA256SUMS and build attestations
+    type: chore
+    area:
+    - distribution
+    - ci
+    priority: P0
+    size: S
+    why: cd.yml only uploads workflow artifacts, which expire and need a login to download.
+    scope:
+    - Attach binaries and checksums to the release for v* tags
+    - actions/attest-build-provenance for each binary
+    acceptance:
+    - A test tag produces a draft release
+    - '`gh attestation verify` passes for every binary in the verify job'
+    blocked_by: []
+  - key: E0-hygiene
+    title: CODEOWNERS for config files and an Ubuntu 26 runner check
+    type: chore
+    area:
+    - ci
+    priority: P0
+    size: S
+    why: CODEOWNERS is the human half of the config guard; ubuntu-latest moves to Ubuntu 26 on 2026-10-19.
+    scope:
+    - CODEOWNERS covering pyproject.toml, .claude/ and .inwards/
+    - One CI run on the Ubuntu 26 image; pin or fix what breaks
+    acceptance:
+    - CODEOWNERS active on main
+    - CI green on Ubuntu 26
+    blocked_by: []
+  - key: E0-eval-inw001
+    title: 'Spike: offline agent eval harness, first run on INW001'
+    type: spike
+    area:
+    - agent-kit
+    - rules
+    priority: P0
+    size: L
+    why: Chapter 2 bets that >= 80 % of violations are fixed within one retry. Test that bet on INW001 before building more
+      rules.
+    scope:
+    - Runs today against the jq-based hook, so evasions observed feed E1-guard and E1-escalate
+    - Seeded-violation fixtures and a harness that runs an agent against them
+    - Record fixes, evasions and retries
+    acceptance:
+    - Written report with INW001 fix rate and evasions observed
+    - Adding a rule to the harness means adding fixtures only
+    blocked_by: []
+- key: E1
+  title: Agent loop MVP
+  milestone: M1 · Agent loop MVP (v0.1)
+  goal: A Claude Code or Aider user runs one install command on a release binary and from then on gets an Inwards diagnostic
+    after every edit that breaks a layer, including edits that sneak code outside every layer. The agent can't silence the
+    check by editing its config or baseline, and a hard violation ends in a question to the user, not a loop.
+  exit_criteria:
+  - '`inwards init --agent claude` installs PostToolUse, Stop and PreToolUse hooks that pass the E2E suite on Linux, macOS
+    and Windows'
+  - On a repo with pre-existing violations, a clean agent edit passes the Stop gate
+  - An import from the domain into an unlisted package fails with INW006
+  - Escalation reaches the model after three identical failures; config and baseline edits by the agent are denied
+  - Getting-started pages for Claude Code, Aider and AGENTS.md are live and their commands run in CI
+  docs:
+  - 04-AI-Integration/
+  issues:
+  - key: E1-index
+    title: Module index and reverse-import map for the CLI
+    type: feature
+    area:
+    - engine
+    - cli
+    - perf
+    priority: P0
+    size: M
+    why: The session-scoped Stop gate needs to know who imports the edited files, and INW006 needs the set of first-party
+      modules. Both need a project-wide index.
+    scope:
+    - Walk the file tree under `root` into a module set
+    - Reverse-import map from the prescan, built lazily when the Stop gate asks for it
+    - Engine API gains a project input (ADR-006)
+    - Directory skips apply only to hidden dirs, `__pycache__`, `node_modules` and virtualenvs (detected by `pyvenv.cfg`);
+      `build/`, `dist/`, `site/` inside packages are walked (CLI walker fixed in review round 3)
+    acceptance:
+    - Index build time on the synthetic repo reported by E2-bench once it exists; under 1 s on one core until then
+    - 'Fixture: a module under `shop/domain/build/` is indexed and checked'
+    blocked_by: []
+  - key: E1-registry
+    title: 'Rule registry: metadata and SARIF rules[]'
+    type: feature
+    area:
+    - engine
+    - rules
+    priority: P0
+    size: S
+    why: SARIF hardcodes LAYER_RULE and there is no per-rule enable or severity config; every new rule would copy that.
+    scope:
+    - Rule metadata (code, name, docs, default severity) in one registry
+    - SARIF `rules[]` built from it
+    acceptance:
+    - Adding a rule touches only its own module and the registry
+    blocked_by: []
+  - key: E1-state
+    title: 'Session state: always-on violation fingerprints per agent session'
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P0
+    size: S
+    why: Escalation and the session-scoped Stop gate need to remember what happened earlier in the session, even when the
+      opt-in metrics log is off.
+    scope:
+    - '`.inwards/state/<session_id>.json`: violation fingerprints, Stop block count, files edited this session'
+    - A SessionStart hook (installed by `inwards init`) records HEAD sha, a content-hash manifest of `.py` files and the `[tool.inwards]`
+      table
+    - If state is missing mid-session, fall back to `git show <session-start sha>:pyproject.toml` and fail closed
+    - Pruned automatically (age and count caps); gitignored by `inwards init`
+    acceptance:
+    - Works with the run log disabled
+    - 20 parallel hook processes on all three OSes leave a file that parses and contains every fingerprint
+    - Deleting `.inwards/` mid-session makes the next Stop fail closed
+    blocked_by:
+    - E0-hook
+  - key: E1-stop
+    title: 'Stop gate: check this session''s edits and their importers before the agent finishes'
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P0
+    size: M
+    why: Per-edit checks miss cross-file effects (UC3), but a full check would block every turn on legacy repos that have
+      no baseline yet.
+    scope:
+    - Edited set = session state ∪ manifest diff since SessionStart ∪ `git diff --name-only <start sha>` ∪ `git status --porcelain
+      -z --untracked-files=all` (`.py` only); check it plus first-party files that import it
+    - Block up to N times per session (count in session state), then hand over to escalation; `stop_hook_active` only as the
+      final safety valve
+    - Fail when `[tool.inwards]` differs from the SessionStart snapshot (catches Bash `sed -i`)
+    - Fail when any Claude Code settings layer (project, local, user) drops the Inwards hooks or sets `disableAllHooks`
+    - Update chapters 2 (UC3) and 4 (text and diagram) that still describe a full-repo Stop check
+    acceptance:
+    - A repo with 10 pre-existing violations plus a clean agent edit gives exit 0
+    - A violating agent edit gives exit 2 with diagnostics
+    - Edits hidden by commit, `assume-unchanged`, `.gitignore` or a new untracked directory are all still checked (one test
+      each)
+    - A Bash `sed` edit to `[tool.inwards]` and `disableAllHooks` in settings.local.json both fail the Stop gate
+    - Stop time on the synthetic repo reported by E2-bench once it exists
+    blocked_by:
+    - E0-hook
+    - E1-state
+    - E1-index
+    - E0-e2e
+    docs:
+    - 02-Business-Context/#use-cases
+  - key: E1-integrity
+    title: 'Config integrity: unassigned packages, dead prefixes, overlaps (INW006)'
+    type: feature
+    area:
+    - engine
+    - rules
+    priority: P0
+    size: M
+    why: 'Today a module in no layer is unchecked, and so is an import into one. An agent that creates `shop/persistence/`
+      escapes every rule, and a renamed prefix silently matches nothing. That breaks quality goal #1 (no false negatives).'
+    scope:
+    - 'INW006 unassigned-module: an import from a layer into a first-party package that belongs to no layer is an error; an
+      unassigned package on its own is a warning'
+    - A layer whose prefixes all match nothing is an error; a prefix that matches files at the session-start commit but not
+      now is an error (catches `git mv shop/domain shop/core`); other dead prefixes are warnings
+    - Unknown `[tool.inwards]` keys and prefixes claimed by two layers are errors
+    - Warnings reach the agent as exit 0 + `additionalContext`, not silence
+    - '`inwards init` writes default ignores for tests, scripts, migrations and conftest.py'
+    - Chapter 4 evasion table and chapter 3 limitations updated
+    acceptance:
+    - An import from the domain into an unlisted package fails with INW006
+    - A legacy fixture with unassigned test and script folders passes after `init`
+    - One fixture per config-error case
+    - '`git mv shop/domain shop/core` during a session fails the Stop gate'
+    docs:
+    - 04-AI-Integration/#stopping-the-agent-from-gaming-the-check
+    - 03-Architecture-C4/#known-limitations
+    blocked_by:
+    - E1-index
+    - E1-registry
+  - key: E1-escalate
+    title: Escalate to the user after N identical failures
+    type: feature
+    area:
+    - agent-kit
+    priority: P0
+    size: S
+    why: Some violations need a human decision. Without a limit the stop hook blocks until the host gives up by itself, and
+      an exit-0 message would never reach the model.
+    scope:
+    - Same fingerprint surviving N attempts (default 3, configurable) triggers escalation
+    - 'PostToolUse: the escalating run exits 0 with `additionalContext`; escalation is not sticky, later runs with the violation
+      still exit 2'
+    - 'Stop: block once more with a reason telling the agent to ask the user; the final allowed Stop emits a user-visible
+      `systemMessage` listing unresolved violations and records them for the next session'
+    - Update chapter 4 ('When the agent can't fix it') to the final mechanism
+    acceptance:
+    - E2E test asserts the escalation text appears in the JSON field the model reads
+    - The user sees the unresolved violations when the turn ends
+    - A Stop payload with `stop_hook_active=true` after escalation gives exit 0 and no block
+    blocked_by:
+    - E0-hook
+    - E1-state
+    - E1-stop
+    - E0-e2e
+    docs:
+    - 04-AI-Integration/#when-the-agent-cant-fix-it
+  - key: E1-guard
+    title: 'Config guard: PreToolUse hook denies agent edits to `[tool.inwards]`'
+    type: feature
+    area:
+    - agent-kit
+    priority: P0
+    size: M
+    why: An agent that can edit the rules isn't constrained by them. This is the highest-risk evasion in chapter 4.
+    scope:
+    - 'PreToolUse on Edit/Write/MultiEdit of any `pyproject.toml`: apply the edit in memory, compare the parsed `[tool.inwards]`
+      table, deny real changes'
+    - PreToolUse on Edit/Write/MultiEdit of `.inwards/**`, and on Bash commands running `inwards baseline` or writing under
+      `.inwards/`
+    - '`inwards init` writes `permissions.deny` for `Edit(.claude/settings*.json)` and `Edit(.inwards/**)`'
+    - Config discovery is pinned to the root config recorded by `init`, so a new nested pyproject.toml can't take over
+    - Deny messages tell the agent to ask the user
+    acceptance:
+    - Dependency bump in pyproject passes; layer change is denied
+    - Edits to `.inwards/state` through Edit and Bash are denied
+    - A new `shop/pyproject.toml` with `[tool.inwards]` doesn't change which config is used
+    - E2E cases for each deny path
+    docs:
+    - 04-AI-Integration/#stopping-the-agent-from-gaming-the-check
+    blocked_by:
+    - E0-hook
+    - E0-e2e
+  - key: E1-init
+    title: '`inwards init --agent claude|aider|agents-md` installer'
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P0
+    size: M
+    why: React Doctor showed that a one-command install is what gets agent tooling adopted.
+    scope:
+    - 'Claude Code: merge hooks into .claude/settings.json idempotently, never clobbering user hooks'
+    - 'Aider: print or write the --lint-cmd configuration'
+    - 'AGENTS.md: add or update a marked section telling the agent to run `inwards check` (the architecture brief itself arrives
+      with E4-context)'
+    - '`--dry-run` shows the diff'
+    - Write an absolute binary path into hooks (no PATH lookups a shim could hijack), with a `required-version` key in `[tool.inwards]`
+      checked by every run
+    - Install the SessionStart hook used by E1-state
+    acceptance:
+    - Running twice is a no-op
+    - Existing hooks and settings survive
+    - The installed hook works from a fresh shell with no virtualenv activated
+    blocked_by:
+    - E0-hook
+  - key: E1-guides
+    title: 'Getting-started guides: Claude Code, Aider, AGENTS.md'
+    type: docs
+    area:
+    - docs
+    priority: P0
+    size: S
+    why: Chapter 4 explains the design; users need copy-paste setup pages.
+    scope:
+    - One page per agent with install, verification step and troubleshooting
+    - Copilot page waits for the marketplace extension (E6-vscode)
+    acceptance:
+    - Every command verified by hand on Linux, macOS and Windows, with the date on the page (automated later by E2-e2e-extras)
+    - Pages in `zensical.toml` nav; strict build green
+    blocked_by:
+    - E1-init
+    - E0-release
+    - E0-e2e
+  - key: E1-docs-ci
+    title: 'Docs CI: nav coverage and link checking'
+    type: chore
+    area:
+    - ci
+    - docs
+    priority: P1
+    size: S
+    why: '`zensical build --strict` doesn''t fail on pages missing from the nav, and several issues promise checked links.'
+    scope:
+    - Fail when a page under docs/chapters isn't in `zensical.toml` nav
+    - Link checker over the built site, internal links strict, external links weekly
+    acceptance:
+    - A page left out of the nav fails the docs job
+    - A broken internal link fails the docs job
+    blocked_by: []
+  - key: E1-inw011-literal
+    title: 'INW011 (literal targets): importlib, __import__, exec, eval, compile, runpy'
+    type: feature
+    area:
+    - rules
+    priority: P0
+    size: S
+    why: '`importlib.import_module("shop.infrastructure.x")` and `exec("from shop.infrastructure import ...")` exit 0 today,
+      and INW001''s fix text closes the other doors, so this is where a pressured agent goes next.'
+    scope:
+    - String-literal targets of importlib.import_module, __import__, runpy.run_module, and import statements inside literal
+      exec/eval/compile source, checked like normal imports
+    - Non-literal targets stay for E3-inw011
+    acceptance:
+    - Tests for each call form and common aliases (`from importlib import import_module as im`)
+    blocked_by:
+    - E1-registry
+  - key: E1-runlog
+    title: Run log `.inwards/runs.jsonl` (opt-in, local)
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P0
+    size: S
+    why: The business hypothesis is measured from hook runs (fix-within-one-retry, violations per 1,000 agent-written lines).
+    scope:
+    - 'One JSON line per hook or check run: timestamp, session_id, event, tool_name, files, lines changed per edited file,
+      violation fingerprints, duration'
+    - '`inwards check --log` so Aider (lint-cmd) runs are recorded too'
+    - Off by default; enabled by config or env var; size-capped with rotation
+    - Documented, versioned line schema
+    acceptance:
+    - No log is written unless enabled
+    - Schema page covered by the docs nav check
+    - Hook adoption (share of installs with a hook) is documented as partner-reported, not measured
+    docs:
+    - 02-Business-Context/#business-hypothesis
+    blocked_by:
+    - E1-state
+- key: E2
+  title: Design-partner ready
+  milestone: M2 · Design-partner ready (v0.2)
+  goal: A team with an existing, imperfect codebase installs Inwards with `uv add --dev inwards`, adopts it without fixing
+    every legacy violation first, and can share the metrics that test the business hypothesis.
+  exit_criteria:
+  - '`uv add --dev inwards` works on Linux, macOS and Windows'
+  - '`inwards baseline` lets a legacy repo go green on day one'
+  - At least 3 design partners run the hook and share `inwards stats` output
+  - The go/no-go decision is recorded
+  - The benchmark job guards hook latency on every PR
+  docs:
+  - 02-Business-Context/#the-hypothesis
+  issues:
+  - key: E2-bench
+    title: Benchmark harness in CI with regression thresholds
+    type: chore
+    area:
+    - perf
+    - ci
+    priority: P0
+    size: M
+    why: The M2 hypothesis check (median hook < 100 ms on partner repos) needs trustworthy numbers; today's p95 of 80 ms comes
+      from one laptop.
+    scope:
+    - 'bench/ runner: synthetic repo, single-file p50/p95, cold full run'
+    - Base and head measured in the same job to cancel runner noise; gate on the relative difference
+    - Runner type recorded with every result
+    acceptance:
+    - Job runs on every PR in under 5 minutes
+    - A deliberate 30 % slowdown fails the job; unchanged code doesn't flap over 10 runs
+    blocked_by: []
+  - key: E2-versioning
+    title: 'Release process: single version source, CHANGELOG, compatibility policy'
+    type: chore
+    area:
+    - distribution
+    priority: P0
+    size: S
+    why: The version lives in meta.ts, pyproject.toml and the extension's package.json, and nothing says what may change in
+      `diagnostics@1` or the config before 1.0.
+    scope:
+    - One version source, stamped into the others at build time
+    - CHANGELOG.md (keep-a-changelog)
+    - Written policy for output schema and config compatibility before 1.0
+    acceptance:
+    - cd.yml fails when versions disagree or the changelog has no entry for the tag
+    blocked_by: []
+  - key: E2-wheel-build
+    title: PyPI platform wheels for `inwards` (binary inside, like Ruff)
+    type: feature
+    area:
+    - distribution
+    priority: P0
+    size: M
+    why: Python teams expect `uv add --dev <linter>`; ADR-003 promised this.
+    scope:
+    - One wheel per platform tag incl. musllinux; `inwards` console entry point
+    - Size budget per wheel recorded; request a PyPI project size increase if needed
+    acceptance:
+    - '`uvx inwards --version` works on all six targets in the verify matrix'
+    blocked_by:
+    - E0-release
+    - E0-xplat
+    docs:
+    - 05-ADR/#adr-003-ship-a-bun-single-file-executable
+  - key: E2-wheel-publish
+    title: Publish wheels to PyPI with trusted publishing
+    type: chore
+    area:
+    - distribution
+    - ci
+    priority: P0
+    size: S
+    why: Design partners install with `uv add --dev inwards`.
+    scope:
+    - Trusted publishing from cd.yml
+    - TestPyPI run before the first real release
+    acceptance:
+    - '`uv add --dev inwards` in a fresh project installs the release'
+    blocked_by:
+    - E2-wheel-build
+    - E2-versioning
+  - key: E2-baseline
+    title: '`inwards baseline` for legacy codebases (UC6)'
+    type: feature
+    area:
+    - cli
+    - engine
+    priority: P0
+    size: M
+    why: Design partners have existing violations; without a baseline they can't turn the check on.
+    scope:
+    - Fingerprint = rule + module + import target (line-independent)
+    - '`inwards baseline` writes .inwards/baseline.json; `check` ignores baselined, reports resolved ones'
+    - Engine skips the confirming parse for baselined violations (ADR-004 bad case)
+    - When a baseline exists, the Stop gate can run in full-repo mode (config switch)
+    - 'Guarded like the config: agents can''t create or edit the baseline (E1-guard)'
+    acceptance:
+    - Moving a baselined import to another line doesn't resurface it
+    - Adding a new violation still fails
+    docs:
+    - 03-Architecture-C4/#how-one-check-flows
+    blocked_by:
+    - E1-stop
+    - E1-guard
+  - key: E2-stats
+    title: '`inwards stats`: hypothesis metrics from the run log'
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P0
+    size: M
+    why: The chapter-2 hypothesis has numeric pass/fail thresholds; partners need a way to produce them.
+    scope:
+    - Fix-within-one-retry rate per rule, violations per 1,000 agent-edited lines, hook latency p50/p95
+    - JSON and human output; no network
+    acceptance:
+    - Numbers match a hand-computed fixture log
+    blocked_by:
+    - E1-runlog
+  - key: E2-kit
+    title: 'Design-partner kit: onboarding, consent, data sharing'
+    type: docs
+    area:
+    - docs
+    priority: P0
+    size: S
+    why: Partners need a clear, privacy-respecting path from install to shared metrics.
+    scope:
+    - Onboarding checklist, what the run log contains, how to share it
+    - Feedback issue template
+    - 'Redaction option: hash module paths before sharing a log'
+    acceptance:
+    - Reviewed with the first partner
+    blocked_by:
+    - E2-stats
+    - E2-wheel-publish
+    - E0-partners
+  - key: E2-corpus
+    title: Real-repo corpus for the prescan differential test and benchmarks
+    type: chore
+    area:
+    - ci
+    - perf
+    priority: P0
+    size: M
+    why: Stdlib and synthetic repos aren't representative of FastAPI/Django services.
+    scope:
+    - Pin a handful of open-source service repos by commit
+    - Nightly workflow runs prescan-diff and records timings
+    acceptance:
+    - Nightly job green; results uploaded as artifacts
+    blocked_by: []
+  - key: E2-concise
+    title: '`--format concise` and `--max-diagnostics`'
+    type: feature
+    area:
+    - engine
+    - agent-kit
+    priority: P1
+    size: S
+    why: One diagnostic is about 280 tokens of JSON. Legacy repos can flood the agent's context.
+    scope:
+    - One line per violation with code, location, target and the first fix step
+    - '`--max-diagnostics N` plus a summary of what was cut'
+    acceptance:
+    - Token count per diagnostic measured and documented
+    blocked_by: []
+  - key: E2-sarif
+    title: 'CI integration: SARIF upload workflow template (UC5)'
+    type: feature
+    area:
+    - ci
+    - distribution
+    priority: P1
+    size: S
+    why: Pull requests are the last line of defence; SARIF gives inline annotations in code scanning.
+    scope:
+    - Documented workflow snippet using github/codeql-action/upload-sarif
+    - Dogfood it in this repo on examples/
+    - Add `examples/broken-app` with a known violation as the fixture
+    acceptance:
+    - The workflow on a PR touching `examples/broken-app` shows an INW001 annotation
+    blocked_by: []
+  - key: E2-startup
+    title: 'Spike: binary size and start-up (`--bytecode`, minification)'
+    type: spike
+    area:
+    - perf
+    - distribution
+    priority: P1
+    size: S
+    why: 82 MB per binary times six wheels per release eats into PyPI's project size quota, and start-up is two thirds of
+      hook latency.
+    scope:
+    - Measure start-up and size with and without --bytecode and minification
+    acceptance:
+    - Written result; adopted if it helps p95 without breaking the verify matrix
+    blocked_by:
+    - E2-bench
+  - key: E2-hygiene
+    title: 'Repo hygiene: Dependabot, issue templates, SECURITY.md'
+    type: chore
+    area:
+    - ci
+    priority: P1
+    size: S
+    why: Keeps dependencies current and gives outside contributors and partners a clear way in.
+    scope:
+    - Dependabot for github-actions, npm (bun) and uv
+    - Issue templates for feature, bug and rule proposal
+    - SECURITY.md with a private reporting channel
+    acceptance:
+    - All three present on main; Dependabot opens its first PRs
+    blocked_by: []
+  - key: E2-e2e-extras
+    title: 'E2E extras: nightly payload re-recording and doc-snippet runner'
+    type: chore
+    area:
+    - ci
+    - agent-kit
+    - docs
+    priority: P1
+    size: M
+    why: Recorded payloads can drift from Claude Code's real format, and getting-started pages can rot.
+    scope:
+    - Nightly job re-records payloads with `claude -p` (API key in secrets, cost capped)
+    - Tagged code fences in the getting-started pages run as E2E cases
+    acceptance:
+    - Drift opens an issue instead of failing silently
+    - Every tagged snippet runs in CI
+    blocked_by:
+    - E0-e2e
+    - E1-guides
+  - key: E2-decision
+    title: Go/no-go review against the chapter-2 thresholds
+    type: spike
+    area:
+    - product
+    priority: P0
+    size: S
+    why: M3-M6 only make sense if the hypothesis holds; this is the checkpoint that decides.
+    scope:
+    - Collect partner metrics via `inwards stats`, the eval report and benchmark results
+    - 'Written decision: continue, pivot or stop, with changes to M3-M6'
+    acceptance:
+    - Decision record added to docs (new ADR) and the backlog updated
+    blocked_by:
+    - E2-stats
+    - E2-kit
+- key: E3
+  title: Catch hallucinations and dodges
+  milestone: M3 · Catch hallucinations and dodges (v0.3)
+  goal: 'Inwards flags the agent-specific failure modes: imports of first-party modules that don''t exist, dynamic imports
+    that route around the layer rule, and frameworks leaking into the domain.'
+  exit_criteria:
+  - INW010, INW011 and INW005 shipped with docs and fix steps
+  - An offline eval reports the fix-within-one-retry rate for each rule
+  docs:
+  - 04-AI-Integration/#catching-hallucinated-modules
+  issues:
+  - key: E3-rule-config
+    title: 'Per-rule configuration: select, ignore, severity'
+    type: feature
+    area:
+    - engine
+    - rules
+    priority: P1
+    size: S
+    why: Teams need to phase rules in; the registry from M1 makes this cheap.
+    scope:
+    - '`select`, `ignore` and per-rule severity in [tool.inwards]'
+    - Changes to these keys are guarded like the rest of the table
+    acceptance:
+    - Tests for each key; unknown codes are config errors
+    blocked_by:
+    - E1-registry
+  - key: E3-index
+    title: Module index as an engine input for all adapters
+    type: feature
+    area:
+    - engine
+    - cli
+    priority: P0
+    size: S
+    why: Cross-file rules need to know which modules exist. ADR-006 requires the adapter to supply it.
+    scope:
+    - Expose the E1-index structures through the engine API used by the language server and future MCP server
+    - Documented contract for incremental updates
+    acceptance:
+    - The language server and CLI produce identical indexes for examples/
+    docs:
+    - 05-ADR/#adr-006-the-engine-does-no-io
+    blocked_by:
+    - E1-index
+    - E2-decision
+  - key: E3-inw010
+    title: 'INW010 unknown-first-party: hallucinated module imports'
+    type: feature
+    area:
+    - rules
+    priority: P0
+    size: M
+    why: 'The typical agent hallucination: a plausible module that doesn''t exist.'
+    scope:
+    - Flag imports of first-party modules missing from the index
+    - Fix steps list the closest real modules (edit distance)
+    acceptance:
+    - No false positives on the real-repo corpus (E2-corpus) or examples/
+    blocked_by:
+    - E3-index
+    - E1-registry
+    - E2-corpus
+  - key: E3-inw011
+    title: 'INW011 (non-literal targets): flag unverifiable dynamic imports in inner layers'
+    type: feature
+    area:
+    - rules
+    priority: P1
+    size: M
+    why: '`importlib.import_module` is the next dodge after function-level imports.'
+    scope:
+    - Non-literal targets of the calls covered by E1-inw011-literal, in inner layers, reported as unverifiable
+    acceptance:
+    - Tests for importlib.import_module, __import__, and aliases
+    blocked_by:
+    - E1-inw011-literal
+  - key: E3-inw005
+    title: 'INW005 pure-domain: third-party and I/O libraries per layer'
+    type: feature
+    area:
+    - rules
+    priority: P0
+    size: M
+    why: SQLAlchemy or FastAPI in the domain is the most common leak and isn't caught by INW001.
+    scope:
+    - Per-layer allow/deny lists of third-party packages; stdlib list bundled
+    - Sensible default deny list for the innermost layer
+    acceptance:
+    - Distinguishes first-party, stdlib and third-party correctly
+    blocked_by:
+    - E3-index
+    - E1-registry
+  - key: E3-eval-rules
+    title: Run the eval harness on INW010, INW011 and INW005
+    type: spike
+    area:
+    - agent-kit
+    - rules
+    priority: P0
+    size: S
+    why: New rules need the same fix-rate evidence as INW001.
+    scope:
+    - Fixtures per rule; reuse the harness from E0-eval-inw001
+    acceptance:
+    - Per-rule fix rate and evasions in the eval report
+    blocked_by:
+    - E0-eval-inw001
+    - E3-inw010
+    - E3-inw011
+    - E3-inw005
+  - key: E3-ruledocs
+    title: Per-rule documentation pages linked from diagnostics
+    type: docs
+    area:
+    - docs
+    - rules
+    priority: P1
+    size: S
+    why: Diagnostics currently link to the rule catalogue; each rule needs examples, rationale and fixes.
+    scope:
+    - docs/rules/INWxxx pages; DOCS link per rule
+    acceptance:
+    - Every shipped rule has a page; links checked in CI
+    - Pages in `zensical.toml` nav; strict build green
+    blocked_by:
+    - E1-registry
+  - key: E3-suppress
+    title: Inline suppressions with a mandatory reason
+    type: feature
+    area:
+    - engine
+    - agent-kit
+    priority: P1
+    size: M
+    why: Suppressions are an evasion path; they must be visible and accountable.
+    scope:
+    - '`# inwards: ignore[INW001] reason="..."` on the import line'
+    - Missing reason is itself a diagnostic; summary counts suppressions
+    - Hook option to reject suppressions added by the agent
+    acceptance:
+    - Tests for valid, reasonless and unknown-code suppressions
+    blocked_by: []
+- key: E4
+  title: Architectures beyond the onion
+  milestone: M4 · Architectures beyond the onion (v0.4)
+  goal: Vertical slices, bounded contexts and hexagonal public APIs can be expressed in config and are enforced, including
+    import cycles.
+  exit_criteria:
+  - Config schema v2 published with a JSON Schema
+  - INW002 and INW004 shipped
+  - Warm full runs use the cache
+  docs:
+  - 03-Architecture-C4/#rule-catalogue
+  issues:
+  - key: E4-schema
+    title: Config schema v2 with JSON Schema (contexts, public modules, patterns)
+    type: feature
+    area:
+    - engine
+    priority: P0
+    size: M
+    why: Non-linear rules need more syntax; ADR-005 promised separate tables so the simple case stays simple.
+    scope:
+    - Tables for contexts/slices and public modules; glob patterns for layer membership
+    - JSON Schema published (SchemaStore) for editor completion
+    - v1 configs keep working unchanged
+    acceptance:
+    - Schema validates all example configs; errors name the key
+    docs:
+    - 05-ADR/#adr-005-configuration-lives-in-pyprojecttoml
+    blocked_by:
+    - E2-decision
+  - key: E4-inw002
+    title: INW002 context-independence for bounded contexts and vertical slices
+    type: feature
+    area:
+    - rules
+    priority: P0
+    size: M
+    why: Slices reaching into each other's internals is the vertical-slice equivalent of INW001.
+    scope:
+    - Contexts may not import each other except through declared public modules
+    acceptance:
+    - Fixture with three slices covering allowed and forbidden cases
+    blocked_by:
+    - E4-schema
+  - key: E4-inw003
+    title: INW003 public-api-only
+    type: feature
+    area:
+    - rules
+    priority: P1
+    size: M
+    why: Hexagonal modules expose ports through a public module; importing internals couples callers to details.
+    scope:
+    - Imports must stop at the declared public module (`__init__` or `api.py`)
+    acceptance:
+    - Fix steps name the public symbol when it exists
+    blocked_by:
+    - E4-schema
+  - key: E4-inw004
+    title: Import graph and INW004 no-cycles
+    type: feature
+    area:
+    - engine
+    - rules
+    - perf
+    priority: P0
+    size: L
+    why: Cycles between modules or contexts are a classic architecture smell; Biome calls its cycle rule expensive, so design
+      for caching.
+    scope:
+    - Graph built from cached import lists; cycles reported once, with the full path
+    - Module-level and context-level modes
+    acceptance:
+    - Cold run on the synthetic repo stays within the < 1 s budget
+    blocked_by:
+    - E3-index
+    - E4-cache
+    - E4-schema
+  - key: E4-importlinter
+    title: Convert import-linter contracts (`inwards import-config`)
+    type: feature
+    area:
+    - cli
+    priority: P2
+    size: M
+    why: import-linter is the incumbent; migration should be one command.
+    scope:
+    - layers, forbidden and independence contracts mapped to v2 config
+    - Report contracts that can't be mapped
+    acceptance:
+    - Round-trip on import-linter's own examples
+    blocked_by:
+    - E4-schema
+  - key: E4-cache
+    title: Content-hash cache of import lists (`.inwards/cache`)
+    type: feature
+    area:
+    - perf
+    - engine
+    priority: P0
+    size: M
+    why: Unchanged files shouldn't be parsed again; also the base for the import graph.
+    scope:
+    - Keyed by file hash + engine version + grammar version
+    - Safe under concurrent runs
+    acceptance:
+    - Warm full run on the synthetic repo at least 5x faster than cold
+    blocked_by:
+    - E2-bench
+  - key: E4-roots
+    title: Multi-package monorepos and namespace packages
+    type: feature
+    area:
+    - engine
+    - cli
+    priority: P1
+    size: M
+    why: 'Known limitations in chapter 3: one root per config, namespace packages resolve relative imports as regular packages.'
+    scope:
+    - Several roots in one config, or per-file nearest-config discovery
+    - Correct relative-import resolution in implicit namespace packages
+    - The language server's first-workspace-folder limitation is handled in E6-server
+    - Extend the E1-guard config pinning to multi-root discovery
+    acceptance:
+    - Fixture monorepo with two packages and a namespace package passes
+    docs:
+    - 03-Architecture-C4/#known-limitations
+    blocked_by: []
+  - key: E4-context
+    title: '`inwards context`: architecture brief for AGENTS.md / CLAUDE.md (UC7)'
+    type: feature
+    area:
+    - cli
+    - agent-kit
+    priority: P1
+    size: M
+    why: Avoiding a violation costs nothing; fixing one costs a retry.
+    scope:
+    - Compact layer map, allowed directions, where ports live
+    - Updates a marked section in place
+    - Behind a flag (`inwards init --brief`) so design partners can A/B it without confounding the violation-rate metric
+    - '`inwards init` calls it when the flag is set'
+    acceptance:
+    - Brief under 300 tokens for the example config
+    blocked_by:
+    - E1-init
+  tentative: true
+- key: E5
+  title: Speed at scale
+  milestone: M5 · Speed at scale (v0.5)
+  goal: Single-file hook checks stay well under 100 ms p95 on real repos, and cold full runs scale with cores, with regressions
+    caught in CI.
+  exit_criteria:
+  - Hook p95 with the resident process, reported as the median of 10 benchmark runs on ubuntu-latest, under 50 ms
+  - Cold 500k-line run at least 3x faster than single-threaded on ubuntu-latest (4 vCPU)
+  - Resident-process ADR accepted
+  docs:
+  - 06-Constraints-and-Quality/#performance-roadmap
+  issues:
+  - key: E5-resident-adr
+    title: 'Spike + ADR: resident process design (one process or two, protocol, names)'
+    type: spike
+    area:
+    - perf
+    - lsp
+    priority: P0
+    size: S
+    why: The hook daemon and the LSP server could share one process. Chapter 6 and the backlog used conflicting names.
+    scope:
+    - Decide process model, socket protocol and command names
+    - New ADR; chapter 6 and ADR-008 updated
+    acceptance:
+    - ADR accepted before E5-daemon starts
+    blocked_by: []
+  - key: E5-daemon
+    title: Resident process for hooks (`inwards daemon`) with one-shot fallback
+    type: feature
+    area:
+    - perf
+    - cli
+    priority: P0
+    size: L
+    why: About 25 ms of every hook call is process and WASM start-up; parsing is ~1 ms.
+    scope:
+    - Hooks talk to a per-repo daemon over a local socket; start on demand, exit when idle
+    - Transparent fallback to one-shot runs
+    acceptance:
+    - Hook p95 < 50 ms in the benchmark job
+    blocked_by:
+    - E2-bench
+    - E0-hook
+    - E5-resident-adr
+  - key: E5-workers
+    title: Worker pool for cold full runs
+    type: feature
+    area:
+    - perf
+    - cli
+    priority: P0
+    size: M
+    why: The engine runs on one core; CI runners have several.
+    scope:
+    - One parser per worker; deterministic output order
+    acceptance:
+    - At least 3x faster than single-threaded on ubuntu-latest (4 vCPU), deterministic output order
+    blocked_by:
+    - E2-bench
+  - key: E5-cursor
+    title: Replace `descendantsOfType` with a tree-cursor walk on the full-parse path
+    type: chore
+    area:
+    - perf
+    - engine
+    priority: P2
+    size: S
+    why: Profiling spent 1.2 s there on the naive design; the full parse still runs for refused files and confirmations.
+    scope:
+    - Cursor-based extraction with identical results
+    acceptance:
+    - Prescan differential test unchanged; measurable speed-up on refused files
+    blocked_by:
+    - E2-bench
+  tentative: true
+- key: E6
+  title: Editors everywhere
+  milestone: M6 · Editors everywhere (v0.6)
+  goal: Every LSP editor gets Inwards from the same binary, the VS Code extension is on the marketplaces, and Copilot users
+    have a supported setup.
+  exit_criteria:
+  - '`inwards server` replaces the Node language server (ADR-008 superseded)'
+  - Extension published to VS Code Marketplace and Open VSX
+  - Copilot getting-started page published
+  docs:
+  - 05-ADR/#adr-008-language-server-on-node-inside-the-extension-for-now
+  issues:
+  - key: E6-server
+    title: '`inwards server`: stdio LSP inside the binary'
+    type: feature
+    area:
+    - lsp
+    - cli
+    priority: P0
+    size: L
+    why: 'ADR-008 planned this: one server for VS Code, Neovim, Zed and Helix.'
+    scope:
+    - Diagnostics on open/change/save, workspace config reload
+    - New ADR superseding ADR-008
+    - Keeps the module index up to date on file create/delete/rename
+    - 'Multi-root workspaces: per-folder config'
+    acceptance:
+    - Same diagnostics as `inwards check` on examples/ (snapshot test)
+    blocked_by:
+    - E5-resident-adr
+    - E3-index
+  - key: E6-vscode
+    title: VS Code extension as thin client; publish to Marketplace and Open VSX
+    type: feature
+    area:
+    - lsp
+    - distribution
+    priority: P0
+    size: M
+    why: The Node server bundled today is a stopgap.
+    scope:
+    - Extension starts the bundled or configured binary
+    - Publishing workflow on release tags
+    acceptance:
+    - Install from the marketplace works on the three OSes
+    blocked_by:
+    - E6-server
+    - E0-release
+  - key: E6-mcp
+    title: '`inwards mcp`: MCP server (check_files, explain_rule, where_should_this_go)'
+    type: feature
+    area:
+    - agent-kit
+    priority: P1
+    size: L
+    why: Agents with MCP can ask where new code belongs before writing it.
+    scope:
+    - Three tools over stdio; reuses the engine
+    acceptance:
+    - Works in Claude Code and one other MCP client
+    blocked_by:
+    - E3-index
+  - key: E6-editors
+    title: Setup docs for Neovim, Zed and Helix
+    type: docs
+    area:
+    - docs
+    - lsp
+    priority: P2
+    size: S
+    why: Once the server is in the binary, other editors only need configuration.
+    scope:
+    - One tested snippet per editor
+    acceptance:
+    - Each snippet verified by hand and dated
+    - Pages in `zensical.toml` nav; strict build green
+    blocked_by:
+    - E6-server
+  - key: E6-copilot
+    title: 'Getting-started guide: Copilot (agent mode and coding agent)'
+    type: docs
+    area:
+    - docs
+    priority: P0
+    size: S
+    why: Copilot sees Inwards through the extension's diagnostics and through CI.
+    scope:
+    - Agent mode with the marketplace extension
+    - 'Coding agent: copilot-setup-steps.yml plus SARIF'
+    acceptance:
+    - Pages in `zensical.toml` nav; strict build green
+    blocked_by:
+    - E6-vscode
+    - E2-sarif
+  tentative: true

@@ -110,3 +110,16 @@ describe("text reporter colour", () => {
     expect(render(report, "text", { color: true })).toContain("\x1b[31m");
   });
 });
+
+describe("backslash continuations (review round 3)", () => {
+  test("`from x \\` + newline + `import y` is caught", () => {
+    const src = "from shop.infrastructure \\\n    import sql_orders\n";
+    const [d] = engine.checkFile(file("shop/domain/order.py", src));
+    expect(d?.message).toContain("shop.infrastructure.sql_orders");
+  });
+
+  test("`import \\` + newline + module is caught", () => {
+    const src = "import \\\n    shop.infrastructure.db\n";
+    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+  });
+});

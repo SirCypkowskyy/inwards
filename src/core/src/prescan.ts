@@ -26,6 +26,9 @@ export function importSkeleton(source: string): Skeleton | null {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
+    // `from x \` + newline + `import y` would otherwise look like `import y`.
+    const continued = (lines[i - 1] ?? "").trimEnd().endsWith("\\");
+    if (continued && MENTIONS_IMPORT.test(line)) return null;
     const m = STARTS_IMPORT.exec(line);
     if (!m) {
       // A comment can't hide an import. Anything else that mentions one might.

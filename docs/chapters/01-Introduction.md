@@ -42,7 +42,7 @@ layers = [
   <figcaption>The example app as shipped: every import points inward.</figcaption>
 </figure>
 
-Layers are listed innermost first. A module may import its own layer and anything listed before it. Modules that match no layer (scripts, tests, migrations) are not checked. When the domain imports infrastructure, you get this (abridged, one diagnostic out of the `diagnostics` array):
+Layers are listed innermost first. A module may import its own layer and anything listed before it. Modules that match no layer (scripts, tests, migrations) are not checked today. An agent could use that gap by putting new code in a package outside every layer, so INW006, planned for 0.1, will flag unassigned first-party packages. When the domain imports infrastructure, you get this (abridged, one diagnostic out of the `diagnostics` array):
 
 ```json
 {

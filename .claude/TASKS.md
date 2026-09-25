@@ -54,7 +54,18 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] Docs on GitHub Pages (docs.yml), Cloudflare kept as manual docs-cloudflare.yml, ADR-012
 - [x] DOCS_BASE -> https://sircypkowskyy.github.io/inwards, diagnostics link to the rule catalogue
 
+- [x] Local folder renamed to ~/Documents/GitHub/inwards (venv recreated, memory copied to the new project key)
+
+## Round 4 (2026-09-25): backlog on GitHub
+- [x] Local folder renamed to inwards
+- [x] Backlog drafted in `.claude/plan/backlog.yaml` (source of truth)
+- [x] Review round 1 (architecture/product), fixes applied
+- [x] Review round 2 (delivery/QA + sync script), fixes applied; new M0 milestone
+- [x] Review round 3 (adversarial/product/script), fixes applied
+- [x] Two false negatives found in review fixed in code with tests: backslash-continued imports, build/dist/site dirs skipped at any depth
+- [x] `scripts/sync-backlog.py` created labels, 7 milestones, 7 epics, 60 issues, sub-issues, dependencies
+
 ## Blocked on the user
+- Reserve `inwards` on PyPI/npm (E0-names): publishing placeholders is outward-facing, left to the owner
 - Optional: Cloudflare token with Workers Scripts > Edit, only if moving docs back to Cloudflare
-- Local folder is still ~/Documents/GitHub/stratum (not renamed, to avoid breaking open sessions)
 - Design partners for the business-hypothesis metrics

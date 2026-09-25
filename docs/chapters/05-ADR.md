@@ -11,7 +11,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :white_check_mark: Accepted |
 | [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :white_check_mark: Accepted |
-| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-progress-clock: Accepted, revisit at 0.3 |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-progress-clock: Accepted, revisit in M6 (v0.6) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :white_check_mark: Accepted |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Docs built with Zensical, served by Cloudflare Workers | :material-swap-horizontal: Hosting superseded by 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :white_check_mark: Accepted |
@@ -87,7 +87,7 @@ Each record states the decision, the context it was made in, what it costs us, a
   <figcaption>The differential test on the CPython 3.14 standard library. CI runs the same script on every push.</figcaption>
 </figure>
 
-- :material-alert-outline: One theoretical gap remains: an unbalanced bracket inside a string *on an import line* could make the prescan copy the wrong span. Such a file hasn't shown up in the corpus yet. If one does, the differential test will catch it.
+- :material-alert-outline: Review found a real gap the corpus never showed: `from shop.infrastructure \` with `import sql_orders` on the next line was read as `import sql_orders`, and the violation went unreported. The prescan now refuses any file where a line mentioning `import` follows a backslash continuation, and unit tests pin both spellings. The stdlib corpus contains no such imports, so an adversarial spelling generator for the differential test is on the backlog. One theoretical gap remains: an unbalanced bracket inside a string on an import line.
 - :material-minus-circle-outline: Files with violations pay for two parses. On a legacy repo with many violations that approaches the naive cost, until the baseline (UC6) lets the engine skip re-confirming known violations.
 - :material-minus-circle-outline: Future rules that need more than imports (for example "no framework decorators in the domain") can't use the skeleton and will need their own fast path or the full parse.
 
@@ -144,7 +144,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 ## ADR-008: Language server on Node inside the extension, for now
 
-**Status:** Accepted, revisit at 0.3 · 2026-09-25
+**Status:** Accepted, revisit in M6 (v0.6) · 2026-09-25
 
 **Context.** Ruff and ty ship their language server inside the same binary (`ruff server`). That gives every LSP-capable editor (Neovim, Zed, Helix) the server for free. Inwards' scaffold instead bundles a Node LSP server into the VS Code extension, next to the grammar files.
 

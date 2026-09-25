@@ -79,7 +79,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 | Step | Expected effect | Targets |
 |---|---|---|
-| Resident process (`inwards server`, reused by hooks through a socket, with fallback to a one-shot run) | Removes ~25 ms of WASM and runtime start-up from every hook call | Single-file p95 |
+| Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it) | Removes ~25 ms of WASM and runtime start-up from every hook call | Single-file p95 |
 | `bun build --bytecode` | Faster JS start-up. Bun's docs cite a large CLI going from 1.0 s to 0.53 s cold. Our bundle is small, so the gain will be smaller and needs measuring | Single-file p95 |
 | Worker pool, one parser per core | Near-linear speed-up on the cold full run; this laptop has 22 logical CPUs | Cold full run |
 | Content-hash cache of import lists (`.inwards/cache`) | Unchanged files skip parsing entirely | Warm full run, stop hook |
