@@ -1,22 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mentionsDynamicImport } from "../src/dynamic.ts";
 import { skeletonImports } from "../src/prescan.ts";
-import { engine, file, parser } from "./helpers.ts";
-
-const TARGET = /imports "(?<t>[^"]+)"/u;
-
-/**
- * Checks a snippet as a domain module and lists what INW011 reports.
- *
- * @param src - Python source.
- * @param path - where the file sits; a domain module by default.
- * @returns `[code, target]` for each diagnostic, the target read from the message.
- */
-function found(src: string, path = "shop/domain/order.py"): [string, string][] {
-  return engine
-    .checkFile(file(path, src))
-    .map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
-}
+import { engine, file, found, parser } from "./helpers.ts";
 
 describe("INW011 dynamic-import: call forms", () => {
   test.each([

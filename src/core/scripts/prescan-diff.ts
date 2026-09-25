@@ -216,6 +216,8 @@ const FORMS = [
   "compile(b'from M import x', 'f', 'exec')",
   "ｅｘｅｃ('import M')",
   "(exec)('import M')",
+  "vars(importlib)['import_module']('M')",
+  "exec('import ' + 'M')",
 ];
 
 // Strings and comments: the forms that can swallow or be swallowed by their neighbours.

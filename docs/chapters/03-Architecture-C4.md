@@ -248,7 +248,11 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 - The language server reads only the first workspace folder's `pyproject.toml`.
 - Implicit namespace packages (no `__init__.py`) work for naming, but relative imports inside them resolve as if the directory were a regular package.
 - Layer membership is by module prefix only. Glob patterns (`shop.*.domain`) for vertical slices are planned together with INW002.
-- Dynamic imports are checked only when the target is a string literal (INW011). `importlib.import_module(name)` with a computed `name`, a relative `import_module` without a literal `package`, `__package__` or `__name__`, and literals that use a `\N{...}` escape are not read. Flagging those as unverifiable is [#46](https://github.com/SirCypkowskyy/inwards/issues/46).
+- Dynamic imports are checked only when the target is a constant string (INW011). Known gaps:
+    - computed targets (`importlib.import_module(name)`, a module-level `TARGET = "..."` constant, `str.format`), a relative `import_module` without a literal `package`, `__package__` or `__name__`, and literals that use a `\N{...}` escape. Flagging those as unverifiable is [#46](https://github.com/SirCypkowskyy/inwards/issues/46);
+    - loaders reached through a walrus, tuple assignment, class or instance attributes, `functools.partial`, a name bound inside `exec`, or an object (`print.__self__.exec`): [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
+    - other loading APIs: `pkgutil.resolve_name`, `importlib.util.find_spec` with `exec_module`, and `SourceFileLoader(...).load_module()`: [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
+    - a builtin rebound inside a function or an `if` still counts as the builtin, which can give a false positive.
 - Modules that belong to no layer are unchecked, and so are imports into them. A new `shop/persistence/` package escapes every rule, and a mistyped prefix silently matches nothing. INW006 and stricter config validation close this in 0.1.
 
 ## Rule catalogue
@@ -263,7 +267,7 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 | INW006 | `unassigned-module` | A first-party package that belongs to no layer, or an import into one; also dead or overlapping layer prefixes | :material-progress-clock: 0.1 |
 | INW005 | `pure-domain` | The domain layer importing frameworks or I/O libraries (`sqlalchemy`, `fastapi`, `requests`...) | :material-progress-clock: |
 | INW010 | `unknown-first-party` | Importing a first-party module that doesn't exist, the typical agent hallucination | :material-progress-clock: needs the module index |
-| INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source. Import aliases, `name = loader` assignments and `getattr(m, "name")` are followed. A common way to dodge INW001 | :white_check_mark: literal targets |
+| INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. A common way to dodge INW001. Known gaps are listed above | :white_check_mark: literal targets |
 
 ## Code map
 
@@ -278,6 +282,7 @@ src/
 │   │   ├── layers.ts      # INW001 + fix composer
 │   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
 │   │   ├── callees.ts     # which calls are loaders, through aliases
+│   │   ├── shadows.ts     # builtins a module rebinds
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / json / sarif

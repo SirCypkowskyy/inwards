@@ -98,43 +98,61 @@ export function literalString(node: Node | null): string | null {
 }
 
 /**
- * Reads the literal source of `exec`, `eval` or `compile`: `str` or UTF-8 bytes.
+ * Reads the literal source of `exec`, `eval` or `compile`: `str`, or bytes read as UTF-8.
+ * The caller must still honour a coding declaration in bytes, as CPython does.
  *
  * @param node - the source argument, or null.
- * @returns the source text, or null when it is not a constant.
+ * @returns the source text and whether it came from bytes, or null when it is not a constant.
  */
-export function literalSource(node: Node | null): string | null {
+export function literalSource(node: Node | null): { text: string; bytes: boolean } | null {
   const literal = node ? literalValue(node) : null;
   if (!literal) {
     return null;
   }
   if (!literal.bytes) {
-    return literal.value;
+    return { text: literal.value, bytes: false };
   }
   const bytes = Uint8Array.from(literal.value, (ch) => ch.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
+  return { text: new TextDecoder().decode(bytes), bytes: true };
 }
 
 /**
- * Decodes a string literal, including implicit concatenation and parentheses.
+ * Decodes a constant string expression: a literal, implicit concatenation,
+ * `+` between constants, and parentheses.
  *
  * @param node - an expression node.
  * @returns the value, or null for anything that is not a constant string.
  */
 function literalValue(node: Node): Literal | null {
-  if (node.type === "parenthesized_expression") {
-    const [inner, ...more] = namedChildren(node);
-    return inner && more.length === 0 ? literalValue(inner) : null;
+  switch (node.type) {
+    case "parenthesized_expression": {
+      const [inner, ...more] = namedChildren(node);
+      return inner && more.length === 0 ? literalValue(inner) : null;
+    }
+    case "string":
+      return stringPart(node);
+    case "concatenated_string":
+      return joined(
+        namedChildren(node).map((part) => (part.type === "string" ? stringPart(part) : null)),
+      );
+    case "binary_operator": {
+      const left = node.childForFieldName("left");
+      const right = node.childForFieldName("right");
+      const plus = node.childForFieldName("operator")?.type === "+";
+      return plus && left && right ? joined([literalValue(left), literalValue(right)]) : null;
+    }
+    default:
+      return null;
   }
-  if (node.type === "string") {
-    return stringPart(node);
-  }
-  if (node.type !== "concatenated_string") {
-    return null;
-  }
-  const parts = namedChildren(node).map((part) =>
-    part.type === "string" ? stringPart(part) : null,
-  );
+}
+
+/**
+ * Joins constant parts into one value, as Python's concatenation does.
+ *
+ * @param parts - the decoded parts, null where a part is not constant.
+ * @returns the joined value, or null when a part is missing or str is mixed with bytes.
+ */
+function joined(parts: readonly (Literal | null)[]): Literal | null {
   const [first] = parts;
   if (!first || parts.some((part) => part === null || part.bytes !== first.bytes)) {
     return null; // not all constant, or str mixed with bytes
@@ -146,8 +164,9 @@ const STRING_START = /^(?<prefix>[A-Za-z]*)(?:'''|"""|'|")$/u;
 
 /**
  * Decodes one string literal token, with its prefix (`r`, `b`, `f`, `u`).
- * An f-string counts only when it has no replacement fields; a t-string is
- * never a `str`.
+ * An f-string counts when each replacement field is itself a constant `str`
+ * with no conversion or format spec (`f"shop.{'infrastructure'}"`); a
+ * t-string is never a `str`.
  *
  * @param node - a `string` node.
  * @returns the value, or null when the string is not constant.
@@ -156,23 +175,60 @@ function stringPart(node: Node): Literal | null {
   const start = node.firstChild;
   const end = node.lastChild;
   const prefix = STRING_START.exec(start?.text ?? "")?.groups?.["prefix"]?.toLowerCase();
-  const interpolated = node.children.some((c) => c?.type === "interpolation");
-  if (!(start && end) || end.type !== "string_end" || prefix === undefined || interpolated) {
+  if (!(start && end) || end.type !== "string_end" || prefix === undefined) {
     return null;
   }
   if (prefix.includes("t")) {
     return null;
   }
+  const bytes = prefix.includes("b");
+  const pieces: string[] = [];
+  let from = start.endIndex;
+  for (const field of node.children) {
+    if (field?.type !== "interpolation") {
+      continue;
+    }
+    const text = textPiece(node, from, field.startIndex, prefix);
+    const value = fieldValue(field);
+    if (text === null || value === null) {
+      return null;
+    }
+    pieces.push(text, value);
+    from = field.endIndex;
+  }
+  const last = textPiece(node, from, end.startIndex, prefix);
+  return last === null ? null : { value: [...pieces, last].join(""), bytes };
+}
+
+/**
+ * Decodes the literal text between two offsets of a string token.
+ *
+ * @param node - the `string` node.
+ * @param from - start offset in the source, inclusive.
+ * @param to - end offset in the source, exclusive.
+ * @param prefix - the string's lower-cased prefix.
+ * @returns the decoded text, or null for an escape Inwards can't decode.
+ */
+function textPiece(node: Node, from: number, to: number, prefix: string): string | null {
   // Python reads CRLF inside a literal as \n.
-  let body = node.text
-    .slice(start.text.length, node.text.length - end.text.length)
-    .replaceAll("\r\n", "\n");
+  let body = node.text.slice(from - node.startIndex, to - node.startIndex).replaceAll("\r\n", "\n");
   if (prefix.includes("f")) {
     body = body.replaceAll("{{", "{").replaceAll("}}", "}");
   }
-  const bytes = prefix.includes("b");
-  const value = prefix.includes("r") ? body : decodeEscapes(body, bytes);
-  return value === null ? null : { value, bytes };
+  return prefix.includes("r") ? body : decodeEscapes(body, prefix.includes("b"));
+}
+
+/**
+ * Reads a replacement field whose expression is a constant `str`.
+ *
+ * @param field - an `interpolation` node.
+ * @returns the value, or null when the field is computed, converted or formatted.
+ */
+function fieldValue(field: Node): string | null {
+  // `{`, the expression, `}`: anything else is `!r`, `:spec` or `=`.
+  const [open, expression, close, ...rest] = field.children;
+  const plain = open?.type === "{" && close?.type === "}" && rest.length === 0;
+  return plain && expression ? literalString(expression) : null;
 }
 
 const ESCAPE =

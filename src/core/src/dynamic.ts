@@ -28,10 +28,12 @@ import {
   LOADERS,
   type LoaderKind,
   qualify,
+  type Scope,
   syntaxOf,
 } from "./callees.ts";
 import type { LayerSpec } from "./config.ts";
-import { allowedDirection, outwardImports, portSteps } from "./layers.ts";
+import { unreadableEncoding } from "./encoding.ts";
+import { allowedDirection, layerIndexOf, outwardImports, portSteps } from "./layers.ts";
 import {
   argumentAt,
   identifierName,
@@ -48,12 +50,18 @@ import {
   resolveRelative,
 } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
+import { bindingsAt, moduleShadows } from "./shadows.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 /** An import made by a call rather than an import statement. */
 export interface DynamicImportRef extends ImportRef {
   /** The loading call as written in the report, e.g. `importlib.import_module` or `exec`. */
   via: string;
+  /**
+   * The codec a bytes source for `exec` or `compile` declares when Inwards
+   * can't read it (PEP 263, as for files); `target` is then empty. Null otherwise.
+   */
+  unreadable: string | null;
 }
 
 /**
@@ -101,10 +109,11 @@ export function extractDynamicImports(
   const refs: DynamicImportRef[] = [];
   for (const { call, loads } of loadingCalls(parser, tree.rootNode, file, base)) {
     const statement = shorten(call.text);
-    for (const { target, via } of loads) {
+    for (const { target, via, unreadable } of loads) {
       refs.push({
         target,
         via,
+        unreadable,
         statement,
         line: call.startPosition.row + 1,
         column: call.startPosition.column + 1,
@@ -119,19 +128,21 @@ export function extractDynamicImports(
 /**
  * Applies INW011: a dynamic import must not reach an outer layer either.
  * Same direction rule as INW001, with a fix that tells the agent the loader
- * itself is the problem.
+ * itself is the problem. A call whose bytes source declares an encoding
+ * Inwards can't read is reported in any layer, since its imports are unknown.
  *
  * @param file - the file the imports come from.
  * @param refs - the dynamic imports found in that file.
  * @param layers - the configured layers, innermost first.
- * @returns one diagnostic per dynamic import that points outward.
+ * @returns one diagnostic per dynamic import that points outward or can't be read.
  */
 export function checkDynamicImports(
   file: SourceFile,
   refs: readonly DynamicImportRef[],
   layers: readonly LayerSpec[],
 ): Diagnostic[] {
-  return outwardImports(file, refs, layers).map(({ ref, source, target }) => {
+  const readable = refs.filter((ref) => ref.unreadable === null);
+  const outward = outwardImports(file, readable, layers).map(({ ref, source, target }) => {
     const message =
       `Layer "${source.name}" imports "${ref.target}" from outer layer "${target.name}" ` +
       `through a dynamic import (${ref.via}). Allowed direction: ${allowedDirection(layers)}.`;
@@ -147,6 +158,39 @@ export function checkDynamicImports(
       },
     });
   });
+  if (layerIndexOf(file.module, layers) === -1) {
+    return outward;
+  }
+  const unreadable = refs.flatMap((ref) =>
+    ref.unreadable === null ? [] : [unreadableSource(file, ref, ref.unreadable)],
+  );
+  return [...outward, ...unreadable];
+}
+
+/**
+ * Reports a loader call whose bytes source Inwards can't decode.
+ *
+ * @param file - the calling file.
+ * @param ref - the call.
+ * @param encoding - the codec the source declares.
+ * @returns the INW011 diagnostic.
+ */
+function unreadableSource(file: SourceFile, ref: DynamicImportRef, encoding: string): Diagnostic {
+  const message =
+    `The ${ref.via} call runs bytes that declare encoding "${encoding}", which can hide imports ` +
+    "from Inwards, so the imports in that source were not checked.";
+  return diagnostic(RULES.INW011, file, {
+    span: ref,
+    message,
+    fix: {
+      summary: "Replace the executed bytes with ordinary code, so its imports are checked.",
+      steps: [
+        `Delete \`${ref.statement}\`.`,
+        "Write the code it ran as plain Python in this module or a module of the right layer.",
+        "If that code needs something from an outer layer, declare a typing.Protocol in this layer and receive the implementation as a parameter.",
+      ],
+    },
+  });
 }
 
 const BUILTINS_PREFIX = /^builtins\./u;
@@ -155,7 +199,12 @@ const BUILTINS_PREFIX = /^builtins\./u;
 interface Load {
   target: string;
   via: string;
+  /** Set instead of `target` when the call's bytes source can't be read. */
+  unreadable: string | null;
 }
+
+/** What a loader call loads, before the loader's name is attached. */
+type Loaded = Omit<Load, "via">;
 
 /**
  * Finds the loading calls under a node and what each one loads.
@@ -176,9 +225,10 @@ function loadingCalls(
 ): { call: Node; loads: Load[] }[] {
   const syntax = syntaxOf(root);
   const bindings = collectBindings(syntax, outer);
+  const scope: Scope = { bindings, shadows: moduleShadows(root, syntax, bindings) };
   const found: { call: Node; loads: Load[] }[] = [];
   for (const call of syntax) {
-    const loads = call.type === "call" ? loadsOf(parser, call, file, bindings) : [];
+    const loads = call.type === "call" ? loadsOf(parser, call, file, scope) : [];
     if (loads.length > 0) {
       found.push({ call, loads });
     }
@@ -192,21 +242,21 @@ function loadingCalls(
  * @param parser - parser with the Python grammar loaded.
  * @param call - a `call` node.
  * @param file - the file being checked.
- * @param bindings - names bound where the call runs.
+ * @param scope - what names mean in the calling module.
  * @returns the loaded modules, each with the loader's name; empty for any other call.
  */
-function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): Load[] {
+function loadsOf(parser: Parser, call: Node, file: SourceFile, scope: Scope): Load[] {
   const fn = call.childForFieldName("function");
   const loads: Load[] = [];
-  for (const qualified of new Set(fn ? qualify(fn, bindings) : [])) {
+  for (const qualified of new Set(fn ? qualify(fn, scope) : [])) {
     const kind = LOADERS.get(qualified);
     if (kind) {
       const via = qualified.replace(BUILTINS_PREFIX, "");
-      const targets =
+      const loaded: Loaded[] =
         kind === "source"
-          ? sourceTargets(parser, call, file, bindings)
-          : moduleTargets(kind, call, file);
-      loads.push(...targets.map((target) => ({ target, via })));
+          ? sourceTargets(parser, call, file, bindingsAt(scope, call.startIndex))
+          : moduleTargets(kind, call, file).map((target) => ({ target, unreadable: null }));
+      loads.push(...loaded.map((load) => ({ ...load, via })));
     }
   }
   return loads;
@@ -318,25 +368,34 @@ function dunderImportTargets(call: Node, file: SourceFile): string[] {
  * Lists the imports made by the literal source of `exec`, `eval` or `compile`.
  * The source is parsed as Python. Its import statements and its own dynamic
  * imports count; relative ones resolve against the calling file, whose globals
- * the code runs in. Names the caller bound stay bound inside.
+ * the code runs in. Names the caller bound stay bound inside. Bytes are
+ * decoded as CPython does: a PEP 263 declaration counts, and a codec Inwards
+ * can't read makes the whole source unreadable.
  *
  * @param parser - parser with the Python grammar loaded.
  * @param call - the `call` node.
  * @param file - the calling file.
- * @param bindings - names bound in the calling file.
+ * @param bindings - names bound in the calling file at the call.
  * @returns the modules the source imports, empty when it isn't a literal.
  */
-function sourceTargets(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): string[] {
+function sourceTargets(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): Loaded[] {
   const source = literalSource(argumentAt(call, 0, "source"));
   if (source === null) {
     return [];
   }
-  const tree = parsePython(parser, normalizeSource(source));
+  const text = normalizeSource(source.text);
+  const unreadable = source.bytes ? unreadableEncoding(text) : null;
+  if (unreadable !== null) {
+    return [{ target: "", unreadable }];
+  }
+  const tree = parsePython(parser, text);
   try {
     const nested = loadingCalls(parser, tree.rootNode, file, bindings);
     return [
-      ...extractImports(tree, file).map((ref) => ref.target),
-      ...nested.flatMap(({ loads }) => loads.map((load) => load.target)),
+      ...extractImports(tree, file).map((ref) => ({ target: ref.target, unreadable: null })),
+      ...nested.flatMap(({ loads }) =>
+        loads.map(({ target, unreadable: inner }) => ({ target, unreadable: inner })),
+      ),
     ];
   } finally {
     tree.delete(); // WASM memory is not garbage collected

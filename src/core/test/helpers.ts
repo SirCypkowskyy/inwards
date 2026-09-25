@@ -56,3 +56,18 @@ export const engine: Engine = await Engine.create(grammars(), CONFIG);
 
 /** A bare parser, for tests of the prescan and extractors below the engine. */
 export const parser: Parser = await createPythonParser(grammars());
+
+const TARGET = /imports "(?<t>[^"]+)"/u;
+
+/**
+ * Checks a snippet as a domain module and lists what INW011 reports.
+ *
+ * @param src - Python source.
+ * @param path - where the file sits; a domain module by default.
+ * @returns `[code, target]` for each diagnostic, the target read from the message.
+ */
+export function found(src: string, path = "shop/domain/order.py"): [string, string][] {
+  return engine
+    .checkFile(file(path, src))
+    .map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
+}
