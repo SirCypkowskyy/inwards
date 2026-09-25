@@ -1,5 +1,9 @@
 """Sync .claude/plan/backlog.yaml to GitHub: labels, milestones, epics, issues.
 
+RETIRED (2026-09-25): kept for history only. GitHub issues are the source of
+truth for the plan now. Don't run this script or edit the YAML to change the
+plan; a run would fight edits made on GitHub. See "Source of truth" in CLAUDE.md.
+
     python3 scripts/sync-backlog.py --check     # offline validation only
     python3 scripts/sync-backlog.py --dry-run   # validation + what would change on GitHub
     python3 scripts/sync-backlog.py             # apply

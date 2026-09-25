@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, parseConfig, render } from "../src/index.ts";
+import { ConfigError, declaresInwards, parseConfig, render } from "../src/index.ts";
 import { engine, file } from "./helpers.ts";
 
 describe("INW001 layer-dependency", () => {
@@ -121,5 +121,129 @@ describe("backslash continuations (review round 3)", () => {
   test("`import \\` + newline + module is caught", () => {
     const src = "import \\\n    shop.infrastructure.db\n";
     expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+  });
+});
+
+describe("source quirks (M0)", () => {
+  test("a string holding `from a import (` cannot glue a real import onto it", () => {
+    const src = 's = """\nfrom a import (\n"""\nimport shop.infrastructure\ny = """\n)\n"""\n';
+    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+  });
+
+  test("a lone \\r ends a line, as in Python", () => {
+    const [d] = engine.checkFile(file("shop/domain/order.py", "# c\rimport shop.infrastructure\n"));
+    expect(d?.line).toBe(2);
+  });
+
+  test("BOM is not a column, CRLF is a line break", () => {
+    const src = "\uFEFFimport shop.api\r\nx = 1\r\nfrom shop.infrastructure \\\r\n  import db\r\n";
+    const found = engine.checkFile(file("shop/domain/order.py", src));
+    expect(found.map((d) => [d.line, d.column])).toEqual([
+      [1, 8],
+      [4, 10],
+    ]);
+  });
+});
+
+test("an import line inside a string cannot open a string that hides a real import", () => {
+  const src = [
+    's = """',
+    "import a; t = '''",
+    '"""',
+    "import shop.infrastructure",
+    'u = """',
+    "import b; v = '''",
+    '"""',
+    "",
+  ].join("\n");
+  expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+});
+
+describe("dotted names as Python spells them (Astra review)", () => {
+  test.each([
+    ["spaces around dots", "import shop . infrastructure . db\n"],
+    ["backslash inside the name", "import shop.\\\n  infrastructure\n"],
+    ["spaces in a from import", "from shop . infrastructure import db\n"],
+    ["NFKC identifiers", "import ｓhop.infrastructure\n"],
+  ])("%s is still an import of shop.infrastructure", (_, src) => {
+    const [d] = engine.checkFile(file("shop/domain/order.py", src));
+    expect(d?.message).toContain("shop.infrastructure");
+  });
+
+  test("dots in a relative import are counted, not characters", () => {
+    const [d] = engine.checkFile(
+      file("shop/application/x.py", "from . . infrastructure import db\n"),
+    );
+    expect(d?.message).toContain('"shop.infrastructure.db"');
+  });
+});
+
+test("SARIF URIs keep #, ? and spaces inside the path", () => {
+  const [d] = engine.checkFile(file("shop/domain/order#1 ?.py", "import shop.api\n"));
+  const sarif = JSON.parse(
+    render({ diagnostics: d ? [d] : [], filesChecked: 1, durationMs: 1 }, "sarif"),
+  );
+  const { uri } = sarif.runs[0].results[0].locations[0].physicalLocation.artifactLocation;
+  expect(uri).toBe("shop/domain/order%231%20%3F.py");
+  expect(decodeURIComponent(new URL(uri, "file:///repo/").pathname.slice(6))).toBe(
+    "shop/domain/order#1 ?.py",
+  );
+});
+
+describe("source encodings (Astra review, round 2)", () => {
+  test.each([
+    ["unicode_escape", "# coding: unicode_escape\n#\\u000aimport shop.infrastructure.db\n"],
+    ["utf-7 on line 2", "#!/usr/bin/env python\n# -*- coding: utf-7 -*-\nx = 1\n"],
+  ])("%s gets INW000 instead of a silent pass", (_, src) => {
+    const found = engine.checkFile(file("shop/domain/order.py", src));
+    expect(found.map((d) => d.code)).toEqual(["INW000"]);
+  });
+
+  test.each(["utf-8", "UTF8", "latin-1", "iso-8859-2", "ascii"])(
+    "%s is read as usual",
+    (encoding) => {
+      const src = `# coding: ${encoding}\nimport shop.infrastructure.db\n`;
+      expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
+        "INW001",
+      ]);
+    },
+  );
+
+  test("a declaration on line 2 counts only after a comment or blank line 1", () => {
+    const src = "x = 1\n# coding: unicode_escape\n";
+    expect(engine.checkFile(file("shop/domain/order.py", src))).toEqual([]);
+  });
+
+  test("files outside every layer are not reported", () => {
+    const src = "# coding: unicode_escape\n";
+    expect(engine.checkFile(file("scripts/tool.py", src))).toEqual([]);
+  });
+});
+
+describe("declaresInwards", () => {
+  test.each([
+    ["[tool.inwards]\nlayers = []\n", true],
+    ["[ tool.inwards ]\nlayers = []\n", true],
+    ['["tool"."inwards"]\nlayers = []\n', true],
+    ["[tool.inwards\n", true],
+    ["[project]\nname = 'x'\n", false],
+    ["[tool.ruff]\n", false],
+  ])("%j -> %p", (text, expected) => {
+    expect(declaresInwards(text)).toBe(expected);
+  });
+});
+
+describe("encoding declarations CPython honours (review of round 2)", () => {
+  test.each([
+    [
+      "CRLF with a shebang on line 1",
+      "#!/usr/bin/env python\r\n# coding: unicode_escape\r\nx = 1\r\n",
+    ],
+    ["CRLF with a blank line 1", "\r\n# coding: unicode_escape\r\nx = 1\r\n"],
+    ["U+2028 inside the comment", "# note  coding: unicode_escape\nx = 1\n"],
+  ])("%s gets INW000", (_, src) => {
+    expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
+      "INW000",
+    ]);
   });
 });

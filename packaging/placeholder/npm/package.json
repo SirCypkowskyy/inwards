@@ -1,0 +1,17 @@
+{
+  "name": "inwards",
+  "version": "0.0.0",
+  "description": "Inwards, an architecture linter for Python that keeps AI coding agents inside your layers. This early release points to the binary on GitHub Releases.",
+  "bin": {
+    "inwards": "bin.js"
+  },
+  "files": [
+    "bin.js",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SirCypkowskyy/inwards.git"
+  },
+  "license": "MIT"
+}

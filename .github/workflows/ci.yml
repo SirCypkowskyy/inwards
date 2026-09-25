@@ -14,36 +14,85 @@ concurrency:
 
 jobs:
   engine:
-    name: Lint, typecheck, test
-    runs-on: ubuntu-latest
+    name: Lint, typecheck, prescan
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
+      - name: CLAUDE.md only imports AGENTS.md (edit AGENTS.md instead)
+        run: test "$(cat CLAUDE.md)" = "@AGENTS.md"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       - name: Biome (lint + format)
         run: bun x biome ci .
+      - name: Every function has a TSDoc block (oxlint + eslint-plugin-jsdoc)
+        run: bun run lint:docs
       - name: Typecheck
         run: bun run typecheck
-      - name: Unit tests
-        run: bun test
-      - name: Prescan never misses an import (differential test on the Python stdlib)
-        run: bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+      - name: Fallow (dead code, unused deps, architecture boundaries, duplication)
+        run: bun run fallow
+      # A full CPython: Ubuntu 26.04's python3 ships its stdlib tests in a separate
+      # package, which shrank the corpus from 2,273 files to 626.
+      - uses: actions/setup-python@v7
+        id: python
+        with:
+          python-version: "3.14"
+      - name: Prescan never misses an import (generated spellings + the Python stdlib)
+        run: |
+          stdlib="$("${{ steps.python.outputs.python-path }}" -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+          bun run src/core/scripts/prescan-diff.ts "$stdlib" 1500
       - name: Dogfood - inwards checks its own example app
         run: bun run check:self
-      - name: Smoke-test the compiled binary (catches WASM embedding regressions)
-        run: |
-          bun run scripts/build-binaries.ts bun-linux-x64
-          ./dist/inwards-linux-x64 --version
-          ./dist/inwards-linux-x64 check --format json > /dev/null
       - name: Build VS Code extension
         working-directory: src/vscode-extension
         run: bun run build
 
+  test:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Both Ubuntu images until ubuntu-latest moves to 26.04 (2026-10-19).
+          - { os: ubuntu-24.04, target: bun-linux-x64, bin: inwards-linux-x64 }
+          - { os: ubuntu-26.04, target: bun-linux-x64, bin: inwards-linux-x64 }
+          - { os: macos-latest, target: bun-darwin-arm64, bin: inwards-darwin-arm64 }
+          - { os: windows-latest, target: bun-windows-x64, bin: inwards-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Compile the binary for this OS (catches WASM embedding regressions)
+        run: bun run scripts/build-binaries.ts ${{ matrix.target }}
+      - name: Unit and end-to-end tests against the compiled binary
+        run: bun test
+        env:
+          INWARDS_BIN: dist/${{ matrix.bin }}
+      - name: Binary lints the example app
+        run: |
+          dist/${{ matrix.bin }} --version
+          dist/${{ matrix.bin }} check --format json > /dev/null
+      - name: SARIF from this OS validates against the 2.1.0 schema, with forward slashes
+        run: |
+          mkdir -p "$RUNNER_TEMP/sarif/shop/domain/deep"
+          cd "$RUNNER_TEMP/sarif"
+          printf '[tool.inwards]\nlayers = [{ name = "domain", modules = ["shop.domain"] }, { name = "infra", modules = ["shop.infra"] }]\n' > pyproject.toml
+          echo 'import shop.infra.db' > shop/domain/deep/order.py
+          "$GITHUB_WORKSPACE/dist/${{ matrix.bin }}" check --format sarif > out.json || test $? -eq 1
+          grep -q '"uri":"shop/domain/deep/order.py"' out.json
+          curl -sSfL https://json.schemastore.org/sarif-2.1.0.json -o schema.json
+          npx -y -p ajv-cli@5 -p ajv-formats@3 ajv validate --spec=draft7 -c ajv-formats --strict=false -s schema.json -d out.json
+
   docs:
     name: Docs build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag

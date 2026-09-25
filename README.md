@@ -32,5 +32,7 @@ bun run scripts/build-binaries.ts bun-linux-x64 # dist/inwards-linux-x64
 uv run zensical serve -f docs/zensical.toml     # docs preview
 ```
 
-Releases: push a `v*` tag. `cd.yml` cross-compiles binaries for Linux, macOS and Windows,
-runs each one on its native runner, and uploads them as a workflow artifact.
+Releases: push a `v*` tag (`v0.0.1`, or `v0.0.1-rc.1` for a pre-release). `cd.yml`
+cross-compiles binaries for Linux (glibc and musl), macOS and Windows, runs each one on its
+native runner, and drafts a GitHub Release with the binaries, the `.vsix` and `SHA256SUMS`.
+Publish the draft by hand. Build provenance attestations switch on once the repo is public.

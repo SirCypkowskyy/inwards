@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+import process from "node:process";
 import { parseArgs } from "node:util";
 import {
   ConfigError,
+  declaresInwards,
   Engine,
   type Format,
   moduleNameFor,
   parseConfig,
+  type Report,
   render,
   type SourceFile,
   VERSION,
@@ -19,9 +22,19 @@ import { loadGrammars } from "./grammars.ts";
 const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml]
+       inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
 
+/**
+ * Parses the command line and runs the chosen command.
+ * `--version` and `--help` print and exit; `hook claude-code` and `check`
+ * do the work. Anything else prints usage with exit 2. An unknown option
+ * makes parseArgs throw, which the caller at the bottom turns into exit 2.
+ *
+ * @param argv - arguments after the executable and script path.
+ * @returns the process exit code: 0 clean, 1 violations, 2 usage or config error.
+ */
 async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -34,60 +47,384 @@ async function main(argv: string[]): Promise<number> {
     },
   });
 
-  if (values.version) return print(VERSION, 0);
+  if (values.version) {
+    return print(VERSION, 0);
+  }
   const [command, ...paths] = positionals;
-  if (values.help || command !== "check") return print(USAGE, command ? 2 : 0);
+  if (command === "hook" && !values.help) {
+    return paths[0] === "claude-code" && paths.length === 1
+      ? await hookClaudeCode()
+      : print(USAGE, 2);
+  }
+  if (values.help || command !== "check") {
+    return print(USAGE, command ? 2 : 0);
+  }
+  return await checkCommand(paths, values.format, values.config);
+}
 
-  const format = values.format as Format;
-  if (!["text", "json", "sarif"].includes(format)) return print(`Unknown --format ${format}`, 2);
+const FORMATS: readonly Format[] = ["text", "json", "sarif"];
 
-  const configPath = values.config ? resolve(values.config) : findConfig(process.cwd());
-  if (!configPath) return print("No pyproject.toml with [tool.inwards] found.", 2);
+/**
+ * Tells whether a `--format` value is one the reporters support.
+ *
+ * @param value - the raw option value.
+ * @returns true for `text`, `json` or `sarif`.
+ */
+function isFormat(value: string): value is Format {
+  return FORMATS.some((format) => format === value);
+}
 
-  const started = performance.now();
-  const config = parseConfig(readFileSync(configPath, "utf8"));
-  const root = resolve(dirname(configPath), config.root);
-  const engine = await Engine.create(await loadGrammars(), config);
+/**
+ * Runs `inwards check` and writes the report to stdout.
+ * Without `--config`, the nearest pyproject.toml with `[tool.inwards]` above
+ * the working directory is used. Without paths, the whole config root is checked.
+ *
+ * Output is indented only on a TTY, since agents and hooks read a pipe.
+ * Colour follows FORCE_COLOR first, then NO_COLOR, then the TTY check.
+ *
+ * @param paths - files or directories to check; empty means the config root.
+ * @param format - the `--format` value, validated here.
+ * @param config - the `--config` path, if given.
+ * @returns 0 when clean, 1 with violations, 2 for a bad format or no config.
+ */
+async function checkCommand(
+  paths: string[],
+  format: string,
+  config: string | undefined,
+): Promise<number> {
+  if (!isFormat(format)) {
+    return print(`Unknown --format ${format}`, 2);
+  }
 
-  const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : [root];
-  const files = collectPythonFiles(targets).map(
-    (abs): SourceFile => ({
-      path: relative(process.cwd(), abs),
-      text: readFileSync(abs, "utf8"),
-      ...moduleNameFor(relative(root, abs)),
-    }),
-  );
-  const diagnostics = engine.checkFiles(files);
-  const durationMs = performance.now() - started;
+  const configPath = config ? resolve(config) : findConfig(process.cwd());
+  if (!configPath) {
+    return print("No pyproject.toml with [tool.inwards] found.", 2);
+  }
+
+  const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : undefined;
+  const report = await runCheck(configPath, targets, process.cwd());
 
   // Agents and hooks read a pipe, and indentation there is wasted tokens.
   const pretty = process.stdout.isTTY === true;
-  const color = process.env.FORCE_COLOR ? true : pretty && !process.env.NO_COLOR;
-  const report = { diagnostics, filesChecked: files.length, durationMs };
-  console.log(render(report, format, { pretty, color }));
-  return diagnostics.length > 0 ? 1 : 0;
+  const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
+  process.stdout.write(`${render(report, format, { pretty, color })}\n`);
+  return report.diagnostics.length > 0 ? 1 : 0;
 }
 
-/** Walks up from `dir` to the first pyproject.toml that has a [tool.inwards] table. */
-function findConfig(dir: string): string | undefined {
-  for (let d = dir; ; d = dirname(d)) {
-    const candidate = resolve(d, "pyproject.toml");
-    if (existsSync(candidate) && readFileSync(candidate, "utf8").includes("[tool.inwards")) {
-      return candidate;
+/**
+ * Loads the config and engine, then checks the Python files under the targets.
+ * Files outside the config root are dropped: they have no module name in the
+ * project. The duration covers config, grammar loading, reading and checking.
+ *
+ * @param configPath - absolute path of the pyproject.toml to use.
+ * @param targets - absolute files or directories; undefined means the config root.
+ * @param base - directory that report paths are made relative to.
+ * @returns the report, with forward-slash paths on every OS.
+ * @throws {ConfigError} when the config is invalid.
+ */
+async function runCheck(
+  configPath: string,
+  targets: string[] | undefined,
+  base: string,
+): Promise<Report> {
+  const started = performance.now();
+  const config = parseConfig(readFileSync(configPath, "utf8"));
+  const lexicalRoot = resolve(dirname(configPath), config.root);
+  const realRoot = realpath(lexicalRoot) ?? lexicalRoot;
+  const engine = await Engine.create(await loadGrammars(), config);
+  const files: SourceFile[] = [];
+  // One entry per (module, file): a file reached through an alias and through
+  // its real path has the same real name, and must not be reported twice.
+  const seen = new Set<string>();
+  for (const abs of collectPythonFiles(targets ?? [lexicalRoot])) {
+    const text = readFileSync(abs, "utf8");
+    const real = realpath(abs) ?? abs;
+    for (const { rel, shown } of moduleNames(abs, lexicalRoot, realRoot)) {
+      const named = moduleNameFor(rel);
+      // Keyed on the real file too: order.py and order.pyi are one module, two files.
+      const key = `${named.module}\u0000${real}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        files.push({ path: posix(relative(base, shown)), text, ...named });
+      }
     }
-    if (dirname(d) === d) return undefined;
+  }
+  const diagnostics = engine.checkFiles(files);
+  return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
+}
+
+/**
+ * Lists every module name Python could import a file by.
+ * Python names a module after the path it was imported through, so a file
+ * reached through a symlinked alias has two names: the alias path and the
+ * real path. Both are checked, so an alias can't hide a file from its layer.
+ * Names that fall outside the config root are dropped.
+ *
+ * @param abs - the file as found.
+ * @param lexicalRoot - the config root as written.
+ * @param realRoot - the config root with symlinks resolved.
+ * @returns each name as a root-relative path, with the path to show for it.
+ */
+function moduleNames(
+  abs: string,
+  lexicalRoot: string,
+  realRoot: string,
+): { rel: string; shown: string }[] {
+  const names: { rel: string; shown: string }[] = [];
+  if (isInside(lexicalRoot, abs)) {
+    names.push({ rel: relative(lexicalRoot, abs), shown: abs });
+  }
+  const real = realpath(abs);
+  if (real !== undefined && isInside(realRoot, real)) {
+    const rel = relative(realRoot, real);
+    if (!names.some((n) => n.rel === rel)) {
+      names.push({ rel, shown: real });
+    }
+  }
+  return names;
+}
+
+const PYTHON_FILE = /\.pyi?$/u;
+
+/**
+ * Runs the Claude Code PostToolUse hook on the file the agent just wrote.
+ * Exit 2 puts stderr in front of the model, so violations and config errors go
+ * there. Exit 1 reaches only the user: a bad payload or a bug in Inwards is not
+ * the model's to fix. Anything else passes silently with exit 0.
+ *
+ * Silent exit 0 also covers: other hook events, non-Python files, files
+ * outside the project, and projects without `[tool.inwards]` (the hook may be
+ * installed user-wide). Usage goes to stderr with exit 2 when stdin is a TTY.
+ *
+ * @returns the exit code for Claude Code: 0, 1 or 2 as above.
+ */
+async function hookClaudeCode(): Promise<number> {
+  if (process.stdin.isTTY) {
+    return print(USAGE, 2);
+  }
+  const input = readHookPayload();
+  if (input === null) {
+    return print("inwards hook: stdin is not a Claude Code hook payload.", 1);
+  }
+  const toolInput = input["tool_input"];
+  const file = isRecord(toolInput) ? toolInput["file_path"] : undefined;
+  if (input["hook_event_name"] !== "PostToolUse" || typeof file !== "string") {
+    return 0;
+  }
+  if (!PYTHON_FILE.exec(file)) {
+    return 0;
+  }
+  const target = hookTarget(input["cwd"], file);
+  if (!target) {
+    return 0;
+  }
+
+  // The nearest config above the file, so each package in a monorepo uses its own,
+  // and only one that really lives inside the project. No config at all means this
+  // project doesn't use Inwards (the hook may be user-wide).
+  const configPath = findConfig(dirname(target.file), target.project);
+  if (!configPath) {
+    return 0;
+  }
+  try {
+    const report = await runCheck(configPath, [target.file], target.cwd);
+    if (report.diagnostics.length === 0) {
+      return 0;
+    }
+    process.stderr.write(`${render(report, "json", { pretty: false })}\n`);
+    return 2;
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      return print(`inwards: config error: ${err.message}`, 2);
+    }
+    return print(`inwards hook: ${err instanceof Error ? err.message : String(err)}`, 1);
   }
 }
 
+/**
+ * Reads the hook payload from stdin and checks that it is a JSON object.
+ *
+ * @returns the payload fields, or null when stdin is not a JSON object.
+ */
+function readHookPayload(): Record<string, unknown> | null {
+  try {
+    // Sync on purpose: awaiting Bun.stdin in the Windows binary let the process
+    // exit before main() settled, i.e. exit 0 and the violation lost.
+    const parsed: unknown = JSON.parse(readFileSync(0, "utf8"));
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves the file named in a hook payload and checks it may be linted.
+ * The payload is agent-controlled, so containment is decided on real paths:
+ * `..` and symlinks cannot reach outside the project. The boundary is
+ * CLAUDE_PROJECT_DIR, else the process cwd (Claude Code runs hooks in the
+ * project), never the payload's own `cwd`.
+ *
+ * @param payloadCwd - the payload's `cwd` field; the process cwd if not a string.
+ * @param file - the payload's `tool_input.file_path`, absolute or relative to cwd.
+ * @returns the file and cwd as written (Python names modules after that
+ *   path) and the real project root; undefined when the file is outside the
+ *   project, missing, or not a regular file.
+ */
+function hookTarget(
+  payloadCwd: unknown,
+  file: string,
+): { file: string; cwd: string; project: string } | undefined {
+  const lexicalCwd = typeof payloadCwd === "string" ? payloadCwd : process.cwd();
+  const cwd = realpath(lexicalCwd);
+  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
+  if (!(cwd && project)) {
+    return undefined;
+  }
+  const real = physicalRealpath(lexicalCwd, file);
+  // With `..` in the path, the name as written is not where the file is.
+  const lexical = PATH_SEPARATORS[Symbol.split](file).includes("..")
+    ? real
+    : resolve(lexicalCwd, file);
+  if (real && lexical && isInside(project, real) && statSync(real).isFile()) {
+    // Report paths against the cwd as written: on macOS /var is a link to
+    // /private/var, and mixing the two spellings gives ../../var/... paths.
+    return { file: lexical, cwd: resolve(lexicalCwd), project };
+  }
+  return undefined;
+}
+
+const PATH_SEPARATORS = /[\\/]/u;
+
+/**
+ * Resolves a path the way the OS does when it opens it.
+ * `path.resolve` (and Bun's realpath) fold `dlink/..` away as text, but the
+ * OS follows `dlink` first, so `dlink/../x.py` can be a different file. Each
+ * `..` is applied to the real path of what comes before it.
+ *
+ * @param base - directory a relative `file` is resolved against.
+ * @param file - the path as given, absolute or relative.
+ * @returns the real path, or undefined when it does not exist.
+ */
+function physicalRealpath(base: string, file: string): string | undefined {
+  const root = isAbsolute(file) ? parse(file).root : "";
+  let current = root === "" ? base : root;
+  for (const segment of PATH_SEPARATORS[Symbol.split](file.slice(root.length))) {
+    if (segment === "" || segment === ".") {
+      continue;
+    }
+    if (segment === "..") {
+      const resolved = realpath(current);
+      if (resolved === undefined) {
+        return undefined;
+      }
+      current = dirname(resolved);
+    } else {
+      current = join(current, segment);
+    }
+  }
+  return realpath(current);
+}
+
+/**
+ * Tells whether a parsed JSON value is an object whose fields can be read.
+ *
+ * @param value - any parsed JSON value.
+ * @returns true when the value is a non-null object (arrays included).
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * Resolves symlinks and `..` in a path that may not exist.
+ *
+ * @param path - any path.
+ * @returns the canonical path, or undefined when it does not exist.
+ */
+function realpath(path: string): string | undefined {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Tells whether a path lies strictly below a directory.
+ * The directory itself does not count. On Windows a path on another drive
+ * gives an absolute relative path, which also does not count.
+ *
+ * @param dir - the containing directory.
+ * @param file - the path to test.
+ * @returns true when `file` is inside `dir`.
+ */
+function isInside(dir: string, file: string): boolean {
+  const rel = relative(dir, file);
+  return rel !== "" && rel.split(sep)[0] !== ".." && !isAbsolute(rel);
+}
+
+/**
+ * Finds the nearest pyproject.toml that configures Inwards.
+ * Walks up from `dir` to the file system root. Whether a file configures
+ * Inwards is decided on the parsed TOML (`declaresInwards`), so any valid
+ * spelling of the table counts. With `within`, a candidate whose real path is
+ * outside that directory is ignored, so a hook never reads a config (or its
+ * text, via an error message) from outside the project.
+ *
+ * @param dir - the directory to start from.
+ * @param within - optional real directory every accepted config must be inside.
+ * @returns the config path, or undefined when no ancestor has one.
+ */
+function findConfig(dir: string, within?: string): string | undefined {
+  for (let d = dir; ; d = dirname(d)) {
+    const candidate = resolve(d, "pyproject.toml");
+    const real = realpath(candidate);
+    const allowed = real !== undefined && (within === undefined || isInside(within, real));
+    if (allowed && declaresInwards(readFileSync(real, "utf8"))) {
+      return candidate;
+    }
+    if (dirname(d) === d) {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Converts a native path to forward slashes.
+ * Diagnostics and SARIF use forward slashes on every OS, so output is identical everywhere.
+ *
+ * @param path - a path with the platform separator.
+ * @returns the same path with `/` separators.
+ */
+function posix(path: string): string {
+  return path.split(sep).join("/");
+}
+
+/**
+ * Writes a message line: stdout for exit 0, stderr otherwise.
+ * Not console.*: with FORCE_COLOR set, Bun paints console.error red, and the
+ * JSON an agent parses would arrive wrapped in ANSI codes.
+ *
+ * @param message - the text to print, without a trailing newline.
+ * @param code - the exit code the caller will return.
+ * @returns `code`, so callers can `return print(...)`.
+ */
 function print(message: string, code: number): number {
-  (code === 2 ? console.error : console.log)(message);
+  (code === 0 ? process.stdout : process.stderr).write(`${message}\n`);
   return code;
 }
 
+// exitCode, not exit(): Node-style exit() may drop writes still queued for a
+// pipe, and a hook's stderr is the whole message to the agent.
 main(process.argv.slice(2)).then(
-  (code) => process.exit(code),
+  (code: number) => {
+    process.exitCode = code;
+  },
   (err: unknown) => {
-    console.error(err instanceof ConfigError ? `config error: ${err.message}` : err);
-    process.exit(2);
+    const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+    process.exitCode = print(
+      err instanceof ConfigError ? `config error: ${err.message}` : detail,
+      2,
+    );
   },
 );

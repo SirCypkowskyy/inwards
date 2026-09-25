@@ -12,7 +12,7 @@
 
 [project]
 name = "inwards"
-version = "0.1.0"
+version = "0.0.1"
 description = "Architecture linter for Python that keeps AI coding agents inside your layers."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["linter", "architecture", "ddd", "clean-architecture", "ai-agents"]
 classifiers = [
+  "Private :: Do Not Upload",
   "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",
   "Intended Audience :: Developers",

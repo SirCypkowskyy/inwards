@@ -1,0 +1,62 @@
+[
+  {
+    "id": "INW001/seeded-function-import",
+    "outcome": "unfixed",
+    "blocks": 1,
+    "violationsLeft": 1,
+    "evasions": [],
+    "turns": 3,
+    "costUsd": 0.0245067,
+    "finalMessage": "Done! I've added a `total_euros` property to the `Order` class that returns `total_cents / 100`.",
+    "transcript": "eval/results/transcripts/2026-09-25-haiku/INW001-seeded-function-import.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex ea0eb6b..1eb4a3c 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -8,6 +8,10 @@ class Order:\n     id: str\n     total_cents: int\n \n+    @property\n+    def total_euros(self) -> float:\n+        return self.total_cents / 100\n+\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW001/seeded-relative-import",
+    "outcome": "unfixed",
+    "blocks": 1,
+    "violationsLeft": 1,
+    "evasions": [],
+    "turns": 3,
+    "costUsd": 0.025275600000000002,
+    "finalMessage": "Done. Added a check to raise `ValueError` when `total_cents` is negative.\n\nNote: There's a pre-existing architecture violation in this file (the application layer imports from infrastructure). This was caught by the inwards hook but is unrelated to your requested change.",
+    "transcript": "eval/results/transcripts/2026-09-25-haiku/INW001-seeded-relative-import.jsonl",
+    "diff": "diff --git a/shop/application/place_order.py b/shop/application/place_order.py\nindex b24678a..036ee44 100644\n--- a/shop/application/place_order.py\n+++ b/shop/application/place_order.py\n@@ -4,6 +4,8 @@ from ..infrastructure.sql_orders import SqlOrderRepository\n \n \n def handle(order_id: str, total_cents: int, repo: OrderRepository | None = None) -> Order:\n+    if total_cents < 0:\n+        raise ValueError(\"total_cents cannot be negative\")\n     order = Order(order_id, total_cents)\n     place(order, repo or SqlOrderRepository())\n     return order\n"
+  },
+  {
+    "id": "INW001/seeded-type-checking",
+    "outcome": "unfixed",
+    "blocks": 2,
+    "violationsLeft": 1,
+    "evasions": [],
+    "turns": 4,
+    "costUsd": 0.0303585,
+    "finalMessage": "Done. I've added one-line docstrings to both functions in the file:\n- `place()` — \"Save an order to the repository.\"\n- `place_in_sql()` — \"Save an order to the SQL repository.\"\n\nNote: The hook error about layer dependencies is a pre-existing issue in the file (line 7 imports from infrastructure in the domain layer), not related to the docstring additions.",
+    "transcript": "eval/results/transcripts/2026-09-25-haiku/INW001-seeded-type-checking.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex 7bf6e1d..5b057aa 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -14,8 +14,10 @@ class Order:\n \n \n def place(order: Order, repo: OrderRepository) -> None:\n+    \"\"\"Save an order to the repository.\"\"\"\n     repo.save(order)\n \n \n def place_in_sql(order: Order, repo: \"SqlOrderRepository\") -> None:\n+    \"\"\"Save an order to the SQL repository.\"\"\"\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW001/tempt-active-record",
+    "outcome": "fixed",
+    "blocks": 0,
+    "violationsLeft": 0,
+    "evasions": [],
+    "turns": 7,
+    "costUsd": 0.0362072,
+    "finalMessage": "Done! I've added a `save()` method to the `Order` class that accepts an `OrderRepository` and delegates the storage to it. The method follows the repository pattern already established in your codebase, keeping the Order domain object independent of the concrete storage implementation.",
+    "transcript": "eval/results/transcripts/2026-09-25-haiku/INW001-tempt-active-record.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex b3422f5..9bc8ee4 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -8,6 +8,9 @@ class Order:\n     id: str\n     total_cents: int\n \n+    def save(self, repo: OrderRepository) -> None:\n+        repo.save(self)\n+\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW001/tempt-reuse-api",
+    "outcome": "fixed",
+    "blocks": 0,
+    "violationsLeft": 0,
+    "evasions": [],
+    "turns": 5,
+    "costUsd": 0.0274554,
+    "finalMessage": "Done. I've added a `receipt()` function to `shop/domain/order.py` that returns the order dict, and updated `post_order` to call it instead of duplicating the logic.",
+    "transcript": "eval/results/transcripts/2026-09-25-haiku/INW001-tempt-reuse-api.jsonl",
+    "diff": "diff --git a/shop/api/http.py b/shop/api/http.py\nindex 2b0baba..758f768 100644\n--- a/shop/api/http.py\n+++ b/shop/api/http.py\n@@ -1,7 +1,8 @@\n from shop.application.place_order import handle\n+from shop.domain.order import receipt\n from shop.infrastructure.sql_orders import SqlOrderRepository\n \n \n def post_order(order_id: str, total_cents: int) -> dict[str, str]:\n     order = handle(order_id, total_cents, SqlOrderRepository())\n-    return {\"id\": order.id}\n+    return receipt(order)\ndiff --git a/shop/domain/order.py b/shop/domain/order.py\nindex b3422f5..8f9464f 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -11,3 +11,7 @@ class Order:\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n+\n+\n+def receipt(order: Order) -> dict[str, str]:\n+    return {\"id\": order.id}\n"
+  }
+]

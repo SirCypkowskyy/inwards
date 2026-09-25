@@ -7,6 +7,7 @@
  * Output: dist/inwards-<os>-<arch>[.exe]
  */
 import { mkdirSync } from "node:fs";
+import process from "node:process";
 
 const ALL_TARGETS = [
   "bun-linux-x64",
@@ -18,20 +19,24 @@ const ALL_TARGETS = [
 ] as const;
 
 const requested = process.argv.slice(2);
-const targets = requested.length > 0 ? requested : ALL_TARGETS;
+const targets: readonly string[] = requested.length > 0 ? requested : ALL_TARGETS;
 mkdirSync("dist", { recursive: true });
 
 for (const target of targets) {
-  const name = `inwards-${target.replace(/^bun-/, "")}`;
+  const name = `inwards-${target.replace(/^bun-/u, "")}`;
   const outfile = `dist/${name}${target.includes("windows") ? ".exe" : ""}`;
+  // biome-ignore lint/performance/noAwaitInLoops: one compile at a time; each embeds a full Bun runtime.
   const result = await Bun.build({
     entrypoints: ["src/cli/src/main.ts"],
     minify: true,
     sourcemap: "linked",
+    // biome-ignore lint/nursery/noUnsafeTypeAssertion: argv goes straight to Bun.build, which rejects unknown targets.
     compile: { target: target as Bun.Build.CompileTarget, outfile },
   });
   if (!result.success) {
-    for (const log of result.logs) console.error(log);
+    for (const log of result.logs) {
+      console.error(log);
+    }
     process.exit(1);
   }
   console.log(`built ${outfile}`);

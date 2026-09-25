@@ -1,0 +1,12 @@
+[project]
+name = "shop"
+version = "0.0.0"
+
+[tool.inwards]
+# Innermost first. A module may import its own layer or any layer listed before it.
+layers = [
+  { name = "domain", modules = ["shop.domain"] },
+  { name = "application", modules = ["shop.application"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"] },
+  { name = "interface", modules = ["shop.api"] },
+]

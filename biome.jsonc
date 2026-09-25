@@ -1,0 +1,187 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!**/site", "!**/dist", "!**/*.md", "!docs/chapters/assets/screens"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    // Every rule of every group at error level. a11y stays at its defaults:
+    // there is no JSX or HTML here. Exceptions live in the first override below,
+    // each with its reason.
+    "rules": {
+      "complexity": "error",
+      "correctness": "error",
+      "nursery": "error",
+      "performance": "error",
+      "security": "error",
+      "style": "error",
+      "suspicious": "error"
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always"
+    },
+    // Declared by @types/bun for tsc; Biome does not read tsconfig `types`.
+    // The engine still may not touch it (noRestrictedGlobals below).
+    "globals": ["Bun"]
+  },
+  "overrides": [
+    {
+      // Exceptions for the whole repo. A group set to "error" above cannot also
+      // list rules, so the per-rule settings sit in this override.
+      "includes": ["**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            // tsconfig's noPropertyAccessFromIndexSignature requires env["X"];
+            // this rule rewrites it back to env.X.
+            "useLiteralKeys": "off"
+          },
+          "correctness": {
+            // The CLI and the extension are Node/Bun adapters and must use node:*.
+            // Turned back on for the engine below.
+            "noNodejsModules": "off",
+            // tsc resolves every import already, and this rule misreads the
+            // `declare module` typings of web-tree-sitter and vscode.
+            "noUnresolvedImports": "off",
+            // Qwik only.
+            "useQwikValidLexicalScope": "off"
+          },
+          "nursery": {
+            // Bun's test runner is `test` (not `it`) throughout.
+            "useConsistentTestIt": {
+              "level": "error",
+              "options": { "function": "test", "withinDescribe": "test" }
+            },
+            // Allowed outside the engine: the CLI is a Bun binary and its
+            // tests and scripts run on Bun. Turned back on for the engine below.
+            "noBunModules": "off",
+            "useConsistentFunctionStyle": {
+              "level": "error",
+              "options": { "style": "declaration" }
+            }
+          },
+          "style": {
+            // Adapters read FORCE_COLOR, NO_COLOR and CLAUDE_PROJECT_DIR by
+            // design. Turned back on for the engine below.
+            "noProcessEnv": "off",
+            // Bans every ternary; the code uses them for short value choices.
+            "noTernary": "off",
+            // Bans `continue`, which the loops use as guard clauses; the
+            // alternative is deeper nesting.
+            "noContinue": "off",
+            // Public API first, private helpers after it, so a reader meets
+            // the exports first. This rule demands the opposite order.
+            "useExportsLast": "off",
+            "useNamingConvention": {
+              "level": "error",
+              "options": {
+                "strictCase": false,
+                "conventions": [
+                  {
+                    // Claude Code hook payloads use snake_case and environment
+                    // variables use CONSTANT_CASE. The names are external contracts.
+                    "selector": { "kind": "typeProperty" },
+                    "formats": ["camelCase", "snake_case"]
+                  },
+                  {
+                    "selector": { "kind": "objectLiteralProperty" },
+                    "formats": ["camelCase", "snake_case", "CONSTANT_CASE"]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      // Tests and scripts hold fixture strings (TOML snippets, adversarial
+      // Python) that the entropy check reads as secrets. None are credentials.
+      "includes": ["**/test/**", "**/scripts/**"],
+      "linter": { "rules": { "security": { "noSecrets": "off" } } }
+    },
+    {
+      // Expected values in assertions are the specification itself (`toBe(12)` for
+      // a column), and a describe() callback holds a whole suite.
+      "includes": ["**/test/**"],
+      "linter": {
+        "rules": {
+          "style": { "noMagicNumbers": "off" },
+          "complexity": { "noExcessiveLinesPerFunction": "off" }
+        }
+      }
+    },
+    {
+      // Scripts print progress for a person at a terminal.
+      "includes": ["**/scripts/**"],
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
+    {
+      // The eval harness is one script run by hand (`bun run eval/run.ts`): a
+      // pipeline of short documented helpers that only it uses. Splitting it into
+      // modules would scatter that pipeline without making any piece reusable.
+      "includes": ["eval/run.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 400 } }
+          }
+        }
+      }
+    },
+    {
+      // The npm name placeholder is a plain CommonJS bin (its package.json has no
+      // "type": "module"), so it cannot `import process from "node:process"`, and
+      // `require` would trip noCommonJs. It must stay dependency-free and run
+      // under bare `node`, so it uses the global.
+      "includes": ["packaging/placeholder/npm/bin.js"],
+      "linter": { "rules": { "correctness": { "noProcessGlobal": "off" } } }
+    },
+    {
+      // Ambient module declarations need a default export to type
+      // `import path from "x.wasm"`.
+      "includes": ["**/*.d.ts"],
+      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+    },
+    {
+      // The engine's public API: adapters import `@inwards/core` and nothing deeper.
+      "includes": ["src/core/src/index.ts"],
+      "linter": { "rules": { "performance": { "noBarrelFile": "off" } } }
+    },
+    {
+      // The engine is pure: no runtime globals, no Node or Bun modules, no env.
+      "includes": ["src/core/src/**"],
+      "linter": {
+        "rules": {
+          "correctness": { "noNodejsModules": "error" },
+          "nursery": { "noBunModules": "error" },
+          "style": {
+            "noProcessEnv": "error",
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "Bun": "The engine also runs on Node inside VS Code. Take I/O through a port instead (see GrammarBinaries).",
+                  "Deno": "The engine must stay runtime-agnostic."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

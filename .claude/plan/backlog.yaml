@@ -1,4 +1,9 @@
-# Inwards backlog: source of truth for GitHub issues, epics and milestones.
+# RETIRED (2026-09-25). This file seeded the GitHub issues once and is kept for
+# history only. GitHub issues are the source of truth for the plan now. Don't
+# edit this file to change the plan, and don't run scripts/sync-backlog.py: it
+# would overwrite edits made on GitHub. See "Source of truth" in CLAUDE.md.
+#
+# Inwards backlog: original seed for GitHub issues, epics and milestones.
 # One epic = one milestone. Issues reference each other by `key`; scripts/sync-backlog.py
 # turns keys into issue numbers and native sub-issue / dependency links.
 # Revised after review rounds 1, 2 and 3 (2026-09-25).
@@ -78,24 +83,10 @@ epics:
   - CI runs unit and E2E tests on Linux, macOS and Windows
   - The `inwards` name is held on PyPI and npm
   - CI is green on the Ubuntu 26 runner image
-  - The INW001 eval report exists and at least 5 partner teams have agreed to try v0.1
+  - The INW001 eval report exists
   docs:
   - 05-ADR/#adr-003-ship-a-bun-single-file-executable
   issues:
-  - key: E0-partners
-    title: Recruit design partners
-    type: chore
-    area:
-    - product
-    priority: P0
-    size: M
-    why: The hypothesis needs five partner repos and recruiting is the slowest step; it has to start now, not when M2 is done.
-    scope:
-    - Shortlist about 15 FastAPI/Django teams using agents heavily, including Tach users
-    - Consent for hook runs and log sharing; tracking sheet with status and dates
-    acceptance:
-    - At least 5 teams have agreed to try v0.1, with names and dates recorded
-    blocked_by: []
   - key: E0-names
     title: Reserve the `inwards` name on PyPI and npm
     type: chore
@@ -667,7 +658,6 @@ epics:
     blocked_by:
     - E2-stats
     - E2-wheel-publish
-    - E0-partners
   - key: E2-corpus
     title: Real-repo corpus for the prescan differential test and benchmarks
     type: chore

@@ -1,6 +1,6 @@
 {
   "name": "@inwards/core",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "description": "Runtime-agnostic Inwards engine: parse Python with tree-sitter, apply architecture rules, report.",
@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "smol-toml": "^1.9.0",
-    "tree-sitter-python": "0.25.0",
     "web-tree-sitter": "0.27.0"
+  },
+  "devDependencies": {
+    "tree-sitter-python": "0.25.0"
   },
   "license": "MIT"
 }

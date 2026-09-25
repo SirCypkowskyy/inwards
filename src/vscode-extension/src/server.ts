@@ -26,8 +26,6 @@ connection.onInitialize(async (params) => {
   if (configPath && existsSync(configPath)) {
     try {
       const config = parseConfig(readFileSync(configPath, "utf8"));
-      // build copies both grammars next to server.js, see scripts/copy-wasm.ts
-      const wasm = (name: string) => new Uint8Array(readFileSync(join(__dirname, name)));
       const engine = await Engine.create(
         { runtime: wasm("web-tree-sitter.wasm"), python: wasm("tree-sitter-python.wasm") },
         config,
@@ -42,7 +40,9 @@ connection.onInitialize(async (params) => {
 
 // Same engine, same rules as `inwards check`, run on every keystroke.
 documents.onDidChangeContent(({ document }) => {
-  if (!state) return;
+  if (!state) {
+    return;
+  }
   const path = fileURLToPath(document.uri);
   const found = state.engine.checkFile({
     path: relative(state.root, path),
@@ -52,6 +52,27 @@ documents.onDidChangeContent(({ document }) => {
   connection.sendDiagnostics({ uri: document.uri, diagnostics: found.map(toLsp) });
 });
 
+/**
+ * Reads one grammar file shipped next to dist/server.js.
+ * The build copies both grammars there (see scripts/copy-wasm.ts), because
+ * the extension runs on Node and cannot use Bun's embedded files.
+ *
+ * @param name - the file name, e.g. `tree-sitter-python.wasm`.
+ * @returns the file's bytes.
+ */
+function wasm(name: string): Uint8Array {
+  // biome-ignore lint/correctness/noGlobalDirnameFilename: the build emits CommonJS (see package.json), where __dirname is dist/.
+  return new Uint8Array(readFileSync(join(__dirname, name)));
+}
+
+/**
+ * Converts an engine diagnostic to an LSP diagnostic.
+ * LSP positions are 0-based; the engine's are 1-based. The message carries
+ * the fix summary on a second line, since LSP has no field for it.
+ *
+ * @param d - the engine's diagnostic.
+ * @returns the diagnostic in LSP form.
+ */
 function toLsp(d: CoreDiagnostic): Diagnostic {
   return {
     range: {

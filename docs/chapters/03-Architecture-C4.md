@@ -149,7 +149,7 @@ flowchart LR
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
-| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]` | Only INW001 so far. Planned rules are listed below |
+| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]` | INW001, plus INW000 for files whose encoding could hide imports. Planned rules are listed below |
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call |
@@ -219,8 +219,8 @@ Exit codes follow Ruff: `0` clean, `1` violations found, `2` usage or config err
 ```mermaid
 flowchart LR
     tag["git tag v*"] --> cd["cd.yml on ubuntu-latest<br/><small>bun build --compile × 6 targets</small>"]
-    cd --> art[("GitHub Artifact<br/><small>binaries + SHA256SUMS + .vsix</small>")]
-    art --> verify["verify matrix<br/><small>linux x64/arm64 · macOS arm64 · Windows x64<br/>each binary lints examples/</small>"]
+    cd --> art[("Draft GitHub Release<br/><small>binaries + SHA256SUMS + .vsix<br/>+ provenance attestations</small>")]
+    art --> verify["verify matrix<br/><small>linux x64/arm64/musl · macOS arm64/x64 · Windows x64<br/>each binary lints examples/</small>"]
     art -.-> wheel["PyPI wheels: inwards<br/><small>one per platform, binary inside</small>"]
     art -.-> market["VS Code Marketplace"]
     wheel -.-> dev["uv add --dev inwards"]
@@ -245,6 +245,7 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 
 | Code | Name | What it catches | Status |
 |---|---|---|---|
+| INW000 | `unsupported-encoding` | A file in a layer declares an encoding (PEP 263) such as `unicode_escape` or `utf-7`, under which text Inwards reads as a comment can be a real import to CPython. The file is reported, not skipped | :white_check_mark: |
 | INW001 | `layer-dependency` | An inner layer importing an outer one | :white_check_mark: |
 | INW002 | `context-independence` | One bounded context or vertical slice importing another's internals | :material-progress-clock: |
 | INW003 | `public-api-only` | Importing past a context's public module (`__init__` or `api.py`) | :material-progress-clock: |

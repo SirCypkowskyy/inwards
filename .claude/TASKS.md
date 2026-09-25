@@ -1,3 +1,6 @@
+> Retired on 2026-09-25: progress is tracked in GitHub issues and the "Inwards"
+> project board (see AGENTS.md). This file is the log of the bootstrap work only.
+
 # Inwards (formerly Stratum): bootstrap tasks
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked

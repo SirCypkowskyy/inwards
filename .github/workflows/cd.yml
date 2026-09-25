@@ -1,6 +1,7 @@
 name: CD
 
-# Tag a release with `git tag v0.1.0 && git push origin v0.1.0`.
+# Tag a release with `git tag v0.1.0 && git push origin v0.1.0`. A tag with a
+# suffix (v0.1.0-rc.1) builds the same version and drafts a pre-release.
 on:
   push:
     tags: ["v*"]
@@ -8,10 +9,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cd-${{ github.ref }}
+
+# Build provenance needs a public repository (private ones need GitHub
+# Enterprise Cloud), so attestation steps are skipped while the repo is private.
+env:
+  ATTEST: ${{ github.event.repository.visibility == 'public' }}
+
 jobs:
   build:
     name: Cross-compile binaries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -21,23 +30,24 @@ jobs:
       - name: Tag must match the engine version
         run: |
           want="${GITHUB_REF_NAME#v}"
+          want="${want%%-*}"
           have="$(sed -nE 's/^export const VERSION = "(.*)";$/\1/p' src/core/src/meta.ts)"
-          if [ "$want" != "$have" ]; then
+          if [ -z "$have" ] || [ "$want" != "$have" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $have in src/core/src/meta.ts"
             exit 1
           fi
       - run: bun test
       - name: Compile every target with Bun
         run: bun run scripts/build-binaries.ts
-      - name: Checksums
-        working-directory: dist
-        run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
       - name: Build VS Code extension (.vsix)
         working-directory: src/vscode-extension
         run: |
           bun run build
-          bun x @vscode/vsce package --no-dependencies --allow-missing-repository \
+          bun x vsce package --no-dependencies --allow-missing-repository \
             -o "../../dist/inwards-vscode-${GITHUB_REF_NAME}.vsix"
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: inwards-${{ github.ref_name }}
@@ -47,16 +57,41 @@ jobs:
             !dist/*.map
           if-no-files-found: error
 
+  # Its own job, so the OIDC token never shares a runner with `bun install`.
+  # Jobs holding write or OIDC permissions pin actions by commit SHA
+  # (Dependabot keeps them current).
+  attest:
+    name: Attest build provenance
+    needs: build
+    if: github.event.repository.visibility == 'public'
+    runs-on: ubuntu-26.04
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: inwards-${{ github.ref_name }}
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+
   verify:
     name: Run on ${{ matrix.os }}
-    needs: build
+    needs: [build, attest]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.attest.result != 'failure' }}
+    permissions:
+      contents: read
+      attestations: read
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, bin: inwards-linux-x64 }
+          - { os: ubuntu-26.04, bin: inwards-linux-x64 }
           - { os: ubuntu-24.04-arm, bin: inwards-linux-arm64 }
           - { os: macos-latest, bin: inwards-darwin-arm64 }
+          - { os: macos-15-intel, bin: inwards-darwin-x64 }
           - { os: windows-latest, bin: inwards-windows-x64.exe }
     runs-on: ${{ matrix.os }}
     steps:
@@ -68,6 +103,74 @@ jobs:
       - name: Binary starts and lints the example app
         shell: bash
         run: |
-          chmod +x "dist/${{ matrix.bin }}" || true
+          chmod +x "dist/${{ matrix.bin }}"
           "dist/${{ matrix.bin }}" --version
           "dist/${{ matrix.bin }}" check --format json
+      - name: Provenance verifies
+        if: env.ATTEST == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify "dist/${{ matrix.bin }}" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/cd.yml" --source-ref "$GITHUB_REF"
+
+  verify-musl:
+    name: Run on Alpine (musl)
+    needs: [build, attest]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.attest.result != 'failure' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: inwards-${{ github.ref_name }}
+          path: dist
+      - name: Provenance verifies
+        if: env.ATTEST == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify dist/inwards-linux-x64-musl --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/cd.yml" --source-ref "$GITHUB_REF"
+      - name: Binary starts and lints the example app
+        run: |
+          chmod +x dist/inwards-linux-x64-musl
+          docker run --rm -v "$PWD:/w" -w /w alpine:3 sh -euc '
+            apk add --no-cache libstdc++ libgcc >/dev/null
+            dist/inwards-linux-x64-musl --version
+            dist/inwards-linux-x64-musl check --format json'
+
+  release:
+    name: Draft the GitHub Release
+    needs: [verify, verify-musl]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.verify-musl.result == 'success' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: inwards-${{ github.ref_name }}
+          path: dist
+      - name: Draft release with binaries, .vsix and SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
+          # Idempotent for drafts: a re-run refreshes the draft's assets. A published
+          # release is never overwritten; cut a new tag instead.
+          if draft="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null)"; then
+            if [ "$draft" != "true" ]; then
+              echo "::error::$GITHUB_REF_NAME is already published; refusing to replace its assets"
+              exit 1
+            fi
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+              --draft --generate-notes $pre
+          fi

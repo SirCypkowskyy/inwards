@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Doc linter only: Biome does everything else. It runs eslint-plugin-jsdoc
+  // under oxlint because typescript-eslint refuses TypeScript 7.
+  "plugins": [],
+  "categories": { "correctness": "off" },
+  "jsPlugins": [{ "name": "jsdoc-js", "specifier": "eslint-plugin-jsdoc" }],
+  "ignorePatterns": ["**/*.d.ts", "**/dist/**", "**/site/**"],
+  // Functions, methods, constructors and arrow functions bound to a name need a
+  // block with a description, @param per parameter and @returns when a value
+  // comes back. Inline callbacks (test bodies, .map arguments) are exempt.
+  "rules": {
+    "jsdoc-js/require-jsdoc": [
+      "error",
+      {
+        "publicOnly": false,
+        "checkConstructors": true,
+        "require": {
+          "FunctionDeclaration": true,
+          "MethodDefinition": true,
+          "ArrowFunctionExpression": false,
+          "FunctionExpression": false,
+          "ClassDeclaration": false
+        },
+        "contexts": [
+          "VariableDeclarator > ArrowFunctionExpression",
+          "VariableDeclarator > FunctionExpression"
+        ]
+      }
+    ],
+    "jsdoc-js/require-description": [
+      "error",
+      { "descriptionStyle": "body", "checkConstructors": true }
+    ],
+    "jsdoc-js/require-param": ["error", { "checkDestructured": false, "checkConstructors": true }],
+    "jsdoc-js/require-returns": ["error", { "checkGetters": true }]
+  }
+}

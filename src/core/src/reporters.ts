@@ -1,3 +1,4 @@
+import { ENCODING_RULE } from "./encoding.ts";
 import { LAYER_RULE } from "./layers.ts";
 import { DOCS_BASE, VERSION } from "./meta.ts";
 import type { Diagnostic } from "./types.ts";
@@ -17,22 +18,67 @@ export interface RenderOptions {
   color?: boolean;
 }
 
+/**
+ * Formats a report as text, JSON or SARIF.
+ * The engine only builds strings; the adapter decides where they go and
+ * whether to indent or colour them.
+ *
+ * @param report - the diagnostics plus file count and timing.
+ * @param format - `text` for people, `json` (`inwards/diagnostics@1`) or `sarif` for tools.
+ * @param options - `pretty` indents JSON and SARIF (default true); `color`
+ *   adds ANSI codes to text (default false).
+ * @returns the rendered report, without a trailing newline.
+ */
 export function render(
   report: Report,
   format: Format,
   { pretty = true, color = false }: RenderOptions = {},
 ): string {
   const indent = pretty ? 2 : undefined;
-  if (format === "json") return renderJson(report, indent);
-  if (format === "sarif") return renderSarif(report, indent);
+  if (format === "json") {
+    return renderJson(report, indent);
+  }
+  if (format === "sarif") {
+    return renderSarif(report, indent);
+  }
   return renderText(report, color ? ANSI : PLAIN);
 }
 
-type Paint = Record<"bold" | "dim" | "red" | "green" | "cyan", (s: string) => string>;
-const sgr = (code: number) => (s: string) => `\x1b[${code}m${s}\x1b[0m`;
-const ANSI: Paint = { bold: sgr(1), dim: sgr(2), red: sgr(31), green: sgr(32), cyan: sgr(36) };
+type Style = "bold" | "dim" | "red" | "green" | "cyan";
+type Paint = Record<Style, (s: string) => string>;
+
+/** SGR parameters, see ECMA-48. */
+const SGR_CODES: Record<Style, number> = { bold: 1, dim: 2, red: 31, green: 32, cyan: 36 };
+
+/**
+ * Makes a function that wraps text in one ANSI style and a reset.
+ *
+ * @param style - the style to apply.
+ * @returns a function from plain text to styled text.
+ */
+function sgr(style: Style): (s: string) => string {
+  const code = SGR_CODES[style];
+  return (s: string): string => `\x1b[${code}m${s}\x1b[0m`;
+}
+
+const ANSI: Paint = {
+  bold: sgr("bold"),
+  dim: sgr("dim"),
+  red: sgr("red"),
+  green: sgr("green"),
+  cyan: sgr("cyan"),
+};
 const PLAIN: Paint = { bold: String, dim: String, red: String, green: String, cyan: String };
 
+/**
+ * Renders the human-readable report.
+ * One block per diagnostic (location, code, message, numbered fix steps,
+ * docs link), blank lines between blocks, then a one-line summary.
+ *
+ * @param report - the diagnostics plus file count and timing.
+ * @param c - the palette: ANSI styles, or identity functions for plain text.
+ * @returns the text report.
+ */
 function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint): string {
   const lines = diagnostics.map((d) =>
     [
@@ -51,9 +97,26 @@ function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint)
   return [...lines, tail].join("\n\n");
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/**
+ * Writes a count with its noun, adding "s" unless the count is 1.
+ *
+ * @param n - the count.
+ * @param word - the singular noun.
+ * @returns e.g. `1 file` or `3 files`.
+ */
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
 
-/** Stable, versioned shape. Agents parse this, so fields are only ever added. */
+/**
+ * Renders the `inwards/diagnostics@1` JSON report.
+ * Stable, versioned shape. Agents parse this, so fields are only ever added.
+ * The duration is rounded to 0.1 ms.
+ *
+ * @param report - the diagnostics plus file count and timing.
+ * @param indent - spaces per level, or undefined for one line.
+ * @returns the JSON document.
+ */
 function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: number): string {
   return JSON.stringify(
     {
@@ -70,10 +133,32 @@ function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: 
   );
 }
 
-/** SARIF 2.1.0, enough for GitHub code scanning and most IDE viewers. */
+/**
+ * Turns a forward-slash file path into a relative URI reference.
+ * Each segment is percent-encoded on its own, so `#`, `?` and spaces in file
+ * names stay part of the path instead of starting a fragment or a query.
+ *
+ * @param path - a relative path with `/` separators.
+ * @returns the path as a URI reference, e.g. `shop/order%231.py`.
+ */
+function toUriPath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
+ * Renders the report as SARIF 2.1.0.
+ * Enough for GitHub code scanning and most IDE viewers. Each result carries
+ * the fix as text and as a `fix` property; file URIs are relative to
+ * `%SRCROOT%`.
+ *
+ * @param report - the diagnostics; the counts are not part of SARIF.
+ * @param indent - spaces per level, or undefined for one line.
+ * @returns the SARIF log.
+ */
 function renderSarif({ diagnostics }: Report, indent?: number): string {
   return JSON.stringify(
     {
+      // biome-ignore lint/style/useNamingConvention: SARIF names this key "$schema".
       $schema: "https://json.schemastore.org/sarif-2.1.0.json",
       version: "2.1.0",
       runs: [
@@ -90,6 +175,12 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
                   shortDescription: { text: "Dependencies must point toward inner layers." },
                   helpUri: LAYER_RULE.docs,
                 },
+                {
+                  id: ENCODING_RULE.code,
+                  name: ENCODING_RULE.name,
+                  shortDescription: { text: "The file's declared encoding can hide imports." },
+                  helpUri: ENCODING_RULE.docs,
+                },
               ],
             },
           },
@@ -102,7 +193,8 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
             locations: [
               {
                 physicalLocation: {
-                  artifactLocation: { uri: d.file },
+                  // Relative to where `inwards check` ran; CI runs it from the checkout root.
+                  artifactLocation: { uri: toUriPath(d.file), uriBaseId: "%SRCROOT%" },
                   region: {
                     startLine: d.line,
                     startColumn: d.column,
