@@ -9,6 +9,9 @@ LC_BUILD_VERSION load command, so a wheel never claims more than it runs on.
     python3 scripts/build-wheels.py dist 0.1.0-rc.1   # writes dist/wheels/*.whl
 
 The version may be a git tag (`v0.1.0-rc.1`); it is turned into PEP 440 (`0.1.0rc1`).
+
+No musllinux wheel: the musl binary needs libstdc++, which the musllinux
+policy doesn't allow a wheel to assume. Alpine users take the raw binary.
 """
 
 import base64
@@ -27,12 +30,13 @@ DOCS = "https://sircypkowskyy.github.io/inwards"
 BINARIES = {
     "inwards-linux-x64": ("manylinux_{glibc}_x86_64", "inwards"),
     "inwards-linux-arm64": ("manylinux_{glibc}_aarch64", "inwards"),
-    "inwards-linux-x64-musl": ("musllinux_1_2_x86_64", "inwards"),
     "inwards-darwin-x64": ("macosx_{macos}_x86_64", "inwards"),
     "inwards-darwin-arm64": ("macosx_{macos}_arm64", "inwards"),
     "inwards-windows-x64.exe": ("win_amd64", "inwards.exe"),
 }
-GLIBC = re.compile(rb"GLIBC_2\.(\d+)")
+# NUL-terminated, as in the dynamic string table (which shares string tails, so
+# no leading NUL), so a version inside a JS string in the bundle doesn't count.
+GLIBC = re.compile(rb"GLIBC_2\.(\d+)\x00")
 PRE = re.compile(r"^(\d+\.\d+\.\d+)(?:-(a|alpha|b|beta|rc)\.?(\d+))?$")
 PEP440_PRE = {"a": "a", "alpha": "a", "b": "b", "beta": "b", "rc": "rc"}
 LC_BUILD_VERSION = 0x32
@@ -122,7 +126,7 @@ def build(binary: Path, version: str, out: Path) -> Path:
         f"{dist_info}/WHEEL": (
             f"Wheel-Version: 1.0\nGenerator: inwards build-wheels.py\nRoot-Is-Purelib: false\nTag: {tag}\n"
         ).encode(),
-        f"{dist_info}/licenses/LICENSE": (ROOT / "LICENSE").read_bytes(),
+        f"{dist_info}/LICENSE": (ROOT / "LICENSE").read_bytes(),
     }
     record = [record_line(name, content) for name, content in files.items()]
     record.append(f"{dist_info}/RECORD,,")

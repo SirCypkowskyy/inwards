@@ -29,6 +29,11 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Tag must match the engine version
         run: |
+          # Suffixes wheels can carry as PEP 440 pre-releases: v1.2.3, v1.2.3-rc.1, -a.1, -b.1.
+          if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(a|alpha|b|beta|rc)\.?[0-9]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not vX.Y.Z or vX.Y.Z-(a|b|rc).N"
+            exit 1
+          fi
           want="${GITHUB_REF_NAME#v}"
           want="${want%%-*}"
           have="$(sed -nE 's/^export const VERSION = "(.*)";$/\1/p' src/core/src/meta.ts)"
@@ -150,12 +155,9 @@ jobs:
         run: |
           chmod +x dist/inwards-linux-x64-musl
           docker run --rm -v "$PWD:/w" -w /w alpine:3 sh -euc '
-            apk add --no-cache libstdc++ libgcc python3 >/dev/null
+            apk add --no-cache libstdc++ libgcc >/dev/null
             dist/inwards-linux-x64-musl --version
-            dist/inwards-linux-x64-musl check --format json
-            python3 -m venv /tmp/venv
-            /tmp/venv/bin/pip install -q --no-index --find-links dist --pre inwards
-            /tmp/venv/bin/inwards --version'
+            dist/inwards-linux-x64-musl check --format json'
 
   release:
     name: Draft the GitHub Release
