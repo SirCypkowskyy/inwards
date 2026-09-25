@@ -45,6 +45,10 @@ jobs:
           bun run build
           bun x vsce package --no-dependencies --allow-missing-repository \
             -o "../../dist/inwards-vscode-${GITHUB_REF_NAME}.vsix"
+      - name: Wrap each binary in a platform wheel (uv add / uvx)
+        run: |
+          python3 scripts/build-wheels.py dist "$GITHUB_REF_NAME"
+          mv dist/wheels/*.whl dist/ && rmdir dist/wheels
       - name: Checksums
         working-directory: dist
         run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
@@ -106,6 +110,12 @@ jobs:
           chmod +x "dist/${{ matrix.bin }}"
           "dist/${{ matrix.bin }}" --version
           "dist/${{ matrix.bin }}" check --format json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: The wheel installs with uvx and runs
+        shell: bash
+        run: |
+          uvx --no-index --find-links dist --prerelease allow inwards --version
+          uvx --no-index --find-links dist --prerelease allow inwards check --format json
       - name: Provenance verifies
         if: env.ATTEST == 'true'
         shell: bash
@@ -140,9 +150,12 @@ jobs:
         run: |
           chmod +x dist/inwards-linux-x64-musl
           docker run --rm -v "$PWD:/w" -w /w alpine:3 sh -euc '
-            apk add --no-cache libstdc++ libgcc >/dev/null
+            apk add --no-cache libstdc++ libgcc python3 >/dev/null
             dist/inwards-linux-x64-musl --version
-            dist/inwards-linux-x64-musl check --format json'
+            dist/inwards-linux-x64-musl check --format json
+            python3 -m venv /tmp/venv
+            /tmp/venv/bin/pip install -q --no-index --find-links dist --pre inwards
+            /tmp/venv/bin/inwards --version'
 
   release:
     name: Draft the GitHub Release
@@ -156,7 +169,7 @@ jobs:
         with:
           name: inwards-${{ github.ref_name }}
           path: dist
-      - name: Draft release with binaries, .vsix and SHA256SUMS
+      - name: Draft release with binaries, wheels, .vsix and SHA256SUMS
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

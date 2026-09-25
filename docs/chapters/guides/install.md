@@ -44,6 +44,33 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 
 Once attestations are published, `gh attestation verify <file> --repo SirCypkowskyy/inwards` checks that a binary was built by this repository's release workflow.
 
+## As a uv dev dependency
+
+Each release also has one wheel per platform with the binary inside, the way Ruff ships. uv installs it like any other package, and `inwards` lands in the project's virtual environment:
+
+```sh
+TAG=v0.1.0-rc.1; VER=0.1.0rc1   # the release, and its Python version
+uv add --dev "inwards @ https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl"
+uv run inwards check
+uvx --from "https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl" inwards --version   # one-off, no project
+```
+
+Pick the wheel for your platform: `manylinux_2_17_x86_64`, `manylinux_2_17_aarch64`, `musllinux_1_2_x86_64`, `macosx_13_0_arm64`, `macosx_13_0_x86_64` or `win_amd64`. For a team on several platforms, give uv one source per platform in `pyproject.toml`:
+
+```toml title="pyproject.toml"
+[dependency-groups]
+dev = ["inwards"]
+
+[tool.uv.sources]
+inwards = [
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_x86_64.whl", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_arm64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'arm64'" },
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-win_amd64.whl", marker = "sys_platform == 'win32'" },
+]
+```
+
+Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), this becomes `uv add --dev inwards`.
+
 ## From source
 
 You need [Bun](https://bun.sh) 1.4.2 (the version in `.bun-version`) and access to the repository.

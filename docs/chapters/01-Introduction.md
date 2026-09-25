@@ -29,7 +29,7 @@ Inwards turns those wiki rules into a check that runs in milliseconds and talks 
 ```toml title="pyproject.toml"
 [tool.inwards]
 root = "src"
-required-version = "0.0.1"  # oldest Inwards allowed; `inwards init` sets it
+required-version = "0.1.0"  # oldest Inwards allowed; `inwards init` sets it
 ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
 escalate-after = 3  # attempts at one violation before the agent is told to ask you (optional)
 run-log = false  # local log of hook runs, see the Run log chapter (optional)
@@ -114,4 +114,4 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 | [7. Glossary](07-Glossary.md) | The vocabulary, from "port" to "import skeleton" |
 
 !!! info "Status"
-    Pre-alpha (0.0.1). Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, with a Stop gate that checks what the session changed, and each `v*` tag drafts a GitHub Release with binaries for six platforms. Everything marked :material-progress-clock: in these docs is planned, not built.
+    Pre-alpha (0.1.0). Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, with a Stop gate that checks what the session changed, and each `v*` tag drafts a GitHub Release with binaries for six platforms. Everything marked :material-progress-clock: in these docs is planned, not built.

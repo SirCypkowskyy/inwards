@@ -68,7 +68,7 @@ describe("inwards init --agent claude", () => {
     const entry = ourEntry(root);
     expect(entry.args?.slice(-2)).toEqual(["hook", "claude-code"]);
     expect(read(root, ".gitignore")).toContain(".inwards/");
-    expect(read(root, "pyproject.toml")).toContain('required-version = "0.0.1"');
+    expect(read(root, "pyproject.toml")).toContain('required-version = "0.1.0"');
 
     const before = ["pyproject.toml", ".gitignore", SETTINGS].map((f) => read(root, f));
     const again = init(root, "--agent", "claude");
@@ -156,7 +156,7 @@ describe("inwards init --agent claude", () => {
       "dist/\r\n# Inwards: local state and machine-specific hooks\r\n.inwards/\r\n.claude/settings.local.json\r\n",
     );
     expect(read(root, "pyproject.toml")).toContain(
-      '[tool.inwards]\r\nrequired-version = "0.0.1"\r\n',
+      '[tool.inwards]\r\nrequired-version = "0.1.0"\r\n',
     );
   });
 
@@ -165,7 +165,7 @@ describe("inwards init --agent claude", () => {
       "pyproject.toml": LAYERS.replace("[tool.inwards]", "[tool.inwards]  # arch"),
     });
     init(commented, "--agent", "claude");
-    expect(read(commented, "pyproject.toml")).toContain('required-version = "0.0.1"');
+    expect(read(commented, "pyproject.toml")).toContain('required-version = "0.1.0"');
 
     const tricky = `[project]\ndescription = """\n[tool.inwards]\n"""\n\n${LAYERS}`;
     const root = project({ "pyproject.toml": tricky });
@@ -178,7 +178,7 @@ describe("inwards init --agent claude", () => {
     const root = project({ "pyproject.toml": LAYERS });
     const { code, stdout } = init(root, "--agent", "claude", "--dry-run");
     expect(code).toBe(0);
-    expect(stdout).toContain('+required-version = "0.0.1"');
+    expect(stdout).toContain('+required-version = "0.1.0"');
     expect(stdout).toContain("+.inwards/");
     expect(read(root, "pyproject.toml")).toBe(LAYERS);
   });

@@ -12,7 +12,7 @@
 
 [project]
 name = "inwards"
-version = "0.0.1"
+version = "0.1.0"
 description = "Architecture linter for Python that keeps AI coding agents inside your layers."
 readme = "README.md"
 requires-python = ">=3.11"  # scripts/check-docs-nav.py uses tomllib

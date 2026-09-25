@@ -9,8 +9,10 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha (0.0.1). INW001 (layer dependency direction) and INW000 (source encodings that
-could hide imports) work end to end, including the Claude Code hook (`inwards hook claude-code`).
+Status: pre-alpha (0.1.0). Four rules (INW001 layer direction, INW011 literal dynamic imports,
+INW006 code outside every layer, INW000 encodings that could hide imports) work end to end, and
+`inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
+a config guard and escalation to the user.
 
 ## Layout
 
@@ -33,7 +35,9 @@ bun run scripts/build-binaries.ts bun-linux-x64 # dist/inwards-linux-x64
 uv run zensical serve -f docs/zensical.toml     # docs preview
 ```
 
-Releases: push a `v*` tag (`v0.0.1`, or `v0.0.1-rc.1` for a pre-release). `cd.yml`
-cross-compiles binaries for Linux (glibc and musl), macOS and Windows, runs each one on its
-native runner, and drafts a GitHub Release with the binaries, the `.vsix` and `SHA256SUMS`.
-Publish the draft by hand. Build provenance attestations switch on once the repo is public.
+Releases: push a `v*` tag (`v0.1.0`, or `v0.1.0-rc.1` for a pre-release). `cd.yml`
+cross-compiles binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform
+wheel (`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its
+native runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
+`SHA256SUMS`. Publish the draft by hand. Build provenance attestations switch on once the repo
+is public.
