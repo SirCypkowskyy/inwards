@@ -19,7 +19,12 @@ export class ConfigError extends Error {
 
 /** Reads `[tool.inwards]` from the text of a `pyproject.toml`. */
 export function parseConfig(pyprojectText: string): InwardsConfig {
-  const doc = parse(pyprojectText) as { tool?: { inwards?: unknown } };
+  let doc: { tool?: { inwards?: unknown } };
+  try {
+    doc = parse(pyprojectText) as typeof doc;
+  } catch (err) {
+    throw new ConfigError(`pyproject.toml is not valid TOML: ${(err as Error).message}`);
+  }
   const raw = doc.tool?.inwards;
   if (!raw || typeof raw !== "object") {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
@@ -42,5 +47,5 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     }
     return { name, modules };
   });
-  return { root, layers: parsed };
+  return { root: root.replaceAll("\\", "/"), layers: parsed };
 }

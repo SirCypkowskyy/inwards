@@ -29,15 +29,15 @@ jobs:
       - run: bun test
       - name: Compile every target with Bun
         run: bun run scripts/build-binaries.ts
-      - name: Checksums
-        working-directory: dist
-        run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
       - name: Build VS Code extension (.vsix)
         working-directory: src/vscode-extension
         run: |
           bun run build
           bun x @vscode/vsce package --no-dependencies --allow-missing-repository \
             -o "../../dist/inwards-vscode-${GITHUB_REF_NAME}.vsix"
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: inwards-${{ github.ref_name }}
@@ -69,7 +69,7 @@ jobs:
       - name: Binary starts and lints the example app
         shell: bash
         run: |
-          chmod +x "dist/${{ matrix.bin }}" || true
+          chmod +x "dist/${{ matrix.bin }}"
           "dist/${{ matrix.bin }}" --version
           "dist/${{ matrix.bin }}" check --format json
 

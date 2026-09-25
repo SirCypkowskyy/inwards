@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import {
@@ -69,13 +69,15 @@ async function runCheck(
   const config = parseConfig(readFileSync(configPath, "utf8"));
   const root = resolve(dirname(configPath), config.root);
   const engine = await Engine.create(await loadGrammars(), config);
-  const files = collectPythonFiles(targets ?? [root]).map(
-    (abs): SourceFile => ({
-      path: posix(relative(base, abs)),
-      text: readFileSync(abs, "utf8"),
-      ...moduleNameFor(relative(root, abs)),
-    }),
-  );
+  const files = collectPythonFiles(targets ?? [root])
+    .filter((abs) => isInside(root, abs))
+    .map(
+      (abs): SourceFile => ({
+        path: posix(relative(base, abs)),
+        text: readFileSync(abs, "utf8"),
+        ...moduleNameFor(relative(root, abs)),
+      }),
+    );
   const diagnostics = engine.checkFiles(files);
   return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
 }
@@ -89,39 +91,57 @@ interface ClaudeCodeHookInput {
 /**
  * Claude Code PostToolUse hook: checks the one file the agent just wrote.
  * Exit 2 puts stderr in front of the model, so violations and config errors go
- * there. Every other event and non-Python file passes silently with exit 0.
+ * there. Exit 1 reaches only the user: a bad payload or a bug in Inwards is not
+ * the model's to fix. Anything else passes silently with exit 0.
  */
 async function hookClaudeCode(): Promise<number> {
-  let input: ClaudeCodeHookInput;
+  if (process.stdin.isTTY) return print(USAGE, 2);
+  let input: ClaudeCodeHookInput | null = null;
   try {
-    input = JSON.parse(await Bun.stdin.text());
-  } catch {
+    // Sync on purpose: awaiting Bun.stdin in the Windows binary let the process
+    // exit before main() settled, i.e. exit 0 and the violation lost.
+    input = JSON.parse(readFileSync(0, "utf8"));
+  } catch {}
+  if (typeof input !== "object" || input === null) {
     return print("inwards hook: stdin is not a Claude Code hook payload.", 1);
   }
   const file = input.tool_input?.file_path;
   if (input.hook_event_name !== "PostToolUse" || typeof file !== "string") return 0;
   if (!/\.pyi?$/.test(file)) return 0;
 
-  const cwd = typeof input.cwd === "string" ? input.cwd : process.cwd();
-  const configPath = findConfig(cwd);
-  if (!configPath) {
-    return print(
-      `inwards: no pyproject.toml with [tool.inwards] above ${cwd}; nothing was checked.`,
-      2,
-    );
-  }
-  // The payload is agent-controlled: only files inside the project are checked.
-  const abs = resolve(cwd, file);
-  if (!existsSync(abs) || !isInside(dirname(configPath), abs)) return 0;
+  // The payload is agent-controlled. Compare real paths, so `..` and symlinks
+  // can't reach a file outside the project, and check regular files only.
+  const cwd = realpath(typeof input.cwd === "string" ? input.cwd : process.cwd());
+  if (!cwd) return 0;
+  const project = realpath(process.env.CLAUDE_PROJECT_DIR || cwd);
+  const abs = realpath(resolve(cwd, file));
+  if (!abs || !project || !isInside(project, abs) || !statSync(abs).isFile()) return 0;
 
-  const report = await runCheck(configPath, [abs], cwd);
-  if (report.diagnostics.length === 0) return 0;
-  process.stderr.write(`${render(report, "json", { pretty: false })}\n`);
-  return 2;
+  // The nearest config above the file, so each package in a monorepo uses its own.
+  // No config at all means this project doesn't use Inwards (the hook may be user-wide).
+  const configPath = findConfig(dirname(abs));
+  if (!configPath) return 0;
+  try {
+    const report = await runCheck(configPath, [abs], cwd);
+    if (report.diagnostics.length === 0) return 0;
+    process.stderr.write(`${render(report, "json", { pretty: false })}\n`);
+    return 2;
+  } catch (err) {
+    if (err instanceof ConfigError) return print(`inwards: config error: ${err.message}`, 2);
+    return print(`inwards hook: ${err instanceof Error ? err.message : String(err)}`, 1);
+  }
+}
+
+function realpath(path: string): string | undefined {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
 }
 
 function isInside(dir: string, file: string): boolean {
-  const rel = relative(realpathSync(dir), realpathSync(file));
+  const rel = relative(dir, file);
   return rel !== "" && rel.split(sep)[0] !== ".." && !isAbsolute(rel);
 }
 

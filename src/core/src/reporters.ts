@@ -102,7 +102,8 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
             locations: [
               {
                 physicalLocation: {
-                  artifactLocation: { uri: d.file },
+                  // Relative to where `inwards check` ran; CI runs it from the checkout root.
+                  artifactLocation: { uri: encodeURI(d.file), uriBaseId: "%SRCROOT%" },
                   region: {
                     startLine: d.line,
                     startColumn: d.column,

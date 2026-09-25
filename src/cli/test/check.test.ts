@@ -15,5 +15,5 @@ test("diagnostic paths use forward slashes on every OS", () => {
 test("SARIF artifact URIs use forward slashes on every OS", () => {
   const { stdout } = inwards(["check", "--format", "sarif"], { cwd: leak });
   const uri = JSON.parse(stdout).runs[0].results[0].locations[0].physicalLocation.artifactLocation;
-  expect(uri).toEqual({ uri: "shop/domain/deep/order.py" });
+  expect(uri).toEqual({ uri: "shop/domain/deep/order.py", uriBaseId: "%SRCROOT%" });
 });

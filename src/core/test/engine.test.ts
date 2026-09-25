@@ -136,7 +136,7 @@ describe("source quirks (M0)", () => {
   });
 
   test("BOM is not a column, CRLF is a line break", () => {
-    const src = "﻿import shop.api\r\nx = 1\r\nfrom shop.infrastructure \\\r\n  import db\r\n";
+    const src = "\uFEFFimport shop.api\r\nx = 1\r\nfrom shop.infrastructure \\\r\n  import db\r\n";
     const found = engine.checkFile(file("shop/domain/order.py", src));
     expect(found.map((d) => [d.line, d.column])).toEqual([
       [1, 8],

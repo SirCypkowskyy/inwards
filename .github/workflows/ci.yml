@@ -53,18 +53,6 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      - name: DEBUG realpath (temporary)
-        if: runner.os == 'Windows'
-        run: |
-          bun -e '
-          const fs = require("node:fs"), os = require("node:os"), p = require("node:path");
-          const root = fs.mkdtempSync(p.join(os.tmpdir(), "dbg-"));
-          fs.mkdirSync(p.join(root, "a")); fs.writeFileSync(p.join(root, "a", "x.py"), "");
-          const f = p.join(root, "a", "x.py");
-          for (const [k, fn] of [["js", fs.realpathSync], ["native", fs.realpathSync.native]]) {
-            const d = fn(root), ff = fn(f);
-            console.log(k, JSON.stringify({ root, d, ff, rel: p.relative(d, ff), exists: fs.existsSync(f) }));
-          }'
       - name: Compile the binary for this OS (catches WASM embedding regressions)
         run: bun run scripts/build-binaries.ts ${{ matrix.target }}
       - name: Unit and end-to-end tests against the compiled binary
