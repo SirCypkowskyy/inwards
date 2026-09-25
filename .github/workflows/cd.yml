@@ -1,6 +1,7 @@
 name: CD
 
-# Tag a release with `git tag v0.1.0 && git push origin v0.1.0`.
+# Tag a release with `git tag v0.1.0 && git push origin v0.1.0`. A tag with a
+# suffix (v0.1.0-rc.1) builds the same version and drafts a pre-release.
 on:
   push:
     tags: ["v*"]
@@ -8,10 +9,19 @@ on:
 permissions:
   contents: read
 
+# Build provenance needs a public repository (private ones need GitHub
+# Enterprise Cloud), so attestation steps are skipped while the repo is private.
+env:
+  ATTEST: ${{ github.event.repository.visibility == 'public' }}
+
 jobs:
   build:
     name: Cross-compile binaries
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -21,6 +31,7 @@ jobs:
       - name: Tag must match the engine version
         run: |
           want="${GITHUB_REF_NAME#v}"
+          want="${want%%-*}"
           have="$(sed -nE 's/^export const VERSION = "(.*)";$/\1/p' src/core/src/meta.ts)"
           if [ "$want" != "$have" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $have in src/core/src/meta.ts"
@@ -38,6 +49,11 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
+      - name: Attest build provenance of every file in SHA256SUMS
+        if: env.ATTEST == 'true'
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: inwards-${{ github.ref_name }}
@@ -72,6 +88,12 @@ jobs:
           chmod +x "dist/${{ matrix.bin }}"
           "dist/${{ matrix.bin }}" --version
           "dist/${{ matrix.bin }}" check --format json
+      - name: Provenance verifies
+        if: env.ATTEST == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "dist/${{ matrix.bin }}" --repo "$GITHUB_REPOSITORY"
 
   verify-musl:
     name: Run on Alpine (musl)
@@ -83,6 +105,11 @@ jobs:
         with:
           name: inwards-${{ github.ref_name }}
           path: dist
+      - name: Provenance verifies
+        if: env.ATTEST == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify dist/inwards-linux-x64-musl --repo "$GITHUB_REPOSITORY"
       - name: Binary starts and lints the example app
         run: |
           chmod +x dist/inwards-linux-x64-musl
@@ -90,3 +117,23 @@ jobs:
             apk add --no-cache libstdc++ libgcc >/dev/null
             dist/inwards-linux-x64-musl --version
             dist/inwards-linux-x64-musl check --format json'
+
+  release:
+    name: Draft the GitHub Release
+    needs: [verify, verify-musl]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: inwards-${{ github.ref_name }}
+          path: dist
+      - name: Draft release with binaries, .vsix and SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --draft --verify-tag --generate-notes $pre

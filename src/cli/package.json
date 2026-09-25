@@ -1,6 +1,6 @@
 {
   "name": "@inwards/cli",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "description": "The `inwards` command line. Compiled to a single binary with `bun build --compile`.",
