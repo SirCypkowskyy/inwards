@@ -31,7 +31,7 @@
   "scripts": {
     "typecheck": "tsc -p .",
     "build": "bun build src/extension.ts src/server.ts --outdir dist --target node --format cjs --external vscode && bun run scripts/copy-wasm.ts",
-    "package": "bunx @vscode/vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies"
   },
   "dependencies": {
     "@inwards/core": "workspace:*",
@@ -42,8 +42,9 @@
     "web-tree-sitter": "0.27.0"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@types/vscode": "^1.95.0",
-    "@types/node": "^24.0.0"
+    "@vscode/vsce": "4.0.0"
   },
   "license": "MIT"
 }

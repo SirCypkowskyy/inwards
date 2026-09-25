@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cd-${{ github.ref }}
+
 # Build provenance needs a public repository (private ones need GitHub
 # Enterprise Cloud), so attestation steps are skipped while the repo is private.
 env:
@@ -18,10 +21,6 @@ jobs:
   build:
     name: Cross-compile binaries
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -33,7 +32,7 @@ jobs:
           want="${GITHUB_REF_NAME#v}"
           want="${want%%-*}"
           have="$(sed -nE 's/^export const VERSION = "(.*)";$/\1/p' src/core/src/meta.ts)"
-          if [ "$want" != "$have" ]; then
+          if [ -z "$have" ] || [ "$want" != "$have" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $have in src/core/src/meta.ts"
             exit 1
           fi
@@ -44,16 +43,11 @@ jobs:
         working-directory: src/vscode-extension
         run: |
           bun run build
-          bun x @vscode/vsce package --no-dependencies --allow-missing-repository \
+          bun x vsce package --no-dependencies --allow-missing-repository \
             -o "../../dist/inwards-vscode-${GITHUB_REF_NAME}.vsix"
       - name: Checksums
         working-directory: dist
         run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
-      - name: Attest build provenance of every file in SHA256SUMS
-        if: env.ATTEST == 'true'
-        uses: actions/attest-build-provenance@v4.2.2
-        with:
-          subject-checksums: dist/SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: inwards-${{ github.ref_name }}
@@ -63,9 +57,31 @@ jobs:
             !dist/*.map
           if-no-files-found: error
 
+  # Its own job, so the OIDC token never shares a runner with `bun install`.
+  attest:
+    name: Attest build provenance
+    needs: build
+    if: github.event.repository.visibility == 'public'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: inwards-${{ github.ref_name }}
+          path: dist
+      - uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+
   verify:
     name: Run on ${{ matrix.os }}
-    needs: build
+    needs: [build, attest]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.attest.result != 'failure' }}
+    permissions:
+      contents: read
+      attestations: read
     strategy:
       fail-fast: false
       matrix:
@@ -93,12 +109,17 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify "dist/${{ matrix.bin }}" --repo "$GITHUB_REPOSITORY"
+        run: gh attestation verify "dist/${{ matrix.bin }}" --repo "$GITHUB_REPOSITORY" \
+          --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/cd.yml" --source-ref "$GITHUB_REF"
 
   verify-musl:
     name: Run on Alpine (musl)
-    needs: build
+    needs: [build, attest]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.attest.result != 'failure' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: read
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -109,7 +130,9 @@ jobs:
         if: env.ATTEST == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify dist/inwards-linux-x64-musl --repo "$GITHUB_REPOSITORY"
+        run: |
+          gh attestation verify dist/inwards-linux-x64-musl --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/cd.yml" --source-ref "$GITHUB_REF"
       - name: Binary starts and lints the example app
         run: |
           chmod +x dist/inwards-linux-x64-musl
@@ -121,6 +144,7 @@ jobs:
   release:
     name: Draft the GitHub Release
     needs: [verify, verify-musl]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && needs.verify-musl.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -135,5 +159,10 @@ jobs:
         run: |
           pre=""
           [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --draft --verify-tag --generate-notes $pre
+          # Idempotent: a re-run refreshes the assets of the existing release.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+              --draft --generate-notes $pre
+          fi
