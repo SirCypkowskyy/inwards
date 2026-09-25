@@ -1,0 +1,98 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "draft": true,
+  "force-tag-creation": true,
+  "bootstrap-sha": "bf5e8def1586730a6cb55262be401d2e6aac3c1b",
+  "pull-request-title-pattern": "chore: release ${version}",
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Added"
+    },
+    {
+      "type": "fix",
+      "section": "Fixed"
+    },
+    {
+      "type": "perf",
+      "section": "Changed"
+    },
+    {
+      "type": "revert",
+      "section": "Reverted"
+    },
+    {
+      "type": "deps",
+      "section": "Dependencies"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "refactor",
+      "section": "Refactoring",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": true
+    },
+    {
+      "type": "build",
+      "section": "Build",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "CI",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Chores",
+      "hidden": true
+    }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "inwards",
+      "extra-files": [
+        "src/core/src/meta.ts",
+        {
+          "type": "json",
+          "path": "src/core/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "src/cli/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "src/vscode-extension/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.virtual)].version"
+        },
+        "README.md",
+        "docs/chapters/index.md",
+        "docs/chapters/01-Introduction.md"
+      ]
+    }
+  }
+}

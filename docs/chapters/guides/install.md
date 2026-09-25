@@ -3,7 +3,7 @@
 !!! info "Verified 2026-09-25"
     The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary on every push; a by-hand check there is still open. The release download steps can't be tried until v0.1.0 is published.
 
-Inwards is one executable with no runtime to install. The first public release will be v0.1.0. Until it's out, build from source.
+Inwards is one executable with no runtime to install. The latest release is the pre-release v0.1.0-rc.1; the first full release comes with a later milestone. You can also build from source.
 
 ## From a release
 
@@ -20,7 +20,7 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 === "Linux / macOS"
 
     ```sh
-    VERSION=v0.1.0; FILE=inwards-linux-x64   # pick your file from the table
+    VERSION=v0.1.0-rc.1; FILE=inwards-linux-x64   # pick your file from the table
     curl -LO "https://github.com/SirCypkowskyy/inwards/releases/download/$VERSION/$FILE"
     curl -LO "https://github.com/SirCypkowskyy/inwards/releases/download/$VERSION/SHA256SUMS"
     sha256sum --check --ignore-missing SHA256SUMS   # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
@@ -33,7 +33,7 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 === "Windows (PowerShell)"
 
     ```powershell
-    $Version = "v0.1.0"; $File = "inwards-windows-x64.exe"
+    $Version = "v0.1.0-rc.1"; $File = "inwards-windows-x64.exe"
     Invoke-WebRequest "https://github.com/SirCypkowskyy/inwards/releases/download/$Version/$File" -OutFile inwards.exe
     Invoke-WebRequest "https://github.com/SirCypkowskyy/inwards/releases/download/$Version/SHA256SUMS" -OutFile SHA256SUMS
     (Get-FileHash inwards.exe -Algorithm SHA256).Hash.ToLower()   # compare with the line for $File in SHA256SUMS

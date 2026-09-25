@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
+import { VERSION } from "@inwards/core";
 import { CMD, inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
+
+/** The line `init` pins, built from the engine version so a release PR's bump doesn't break the tests. */
+const PINNED = `required-version = "${VERSION.replace(/-.*$/u, "")}"`;
 
 /**
  * Runs `inwards init` in a project.
@@ -68,7 +72,7 @@ describe("inwards init --agent claude", () => {
     const entry = ourEntry(root);
     expect(entry.args?.slice(-2)).toEqual(["hook", "claude-code"]);
     expect(read(root, ".gitignore")).toContain(".inwards/");
-    expect(read(root, "pyproject.toml")).toContain('required-version = "0.1.0"');
+    expect(read(root, "pyproject.toml")).toContain(PINNED);
 
     const before = ["pyproject.toml", ".gitignore", SETTINGS].map((f) => read(root, f));
     const again = init(root, "--agent", "claude");
@@ -155,9 +159,7 @@ describe("inwards init --agent claude", () => {
     expect(read(root, ".gitignore")).toBe(
       "dist/\r\n# Inwards: local state and machine-specific hooks\r\n.inwards/\r\n.claude/settings.local.json\r\n",
     );
-    expect(read(root, "pyproject.toml")).toContain(
-      '[tool.inwards]\r\nrequired-version = "0.1.0"\r\n',
-    );
+    expect(read(root, "pyproject.toml")).toContain(`[tool.inwards]\r\n${PINNED}\r\n`);
   });
 
   test("required-version goes under a header with a comment, and is skipped with a warning where it can't go", () => {
@@ -165,7 +167,7 @@ describe("inwards init --agent claude", () => {
       "pyproject.toml": LAYERS.replace("[tool.inwards]", "[tool.inwards]  # arch"),
     });
     init(commented, "--agent", "claude");
-    expect(read(commented, "pyproject.toml")).toContain('required-version = "0.1.0"');
+    expect(read(commented, "pyproject.toml")).toContain(PINNED);
 
     const tricky = `[project]\ndescription = """\n[tool.inwards]\n"""\n\n${LAYERS}`;
     const root = project({ "pyproject.toml": tricky });
@@ -178,7 +180,7 @@ describe("inwards init --agent claude", () => {
     const root = project({ "pyproject.toml": LAYERS });
     const { code, stdout } = init(root, "--agent", "claude", "--dry-run");
     expect(code).toBe(0);
-    expect(stdout).toContain('+required-version = "0.1.0"');
+    expect(stdout).toContain(`+${PINNED}`);
     expect(stdout).toContain("+.inwards/");
     expect(read(root, "pyproject.toml")).toBe(LAYERS);
   });
