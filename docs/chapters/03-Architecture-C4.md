@@ -59,7 +59,7 @@ flowchart TB
         lsp["<b>Language server</b><br/><small>TypeScript on Node, bundled in the extension</small>"]
         ext["<b>VS Code extension</b><br/><small>LSP client, starts the server</small>"]
         core["<b>Engine</b> @inwards/core<br/><small>TypeScript library + tree-sitter WASM<br/>no I/O</small>"]
-        hooks["Agent kit<br/><small>inwards init --agent: hook config,<br/>AGENTS.md section</small>"]
+        hooks["<b>Agent kit</b><br/><small>inwards init --agent: hooks,<br/>AGENTS.md section, aider lint-cmd</small>"]
         cache[("Cache<br/><small>.inwards/cache</small>")]
     end
 
@@ -83,7 +83,8 @@ flowchart TB
     classDef ext fill:#eceff1,color:#263238,stroke:#90a4ae
     class agent,dev person
     class cli,lsp,ext,core container
-    class hooks,cache planned
+    class hooks container
+    class cache planned
     class config,src,vscode ext
 ```
 

@@ -4,6 +4,7 @@ import process from "node:process";
 import { parseArgs } from "node:util";
 import { ConfigError, type Format, render, VERSION } from "@inwards/core";
 import { hookClaudeCode } from "./hook.ts";
+import { AGENTS, initCommand, isAgent } from "./init.ts";
 import { print } from "./output.ts";
 import { findConfig } from "./paths.ts";
 import { runCheck } from "./project.ts";
@@ -12,6 +13,7 @@ import { runCheck } from "./project.ts";
 const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml]
+       inwards init --agent claude|aider|agents-md [--dry-run]
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
@@ -34,6 +36,8 @@ async function main(argv: string[]): Promise<number> {
       config: { type: "string" },
       version: { type: "boolean" },
       help: { type: "boolean", short: "h" },
+      agent: { type: "string" },
+      "dry-run": { type: "boolean" },
     },
   });
 
@@ -45,6 +49,11 @@ async function main(argv: string[]): Promise<number> {
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(USAGE)
       : print(USAGE, 2);
+  }
+  if (command === "init" && !values.help) {
+    return paths.length === 0 && isAgent(values.agent)
+      ? initCommand(values.agent, values["dry-run"] === true)
+      : print(`${USAGE}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
   }
   if (values.help || command !== "check") {
     return print(USAGE, command ? 2 : 0);
