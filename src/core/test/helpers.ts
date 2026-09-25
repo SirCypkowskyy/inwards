@@ -11,14 +11,14 @@ function load(spec: string): Uint8Array {
   return new Uint8Array(readFileSync(Bun.resolveSync(spec, import.meta.dir)));
 }
 
-export function grammars(): GrammarBinaries {
+function grammars(): GrammarBinaries {
   return {
     runtime: load("web-tree-sitter/web-tree-sitter.wasm"),
     python: load("tree-sitter-python/tree-sitter-python.wasm"),
   };
 }
 
-export const CONFIG = parseConfig(`
+const CONFIG = parseConfig(`
 [tool.inwards]
 layers = [
   { name = "domain", modules = ["shop.domain"] },

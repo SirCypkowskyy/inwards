@@ -14,7 +14,7 @@ import type { Parser } from "web-tree-sitter";
 import { extractImports, parsePython } from "./python.ts";
 import type { ImportRef, SourceFile } from "./types.ts";
 
-export interface Skeleton {
+interface Skeleton {
   text: string;
   /** Columns removed from each line by dedenting, indexed by 0-based row. */
   indent: number[];
@@ -23,7 +23,7 @@ export interface Skeleton {
 const STARTS_IMPORT = /^(?<pad>[ \t]*)(?:import[ \t]|from[ \t][^#]*[ \t]import\b)/u;
 const MENTIONS_IMPORT = /\bimport\b/u;
 
-export function importSkeleton(source: string): Skeleton | null {
+function importSkeleton(source: string): Skeleton | null {
   const lines = source.split("\n");
   const out: string[] = new Array<string>(lines.length).fill("");
   const indent: number[] = new Array<number>(lines.length).fill(0);

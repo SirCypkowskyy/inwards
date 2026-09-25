@@ -12,12 +12,14 @@
     "format": "biome format --write .",
     "typecheck": "tsc -p . && bun run --filter '*' typecheck",
     "test": "bun test",
+    "fallow": "fallow dead-code && fallow dupes",
     "build:cli": "bun run scripts/build-binaries.ts",
     "check:self": "bun run src/cli/src/main.ts check examples/clean-app"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
     "@types/bun": "^1.4.2",
+    "fallow": "3.28.0",
     "typescript": "^7.0.2"
   },
   "license": "MIT"

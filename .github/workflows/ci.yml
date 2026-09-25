@@ -26,6 +26,8 @@ jobs:
         run: bun x biome ci .
       - name: Typecheck
         run: bun run typecheck
+      - name: Fallow (dead code, unused deps, architecture boundaries, duplication)
+        run: bun run fallow
       - name: Prescan never misses an import (generated spellings + the Python stdlib)
         run: bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
       - name: Dogfood - inwards checks its own example app
