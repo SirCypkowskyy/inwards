@@ -1,4 +1,7 @@
-# Design partners (issue #8)
+# Design partners
+
+Parked: recruiting was moved to the end of the roadmap (issue #8 deleted on
+2026-09-25). The shortlist below is kept for when it comes back.
 
 Goal: at least 5 teams agree to try v0.1 on a real repo, with consent to run
 the hook and share the opt-in run log. Recruiting is manual; this file is the
