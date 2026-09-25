@@ -1,7 +1,7 @@
 {
   "name": "inwards",
   "version": "0.0.0",
-  "description": "Name reservation for Inwards, an architecture linter for Python. Get the binary from GitHub Releases.",
+  "description": "Inwards, an architecture linter for Python that keeps AI coding agents inside your layers. This early release points to the binary on GitHub Releases.",
   "bin": {
     "inwards": "bin.js"
   },

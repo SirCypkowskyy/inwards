@@ -4,11 +4,16 @@ Both registries reclaim empty squats, so these are small working packages:
 `inwards --version` points to GitHub Releases and every other command exits 2,
 so a dependency bump to a placeholder fails CI instead of passing every check.
 
-Publish once, from this directory, with the project account:
+Publish once, from this directory, with the project account (2FA on, and a
+token scoped to this one project):
 
 ```sh
-(cd pypi && uv build && uv publish)          # needs a PyPI token: UV_PUBLISH_TOKEN
-(cd npm && npm publish)                       # needs `npm login`
+npm view inwards; curl -s -o /dev/null -w "%{http_code}\n" https://pypi.org/pypi/inwards/json  # both must say 404
+(cd pypi && uv build && uvx twine check dist/* && uv publish)   # UV_PUBLISH_TOKEN
+(cd npm && npm publish)                                          # after `npm login`
 ```
 
-Record who holds each credential in the issue when done.
+Then record on the issue who holds each credential. Replace these packages
+with the real wheel and npm package as soon as they exist (a name held only
+by a placeholder can be reclaimed under PEP 541 or npm's dispute policy),
+and yank or deprecate 0.0.0 then.

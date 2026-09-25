@@ -1,10 +1,11 @@
 [project]
 name = "inwards"
 version = "0.0.0"
-description = "Name reservation for Inwards, an architecture linter for Python. Get the binary from GitHub Releases."
+description = "Inwards, an architecture linter for Python that keeps AI coding agents inside your layers. This early release points to the binary on GitHub Releases."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+license-files = ["LICENSE"]
 urls = { Homepage = "https://github.com/SirCypkowskyy/inwards" }
 scripts = { inwards = "inwards:main" }
 
