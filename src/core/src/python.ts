@@ -23,6 +23,15 @@ export function parsePython(parser: Parser, text: string): Tree {
   return tree;
 }
 
+/**
+ * Drops a BOM (editors don't count it as a column) and turns a lone \r into \n.
+ * Python ends a line at a lone \r but tree-sitter doesn't, so `# c\rimport x`
+ * would otherwise hide a real import inside a comment.
+ */
+export function normalizeSource(text: string): string {
+  return text.replace(/^\uFEFF/, "").replace(/\r(?!\n)/g, "\n");
+}
+
 /** Every import in the file, including ones nested in functions or `if TYPE_CHECKING:`. */
 export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
   const refs: ImportRef[] = [];

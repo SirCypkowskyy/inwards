@@ -1,8 +1,14 @@
 import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "./config.ts";
 import { checkLayers } from "./layers.ts";
-import { importSkeleton } from "./prescan.ts";
-import { createPythonParser, extractImports, type GrammarBinaries, parsePython } from "./python.ts";
+import { skeletonImports } from "./prescan.ts";
+import {
+  createPythonParser,
+  extractImports,
+  type GrammarBinaries,
+  normalizeSource,
+  parsePython,
+} from "./python.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
@@ -21,17 +27,14 @@ export class Engine {
    * parse runs only to confirm one (or when the prescan declines the file).
    */
   checkFile(file: SourceFile): Diagnostic[] {
-    const skeleton = importSkeleton(file.text);
-    if (skeleton) {
-      const imports = this.imports(file, skeleton.text).map((ref) => ({
-        ...ref,
-        column: ref.column + (skeleton.indent[ref.line - 1] ?? 0),
-        endColumn: ref.endColumn + (skeleton.indent[ref.endLine - 1] ?? 0),
-      }));
-      const found = checkLayers(file, imports, this.config.layers);
+    const text = normalizeSource(file.text);
+    const src = text === file.text ? file : { ...file, text };
+    const fast = skeletonImports(this.parser, src);
+    if (fast) {
+      const found = checkLayers(src, fast, this.config.layers);
       if (found.length === 0) return found;
     }
-    return checkLayers(file, this.imports(file, file.text), this.config.layers);
+    return checkLayers(src, this.imports(src, src.text), this.config.layers);
   }
 
   private imports(file: SourceFile, text: string): ImportRef[] {

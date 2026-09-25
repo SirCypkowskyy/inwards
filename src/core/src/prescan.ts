@@ -10,6 +10,10 @@
  * parses the full file. False positives are fine because the engine confirms
  * every violation against a full parse.
  */
+import type { Parser } from "web-tree-sitter";
+import { extractImports, parsePython } from "./python.ts";
+import type { ImportRef, SourceFile } from "./types.ts";
+
 export interface Skeleton {
   text: string;
   /** Columns removed from each line by dedenting, indexed by 0-based row. */
@@ -56,4 +60,23 @@ export function importSkeleton(source: string): Skeleton | null {
     }
   }
   return { text: out.join("\n"), indent };
+}
+
+/** Imports read from the skeleton, with real columns. Null means: do the full parse. */
+export function skeletonImports(parser: Parser, file: SourceFile): ImportRef[] | null {
+  const skeleton = importSkeleton(file.text);
+  if (!skeleton) return null;
+  const tree = parsePython(parser, skeleton.text);
+  try {
+    // A string holding `from a import (` glues the real code after it onto a bogus
+    // import, which hides real imports. That skeleton never parses cleanly.
+    if (tree.rootNode.hasError) return null;
+    return extractImports(tree, file).map((ref) => ({
+      ...ref,
+      column: ref.column + (skeleton.indent[ref.line - 1] ?? 0),
+      endColumn: ref.endColumn + (skeleton.indent[ref.endLine - 1] ?? 0),
+    }));
+  } finally {
+    tree.delete(); // WASM memory is not garbage collected
+  }
 }

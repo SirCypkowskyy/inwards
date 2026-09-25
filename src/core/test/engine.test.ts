@@ -123,3 +123,24 @@ describe("backslash continuations (review round 3)", () => {
     expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
   });
 });
+
+describe("source quirks (M0)", () => {
+  test("a string holding `from a import (` cannot glue a real import onto it", () => {
+    const src = 's = """\nfrom a import (\n"""\nimport shop.infrastructure\ny = """\n)\n"""\n';
+    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+  });
+
+  test("a lone \\r ends a line, as in Python", () => {
+    const [d] = engine.checkFile(file("shop/domain/order.py", "# c\rimport shop.infrastructure\n"));
+    expect(d?.line).toBe(2);
+  });
+
+  test("BOM is not a column, CRLF is a line break", () => {
+    const src = "﻿import shop.api\r\nx = 1\r\nfrom shop.infrastructure \\\r\n  import db\r\n";
+    const found = engine.checkFile(file("shop/domain/order.py", src));
+    expect(found.map((d) => [d.line, d.column])).toEqual([
+      [1, 8],
+      [4, 10],
+    ]);
+  });
+});
