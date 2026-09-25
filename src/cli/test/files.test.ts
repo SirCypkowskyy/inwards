@@ -6,10 +6,10 @@ import { collectPythonFiles } from "../src/files.ts";
 
 test("walks build/dist/site inside packages, skips venvs and hidden dirs", () => {
   const root = mkdtempSync(join(tmpdir(), "inwards-files-"));
-  const put = (rel: string) => {
+  function put(rel: string): void {
     mkdirSync(join(root, rel, ".."), { recursive: true });
     writeFileSync(join(root, rel), "");
-  };
+  }
   put("shop/domain/build/leak.py");
   put("shop/dist/x.py");
   put(".venv/lib/site.py");

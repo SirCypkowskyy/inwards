@@ -7,9 +7,11 @@ import {
   type SourceFile,
 } from "../src/index.ts";
 
+function load(spec: string): Uint8Array {
+  return new Uint8Array(readFileSync(Bun.resolveSync(spec, import.meta.dir)));
+}
+
 export function grammars(): GrammarBinaries {
-  const load = (spec: string) =>
-    new Uint8Array(readFileSync(Bun.resolveSync(spec, import.meta.dir)));
   return {
     runtime: load("web-tree-sitter/web-tree-sitter.wasm"),
     python: load("tree-sitter-python/tree-sitter-python.wasm"),
@@ -30,4 +32,4 @@ export function file(path: string, text: string): SourceFile {
   return { path, text, ...moduleNameFor(path) };
 }
 
-export const engine = await Engine.create(grammars(), CONFIG);
+export const engine: Engine = await Engine.create(grammars(), CONFIG);

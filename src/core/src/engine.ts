@@ -34,7 +34,9 @@ export class Engine {
     const fast = skeletonImports(this.parser, src);
     if (fast) {
       const found = checkLayers(src, fast, this.config.layers);
-      if (found.length === 0) return found;
+      if (found.length === 0) {
+        return found;
+      }
     }
     return checkLayers(src, this.imports(src), this.config.layers);
   }
@@ -50,7 +52,9 @@ export class Engine {
 
   checkFiles(files: Iterable<SourceFile>): Diagnostic[] {
     const all: Diagnostic[] = [];
-    for (const file of files) all.push(...this.checkFile(file));
+    for (const file of files) {
+      all.push(...this.checkFile(file));
+    }
     return all;
   }
 }

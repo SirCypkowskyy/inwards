@@ -1,15 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { inwards, LAYERS, payload, project } from "./run.ts";
+import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 
 // Exit codes and output shape for the common paths are pinned by e2e.test.ts.
 // These are the edge cases around what gets checked at all.
-const hook = (root: string, stdin: string) =>
-  inwards(["hook", "claude-code"], { cwd: root, stdin });
-const at = (root: string, file_path: string, extra: Record<string, unknown> = {}) =>
-  payload("post-write-order", root, { tool_input: { file_path }, ...extra });
+function hook(root: string, stdin: string): RunResult {
+  return inwards(["hook", "claude-code"], { cwd: root, stdin });
+}
 
+function at(root: string, filePath: string, extra: Record<string, unknown> = {}): string {
+  return payload("post-write-order", root, { tool_input: { file_path: filePath }, ...extra });
+}
+
+const PATH_SEPARATOR = /[\\/]/u;
 const LEAK = "import shop.infrastructure.db\n";
 const SILENT = { code: 0, stdout: "", stderr: "" };
 
@@ -34,7 +38,12 @@ describe("inwards hook claude-code", () => {
     const other = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
     mkdirSync(join(root, "shop/domain"), { recursive: true });
     symlinkSync(join(other, "shop/domain/order.py"), join(root, "shop/domain/linked.py"));
-    const dotdot = join(root, "..", other.split(/[\\/]/).at(-1) ?? "", "shop/domain/order.py");
+    const dotdot = join(
+      root,
+      "..",
+      other.split(PATH_SEPARATOR).at(-1) ?? "",
+      "shop/domain/order.py",
+    );
     for (const path of [join(other, "shop/domain/order.py"), dotdot, "shop/domain/linked.py"]) {
       expect(hook(root, at(root, path))).toEqual(SILENT);
     }
@@ -44,12 +53,13 @@ describe("inwards hook claude-code", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
     const elsewhere = project({});
     const input = at(root, join(root, "shop/domain/order.py"));
-    const run = (dir: string) =>
-      inwards(["hook", "claude-code"], {
+    function run(dir: string): RunResult {
+      return inwards(["hook", "claude-code"], {
         cwd: root,
         stdin: input,
         env: { CLAUDE_PROJECT_DIR: dir },
       });
+    }
     expect(run(root).code).toBe(2);
     expect(run(elsewhere)).toEqual(SILENT);
   });

@@ -32,13 +32,17 @@ export function checkLayers(
 ): Diagnostic[] {
   const from = layerIndexOf(file.module, layers);
   const source = layers[from];
-  if (!source) return [];
+  if (!source) {
+    return [];
+  }
 
   const out: Diagnostic[] = [];
   for (const ref of imports) {
     const to = layerIndexOf(ref.target, layers);
     const target = layers[to];
-    if (!target || to <= from) continue;
+    if (!target || to <= from) {
+      continue;
+    }
     out.push({
       code: LAYER_RULE.code,
       rule: LAYER_RULE.name,
@@ -67,7 +71,7 @@ function fixFor(source: LayerSpec, target: LayerSpec, ref: ImportRef): Diagnosti
     steps: [
       `Delete \`${ref.statement}\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.`,
       `Declare a typing.Protocol in \`${home}\` (for example \`${home}.ports\`) that describes only what this module needs from \`${symbol}\`.`,
-      `Type this module against that Protocol and receive the implementation through a constructor or function parameter.`,
+      "Type this module against that Protocol and receive the implementation through a constructor or function parameter.",
       `Make the class in "${target.name}" satisfy the Protocol, and wire it in the outermost layer (the composition root).`,
     ],
   };

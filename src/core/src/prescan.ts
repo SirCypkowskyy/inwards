@@ -20,46 +20,75 @@ export interface Skeleton {
   indent: number[];
 }
 
-const STARTS_IMPORT = /^([ \t]*)(?:import[ \t]|from[ \t][^#]*[ \t]import\b)/;
-const MENTIONS_IMPORT = /\bimport\b/;
+const STARTS_IMPORT = /^(?<pad>[ \t]*)(?:import[ \t]|from[ \t][^#]*[ \t]import\b)/u;
+const MENTIONS_IMPORT = /\bimport\b/u;
 
 export function importSkeleton(source: string): Skeleton | null {
   const lines = source.split("\n");
-  const out: string[] = new Array(lines.length).fill("");
-  const indent: number[] = new Array(lines.length).fill(0);
+  const out: string[] = new Array<string>(lines.length).fill("");
+  const indent: number[] = new Array<number>(lines.length).fill(0);
 
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] ?? "";
     // `from x \` + newline + `import y` would otherwise look like `import y`.
-    const continued = (lines[i - 1] ?? "").trimEnd().endsWith("\\");
-    if (continued && MENTIONS_IMPORT.test(line)) return null;
-    const m = STARTS_IMPORT.exec(line);
-    if (!m) {
+    if (endsWithBackslash(lines[i - 1] ?? "") && MENTIONS_IMPORT.test(line)) {
+      return null;
+    }
+    const pad = STARTS_IMPORT.exec(line)?.groups?.["pad"]?.length;
+    if (pad === undefined) {
       // A comment can't hide an import. Anything else that mentions one might.
-      if (MENTIONS_IMPORT.test(line) && !line.trimStart().startsWith("#")) return null;
+      if (MENTIONS_IMPORT.test(line) && !line.trimStart().startsWith("#")) {
+        return null;
+      }
       continue;
     }
-    const pad = m[1]?.length ?? 0;
-    // Copy the logical line: parenthesised lists and backslash continuations.
-    let depth = 0;
-    for (let j = i; j < lines.length; j++) {
-      const raw = lines[j] ?? "";
-      const text = j === i ? raw.slice(pad) : raw;
-      out[j] = text;
-      indent[j] = j === i ? pad : 0;
-      for (const ch of text) {
-        if (ch === "(") depth++;
-        else if (ch === ")") depth--;
-        else if (ch === "#") break;
-      }
-      if (depth <= 0 && !text.trimEnd().endsWith("\\")) {
-        i = j;
-        break;
-      }
-      if (j === lines.length - 1) return null; // unterminated: let the full parse decide
+    const last = copyLogicalLine(lines, i, pad, { lines: out, indent });
+    if (last === null) {
+      return null; // unterminated: let the full parse decide
     }
+    i = last;
   }
   return { text: out.join("\n"), indent };
+}
+
+function copyLogicalLine(
+  lines: readonly string[],
+  first: number,
+  pad: number,
+  into: { lines: string[]; indent: number[] },
+): number | null {
+  // Copy the logical line: parenthesised lists and backslash continuations.
+  let depth = 0;
+  for (let j = first; j < lines.length; j += 1) {
+    const raw = lines[j] ?? "";
+    const text = j === first ? raw.slice(pad) : raw;
+    into.lines[j] = text;
+    into.indent[j] = j === first ? pad : 0;
+    depth += parenBalance(text);
+    if (depth <= 0 && !endsWithBackslash(text)) {
+      return j;
+    }
+  }
+  return null;
+}
+
+function parenBalance(text: string): number {
+  let balance = 0;
+  for (const ch of text) {
+    if (ch === "#") {
+      break;
+    }
+    if (ch === "(") {
+      balance += 1;
+    } else if (ch === ")") {
+      balance -= 1;
+    }
+  }
+  return balance;
+}
+
+function endsWithBackslash(line: string): boolean {
+  return line.trimEnd().endsWith("\\");
 }
 
 const SKELETON_NODES = new Set([
@@ -72,7 +101,9 @@ const SKELETON_NODES = new Set([
 /** Imports read from the skeleton, with real columns. Null means: do the full parse. */
 export function skeletonImports(parser: Parser, file: SourceFile): ImportRef[] | null {
   const skeleton = importSkeleton(file.text);
-  if (!skeleton) return null;
+  if (!skeleton) {
+    return null;
+  }
   const tree = parsePython(parser, skeleton.text);
   try {
     // Import-shaped lines inside strings can glue real code onto a bogus import

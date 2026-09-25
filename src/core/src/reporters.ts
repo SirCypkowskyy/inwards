@@ -23,14 +23,33 @@ export function render(
   { pretty = true, color = false }: RenderOptions = {},
 ): string {
   const indent = pretty ? 2 : undefined;
-  if (format === "json") return renderJson(report, indent);
-  if (format === "sarif") return renderSarif(report, indent);
+  if (format === "json") {
+    return renderJson(report, indent);
+  }
+  if (format === "sarif") {
+    return renderSarif(report, indent);
+  }
   return renderText(report, color ? ANSI : PLAIN);
 }
 
-type Paint = Record<"bold" | "dim" | "red" | "green" | "cyan", (s: string) => string>;
-const sgr = (code: number) => (s: string) => `\x1b[${code}m${s}\x1b[0m`;
-const ANSI: Paint = { bold: sgr(1), dim: sgr(2), red: sgr(31), green: sgr(32), cyan: sgr(36) };
+type Style = "bold" | "dim" | "red" | "green" | "cyan";
+type Paint = Record<Style, (s: string) => string>;
+
+/** SGR parameters, see ECMA-48. */
+const SGR_CODES: Record<Style, number> = { bold: 1, dim: 2, red: 31, green: 32, cyan: 36 };
+
+function sgr(style: Style): (s: string) => string {
+  const code = SGR_CODES[style];
+  return (s: string): string => `\x1b[${code}m${s}\x1b[0m`;
+}
+
+const ANSI: Paint = {
+  bold: sgr("bold"),
+  dim: sgr("dim"),
+  red: sgr("red"),
+  green: sgr("green"),
+  cyan: sgr("cyan"),
+};
 const PLAIN: Paint = { bold: String, dim: String, red: String, green: String, cyan: String };
 
 function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint): string {
@@ -51,7 +70,9 @@ function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint)
   return [...lines, tail].join("\n\n");
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
 
 /** Stable, versioned shape. Agents parse this, so fields are only ever added. */
 function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: number): string {
@@ -74,6 +95,7 @@ function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: 
 function renderSarif({ diagnostics }: Report, indent?: number): string {
   return JSON.stringify(
     {
+      // biome-ignore lint/style/useNamingConvention: SARIF names this key "$schema".
       $schema: "https://json.schemastore.org/sarif-2.1.0.json",
       version: "2.1.0",
       runs: [

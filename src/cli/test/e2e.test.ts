@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { VERSION } from "@inwards/core";
-import { inwards, LAYERS, payload, project } from "./run.ts";
+import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 
 // The contract agents and CI depend on: exit codes and output for every
 // recorded payload, every machine format and the error paths. Any change fails
@@ -10,16 +10,21 @@ import { inwards, LAYERS, payload, project } from "./run.ts";
 // Fix wording is pinned too: it is part of what the model reads.
 const files = { "shop/domain/order.py": "import shop.infrastructure.db\n", "README.md": "hi" };
 const root = project({ "pyproject.toml": LAYERS, ...files });
-const stable = (s: string) =>
-  s.replace(/"durationMs":[\d.]+/g, '"durationMs":0').replaceAll(`"${VERSION}"`, '"<version>"');
-const run = (cwd: string, args: string[], stdin?: string) => {
+const DURATION = /"durationMs":[\d.]+/gu;
+const JSON_SUFFIX = /\.json$/u;
+
+function stable(s: string): string {
+  return s.replace(DURATION, '"durationMs":0').replaceAll(`"${VERSION}"`, '"<version>"');
+}
+
+function run(cwd: string, args: string[], stdin?: string): RunResult {
   const { code, stdout, stderr } = inwards(args, { cwd, stdin });
   return { code, stdout: stable(stdout), stderr: stable(stderr) };
-};
+}
 
 const fixtures = readdirSync(join(import.meta.dir, "fixtures/claude-code"))
   .filter((f) => f.endsWith(".json"))
-  .map((f) => f.replace(/\.json$/, ""))
+  .map((f) => f.replace(JSON_SUFFIX, ""))
   .sort();
 
 test.each(fixtures)("hook claude-code < %s", (name) => {
