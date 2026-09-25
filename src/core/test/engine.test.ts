@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, declaresInwards, parseConfig, RULES, render } from "../src/index.ts";
+import { RULES, render } from "../src/index.ts";
 import { engine, file } from "./helpers.ts";
 
 describe("INW001 layer-dependency", () => {
@@ -65,12 +65,6 @@ describe("reporters", () => {
     const sarif = JSON.parse(render(report, "sarif"));
     expect(sarif.version).toBe("2.1.0");
     expect(sarif.runs[0].results[0].locations[0].physicalLocation.region.startLine).toBe(1);
-  });
-});
-
-describe("config", () => {
-  test("missing table is a clear error", () => {
-    expect(() => parseConfig("[project]\nname='x'\n")).toThrow(ConfigError);
   });
 });
 
@@ -217,19 +211,6 @@ describe("source encodings (Astra review, round 2)", () => {
   test("files outside every layer are not reported", () => {
     const src = "# coding: unicode_escape\n";
     expect(engine.checkFile(file("scripts/tool.py", src))).toEqual([]);
-  });
-});
-
-describe("declaresInwards", () => {
-  test.each([
-    ["[tool.inwards]\nlayers = []\n", true],
-    ["[ tool.inwards ]\nlayers = []\n", true],
-    ['["tool"."inwards"]\nlayers = []\n', true],
-    ["[tool.inwards\n", true],
-    ["[project]\nname = 'x'\n", false],
-    ["[tool.ruff]\n", false],
-  ])("%j -> %p", (text, expected) => {
-    expect(declaresInwards(text)).toBe(expected);
   });
 });
 

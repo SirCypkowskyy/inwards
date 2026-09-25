@@ -1,4 +1,5 @@
 import { parse } from "smol-toml";
+import { VERSION } from "./meta.ts";
 
 export interface LayerSpec {
   name: string;
@@ -11,7 +12,18 @@ export interface InwardsConfig {
   root: string;
   /** Innermost first. A layer may import itself and anything listed before it. */
   layers: LayerSpec[];
+  /**
+   * Oldest Inwards allowed to check this project (`required-version`, set by
+   * `inwards init`). An older binary, or a shim, fails with a config error
+   * instead of checking with rules it may not know.
+   */
+  requiredVersion?: string;
 }
+
+/** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
+const PRERELEASE = /-.*$/u;
+/** A plain release version, `MAJOR.MINOR.PATCH`. */
+const RELEASE = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/u;
 
 export class ConfigError extends Error {
   override name = "ConfigError";
@@ -66,7 +78,8 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
   if (!isRecord(raw)) {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
   }
-  const { root = ".", layers } = raw;
+  const { root = ".", layers, "required-version": required } = raw;
+  const requiredVersion = checkRequiredVersion(required);
   if (typeof root !== "string") {
     throw new ConfigError("tool.inwards.root must be a string.");
   }
@@ -88,7 +101,11 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     }
     return { name, modules };
   });
-  return { root: root.replaceAll("\\", "/"), layers: parsed };
+  const config: InwardsConfig = { root: root.replaceAll("\\", "/"), layers: parsed };
+  if (requiredVersion !== undefined) {
+    config.requiredVersion = requiredVersion;
+  }
+  return config;
 }
 
 /**
@@ -111,4 +128,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function isModuleList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((m) => typeof m === "string" && m !== "");
+}
+
+/**
+ * Validates `required-version` and checks this binary is new enough.
+ *
+ * @param required - the raw `required-version` value, if any.
+ * @returns the version string, or undefined when the key is absent.
+ * @throws {ConfigError} when it isn't `MAJOR.MINOR.PATCH`, or is newer than this Inwards.
+ */
+function checkRequiredVersion(required: unknown): string | undefined {
+  if (required === undefined) {
+    return undefined;
+  }
+  const want = typeof required === "string" ? versionParts(required) : undefined;
+  if (typeof required !== "string" || want === undefined) {
+    throw new ConfigError('tool.inwards.required-version must look like "1.2.3".');
+  }
+  const have = versionParts(VERSION.replace(PRERELEASE, "")) ?? [0, 0, 0];
+  const older = have.findIndex((part, i) => part !== want[i]);
+  if (older !== -1 && (have[older] ?? 0) < (want[older] ?? 0)) {
+    throw new ConfigError(
+      `This project requires Inwards ${required} or newer; this is ${VERSION}. Install the newer release.`,
+    );
+  }
+  return required;
+}
+
+/**
+ * Splits a release version into numbers.
+ *
+ * @param version - e.g. `0.1.2`.
+ * @returns `[major, minor, patch]`, or undefined when it isn't a plain release.
+ */
+function versionParts(version: string): [number, number, number] | undefined {
+  const groups = RELEASE.exec(version)?.groups;
+  if (!groups) {
+    return undefined;
+  }
+  return [Number(groups["major"]), Number(groups["minor"]), Number(groups["patch"])];
 }
