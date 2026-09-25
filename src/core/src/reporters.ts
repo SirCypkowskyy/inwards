@@ -133,6 +133,18 @@ function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: 
 }
 
 /**
+ * Turns a forward-slash file path into a relative URI reference.
+ * Each segment is percent-encoded on its own, so `#`, `?` and spaces in file
+ * names stay part of the path instead of starting a fragment or a query.
+ *
+ * @param path - a relative path with `/` separators.
+ * @returns the path as a URI reference, e.g. `shop/order%231.py`.
+ */
+function toUriPath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
  * Renders the report as SARIF 2.1.0.
  * Enough for GitHub code scanning and most IDE viewers. Each result carries
  * the fix as text and as a `fix` property; file URIs are relative to
@@ -175,7 +187,7 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
               {
                 physicalLocation: {
                   // Relative to where `inwards check` ran; CI runs it from the checkout root.
-                  artifactLocation: { uri: encodeURI(d.file), uriBaseId: "%SRCROOT%" },
+                  artifactLocation: { uri: toUriPath(d.file), uriBaseId: "%SRCROOT%" },
                   region: {
                     startLine: d.line,
                     startColumn: d.column,

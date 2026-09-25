@@ -128,15 +128,19 @@ async function runCheck(
 ): Promise<Report> {
   const started = performance.now();
   const config = parseConfig(readFileSync(configPath, "utf8"));
-  const root = resolve(dirname(configPath), config.root);
+  const lexicalRoot = resolve(dirname(configPath), config.root);
+  // Module names come from real paths on both sides, so a symlinked root or
+  // file can neither hide a module nor rename it.
+  const root = realpath(lexicalRoot) ?? lexicalRoot;
   const engine = await Engine.create(await loadGrammars(), config);
-  const files = collectPythonFiles(targets ?? [root])
-    .filter((abs) => isInside(root, abs))
+  const files = collectPythonFiles(targets ?? [lexicalRoot])
+    .map((abs) => ({ abs, real: realpath(abs) ?? abs }))
+    .filter(({ real }) => isInside(root, real))
     .map(
-      (abs): SourceFile => ({
+      ({ abs, real }): SourceFile => ({
         path: posix(relative(base, abs)),
         text: readFileSync(abs, "utf8"),
-        ...moduleNameFor(relative(root, abs)),
+        ...moduleNameFor(relative(root, real)),
       }),
     );
   const diagnostics = engine.checkFiles(files);
@@ -233,7 +237,9 @@ function hookTarget(payloadCwd: unknown, file: string): { file: string; cwd: str
   if (!cwd) {
     return undefined;
   }
-  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || cwd);
+  // The boundary comes from the host (Claude Code sets CLAUDE_PROJECT_DIR and
+  // runs hooks in the project), never from the payload's own `cwd`.
+  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
   const abs = realpath(resolve(cwd, file));
   if (abs && project && isInside(project, abs) && statSync(abs).isFile()) {
     return { file: abs, cwd };

@@ -72,7 +72,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     - **Clean file, non-Python file, or any other hook event:** exit 0, no output.
     - **Broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it. With no `[tool.inwards]` at all the hook stays silent, because it may be installed for every project; the planned config guard stops an agent from deleting the table.
     - **Unreadable payload or an internal error:** exit 1. Claude Code shows that to the user, not the model.
-    - **File outside the project** (`CLAUDE_PROJECT_DIR`, or the payload's `cwd`): skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.
+    - **File outside the project** (`CLAUDE_PROJECT_DIR`, or the directory Claude Code runs the hook in; never the payload's own `cwd`): skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.
     - **Monorepos:** the nearest `pyproject.toml` with `[tool.inwards]` above the edited file applies.
 
     <figure markdown="span">

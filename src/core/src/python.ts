@@ -93,7 +93,7 @@ function plainImports(stmt: Node): ImportRef[] {
   for (const name of stmt.childrenForFieldName("name")) {
     const dotted = importedName(name);
     if (dotted) {
-      refs.push(refAt(name, dotted.text, stmt.text));
+      refs.push(refAt(name, canonicalName(dotted), stmt.text));
     }
   }
   return refs;
@@ -130,7 +130,8 @@ function fromImports(stmt: Node, file: SourceFile): ImportRef[] {
       continue;
     }
     // `from shop import infrastructure` must count as importing shop.infrastructure.
-    refs.push(refAt(name, base ? `${base}.${dotted.text}` : dotted.text, stmt.text));
+    const imported = canonicalName(dotted);
+    refs.push(refAt(name, base ? `${base}.${imported}` : imported, stmt.text));
   }
   return refs;
 }
@@ -143,6 +144,23 @@ function fromImports(stmt: Node, file: SourceFile): ImportRef[] {
  */
 function importedName(name: Node): Node | null {
   return name.type === "aliased_import" ? name.childForFieldName("name") : name;
+}
+
+/**
+ * Spells a dotted name the way Python's import system sees it.
+ * The node text is not enough: Python allows `shop . infrastructure`, a
+ * backslash continuation or a comment between the parts, and it NFKC-normalises
+ * identifiers, so `ｓhop` (fullwidth) names the module `shop`.
+ *
+ * @param node - a `dotted_name` or `identifier` node.
+ * @returns the dotted name, e.g. `shop.infrastructure.db`.
+ */
+function canonicalName(node: Node): string {
+  const parts = node.type === "dotted_name" ? node.namedChildren : [node];
+  return parts
+    .filter((part) => part?.type === "identifier")
+    .map((part) => part?.text.normalize("NFKC") ?? "")
+    .join(".");
 }
 
 /**
@@ -177,15 +195,18 @@ function refAt(node: Node, target: string, statement: string): ImportRef {
  */
 function resolveModule(node: Node, file: SourceFile): string | null {
   if (node.type !== "relative_import") {
-    return node.text;
+    return canonicalName(node);
   }
+  // `from . . x import y` is valid Python: count the dots, not the characters.
   const prefix = node.children.find((c) => c?.type === "import_prefix")?.text ?? "";
-  const rest = node.children.find((c) => c?.type === "dotted_name")?.text;
+  const dots = prefix.split("").filter((ch) => ch === ".").length;
+  const restNode = node.children.find((c) => c?.type === "dotted_name");
+  const rest = restNode ? canonicalName(restNode) : undefined;
   const pkg = file.module.split(".");
   if (!file.isPackage) {
     pkg.pop();
   }
-  const up = prefix.length - 1;
+  const up = dots - 1;
   if (up > pkg.length) {
     return null;
   }

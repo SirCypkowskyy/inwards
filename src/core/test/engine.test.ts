@@ -158,3 +158,34 @@ test("an import line inside a string cannot open a string that hides a real impo
   ].join("\n");
   expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
 });
+
+describe("dotted names as Python spells them (Astra review)", () => {
+  test.each([
+    ["spaces around dots", "import shop . infrastructure . db\n"],
+    ["backslash inside the name", "import shop.\\\n  infrastructure\n"],
+    ["spaces in a from import", "from shop . infrastructure import db\n"],
+    ["NFKC identifiers", "import ｓhop.infrastructure\n"],
+  ])("%s is still an import of shop.infrastructure", (_, src) => {
+    const [d] = engine.checkFile(file("shop/domain/order.py", src));
+    expect(d?.message).toContain("shop.infrastructure");
+  });
+
+  test("dots in a relative import are counted, not characters", () => {
+    const [d] = engine.checkFile(
+      file("shop/application/x.py", "from . . infrastructure import db\n"),
+    );
+    expect(d?.message).toContain('"shop.infrastructure.db"');
+  });
+});
+
+test("SARIF URIs keep #, ? and spaces inside the path", () => {
+  const [d] = engine.checkFile(file("shop/domain/order#1 ?.py", "import shop.api\n"));
+  const sarif = JSON.parse(
+    render({ diagnostics: d ? [d] : [], filesChecked: 1, durationMs: 1 }, "sarif"),
+  );
+  const { uri } = sarif.runs[0].results[0].locations[0].physicalLocation.artifactLocation;
+  expect(uri).toBe("shop/domain/order%231%20%3F.py");
+  expect(decodeURIComponent(new URL(uri, "file:///repo/").pathname.slice(6))).toBe(
+    "shop/domain/order#1 ?.py",
+  );
+});

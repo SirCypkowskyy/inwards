@@ -118,4 +118,21 @@ describe("inwards hook claude-code", () => {
     const root = project({ "pyproject.toml": LAYERS });
     expect(hook(root, "null").code).toBe(1);
   });
+
+  test("the payload's cwd cannot move the boundary to another project", () => {
+    const root = project({ "pyproject.toml": LAYERS });
+    const other = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
+    const input = at(root, "shop/domain/order.py", { cwd: other });
+    expect(hook(root, input)).toEqual(SILENT);
+  });
+
+  test("a symlinked config root still names modules correctly", () => {
+    const root = project({
+      "pyproject.toml": LAYERS.replace("[tool.inwards]", '[tool.inwards]\nroot = "src"'),
+      "real/shop/domain/order.py": LEAK,
+    });
+    symlinkSync(join(root, "real"), join(root, "src"));
+    const { code } = hook(root, at(root, join(root, "src/shop/domain/order.py")));
+    expect(code).toBe(2);
+  });
 });
