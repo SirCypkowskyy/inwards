@@ -13,18 +13,24 @@
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import { Glob } from "bun";
-import { Language, Parser } from "web-tree-sitter";
+import type { Parser } from "web-tree-sitter";
 import { skeletonImports } from "../src/prescan.ts";
-import { extractImports, moduleNameFor, normalizeSource } from "../src/python.ts";
+import {
+  createPythonParser,
+  extractImports,
+  moduleNameFor,
+  normalizeSource,
+} from "../src/python.ts";
 import type { ImportRef } from "../src/types.ts";
 
 function wasm(spec: string): Uint8Array {
   return new Uint8Array(readFileSync(Bun.resolveSync(spec, import.meta.dir)));
 }
 
-await Parser.init({ wasmBinary: wasm("web-tree-sitter/web-tree-sitter.wasm") });
-const parser = new Parser();
-parser.setLanguage(await Language.load(wasm("tree-sitter-python/tree-sitter-python.wasm")));
+const parser: Parser = await createPythonParser({
+  runtime: wasm("web-tree-sitter/web-tree-sitter.wasm"),
+  python: wasm("tree-sitter-python/tree-sitter-python.wasm"),
+});
 
 /** Share of files, in percent, that the prescan declined. */
 const PERCENT = 100;
