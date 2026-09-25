@@ -177,4 +177,22 @@ describe("session state", () => {
     hook(real, edit(link, "shop/domain/order.py"));
     expect(readSession(realpathSync(real), ID)?.edited).toEqual(["shop/domain/order.py"]);
   });
+
+  test("resume and compact create nothing in a project without state", () => {
+    const root = project({ "shop/domain/order.py": "X = 1\n" });
+    start(root, ID, "resume");
+    start(root, ID, "compact");
+    expect(readdirSync(root)).not.toContain(".inwards");
+  });
+
+  test("a second startup, or one without a source, never resets the baseline", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+    start(root);
+    writeFileSync(join(root, "shop/domain/new.py"), "Y = 2\n");
+    start(root);
+    hook(root, payload("session-start", root, { session_id: "no-source", source: undefined }));
+    const manifest = readSession(realpathSync(root), ID)?.start.manifest ?? {};
+    expect(Object.keys(manifest)).toEqual(["shop/domain/order.py"]);
+    expect(readSession(realpathSync(root), "no-source")).toBeUndefined();
+  });
 });

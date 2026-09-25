@@ -56,7 +56,9 @@ function sessionStart(input: Record<string, unknown>): number {
   if (!(project && isSessionId(id))) {
     return 0;
   }
-  const source = typeof input["source"] === "string" ? input["source"] : "startup";
+  // No source means the payload is not the host's usual one: treat it as a
+  // resume, which can never create a start.
+  const source = typeof input["source"] === "string" ? input["source"] : "resume";
   try {
     recordStart(project, id, source);
     return 0;
