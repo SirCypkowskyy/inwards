@@ -19,11 +19,18 @@ const SKIP = new Set(["node_modules", "__pycache__"]);
  * chain of directories above the current one; unreadable directories are
  * skipped.
  *
+ * Inside a layer's package (`open`), and on the way down to one, nothing but
+ * hidden entries is skipped: Python imports `shop.domain.node_modules.x` or a
+ * package that holds a pyvenv.cfg just fine, so neither may hide code from
+ * its layer. A directory counts as inside by the path it was reached through
+ * as well as its real path, since Python names a module after the former.
+ *
  * @param paths - files or directories.
+ * @param open - directories walked without the skip rules (layer packages, as written and real).
  * @returns unique paths, sorted.
  */
-export function collectPythonFiles(paths: string[]): string[] {
-  return collectFiles(paths, isPythonFile);
+export function collectPythonFiles(paths: string[], open: readonly string[] = []): string[] {
+  return collectFiles(paths, isPythonFile, open);
 }
 
 /**
@@ -32,16 +39,21 @@ export function collectPythonFiles(paths: string[]): string[] {
  *
  * @param paths - files or directories; a file is kept as is.
  * @param match - tells whether a file name is wanted.
+ * @param open - directories walked without the skip rules.
  * @returns unique paths, sorted.
  */
-export function collectFiles(paths: string[], match: (name: string) => boolean): string[] {
+export function collectFiles(
+  paths: string[],
+  match: (name: string) => boolean,
+  open: readonly string[] = [],
+): string[] {
   const out = new Set<string>();
   for (const p of paths) {
     const top = statSync(p).isDirectory() ? realOrUndefined(p) : undefined;
     if (top === undefined) {
       out.add(p);
     } else {
-      walk(p, out, { top, chain: new Set<string>(), match });
+      walk(p, out, { top, chain: new Set<string>(), match, open });
     }
   }
   return [...out].sort();
@@ -52,6 +64,7 @@ interface WalkScope {
   top: string;
   chain: Set<string>;
   match: (name: string) => boolean;
+  open: readonly string[];
 }
 
 /**
@@ -60,7 +73,8 @@ interface WalkScope {
  * @param dir - the directory to walk, as reached (possibly through a symlink).
  * @param out - the collected paths, written in place.
  * @param scope - the real start directory, the real paths of the directories
- *   above this one (a cycle guard, updated in place), and the file-name filter.
+ *   above this one (a cycle guard, updated in place), the file-name filter and
+ *   the directories walked without skips.
  */
 function walk(dir: string, out: Set<string>, scope: WalkScope): void {
   const real = realOrUndefined(dir);
@@ -75,18 +89,47 @@ function walk(dir: string, out: Set<string>, scope: WalkScope): void {
   }
   scope.chain.add(real);
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || SKIP.has(entry.name)) {
+    if (entry.name.startsWith(".")) {
       continue;
     }
     const full = join(dir, entry.name);
     const kind = entryKind(entry, full);
     if (kind === "file" && scope.match(entry.name) && isWithin(scope.top, realOrUndefined(full))) {
       out.add(full);
-    } else if (kind === "dir" && !existsSync(join(full, "pyvenv.cfg"))) {
+    } else if (kind === "dir" && (isOpen(full, scope.open) || !skipped(entry.name, full))) {
       walk(full, out, scope);
     }
   }
   scope.chain.delete(real);
+}
+
+/**
+ * Tells whether a directory is skipped outside layer packages: node_modules,
+ * __pycache__ and virtualenvs (any directory holding pyvenv.cfg).
+ *
+ * @param name - the directory's name.
+ * @param full - its path.
+ * @returns true when the walk should not enter it.
+ */
+function skipped(name: string, full: string): boolean {
+  return SKIP.has(name) || existsSync(join(full, "pyvenv.cfg"));
+}
+
+/**
+ * Tells whether a directory is in a layer package or above one, where nothing is skipped.
+ *
+ * @param dir - a directory path, as reached.
+ * @param open - layer package directories, as written and real.
+ * @returns true when the path as reached, or its real path, is inside or above one of them.
+ */
+function isOpen(dir: string, open: readonly string[]): boolean {
+  if (open.length === 0) {
+    return false;
+  }
+  const spellings = [dir, realOrUndefined(dir)];
+  return open.some((top) =>
+    spellings.some((path) => isWithin(top, path) || (path !== undefined && isWithin(path, top))),
+  );
 }
 
 /**
@@ -109,24 +152,32 @@ function isWithin(top: string, real: string | undefined): boolean {
  *
  * @param entry - the entry as `readdirSync` returned it.
  * @param full - its full path, used to follow a symlink.
- * @returns "dir" or "file", or undefined for a dangling symlink.
+ * @returns "dir" or "file", or undefined for a dangling symlink or anything
+ *   else (a FIFO named x.py would hang the read).
  */
 function entryKind(entry: Dirent, full: string): "dir" | "file" | undefined {
   if (entry.isSymbolicLink()) {
     return linkTargetKind(full);
   }
-  return entry.isDirectory() ? "dir" : "file";
+  if (entry.isDirectory()) {
+    return "dir";
+  }
+  return entry.isFile() ? "file" : undefined;
 }
 
 /**
  * Tells what a symlink points at.
  *
  * @param link - path of the symlink.
- * @returns "dir" or "file", or undefined for a dangling link.
+ * @returns "dir" or "file", or undefined for a dangling link or a special file.
  */
 function linkTargetKind(link: string): "dir" | "file" | undefined {
   try {
-    return statSync(link).isDirectory() ? "dir" : "file";
+    const stat = statSync(link);
+    if (stat.isDirectory()) {
+      return "dir";
+    }
+    return stat.isFile() ? "file" : undefined;
   } catch {
     return undefined;
   }

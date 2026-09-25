@@ -56,7 +56,7 @@ describe("inwards init --agent claude", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
     expect(init(root, "--agent", "claude").code).toBe(0);
     const settings: Settings = JSON.parse(read(root, SETTINGS));
-    expect(Object.keys(settings.hooks).sort()).toEqual(["PostToolUse", "SessionStart"]);
+    expect(Object.keys(settings.hooks).sort()).toEqual(["PostToolUse", "SessionStart", "Stop"]);
     const entry = ourEntry(root);
     expect(entry.args?.slice(-2)).toEqual(["hook", "claude-code"]);
     expect(read(root, ".gitignore")).toContain(".inwards/");

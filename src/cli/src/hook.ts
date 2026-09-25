@@ -9,12 +9,14 @@ import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { isSessionId, recordEdit, recordStart } from "./session.ts";
+import { stopGate } from "./stop.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 
 /**
  * Runs the Claude Code hook for one event: SessionStart records the session,
- * PostToolUse checks the file the agent just wrote.
+ * PostToolUse checks the file the agent just wrote, and Stop runs the gate
+ * over everything the session changed (see `stop.ts`).
  * Exit 2 puts stderr in front of the model, so violations and config errors go
  * there. Exit 1 reaches only the user: a bad payload or a bug in Inwards is not
  * the model's to fix. Anything else passes silently with exit 0.
@@ -37,6 +39,9 @@ export async function hookClaudeCode(usage: string): Promise<number> {
   const event = input["hook_event_name"];
   if (event === "SessionStart") {
     return sessionStart(input);
+  }
+  if (event === "Stop") {
+    return await stopGate(input);
   }
   return event === "PostToolUse" ? await postToolUse(input) : 0;
 }

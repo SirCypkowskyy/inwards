@@ -154,7 +154,7 @@ flowchart LR
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. A layered file whose text names a module loader skips the prescan (see below) |
-| Module index | `Engine.index(files)` returns every first-party module and answers "who imports module X" on demand, parsing only files whose text mentions X's last name segment | Used by the Stop gate (#20) and INW006 (#21). Cycles are not detected yet |
+| Module index | `Engine.index(files)` returns every first-party module and answers "who imports module X" on demand, parsing only files whose text mentions X's last name segment | Used by INW006 (#21). Cycles are not detected yet |
 
 ### How one check flows
 
@@ -211,7 +211,7 @@ The cost model has one bad case. On a legacy codebase where most files already v
 flowchart LR
     argv["argv"] --> args["Arg parser<br/><small>node:util parseArgs</small>"]
     args --> find["Config discovery<br/><small>walks up to pyproject.toml<br/>with [tool.inwards]</small>"]
-    find --> walk["File collector<br/><small>skips hidden dirs, venvs,<br/>node_modules</small>"]
+    find --> walk["File collector<br/><small>skips hidden dirs, venvs,<br/>node_modules (not inside layers)</small>"]
     walk --> mod["Module namer<br/><small>path → dotted name</small>"]
     gram["Grammar loader<br/><small>embedded .wasm via<br/>import ... with type: file</small>"] --> eng
     mod --> eng["Engine"]

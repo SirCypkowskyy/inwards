@@ -21,14 +21,12 @@
  * privilege boundary, since such a process could write those files itself.
  * The PreToolUse guard (#23) keeps the agent's own tools away from `.inwards/`.
  */
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import process from "node:process";
-import { type Diagnostic, declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";
-import { collectFiles, collectPythonFiles } from "./files.ts";
-import { posix, realpath } from "./paths.ts";
+import type { Diagnostic, InwardsConfig } from "@inwards/core";
+import { git, projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
 import { appendLine, prune, stateDir, statePath } from "./state-files.ts";
 
 /** Session ids come from the agent's payload, so only a safe file name is accepted. */
@@ -45,6 +43,8 @@ interface SessionStart {
   head: string | null;
   /** Every `[tool.inwards]` table in the project, by project-relative pyproject.toml path. */
   configs: Record<string, InwardsConfig>;
+  /** pyproject.toml files whose `[tool.inwards]` was already invalid (absent in older state files). */
+  invalid?: string[];
   /** Project-relative path of every Python file in the project, to its SHA-256. */
   manifest: Record<string, string>;
 }
@@ -52,7 +52,9 @@ interface SessionStart {
 /** One line of the session log. */
 type SessionEvent =
   | { t: "edit"; at: string; file: string; fingerprints: string[] }
-  | { t: "resume"; at: string; source: string };
+  | { t: "resume"; at: string; source: string }
+  | { t: "stop"; at: string; fresh: boolean }
+  | { t: "pass"; at: string };
 
 /** The session as the Stop gate and escalation see it. */
 export interface SessionState {
@@ -61,6 +63,8 @@ export interface SessionState {
   edited: string[];
   /** Fingerprint of every violation reported in this session, to how often it was seen. */
   seen: Map<string, number>;
+  /** How many times in a row the Stop gate has blocked, since the last turn start or clean pass. */
+  stops: number;
 }
 
 /**
@@ -109,27 +113,15 @@ export function recordStart(project: string, id: string, source: string): void {
   if (existsSync(startFile)) {
     return; // a start is written once; a repeated startup can't reset the baseline
   }
-  const configs: Record<string, InwardsConfig> = {};
-  for (const path of collectFiles([project], (name) => name === "pyproject.toml")) {
-    const text = readFileSync(path, "utf8");
-    if (declaresInwards(text)) {
-      configs[projectPath(project, path)] = parseConfig(text);
-    }
-  }
+  const { valid: configs, invalid } = projectConfigs(project);
   if (Object.keys(configs).length === 0) {
     return;
   }
-  const manifest: Record<string, string> = {};
-  for (const file of collectPythonFiles([project])) {
-    manifest[projectPath(project, file)] = createHash("sha256")
-      .update(readFileSync(file))
-      .digest("hex");
-  }
-  const git = spawnSync("git", ["rev-parse", "HEAD"], { cwd: project, encoding: "utf8" });
-  const head = git.status === 0 ? git.stdout.trim() : null;
+  const manifest = projectManifest(project, configs);
+  const head = git(project, ["rev-parse", "HEAD"])?.trim() ?? null;
   const dir = stateDir(project);
   prune(dir, id);
-  const start: SessionStart = { at: new Date().toISOString(), head, configs, manifest };
+  const start: SessionStart = { at: new Date().toISOString(), head, configs, invalid, manifest };
   const temp = join(dir, `.${id}.${process.pid}.tmp`);
   writeFileSync(temp, JSON.stringify(start), { flag: "wx" });
   renameSync(temp, startFile); // rename replaces a planted symlink, never follows it
@@ -158,6 +150,28 @@ export function recordEdit(
 }
 
 /**
+ * Records that the Stop gate blocked the turn.
+ *
+ * @param project - the real project root.
+ * @param id - a session id that passed `isSessionId`.
+ * @param fresh - true for the turn's first block (`stop_hook_active` was false),
+ *   which restarts the count.
+ */
+export function recordStop(project: string, id: string, fresh: boolean): void {
+  append(project, id, { t: "stop", at: new Date().toISOString(), fresh });
+}
+
+/**
+ * Records that the Stop gate passed clean, which ends a streak of blocks.
+ *
+ * @param project - the real project root.
+ * @param id - a session id that passed `isSessionId`.
+ */
+export function recordPass(project: string, id: string): void {
+  append(project, id, { t: "pass", at: new Date().toISOString() });
+}
+
+/**
  * Reads a session's state.
  * Returns undefined when the start file is missing or unreadable, so callers
  * can fail closed: a session whose history is gone can't prove it is clean.
@@ -178,21 +192,35 @@ export function readSession(project: string, id: string): SessionState | undefin
   } catch {
     // no edits yet
   }
-  const edited: string[] = [];
-  const seen = new Map<string, number>();
+  const state: SessionState = { start, edited: [], seen: new Map(), stops: 0 };
   for (const line of log.split("\n")) {
     const event = parseEvent(line);
-    if (event?.t !== "edit") {
-      continue;
-    }
-    if (!edited.includes(event.file)) {
-      edited.push(event.file);
-    }
-    for (const print of event.fingerprints) {
-      seen.set(print, (seen.get(print) ?? 0) + 1);
+    if (event !== undefined) {
+      tally(state, event);
     }
   }
-  return { start, edited, seen };
+  return state;
+}
+
+/**
+ * Folds one log event into the session state.
+ *
+ * @param state - the state so far, updated in place.
+ * @param event - one parsed log line.
+ */
+function tally(state: SessionState, event: SessionEvent): void {
+  if (event.t === "stop") {
+    state.stops = event.fresh ? 1 : state.stops + 1;
+  } else if (event.t === "pass") {
+    state.stops = 0;
+  } else if (event.t === "edit") {
+    if (!state.edited.includes(event.file)) {
+      state.edited.push(event.file);
+    }
+    for (const print of event.fingerprints) {
+      state.seen.set(print, (state.seen.get(print) ?? 0) + 1);
+    }
+  }
 }
 
 /**
@@ -231,6 +259,12 @@ function parseEvent(line: string): SessionEvent | undefined {
   }
   try {
     const value: unknown = JSON.parse(line);
+    if (isRecord(value) && value["t"] === "stop") {
+      return { t: "stop", at: String(value["at"]), fresh: value["fresh"] === true };
+    }
+    if (isRecord(value) && value["t"] === "pass") {
+      return { t: "pass", at: String(value["at"]) };
+    }
     if (
       isRecord(value) &&
       value["t"] === "edit" &&
@@ -277,17 +311,4 @@ function append(project: string, id: string, event: SessionEvent): void {
  */
 function logFile(project: string, id: string): string {
   return join(stateDir(project), `${id}.jsonl`);
-}
-
-/**
- * Names a path relative to the project with forward slashes, on real paths.
- * On macOS the project is /private/var/... while a payload may say /var/...;
- * mixing the two spellings would give ../../var paths.
- *
- * @param project - the real project root.
- * @param path - an absolute path inside the project.
- * @returns the project-relative path.
- */
-function projectPath(project: string, path: string): string {
-  return posix(relative(project, realpath(path) ?? path));
 }

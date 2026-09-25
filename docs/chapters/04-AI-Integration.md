@@ -28,12 +28,12 @@ sequenceDiagram
     H->>S: inwards check ...
     S-->>H: exit 0
     A->>H: Stop
-    H->>S: inwards check (whole repo)
+    H->>S: check what this session changed
     S-->>H: exit 0
     A-->>U: Done, layers intact
 ```
 
-Two hooks do the work. A **per-edit hook** gives fast feedback on the file that just changed. A **stop hook** runs the full check before the agent is allowed to report success. The per-edit hook alone misses cross-file effects, and the stop hook alone gives feedback too late for cheap fixes, so we use both.
+Two hooks do the work. A **per-edit hook** gives fast feedback on the file that just changed. A **stop gate** checks everything the session changed before the agent may report success, including edits the per-edit hook never saw (Bash, commits). It checks only what changed, so a legacy repo's old violations never block a clean turn. The per-edit hook alone misses those edits, and the gate alone gives feedback too late for cheap fixes, so we use both.
 
 ## Integrations by agent
 
@@ -45,7 +45,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     inwards init --agent claude            # --dry-run shows the diff first
     ```
 
-    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only and is not committed, and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. `init` also adds `.inwards/` to `.gitignore` and pins `required-version` in `[tool.inwards]`. Running it again changes nothing. It installs only hook events Inwards implements; the Stop gate and the config guard will add theirs once they ship.
+    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only and is not committed, and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. `init` also adds `.inwards/` to `.gitignore` and pins `required-version` in `[tool.inwards]`. Running it again changes nothing. It installs the hook events Inwards implements (SessionStart, PostToolUse, Stop); the config guard will add its own once it ships.
 
     To share the setup through the committed `.claude/settings.json` instead, write it by hand. This version relies on `inwards` being on `PATH`:
 
@@ -69,11 +69,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
           }
         ],
         "Stop": [
-          {
-            "hooks": [
-              { "type": "command", "command": "inwards check --format json >&2 || exit 2" }
-            ]
-          }
+          { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
       }
     }
@@ -96,7 +92,13 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
       <figcaption>Exit code 2 tells Claude Code to show the hook's stderr to the model. <code>seen-by-claude.json</code> is exactly what Claude reads.</figcaption>
     </figure>
 
-    The `Stop` entry above is still a plain `inwards check`, and it needs a POSIX shell. A session-scoped stop gate that only blocks on violations the session introduced, together with the run log and escalation described below, is planned for v0.1.
+    At `Stop`, the same command runs the **stop gate**. It checks every Python file the session changed: the edits the per-edit hook saw, plus every file whose content hash differs from the session start. The hash comparison doesn't depend on git, so a commit made mid-session, `git update-index --assume-unchanged`, gitignored and untracked files all count as changes. Inside a layer's package, and on the way down to it, nothing is skipped, so a `pyvenv.cfg`, a `node_modules` directory or a symlink into one can't hide a module there (`inwards check` walks layers the same way). Other files aren't checked: an import's verdict depends only on module names, so an edit can't make a file that imports it newly violate. It also refuses to let the turn end when it can't trust the session:
+
+    - **No start record**, because `.inwards/` was deleted or the hooks were installed mid-session. When Claude Code sets `stop_hook_active` after a block, the gate lets that turn end.
+    - **`[tool.inwards]` differs from the start snapshot**, for example after a `sed -i` through Bash, or **a changed file falls under a `pyproject.toml` that had no valid `[tool.inwards]` at the start** (a new, permissive config nested in a layer).
+    - **The Inwards `SessionStart` or `PostToolUse` hook is gone from every settings layer** (user, project, local), including a `PostToolUse` matcher that no longer covers `Edit`, `Write` and `MultiEdit`, or **`disableAllHooks`** is set. The check reads the settings, not the programs they run, so it proves the configuration, not that the real Inwards runs. Claude Code reloads hooks when settings change, so removing the Stop hook itself switches the gate off at once; the config guard (below) is what blocks those edits.
+
+    It blocks a turn at most three times. The fourth time it lets the turn end and tells the user (exit 1), and escalation (below) turns the repeated failure into a question for the user. The count starts again with each new turn. If the gate itself fails (an unreadable file, say), it blocks once with the error and lets the turn end on the next try, so a broken gate can't keep a session going forever.
 
 === ":material-console: Aider"
 
@@ -195,7 +197,7 @@ flowchart LR
     brief["🧭 Brief<br/><small>inwards context / MCP</small>"] --> write["✍️ Agent writes code"]
     write --> check["⚡ Per-edit check<br/><small>PostToolUse hook</small>"]
     check -- "violation + steps" --> write
-    check -- "clean" --> gate["🚦 Stop gate<br/><small>full check</small>"]
+    check -- "clean" --> gate["🚦 Stop gate<br/><small>what the session changed</small>"]
     gate -- "violation" --> write
     gate -- "clean" --> pr["📬 Pull request<br/><small>CI + SARIF</small>"]
 ```
