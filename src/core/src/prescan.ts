@@ -62,15 +62,26 @@ export function importSkeleton(source: string): Skeleton | null {
   return { text: out.join("\n"), indent };
 }
 
+const SKELETON_NODES = new Set([
+  "import_statement",
+  "import_from_statement",
+  "future_import_statement",
+  "comment",
+]);
+
 /** Imports read from the skeleton, with real columns. Null means: do the full parse. */
 export function skeletonImports(parser: Parser, file: SourceFile): ImportRef[] | null {
   const skeleton = importSkeleton(file.text);
   if (!skeleton) return null;
   const tree = parsePython(parser, skeleton.text);
   try {
-    // A string holding `from a import (` glues the real code after it onto a bogus
-    // import, which hides real imports. That skeleton never parses cleanly.
-    if (tree.rootNode.hasError) return null;
+    // Import-shaped lines inside strings can glue real code onto a bogus import
+    // (`from a import (`) or open a string of their own (`import a; t = '''`).
+    // A skeleton we can trust parses cleanly and holds nothing but imports.
+    const root = tree.rootNode;
+    if (root.hasError || !root.namedChildren.every((n) => n && SKELETON_NODES.has(n.type))) {
+      return null;
+    }
     return extractImports(tree, file).map((ref) => ({
       ...ref,
       column: ref.column + (skeleton.indent[ref.line - 1] ?? 0),

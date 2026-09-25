@@ -144,3 +144,17 @@ describe("source quirks (M0)", () => {
     ]);
   });
 });
+
+test("an import line inside a string cannot open a string that hides a real import", () => {
+  const src = [
+    's = """',
+    "import a; t = '''",
+    '"""',
+    "import shop.infrastructure",
+    'u = """',
+    "import b; v = '''",
+    '"""',
+    "",
+  ].join("\n");
+  expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+});

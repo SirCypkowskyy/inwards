@@ -27,18 +27,17 @@ export class Engine {
    * parse runs only to confirm one (or when the prescan declines the file).
    */
   checkFile(file: SourceFile): Diagnostic[] {
-    const text = normalizeSource(file.text);
-    const src = text === file.text ? file : { ...file, text };
+    const src = { ...file, text: normalizeSource(file.text) };
     const fast = skeletonImports(this.parser, src);
     if (fast) {
       const found = checkLayers(src, fast, this.config.layers);
       if (found.length === 0) return found;
     }
-    return checkLayers(src, this.imports(src, src.text), this.config.layers);
+    return checkLayers(src, this.imports(src), this.config.layers);
   }
 
-  private imports(file: SourceFile, text: string): ImportRef[] {
-    const tree = parsePython(this.parser, text);
+  private imports(file: SourceFile): ImportRef[] {
+    const tree = parsePython(this.parser, file.text);
     try {
       return extractImports(tree, file);
     } finally {
