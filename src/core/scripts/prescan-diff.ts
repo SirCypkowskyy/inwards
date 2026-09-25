@@ -263,7 +263,9 @@ const minFiles: number = Number(minFilesArg);
 if (stdlibDir !== "" || minFiles > 0) {
   const found: number = stdlibDir === "" ? 0 : [...new Glob("**/*.py").scanSync(stdlibDir)].length;
   if (found < minFiles) {
-    process.stderr.write(`corpus too small: ${found} .py files in "${stdlibDir}", need ${minFiles}\n`);
+    process.stderr.write(
+      `corpus too small: ${found} .py files in "${stdlibDir}", need ${minFiles}\n`,
+    );
     ok = false;
   } else {
     ok = check(stdlibDir, pythonFilesUnder(stdlibDir)) && ok;

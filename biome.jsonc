@@ -130,6 +130,27 @@
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     },
     {
+      // The eval harness is one script run by hand (`bun run eval/run.ts`): a
+      // pipeline of short documented helpers that only it uses. Splitting it into
+      // modules would scatter that pipeline without making any piece reusable.
+      "includes": ["eval/run.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 400 } }
+          }
+        }
+      }
+    },
+    {
+      // The npm name placeholder is a plain CommonJS bin (its package.json has no
+      // "type": "module"), so it cannot `import process from "node:process"`, and
+      // `require` would trip noCommonJs. It must stay dependency-free and run
+      // under bare `node`, so it uses the global.
+      "includes": ["packaging/placeholder/npm/bin.js"],
+      "linter": { "rules": { "correctness": { "noProcessGlobal": "off" } } }
+    },
+    {
       // Ambient module declarations need a default export to type
       // `import path from "x.wasm"`.
       "includes": ["**/*.d.ts"],
