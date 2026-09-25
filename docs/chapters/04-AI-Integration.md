@@ -45,7 +45,9 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     inwards init --agent claude            # --dry-run shows the diff first
     ```
 
-    It merges the hooks below into `.claude/settings.json`, keeping any hooks and settings you already have. It uses the absolute path of the binary, so a hook never depends on `PATH` or an activated virtualenv. It also adds `.inwards/` to `.gitignore` and pins `required-version` in `[tool.inwards]`. Running it again changes nothing. It installs only hook events Inwards implements; the Stop gate and the config guard will add theirs once they ship.
+    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only and is not committed, and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. `init` also adds `.inwards/` to `.gitignore` and pins `required-version` in `[tool.inwards]`. Running it again changes nothing. It installs only hook events Inwards implements; the Stop gate and the config guard will add theirs once they ship.
+
+    To share the setup through the committed `.claude/settings.json` instead, write it by hand. This version relies on `inwards` being on `PATH`:
 
     Claude Code runs [hooks](https://code.claude.com/docs/en/hooks) around tool calls. For `PostToolUse`, exit code 2 doesn't undo the edit (it already happened), but Claude sees the hook's stderr and reacts to it. For `Stop`, exit code 2 keeps Claude working instead of ending the turn. The hook input includes `stop_hook_active`, and Claude Code ends the turn anyway after several consecutive blocks, so a broken stop hook can't trap the session.
 
