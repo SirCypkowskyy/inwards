@@ -23,7 +23,7 @@ const MAX_AGE_MS = 604_800_000;
 /** At most this many sessions are kept. */
 const MAX_SESSIONS = 50;
 /** The two files a session owns: `<id>.start.json` and `<id>.jsonl`. */
-const SESSION_FILE = /\.(?:start\.json|jsonl)$/u;
+const SESSION_FILE = /\.(?:start\.json|jsonl|unresolved\.json)$/u;
 /** O_NOFOLLOW where the OS has it (not on Windows), so a planted symlink isn't followed. */
 const NO_FOLLOW: number = constants.O_NOFOLLOW ?? 0;
 
@@ -144,6 +144,29 @@ function existsAsNonDirectory(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Finds the state directory for a reader that also deletes, without creating
+ * it: only when `.inwards` and `state` are real directories inside the project.
+ *
+ * @param project - the real project root.
+ * @returns the state directory, or undefined when it is missing or not safe to use.
+ */
+export function existingStateDir(project: string): string | undefined {
+  let dir = project;
+  for (const part of [".inwards", "state"]) {
+    dir = join(dir, part);
+    try {
+      if (!lstatSync(dir).isDirectory()) {
+        return undefined;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+  const real = realpath(dir);
+  return real !== undefined && isInside(project, real) ? dir : undefined;
 }
 
 /**

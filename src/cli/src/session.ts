@@ -145,7 +145,8 @@ export function recordEdit(
     t: "edit",
     at: new Date().toISOString(),
     file: projectPath(project, file),
-    fingerprints: diagnostics.map(fingerprint),
+    // Once per edit: the same import twice in a file is one attempt, not two.
+    fingerprints: [...new Set(diagnostics.map(fingerprint))],
   });
 }
 

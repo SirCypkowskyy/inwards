@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { inwards, LAYERS, payload, type RunResult } from "./run.ts";
+import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 import { agentWrites, LEAK, put, session, stop } from "./stop-helpers.ts";
 
 const ID = "stop-test";
@@ -71,5 +72,96 @@ describe("escalation", () => {
       stdin: payload("session-start", root, { session_id: "third-session", source: "startup" }),
     });
     expect(again.stdout).toBe("");
+  });
+});
+
+describe("escalation: review round 1", () => {
+  test("a config broken mid-session doesn't stop the gate from ending the turn", () => {
+    const root = session();
+    agentWrites(root, "shop/domain/order.py", LEAK);
+    put(
+      root,
+      "pyproject.toml",
+      LAYERS.replace("[tool.inwards]", "[tool.inwards]\nescalate-after = 0"),
+    );
+    for (const active of [false, true, true]) {
+      expect(stop(root, { stop_hook_active: active }).code).toBe(2);
+    }
+    expect(stop(root, { stop_hook_active: true }).code).toBe(0);
+  });
+
+  test("the same import twice in a file is one attempt per edit", () => {
+    const root = session();
+    const twice = `${LEAK}def f():\n    import shop.infrastructure.db\n`;
+    expect(write(root, twice).code).toBe(2);
+    expect(write(root, `${twice}X = 1\n`).code).toBe(2);
+    expect(context(write(root, `${twice}X = 2\n`))).toContain("survived 3 attempts");
+  });
+
+  test("an escalating run with a new violation still blocks, and says to ask the user", () => {
+    const root = session();
+    write(root, LEAK);
+    write(root, `${LEAK}X = 1\n`);
+    const mixed = write(root, `${LEAK}import shop.infrastructure.other\n`);
+    expect(mixed.code).toBe(2);
+    expect(mixed.stderr).toContain("survived 3 attempts");
+  });
+
+  test("once a violation has escalated, the first Stop already says to ask the user", () => {
+    const root = session();
+    for (const n of [1, 2, 3]) {
+      write(root, `${LEAK}X = ${n}\n`);
+    }
+    const first = stop(root);
+    expect(first.code).toBe(2);
+    expect(first.stderr).toContain("ask how to proceed");
+  });
+
+  test("escalate-after edited mid-session changes nothing", () => {
+    const root = session();
+    put(
+      root,
+      "pyproject.toml",
+      LAYERS.replace("[tool.inwards]", "[tool.inwards]\nescalate-after = 1"),
+    );
+    expect(write(root, LEAK).code).toBe(2);
+  });
+
+  test("an unrelated package's limit doesn't cut the gate short", () => {
+    const root = session({
+      "other/pyproject.toml":
+        '[tool.inwards]\nescalate-after = 1\nlayers = [{ name = "o", modules = ["o"] }]\n',
+      "other/o/x.py": "",
+    });
+    agentWrites(root, "shop/domain/order.py", LEAK);
+    expect(stop(root).code).toBe(2);
+    expect(stop(root, { stop_hook_active: true }).code).toBe(2);
+  });
+
+  test("a symlinked .inwards can't feed the next session, nor lose its files", () => {
+    const root = session();
+    const outside = project({ "state/x.unresolved.json": '{"summary":"INJECTED"}' });
+    rmSync(join(root, ".inwards"), { recursive: true, force: true });
+    symlinkSync(outside, join(root, ".inwards"), "dir");
+    const next = inwards(["hook", "claude-code"], {
+      cwd: root,
+      stdin: payload("session-start", root, { session_id: "next-session", source: "clear" }),
+    });
+    expect(next.stdout).not.toContain("INJECTED");
+    expect(existsSync(join(outside, "state/x.unresolved.json"))).toBe(true);
+  });
+
+  test("a list whose files were fixed since isn't handed to the next session", () => {
+    const root = session();
+    agentWrites(root, "shop/domain/order.py", LEAK);
+    for (const active of [false, true, true, true]) {
+      stop(root, { stop_hook_active: active });
+    }
+    put(root, "shop/domain/order.py", "X = 1\n");
+    const next = inwards(["hook", "claude-code"], {
+      cwd: root,
+      stdin: payload("session-start", root, { session_id: "next-session", source: "startup" }),
+    });
+    expect(next.stdout).toBe("");
   });
 });

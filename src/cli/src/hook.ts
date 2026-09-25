@@ -4,7 +4,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
-import { ConfigError, type Diagnostic, parseConfig, render } from "@inwards/core";
+import { ConfigError, type Diagnostic, render } from "@inwards/core";
 import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
 import { configGuard } from "./guard.ts";
 import { print } from "./output.ts";
@@ -64,7 +64,9 @@ export async function hookClaudeCode(usage: string): Promise<number> {
  * Records where a session starts (at startup or /clear): HEAD, every
  * `[tool.inwards]` table and a content-hash manifest of the Python files, for
  * the Stop gate and the config guard. A resume or compact only logs itself.
- * Silent on success, since SessionStart output is shown to the model.
+ * On a new session it also hands the model what earlier sessions left
+ * unresolved (see `escalation.ts`); otherwise it is silent, since
+ * SessionStart output goes to the model.
  *
  * @param input - the hook payload.
  * @returns 0, or 1 (shown to the user only) when the state can't be written.
@@ -123,19 +125,25 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   }
   try {
     const report = await runCheck(configPath, [target.file], target.cwd);
-    const limit = escalatesAt(target.project, input["session_id"], configPath, report.diagnostics);
+    const escalation = escalationOf(
+      target.project,
+      input["session_id"],
+      configPath,
+      report.diagnostics,
+    );
     rememberEdit(target.project, input["session_id"], target.file, report.diagnostics);
     if (report.diagnostics.length === 0) {
       return 0;
     }
     const json = render(report, "json", { pretty: false });
-    if (report.diagnostics.some((d) => d.severity === "error") && limit === undefined) {
-      process.stderr.write(`${json}\n`);
+    const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
+    const errors = report.diagnostics.some((d) => d.severity === "error");
+    if (errors && escalation?.every !== true) {
+      process.stderr.write(`${ask}${json}\n`); // a new violation still blocks
       return 2;
     }
-    // Warnings only, or an escalation: the report reaches the model as context.
-    const context = limit === undefined ? json : `inwards: ${askUser(limit)}\n${json}`;
-    const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: context };
+    // Warnings only, or every error has just reached the limit: the report is context.
+    const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: `${ask}${json}` };
     process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
     return 0;
   } catch (err) {
@@ -147,32 +155,33 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
 }
 
 /**
- * Tells whether this run escalates: an error in it has now been reported
- * exactly `escalate-after` times this session. Only that run escalates; the
- * next one with the same violation blocks again.
+ * Works out whether this run escalates: some error in it has now been reported
+ * exactly `escalate-after` times this session (counted once per edit). The
+ * limit comes from the config as it was at session start, so editing it
+ * mid-session changes nothing. Only that run escalates; the next one with the
+ * same violation blocks again.
  *
  * @param project - the real project root.
  * @param id - the payload's `session_id`.
  * @param configPath - the config the file was checked with.
  * @param diagnostics - this run's findings.
- * @returns the limit when this run reaches it, else undefined.
+ * @returns the limit, and whether every error in the run reached it; undefined when none did.
  */
-function escalatesAt(
+function escalationOf(
   project: string,
   id: unknown,
   configPath: string,
   diagnostics: readonly Diagnostic[],
-): number | undefined {
-  const seen = isSessionId(id) ? readSession(project, id)?.seen : undefined;
-  if (seen === undefined) {
+): { limit: number; every: boolean } | undefined {
+  const state = isSessionId(id) ? readSession(project, id) : undefined;
+  if (state === undefined) {
     return undefined;
   }
-  const limit =
-    parseConfig(readFileSync(configPath, "utf8")).escalateAfter ?? DEFAULT_ESCALATE_AFTER;
-  const reached = diagnostics.some(
-    (d) => d.severity === "error" && (seen.get(fingerprint(d)) ?? 0) + 1 === limit,
-  );
-  return reached ? limit : undefined;
+  const config = state.start.configs[projectPath(project, configPath)];
+  const limit = config?.escalateAfter ?? DEFAULT_ESCALATE_AFTER;
+  const errors = new Set(diagnostics.filter((d) => d.severity === "error").map(fingerprint));
+  const reached = [...errors].filter((fp) => (state.seen.get(fp) ?? 0) + 1 === limit);
+  return reached.length === 0 ? undefined : { limit, every: reached.length === errors.size };
 }
 
 /**
