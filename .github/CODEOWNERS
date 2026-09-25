@@ -1,0 +1,8 @@
+# Files that decide what Inwards enforces, or how the agent is hooked up, need
+# a human review. The agent-side half is the PreToolUse config guard (E1-guard).
+pyproject.toml    @SirCypkowskyy
+**/pyproject.toml @SirCypkowskyy
+/.claude/         @SirCypkowskyy
+/.inwards/        @SirCypkowskyy
+/.github/         @SirCypkowskyy
+/CLAUDE.md        @SirCypkowskyy
