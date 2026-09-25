@@ -9,7 +9,7 @@ This chapter covers the rules the design has to live within, the quality goals i
 | C1 | Engine in TypeScript | Shared by CLI, language server and extension ([ADR-001](05-ADR.md#adr-001-typescript-for-the-engine)) | Raw parse speed, binary size |
 | C2 | Python parsed with tree-sitter, WASM build | Portable across Bun, Node and every target ([ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)) | About 12 ms of WASM start-up per process |
 | C3 | Distributed as a Bun single-file executable | No runtime prerequisites; installs as a dev dependency ([ADR-003](05-ADR.md#adr-003-ship-a-bun-single-file-executable)) | 82 MB per binary |
-| C4 | Never import or execute user code | Deterministic, safe on untrusted repos, no venv needed | Dynamic imports stay invisible to static analysis |
+| C4 | Never import or execute user code | Deterministic, safe on untrusted repos, no venv needed | Only dynamic imports with a literal target are visible (INW011); computed targets stay invisible |
 | C5 | No network access at check time | Works offline, in sandboxes and in locked-down CI | Rule packs must ship inside the binary or the repo |
 | C6 | Config in `pyproject.toml` under `[tool.inwards]` | Python convention ([ADR-005](05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml)) | Protecting the config needs hooks or CODEOWNERS |
 | C7 | Output contract `inwards/diagnostics@1` is additive only | Agents and scripts depend on it ([ADR-007](05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)) | Renames need a new major schema |
@@ -21,7 +21,7 @@ Ranked. When two goals conflict, the higher one wins.
 
 | Rank | Goal | Scenario | Measure |
 |---|---|---|---|
-| 1 | :material-shield-check: **No false negatives** | An agent hides a forbidden import in a function, behind `TYPE_CHECKING`, via a relative path or a package import | Every form is reported, including `shop . infrastructure` with spaces, a backslash inside the name, NFKC identifiers and symlinked aliases of a layer. Unit tests plus the prescan differential test (0 misses on 52,338 generated and 1,921 stdlib files) |
+| 1 | :material-shield-check: **No false negatives** | An agent hides a forbidden import in a function, behind `TYPE_CHECKING`, via a relative path or a package import | Every form is reported, including `shop . infrastructure` with spaces, a backslash inside the name, NFKC identifiers and symlinked aliases of a layer. Literal dynamic imports (`importlib.import_module`, `__import__`, `exec`) are reported as INW011. Unit tests plus the prescan differential test (0 misses on 63,048 generated and 1,921 stdlib files, dynamic imports included) |
 | 2 | :material-lightning-bolt: **Agent-loop latency** | A hook checks one edited file | p95 < 100 ms wall time, process start included |
 | 3 | :material-robot-outline: **Actionable for agents** | An agent gets INW001 | It fixes the violation within one retry in ≥ 80 % of cases (measured with design partners, see [chapter 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministic** | Same repo, same config, two runs | Identical diagnostics in identical order. Only the timing fields in the summary (`durationMs`) change |
@@ -90,7 +90,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 ```sh
 bun install
-bun test                                                    # 84 tests: unit, CLI, hook, E2E snapshots
+bun test                                                    # 175 tests: unit, CLI, hook, E2E snapshots
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms

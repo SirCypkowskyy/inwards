@@ -201,12 +201,41 @@ function resolveModule(node: Node, file: SourceFile): string | null {
   const prefix = node.children.find((c) => c?.type === "import_prefix")?.text ?? "";
   const dots = prefix.split("").filter((ch) => ch === ".").length;
   const restNode = node.children.find((c) => c?.type === "dotted_name");
-  const rest = restNode ? canonicalName(restNode) : undefined;
+  return resolveRelative(packageOf(file), dots, restNode ? canonicalName(restNode) : undefined);
+}
+
+/**
+ * Returns the package a file's relative imports start from, as name parts.
+ * That is the file's own module for `__init__.py` and its parent otherwise,
+ * the value Python stores in `__package__`.
+ *
+ * @param file - the importing file.
+ * @returns the package's dotted name split into parts.
+ */
+export function packageOf(file: SourceFile): string[] {
   const pkg = file.module.split(".");
   if (!file.isPackage) {
     pkg.pop();
   }
-  const up = dots - 1;
+  return pkg;
+}
+
+/**
+ * Resolves a relative module name against a package.
+ * Level 1 is the package itself, and each extra level climbs one package up,
+ * as the dots of `from ..x import y` or the `level` of `__import__` do.
+ *
+ * @param pkg - the package the name is relative to, split into parts.
+ * @param level - the number of leading dots, 1 or more.
+ * @param rest - the dotted name after the dots, if any.
+ * @returns the dotted module name, or null if the level climbs above the root.
+ */
+export function resolveRelative(
+  pkg: readonly string[],
+  level: number,
+  rest: string | undefined,
+): string | null {
+  const up = level - 1;
   if (up > pkg.length) {
     return null;
   }

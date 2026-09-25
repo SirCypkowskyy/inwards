@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { Parser } from "web-tree-sitter";
 import {
   Engine,
   type GrammarBinaries,
@@ -6,6 +7,7 @@ import {
   parseConfig,
   type SourceFile,
 } from "../src/index.ts";
+import { createPythonParser } from "../src/python.ts";
 
 /**
  * Reads a WASM file from an installed package.
@@ -51,3 +53,6 @@ export function file(path: string, text: string): SourceFile {
 }
 
 export const engine: Engine = await Engine.create(grammars(), CONFIG);
+
+/** A bare parser, for tests of the prescan and extractors below the engine. */
+export const parser: Parser = await createPythonParser(grammars());

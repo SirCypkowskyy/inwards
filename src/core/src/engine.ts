@@ -1,5 +1,6 @@
 import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "./config.ts";
+import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
 import { checkLayers, layerIndexOf } from "./layers.ts";
 import { skeletonImports } from "./prescan.ts";
@@ -53,25 +54,54 @@ export class Engine {
    * that declares an encoding Inwards can't read faithfully gets one INW000
    * diagnostic instead of a check (see `encoding.ts`).
    *
+   * The skeleton keeps import statements only, so it can't see
+   * `importlib.import_module("...")` or `exec("import ...")`. A file in a layer
+   * whose text names a loader (`mentionsDynamicImport`) skips the skeleton and
+   * gets the full parse, which also looks for dynamic imports (INW011).
+   *
    * @param file - the source file as read by the adapter.
    * @returns the violations found, empty when the file is clean.
    */
   checkFile(file: SourceFile): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    if (layerIndexOf(src.module, this.config.layers) !== -1) {
+    const layered = layerIndexOf(src.module, this.config.layers) !== -1;
+    if (layered) {
       const unreadable = checkEncoding(src);
       if (unreadable) {
         return [unreadable];
       }
     }
-    const fast = skeletonImports(this.parser, src);
-    if (fast) {
-      const found = checkLayers(src, fast, this.config.layers);
-      if (found.length === 0) {
-        return found;
+    const dynamic = layered && mentionsDynamicImport(src.text);
+    if (!dynamic) {
+      const fast = skeletonImports(this.parser, src);
+      if (fast && checkLayers(src, fast, this.config.layers).length === 0) {
+        return [];
       }
     }
-    return checkLayers(src, this.imports(src), this.config.layers);
+    return this.fullCheck(src, dynamic);
+  }
+
+  /**
+   * Checks a file against a full parse, the exact path.
+   * Diagnostics come back in source order, static and dynamic imports mixed.
+   *
+   * @param file - the source file, with normalised text.
+   * @param dynamic - true to look for dynamic imports as well (INW011).
+   * @returns the violations found.
+   */
+  private fullCheck(file: SourceFile, dynamic: boolean): Diagnostic[] {
+    const { layers } = this.config;
+    const tree = parsePython(this.parser, file.text);
+    try {
+      const found = checkLayers(file, extractImports(tree, file), layers);
+      if (dynamic) {
+        const refs = extractDynamicImports(this.parser, tree, file);
+        found.push(...checkDynamicImports(file, refs, layers));
+      }
+      return found.sort((a, b) => a.line - b.line || a.column - b.column);
+    } finally {
+      tree.delete(); // WASM memory is not garbage collected
+    }
   }
 
   /**
