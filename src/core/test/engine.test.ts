@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { RULES, render } from "../src/index.ts";
-import { engine, file } from "./helpers.ts";
+import { check, file } from "./helpers.ts";
 
 describe("INW001 layer-dependency", () => {
   test("domain importing infrastructure is a violation with a fix", () => {
-    const [d, ...rest] = engine.checkFile(
+    const [d, ...rest] = check(
       file("shop/domain/order.py", "from shop.infrastructure.db import OrderTable\n"),
     );
     expect(rest).toHaveLength(0);
@@ -17,17 +17,17 @@ describe("INW001 layer-dependency", () => {
 
   test("inward imports are allowed", () => {
     const src = "from shop.domain.order import Order\nimport shop.application.place_order\n";
-    expect(engine.checkFile(file("shop/api/http.py", src))).toEqual([]);
+    expect(check(file("shop/api/http.py", src))).toEqual([]);
   });
 
   test("relative imports resolve before the check", () => {
     const src = "from ..infrastructure import sql_orders\n";
-    const [d] = engine.checkFile(file("shop/application/place_order.py", src));
+    const [d] = check(file("shop/application/place_order.py", src));
     expect(d?.message).toContain("shop.infrastructure.sql_orders");
   });
 
   test("`from pkg import submodule` cannot sneak past the rule", () => {
-    const [d] = engine.checkFile(file("shop/domain/order.py", "from shop import infrastructure\n"));
+    const [d] = check(file("shop/domain/order.py", "from shop import infrastructure\n"));
     expect(d?.code).toBe("INW001");
   });
 
@@ -40,19 +40,17 @@ describe("INW001 layer-dependency", () => {
       "    import shop.infrastructure.sql_orders as s",
       "",
     ].join("\n");
-    const found = engine.checkFile(file("shop/domain/order.py", src));
+    const found = check(file("shop/domain/order.py", src));
     expect(found.map((d) => d.line)).toEqual([3, 5]);
   });
 
   test("files outside every layer are ignored", () => {
-    expect(engine.checkFile(file("scripts/seed.py", "import shop.infrastructure\n"))).toEqual([]);
+    expect(check(file("scripts/seed.py", "import shop.infrastructure\n"))).toEqual([]);
   });
 });
 
 describe("reporters", () => {
-  const diagnostics = engine.checkFile(
-    file("shop/domain/order.py", "import shop.infrastructure.db\n"),
-  );
+  const diagnostics = check(file("shop/domain/order.py", "import shop.infrastructure.db\n"));
   const report = { diagnostics, filesChecked: 1, durationMs: 1.23 };
 
   test("json is versioned and carries the fix", () => {
@@ -71,29 +69,29 @@ describe("reporters", () => {
 describe("import skeleton prescan", () => {
   test("keeps line numbers and restores columns of nested imports", () => {
     const src = ["def f():", "    x = 1", "    import shop.infrastructure.db", ""].join("\n");
-    const [d] = engine.checkFile(file("shop/domain/order.py", src));
+    const [d] = check(file("shop/domain/order.py", src));
     expect(d?.line).toBe(3);
     expect(d?.column).toBe(12);
   });
 
   test("multi-line parenthesised imports survive", () => {
     const src = "from shop.infrastructure.db import (\n    A,\n    B,\n)\nx = 1\n";
-    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(2);
+    expect(check(file("shop/domain/order.py", src))).toHaveLength(2);
   });
 
   test("an import after a semicolon forces the full parse and is still caught", () => {
     const src = "x = 1; import shop.infrastructure.db\n";
-    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+    expect(check(file("shop/domain/order.py", src))).toHaveLength(1);
   });
 
   test("import-looking text inside a docstring is not reported", () => {
     const src = '"""\nfrom shop.infrastructure.db import Table\n"""\n';
-    expect(engine.checkFile(file("shop/domain/order.py", src))).toEqual([]);
+    expect(check(file("shop/domain/order.py", src))).toEqual([]);
   });
 });
 
 describe("text reporter colour", () => {
-  const diagnostics = engine.checkFile(file("shop/domain/order.py", "import shop.api.http\n"));
+  const diagnostics = check(file("shop/domain/order.py", "import shop.api.http\n"));
   const report = { diagnostics, filesChecked: 1, durationMs: 1 };
 
   test("plain by default, so pipes and agents get clean text", () => {
@@ -108,30 +106,30 @@ describe("text reporter colour", () => {
 describe("backslash continuations (review round 3)", () => {
   test("`from x \\` + newline + `import y` is caught", () => {
     const src = "from shop.infrastructure \\\n    import sql_orders\n";
-    const [d] = engine.checkFile(file("shop/domain/order.py", src));
+    const [d] = check(file("shop/domain/order.py", src));
     expect(d?.message).toContain("shop.infrastructure.sql_orders");
   });
 
   test("`import \\` + newline + module is caught", () => {
     const src = "import \\\n    shop.infrastructure.db\n";
-    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+    expect(check(file("shop/domain/order.py", src))).toHaveLength(1);
   });
 });
 
 describe("source quirks (M0)", () => {
   test("a string holding `from a import (` cannot glue a real import onto it", () => {
     const src = 's = """\nfrom a import (\n"""\nimport shop.infrastructure\ny = """\n)\n"""\n';
-    expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+    expect(check(file("shop/domain/order.py", src))).toHaveLength(1);
   });
 
   test("a lone \\r ends a line, as in Python", () => {
-    const [d] = engine.checkFile(file("shop/domain/order.py", "# c\rimport shop.infrastructure\n"));
+    const [d] = check(file("shop/domain/order.py", "# c\rimport shop.infrastructure\n"));
     expect(d?.line).toBe(2);
   });
 
   test("BOM is not a column, CRLF is a line break", () => {
     const src = "\uFEFFimport shop.api\r\nx = 1\r\nfrom shop.infrastructure \\\r\n  import db\r\n";
-    const found = engine.checkFile(file("shop/domain/order.py", src));
+    const found = check(file("shop/domain/order.py", src));
     expect(found.map((d) => [d.line, d.column])).toEqual([
       [1, 8],
       [4, 10],
@@ -150,7 +148,7 @@ test("an import line inside a string cannot open a string that hides a real impo
     '"""',
     "",
   ].join("\n");
-  expect(engine.checkFile(file("shop/domain/order.py", src))).toHaveLength(1);
+  expect(check(file("shop/domain/order.py", src))).toHaveLength(1);
 });
 
 describe("dotted names as Python spells them (Astra review)", () => {
@@ -160,20 +158,18 @@ describe("dotted names as Python spells them (Astra review)", () => {
     ["spaces in a from import", "from shop . infrastructure import db\n"],
     ["NFKC identifiers", "import ｓhop.infrastructure\n"],
   ])("%s is still an import of shop.infrastructure", (_, src) => {
-    const [d] = engine.checkFile(file("shop/domain/order.py", src));
+    const [d] = check(file("shop/domain/order.py", src));
     expect(d?.message).toContain("shop.infrastructure");
   });
 
   test("dots in a relative import are counted, not characters", () => {
-    const [d] = engine.checkFile(
-      file("shop/application/x.py", "from . . infrastructure import db\n"),
-    );
+    const [d] = check(file("shop/application/x.py", "from . . infrastructure import db\n"));
     expect(d?.message).toContain('"shop.infrastructure.db"');
   });
 });
 
 test("SARIF URIs keep #, ? and spaces inside the path", () => {
-  const [d] = engine.checkFile(file("shop/domain/order#1 ?.py", "import shop.api\n"));
+  const [d] = check(file("shop/domain/order#1 ?.py", "import shop.api\n"));
   const sarif = JSON.parse(
     render({ diagnostics: d ? [d] : [], filesChecked: 1, durationMs: 1 }, "sarif"),
   );
@@ -189,7 +185,7 @@ describe("source encodings (Astra review, round 2)", () => {
     ["unicode_escape", "# coding: unicode_escape\n#\\u000aimport shop.infrastructure.db\n"],
     ["utf-7 on line 2", "#!/usr/bin/env python\n# -*- coding: utf-7 -*-\nx = 1\n"],
   ])("%s gets INW000 instead of a silent pass", (_, src) => {
-    const found = engine.checkFile(file("shop/domain/order.py", src));
+    const found = check(file("shop/domain/order.py", src));
     expect(found.map((d) => d.code)).toEqual(["INW000"]);
   });
 
@@ -197,20 +193,18 @@ describe("source encodings (Astra review, round 2)", () => {
     "%s is read as usual",
     (encoding) => {
       const src = `# coding: ${encoding}\nimport shop.infrastructure.db\n`;
-      expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
-        "INW001",
-      ]);
+      expect(check(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual(["INW001"]);
     },
   );
 
   test("a declaration on line 2 counts only after a comment or blank line 1", () => {
     const src = "x = 1\n# coding: unicode_escape\n";
-    expect(engine.checkFile(file("shop/domain/order.py", src))).toEqual([]);
+    expect(check(file("shop/domain/order.py", src))).toEqual([]);
   });
 
   test("files outside every layer are not reported", () => {
     const src = "# coding: unicode_escape\n";
-    expect(engine.checkFile(file("scripts/tool.py", src))).toEqual([]);
+    expect(check(file("scripts/tool.py", src))).toEqual([]);
   });
 });
 
@@ -223,9 +217,7 @@ describe("encoding declarations CPython honours (review of round 2)", () => {
     ["CRLF with a blank line 1", "\r\n# coding: unicode_escape\r\nx = 1\r\n"],
     ["U+2028 inside the comment", "# note  coding: unicode_escape\nx = 1\n"],
   ])("%s gets INW000", (_, src) => {
-    expect(engine.checkFile(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual([
-      "INW000",
-    ]);
+    expect(check(file("shop/domain/order.py", src)).map((d) => d.code)).toEqual(["INW000"]);
   });
 });
 
@@ -248,8 +240,8 @@ describe("rule registry", () => {
 
   test("every diagnostic the engine emits comes from a registered rule", () => {
     const found = [
-      ...engine.checkFile(file("shop/domain/a.py", "import shop.api\n")),
-      ...engine.checkFile(file("shop/domain/b.py", "# coding: utf-7\n")),
+      ...check(file("shop/domain/a.py", "import shop.api\n")),
+      ...check(file("shop/domain/b.py", "# coding: utf-7\n")),
     ];
     for (const d of found) {
       const rule = Object.values(RULES).find((r) => r.code === d.code);

@@ -23,6 +23,7 @@ import { type InwardsConfig, type Report, render } from "@inwards/core";
 import { settingsProblem } from "./claude-settings.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
+import { newPrefixErrors } from "./prefixes.ts";
 import { runCheck } from "./project.ts";
 import { isSessionId, readSession, recordPass, recordStop, type SessionState } from "./session.ts";
 import { projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
@@ -85,18 +86,22 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     );
   }
   const problems = trustProblems(project, configs, state);
+  const manifest = projectManifest(project, configs);
   const { report, strangers } = await checkChanged(
     project,
-    changedFiles(project, state, configs),
+    changedFiles(project, state, manifest),
     state.start,
     configs,
+  );
+  report.diagnostics.unshift(
+    ...newPrefixErrors(project, configs, Object.keys(state.start.manifest), Object.keys(manifest)),
   );
   for (const [file, config] of strangers) {
     problems.push(
       `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,
     );
   }
-  if (problems.length === 0 && report.diagnostics.length === 0) {
+  if (problems.length === 0 && !report.diagnostics.some((d) => d.severity === "error")) {
     if (state.stops > 0) {
       recordPass(project, id); // ends the streak, so a later turn starts counting at 0
     }
@@ -157,16 +162,16 @@ function block(problems: string[], report: Report | undefined): number {
  *
  * @param project - the real project root.
  * @param state - the session state.
- * @param configs - the project's configs now, which decide the layer packages walked.
+ * @param manifest - the content hashes now, from `projectManifest`.
  * @returns absolute paths of changed Python files that still exist as regular files.
  */
 function changedFiles(
   project: string,
   state: SessionState,
-  configs: Record<string, InwardsConfig>,
+  manifest: Record<string, string>,
 ): string[] {
   const changed = new Set(state.edited);
-  for (const [path, hash] of Object.entries(projectManifest(project, configs))) {
+  for (const [path, hash] of Object.entries(manifest)) {
     if (state.start.manifest[path] !== hash) {
       changed.add(path);
     }

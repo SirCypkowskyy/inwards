@@ -78,6 +78,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote:
 
     - **Violation:** compact JSON diagnostics on stderr, exit code 2.
+    - **Warnings only** (INW006: the file belongs to no layer): exit 0, and the same JSON goes back to the model as `additionalContext`, so the edit stands but the agent hears about it.
     - **Clean file, non-Python file, or any other hook event:** exit 0, no output.
     - **Broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it. With no `[tool.inwards]` at all the hook stays silent, because it may be installed for every project; the planned config guard stops an agent from deleting the table.
     - **Unreadable payload or an internal error:** exit 1. Claude Code shows that to the user, not the model.
@@ -173,7 +174,8 @@ A model under pressure to finish will try the cheapest thing that turns the chec
 | Hide it behind `TYPE_CHECKING` | `if TYPE_CHECKING: from shop.infrastructure...` | Checked too. If a domain signature mentions an infrastructure type, the domain can't be understood or reused without it, whether or not the import runs | :white_check_mark: |
 | Import the package, not the module | `from shop import infrastructure` | Resolved to `shop.infrastructure` | :white_check_mark: |
 | Use a relative import | `from ..infrastructure import db` | Resolved against the file's package | :white_check_mark: |
-| Put new code outside every layer | Create `shop/persistence/` and import it from the domain | INW006 flags first-party packages that belong to no layer | :material-progress-clock: |
+| Put new code outside every layer | Create `shop/persistence/` and import it from the domain | INW006: the import is an error; the new package gets a warning | :white_check_mark: |
+| Move a layer away | `git mv shop/domain shop/core`, so the prefix matches nothing | INW006: a prefix that matched modules at session start and matches none now fails the Stop gate | :white_check_mark: |
 | Import dynamically | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 reports a literal target that reaches an outer layer, through aliases such as `from importlib import import_module as im`. A computed target is not read yet | :white_check_mark: literal targets |
 | Suppress it | `# inwards: ignore` | Suppressions will need a code and a reason, show up in the summary, and can be rejected in hooks | :material-progress-clock: |
 | Loosen the config | Move `shop.infrastructure` into the domain layer | A `PreToolUse` guard denies agent edits to `[tool.inwards]`; CODEOWNERS covers humans | :material-progress-clock: |

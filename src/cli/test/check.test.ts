@@ -3,6 +3,18 @@ import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, LAYERS, project } from "./run.ts";
 
+/**
+ * Reads the errors from a JSON report, leaving out INW006 warnings.
+ *
+ * @param stdout - `inwards check --format json` output.
+ * @returns the diagnostics whose severity is error.
+ */
+function errors(stdout: string): { file: string; module: string; severity: string }[] {
+  const report: { diagnostics: { file: string; module: string; severity: string }[] } =
+    JSON.parse(stdout);
+  return report.diagnostics.filter((d) => d.severity === "error");
+}
+
 const leak = project({
   "pyproject.toml": LAYERS,
   "shop/domain/deep/order.py": "import shop.infrastructure.db\n",
@@ -28,9 +40,7 @@ test("a symlinked alias of a layer can't hide its violations", () => {
   symlinkSync(join(root, "shop/domain"), join(root, "aaa"));
   const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
   expect(code).toBe(1);
-  expect(JSON.parse(stdout).diagnostics.map((d: { module: string }) => d.module)).toEqual([
-    "shop.domain.order",
-  ]);
+  expect(errors(stdout).map((d: { module: string }) => d.module)).toEqual(["shop.domain.order"]);
 });
 
 test("a stub next to its module is checked too", () => {
@@ -63,7 +73,7 @@ test("a pyvenv.cfg above a layer, or a symlink into a disguised directory, can't
   });
   symlinkSync(join(root, "vendor"), join(root, "shop/domain/sub"), "dir");
   const { stdout } = inwards(["check", "--format", "json"], { cwd: root });
-  expect(JSON.parse(stdout).diagnostics.map((d: { file: string }) => d.file)).toEqual([
+  expect(errors(stdout).map((d: { file: string }) => d.file)).toEqual([
     "shop/domain/order.py",
     "shop/domain/sub/leak.py",
   ]);
@@ -84,7 +94,5 @@ test.each([
   });
   const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
   expect(code).toBe(1);
-  expect(JSON.parse(stdout).diagnostics.map((d: { file: string }) => d.file)).toEqual([
-    `${dir}/leak.py`,
-  ]);
+  expect(errors(stdout).map((d: { file: string }) => d.file)).toEqual([`${dir}/leak.py`]);
 });

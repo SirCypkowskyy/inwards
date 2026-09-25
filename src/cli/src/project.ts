@@ -3,14 +3,17 @@
  * and a check run over them. The engine does no I/O (ADR-006), so all file
  * reading happens here.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkPrefixes,
   Engine,
   type InwardsConfig,
+  type ModuleLookup,
   moduleNameFor,
   type ProjectIndex,
   parseConfig,
+  probeLookup,
   type Report,
   type SourceFile,
 } from "@inwards/core";
@@ -21,6 +24,10 @@ import { isInside, posix, realpath } from "./paths.ts";
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
   engine: Engine;
+  config: InwardsConfig;
+  /** The pyproject.toml, as found and as text, for findings about the config itself. */
+  configPath: string;
+  configText: string;
   /** The config root as written. */
   lexicalRoot: string;
   /** The config root with symlinks resolved. */
@@ -37,10 +44,14 @@ interface Project {
  * @throws {ConfigError} when the config is invalid.
  */
 async function openProject(configPath: string): Promise<Project> {
-  const config = parseConfig(readFileSync(configPath, "utf8"));
+  const configText = readFileSync(configPath, "utf8");
+  const config = parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
   return {
     engine: await Engine.create(await loadGrammars(), config),
+    config,
+    configPath,
+    configText,
     lexicalRoot,
     realRoot: realpath(lexicalRoot) ?? lexicalRoot,
     layerDirs: layerDirs(configPath, config),
@@ -99,8 +110,27 @@ function loadSources(project: Project, targets: string[] | undefined, base: stri
 }
 
 /**
+ * Finds first-party modules on disk under the config root, for INW006.
+ *
+ * @param root - the config root.
+ * @returns a lookup that probes `a/b.py`, `a/b.pyi` and package directories.
+ */
+function moduleLookup(root: string): ModuleLookup {
+  return probeLookup((segments) => {
+    const base = join(root, ...segments);
+    return (
+      existsSync(`${base}.py`) ||
+      existsSync(`${base}.pyi`) ||
+      (statSync(base, { throwIfNoEntry: false })?.isDirectory() ?? false)
+    );
+  });
+}
+
+/**
  * Loads the config and engine, then checks the Python files under the targets.
- * The duration covers config, grammar loading, reading and checking.
+ * A whole-project run (no targets) also checks the layer prefixes against the
+ * modules found (INW006). The duration covers config, grammar loading,
+ * reading and checking.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param targets - absolute files or directories; undefined means the config root.
@@ -116,7 +146,12 @@ export async function runCheck(
   const started = performance.now();
   const project = await openProject(configPath);
   const files = loadSources(project, targets, base);
-  const diagnostics = project.engine.checkFiles(files);
+  const diagnostics = project.engine.checkFiles(files, moduleLookup(project.lexicalRoot));
+  if (targets === undefined) {
+    const modules = new Set(files.map((file) => file.module));
+    const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
+    diagnostics.unshift(...checkPrefixes(project.config, modules, pyproject));
+  }
   return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
 }
 

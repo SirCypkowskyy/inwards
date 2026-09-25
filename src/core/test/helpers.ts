@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
 import type { Parser } from "web-tree-sitter";
 import {
+  type Diagnostic,
   Engine,
   type GrammarBinaries,
+  type ModuleLookup,
   moduleNameFor,
   parseConfig,
+  probeLookup,
   type SourceFile,
 } from "../src/index.ts";
 import { createPythonParser } from "../src/python.ts";
@@ -33,6 +36,7 @@ function grammars(): GrammarBinaries {
 
 const CONFIG = parseConfig(`
 [tool.inwards]
+ignore = ["scripts"]
 layers = [
   { name = "domain", modules = ["shop.domain"] },
   { name = "application", modules = ["shop.application"] },
@@ -54,6 +58,33 @@ export function file(path: string, text: string): SourceFile {
 
 export const engine: Engine = await Engine.create(grammars(), CONFIG);
 
+/** The packages and modules the test project has on disk, for INW006. */
+const ON_DISK = new Set([
+  "shop",
+  "shop.domain",
+  "shop.domain.order",
+  "shop.application",
+  "shop.infrastructure",
+  "shop.infrastructure.db",
+  "shop.api",
+  "shop.persistence",
+  "shop.persistence.repo",
+  "scripts",
+]);
+
+/** Finds first-party modules among `ON_DISK`. */
+export const OWNERS: ModuleLookup = probeLookup((segments) => ON_DISK.has(segments.join(".")));
+
+/**
+ * Checks one file with the test engine and the test project's modules.
+ *
+ * @param source - the file.
+ * @returns the diagnostics.
+ */
+export function check(source: SourceFile): Diagnostic[] {
+  return engine.checkFile(source, OWNERS);
+}
+
 /** A bare parser, for tests of the prescan and extractors below the engine. */
 export const parser: Parser = await createPythonParser(grammars());
 
@@ -67,7 +98,5 @@ const TARGET = /imports "(?<t>[^"]+)"/u;
  * @returns `[code, target]` for each diagnostic, the target read from the message.
  */
 export function found(src: string, path = "shop/domain/order.py"): [string, string][] {
-  return engine
-    .checkFile(file(path, src))
-    .map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
+  return check(file(path, src)).map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
 }

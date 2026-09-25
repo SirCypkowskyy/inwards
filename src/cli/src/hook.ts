@@ -79,7 +79,8 @@ function sessionStart(input: Record<string, unknown>): number {
  * Checks the one file the agent just wrote and records the edit in the session.
  *
  * @param input - the hook payload.
- * @returns 2 with diagnostics or a config error on stderr, 1 for an internal error, else 0.
+ * @returns 2 with errors or a config error on stderr, 1 for an internal error, else 0
+ *   (warnings only go to stdout as `additionalContext`).
  */
 async function postToolUse(input: Record<string, unknown>): Promise<number> {
   const toolInput = input["tool_input"];
@@ -105,8 +106,15 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     if (report.diagnostics.length === 0) {
       return 0;
     }
-    process.stderr.write(`${render(report, "json", { pretty: false })}\n`);
-    return 2;
+    const json = render(report, "json", { pretty: false });
+    if (report.diagnostics.some((d) => d.severity === "error")) {
+      process.stderr.write(`${json}\n`);
+      return 2;
+    }
+    // Warnings only: the edit stands, and the report reaches the model as context.
+    const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: json };
+    process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
+    return 0;
   } catch (err) {
     if (err instanceof ConfigError) {
       return print(`inwards: config error: ${err.message}`, 2);

@@ -88,13 +88,18 @@ export async function inwardsAsync(
 /**
  * Creates a throwaway project in a temp directory removed when the process exits.
  * Example: `{ "pyproject.toml": LAYERS, "shop/domain/order.py": "..." }`.
+ * A project on LAYERS also gets `shop/infrastructure/db.py` unless it has its
+ * own infrastructure files, so both layers exist (an empty layer is INW006).
  *
  * @param files - file contents keyed by path relative to the project root.
  * @returns the project's absolute root.
  */
 export function project(files: Record<string, string>): string {
   const root = mkdtempSync(join(TMP, "p-"));
-  for (const [rel, text] of Object.entries(files)) {
+  const withLayers = files["pyproject.toml"] === LAYERS;
+  const hasInfra = Object.keys(files).some((rel) => rel.startsWith("shop/infrastructure/"));
+  const all = withLayers && !hasInfra ? { "shop/infrastructure/db.py": "", ...files } : files;
+  for (const [rel, text] of Object.entries(all)) {
     mkdirSync(dirname(join(root, rel)), { recursive: true });
     writeFileSync(join(root, rel), text);
   }

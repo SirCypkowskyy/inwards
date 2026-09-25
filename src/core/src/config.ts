@@ -18,6 +18,13 @@ export interface InwardsConfig {
    * instead of checking with rules it may not know.
    */
   requiredVersion?: string;
+  /**
+   * Module names left out of the INW006 unassigned-package warning, such as
+   * `tests` or `migrations`. An entry matches whole name segments anywhere in a
+   * module name: `migrations` covers `shop.orders.migrations.0001_initial`.
+   * Imports from a layer into them are still checked. Absent when not set.
+   */
+  ignore?: string[];
 }
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
@@ -28,6 +35,10 @@ const RELEASE = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/u;
 export class ConfigError extends Error {
   override name = "ConfigError";
 }
+
+/** Keys `[tool.inwards]` understands; anything else is a typo or a newer feature. */
+const TABLE_KEYS: ReadonlySet<string> = new Set(["root", "layers", "required-version", "ignore"]);
+const LAYER_KEYS: ReadonlySet<string> = new Set(["name", "modules"]);
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
 const INWARDS_WORD = /\binwards\b/u;
@@ -59,7 +70,9 @@ export function declaresInwards(pyprojectText: string): boolean {
  *
  * `root` defaults to `.` and has backslashes turned into slashes. Layer names
  * must be unique and non-empty; each layer needs a list of non-empty module
- * prefixes. The TOML parser's own error is kept as `cause`.
+ * prefixes, and no prefix may belong to two layers. Unknown keys are errors,
+ * since a mistyped key would silently change nothing. The TOML parser's own
+ * error is kept as `cause`.
  *
  * @param pyprojectText - the full text of the `pyproject.toml` file.
  * @returns the validated configuration.
@@ -78,8 +91,12 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
   if (!isRecord(raw)) {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
   }
-  const { root = ".", layers, "required-version": required } = raw;
+  rejectUnknownKeys(raw, TABLE_KEYS, "tool.inwards");
+  const { root = ".", layers, "required-version": required, ignore } = raw;
   const requiredVersion = checkRequiredVersion(required);
+  if (ignore !== undefined && !isModuleList(ignore)) {
+    throw new ConfigError("tool.inwards.ignore must be a list of module names.");
+  }
   if (typeof root !== "string") {
     throw new ConfigError("tool.inwards.root must be a string.");
   }
@@ -87,23 +104,14 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     throw new ConfigError("tool.inwards.layers must be a non-empty array.");
   }
   const seen = new Set<string>();
-  const parsed = layers.map((layer: unknown, i): LayerSpec => {
-    const { name, modules } = isRecord(layer) ? layer : {};
-    if (typeof name !== "string" || name === "") {
-      throw new ConfigError(`tool.inwards.layers[${i}].name must be a non-empty string.`);
-    }
-    if (seen.has(name)) {
-      throw new ConfigError(`Layer "${name}" is declared twice.`);
-    }
-    seen.add(name);
-    if (!isModuleList(modules)) {
-      throw new ConfigError(`tool.inwards.layers[${i}].modules must be a list of module names.`);
-    }
-    return { name, modules };
-  });
+  const parsed = layers.map((layer: unknown, i) => parseLayer(layer, i, seen));
+  rejectOverlaps(parsed);
   const config: InwardsConfig = { root: root.replaceAll("\\", "/"), layers: parsed };
   if (requiredVersion !== undefined) {
     config.requiredVersion = requiredVersion;
+  }
+  if (ignore !== undefined) {
+    config.ignore = ignore;
   }
   return config;
 }
@@ -117,6 +125,71 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/**
+ * Validates one entry of `layers`.
+ *
+ * @param layer - the raw entry.
+ * @param i - its index, for messages.
+ * @param seen - layer names so far, updated in place.
+ * @returns the layer.
+ * @throws {ConfigError} for unknown keys, a missing or repeated name, or bad modules.
+ */
+function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
+  if (isRecord(layer)) {
+    rejectUnknownKeys(layer, LAYER_KEYS, `tool.inwards.layers[${i}]`);
+  }
+  const { name, modules } = isRecord(layer) ? layer : {};
+  if (typeof name !== "string" || name === "") {
+    throw new ConfigError(`tool.inwards.layers[${i}].name must be a non-empty string.`);
+  }
+  if (seen.has(name)) {
+    throw new ConfigError(`Layer "${name}" is declared twice.`);
+  }
+  seen.add(name);
+  if (!isModuleList(modules)) {
+    throw new ConfigError(`tool.inwards.layers[${i}].modules must be a list of module names.`);
+  }
+  return { name, modules };
+}
+
+/**
+ * Throws when a prefix belongs to two layers: which one owns it would be a guess.
+ *
+ * @param layers - the parsed layers.
+ * @throws {ConfigError} naming the prefix and both layers.
+ */
+function rejectOverlaps(layers: readonly LayerSpec[]): void {
+  const owners = new Map<string, string>();
+  for (const { name, modules } of layers) {
+    for (const prefix of modules) {
+      const owner = owners.get(prefix);
+      if (owner !== undefined && owner !== name) {
+        throw new ConfigError(`"${prefix}" is in two layers, "${owner}" and "${name}".`);
+      }
+      owners.set(prefix, name);
+    }
+  }
+}
+
+/**
+ * Throws on the first key a table isn't allowed to have.
+ *
+ * @param table - a parsed TOML table.
+ * @param known - the keys it may have.
+ * @param where - the table's dotted path, for the message.
+ * @throws {ConfigError} naming the unknown key and the known ones.
+ */
+function rejectUnknownKeys(
+  table: Record<string, unknown>,
+  known: ReadonlySet<string>,
+  where: string,
+): void {
+  const unknown = Object.keys(table).find((key) => !known.has(key));
+  if (unknown !== undefined) {
+    throw new ConfigError(`Unknown key ${where}.${unknown}. Known keys: ${[...known].join(", ")}.`);
+  }
 }
 
 /**

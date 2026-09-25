@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mentionsDynamicImport } from "../src/dynamic.ts";
 import { skeletonImports } from "../src/prescan.ts";
-import { engine, file, found, parser } from "./helpers.ts";
+import { check, file, found, parser } from "./helpers.ts";
 
 describe("INW011 dynamic-import: call forms", () => {
   test.each([
@@ -169,7 +169,7 @@ describe("INW011: report", () => {
     '    return importlib.import_module("shop.infrastructure.db")',
     "",
   ].join("\n");
-  const diagnostics = engine.checkFile(file("shop/domain/order.py", src));
+  const diagnostics = check(file("shop/domain/order.py", src));
 
   test("static and dynamic findings come back in source order", () => {
     expect(diagnostics.map((d) => [d.code, d.line, d.column])).toEqual([

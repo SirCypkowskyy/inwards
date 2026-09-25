@@ -13,3 +13,4 @@ export { extractImports, type GrammarBinaries, moduleNameFor } from "./python.ts
 export { type Format, type RenderOptions, type Report, render } from "./reporters.ts";
 export { RULES } from "./rules.ts";
 export type { Diagnostic, Fix, ImportRef, Severity, SourceFile, Span } from "./types.ts";
+export { checkPrefixes, type ModuleLookup, probeLookup } from "./unassigned.ts";
