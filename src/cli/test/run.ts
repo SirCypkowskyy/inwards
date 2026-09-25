@@ -58,6 +58,32 @@ const TMP = mkdtempSync(join(tmpdir(), "inwards-e2e-"));
 process.on("exit", () => rmSync(TMP, { recursive: true, force: true }));
 
 /**
+ * Runs the CLI without blocking, so several copies can run at once.
+ *
+ * @param args - CLI arguments.
+ * @param opts - working directory and stdin text.
+ * @returns the exit code and captured output, once the process ends.
+ */
+export async function inwardsAsync(
+  args: string[],
+  opts: { cwd: string; stdin: string },
+): Promise<RunResult> {
+  const p = Bun.spawn([...CMD, ...args], {
+    cwd: opts.cwd,
+    stdin: new TextEncoder().encode(opts.stdin),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: ENV,
+  });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(p.stdout).text(),
+    new Response(p.stderr).text(),
+    p.exited,
+  ]);
+  return { code, stdout, stderr };
+}
+
+/**
  * Creates a throwaway project in a temp directory removed when the process exits.
  * Example: `{ "pyproject.toml": LAYERS, "shop/domain/order.py": "..." }`.
  *

@@ -273,6 +273,7 @@ src/
 │   │   ├── project.ts     # module index, importers on demand
 │   │   └── meta.ts        # VERSION, DOCS_BASE
 │   └── test/              # bun test
-├── cli/src/               # main (commands), hook, project (load sources), paths, files, grammars
+├── cli/src/               # main (commands), hook, session + state-files (session state),
+│                          # project (load sources), paths, files, grammars
 └── vscode-extension/src/  # extension.ts (client), server.ts (LSP)
 ```

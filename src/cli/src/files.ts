@@ -23,27 +23,46 @@ const SKIP = new Set(["node_modules", "__pycache__"]);
  * @returns unique paths, sorted.
  */
 export function collectPythonFiles(paths: string[]): string[] {
+  return collectFiles(paths, isPythonFile);
+}
+
+/**
+ * Lists the files under each path whose name matches, with the same walking
+ * rules as `collectPythonFiles` (skips, symlinks, cycles).
+ *
+ * @param paths - files or directories; a file is kept as is.
+ * @param match - tells whether a file name is wanted.
+ * @returns unique paths, sorted.
+ */
+export function collectFiles(paths: string[], match: (name: string) => boolean): string[] {
   const out = new Set<string>();
   for (const p of paths) {
     const top = statSync(p).isDirectory() ? realOrUndefined(p) : undefined;
     if (top === undefined) {
       out.add(p);
     } else {
-      walk(p, out, { top, chain: new Set<string>() });
+      walk(p, out, { top, chain: new Set<string>(), match });
     }
   }
   return [...out].sort();
 }
 
+/** What a walk carries down the tree. */
+interface WalkScope {
+  top: string;
+  chain: Set<string>;
+  match: (name: string) => boolean;
+}
+
 /**
- * Adds every Python file below a directory to `out`, recursively.
+ * Adds every matching file below a directory to `out`, recursively.
  *
  * @param dir - the directory to walk, as reached (possibly through a symlink).
  * @param out - the collected paths, written in place.
- * @param scope - the real start directory, and the real paths of the
- *   directories above this one (a cycle guard, updated in place).
+ * @param scope - the real start directory, the real paths of the directories
+ *   above this one (a cycle guard, updated in place), and the file-name filter.
  */
-function walk(dir: string, out: Set<string>, scope: { top: string; chain: Set<string> }): void {
+function walk(dir: string, out: Set<string>, scope: WalkScope): void {
   const real = realOrUndefined(dir);
   if (real === undefined || scope.chain.has(real) || !isWithin(scope.top, real)) {
     return;
@@ -61,7 +80,7 @@ function walk(dir: string, out: Set<string>, scope: { top: string; chain: Set<st
     }
     const full = join(dir, entry.name);
     const kind = entryKind(entry, full);
-    if (kind === "file" && isPythonFile(entry.name) && isWithin(scope.top, realOrUndefined(full))) {
+    if (kind === "file" && scope.match(entry.name) && isWithin(scope.top, realOrUndefined(full))) {
       out.add(full);
     } else if (kind === "dir" && !existsSync(join(full, "pyvenv.cfg"))) {
       walk(full, out, scope);

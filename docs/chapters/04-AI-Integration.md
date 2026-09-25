@@ -44,6 +44,9 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     ```json title=".claude/settings.json"
     {
       "hooks": {
+        "SessionStart": [
+          { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
+        ],
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
@@ -75,6 +78,8 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     - **File outside the project** (`CLAUDE_PROJECT_DIR`, or the directory Claude Code runs the hook in; never the payload's own `cwd`): skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.
     - **Monorepos:** the nearest `pyproject.toml` with `[tool.inwards]` above the edited file applies, as long as it lies inside the project. A config above `CLAUDE_PROJECT_DIR` is ignored, so open the session at the directory that holds the config.
     - **Symlinks:** a file reached through a symlinked alias is checked under every name Python could import it by, so an alias can't move it out of its layer.
+
+    The hook also keeps per-session state in `.inwards/state/`, always on and never sent anywhere. At `SessionStart` (startup or `/clear`) it writes `<session_id>.start.json`: the HEAD commit, every `[tool.inwards]` table in the project and a hash of every Python file. It writes to a temporary file and renames it, so the file is never half-written. After each edit it appends one line to `<session_id>.jsonl`: the file and a fingerprint of each reported violation (rule, module, message). Hooks run in parallel, so the log is only ever appended to. The Stop gate and escalation below read this state to tell violations the session introduced from ones that were already there. A session without its start file counts as unknown, and the Stop gate treats unknown as not clean. A resume or compact never writes a new start, so deleting `.inwards/` mid-session can't be undone by the next `SessionStart`. The hook refuses to follow a symlinked `.inwards` or `state`, so state can't be written outside the project. Other sessions older than a week, or beyond the newest 50, are pruned when a session starts.
 
     <figure markdown="span">
       ![Claude Code hook returning exit code 2 with INW001](assets/screens/claude-code-hook.svg){ loading=lazy }

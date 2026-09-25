@@ -4,15 +4,17 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
-import { ConfigError, render } from "@inwards/core";
+import { ConfigError, type Diagnostic, render } from "@inwards/core";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
+import { isSessionId, recordEdit, recordStart } from "./session.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 
 /**
- * Runs the Claude Code PostToolUse hook on the file the agent just wrote.
+ * Runs the Claude Code hook for one event: SessionStart records the session,
+ * PostToolUse checks the file the agent just wrote.
  * Exit 2 puts stderr in front of the model, so violations and config errors go
  * there. Exit 1 reaches only the user: a bad payload or a bug in Inwards is not
  * the model's to fix. Anything else passes silently with exit 0.
@@ -32,12 +34,52 @@ export async function hookClaudeCode(usage: string): Promise<number> {
   if (input === null) {
     return print("inwards hook: stdin is not a Claude Code hook payload.", 1);
   }
-  const toolInput = input["tool_input"];
-  const file = isRecord(toolInput) ? toolInput["file_path"] : undefined;
-  if (input["hook_event_name"] !== "PostToolUse" || typeof file !== "string") {
+  const event = input["hook_event_name"];
+  if (event === "SessionStart") {
+    return sessionStart(input);
+  }
+  return event === "PostToolUse" ? await postToolUse(input) : 0;
+}
+
+/**
+ * Records where a session starts (at startup or /clear): HEAD, every
+ * `[tool.inwards]` table and a content-hash manifest of the Python files, for
+ * the Stop gate and the config guard. A resume or compact only logs itself.
+ * Silent on success, since SessionStart output is shown to the model.
+ *
+ * @param input - the hook payload.
+ * @returns 0, or 1 (shown to the user only) when the state can't be written.
+ */
+function sessionStart(input: Record<string, unknown>): number {
+  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
+  const id = input["session_id"];
+  if (!(project && isSessionId(id))) {
     return 0;
   }
-  if (!PYTHON_FILE.exec(file)) {
+  // No source means the payload is not the host's usual one: treat it as a
+  // resume, which can never create a start.
+  const source = typeof input["source"] === "string" ? input["source"] : "resume";
+  try {
+    recordStart(project, id, source);
+    return 0;
+  } catch (err) {
+    return print(
+      `inwards hook: session state: ${err instanceof Error ? err.message : String(err)}`,
+      1,
+    );
+  }
+}
+
+/**
+ * Checks the one file the agent just wrote and records the edit in the session.
+ *
+ * @param input - the hook payload.
+ * @returns 2 with diagnostics or a config error on stderr, 1 for an internal error, else 0.
+ */
+async function postToolUse(input: Record<string, unknown>): Promise<number> {
+  const toolInput = input["tool_input"];
+  const file = isRecord(toolInput) ? toolInput["file_path"] : undefined;
+  if (typeof file !== "string" || !PYTHON_FILE.exec(file)) {
     return 0;
   }
   const target = hookTarget(input["cwd"], file);
@@ -54,6 +96,7 @@ export async function hookClaudeCode(usage: string): Promise<number> {
   }
   try {
     const report = await runCheck(configPath, [target.file], target.cwd);
+    rememberEdit(target.project, input["session_id"], target.file, report.diagnostics);
     if (report.diagnostics.length === 0) {
       return 0;
     }
@@ -64,6 +107,33 @@ export async function hookClaudeCode(usage: string): Promise<number> {
       return print(`inwards: config error: ${err.message}`, 2);
     }
     return print(`inwards hook: ${err instanceof Error ? err.message : String(err)}`, 1);
+  }
+}
+
+/**
+ * Appends an edit to the session log, if the payload names a session.
+ * Best effort: a read-only disk must not turn a clean edit into an error. A
+ * session whose log is incomplete is caught later, since the Stop gate fails
+ * closed without a start record.
+ *
+ * @param project - the real project root.
+ * @param id - the payload's `session_id`.
+ * @param file - the edited file.
+ * @param diagnostics - what the check reported for it.
+ */
+function rememberEdit(
+  project: string,
+  id: unknown,
+  file: string,
+  diagnostics: readonly Diagnostic[],
+): void {
+  if (!isSessionId(id)) {
+    return;
+  }
+  try {
+    recordEdit(project, id, file, diagnostics);
+  } catch {
+    // best effort, see above
   }
 }
 
