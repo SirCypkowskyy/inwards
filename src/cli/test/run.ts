@@ -4,14 +4,14 @@ import { dirname, join, resolve } from "node:path";
 
 // CI sets INWARDS_BIN to the compiled binary; locally the tests run the source.
 const REPO = resolve(import.meta.dir, "../../..");
-const CMD = process.env.INWARDS_BIN
-  ? [resolve(REPO, process.env.INWARDS_BIN)]
+const CMD = process.env["INWARDS_BIN"]
+  ? [resolve(REPO, process.env["INWARDS_BIN"])]
   : [process.execPath, join(REPO, "src/cli/src/main.ts")];
 
 // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
 // CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code.
 const ENV: Record<string, string | undefined> = { ...process.env, NO_COLOR: "", FORCE_COLOR: "1" };
-delete ENV.CLAUDE_PROJECT_DIR;
+delete ENV["CLAUDE_PROJECT_DIR"];
 
 export function inwards(
   args: string[],

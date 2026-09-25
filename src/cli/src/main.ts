@@ -54,7 +54,7 @@ async function main(argv: string[]): Promise<number> {
 
   // Agents and hooks read a pipe, and indentation there is wasted tokens.
   const pretty = process.stdout.isTTY === true;
-  const color = process.env.FORCE_COLOR ? true : pretty && !process.env.NO_COLOR;
+  const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
   process.stdout.write(`${render(report, format, { pretty, color })}\n`);
   return report.diagnostics.length > 0 ? 1 : 0;
 }
@@ -113,7 +113,7 @@ async function hookClaudeCode(): Promise<number> {
   // can't reach a file outside the project, and check regular files only.
   const cwd = realpath(typeof input.cwd === "string" ? input.cwd : process.cwd());
   if (!cwd) return 0;
-  const project = realpath(process.env.CLAUDE_PROJECT_DIR || cwd);
+  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || cwd);
   const abs = realpath(resolve(cwd, file));
   if (!abs || !project || !isInside(project, abs) || !statSync(abs).isFile()) return 0;
 

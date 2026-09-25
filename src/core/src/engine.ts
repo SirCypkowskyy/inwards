@@ -13,10 +13,13 @@ import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
 export class Engine {
-  private constructor(
-    private readonly parser: Parser,
-    private readonly config: InwardsConfig,
-  ) {}
+  private readonly parser: Parser;
+  private readonly config: InwardsConfig;
+
+  private constructor(parser: Parser, config: InwardsConfig) {
+    this.parser = parser;
+    this.config = config;
+  }
 
   static async create(wasm: GrammarBinaries, config: InwardsConfig): Promise<Engine> {
     return new Engine(await createPythonParser(wasm), config);

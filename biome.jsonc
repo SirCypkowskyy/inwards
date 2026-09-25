@@ -14,7 +14,14 @@
     "lineWidth": 100
   },
   "linter": {
-    "enabled": true
+    "enabled": true,
+    "rules": {
+      "complexity": {
+        // Off: tsconfig's noPropertyAccessFromIndexSignature requires env["X"],
+        // and this rule rewrites it back to env.X.
+        "useLiteralKeys": "off"
+      }
+    }
   },
   "javascript": {
     "formatter": {
