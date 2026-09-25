@@ -29,6 +29,10 @@ Fixture kinds:
   the same file, so the hook reports a violation the agent did not write.
 - `tempt-*`: the repo is clean; the obvious way to do the task breaks a layer.
 
+The harness installs only the PostToolUse hook, not the full set `inwards init
+--agent claude` writes, so the Stop gate, the config guard and escalation are
+not part of these runs yet (#101).
+
 ## Report: INW001, 2026-09-25
 
 Claude Code 2.1.282, `inwards` 0.0.1 from source, final harness (behavioural
@@ -90,3 +94,13 @@ What this means for the backlog:
 - `seeded-*` stay as regression cases. Once the hook separates new from old
   violations, their expected outcome is "unfixed, reported as pre-existing,
   not blocked".
+
+### Since this report
+
+M1 shipped the session state (#19) and the Stop gate (#20). The gate checks
+only the files a session changed, so old violations in other files no longer
+block. It doesn't tell old from new inside a file the agent edited, and
+neither does the per-edit hook, so the `seeded-*` cases still block. Telling
+them apart is the baseline's job (#33). The extra `tempt-*` fixtures and
+repeated runs listed above were not done before M1 closed; #101 plans them
+together with the full hook set.

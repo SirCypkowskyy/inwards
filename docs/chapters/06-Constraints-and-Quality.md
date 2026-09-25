@@ -26,13 +26,13 @@ Ranked. When two goals conflict, the higher one wins.
 | 3 | :material-robot-outline: **Actionable for agents** | An agent gets INW001 | It fixes the violation within one retry in ≥ 80 % of cases (measured with design partners, see [chapter 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministic** | Same repo, same config, two runs | Identical diagnostics in identical order. Only the timing fields in the summary (`durationMs`) change |
 | 5 | :material-timer-sand: **Full-repo throughput** | CI checks a 500k-line repo cold | About 1 s today on one core. Target < 300 ms with workers and cache |
-| 6 | :material-package-variant: **Easy to adopt** | New team, existing codebase | One install command; the baseline keeps old violations from blocking |
+| 6 | :material-package-variant: **Easy to adopt** | New team, existing codebase | One command wires in the agent (`inwards init`). The Stop gate checks only what a session changed, so old violations in other files don't block; the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) will cover the rest |
 
 Correctness sits above speed on purpose. A guardrail that sometimes stays silent teaches the agent that the wrong move is fine, and that's worse than no guardrail.
 
 ## Measurements
 
-All numbers come from the scaffold in this repository. Nothing here is projected.
+All numbers come from the scaffold in this repository. Nothing here is projected. They were measured during M0; the spot check below shows how they have moved since.
 
 **Setup.** Intel Core Ultra 7 155H laptop, 30 GB RAM, Fedora Linux, Bun 1.4.2, `inwards-linux-x64` built by `scripts/build-binaries.ts`. Everything runs on one thread, since the engine has no worker pool yet. The laptop was in normal desktop use (load average around 2 to 3), so these are realistic numbers rather than best-case ones.
 
@@ -60,6 +60,9 @@ All numbers come from the scaffold in this repository. Nothing here is projected
   <figcaption>One cold run on the synthetic repo, single core. Run-to-run spread is in the table above.</figcaption>
 </figure>
 
+!!! note "Spot check on 0.1.0 (2026-09-26)"
+    Same laptop, a fresh `inwards-linux-x64` build, load average about 2. Single-file check on the example app, 30 runs: p50 44 ms, p95 51 ms wall time, 20 ms engine time. `inwards --version`: about 25 ms, up from about 10 ms. Cold full run on the synthetic repo, 5 runs: 0.71 to 1.22 s, peak RSS about 205 MB, up from about 120 MB. Binary size is unchanged at 82 MB. The start-up breakdown below is from M0 and needs redoing with the start-up spike ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)); the CI benchmark ([#29](https://github.com/SirCypkowskyy/inwards/issues/29)) will track these numbers from now on.
+
 ### Where a single-file check spends its time
 
 Process start and the two WASM figures were measured on their own (`inwards --version`, and a script timing `Parser.init` and `Language.load`). The parse figure was measured the same way. "Config + I/O + rules" is the remainder, not a measurement.
@@ -82,17 +85,17 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 | Step | Expected effect | Targets |
 |---|---|---|
-| Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it) | Removes ~25 ms of WASM and runtime start-up from every hook call | Single-file p95 |
-| `bun build --bytecode` | Faster JS start-up. Bun's docs cite a large CLI going from 1.0 s to 0.53 s cold. Our bundle is small, so the gain will be smaller and needs measuring | Single-file p95 |
-| Worker pool, one parser per core | Near-linear speed-up on the cold full run; this laptop has 22 logical CPUs | Cold full run |
-| Content-hash cache of import lists (`.inwards/cache`) | Unchanged files skip parsing entirely | Warm full run, stop hook |
-| Replace `descendantsOfType` with a tree cursor walk on the full-parse path | Profiling showed 1.2 s spent there on the naive design | Refused files and confirmations |
+| Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Removes ~25 ms of WASM and runtime start-up from every hook call | Single-file p95 |
+| `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)) | Faster JS start-up. Bun's docs cite a large CLI going from 1.0 s to 0.53 s cold. Our bundle is small, so the gain will be smaller and needs measuring | Single-file p95 |
+| Worker pool, one parser per core ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Near-linear speed-up on the cold full run; this laptop has 22 logical CPUs | Cold full run |
+| Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)) | Unchanged files skip parsing entirely | Warm full run, stop hook |
+| Replace `descendantsOfType` with a tree cursor walk on the full-parse path ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)) | Profiling showed 1.2 s spent there on the naive design | Refused files and confirmations |
 
 ### Reproduce
 
 ```sh
 bun install
-bun test                                                    # 197 tests: unit, CLI, hook, E2E snapshots
+bun test                                                    # 320 tests: unit, CLI, hook, Stop gate, E2E snapshots
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms
@@ -114,7 +117,7 @@ The screenshots in these docs come from `scripts/screenshots.py`, which runs eac
 | import-linter adds JSON output and agent hooks | Medium | Medium | Stay ahead on latency, a standalone binary and per-violation fixes. Offer an import from `.importlinter` contracts |
 | Real repos break the 100 ms p95 | Low to medium | High | Resident process first, then a Rust/Zig WASM prescan (the fallback in ADR-001) |
 | The prescan misses an import on some unusual file | Low | High | Differential test in CI; grow the corpus with real repos from design partners |
-| Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse guard, CODEOWNERS, deny rules in agent settings ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)) |
+| Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard and the session record ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
 | Zensical (0.0.x) changes its config format | Medium | Low | Docs build runs in CI on every PR; the config is small |
 | Fix steps are wrong for unusual layouts (no obvious place for a port) | Medium | Medium | Measure fix-within-one-retry per rule; let the config name the ports module |

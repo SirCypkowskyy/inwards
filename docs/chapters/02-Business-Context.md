@@ -77,7 +77,7 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 | import-linter | :white_check_mark: | :white_check_mark: | yes | static text per contract | :x: | :x: | :x: |
 | pytest-archon | :white_check_mark: | :white_check_mark: | yes (code must import) | :x: | :x: | :x: | :x: |
 | Tach | :white_check_mark: | :white_check_mark: | yes (pip package, Rust extension) | :x: | :x: | :x: | ? |
-| **Inwards** (target) | :white_check_mark: | :white_check_mark: | no (single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| **Inwards** (target) | :white_check_mark: | :white_check_mark: | no (binary in a wheel, or a single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 
 `?` means we couldn't verify it. "Repair guidance" is about telling the reader what to change. Autofix, where the tool rewrites the code itself, is a stronger form of it.
 
@@ -135,7 +135,7 @@ Each part below has a number attached and a condition that would make us drop it
 | Speed is the moat against import-linter | Median hook run < 100 ms on design-partner repos | grimp's Rust core closes the gap and import-linter ships JSON and hooks |
 | There's room next to Astral | Inwards is adopted alongside Ruff and ty, not instead of them | ty or Ruff ships layer contracts. It already has the resolver and the graph, and the OpenAI deal gives it a Codex channel |
 
-**First data.** The M0 agent eval (`eval/README.md`) ran 5 fixtures once each on Sonnet and Haiku. Both violations an agent introduced were fixed after exactly one hook block, and in both the agent's first attempt hid the import inside a function, which Inwards reads anyway. That is far too small a sample to settle the ≥ 80 % bet. It also showed that agents leave violations that were already in a file alone (0 of 6 fixed, 5 of 6 reported as pre-existing), which is why the session state and stop gate in M1 separate new violations from old ones.
+**First data.** The M0 agent eval (`eval/README.md`) ran 5 fixtures once each on Sonnet and Haiku. Both violations an agent introduced were fixed after exactly one hook block, and in both the agent's first attempt hid the import inside a function, which Inwards reads anyway. That is far too small a sample to settle the ≥ 80 % bet. It also showed that agents leave violations that were already in a file alone (0 of 6 fixed, 5 of 6 reported as pre-existing). That is why the Stop gate added in M1 checks only the files a session changed, so old violations elsewhere don't block the agent. Inside a file the agent edits, old and new violations are still reported alike; the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) is meant to separate them.
 
 **How we'll measure.** With the [run log](08-Run-Log.md) on, every hook run and `inwards check --log` appends one JSON line to `.inwards/runs.jsonl`: the files checked, the lines each edit added and removed, a fingerprint per violation, the exit code and the duration. The log stays local and is off by default. Design partners share it by choice. "Fixed within one retry" means a fingerprint reported for a file is gone on the next hook run for that file. "Agent-written lines" come from the hook's own edit events, so we never guess authorship from git. Hook adoption (the share of active installs with an agent hook) can't be measured from inside one project, so it is partner-reported, not measured.
 
@@ -148,8 +148,8 @@ Each part below has a number attached and a condition that would make us drop it
 Our own measurements (details in [chapter 6](06-Constraints-and-Quality.md#measurements)) already support part of this:
 
 - Parsing whole files with WASM tree-sitter costs about 1.3 MB/s on one core. On a synthetic 496k-line repo a naive full run took **7.5 s**. That kills the naive design.
-- Parsing only the import skeleton brought the same run down to **0.63 to 0.96 s**, still on one core.
-- A single-file check, which is what an agent hook runs, takes **about 25 ms** including process start.
+- Parsing only the import skeleton brought the same run down to **0.63 to 1.17 s**, still on one core.
+- A single-file check, which is what an agent hook runs, takes **under 50 ms** at the median and 80 ms at p95, process start included. About 20 ms of that is the engine.
 
 The hypothesis fails if real-world repos (not synthetic ones) push the single-file p95 over 100 ms, or if the cross-file rules we need later (cycles, bounded-context independence) can't reuse a cached graph and force full-repo parses on every edit.
 
@@ -194,12 +194,12 @@ flowchart LR
 | ID | Use case | Trigger | Outcome | Status |
 |---|---|---|---|---|
 | UC1 | Declare layers | Architect edits `[tool.inwards]` | Config validates, and errors name the offending key | :white_check_mark: |
-| UC2 | Check after each edit | Agent writes a `.py` file; a PostToolUse hook runs `inwards check <file> --format json` | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: engine, :material-progress-clock: installer |
+| UC2 | Check after each edit | Agent writes a `.py` file; the PostToolUse hook `inwards init --agent claude` installed checks that file | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: |
 | UC3 | Gate before "done" | Agent tries to finish; the Stop gate checks every file the session changed, however it changed | The agent can't declare victory with a violation it introduced, and a legacy repo's old violations don't block it | :white_check_mark: |
-| UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: scaffold |
-| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template |
+| UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace |
+| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template ([#38](https://github.com/SirCypkowskyy/inwards/issues/38)) |
 | UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :white_check_mark: |
-| UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: |
+| UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: [#58](https://github.com/SirCypkowskyy/inwards/issues/58). Today `init --agent agents-md` only tells the agent to run the check |
 
 ## Sources
 

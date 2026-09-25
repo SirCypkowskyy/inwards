@@ -60,15 +60,18 @@ Port
 :   An interface the inner code owns and the outer code implements. In Python, usually a `typing.Protocol`.
 
 Vertical slice
-:   Organising code by feature (`orders/`, `invoices/`) rather than by technical layer, with each slice holding its own handlers and data access. Slices shouldn't reach into each other. Pattern-based layer matching for slices is planned with INW002.
+:   Organising code by feature (`orders/`, `invoices/`) rather than by technical layer, with each slice holding its own handlers and data access. Slices shouldn't reach into each other. Glob patterns for slices in the layer config come with the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), and INW002 (planned) keeps slices apart.
 
 ## Inwards terms
 
 Agent hook
-:   A command that an AI coding tool runs automatically around its own actions, for example Claude Code's `PostToolUse` and `Stop` hooks. Inwards' main integration point. See [chapter 4](04-AI-Integration.md).
+:   A command that an AI coding tool runs automatically around its own actions, for example Claude Code's `PostToolUse` and `Stop` hooks. Inwards' main integration point. `inwards init --agent claude` installs four of them. See [chapter 4](04-AI-Integration.md).
 
 Baseline
 :   The violations a project already had when it adopted Inwards, recorded by `inwards baseline` in `inwards-baseline.json` next to `pyproject.toml`. They don't fail the check; new ones do (UC6). Entries match by rule, module and message, not by line.
+
+Config guard
+:   The `PreToolUse` hook that denies an agent's edits to `[tool.inwards]`, to `.inwards/` and to the Claude Code settings that hold the Inwards hooks, before they happen. See [chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
 
 Confirming parse
 :   The full tree-sitter parse the engine runs when the import skeleton reports a violation, so that only real imports are ever reported. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse).
@@ -82,8 +85,14 @@ Differential test
 Engine
 :   `@inwards/core`. Pure TypeScript that turns source text, config and grammars into diagnostics. It does no I/O ([ADR-006](05-ADR.md#adr-006-the-engine-does-no-io)).
 
+Escalation
+:   What the hooks do once the same violation survives `escalate-after` attempts (default 3): stop blocking, tell the agent to ask the user, and hand what is unresolved to the user and to the next session. See [chapter 4](04-AI-Integration.md#when-the-agent-cant-fix-it).
+
 Evasion
 :   An agent changing code so that a check goes quiet without fixing the design, for example moving an import into a function. Chapter 4 lists the evasions Inwards handles.
+
+Fingerprint
+:   A 16-hex-digit hash of a violation's rule code, module and message. The session state and the run log use it to recognise the same violation across edits, independent of its line number.
 
 Fix steps
 :   The ordered, concrete repair instructions attached to every diagnostic, built from the actual module and layer names.
@@ -97,17 +106,26 @@ Hallucinated module
 Import skeleton
 :   A copy of a file where every non-import line is blank and import lines are dedented. Line numbers are preserved, and it parses far faster than the whole file.
 
+Module index
+:   Every first-party module of a project, with the importers of any one module worked out on demand (`Engine.index`). Built, but no rule uses it yet; INW010 will.
+
 Prescan refusal
-:   The prescan declining a file because `import` appears somewhere it can't account for. The file then gets a full parse. 8.2 % of CPython's stdlib files are refused.
+:   The prescan declining a file because `import` appears somewhere it can't account for. The file then gets a full parse. 8.3 % of CPython's stdlib files are refused.
 
 Rule code
 :   `INW` plus three digits. Codes are never reused, and a retired rule keeps its number.
 
-Run log :material-progress-clock:
-:   `.inwards/runs.jsonl`, one line per hook run: time, files, violations, duration, and whether a violation repeated. Local and off by default. It feeds the escalation logic and the design-partner metrics.
+Release PR
+:   The pull request release-please keeps open with the next version and its changelog. Merging it cuts the release ([ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)).
+
+Run log
+:   `.inwards/runs.jsonl`, one line per hook run or `inwards check --log`: time, event, files, lines added and removed, violation fingerprints, exit code and duration. Local and off by default. It feeds the design-partner metrics. See [chapter 8](08-Run-Log.md).
+
+Session state
+:   What the Claude Code hooks record per session in `.inwards/state/`: the start snapshot (HEAD, every `[tool.inwards]` table, a hash of every Python file) and one line per edit. Always on and local. The Stop gate and escalation read it.
 
 Stop gate
-:   A full `inwards check` run from the agent's `Stop` hook. It keeps the agent from reporting success while the architecture is broken.
+:   The check run from the agent's `Stop` hook. It checks every Python file the session changed, plus whether the config and the hooks are still intact, and keeps the agent from ending the turn while they aren't.
 
 ## Tooling terms
 
@@ -118,7 +136,7 @@ LSP
 :   Language Server Protocol. It's how the VS Code extension gets diagnostics from the Inwards language server.
 
 MCP
-:   Model Context Protocol. It lets an AI agent call external tools. `inwards mcp` is planned.
+:   Model Context Protocol. It lets an AI agent call external tools. `inwards mcp` is planned ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)).
 
 SARIF
 :   Static Analysis Results Interchange Format 2.1.0, a JSON format for analysis results. GitHub code scanning ingests it.

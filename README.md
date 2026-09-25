@@ -12,7 +12,10 @@ $ inwards check --format json
 Status: pre-alpha. Four rules (INW001 layer direction, INW011 literal dynamic imports,
 INW006 code outside every layer, INW000 encodings that could hide imports) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
-a config guard and escalation to the user.
+a config guard and escalation to the user (`--agent aider` and `--agent agents-md` cover Aider
+and `AGENTS.md`). The only release so far is the pre-release v0.1.0-rc.1, with binaries for six
+platforms and platform wheels for `uv add`; see the
+[install guide](https://sircypkowskyy.github.io/inwards/guides/install/).
 
 ## Layout
 
@@ -23,7 +26,10 @@ a config guard and escalation to the user.
 | `src/vscode-extension/` | LSP server + client. Uses the same engine as the CLI. |
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
 | `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
-| `scripts/` | Release tooling. |
+| `eval/` | Agent eval harness: does an agent fix what the hook reports? |
+| `bench/` | Generator for the synthetic benchmark repo. |
+| `packaging/` | README for the platform wheels, and the PyPI/npm name placeholders. |
+| `scripts/` | Build binaries and wheels, version and docs-nav checks, screenshots. |
 
 ## Develop
 
