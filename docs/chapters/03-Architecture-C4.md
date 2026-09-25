@@ -119,7 +119,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>encoding.ts: INW000</small>"]
+        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>dynamic.ts: INW011<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>reporters.ts<br/>text · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
@@ -150,10 +150,10 @@ flowchart LR
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
-| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, plus INW000 for files whose encoding could hide imports. Planned rules are listed below |
+| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, INW011 for dynamic imports with literal targets, and INW000 for files whose encoding could hide imports. Planned rules are listed below |
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
-| Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call |
+| Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. A layered file whose text names a module loader skips the prescan (see below) |
 | Module index | `Engine.index(files)` returns every first-party module and answers "who imports module X" on demand, parsing only files whose text mentions X's last name segment | Used by the Stop gate (#20) and INW006 (#21). Cycles are not detected yet |
 
 ### How one check flows
@@ -168,6 +168,12 @@ sequenceDiagram
     participant R as Rules
 
     A->>E: checkFile({path, module, text})
+    opt file in a layer names a loader (importlib, runpy, builtins, __import__, exec, eval, compile)
+        E->>T: parse(full text)
+        E->>R: checkLayers + checkDynamicImports (INW011)
+        R-->>E: diagnostics
+        E-->>A: diagnostics
+    end
     E->>P: importSkeleton(text)
     alt skeleton accepted
         P-->>E: skeleton (imports only)
@@ -194,6 +200,8 @@ sequenceDiagram
 ```
 
 The prescan may report false positives, such as an import-shaped line inside a docstring, but it can never hide a real import, because it refuses any file it can't fully account for. The full parse is the source of truth, and it only runs when a violation needs confirming.
+
+The skeleton keeps import statements only, so a file whose only outward dependency is `importlib.import_module("shop.infrastructure.db")` would pass it. Before the prescan runs, a text check looks for the names every loading call has to spell (`importlib`, `runpy`, `builtins`, `__import__`, or a bare `exec`, `eval` or `compile`, after NFKC). A file in a layer that matches goes straight to the full parse, which also looks for dynamic imports. `re.compile` does not match. On the CPython 3.14 standard library, 209 of 1,921 files match. See [ADR-015](05-ADR.md#adr-015-check-literal-dynamic-imports-as-inw011).
 
 The cost model has one bad case. On a legacy codebase where most files already violate, nearly every file pays for the skeleton parse and then the full parse, which is a little slower than parsing everything once. The planned baseline (UC6) fixes this: once a violation is recorded in the baseline, the engine doesn't need to confirm it on every run.
 
@@ -240,7 +248,11 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 - The language server reads only the first workspace folder's `pyproject.toml`.
 - Implicit namespace packages (no `__init__.py`) work for naming, but relative imports inside them resolve as if the directory were a regular package.
 - Layer membership is by module prefix only. Glob patterns (`shop.*.domain`) for vertical slices are planned together with INW002.
-- Dynamic imports (`importlib.import_module("shop.infrastructure")`) are invisible today. INW011 will flag them in inner layers.
+- Dynamic imports are checked only when the target is a constant string (INW011). Known gaps:
+    - computed targets (`importlib.import_module(name)`, a module-level `TARGET = "..."` constant, `str.format`), a relative `import_module` without a literal `package`, `__package__` or `__name__`, and literals that use a `\N{...}` escape. Flagging those as unverifiable is [#46](https://github.com/SirCypkowskyy/inwards/issues/46);
+    - loaders reached through a walrus, tuple assignment, class or instance attributes, `functools.partial`, a name bound inside `exec`, or an object (`print.__self__.exec`): [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
+    - other loading APIs: `pkgutil.resolve_name`, `importlib.util.find_spec` with `exec_module`, and `SourceFileLoader(...).load_module()`: [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
+    - a false positive, accepted over a miss: `exec`, `eval`, `compile` and `__import__` always count as the builtins, so after `from re import compile`, `compile("from shop.infrastructure import x")` is reported.
 - Modules that belong to no layer are unchecked, and so are imports into them. A new `shop/persistence/` package escapes every rule, and a mistyped prefix silently matches nothing. INW006 and stricter config validation close this in 0.1.
 
 ## Rule catalogue
@@ -255,7 +267,7 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 | INW006 | `unassigned-module` | A first-party package that belongs to no layer, or an import into one; also dead or overlapping layer prefixes | :material-progress-clock: 0.1 |
 | INW005 | `pure-domain` | The domain layer importing frameworks or I/O libraries (`sqlalchemy`, `fastapi`, `requests`...) | :material-progress-clock: |
 | INW010 | `unknown-first-party` | Importing a first-party module that doesn't exist, the typical agent hallucination | :material-progress-clock: needs the module index |
-| INW011 | `dynamic-import` | `importlib.import_module` / `__import__` in inner layers, a common way to dodge INW001 | :material-progress-clock: |
+| INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. A common way to dodge INW001. Known gaps are listed above | :white_check_mark: literal targets |
 
 ## Code map
 
@@ -268,6 +280,9 @@ src/
 │   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
 │   │   ├── rules.ts       # rule registry: code, name, severity, docs
 │   │   ├── layers.ts      # INW001 + fix composer
+│   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
+│   │   ├── callees.ts     # which calls are loaders, through aliases
+│   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / json / sarif
 │   │   ├── engine.ts      # facade

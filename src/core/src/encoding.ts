@@ -39,14 +39,27 @@ function declaredEncoding(text: string): string | null {
 }
 
 /**
+ * Names the declared encoding of some Python source when Inwards can't read it.
+ * Used for files, and for bytes passed to `exec` or `compile`, which CPython
+ * decodes by the same PEP 263 rules (a `str` source ignores the declaration).
+ *
+ * @param text - normalised source text.
+ * @returns the declared codec when it can hide imports, or null when it is safe or undeclared.
+ */
+export function unreadableEncoding(text: string): string | null {
+  const encoding = declaredEncoding(text);
+  return encoding === null || SAFE.test(encoding) ? null : encoding;
+}
+
+/**
  * Reports a file whose declared encoding Inwards can't read faithfully.
  *
  * @param file - the source file, with normalised text.
  * @returns an INW000 diagnostic on line 1, or null when the encoding is safe or undeclared.
  */
 export function checkEncoding(file: SourceFile): Diagnostic | null {
-  const encoding = declaredEncoding(file.text);
-  if (encoding === null || SAFE.test(encoding)) {
+  const encoding = unreadableEncoding(file.text);
+  if (encoding === null) {
     return null;
   }
   const lineOne = { line: 1, column: 1, endLine: 1, endColumn: 1 };

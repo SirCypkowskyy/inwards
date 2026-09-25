@@ -5,6 +5,10 @@
  * skeleton. The skeleton may find extra imports (the engine confirms those
  * against a full parse) but must never miss one. Exits 1 if it does.
  *
+ * The skeleton can't see dynamic imports (INW011), so the engine skips it for
+ * any file whose text names a loader (`hinted` in the summary). The same run
+ * checks that hint: a dynamic import in a file without it is a miss.
+ *
  * Two corpora: a generated one of adversarial import spellings (always), and
  * every .py file under DIR when given (CI passes the Python stdlib).
  *
@@ -14,6 +18,7 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 import { Glob } from "bun";
 import type { Parser } from "web-tree-sitter";
+import { extractDynamicImports, mentionsDynamicImport } from "../src/dynamic.ts";
 import { skeletonImports } from "../src/prescan.ts";
 import {
   createPythonParser,
@@ -54,36 +59,50 @@ function key(r: ImportRef): string {
   return `${r.line}:${r.target}`;
 }
 
-type Outcome = { refused: true } | { refused: false; missed: string[]; extra: number };
+type Outcome =
+  | { refused: true; missed: string[]; hinted: boolean }
+  | { refused: false; missed: string[]; extra: number; hinted: boolean };
 
 /**
  * Extracts one file's imports with the prescan and with a full parse, and compares.
  * An import only the full parse finds is a miss (a prescan bug); one only the
- * prescan finds is an extra (harmless, the engine confirms violations).
+ * prescan finds is an extra (harmless, the engine confirms violations). A
+ * dynamic import in a file that `mentionsDynamicImport` rejects is a miss too,
+ * whether or not the prescan refused the file.
  *
  * @param rel - the file's path, used for its module name and in messages.
  * @param raw - the file's text before normalisation.
- * @returns refused when the prescan declined the file, else its misses and extra count.
+ * @returns whether the prescan declined the file, its misses and extras, and the loader hint.
  * @throws {Error} when tree-sitter returns no tree.
  */
 function compare(rel: string, raw: string): Outcome {
   const file = { path: rel, text: normalizeSource(raw), ...moduleNameFor(rel) };
+  const hinted = mentionsDynamicImport(file.text);
   const fastRefs = skeletonImports(parser, file);
-  if (!fastRefs) {
-    return { refused: true };
+  if (!fastRefs && hinted) {
+    return { refused: true, missed: [], hinted }; // the engine parses this file in full anyway
   }
   const parsed = parser.parse(file.text);
   if (!parsed) {
     throw new Error(`no tree for ${rel}`);
   }
-  const full = new Set(extractImports(parsed, file).map(key));
+  const imports = extractImports(parsed, file);
+  // A hinted file gets the full parse in the engine, so only unhinted ones can miss.
+  const unseen = hinted ? [] : extractDynamicImports(parser, parsed, file);
   parsed.delete();
+  const missed = unseen.map((r) => `${rel} dynamic ${key(r)}\n${JSON.stringify(raw)}`);
+  if (!fastRefs) {
+    return { refused: true, missed, hinted };
+  }
+  const full = new Set(imports.map(key));
   const fast = new Set(fastRefs.map(key));
-  const missed = [...full]
-    .filter((k) => !fast.has(k))
-    .map((k) => `${rel} ${k}\n${JSON.stringify(raw)}`);
+  for (const k of full) {
+    if (!fast.has(k)) {
+      missed.push(`${rel} ${k}\n${JSON.stringify(raw)}`);
+    }
+  }
   const extra = [...fast].filter((k) => !full.has(k)).length;
-  return { refused: false, missed, extra };
+  return { refused: false, missed, extra, hinted };
 }
 
 /**
@@ -98,20 +117,22 @@ function check(corpus: string, entries: Iterable<[string, string]>): boolean {
   let files = 0;
   let refused = 0;
   let extra = 0;
+  let hinted = 0;
   const missed: string[] = [];
   for (const [rel, raw] of entries) {
     files += 1;
     const outcome = compare(rel, raw);
+    missed.push(...outcome.missed);
+    hinted += outcome.hinted ? 1 : 0;
     if (outcome.refused) {
       refused += 1;
-      continue;
+    } else {
+      extra += outcome.extra;
     }
-    missed.push(...outcome.missed);
-    extra += outcome.extra;
   }
   const pct = files ? ((PERCENT * refused) / files).toFixed(1) : "0";
   console.log(
-    `${corpus}: files=${files} refused=${refused} (${pct}%) extra=${extra} missed=${missed.length}`,
+    `${corpus}: files=${files} refused=${refused} (${pct}%) extra=${extra} hinted=${hinted} missed=${missed.length}`,
   );
   if (missed.length > 0) {
     console.error(missed.slice(0, MISSES_SHOWN).join("\n"));
@@ -184,6 +205,19 @@ const FORMS = [
   "x = (\nimport_ := 1)\nimport M",
   "lambda: __import__('M')",
   "print(1) ; from M import x",
+  // Dynamic imports (INW011): the skeleton drops them, the loader hint must not.
+  "importlib.import_module('M')",
+  "from importlib import import_module as im\nim('M')",
+  "import builtins as b\nb.__import__('M')",
+  "from runpy import run_module as rm\nrm('M')",
+  "getattr(__import__('importlib'), 'import_module')('M')",
+  "exec('\\x69mport M')",
+  "eval(\"__import__('M')\")",
+  "compile(b'from M import x', 'f', 'exec')",
+  "ｅｘｅｃ('import M')",
+  "(exec)('import M')",
+  "vars(importlib)['import_module']('M')",
+  "exec('import ' + 'M')",
 ];
 
 // Strings and comments: the forms that can swallow or be swallowed by their neighbours.
