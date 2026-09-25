@@ -31,7 +31,7 @@ jobs:
       - name: Fallow (dead code, unused deps, architecture boundaries, duplication)
         run: bun run fallow
       # A full CPython: Ubuntu 26.04's python3 ships its stdlib tests in a separate
-      # package, which shrinks the corpus from ~1,900 files to ~600.
+      # package, which shrank the corpus from 2,273 files to 626.
       - uses: actions/setup-python@v7
         id: python
         with:
@@ -39,7 +39,7 @@ jobs:
       - name: Prescan never misses an import (generated spellings + the Python stdlib)
         run: |
           stdlib="$("${{ steps.python.outputs.python-path }}" -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
-          bun run src/core/scripts/prescan-diff.ts "$stdlib"
+          bun run src/core/scripts/prescan-diff.ts "$stdlib" 1500
       - name: Dogfood - inwards checks its own example app
         run: bun run check:self
       - name: Build VS Code extension

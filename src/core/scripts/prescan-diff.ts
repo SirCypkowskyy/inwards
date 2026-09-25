@@ -8,7 +8,7 @@
  * Two corpora: a generated one of adversarial import spellings (always), and
  * every .py file under DIR when given (CI passes the Python stdlib).
  *
- *   bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+ *   bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')" [MIN_FILES]
  */
 import { readFileSync } from "node:fs";
 import process from "node:process";
@@ -256,9 +256,18 @@ function* pythonFilesUnder(dir: string): Generator<[string, string]> {
 }
 
 let ok: boolean = check("generated", generated());
-const [, , stdlibDir]: (string | undefined)[] = process.argv;
-if (stdlibDir) {
-  ok = check(stdlibDir, pythonFilesUnder(stdlibDir)) && ok;
+// CI passes a minimum corpus size: a runner image once shipped a stdlib
+// without Lib/test and the corpus shrank from 1,921 files to 626 unnoticed.
+const [, , stdlibDir = "", minFilesArg = "0"]: (string | undefined)[] = process.argv;
+const minFiles: number = Number(minFilesArg);
+if (stdlibDir !== "" || minFiles > 0) {
+  const found: number = stdlibDir === "" ? 0 : [...new Glob("**/*.py").scanSync(stdlibDir)].length;
+  if (found < minFiles) {
+    process.stderr.write(`corpus too small: ${found} .py files in "${stdlibDir}", need ${minFiles}\n`);
+    ok = false;
+  } else {
+    ok = check(stdlibDir, pythonFilesUnder(stdlibDir)) && ok;
+  }
 }
 if (!ok) {
   process.exit(1);

@@ -20,7 +20,7 @@ env:
 jobs:
   build:
     name: Cross-compile binaries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -62,7 +62,7 @@ jobs:
     name: Attest build provenance
     needs: build
     if: github.event.repository.visibility == 'public'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       id-token: write
       attestations: write
@@ -86,7 +86,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, bin: inwards-linux-x64 }
+          - { os: ubuntu-26.04, bin: inwards-linux-x64 }
           - { os: ubuntu-24.04-arm, bin: inwards-linux-arm64 }
           - { os: macos-latest, bin: inwards-darwin-arm64 }
           - { os: macos-15-intel, bin: inwards-darwin-x64 }
@@ -116,7 +116,7 @@ jobs:
     name: Run on Alpine (musl)
     needs: [build, attest]
     if: ${{ !cancelled() && needs.build.result == 'success' && needs.attest.result != 'failure' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       attestations: read
@@ -145,7 +145,7 @@ jobs:
     name: Draft the GitHub Release
     needs: [verify, verify-musl]
     if: ${{ !cancelled() && needs.verify.result == 'success' && needs.verify-musl.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
