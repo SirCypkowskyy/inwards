@@ -121,6 +121,7 @@ bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
 bun run typecheck       # tsgo, strictest flags (tsconfig.base.json)
 bun run fallow          # dead code, unused deps, boundaries, duplication
 bun test                # unit + CLI + E2E snapshots
+uv run scripts/check-docs-nav.py  # every page in docs/chapters is in the nav
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
@@ -137,6 +138,7 @@ finding the bug. `.actrc` maps the runner labels to
 act pull_request -W .github/workflows/ci.yml -j engine                        # lint, typecheck, fallow, prescan
 act pull_request -W .github/workflows/ci.yml -j test --matrix os:ubuntu-26.04  # tests against the compiled Linux binary
 act pull_request -W .github/workflows/ci.yml -j docs                          # strict docs build
+act workflow_dispatch -W .github/workflows/docs-links.yml                    # external links (weekly on GitHub)
 act push -W .github/workflows/cd.yml -n                                       # CD: dry run, validates the workflow only
 ```
 
