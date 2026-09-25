@@ -219,7 +219,7 @@ Exit codes follow Ruff: `0` clean, `1` violations found, `2` usage or config err
 ```mermaid
 flowchart LR
     tag["git tag v*"] --> cd["cd.yml on ubuntu-latest<br/><small>bun build --compile × 6 targets</small>"]
-    cd --> art[("Draft GitHub Release<br/><small>binaries + SHA256SUMS + .vsix<br/>+ provenance attestations</small>")]
+    cd --> art[("Draft GitHub Release<br/><small>binaries + SHA256SUMS + .vsix<br/>+ provenance attestations once the repo is public</small>")]
     art --> verify["verify matrix<br/><small>linux x64/arm64/musl · macOS arm64/x64 · Windows x64<br/>each binary lints examples/</small>"]
     art -.-> wheel["PyPI wheels: inwards<br/><small>one per platform, binary inside</small>"]
     art -.-> market["VS Code Marketplace"]
