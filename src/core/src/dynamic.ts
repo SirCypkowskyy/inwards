@@ -28,7 +28,6 @@ import {
   LOADERS,
   type LoaderKind,
   qualify,
-  type Scope,
   syntaxOf,
 } from "./callees.ts";
 import type { LayerSpec } from "./config.ts";
@@ -50,7 +49,6 @@ import {
   resolveRelative,
 } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
-import { bindingsAt, moduleShadows } from "./shadows.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 /** An import made by a call rather than an import statement. */
@@ -225,10 +223,9 @@ function loadingCalls(
 ): { call: Node; loads: Load[] }[] {
   const syntax = syntaxOf(root);
   const bindings = collectBindings(syntax, outer);
-  const scope: Scope = { bindings, shadows: moduleShadows(root, syntax, bindings) };
   const found: { call: Node; loads: Load[] }[] = [];
   for (const call of syntax) {
-    const loads = call.type === "call" ? loadsOf(parser, call, file, scope) : [];
+    const loads = call.type === "call" ? loadsOf(parser, call, file, bindings) : [];
     if (loads.length > 0) {
       found.push({ call, loads });
     }
@@ -242,19 +239,19 @@ function loadingCalls(
  * @param parser - parser with the Python grammar loaded.
  * @param call - a `call` node.
  * @param file - the file being checked.
- * @param scope - what names mean in the calling module.
+ * @param bindings - what names mean in the calling module.
  * @returns the loaded modules, each with the loader's name; empty for any other call.
  */
-function loadsOf(parser: Parser, call: Node, file: SourceFile, scope: Scope): Load[] {
+function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): Load[] {
   const fn = call.childForFieldName("function");
   const loads: Load[] = [];
-  for (const qualified of new Set(fn ? qualify(fn, scope) : [])) {
+  for (const qualified of new Set(fn ? qualify(fn, bindings) : [])) {
     const kind = LOADERS.get(qualified);
     if (kind) {
       const via = qualified.replace(BUILTINS_PREFIX, "");
       const loaded: Loaded[] =
         kind === "source"
-          ? sourceTargets(parser, call, file, bindingsAt(scope, call.startIndex))
+          ? sourceTargets(parser, call, file, bindings)
           : moduleTargets(kind, call, file).map((target) => ({ target, unreadable: null }));
       loads.push(...loaded.map((load) => ({ ...load, via })));
     }
@@ -375,7 +372,7 @@ function dunderImportTargets(call: Node, file: SourceFile): string[] {
  * @param parser - parser with the Python grammar loaded.
  * @param call - the `call` node.
  * @param file - the calling file.
- * @param bindings - names bound in the calling file at the call.
+ * @param bindings - names bound in the calling file.
  * @returns the modules the source imports, empty when it isn't a literal.
  */
 function sourceTargets(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): Loaded[] {

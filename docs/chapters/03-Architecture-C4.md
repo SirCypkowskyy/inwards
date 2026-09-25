@@ -252,7 +252,7 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
     - computed targets (`importlib.import_module(name)`, a module-level `TARGET = "..."` constant, `str.format`), a relative `import_module` without a literal `package`, `__package__` or `__name__`, and literals that use a `\N{...}` escape. Flagging those as unverifiable is [#46](https://github.com/SirCypkowskyy/inwards/issues/46);
     - loaders reached through a walrus, tuple assignment, class or instance attributes, `functools.partial`, a name bound inside `exec`, or an object (`print.__self__.exec`): [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
     - other loading APIs: `pkgutil.resolve_name`, `importlib.util.find_spec` with `exec_module`, and `SourceFileLoader(...).load_module()`: [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
-    - a builtin rebound inside a function or an `if` still counts as the builtin, which can give a false positive.
+    - a false positive, accepted over a miss: `exec`, `eval`, `compile` and `__import__` always count as the builtins, so after `from re import compile`, `compile("from shop.infrastructure import x")` is reported.
 - Modules that belong to no layer are unchecked, and so are imports into them. A new `shop/persistence/` package escapes every rule, and a mistyped prefix silently matches nothing. INW006 and stricter config validation close this in 0.1.
 
 ## Rule catalogue
@@ -282,7 +282,6 @@ src/
 │   │   ├── layers.ts      # INW001 + fix composer
 │   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
 │   │   ├── callees.ts     # which calls are loaders, through aliases
-│   │   ├── shadows.ts     # builtins a module rebinds
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / json / sarif

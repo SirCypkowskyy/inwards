@@ -8,8 +8,10 @@
  * plain assignments (`load = importlib.import_module`), `getattr(m, "name")`,
  * `m["name"]`, `m.__dict__["name"]`, `vars(m)["name"]` and
  * `__import__("importlib")`. Function and class scopes are ignored: a name
- * bound anywhere in the file counts everywhere, which can only add findings.
- * A builtin rebound at module level is dropped from that point on (`shadows.ts`).
+ * bound anywhere in the file counts everywhere, and `exec`, `eval`, `compile`
+ * and `__import__` always count as the builtins, even where a module rebinds
+ * them. Both can only add findings: `from re import compile` followed by
+ * `compile("from shop.infrastructure import x")` is a known false positive.
  *
  * Other bindings are not followed (walrus, tuple assignment, attributes,
  * `functools.partial`, names bound inside `exec`), so a loader reached that
@@ -48,26 +50,6 @@ const TRACKED: ReadonlySet<string> = new Set([
 /** Local name to every qualified name it may be bound to. */
 export type Bindings = Map<string, Set<string>>;
 
-/** What names mean at a point in the code. */
-export interface Scope {
-  bindings: Bindings;
-  /**
-   * Builtins rebound at module level (`from re import compile`), each with
-   * the source offset from which the builtin meaning no longer applies.
-   */
-  shadows: ReadonlyMap<string, number>;
-}
-
-/**
- * Tells whether a qualified name is a loader, `getattr`, `vars` or a loader module.
- *
- * @param qualified - a dotted name such as `importlib.import_module`.
- * @returns true when INW011 tracks it.
- */
-export function isTracked(qualified: string): boolean {
-  return TRACKED.has(qualified);
-}
-
 /**
  * Returns the names every module starts with: the builtins, and the loader
  * modules under their own names.
@@ -91,17 +73,11 @@ export function builtinBindings(): Bindings {
 }
 
 /** Node types `collectBindings` reads; `syntaxOf` collects them in one walk. */
-const BINDING_NODES = [
-  "import_statement",
-  "import_from_statement",
-  "assignment",
-  "call",
-  "delete_statement",
-];
+const BINDING_NODES = ["import_statement", "import_from_statement", "assignment", "call"];
 
 /**
  * Collects, in one walk of the tree, the nodes the loader search needs:
- * imports, assignments and `del` for the bindings, and calls to inspect.
+ * imports and assignments for the bindings, and calls to inspect.
  * One walk instead of four matters: each walk crosses into WASM for every node.
  *
  * @param root - the module node.
@@ -124,7 +100,6 @@ export function syntaxOf(root: Node): Node[] {
  */
 export function collectBindings(syntax: readonly Node[], outer: Bindings): Bindings {
   const bindings: Bindings = new Map([...outer].map(([name, qs]) => [name, new Set(qs)]));
-  const scope: Scope = { bindings, shadows: new Map() };
   const assignments: { name: string; right: Node }[] = [];
   for (const node of syntax) {
     if (node.type === "import_statement" || node.type === "import_from_statement") {
@@ -135,7 +110,7 @@ export function collectBindings(syntax: readonly Node[], outer: Bindings): Bindi
   }
   for (let pass = 0; pass <= assignments.length; pass += 1) {
     const learned = assignments.map(({ name, right }) =>
-      qualify(right, scope)
+      qualify(right, bindings)
         .map((q) => bind(bindings, name, q))
         .includes(true),
     );
@@ -166,7 +141,7 @@ function bindImport(stmt: Node, bindings: Bindings): void {
  * @param node - an `assignment` node.
  * @returns the assigned name and value, or nothing for another shape.
  */
-export function plainAssignment(node: Node): { name: string; right: Node }[] {
+function plainAssignment(node: Node): { name: string; right: Node }[] {
   const left = node.childForFieldName("left");
   const right = node.childForFieldName("right");
   return left?.type === "identifier" && right ? [{ name: identifierName(left), right }] : [];
@@ -188,7 +163,7 @@ interface ImportBinding {
  * @param stmt - an `import_statement` or `import_from_statement` node.
  * @returns each bound local name with its meaning.
  */
-export function importBindings(stmt: Node): ImportBinding[] {
+function importBindings(stmt: Node): ImportBinding[] {
   const entries = stmt.childrenForFieldName("name").map(importEntry);
   if (stmt.type === "import_statement") {
     return entries.map(({ name, alias }) => {
@@ -218,7 +193,7 @@ export function importBindings(stmt: Node): ImportBinding[] {
  * @param stmt - an `import_from_statement` node.
  * @returns true for a wildcard import.
  */
-export function isWildcard(stmt: Node): boolean {
+function isWildcard(stmt: Node): boolean {
   return stmt.children.some((c) => c?.type === "wildcard_import");
 }
 
@@ -279,17 +254,17 @@ function bind(bindings: Bindings, name: string, qualified: string): boolean {
  * or `__import__("m")` with literal names.
  *
  * @param node - an expression node.
- * @param scope - what local names refer to.
+ * @param bindings - what local names refer to.
  * @returns every qualified name the expression may be, empty when unknown.
  */
-export function qualify(node: Node, scope: Scope): string[] {
+export function qualify(node: Node, bindings: Bindings): string[] {
   switch (node.type) {
     case "parenthesized_expression": {
       const [inner] = namedChildren(node);
-      return inner ? qualify(inner, scope) : [];
+      return inner ? qualify(inner, bindings) : [];
     }
     case "identifier":
-      return nameMeanings(node, scope);
+      return [...(bindings.get(identifierName(node)) ?? [])];
     case "attribute": {
       const object = node.childForFieldName("object");
       const attribute = node.childForFieldName("attribute");
@@ -298,15 +273,17 @@ export function qualify(node: Node, scope: Scope): string[] {
       }
       const name = identifierName(attribute);
       // `m.__dict__[k]` is `m.k`: the subscript below appends k.
-      return name === "__dict__" ? qualify(object, scope) : member(qualify(object, scope), name);
+      return name === "__dict__"
+        ? qualify(object, bindings)
+        : member(qualify(object, bindings), name);
     }
     case "subscript": {
       const value = node.childForFieldName("value");
       const key = literalString(node.childForFieldName("subscript"));
-      return value && key !== null ? member(qualify(value, scope), key) : [];
+      return value && key !== null ? member(qualify(value, bindings), key) : [];
     }
     case "call":
-      return qualifyCall(node, scope);
+      return qualifyCall(node, bindings);
     default:
       return [];
   }
@@ -316,12 +293,14 @@ export function qualify(node: Node, scope: Scope): string[] {
  * Lists what a call expression may return, when it returns a module or a loader.
  *
  * @param call - a `call` node.
- * @param scope - what local names refer to.
+ * @param bindings - what local names refer to.
  * @returns the qualified names, empty when the call returns something else.
  */
-function qualifyCall(call: Node, scope: Scope): string[] {
+function qualifyCall(call: Node, bindings: Bindings): string[] {
   const fn = call.childForFieldName("function");
-  return fn ? qualify(fn, scope).flatMap((qualified) => returnedBy(qualified, call, scope)) : [];
+  return fn
+    ? qualify(fn, bindings).flatMap((qualified) => returnedBy(qualified, call, bindings))
+    : [];
 }
 
 /**
@@ -329,17 +308,17 @@ function qualifyCall(call: Node, scope: Scope): string[] {
  *
  * @param qualified - the callee's qualified name.
  * @param call - the `call` node.
- * @param scope - what local names refer to.
+ * @param bindings - what local names refer to.
  * @returns the qualified names returned, empty for any other callee.
  */
-function returnedBy(qualified: string, call: Node, scope: Scope): string[] {
+function returnedBy(qualified: string, call: Node, bindings: Bindings): string[] {
   const object = argumentAt(call, 0, "");
   if (qualified === "builtins.getattr") {
     const attribute = literalString(argumentAt(call, 1, ""));
-    return object && attribute !== null ? member(qualify(object, scope), attribute) : [];
+    return object && attribute !== null ? member(qualify(object, bindings), attribute) : [];
   }
   if (qualified === "builtins.vars") {
-    return object ? qualify(object, scope) : []; // `vars(m)[k]` is `m.k`
+    return object ? qualify(object, bindings) : []; // `vars(m)[k]` is `m.k`
   }
   const kind = LOADERS.get(qualified);
   const name = literalString(argumentAt(call, 0, "name"));
@@ -351,23 +330,6 @@ function returnedBy(qualified: string, call: Node, scope: Scope): string[] {
   }
   // `__import__` returns the leaf with a fromlist, else the top package.
   return kind === "__import__" ? [name, name.split(".")[0] ?? name] : [];
-}
-
-/**
- * Lists what a name may refer to where it is used.
- * A builtin rebound at module level stops meaning the builtin after the rebinding.
- *
- * @param node - an `identifier` node.
- * @param scope - what local names refer to.
- * @returns the qualified names.
- */
-function nameMeanings(node: Node, scope: Scope): string[] {
-  const name = identifierName(node);
-  const meanings = [...(scope.bindings.get(name) ?? [])];
-  const shadowedFrom = scope.shadows.get(name);
-  return shadowedFrom !== undefined && node.startIndex >= shadowedFrom
-    ? meanings.filter((q) => q !== `builtins.${name}`)
-    : meanings;
 }
 
 /**

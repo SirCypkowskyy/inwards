@@ -25,41 +25,26 @@ describe("INW011: edge cases", () => {
       'exec(b"# coding: latin-1\\nimport shop.infrastructure.db")\n',
     ],
     [
-      "a call before the builtin is rebound",
-      'exec("import shop.infrastructure.db")\nexec = print\n',
+      "a builtin re-exported by another module",
+      'from shop.compat import exec\nexec("import shop.infrastructure.db")\n',
     ],
     [
-      "a rebound builtin that is deleted again",
-      'exec = print\ndel exec\nexec("import shop.infrastructure.db")\n',
+      "a builtin re-exported through a relative import",
+      'from ..compat import exec\nexec("import shop.infrastructure.db")\n',
     ],
     [
-      "a rebound builtin restored as an alias",
-      'import builtins\nexec = print\nexec = builtins.exec\nexec("import shop.infrastructure.db")\n',
+      "a builtin rebound, then restored through globals()",
+      'import builtins\nexec = print\nglobals()["exec"] = builtins.exec\nexec("import shop.infrastructure.db")\n',
     ],
     [
-      "a rebinding inside if",
-      'if x:\n    from re import compile\ncompile("import shop.infrastructure.db", "f", "exec")\n',
+      "a def named exec (builtins always count)",
+      'def exec(src):\n    return src\nexec("import shop.infrastructure.db")\n',
     ],
   ])("%s is reported", (_, src) => {
     expect(found(src)).toEqual([["INW011", "shop.infrastructure.db"]]);
   });
 
   test.each([
-    [
-      "from re import compile",
-      "from re import compile\ncompile(r'^from shop\\.infrastructure import (\\w+)')\n",
-    ],
-    ["def exec", 'def exec(src):\n    return src\nexec("import shop.infrastructure.db")\n'],
-    [
-      "decorated def exec",
-      '@cache\ndef exec(src):\n    return src\nexec("import shop.infrastructure.db")\n',
-    ],
-    ["from mylib import eval", 'from mylib import eval\neval("import shop.infrastructure.db")\n'],
-    ["an assignment", 'compile = make_compiler()\ncompile("import shop.infrastructure.db")\n'],
-    [
-      "a shadowed builtin inside exec",
-      "from re import compile\nexec(\"compile('import shop.infrastructure.db', 'f', 'exec')\")\n",
-    ],
     ["an f-string field with a conversion", "exec(f\"import shop.{'infrastructure'!s}.db\")\n"],
     [
       "a str source with a coding declaration (ignored by CPython)",
@@ -67,6 +52,11 @@ describe("INW011: edge cases", () => {
     ],
   ])("%s is not reported", (_, src) => {
     expect(found(src)).toEqual([]);
+  });
+
+  test("known false positive: a rebound builtin still counts, so re.compile patterns are read as code", () => {
+    const src = 'from re import compile\ncompile("from shop.infrastructure import x")\n';
+    expect(found(src)).toEqual([["INW011", "shop.infrastructure.x"]]);
   });
 
   test("bytes that declare a codec Inwards can't read are reported, not skipped", () => {
