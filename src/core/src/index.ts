@@ -5,10 +5,10 @@ export {
   type LayerSpec,
   parseConfig,
 } from "./config.ts";
-export { ENCODING_RULE } from "./encoding.ts";
 export { Engine } from "./engine.ts";
-export { checkLayers, LAYER_RULE, layerIndexOf } from "./layers.ts";
+export { checkLayers, layerIndexOf } from "./layers.ts";
 export { DOCS_BASE, VERSION } from "./meta.ts";
 export { extractImports, type GrammarBinaries, moduleNameFor } from "./python.ts";
 export { type Format, type RenderOptions, type Report, render } from "./reporters.ts";
+export { RULES } from "./rules.ts";
 export type { Diagnostic, Fix, ImportRef, Severity, SourceFile, Span } from "./types.ts";

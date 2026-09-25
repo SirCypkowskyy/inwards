@@ -8,14 +8,8 @@
  * is a comment to us and a real import to CPython. Inwards can't check such a
  * file, so it reports that instead of passing it.
  */
-import { DOCS_BASE } from "./meta.ts";
+import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, SourceFile } from "./types.ts";
-
-export const ENCODING_RULE = {
-  code: "INW000",
-  name: "unsupported-encoding",
-  docs: `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`,
-} as const;
 
 // The `s` flag matters: without it `.` stops at \r, U+2028 and U+2029, which
 // CPython treats as ordinary characters inside a comment.
@@ -55,24 +49,14 @@ export function checkEncoding(file: SourceFile): Diagnostic | null {
   if (encoding === null || SAFE.test(encoding)) {
     return null;
   }
-  return {
-    code: ENCODING_RULE.code,
-    rule: ENCODING_RULE.name,
-    severity: "error",
-    file: file.path,
-    module: file.module,
-    line: 1,
-    column: 1,
-    endLine: 1,
-    endColumn: 1,
-    message: `The file declares encoding "${encoding}", which can hide imports from Inwards, so its imports were not checked.`,
-    fix: {
-      summary: "Save the file as UTF-8 and remove the coding declaration.",
-      steps: [
-        "Re-encode the file as UTF-8 without changing its code.",
-        "Delete the `# coding: ...` line, or change it to `# coding: utf-8`.",
-      ],
-    },
-    docs: ENCODING_RULE.docs,
+  const lineOne = { line: 1, column: 1, endLine: 1, endColumn: 1 };
+  const message = `The file declares encoding "${encoding}", which can hide imports from Inwards, so its imports were not checked.`;
+  const fix = {
+    summary: "Save the file as UTF-8 and remove the coding declaration.",
+    steps: [
+      "Re-encode the file as UTF-8 without changing its code.",
+      "Delete the `# coding: ...` line, or change it to `# coding: utf-8`.",
+    ],
   };
+  return diagnostic(RULES.INW000, file, { span: lineOne, message, fix });
 }

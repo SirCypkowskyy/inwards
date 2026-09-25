@@ -1,6 +1,5 @@
-import { ENCODING_RULE } from "./encoding.ts";
-import { LAYER_RULE } from "./layers.ts";
 import { DOCS_BASE, VERSION } from "./meta.ts";
+import { RULES } from "./rules.ts";
 import type { Diagnostic } from "./types.ts";
 
 export interface Report {
@@ -168,20 +167,13 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
               name: "inwards",
               informationUri: DOCS_BASE,
               version: VERSION,
-              rules: [
-                {
-                  id: LAYER_RULE.code,
-                  name: LAYER_RULE.name,
-                  shortDescription: { text: "Dependencies must point toward inner layers." },
-                  helpUri: LAYER_RULE.docs,
-                },
-                {
-                  id: ENCODING_RULE.code,
-                  name: ENCODING_RULE.name,
-                  shortDescription: { text: "The file's declared encoding can hide imports." },
-                  helpUri: ENCODING_RULE.docs,
-                },
-              ],
+              rules: Object.values(RULES).map((rule) => ({
+                id: rule.code,
+                name: rule.name,
+                shortDescription: { text: rule.summary },
+                helpUri: rule.docs,
+                defaultConfiguration: { level: rule.severity },
+              })),
             },
           },
           results: diagnostics.map((d) => ({

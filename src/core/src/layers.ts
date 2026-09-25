@@ -1,12 +1,6 @@
 import type { LayerSpec } from "./config.ts";
-import { DOCS_BASE } from "./meta.ts";
+import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
-
-export const LAYER_RULE = {
-  code: "INW001",
-  name: "layer-dependency",
-  docs: `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`,
-} as const;
 
 /**
  * Finds the layer that owns a module.
@@ -63,22 +57,12 @@ export function checkLayers(
     if (!target || to <= from) {
       continue;
     }
-    out.push({
-      code: LAYER_RULE.code,
-      rule: LAYER_RULE.name,
-      severity: "error",
-      file: file.path,
-      module: file.module,
-      line: ref.line,
-      column: ref.column,
-      endLine: ref.endLine,
-      endColumn: ref.endColumn,
-      message:
-        `Layer "${source.name}" imports "${ref.target}" from outer layer "${target.name}". ` +
-        `Allowed direction: ${layers.map((l) => l.name).join(" <- ")}.`,
-      fix: fixFor(source, target, ref),
-      docs: LAYER_RULE.docs,
-    });
+    const message =
+      `Layer "${source.name}" imports "${ref.target}" from outer layer "${target.name}". ` +
+      `Allowed direction: ${layers.map((l) => l.name).join(" <- ")}.`;
+    out.push(
+      diagnostic(RULES.INW001, file, { span: ref, message, fix: fixFor(source, target, ref) }),
+    );
   }
   return out;
 }

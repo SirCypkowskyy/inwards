@@ -118,7 +118,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>layers.ts: INW001<br/>more planned</small>"]
+        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>reporters.ts<br/>text · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles</small>"]
@@ -149,7 +149,7 @@ flowchart LR
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
-| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]` | INW001, plus INW000 for files whose encoding could hide imports. Planned rules are listed below |
+| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, plus INW000 for files whose encoding could hide imports. Planned rules are listed below |
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call |
@@ -264,7 +264,9 @@ src/
 │   │   ├── config.ts      # [tool.inwards] parsing and validation
 │   │   ├── prescan.ts     # import skeleton fast path
 │   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
+│   │   ├── rules.ts       # rule registry: code, name, severity, docs
 │   │   ├── layers.ts      # INW001 + fix composer
+│   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / json / sarif
 │   │   ├── engine.ts      # facade
 │   │   └── meta.ts        # VERSION, DOCS_BASE
