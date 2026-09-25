@@ -25,6 +25,11 @@ export interface InwardsConfig {
    * Imports from a layer into them are still checked. Absent when not set.
    */
   ignore?: string[];
+  /**
+   * How many attempts at the same violation before the hooks stop blocking
+   * and tell the agent to ask the user (`escalate-after`, default 3).
+   */
+  escalateAfter?: number;
 }
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
@@ -37,7 +42,13 @@ export class ConfigError extends Error {
 }
 
 /** Keys `[tool.inwards]` understands; anything else is a typo or a newer feature. */
-const TABLE_KEYS: ReadonlySet<string> = new Set(["root", "layers", "required-version", "ignore"]);
+const TABLE_KEYS: ReadonlySet<string> = new Set([
+  "root",
+  "layers",
+  "required-version",
+  "ignore",
+  "escalate-after",
+]);
 const LAYER_KEYS: ReadonlySet<string> = new Set(["name", "modules"]);
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
@@ -110,11 +121,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
   }
   rejectUnknownKeys(raw, TABLE_KEYS, "tool.inwards");
-  const { root = ".", layers, "required-version": required, ignore } = raw;
-  const requiredVersion = checkRequiredVersion(required);
-  if (ignore !== undefined && !isModuleList(ignore)) {
-    throw new ConfigError("tool.inwards.ignore must be a list of module names.");
-  }
+  const { root = ".", layers } = raw;
   if (typeof root !== "string") {
     throw new ConfigError("tool.inwards.root must be a string.");
   }
@@ -124,14 +131,38 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
   const seen = new Set<string>();
   const parsed = layers.map((layer: unknown, i) => parseLayer(layer, i, seen));
   rejectOverlaps(parsed);
-  const config: InwardsConfig = { root: root.replaceAll("\\", "/"), layers: parsed };
-  if (requiredVersion !== undefined) {
-    config.requiredVersion = requiredVersion;
-  }
-  if (ignore !== undefined) {
-    config.ignore = ignore;
-  }
+  const config: InwardsConfig = {
+    root: root.replaceAll("\\", "/"),
+    layers: parsed,
+    ...optionalKeys(raw),
+  };
   return config;
+}
+
+/**
+ * Validates the optional keys of `[tool.inwards]`.
+ *
+ * @param raw - the parsed table.
+ * @returns the keys that are set, under their config names.
+ * @throws {ConfigError} naming the first bad key.
+ */
+function optionalKeys(
+  raw: Record<string, unknown>,
+): Pick<InwardsConfig, "requiredVersion" | "ignore" | "escalateAfter"> {
+  const { "required-version": required, ignore, "escalate-after": escalateAfter } = raw;
+  const requiredVersion = checkRequiredVersion(required);
+  if (ignore !== undefined && !isModuleList(ignore)) {
+    throw new ConfigError("tool.inwards.ignore must be a list of module names.");
+  }
+  const whole = typeof escalateAfter === "number" && Number.isInteger(escalateAfter);
+  if (escalateAfter !== undefined && !(whole && escalateAfter >= 1)) {
+    throw new ConfigError("tool.inwards.escalate-after must be a whole number of at least 1.");
+  }
+  return {
+    ...(requiredVersion === undefined ? {} : { requiredVersion }),
+    ...(ignore === undefined ? {} : { ignore }),
+    ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
+  };
 }
 
 /**

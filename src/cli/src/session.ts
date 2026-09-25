@@ -84,7 +84,7 @@ export function isSessionId(id: unknown): id is string {
  * @param d - a diagnostic.
  * @returns a short stable hash.
  */
-function fingerprint(d: Diagnostic): string {
+export function fingerprint(d: Diagnostic): string {
   return createHash("sha256")
     .update(`${d.code}\u0000${d.module}\u0000${d.message}`)
     .digest("hex")
@@ -145,7 +145,8 @@ export function recordEdit(
     t: "edit",
     at: new Date().toISOString(),
     file: projectPath(project, file),
-    fingerprints: diagnostics.map(fingerprint),
+    // Once per edit: the same import twice in a file is one attempt, not two.
+    fingerprints: [...new Set(diagnostics.map(fingerprint))],
   });
 }
 

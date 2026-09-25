@@ -168,7 +168,10 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 
 ### When the agent can't fix it
 
-Sometimes the right fix needs a decision the agent shouldn't make alone, such as a new port that changes a public API. Without a limit, the stop hook keeps blocking until the host gives up on its own. The planned `inwards hook` command reads the run log, and when the same violation (same code, file and target) survives three attempts, it switches its message: *stop editing, summarise the violation, and ask the user how to proceed*. It then exits 0 so the turn can end cleanly with a question instead of a loop.
+Sometimes the right fix needs a decision the agent shouldn't make alone, such as a new port that changes a public API. Without a limit, the hooks would keep blocking until the host gives up on its own, and an agent that is only ever blocked learns to game the check. So Inwards escalates after `escalate-after` attempts (default 3, set in `[tool.inwards]`):
+
+- **Per edit:** the session state counts how often each violation (same rule, module and message) has been reported, once per edit. The limit comes from the config as it was when the session started, so editing it mid-session changes nothing. When every error in an edit has just reached the limit, the edit exits 0 and its report goes to the model as `additionalContext`, headed *stop editing, summarise the violation, and ask the user how to proceed*. If the edit also has a violation below the limit, it still blocks, with the same instruction added. Escalation isn't sticky: the next edit with the same violation blocks again.
+- **At Stop:** the gate blocks a turn up to the limit of the configs the changed files fall under. The last block, or the first one once a violation has already escalated, adds the same instruction. The Stop after it (with `stop_hook_active` set) lets the turn end and puts the unresolved problems in a `systemMessage` that the user sees. It also records them in `.inwards/state/<session>.unresolved.json`. The next session's `SessionStart` hands that list to the model once, unless every file in it has changed since, which means someone worked on it. Old records are pruned with the rest of the session state.
 
 ## Stopping the agent from gaming the check
 

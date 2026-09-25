@@ -12,24 +12,31 @@
  * record, a `[tool.inwards]` table that differs from the start snapshot (a
  * `sed -i` through Bash), a changed file governed by a config that didn't
  * exist at start, or Claude Code settings that dropped the Inwards hooks. It
- * blocks a turn at most MAX_BLOCKS times, then lets it end and tells the user
- * (escalation, #22, takes over from there). If the gate itself fails, it
- * blocks once with the error, then lets the turn end.
+ * blocks a turn at most `escalate-after` times (default 3); the last block
+ * tells the agent to ask the user, and the Stop after it lets the turn end
+ * with the unresolved violations shown to the user (see `escalation.ts`).
+ * If the gate itself fails, it blocks once with the error, then lets the turn end.
  */
 import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
-import { type InwardsConfig, type Report, render } from "@inwards/core";
+import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
 import { settingsProblem } from "./claude-settings.ts";
+import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { newPrefixErrors } from "./prefixes.ts";
 import { runCheck } from "./project.ts";
-import { isSessionId, readSession, recordPass, recordStop, type SessionState } from "./session.ts";
+import {
+  fingerprint,
+  isSessionId,
+  readSession,
+  recordPass,
+  recordStop,
+  type SessionState,
+} from "./session.ts";
 import { projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
 
-/** Blocks per turn before the gate lets it end. */
-const MAX_BLOCKS = 3;
 const PYTHON_FILE = /\.pyi?$/u;
 
 /**
@@ -79,15 +86,9 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
       undefined,
     );
   }
-  if (active && state.stops >= MAX_BLOCKS) {
-    return print(
-      `inwards: the Stop gate blocked this turn ${MAX_BLOCKS} times and is letting it end. Run \`inwards check\` and review the changes.`,
-      1,
-    );
-  }
   const problems = trustProblems(project, configs, state);
   const manifest = projectManifest(project, configs);
-  const { report, strangers } = await checkChanged(
+  const { report, strangers, governing } = await checkChanged(
     project,
     changedFiles(project, state, manifest),
     state.start,
@@ -105,8 +106,66 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     }
     return 0;
   }
-  recordStop(project, id, !active);
-  return block(problems, report);
+  const limit = escalationLimit(state.start.configs, governing);
+  const escalated = errorsOf(report).some((d) => (state.seen.get(fingerprint(d)) ?? 0) >= limit);
+  const turn = { streak: active ? state.stops : 0, limit, fresh: !active, escalated };
+  return blockOrYield(project, id, turn, { problems, report });
+}
+
+/**
+ * Blocks the turn, or lets it end once the limit is reached. The last block,
+ * or every block once a violation has already escalated during the session,
+ * tells the agent to ask the user; after the last one, the turn ends with the
+ * unresolved problems shown to the user.
+ *
+ * @param project - the real project root.
+ * @param id - the session id.
+ * @param turn - blocks so far in this turn, blocks allowed, whether this is the
+ *   turn's first Stop, and whether a violation has already escalated.
+ * @param found - the problems and the report.
+ * @returns 2 to block, 0 to let the turn end.
+ */
+function blockOrYield(
+  project: string,
+  id: string,
+  turn: { streak: number; limit: number; fresh: boolean; escalated: boolean },
+  found: { problems: string[]; report: Report },
+): number {
+  const { streak, limit, fresh, escalated } = turn;
+  const { problems, report } = found;
+  if (streak >= limit) {
+    return yieldTurn(project, id, { problems, diagnostics: errorsOf(report) });
+  }
+  recordStop(project, id, fresh);
+  const ask = escalated || streak + 1 === limit ? [askUser(limit)] : [];
+  return block([...problems, ...ask], report);
+}
+
+/**
+ * Picks the block limit from the session-start configs that govern the
+ * changed files, so neither a config edited mid-session nor an unrelated
+ * package's config can change it.
+ *
+ * @param configs - the configs at session start, by project-relative path.
+ * @param governing - the configs the changed files fall under.
+ * @returns the smallest `escalate-after` among them, or the default.
+ */
+function escalationLimit(
+  configs: Record<string, InwardsConfig>,
+  governing: readonly string[],
+): number {
+  const limits = governing.map((rel) => configs[rel]?.escalateAfter ?? DEFAULT_ESCALATE_AFTER);
+  return limits.length === 0 ? DEFAULT_ESCALATE_AFTER : Math.min(...limits);
+}
+
+/**
+ * Keeps the errors of a report, the violations left unresolved.
+ *
+ * @param report - the check of the changed files.
+ * @returns its error diagnostics.
+ */
+function errorsOf(report: Report): Diagnostic[] {
+  return report.diagnostics.filter((d) => d.severity === "error");
 }
 
 /**
@@ -192,14 +251,15 @@ function changedFiles(
  * @param files - absolute changed files.
  * @param start - the session start, with its valid and invalid configs.
  * @param now - the valid configs now.
- * @returns the merged report, and each file governed by an unknown config with that config.
+ * @returns the merged report, each file governed by an unknown config with
+ *   that config, and the project-relative configs the checked files fall under.
  */
 async function checkChanged(
   project: string,
   files: string[],
   start: SessionState["start"],
   now: Record<string, InwardsConfig>,
-): Promise<{ report: Report; strangers: [string, string][] }> {
+): Promise<{ report: Report; strangers: [string, string][]; governing: string[] }> {
   const byConfig = new Map<string, string[]>();
   const strangers: [string, string][] = [];
   for (const file of files) {
@@ -227,5 +287,6 @@ async function checkChanged(
       durationMs: Math.max(0, ...reports.map((r) => r.durationMs)),
     },
     strangers,
+    governing: [...byConfig.keys()].map((config) => projectPath(project, config)),
   };
 }
