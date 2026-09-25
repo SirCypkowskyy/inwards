@@ -76,13 +76,21 @@ export function isInside(dir: string, file: string): boolean {
  *
  * @param dir - the directory to start from.
  * @param within - optional real directory every accepted config must be inside.
+ * @param accept - optional filter on a candidate's real path; a rejected one is passed over.
  * @returns the config path, or undefined when no ancestor has one.
  */
-export function findConfig(dir: string, within?: string): string | undefined {
+export function findConfig(
+  dir: string,
+  within?: string,
+  accept?: (real: string) => boolean,
+): string | undefined {
   for (let d = dir; ; d = dirname(d)) {
     const candidate = resolve(d, "pyproject.toml");
     const real = realpath(candidate);
-    const allowed = real !== undefined && (within === undefined || isInside(within, real));
+    const allowed =
+      real !== undefined &&
+      (within === undefined || isInside(within, real)) &&
+      (accept === undefined || accept(real));
     if (allowed && declaresInwards(readFileSync(real, "utf8"))) {
       return candidate;
     }

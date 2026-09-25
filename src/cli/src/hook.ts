@@ -5,18 +5,21 @@ import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { ConfigError, type Diagnostic, render } from "@inwards/core";
+import { configGuard } from "./guard.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
-import { isSessionId, recordEdit, recordStart } from "./session.ts";
+import { isSessionId, readSessionStart, recordEdit, recordStart } from "./session.ts";
+import { projectPath } from "./snapshot.ts";
 import { stopGate } from "./stop.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 
 /**
  * Runs the Claude Code hook for one event: SessionStart records the session,
- * PostToolUse checks the file the agent just wrote, and Stop runs the gate
- * over everything the session changed (see `stop.ts`).
+ * PreToolUse denies edits to the rules (see `guard.ts`), PostToolUse checks
+ * the file the agent just wrote, and Stop runs the gate over everything the
+ * session changed (see `stop.ts`).
  * Exit 2 puts stderr in front of the model, so violations and config errors go
  * there. Exit 1 reaches only the user: a bad payload or a bug in Inwards is not
  * the model's to fix. Anything else passes silently with exit 0.
@@ -42,6 +45,9 @@ export async function hookClaudeCode(usage: string): Promise<number> {
   }
   if (event === "Stop") {
     return await stopGate(input);
+  }
+  if (event === "PreToolUse") {
+    return configGuard(input);
   }
   return event === "PostToolUse" ? await postToolUse(input) : 0;
 }
@@ -96,7 +102,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   // The nearest config above the file, so each package in a monorepo uses its own,
   // and only one that really lives inside the project. No config at all means this
   // project doesn't use Inwards (the hook may be user-wide).
-  const configPath = findConfig(dirname(target.file), target.project);
+  const configPath = sessionConfig(dirname(target.file), target.project, input["session_id"]);
   if (!configPath) {
     return 0;
   }
@@ -121,6 +127,25 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     }
     return print(`inwards hook: ${err instanceof Error ? err.message : String(err)}`, 1);
   }
+}
+
+/**
+ * Finds the config for an edited file. Once a session has a start record,
+ * only configs recorded there count: a pyproject.toml with a permissive
+ * `[tool.inwards]` created mid-session (through Bash, past the guard) is
+ * passed over for the next one up. The Stop gate reports it.
+ *
+ * @param dir - the edited file's directory.
+ * @param project - the real project root.
+ * @param id - the payload's `session_id`.
+ * @returns the config path, or undefined without one.
+ */
+function sessionConfig(dir: string, project: string, id: unknown): string | undefined {
+  const known = isSessionId(id) ? readSessionStart(project, id)?.configs : undefined;
+  if (known === undefined) {
+    return findConfig(dir, project);
+  }
+  return findConfig(dir, project, (real) => known[projectPath(project, real)] !== undefined);
 }
 
 /**

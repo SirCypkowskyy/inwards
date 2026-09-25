@@ -45,7 +45,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     inwards init --agent claude            # --dry-run shows the diff first
     ```
 
-    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only and is not committed, and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. `init` also adds `.inwards/` to `.gitignore` and pins `required-version` in `[tool.inwards]`. Running it again changes nothing. It installs the hook events Inwards implements (SessionStart, PostToolUse, Stop); the config guard will add its own once it ships.
+    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only and is not committed, and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. `init` also adds `.inwards/` to `.gitignore`, pins `required-version` in `[tool.inwards]`, and adds two `permissions.deny` rules, `Edit(/.claude/settings*.json)` and `Edit(/.inwards/**)`, so Claude Code itself refuses those edits even if a hook is gone. Running it again changes nothing. It installs every hook event Inwards implements: SessionStart, PreToolUse (the config guard), PostToolUse and Stop.
 
     To share the setup through the committed `.claude/settings.json` instead, write it by hand. This version relies on `inwards` being on `PATH`:
 
@@ -56,6 +56,12 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
       "hooks": {
         "SessionStart": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
+        ],
+        "PreToolUse": [
+          {
+            "matcher": "Edit|Write|MultiEdit|Bash",
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
+          }
         ],
         "PostToolUse": [
           {
@@ -80,7 +86,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
     - **Violation:** compact JSON diagnostics on stderr, exit code 2.
     - **Warnings only** (INW006: the file belongs to no layer): exit 0, and the same JSON goes back to the model as `additionalContext`, so the edit stands but the agent hears about it.
     - **Clean file, non-Python file, or any other hook event:** exit 0, no output.
-    - **Broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it. With no `[tool.inwards]` at all the hook stays silent, because it may be installed for every project; the planned config guard stops an agent from deleting the table.
+    - **Broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it. With no `[tool.inwards]` at all the hook stays silent, because it may be installed for every project; the config guard stops an agent from deleting the table.
     - **Unreadable payload or an internal error:** exit 1. Claude Code shows that to the user, not the model.
     - **File outside the project** (`CLAUDE_PROJECT_DIR`, or the directory Claude Code runs the hook in; never the payload's own `cwd`): skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.
     - **Monorepos:** the nearest `pyproject.toml` with `[tool.inwards]` above the edited file applies, as long as it lies inside the project. A config above `CLAUDE_PROJECT_DIR` is ignored, so open the session at the directory that holds the config.
@@ -97,7 +103,7 @@ Two hooks do the work. A **per-edit hook** gives fast feedback on the file that 
 
     - **No start record**, because `.inwards/` was deleted or the hooks were installed mid-session. When Claude Code sets `stop_hook_active` after a block, the gate lets that turn end.
     - **`[tool.inwards]` differs from the start snapshot**, for example after a `sed -i` through Bash, or **a changed file falls under a `pyproject.toml` that had no valid `[tool.inwards]` at the start** (a new, permissive config nested in a layer).
-    - **The Inwards `SessionStart` or `PostToolUse` hook is gone from every settings layer** (user, project, local), including a `PostToolUse` matcher that no longer covers `Edit`, `Write` and `MultiEdit`, or **`disableAllHooks`** is set. The check reads the settings, not the programs they run, so it proves the configuration, not that the real Inwards runs. Claude Code reloads hooks when settings change, so removing the Stop hook itself switches the gate off at once; the config guard (below) is what blocks those edits.
+    - **The Inwards `SessionStart`, `PreToolUse` or `PostToolUse` hook is gone from every settings layer** (user, project, local), including a matcher that no longer covers the tools it must see, or **`disableAllHooks`** is set. The check reads the settings, not the programs they run, so it proves the configuration, not that the real Inwards runs. Claude Code reloads hooks when settings change, so removing the Stop hook itself switches the gate off at once; the config guard (below) is what blocks those edits.
 
     It blocks a turn at most three times. The fourth time it lets the turn end and tells the user (exit 1), and escalation (below) turns the repeated failure into a question for the user. The count starts again with each new turn. If the gate itself fails (an unreadable file, say), it blocks once with the error and lets the turn end on the next try, so a broken gate can't keep a session going forever.
 
@@ -178,10 +184,17 @@ A model under pressure to finish will try the cheapest thing that turns the chec
 | Move a layer away | `git mv shop/domain shop/core`, so the prefix matches nothing | INW006: a prefix that matched modules at session start and matches none now fails the Stop gate | :white_check_mark: |
 | Import dynamically | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 reports a literal target that reaches an outer layer, through aliases such as `from importlib import import_module as im`. A computed target is not read yet | :white_check_mark: literal targets |
 | Suppress it | `# inwards: ignore` | Suppressions will need a code and a reason, show up in the summary, and can be rejected in hooks | :material-progress-clock: |
-| Loosen the config | Move `shop.infrastructure` into the domain layer | A `PreToolUse` guard denies agent edits to `[tool.inwards]`; CODEOWNERS covers humans | :material-progress-clock: |
+| Loosen the config | Move `shop.infrastructure` into the domain layer | The `PreToolUse` config guard denies the edit; a `sed -i` through Bash fails the Stop gate; CODEOWNERS covers humans | :white_check_mark: |
+| Turn Inwards off | Delete `.inwards/`, remove the hooks, set `disableAllHooks` | The config guard denies edits to `.inwards/` and to settings files that hold the hooks or would disable them; `permissions.deny` backs it up | :white_check_mark: |
 | Copy the code over | Paste the SQL class into `shop/domain/` | Out of scope. Duplication is for review and other tools | :x: |
 
-The config guard matters most. An agent that can edit the rules isn't constrained by them. Until the guard ships, put `pyproject.toml` under CODEOWNERS and deny edits to it in the agent's permission settings.
+The config guard matters most. An agent that can edit the rules isn't constrained by them. On `PreToolUse`, `inwards hook claude-code` looks at the tool call before it runs:
+
+- **Edit, Write or MultiEdit of any `pyproject.toml`**: the edit is applied in memory and denied when the parsed `[tool.inwards]` table would change, appear, disappear or stop parsing. A dependency bump passes.
+- **Any file tool on `.inwards/`**, or on a Claude Code settings file (user, project, local) that holds the Inwards hooks or would get `disableAllHooks`. Paths are resolved through symlinks first.
+- **Bash** that names `.inwards`, the Claude Code settings files, or runs `inwards hook` or `inwards baseline`.
+
+A denial reaches the model as the reason for the refused call and tells it to ask the user. Bash can reach the same files in ways no pattern sees (`python -c ...`), so those rules are a speed bump; the Stop gate re-checks the config, the hooks and every changed file before the turn ends. Config discovery is pinned too: once a session has started, a `pyproject.toml` that wasn't in the start snapshot is passed over when the per-edit hook picks a config, so a permissive table created through Bash can't take over the files below it. CODEOWNERS on `pyproject.toml` still covers humans.
 
 ## Catching hallucinated modules
 

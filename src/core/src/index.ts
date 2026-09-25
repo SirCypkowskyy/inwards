@@ -2,6 +2,7 @@ export {
   ConfigError,
   declaresInwards,
   type InwardsConfig,
+  inwardsTable,
   type LayerSpec,
   parseConfig,
 } from "./config.ts";

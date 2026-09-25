@@ -9,6 +9,9 @@ const CMD: string[] = process.env["INWARDS_BIN"]
   ? [resolve(REPO, process.env["INWARDS_BIN"])]
   : [process.execPath, join(REPO, "src/cli/src/main.ts")];
 
+/** The user-level Claude settings directory the CLI sees in tests, so the real one never leaks in. */
+export const CLAUDE_USER_DIR: string = mkdtempSync(join(tmpdir(), "inwards-claude-user-"));
+
 // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
 // CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code.
 const ENV: Record<string, string | undefined> = {
@@ -17,8 +20,7 @@ const ENV: Record<string, string | undefined> = {
   ),
   NO_COLOR: "",
   FORCE_COLOR: "1",
-  // The user-level Claude settings of whoever runs the tests must not leak in.
-  CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), "inwards-claude-user-")),
+  CLAUDE_CONFIG_DIR: CLAUDE_USER_DIR,
 };
 
 /** What one run of the CLI produced. */

@@ -32,14 +32,19 @@ interface Exec {
 /**
  * Claude Code hook events Inwards handles, with the tool matcher each needs.
  * Only events the hook implements are installed, so init never swaps a
- * working setup for a no-op: the config guard's PreToolUse (#23) adds its
- * entry here, and re-running init installs it.
+ * working setup for a no-op.
  */
 const CLAUDE_HOOKS: readonly [event: string, matcher: string | undefined][] = [
   ["SessionStart", undefined],
+  ["PreToolUse", ["Edit", "Write", "MultiEdit", "Bash"].join("|")],
   ["PostToolUse", "Edit|Write|MultiEdit"],
   ["Stop", undefined],
 ];
+/**
+ * Permission rules init adds, so Claude Code itself refuses edits to the
+ * hooks and the session state even if a hook is gone (`/` anchors at the project).
+ */
+const DENY_RULES = ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"];
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
 const PRERELEASE = /-.*$/u;
@@ -221,10 +226,11 @@ function safeParse(text: string): ReturnType<typeof parseConfig> | undefined {
 }
 
 /**
- * Merges the Inwards hooks into Claude Code's local project settings.
- * Our old entries are removed wherever they are and one fresh group per event
- * is appended, so matchers stay right and duplicates go away. Anything that
- * isn't the documented shape stops init rather than being rewritten.
+ * Merges the Inwards hooks and deny rules into Claude Code's local project
+ * settings. Our old hook entries are removed wherever they are and one fresh
+ * group per event is appended, so matchers stay right and duplicates go away;
+ * deny rules are added once. Anything that isn't the documented shape stops
+ * init rather than being rewritten.
  *
  * @param path - `.claude/settings.local.json`.
  * @param exec - how to start Inwards.
@@ -256,7 +262,27 @@ function claudeSettings(path: string, exec: Exec): Change | string {
     hooks[event] = kept;
   }
   settings["hooks"] = hooks;
+  const denied = withDenyRules(settings["permissions"]);
+  if (denied === undefined) {
+    return `"permissions.deny" in ${path} is not a list; fix it first`;
+  }
+  settings["permissions"] = denied;
   return { path, before, after: `${JSON.stringify(settings, null, 2)}\n` };
+}
+
+/**
+ * Adds the Inwards deny rules to a `permissions` value, once each.
+ *
+ * @param permissions - the current `permissions`, possibly absent.
+ * @returns the updated object, or undefined when it or its `deny` has the wrong shape.
+ */
+function withDenyRules(permissions: unknown): Record<string, unknown> | undefined {
+  const table = permissions ?? {};
+  const deny = isRecord(table) ? (table["deny"] ?? []) : undefined;
+  if (!(isRecord(table) && Array.isArray(deny))) {
+    return undefined;
+  }
+  return { ...table, deny: [...deny, ...DENY_RULES.filter((rule) => !deny.includes(rule))] };
 }
 
 /**
