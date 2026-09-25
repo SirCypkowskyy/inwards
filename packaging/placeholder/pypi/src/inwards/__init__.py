@@ -3,13 +3,13 @@
 import sys
 
 MESSAGE = (
-    "inwards 0.0.0 is a name placeholder, not the linter.\n"
-    "Install the binary from https://github.com/SirCypkowskyy/inwards/releases"
+    "inwards 0.0.0 is an early placeholder, not the linter itself.\n"
+    "Inwards, an architecture linter for Python, has not been released yet."
 )
 
 
 def main() -> None:
-    """Print where the real binary lives; exit 2 for anything but --version.
+    """Say that the linter is not released yet; exit 2 for anything but --version.
 
     Exit 2 is "usage or config error", so a dependency bump to this placeholder
     fails CI and hooks loudly instead of passing every check.
