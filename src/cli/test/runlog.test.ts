@@ -142,4 +142,18 @@ describe("run log: review round 1", () => {
     inwards(["check", "--log"], { cwd: root });
     expect(runs(root)).toMatchObject([{ event: "check", files: ["."] }]);
   });
+
+  test("a relative file_path is counted against the payload's cwd", () => {
+    const root = session();
+    put(root, "shop/domain/order.py", "X = 1\n");
+    const stdin = payload("post-write-order", root, {
+      session_id: "stop-test",
+      cwd: join(root, "shop"),
+      tool_name: "Write",
+      tool_input: { file_path: "domain/order.py", content: "X = 1\n" },
+    });
+    inwards(["hook", "claude-code"], { cwd: root, stdin, env: ON });
+    const [line] = runs(root).filter((r) => r["event"] === "PostToolUse");
+    expect(line?.["lines"]).toEqual([{ file: "shop/domain/order.py", added: 1, removed: 0 }]);
+  });
 });

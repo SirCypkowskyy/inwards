@@ -11,7 +11,7 @@
  * `{ v, at, session_id, event, tool, files, lines, fingerprints, exit, durationMs }`.
  */
 import { readFileSync, renameSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { type Diagnostic, parseConfig } from "@inwards/core";
 import { findConfig } from "./paths.ts";
@@ -146,7 +146,9 @@ function lineCounts(
   if (typeof tool.file_path !== "string") {
     return [];
   }
-  const file = projectPath(project, tool.file_path);
+  // Relative to the payload's cwd, as the hook resolves it.
+  const cwd = typeof input["cwd"] === "string" ? input["cwd"] : process.cwd();
+  const file = projectPath(project, resolve(cwd, tool.file_path));
   if (!checked.includes(file)) {
     return [];
   }
