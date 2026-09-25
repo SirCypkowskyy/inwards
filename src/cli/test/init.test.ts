@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
+import { CMD, inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 
 /**
  * Runs `inwards init` in a project.
@@ -152,7 +152,9 @@ describe("inwards init --agent claude", () => {
       ".gitignore": "dist/\r\n",
     });
     init(root, "--agent", "claude");
-    expect(read(root, ".gitignore")).toBe("dist/\r\n# Inwards session state\r\n.inwards/\r\n");
+    expect(read(root, ".gitignore")).toBe(
+      "dist/\r\n# Inwards: local state and machine-specific hooks\r\n.inwards/\r\n.claude/settings.local.json\r\n",
+    );
     expect(read(root, "pyproject.toml")).toContain(
       '[tool.inwards]\r\nrequired-version = "0.0.1"\r\n',
     );
@@ -224,4 +226,25 @@ test("a project that requires a newer Inwards fails every check with exit 2", ()
   const { code, stderr } = inwards(["check"], { cwd: root });
   expect(code).toBe(2);
   expect(stderr).toContain("requires Inwards 99.0.0 or newer");
+});
+
+test("a reader that stops early (| head) gets no stack trace, and the exit code stands", () => {
+  if (process.platform === "win32") {
+    return; // no POSIX shell pipe
+  }
+  const root = project({ "pyproject.toml": LAYERS });
+  // `| true` closes the pipe before anything is read, so every write hits EPIPE.
+  const script = 'set -o pipefail; "$@" | true'; // the exit code is the CLI's
+  const args = [...CMD, "init", "--agent", "claude", "--dry-run"];
+  const run = Bun.spawnSync(["bash", "-c", script, "_", ...args], { cwd: root });
+  expect(run.stderr.toString()).not.toContain("EPIPE");
+  expect(run.exitCode).toBe(0);
+});
+
+test("init writes the default ignore list readably", () => {
+  const root = project({ "pyproject.toml": LAYERS });
+  inwards(["init", "--agent", "agents-md"], { cwd: root });
+  expect(read(root, "pyproject.toml")).toContain(
+    'ignore = ["tests", "scripts", "migrations", "conftest"]',
+  );
 });

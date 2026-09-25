@@ -5,7 +5,8 @@ import process from "node:process";
 
 // CI sets INWARDS_BIN to the compiled binary; locally the tests run the source.
 const REPO = resolve(import.meta.dir, "../../..");
-const CMD: string[] = process.env["INWARDS_BIN"]
+/** How the tests start the CLI: the compiled binary in CI, else main.ts under Bun. */
+export const CMD: string[] = process.env["INWARDS_BIN"]
   ? [resolve(REPO, process.env["INWARDS_BIN"])]
   : [process.execPath, join(REPO, "src/cli/src/main.ts")];
 

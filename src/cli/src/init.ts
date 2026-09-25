@@ -99,7 +99,7 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
     changes.push(change);
   }
   // Every agent: session state and the run log (`check --log`) both live in .inwards/.
-  changes.push(gitignore(join(project, ".gitignore")));
+  changes.push(gitignore(join(project, ".gitignore"), agent));
   return apply(
     changes.filter((c) => c.before !== c.after),
     dryRun,
@@ -174,7 +174,9 @@ function pinDefaults(configPath: string): Change {
   };
   const lines = [
     config.requiredVersion === undefined ? `required-version = "${want.requiredVersion}"` : "",
-    config.ignore === undefined ? `ignore = ${JSON.stringify(DEFAULT_IGNORE)}` : "",
+    config.ignore === undefined
+      ? `ignore = [${DEFAULT_IGNORE.map((e) => JSON.stringify(e)).join(", ")}]`
+      : "",
   ].filter((line) => line !== "");
   if (lines.length === 0) {
     return unchanged;
@@ -299,21 +301,31 @@ function withoutOurHook(group: unknown): unknown {
 }
 
 /**
- * Adds `.inwards/` (session state, run log) to the project's .gitignore.
+ * Adds what Inwards writes locally to the project's .gitignore: `.inwards/`
+ * (session state, run log) for every agent, and for Claude Code the
+ * machine-specific `.claude/settings.local.json` that holds the hooks.
  *
  * @param path - the project's .gitignore.
- * @returns the change (unchanged when already ignored).
+ * @param agent - which agent is being wired up.
+ * @returns the change (unchanged when every entry is already there).
  */
-function gitignore(path: string): Change {
+function gitignore(path: string, agent: Agent): Change {
   const before = existsSync(path) ? readFileSync(path, "utf8") : undefined;
   const text = before ?? "";
-  const lines = text.split(LINE_BREAK).map((l) => l.trim());
-  if (lines.includes(".inwards/") || lines.includes(".inwards")) {
+  const lines = new Set(text.split(LINE_BREAK).map((l) => l.trim()));
+  const wanted = [
+    lines.has(".inwards/") || lines.has(".inwards") ? "" : ".inwards/",
+    agent !== "claude" || lines.has(".claude/settings.local.json")
+      ? ""
+      : ".claude/settings.local.json",
+  ].filter((entry) => entry !== "");
+  if (wanted.length === 0) {
     return { path, before, after: text };
   }
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const base = text === "" || text.endsWith("\n") ? text : `${text}${eol}`;
-  return { path, before, after: `${base}# Inwards session state${eol}.inwards/${eol}` };
+  const added = ["# Inwards: local state and machine-specific hooks", ...wanted].join(eol);
+  return { path, before, after: `${base}${added}${eol}` };
 }
 
 /**

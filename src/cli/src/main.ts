@@ -120,6 +120,20 @@ async function checkCommand(
   return exit;
 }
 
+/**
+ * Ignores a reader that has gone away: `inwards ... | head` closes the pipe
+ * early, and that is no reason for a stack trace. Other stream errors still throw.
+ *
+ * @param err - the stream's error.
+ */
+function ignoreClosedPipe(err: Error & { code?: string }): void {
+  if (err.code !== "EPIPE") {
+    throw err;
+  }
+}
+process.stdout.on("error", ignoreClosedPipe);
+process.stderr.on("error", ignoreClosedPipe);
+
 // exitCode, not exit(): Node-style exit() may drop writes still queued for a
 // pipe, and a hook's stderr is the whole message to the agent.
 main(process.argv.slice(2)).then(

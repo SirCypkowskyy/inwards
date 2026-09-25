@@ -17,6 +17,12 @@ site_dir = "site"
 
 nav = [
   { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Install" = "guides/install.md" },
+    { "Claude Code" = "guides/claude-code.md" },
+    { "Aider" = "guides/aider.md" },
+    { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
+  ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },
   { "3. Architecture (C4)" = "03-Architecture-C4.md" },
