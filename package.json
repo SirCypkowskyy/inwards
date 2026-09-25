@@ -12,6 +12,7 @@
     "format": "biome format --write .",
     "typecheck": "tsc -p . && bun run --filter '*' typecheck",
     "test": "bun test",
+    "lint:docs": "oxlint --config .oxlintrc.jsonc --deny-warnings",
     "fallow": "fallow dead-code && fallow dupes",
     "build:cli": "bun run scripts/build-binaries.ts",
     "check:self": "bun run src/cli/src/main.ts check examples/clean-app"
@@ -19,7 +20,9 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
     "@types/bun": "^1.4.2",
+    "eslint-plugin-jsdoc": "64.5.4",
     "fallow": "3.28.0",
+    "oxlint": "1.85.0",
     "typescript": "^7.0.2"
   },
   "license": "MIT"

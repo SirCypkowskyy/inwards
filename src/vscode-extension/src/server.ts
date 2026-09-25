@@ -52,12 +52,27 @@ documents.onDidChangeContent(({ document }) => {
   connection.sendDiagnostics({ uri: document.uri, diagnostics: found.map(toLsp) });
 });
 
-// build copies both grammars next to server.js, see scripts/copy-wasm.ts
+/**
+ * Reads one grammar file shipped next to dist/server.js.
+ * The build copies both grammars there (see scripts/copy-wasm.ts), because
+ * the extension runs on Node and cannot use Bun's embedded files.
+ *
+ * @param name - the file name, e.g. `tree-sitter-python.wasm`.
+ * @returns the file's bytes.
+ */
 function wasm(name: string): Uint8Array {
   // biome-ignore lint/correctness/noGlobalDirnameFilename: the build emits CommonJS (see package.json), where __dirname is dist/.
   return new Uint8Array(readFileSync(join(__dirname, name)));
 }
 
+/**
+ * Converts an engine diagnostic to an LSP diagnostic.
+ * LSP positions are 0-based; the engine's are 1-based. The message carries
+ * the fix summary on a second line, since LSP has no field for it.
+ *
+ * @param d - the engine's diagnostic.
+ * @returns the diagnostic in LSP form.
+ */
 function toLsp(d: CoreDiagnostic): Diagnostic {
   return {
     range: {

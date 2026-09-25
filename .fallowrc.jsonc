@@ -4,7 +4,8 @@
   "entry": ["src/core/scripts/prescan-diff.ts"],
   // Loaded by path, never imported: Bun.resolveSync("tree-sitter-python/...wasm")
   // in core's tests and scripts, and the extension's scripts/copy-wasm.ts.
-  "ignoreDependencies": ["tree-sitter-python"],
+  // eslint-plugin-jsdoc is loaded by oxlint through .oxlintrc.jsonc "jsPlugins".
+  "ignoreDependencies": ["tree-sitter-python", "eslint-plugin-jsdoc"],
   // Called by the CLI on the Engine that Engine.create() returns; fallow does not
   // follow the type of an awaited factory result.
   // Fail CI when more than 3% of the code is duplicated (it is 0% today).

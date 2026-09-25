@@ -24,6 +24,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Biome (lint + format)
         run: bun x biome ci .
+      - name: Every function has a TSDoc block (oxlint + eslint-plugin-jsdoc)
+        run: bun run lint:docs
       - name: Typecheck
         run: bun run typecheck
       - name: Fallow (dead code, unused deps, architecture boundaries, duplication)

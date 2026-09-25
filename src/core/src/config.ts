@@ -17,7 +17,19 @@ export class ConfigError extends Error {
   override name = "ConfigError";
 }
 
-/** Reads `[tool.inwards]` from the text of a `pyproject.toml`. */
+/**
+ * Reads `[tool.inwards]` from the text of a `pyproject.toml`.
+ * Validates every field the engine relies on and throws a ConfigError that
+ * names the bad key, so adapters can show the message as is.
+ *
+ * `root` defaults to `.` and has backslashes turned into slashes. Layer names
+ * must be unique and non-empty; each layer needs a list of non-empty module
+ * prefixes. The TOML parser's own error is kept as `cause`.
+ *
+ * @param pyprojectText - the full text of the `pyproject.toml` file.
+ * @returns the validated configuration.
+ * @throws {ConfigError} when the TOML is invalid or the table is missing or malformed.
+ */
 export function parseConfig(pyprojectText: string): InwardsConfig {
   let doc: unknown;
   try {
@@ -56,10 +68,24 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
   return { root: root.replaceAll("\\", "/"), layers: parsed };
 }
 
+/**
+ * Tells whether a parsed value is a table (or array) whose keys can be read.
+ * Used to walk untrusted TOML without casts.
+ *
+ * @param value - any value from the parsed document.
+ * @returns true when the value is a non-null object.
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * Tells whether a layer's `modules` value is a list of module prefixes.
+ * An empty list passes; an empty string inside it does not.
+ *
+ * @param value - the raw `modules` value of one layer.
+ * @returns true when every entry is a non-empty string.
+ */
 function isModuleList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((m) => typeof m === "string" && m !== "");
 }

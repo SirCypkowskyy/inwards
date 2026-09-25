@@ -8,7 +8,17 @@ export const LAYER_RULE = {
   docs: `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`,
 } as const;
 
-/** Index of the layer that owns `module`, or -1. The longest matching prefix wins. */
+/**
+ * Finds the layer that owns a module.
+ * A prefix matches the module itself or any submodule (`shop.domain` owns
+ * `shop.domain.order` but not `shop.domainx`). When several layers match,
+ * the longest prefix wins, so a nested package can sit in a different layer
+ * from its parent.
+ *
+ * @param module - dotted module name, e.g. `shop.domain.order`.
+ * @param layers - the configured layers, innermost first.
+ * @returns the index of the owning layer, or -1 when no layer owns it.
+ */
 export function layerIndexOf(module: string, layers: readonly LayerSpec[]): number {
   let best = -1;
   let bestLength = -1;
@@ -24,7 +34,17 @@ export function layerIndexOf(module: string, layers: readonly LayerSpec[]): numb
   return best;
 }
 
-/** INW001: dependencies point inward. An inner layer never imports an outer one. */
+/**
+ * Applies INW001: dependencies point inward.
+ * An inner layer never imports an outer one. Imports of the same layer, of
+ * inner layers, and of modules outside every layer are allowed. A file that
+ * belongs to no layer is not checked at all.
+ *
+ * @param file - the file the imports come from.
+ * @param imports - the imports found in that file.
+ * @param layers - the configured layers, innermost first.
+ * @returns one diagnostic per import that points outward.
+ */
 export function checkLayers(
   file: SourceFile,
   imports: readonly ImportRef[],
@@ -63,6 +83,17 @@ export function checkLayers(
   return out;
 }
 
+/**
+ * Writes the repair advice attached to an INW001 diagnostic.
+ * The steps are aimed at a coding agent: remove the import, add a Protocol in
+ * the inner layer, and wire the outer implementation at the composition root.
+ * E2E snapshots pin this wording.
+ *
+ * @param source - the inner layer that made the import.
+ * @param target - the outer layer it imported from.
+ * @param ref - the offending import.
+ * @returns the summary and numbered steps of the fix.
+ */
 function fixFor(source: LayerSpec, target: LayerSpec, ref: ImportRef): Diagnostic["fix"] {
   const home = source.modules[0] ?? source.name;
   const symbol = ref.target.split(".").at(-1) ?? ref.target;

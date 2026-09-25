@@ -5,10 +5,25 @@ import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 
 // Exit codes and output shape for the common paths are pinned by e2e.test.ts.
 // These are the edge cases around what gets checked at all.
+/**
+ * Runs `inwards hook claude-code` in a project with the given payload.
+ *
+ * @param root - the project directory, used as the working directory.
+ * @param stdin - the payload text.
+ * @returns the exit code and output.
+ */
 function hook(root: string, stdin: string): RunResult {
   return inwards(["hook", "claude-code"], { cwd: root, stdin });
 }
 
+/**
+ * Builds a PostToolUse Write payload for one file path.
+ *
+ * @param root - the project root that `{{ROOT}}` expands to.
+ * @param filePath - the `tool_input.file_path` to report, absolute or relative.
+ * @param extra - top-level fields to override, e.g. `{ cwd: undefined }`.
+ * @returns the payload as JSON text.
+ */
 function at(root: string, filePath: string, extra: Record<string, unknown> = {}): string {
   return payload("post-write-order", root, { tool_input: { file_path: filePath }, ...extra });
 }
@@ -53,6 +68,12 @@ describe("inwards hook claude-code", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
     const elsewhere = project({});
     const input = at(root, join(root, "shop/domain/order.py"));
+    /**
+     * Runs the hook with CLAUDE_PROJECT_DIR set.
+     *
+     * @param dir - the value for CLAUDE_PROJECT_DIR.
+     * @returns the exit code and output.
+     */
     function run(dir: string): RunResult {
       return inwards(["hook", "claude-code"], {
         cwd: root,

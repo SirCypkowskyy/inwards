@@ -13,10 +13,24 @@ const root = project({ "pyproject.toml": LAYERS, ...files });
 const DURATION = /"durationMs":[\d.]+/gu;
 const JSON_SUFFIX = /\.json$/u;
 
+/**
+ * Masks the parts of CLI output that change between runs: duration and version.
+ *
+ * @param s - raw stdout or stderr.
+ * @returns the text with `durationMs` set to 0 and the version as `<version>`.
+ */
 function stable(s: string): string {
   return s.replace(DURATION, '"durationMs":0').replaceAll(`"${VERSION}"`, '"<version>"');
 }
 
+/**
+ * Runs the CLI and masks run-dependent output, ready for a snapshot.
+ *
+ * @param cwd - the project directory.
+ * @param args - CLI arguments.
+ * @param stdin - text for stdin, if any.
+ * @returns the exit code and masked output.
+ */
 function run(cwd: string, args: string[], stdin?: string): RunResult {
   const { code, stdout, stderr } = inwards(args, { cwd, stdin });
   return { code, stdout: stable(stdout), stderr: stable(stderr) };

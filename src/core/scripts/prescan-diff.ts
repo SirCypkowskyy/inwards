@@ -23,6 +23,12 @@ import {
 } from "../src/python.ts";
 import type { ImportRef } from "../src/types.ts";
 
+/**
+ * Reads a WASM file from an installed package.
+ *
+ * @param spec - a module specifier such as `web-tree-sitter/web-tree-sitter.wasm`.
+ * @returns the file's bytes.
+ */
 function wasm(spec: string): Uint8Array {
   return new Uint8Array(readFileSync(Bun.resolveSync(spec, import.meta.dir)));
 }
@@ -37,12 +43,29 @@ const PERCENT = 100;
 /** Misses printed in full; the count covers the rest. */
 const MISSES_SHOWN = 20;
 
+/**
+ * Identifies an import by line and target, the fields both parses must agree on.
+ * Two imports of the same target on one line collapse into one key.
+ *
+ * @param r - an import found by either parse.
+ * @returns `line:target`.
+ */
 function key(r: ImportRef): string {
   return `${r.line}:${r.target}`;
 }
 
 type Outcome = { refused: true } | { refused: false; missed: string[]; extra: number };
 
+/**
+ * Extracts one file's imports with the prescan and with a full parse, and compares.
+ * An import only the full parse finds is a miss (a prescan bug); one only the
+ * prescan finds is an extra (harmless, the engine confirms violations).
+ *
+ * @param rel - the file's path, used for its module name and in messages.
+ * @param raw - the file's text before normalisation.
+ * @returns refused when the prescan declined the file, else its misses and extra count.
+ * @throws {Error} when tree-sitter returns no tree.
+ */
 function compare(rel: string, raw: string): Outcome {
   const file = { path: rel, text: normalizeSource(raw), ...moduleNameFor(rel) };
   const fastRefs = skeletonImports(parser, file);
@@ -63,6 +86,14 @@ function compare(rel: string, raw: string): Outcome {
   return { refused: false, missed, extra };
 }
 
+/**
+ * Runs the comparison over a corpus and prints a one-line summary.
+ * Prints up to 20 misses in full to stderr.
+ *
+ * @param corpus - a label for the summary line.
+ * @param entries - `[path, text]` pairs.
+ * @returns true when the prescan missed no import.
+ */
 function check(corpus: string, entries: Iterable<[string, string]>): boolean {
   let files = 0;
   let refused = 0;
@@ -156,10 +187,24 @@ const FORMS = [
 const STRING_OR_COMMENT = /^(?:s = |#)|\r/u;
 const CONTEXTS = FORMS.filter((f) => STRING_OR_COMMENT.exec(f) !== null);
 
+/**
+ * Replaces the placeholder `M` with a module name unique to one slot of a combination.
+ *
+ * @param text - a form from FORMS.
+ * @param tag - `a`, `b` or `c`, the slot the form fills.
+ * @returns the form importing `pkg.m<tag>`.
+ */
 function named(text: string, tag: string): string {
   return text.replaceAll("M", `pkg.m${tag}`);
 }
 
+/**
+ * Produces a file in three encodings: LF, CRLF, and LF with a BOM.
+ *
+ * @param name - the path without extension.
+ * @param text - the file's text with LF line breaks.
+ * @returns three `[path, text]` pairs.
+ */
 function variants(name: string, text: string): [string, string][] {
   return [
     [`${name}.py`, text],
@@ -168,6 +213,14 @@ function variants(name: string, text: string): [string, string][] {
   ];
 }
 
+/**
+ * Generates the adversarial corpus.
+ * Every pair of FORMS, plus every string-or-comment context around every
+ * form, each in three encodings. Most misses come from one line changing how
+ * the prescan reads the next.
+ *
+ * @yields `[path, text]` pairs.
+ */
 function* generated(): Generator<[string, string]> {
   for (const [i, a] of FORMS.entries()) {
     for (const [j, b] of FORMS.entries()) {
@@ -186,6 +239,12 @@ function* generated(): Generator<[string, string]> {
   }
 }
 
+/**
+ * Reads every .py file under a directory, skipping files that cannot be read.
+ *
+ * @param dir - the directory to scan, e.g. the Python stdlib.
+ * @yields `[path relative to dir, text]` pairs.
+ */
 function* pythonFilesUnder(dir: string): Generator<[string, string]> {
   for (const rel of new Glob("**/*.py").scanSync(dir)) {
     try {

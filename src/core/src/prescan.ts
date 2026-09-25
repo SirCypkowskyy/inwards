@@ -23,6 +23,21 @@ interface Skeleton {
 const STARTS_IMPORT = /^(?<pad>[ \t]*)(?:import[ \t]|from[ \t][^#]*[ \t]import\b)/u;
 const MENTIONS_IMPORT = /\bimport\b/u;
 
+/**
+ * Reduces a Python file to its import lines, keeping every line number.
+ * Lines that start an import are copied (dedented, with their parenthesised
+ * or backslash-continued tail); every other line becomes empty.
+ *
+ * Returns null, which means "parse the whole file instead", when:
+ * - a line mentions `import` but does not start an import and is not a
+ *   comment (`x = 1; import os`, `if a: import b`, text inside a string);
+ * - a line after a backslash continuation mentions `import`
+ *   (`from x \` then `import y`);
+ * - an import's parentheses or continuation never close before the end of file.
+ *
+ * @param source - normalised file text (no BOM, no lone \r).
+ * @returns the skeleton text and per-row dedent, or null to force a full parse.
+ */
 function importSkeleton(source: string): Skeleton | null {
   const lines = source.split("\n");
   const out: string[] = new Array<string>(lines.length).fill("");
@@ -51,6 +66,18 @@ function importSkeleton(source: string): Skeleton | null {
   return { text: out.join("\n"), indent };
 }
 
+/**
+ * Copies one logical import line into the skeleton.
+ * A logical line runs until its parentheses balance and it does not end in a
+ * backslash. The first row is dedented by `pad` columns; later rows are
+ * copied as is.
+ *
+ * @param lines - all rows of the file.
+ * @param first - index of the row where the import starts.
+ * @param pad - leading whitespace width removed from the first row.
+ * @param into - skeleton rows and per-row dedent, written in place.
+ * @returns the index of the last row copied, or null if the file ends first.
+ */
 function copyLogicalLine(
   lines: readonly string[],
   first: number,
@@ -72,6 +99,14 @@ function copyLogicalLine(
   return null;
 }
 
+/**
+ * Counts opening minus closing parentheses on one row.
+ * Stops at `#`, so parentheses in a trailing comment do not count. Brackets
+ * inside strings are counted; a skeleton that parses badly is caught later.
+ *
+ * @param text - one row of source.
+ * @returns the net change in parenthesis depth.
+ */
 function parenBalance(text: string): number {
   let balance = 0;
   for (const ch of text) {
@@ -87,6 +122,13 @@ function parenBalance(text: string): number {
   return balance;
 }
 
+/**
+ * Tells whether a row continues onto the next one with a backslash.
+ * Trailing whitespace after the backslash is ignored.
+ *
+ * @param line - one row of source.
+ * @returns true when the row ends in `\`.
+ */
 function endsWithBackslash(line: string): boolean {
   return line.trimEnd().endsWith("\\");
 }
@@ -98,7 +140,19 @@ const SKELETON_NODES = new Set([
   "comment",
 ]);
 
-/** Imports read from the skeleton, with real columns. Null means: do the full parse. */
+/**
+ * Reads imports from the skeleton, with columns mapped back to the real file.
+ * Returns null (do the full parse) when the prescan refuses the file or when
+ * the skeleton does not parse into imports and comments only.
+ *
+ * A skeleton with a parse error, or with any node other than an import or a
+ * comment, is not trusted (the comment in the body shows how that happens).
+ * `src/core/scripts/prescan-diff.ts` checks that this never misses an import.
+ *
+ * @param parser - parser with the Python grammar loaded.
+ * @param file - the source file, with normalised text.
+ * @returns the imports with real spans, or null to force a full parse.
+ */
 export function skeletonImports(parser: Parser, file: SourceFile): ImportRef[] | null {
   const skeleton = importSkeleton(file.text);
   if (!skeleton) {
