@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
-import { agentWrites, git, put, session, stop } from "./stop-helpers.ts";
+import { agentWrites, git, LEAK, put, session, stop } from "./stop-helpers.ts";
 
 const INTO_PERSISTENCE = "from shop.persistence import repo\n";
 
@@ -162,5 +162,14 @@ describe("INW006: moves the prefix check alone would miss", () => {
     rmSync(join(root, "shop/domain/old.py"));
     agentWrites(root, "setup.py", "from setuptools import setup\n");
     expect(stop(root).code).toBe(0);
+  });
+
+  test("a renamed and edited move next to the layer still fails the gate", () => {
+    const root = session();
+    put(root, "shop/core/__init__.py", "");
+    git(root, "mv", "shop/domain/order.py", "shop/core/orders.py");
+    agentWrites(root, "shop/core/orders.py", LEAK);
+    agentWrites(root, "shop/domain/__init__.py", "");
+    expect(stop(root).code).toBe(2);
   });
 });

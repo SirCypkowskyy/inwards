@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseConfig } from "../src/index.ts";
-import { checkPrefixes } from "../src/unassigned.ts";
+import { checkPrefixes } from "../src/layout.ts";
 import { check, engine, file, OWNERS } from "./helpers.ts";
 
 describe("INW006 unassigned-module", () => {

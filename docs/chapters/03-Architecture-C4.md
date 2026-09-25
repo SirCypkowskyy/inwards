@@ -119,7 +119,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>dynamic.ts: INW011<br/>unassigned.ts: INW006<br/>encoding.ts: INW000</small>"]
+        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>reporters.ts<br/>text · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
@@ -281,7 +281,8 @@ src/
 │   │   ├── rules.ts       # rule registry: code, name, severity, docs
 │   │   ├── layers.ts      # INW001 + fix composer
 │   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
-│   │   ├── unassigned.ts  # INW006: code outside every layer, dead prefixes
+│   │   ├── unassigned.ts  # INW006: code outside every layer, first-party probe
+│   │   ├── layout.ts      # INW006: dead prefixes, layer code moved out of every layer
 │   │   ├── callees.ts     # which calls are loaders, through aliases
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
