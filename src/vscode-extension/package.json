@@ -2,7 +2,7 @@
   "name": "inwards-vscode",
   "displayName": "Inwards",
   "description": "Architecture rules for Python, live in the editor. Same engine as `inwards check`.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "publisher": "inwards",
   "engines": {

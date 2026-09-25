@@ -44,6 +44,57 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 
 Once attestations are published, `gh attestation verify <file> --repo SirCypkowskyy/inwards` checks that a binary was built by this repository's release workflow.
 
+## As a uv dev dependency
+
+Each release also has one wheel per platform with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the binary). uv installs it like any other package, and `inwards` lands in the project's virtual environment:
+
+```sh
+TAG=v0.1.0-rc.1; VER=0.1.0rc1   # the release, and its Python version
+uv add --dev "inwards @ https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl"
+uv run inwards check
+uvx --from "https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl" inwards --version   # one-off, no project
+```
+
+Pick the wheel for your platform: `manylinux_2_17_x86_64`, `manylinux_2_17_aarch64`, `macosx_13_0_arm64`, `macosx_13_0_x86_64` or `win_amd64`. For a team on several platforms, give uv one source per platform in `pyproject.toml`. List all five: on a platform no marker matches, uv falls back to PyPI, which holds only a placeholder until the first PyPI release.
+
+```toml title="pyproject.toml"
+[dependency-groups]
+dev = ["inwards"]
+
+[tool.uv.sources]
+inwards = [
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_x86_64.whl", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_arm64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'arm64'" },
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_x86_64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'x86_64'" },
+  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-win_amd64.whl", marker = "sys_platform == 'win32'" },
+]
+```
+
+No marker tells glibc from musl, so on Alpine `uv sync` stops with "incompatible platform"; use the binary there.
+
+!!! warning "While the repository is private"
+    GitHub serves a private repository's release files only through its API, which uv can't call, so these URLs return 404 even with a token. Download the wheels with the GitHub CLI and tell uv to look in that folder. uv then picks the wheel for each platform:
+
+    ```sh
+    gh release download v0.1.0-rc.1 --repo SirCypkowskyy/inwards --pattern '*.whl' --dir wheels
+    ```
+
+    ```toml title="pyproject.toml"
+    [tool.uv]
+    find-links = ["wheels"]
+    prerelease = "allow"
+    ```
+
+    ```sh
+    uv add --dev inwards
+    uv run inwards --version
+    ```
+
+`inwards --version` prints the release it was built from without the pre-release suffix (`0.1.0` for `0.1.0rc1`).
+
+Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), this becomes `uv add --dev inwards`.
+
 ## From source
 
 You need [Bun](https://bun.sh) 1.4.2 (the version in `.bun-version`) and access to the repository.
