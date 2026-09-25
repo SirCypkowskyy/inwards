@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { readSession } from "../src/session.ts";
 import { inwards, inwardsAsync, LAYERS, payload, project, type RunResult } from "./run.ts";
@@ -22,10 +30,11 @@ function hook(root: string, stdin: string): RunResult {
  *
  * @param root - the project directory.
  * @param id - the session id to report.
+ * @param source - startup, resume, clear or compact.
  * @returns the exit code and output.
  */
-function start(root: string, id: string = ID): RunResult {
-  return hook(root, payload("session-start", root, { session_id: id }));
+function start(root: string, id: string = ID, source = "startup"): RunResult {
+  return hook(root, payload("session-start", root, { session_id: id, source }));
 }
 
 /**
@@ -43,13 +52,26 @@ function edit(root: string, file: string): string {
 }
 
 describe("session state", () => {
-  test("SessionStart records the config and a manifest, silently", () => {
-    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+  test("SessionStart records every config and a manifest, silently", () => {
+    const root = project({
+      "pyproject.toml": LAYERS,
+      "pkg/pyproject.toml": LAYERS,
+      "shop/domain/order.py": "X = 1\n",
+    });
     expect(start(root)).toEqual({ code: 0, stdout: "", stderr: "" });
     const state = readSession(realpathSync(root), ID);
-    expect(state?.start.config.layers.map((l) => l.name)).toEqual(["domain", "infrastructure"]);
+    expect(Object.keys(state?.start.configs ?? {}).sort()).toEqual([
+      "pkg/pyproject.toml",
+      "pyproject.toml",
+    ]);
     expect(Object.keys(state?.start.manifest ?? {})).toEqual(["shop/domain/order.py"]);
     expect(state?.start.head).toBeNull(); // not a git repo
+  });
+
+  test("a project without [tool.inwards] gets no state", () => {
+    const root = project({ "shop/domain/order.py": "X = 1\n" });
+    start(root);
+    expect(readdirSync(root)).not.toContain(".inwards");
   });
 
   test("edits and the fingerprints of their violations are recorded", () => {
@@ -92,27 +114,67 @@ describe("session state", () => {
     expect(readdirSync(root)).not.toContain(".inwards");
   });
 
-  test("without its start record, a session has no state (callers fail closed)", () => {
+  test("deleting .inwards mid-session can't be undone by an edit, a resume or a compact", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
     start(root);
     rmSync(join(root, ".inwards"), { recursive: true });
-    hook(root, edit(root, "shop/domain/order.py")); // recreates the log without a start
+    hook(root, edit(root, "shop/domain/order.py"));
+    start(root, ID, "compact");
+    start(root, ID, "resume");
     expect(readSession(realpathSync(root), ID)).toBeUndefined();
   });
 
-  test("a new session prunes logs past 50 or older than a week", () => {
+  test("a resume keeps the original start", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+    start(root);
+    writeFileSync(join(root, "shop/domain/new.py"), "Y = 2\n");
+    start(root, ID, "resume");
+    const manifest = readSession(realpathSync(root), ID)?.start.manifest ?? {};
+    expect(Object.keys(manifest)).toEqual(["shop/domain/order.py"]);
+  });
+
+  test("a symlinked .inwards pointing outside the project is refused", () => {
+    const outside = project({});
+    writeFileSync(join(outside, "victim.jsonl"), "keep me\n");
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+    symlinkSync(outside, join(root, ".inwards"));
+    expect(start(root).code).toBe(1);
+    expect(readdirSync(outside)).toEqual(["victim.jsonl"]);
+  });
+
+  test("a tampered log line is skipped, not fatal", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+    start(root);
+    writeFileSync(
+      join(root, `.inwards/state/${ID}.jsonl`),
+      '{"t":"edit","at":"x","file":"a.py","fingerprints":"not-an-array"}\n',
+    );
+    expect(readSession(realpathSync(root), ID)?.edited).toEqual([]);
+  });
+
+  test("a new session prunes others past 50 or older than a week, never itself", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
     const dir = join(root, ".inwards/state");
+    mkdirSync(dir, { recursive: true });
     for (let i = 0; i < 55; i += 1) {
-      start(root, `old-${i}`);
+      writeFileSync(join(dir, `old-${i}.jsonl`), "");
     }
-    writeFileSync(join(dir, "ancient.jsonl"), "");
+    writeFileSync(join(dir, "ancient.start.json"), "{}");
     const eightDaysAgo = (Date.now() - 8 * 86_400_000) / 1000;
-    utimesSync(join(dir, "ancient.jsonl"), eightDaysAgo, eightDaysAgo);
+    utimesSync(join(dir, "ancient.start.json"), eightDaysAgo, eightDaysAgo);
     start(root, "newest");
     const left = readdirSync(dir);
-    expect(left.length).toBeLessThanOrEqual(51);
-    expect(left).not.toContain("ancient.jsonl");
-    expect(left).toContain("newest.jsonl");
+    expect(left.filter((n) => n.startsWith("old-")).length).toBe(49);
+    expect(left).not.toContain("ancient.start.json");
+    expect(left).toContain("newest.start.json");
+  });
+
+  test("edited paths stay project-relative when the payload names a symlinked path (macOS /var)", () => {
+    const real = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+    const link = `${real}-link`;
+    symlinkSync(real, link);
+    start(real);
+    hook(real, edit(link, "shop/domain/order.py"));
+    expect(readSession(realpathSync(real), ID)?.edited).toEqual(["shop/domain/order.py"]);
   });
 });

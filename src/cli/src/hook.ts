@@ -42,9 +42,10 @@ export async function hookClaudeCode(usage: string): Promise<number> {
 }
 
 /**
- * Records where a session starts: HEAD, the `[tool.inwards]` table and a
- * content-hash manifest of the Python files, for the Stop gate and the config
- * guard. Silent on success, since SessionStart output is shown to the model.
+ * Records where a session starts (at startup or /clear): HEAD, every
+ * `[tool.inwards]` table and a content-hash manifest of the Python files, for
+ * the Stop gate and the config guard. A resume or compact only logs itself.
+ * Silent on success, since SessionStart output is shown to the model.
  *
  * @param input - the hook payload.
  * @returns 0, or 1 (shown to the user only) when the state can't be written.
@@ -52,12 +53,12 @@ export async function hookClaudeCode(usage: string): Promise<number> {
 function sessionStart(input: Record<string, unknown>): number {
   const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
   const id = input["session_id"];
-  const configPath = project && findConfig(project, project);
-  if (!(project && configPath && isSessionId(id))) {
+  if (!(project && isSessionId(id))) {
     return 0;
   }
+  const source = typeof input["source"] === "string" ? input["source"] : "startup";
   try {
-    recordStart(project, id, configPath);
+    recordStart(project, id, source);
     return 0;
   } catch (err) {
     return print(
