@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "stratum-monorepo",
+      "name": "inwards-monorepo",
       "devDependencies": {
         "@biomejs/biome": "^2.5.14",
         "@types/bun": "^1.4.2",
@@ -11,19 +11,19 @@
       },
     },
     "src/cli": {
-      "name": "@stratum-lint/cli",
+      "name": "@inwards/cli",
       "version": "0.1.0",
       "bin": {
-        "stratum": "./src/main.ts",
+        "inwards": "./src/main.ts",
       },
       "dependencies": {
-        "@stratum-lint/core": "workspace:*",
+        "@inwards/core": "workspace:*",
         "tree-sitter-python": "0.25.0",
         "web-tree-sitter": "0.27.0",
       },
     },
     "src/core": {
-      "name": "@stratum-lint/core",
+      "name": "@inwards/core",
       "version": "0.1.0",
       "dependencies": {
         "smol-toml": "^1.9.0",
@@ -32,10 +32,10 @@
       },
     },
     "src/vscode-extension": {
-      "name": "stratum-vscode",
+      "name": "inwards-vscode",
       "version": "0.1.0",
       "dependencies": {
-        "@stratum-lint/core": "workspace:*",
+        "@inwards/core": "workspace:*",
         "tree-sitter-python": "0.25.0",
         "vscode-languageclient": "^10.1.2",
         "vscode-languageserver": "^10.1.2",
@@ -67,9 +67,9 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.14", "", { "os": "win32", "cpu": "x64" }, "sha512-oJWmBhoHsnhUKIke+0gXDX0mltJrWHA1UyHsrTlXwX0TL64ilVZAo+TYZm97baecV0esBdpzy3k96q+09JaZUQ=="],
 
-    "@stratum-lint/cli": ["@stratum-lint/cli@workspace:src/cli"],
+    "@inwards/cli": ["@inwards/cli@workspace:src/cli"],
 
-    "@stratum-lint/core": ["@stratum-lint/core@workspace:src/core"],
+    "@inwards/core": ["@inwards/core@workspace:src/core"],
 
     "@types/bun": ["@types/bun@1.4.2", "", { "dependencies": { "bun-types": "1.4.2" } }, "sha512-GimotNn7+ZV0uVArItBbriZsR1oNf0+WTzPkdcFrzShI7k2norL0uzEaJT8T33dWr7O/c9ZDuAFQrctKCi72oQ=="],
 
@@ -123,6 +123,8 @@
 
     "bun-types": ["bun-types@1.4.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-bxV1FgK7yBIzjRe5zBozIM4Bem11ZJcCXSrjWRG3YWLt8yFDePu4cLjpebO8OvPeIE9trbyPF4fuj3Cia4Fj3w=="],
 
+    "inwards-vscode": ["inwards-vscode@workspace:src/vscode-extension"],
+
     "minimatch": ["minimatch@10.2.6", "", { "dependencies": { "brace-expansion": "^5.0.8" } }, "sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A=="],
 
     "node-addon-api": ["node-addon-api@8.9.2", "", {}, "sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg=="],
@@ -132,8 +134,6 @@
     "semver": ["semver@7.8.5", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="],
 
     "smol-toml": ["smol-toml@1.9.0", "", {}, "sha512-hpd+HLON7HdZXqYchMM/+LaTTbdK0AU3NngIJ4KVyWbY9bfQqdL9cD+4yf6dUoU2Ap4VsU0JkQi6FxAI1B2mXQ=="],
-
-    "stratum-vscode": ["stratum-vscode@workspace:src/vscode-extension"],
 
     "tree-sitter-python": ["tree-sitter-python@0.25.0", "", { "dependencies": { "node-addon-api": "^8.5.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.25.0" }, "optionalPeers": ["tree-sitter"] }, "sha512-eCmJx6zQa35GxaCtQD+wXHOhYqBxEL+bp71W/s3fcDMu06MrtzkVXR437dRrCrbrDbyLuUDJpAgycs7ncngLXw=="],
 

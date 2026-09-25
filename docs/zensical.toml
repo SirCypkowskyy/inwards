@@ -1,13 +1,17 @@
-# Zensical site for the Stratum architecture docs.
+# Zensical site for the Inwards architecture docs.
 #   uv run zensical serve -f docs/zensical.toml          # live preview
 #   uv run zensical build -f docs/zensical.toml --clean  # writes docs/site/
-# docs/wrangler.jsonc then ships docs/site/ to Cloudflare Workers static assets.
+# .github/workflows/docs.yml publishes docs/site/ to GitHub Pages (ADR-012).
+# docs/wrangler.jsonc keeps the Cloudflare Workers option ready (docs-cloudflare.yml).
 
 [project]
-site_name = "Stratum"
+site_name = "Inwards"
+site_url = "https://sircypkowskyy.github.io/inwards/"
+repo_url = "https://github.com/SirCypkowskyy/inwards"
+repo_name = "SirCypkowskyy/inwards"
 site_description = "Architecture linter for Python that keeps AI coding agents inside your layers."
-site_author = "Stratum maintainers"
-copyright = "Copyright &copy; 2026 Stratum maintainers"
+site_author = "Inwards maintainers"
+copyright = "Copyright &copy; 2026 Inwards maintainers"
 docs_dir = "chapters"
 site_dir = "site"
 

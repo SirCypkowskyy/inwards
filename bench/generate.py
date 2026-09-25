@@ -1,7 +1,7 @@
 """Generate the synthetic layered repo used in docs chapter 6.
 
-    python3 bench/generate.py /tmp/stratum-bench     # 2,100 files, ~496k lines
-    cd /tmp/stratum-bench && stratum check
+    python3 bench/generate.py /tmp/inwards-bench     # 2,100 files, ~496k lines
+    cd /tmp/inwards-bench && inwards check
 
 Every import points inward, so a correct run reports 0 violations.
 """
@@ -21,7 +21,7 @@ BODY = "\n".join(
     for i in range(FUNCTIONS_PER_MODULE)
 )
 
-CONFIG = """[tool.stratum]
+CONFIG = """[tool.inwards]
 root = "src"
 layers = [
   { name = "domain", modules = ["shop.domain"] },
@@ -50,4 +50,4 @@ def main(out: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1] if len(sys.argv) > 1 else "stratum-bench"))
+    main(Path(sys.argv[1] if len(sys.argv) > 1 else "inwards-bench"))

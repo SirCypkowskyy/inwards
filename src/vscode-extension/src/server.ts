@@ -6,7 +6,7 @@ import {
   Engine,
   moduleNameFor,
   parseConfig,
-} from "@stratum-lint/core";
+} from "@inwards/core";
 import {
   createConnection,
   type Diagnostic,
@@ -34,13 +34,13 @@ connection.onInitialize(async (params) => {
       );
       state = { engine, root: resolve(dirname(configPath), config.root) };
     } catch (err) {
-      connection.console.warn(`Stratum disabled: ${String(err)}`);
+      connection.console.warn(`Inwards disabled: ${String(err)}`);
     }
   }
   return { capabilities: { textDocumentSync: 1 } }; // full sync: the engine is fast enough
 });
 
-// Same engine, same rules as `stratum check`, run on every keystroke.
+// Same engine, same rules as `inwards check`, run on every keystroke.
 documents.onDidChangeContent(({ document }) => {
   if (!state) return;
   const path = fileURLToPath(document.uri);
@@ -61,7 +61,7 @@ function toLsp(d: CoreDiagnostic): Diagnostic {
     severity: d.severity === "error" ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning,
     code: d.code,
     codeDescription: { href: d.docs },
-    source: "stratum",
+    source: "inwards",
     message: `${d.message}\n${d.fix.summary}`,
   };
 }

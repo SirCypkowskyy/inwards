@@ -1,6 +1,6 @@
 # :material-chart-timeline-variant: Business context
 
-This chapter looks at who else is in this space, what their designs teach us, and where the gap is. It ends with the hypothesis Stratum has to prove, plus the actors and use cases that follow from it.
+This chapter looks at who else is in this space, what their designs teach us, and where the gap is. It ends with the hypothesis Inwards has to prove, plus the actors and use cases that follow from it.
 
 All facts about other tools were checked against their docs, changelogs and registries on 2026-09-25. Links are at the bottom.
 
@@ -30,7 +30,7 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 
     **Architecture support:** `noImportCycles`, `noPrivateImports` and `noRestrictedImports`. Its own docs call `noImportCycles` "computationally expensive". There is no layer model.
 
-    **Lesson for us:** Biome is the first mainstream linter to design an output format for agents. Its token-efficiency argument applies directly to Stratum.
+    **Lesson for us:** Biome is the first mainstream linter to design an output format for agents. Its token-efficiency argument applies directly to Inwards.
 
 === ":material-stethoscope: React Doctor"
 
@@ -77,7 +77,7 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 | import-linter | :white_check_mark: | :white_check_mark: | yes | static text per contract | :x: | :x: | :x: |
 | pytest-archon | :white_check_mark: | :white_check_mark: | yes (code must import) | :x: | :x: | :x: | :x: |
 | Tach | :white_check_mark: | :white_check_mark: | yes (pip package, Rust extension) | :x: | :x: | :x: | ? |
-| **Stratum** (target) | :white_check_mark: | :white_check_mark: | no (single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| **Inwards** (target) | :white_check_mark: | :white_check_mark: | no (single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 
 `?` means we couldn't verify it. "Repair guidance" is about telling the reader what to change. Autofix, where the tool rewrites the code itself, is a stronger form of it.
 
@@ -91,14 +91,14 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 
 ## Positioning
 
-The coordinates are our qualitative reading of the research above, not a measurement. Stratum's dot marks where it's aiming, not where it is today.
+The coordinates are our qualitative reading of the research above, not a measurement. Inwards' dot marks where it's aiming, not where it is today.
 
 ```mermaid
 quadrantChart
     title Where the tools sit
     x-axis "Generic code rules" --> "Architecture rules"
     y-axis "Built for humans" --> "Built for agent loops"
-    quadrant-1 "Stratum's target"
+    quadrant-1 "Inwards' target"
     quadrant-2 "Agent-aware linters"
     quadrant-3 "Classic linters"
     quadrant-4 "Architecture tests"
@@ -110,10 +110,10 @@ quadrantChart
     import-linter: [0.85, 0.3]
     pytest-archon: [0.8, 0.1]
     Tach: [0.75, 0.2]
-    Stratum target: [0.9, 0.9]
+    Inwards target: [0.9, 0.9]
 ```
 
-Stratum's position in one sentence: **import-linter's rules, React Doctor's agent integration, Ruff's distribution.**
+Inwards' position in one sentence: **import-linter's rules, React Doctor's agent integration, Ruff's distribution.**
 
 ### :material-target-account: Who it's for first
 
@@ -129,13 +129,13 @@ Each part below has a number attached and a condition that would make us drop it
 
 | We believe | We'll know it's true when | We'll drop or rethink it if |
 |---|---|---|
-| Agents break layering often enough to hurt | In 5 design-partner repos, Stratum finds at least one real violation per 1,000 agent-written lines | Violations are rare after the first cleanup |
+| Agents break layering often enough to hurt | In 5 design-partner repos, Inwards finds at least one real violation per 1,000 agent-written lines | Violations are rare after the first cleanup |
 | The fix steps work for models | ≥ 80 % of violations are fixed by the agent within one retry, without a human | < 50 % fixed on the first retry |
 | Hooks are the channel that matters | ≥ 60 % of active installs have an agent hook enabled | People only run it in CI, where import-linter already serves them |
 | Speed is the moat against import-linter | Median hook run < 100 ms on design-partner repos | grimp's Rust core closes the gap and import-linter ships JSON and hooks |
-| There's room next to Astral | Stratum is adopted alongside Ruff and ty, not instead of them | ty or Ruff ships layer contracts. It already has the resolver and the graph, and the OpenAI deal gives it a Codex channel |
+| There's room next to Astral | Inwards is adopted alongside Ruff and ty, not instead of them | ty or Ruff ships layer contracts. It already has the resolver and the graph, and the OpenAI deal gives it a Codex channel |
 
-**How we'll measure.** The agent hook will write one JSON line per run to `.stratum/runs.jsonl`: timestamp, files checked, violations, duration, and whether the same violation reappeared on the next run. The log stays local and is off by default. Design partners share it by choice. "Fixed within one retry" means the violation is gone on the next hook run for the same file. "Agent-written lines" come from the hook's own edit events, so we never guess authorship from git.
+**How we'll measure.** The agent hook will write one JSON line per run to `.inwards/runs.jsonl`: timestamp, files checked, violations, duration, and whether the same violation reappeared on the next run. The log stays local and is off by default. Design partners share it by choice. "Fixed within one retry" means the violation is gone on the next hook run for the same file. "Agent-written lines" come from the hook's own edit events, so we never guess authorship from git.
 
 **Business model: open question.** The CLI, engine and editor extension are meant to be open source. Whether anything is ever paid for (a hosted drift dashboard, curated rule packs for common architectures) isn't decided. It depends on the adoption numbers above, so it stays out of scope for now.
 
@@ -153,7 +153,7 @@ The hypothesis fails if real-world repos (not synthetic ones) push the single-fi
 
 ## Actors
 
-| | Actor | What they want from Stratum |
+| | Actor | What they want from Inwards |
 |---|---|---|
 | :material-account-hard-hat: | **Architect / tech lead** | Write the architecture once, as config, and trust that it holds |
 | :material-account: | **Developer** | Hear about a violation while typing, not in code review |
@@ -170,7 +170,7 @@ flowchart LR
     agent(["🤖 AI agent"])
     ci(["⚙️ CI"])
 
-    subgraph S["Stratum"]
+    subgraph S["Inwards"]
         UC1["UC1 Declare layers"]
         UC2["UC2 Check after each edit"]
         UC3["UC3 Gate before 'done'"]
@@ -191,13 +191,13 @@ flowchart LR
 
 | ID | Use case | Trigger | Outcome | Status |
 |---|---|---|---|---|
-| UC1 | Declare layers | Architect edits `[tool.stratum]` | Config validates, and errors name the offending key | :white_check_mark: |
-| UC2 | Check after each edit | Agent writes a `.py` file; a PostToolUse hook runs `stratum check <file> --format json` | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: engine, :material-progress-clock: installer |
+| UC1 | Declare layers | Architect edits `[tool.inwards]` | Config validates, and errors name the offending key | :white_check_mark: |
+| UC2 | Check after each edit | Agent writes a `.py` file; a PostToolUse hook runs `inwards check <file> --format json` | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: engine, :material-progress-clock: installer |
 | UC3 | Gate before "done" | Agent tries to finish; a Stop hook runs a full check | The agent can't declare victory while the build is red | :material-progress-clock: |
 | UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: scaffold |
-| UC5 | Block the pull request | CI runs `stratum check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template |
-| UC6 | Adopt on a legacy codebase | Architect runs `stratum baseline` | Existing violations are recorded and only new ones fail | :material-progress-clock: |
-| UC7 | Brief the agent up front | `stratum context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: |
+| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template |
+| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :material-progress-clock: |
+| UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: |
 
 ## Sources
 

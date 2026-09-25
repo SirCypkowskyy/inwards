@@ -21,11 +21,11 @@ from rich.console import Console
 from rich.text import Text
 
 REPO = Path(__file__).resolve().parent.parent
-BINARY = REPO / "dist" / "stratum-linux-x64"
+BINARY = REPO / "dist" / "inwards-linux-x64"
 OUT = REPO / "docs" / "chapters" / "assets" / "screens"
 WIDTH = 118
 
-CONFIG = """[tool.stratum]
+CONFIG = """[tool.inwards]
 root = "clean-app"
 layers = [
   { name = "domain", modules = ["shop.domain"] },
@@ -39,7 +39,7 @@ HOOK = """#!/bin/sh
 # .claude/settings.json -> hooks.PostToolUse, matcher "Edit|Write"
 f=$(jq -r '.tool_input.file_path // empty')
 case "$f" in
-  *.py) stratum check "$f" --format json >&2 || exit 2 ;;
+  *.py) inwards check "$f" --format json >&2 || exit 2 ;;
 esac
 """
 
@@ -82,38 +82,38 @@ def main() -> None:
         work = Path(tmp) / "shop-repo"
         bindir = Path(tmp) / "bin"
         bindir.mkdir()
-        (bindir / "stratum").symlink_to(BINARY)
+        (bindir / "inwards").symlink_to(BINARY)
         shutil.copytree(REPO / "examples" / "clean-app", work / "clean-app")
         (work / "pyproject.toml").write_text(CONFIG)
         hooks = work / ".claude" / "hooks"
         hooks.mkdir(parents=True)
-        (hooks / "stratum.sh").write_text(HOOK)
+        (hooks / "inwards.sh").write_text(HOOK)
 
         bun = Path.home() / ".bun" / "bin"
         env = {**os.environ, "PATH": f"{bindir}:{bun}:{os.environ['PATH']}", "FORCE_COLOR": "1"}
         env.pop("NO_COLOR", None)
 
-        shoot("check-clean", "stratum check", [("stratum check", "stratum check")], work, env)
+        shoot("check-clean", "inwards check", [("inwards check", "inwards check")], work, env)
 
         order = work / "clean-app" / "shop" / "domain" / "order.py"
         order.write_text(order.read_text() + BAD_IMPORT)
         shoot(
             "check-violation",
-            "stratum check",
+            "inwards check",
             [
                 ("tail -1 clean-app/shop/domain/order.py", "tail -1 clean-app/shop/domain/order.py"),
-                ("stratum check", "stratum check"),
-                ("echo $?", "stratum check >/dev/null; echo $?"),
+                ("inwards check", "inwards check"),
+                ("echo $?", "inwards check >/dev/null; echo $?"),
             ],
             work,
             env,
         )
         shoot(
             "json-for-agents",
-            "stratum check --format json",
+            "inwards check --format json",
             [(
-                "stratum check --format json | jq '.summary, .diagnostics[0].fix'",
-                "stratum check --format json | jq -C '.summary, .diagnostics[0].fix'",
+                "inwards check --format json | jq '.summary, .diagnostics[0].fix'",
+                "inwards check --format json | jq -C '.summary, .diagnostics[0].fix'",
             )],
             work,
             env,
@@ -123,10 +123,10 @@ def main() -> None:
             "claude-code-hook",
             "Claude Code PostToolUse hook",
             [
-                ("cat .claude/hooks/stratum.sh", "cat .claude/hooks/stratum.sh"),
+                ("cat .claude/hooks/inwards.sh", "cat .claude/hooks/inwards.sh"),
                 (
-                    f"echo {hook_input} | sh .claude/hooks/stratum.sh 2> seen-by-claude.json; echo \"hook exit: $?\"",
-                    f"echo {hook_input} | sh .claude/hooks/stratum.sh 2> seen-by-claude.json; echo \"hook exit: $?\"",
+                    f"echo {hook_input} | sh .claude/hooks/inwards.sh 2> seen-by-claude.json; echo \"hook exit: $?\"",
+                    f"echo {hook_input} | sh .claude/hooks/inwards.sh 2> seen-by-claude.json; echo \"hook exit: $?\"",
                 ),
                 (
                     "jq '.diagnostics[0] | {code, line, fix: .fix.summary}' seen-by-claude.json",
@@ -145,7 +145,7 @@ def main() -> None:
             [
                 ("python3 bench/generate.py bench && cd bench", "true"),
                 ("find src -name '*.py' | xargs cat | wc -l", "find src -name '*.py' | xargs cat | wc -l"),
-                ("stratum check", "stratum check"),
+                ("inwards check", "inwards check"),
             ],
             bench,
             env,

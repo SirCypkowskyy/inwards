@@ -1,8 +1,8 @@
 # :material-layers-triple: Introduction
 
-Stratum is an architecture linter for Python. You write down how your codebase is layered, and `stratum check` fails the moment an import crosses a line it shouldn't. It's built to sit inside the edit loop of AI coding agents like Claude Code, Aider and Copilot, because an agent can write a week's worth of imports in an afternoon and nobody reads all of them.
+Inwards is an architecture linter for Python. You write down how your codebase is layered, and `inwards check` fails the moment an import crosses a line it shouldn't. It's built to sit inside the edit loop of AI coding agents like Claude Code, Aider and Copilot, because an agent can write a week's worth of imports in an afternoon and nobody reads all of them.
 
-This chapter covers the problem, what Stratum does about it, and how the rest of the docs are organised.
+This chapter covers the problem, what Inwards does about it, and how the rest of the docs are organised.
 
 ## The problem: agents write code faster than anyone can review its shape
 
@@ -17,17 +17,17 @@ The result is a codebase whose diagrams say "hexagonal" while the imports say "b
 
 Agents add two failure modes of their own. They hallucinate: `from shop.domain.pricing import DiscountPolicy` looks plausible even when `pricing` doesn't exist. And when a check complains, they route around it by moving the import into a function body or behind `if TYPE_CHECKING:`. A guardrail for agents has to catch both.
 
-!!! abstract "The bet behind Stratum"
+!!! abstract "The bet behind Inwards"
     Agents satisfy the constraints they can see and run, and they ignore the ones that only live in a wiki page. Architecture rules usually live in the wiki. Chapter 2 turns this into a testable hypothesis.
 
 Python already has architecture checkers, import-linter and pytest-archon above all. [Chapter 2](02-Business-Context.md#other-tools-in-this-space) compares them in detail. In short, none of them was designed to run after every agent edit and tell the agent how to repair the damage.
 
-## What Stratum does
+## What Inwards does
 
-Stratum turns those wiki rules into a check that runs in milliseconds and talks back in a format an agent can act on.
+Inwards turns those wiki rules into a check that runs in milliseconds and talks back in a format an agent can act on.
 
 ```toml title="pyproject.toml"
-[tool.stratum]
+[tool.inwards]
 root = "src"
 layers = [
   { name = "domain",         modules = ["shop.domain"] },
@@ -38,7 +38,7 @@ layers = [
 ```
 
 <figure markdown="span">
-  ![stratum check on a clean codebase](assets/screens/check-clean.svg){ loading=lazy }
+  ![inwards check on a clean codebase](assets/screens/check-clean.svg){ loading=lazy }
   <figcaption>The example app as shipped: every import points inward.</figcaption>
 </figure>
 
@@ -46,14 +46,14 @@ Layers are listed innermost first. A module may import its own layer and anythin
 
 ```json
 {
-  "code": "STR001",
+  "code": "INW001",
   "file": "clean-app/shop/domain/order.py",
   "line": 14,
   "message": "Layer \"domain\" imports \"shop.infrastructure.sql_orders.SqlOrderRepository\" from outer layer \"infrastructure\".",
   "fix": {
     "summary": "Depend on an abstraction owned by \"domain\" instead of ...",
     "steps": [
-      "Delete `from shop.infrastructure.sql_orders import SqlOrderRepository`. Do not move the import into a function or behind TYPE_CHECKING; Stratum checks those too.",
+      "Delete `from shop.infrastructure.sql_orders import SqlOrderRepository`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.",
       "Declare a typing.Protocol in `shop.domain` (for example `shop.domain.ports`) ...",
       "Type this module against that Protocol and receive the implementation through a constructor ...",
       "Make the class in \"infrastructure\" satisfy the Protocol, and wire it in the composition root."
@@ -92,9 +92,9 @@ The diagnostic comes from the working scaffold in this repository, run on a copy
 
 </div>
 
-## What Stratum is not
+## What Inwards is not
 
-It is not a general linter, a type checker or a formatter. Keep Ruff and ty. Stratum only reasons about the dependency structure between your own modules, and it assumes you already know what architecture you want. It won't invent one for you.
+It is not a general linter, a type checker or a formatter. Keep Ruff and ty. Inwards only reasons about the dependency structure between your own modules, and it assumes you already know what architecture you want. It won't invent one for you.
 
 ## How these docs are organised
 
@@ -102,12 +102,12 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 | Chapter | Read it if you want to know |
 |---|---|
-| [2. Business context](02-Business-Context.md) | Who else is in this space, why Stratum should exist, and the hypothesis we're testing |
+| [2. Business context](02-Business-Context.md) | Who else is in this space, why Inwards should exist, and the hypothesis we're testing |
 | [3. Architecture (C4)](03-Architecture-C4.md) | Context, containers and components, with diagrams |
-| [4. AI integration](04-AI-Integration.md) | How Stratum plugs into Claude Code, Aider, Copilot and friends |
+| [4. AI integration](04-AI-Integration.md) | How Inwards plugs into Claude Code, Aider, Copilot and friends |
 | [5. Decisions (ADR)](05-ADR.md) | Why TypeScript, why WASM tree-sitter, why Bun, and what we gave up |
 | [6. Constraints and quality](06-Constraints-and-Quality.md) | Performance budgets, measurements, risks |
 | [7. Glossary](07-Glossary.md) | The vocabulary, from "port" to "import skeleton" |
 
 !!! info "Status"
-    Pre-alpha. One rule (STR001, layer direction) works end to end in the CLI, the engine and the VS Code server. Everything marked :material-progress-clock: in these docs is planned, not built.
+    Pre-alpha. One rule (INW001, layer direction) works end to end in the CLI, the engine and the VS Code server. Everything marked :material-progress-clock: in these docs is planned, not built.

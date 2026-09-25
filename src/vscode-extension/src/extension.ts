@@ -9,7 +9,7 @@ import {
 
 let client: LanguageClient | undefined;
 
-/** Thin client. All the thinking happens in server.ts, which wraps @stratum-lint/core. */
+/** Thin client. All the thinking happens in server.ts, which wraps @inwards/core. */
 export async function activate(context: ExtensionContext): Promise<void> {
   const module = context.asAbsolutePath(join("dist", "server.js"));
   const serverOptions: ServerOptions = {
@@ -19,7 +19,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "python" }],
   };
-  client = new LanguageClient("stratum", "Stratum", serverOptions, clientOptions);
+  client = new LanguageClient("inwards", "Inwards", serverOptions, clientOptions);
   await client.start();
 }
 

@@ -1,9 +1,9 @@
 {
-  "name": "@stratum-lint/core",
+  "name": "@inwards/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Runtime-agnostic Stratum engine: parse Python with tree-sitter, apply architecture rules, report.",
+  "description": "Runtime-agnostic Inwards engine: parse Python with tree-sitter, apply architecture rules, report.",
   "exports": {
     ".": "./src/index.ts"
   },

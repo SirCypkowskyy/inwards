@@ -30,13 +30,13 @@ jobs:
         run: bun test
       - name: Prescan never misses an import (differential test on the Python stdlib)
         run: bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
-      - name: Dogfood - stratum checks its own example app
+      - name: Dogfood - inwards checks its own example app
         run: bun run check:self
       - name: Smoke-test the compiled binary (catches WASM embedding regressions)
         run: |
           bun run scripts/build-binaries.ts bun-linux-x64
-          ./dist/stratum-linux-x64 --version
-          ./dist/stratum-linux-x64 check --format json > /dev/null
+          ./dist/inwards-linux-x64 --version
+          ./dist/inwards-linux-x64 check --format json > /dev/null
       - name: Build VS Code extension
         working-directory: src/vscode-extension
         run: bun run build

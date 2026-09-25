@@ -17,7 +17,7 @@ export function grammars(): GrammarBinaries {
 }
 
 export const CONFIG = parseConfig(`
-[tool.stratum]
+[tool.inwards]
 layers = [
   { name = "domain", modules = ["shop.domain"] },
   { name = "application", modules = ["shop.application"] },

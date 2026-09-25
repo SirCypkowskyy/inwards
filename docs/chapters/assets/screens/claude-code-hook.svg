@@ -15,119 +15,119 @@
         font-weight: 700;
     }
 
-    .terminal-201145496-matrix {
+    .terminal-2380741701-matrix {
         font-family: Fira Code, monospace;
         font-size: 20px;
         line-height: 24.4px;
         font-variant-east-asian: full-width;
     }
 
-    .terminal-201145496-title {
+    .terminal-2380741701-title {
         font-size: 18px;
         font-weight: bold;
         font-family: arial;
     }
 
-    .terminal-201145496-r1 { fill: #98a84b;font-weight: bold }
-.terminal-201145496-r2 { fill: #c5c8c6;font-weight: bold }
-.terminal-201145496-r3 { fill: #c5c8c6 }
-.terminal-201145496-r4 { fill: #608ab1;font-weight: bold }
-.terminal-201145496-r5 { fill: #98a84b }
+    .terminal-2380741701-r1 { fill: #98a84b;font-weight: bold }
+.terminal-2380741701-r2 { fill: #c5c8c6;font-weight: bold }
+.terminal-2380741701-r3 { fill: #c5c8c6 }
+.terminal-2380741701-r4 { fill: #608ab1;font-weight: bold }
+.terminal-2380741701-r5 { fill: #98a84b }
     </style>
 
     <defs>
-    <clipPath id="terminal-201145496-clip-terminal">
+    <clipPath id="terminal-2380741701-clip-terminal">
       <rect x="0" y="0" width="1438.6" height="487.0" />
     </clipPath>
-    <clipPath id="terminal-201145496-line-0">
+    <clipPath id="terminal-2380741701-line-0">
     <rect x="0" y="1.5" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-1">
+<clipPath id="terminal-2380741701-line-1">
     <rect x="0" y="25.9" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-2">
+<clipPath id="terminal-2380741701-line-2">
     <rect x="0" y="50.3" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-3">
+<clipPath id="terminal-2380741701-line-3">
     <rect x="0" y="74.7" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-4">
+<clipPath id="terminal-2380741701-line-4">
     <rect x="0" y="99.1" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-5">
+<clipPath id="terminal-2380741701-line-5">
     <rect x="0" y="123.5" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-6">
+<clipPath id="terminal-2380741701-line-6">
     <rect x="0" y="147.9" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-7">
+<clipPath id="terminal-2380741701-line-7">
     <rect x="0" y="172.3" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-8">
+<clipPath id="terminal-2380741701-line-8">
     <rect x="0" y="196.7" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-9">
+<clipPath id="terminal-2380741701-line-9">
     <rect x="0" y="221.1" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-10">
+<clipPath id="terminal-2380741701-line-10">
     <rect x="0" y="245.5" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-11">
+<clipPath id="terminal-2380741701-line-11">
     <rect x="0" y="269.9" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-12">
+<clipPath id="terminal-2380741701-line-12">
     <rect x="0" y="294.3" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-13">
+<clipPath id="terminal-2380741701-line-13">
     <rect x="0" y="318.7" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-14">
+<clipPath id="terminal-2380741701-line-14">
     <rect x="0" y="343.1" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-15">
+<clipPath id="terminal-2380741701-line-15">
     <rect x="0" y="367.5" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-16">
+<clipPath id="terminal-2380741701-line-16">
     <rect x="0" y="391.9" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-17">
+<clipPath id="terminal-2380741701-line-17">
     <rect x="0" y="416.3" width="1439.6" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-201145496-line-18">
+<clipPath id="terminal-2380741701-line-18">
     <rect x="0" y="440.7" width="1439.6" height="24.65"/>
             </clipPath>
     </defs>
 
-    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1456" height="536" rx="8"/><text class="terminal-201145496-title" fill="#c5c8c6" text-anchor="middle" x="728" y="27">Claude&#160;Code&#160;PostToolUse&#160;hook</text>
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1456" height="536" rx="8"/><text class="terminal-2380741701-title" fill="#c5c8c6" text-anchor="middle" x="728" y="27">Claude&#160;Code&#160;PostToolUse&#160;hook</text>
             <g transform="translate(26,22)">
             <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
             <circle cx="22" cy="0" r="7" fill="#febc2e"/>
             <circle cx="44" cy="0" r="7" fill="#28c840"/>
             </g>
         
-    <g transform="translate(9, 41)" clip-path="url(#terminal-201145496-clip-terminal)">
+    <g transform="translate(9, 41)" clip-path="url(#terminal-2380741701-clip-terminal)">
     
-    <g class="terminal-201145496-matrix">
-    <text class="terminal-201145496-r1" x="0" y="20" textLength="24.4" clip-path="url(#terminal-201145496-line-0)">$&#160;</text><text class="terminal-201145496-r2" x="24.4" y="20" textLength="341.6" clip-path="url(#terminal-201145496-line-0)">cat&#160;.claude/hooks/stratum.sh</text><text class="terminal-201145496-r3" x="1439.6" y="20" textLength="12.2" clip-path="url(#terminal-201145496-line-0)">
-</text><text class="terminal-201145496-r3" x="0" y="44.4" textLength="109.8" clip-path="url(#terminal-201145496-line-1)">#!/bin/sh</text><text class="terminal-201145496-r3" x="1439.6" y="44.4" textLength="12.2" clip-path="url(#terminal-201145496-line-1)">
-</text><text class="terminal-201145496-r3" x="0" y="68.8" textLength="805.2" clip-path="url(#terminal-201145496-line-2)">#&#160;.claude/settings.json&#160;-&gt;&#160;hooks.PostToolUse,&#160;matcher&#160;&quot;Edit|Write&quot;</text><text class="terminal-201145496-r3" x="1439.6" y="68.8" textLength="12.2" clip-path="url(#terminal-201145496-line-2)">
-</text><text class="terminal-201145496-r3" x="0" y="93.2" textLength="524.6" clip-path="url(#terminal-201145496-line-3)">f=$(jq&#160;-r&#160;&#x27;.tool_input.file_path&#160;//&#160;empty&#x27;)</text><text class="terminal-201145496-r3" x="1439.6" y="93.2" textLength="12.2" clip-path="url(#terminal-201145496-line-3)">
-</text><text class="terminal-201145496-r3" x="0" y="117.6" textLength="146.4" clip-path="url(#terminal-201145496-line-4)">case&#160;&quot;$f&quot;&#160;in</text><text class="terminal-201145496-r3" x="1439.6" y="117.6" textLength="12.2" clip-path="url(#terminal-201145496-line-4)">
-</text><text class="terminal-201145496-r3" x="0" y="142" textLength="695.4" clip-path="url(#terminal-201145496-line-5)">&#160;&#160;*.py)&#160;stratum&#160;check&#160;&quot;$f&quot;&#160;--format&#160;json&#160;&gt;&amp;2&#160;||&#160;exit&#160;2&#160;;;</text><text class="terminal-201145496-r3" x="1439.6" y="142" textLength="12.2" clip-path="url(#terminal-201145496-line-5)">
-</text><text class="terminal-201145496-r3" x="0" y="166.4" textLength="48.8" clip-path="url(#terminal-201145496-line-6)">esac</text><text class="terminal-201145496-r3" x="1439.6" y="166.4" textLength="12.2" clip-path="url(#terminal-201145496-line-6)">
-</text><text class="terminal-201145496-r3" x="1439.6" y="190.8" textLength="12.2" clip-path="url(#terminal-201145496-line-7)">
-</text><text class="terminal-201145496-r1" x="0" y="215.2" textLength="24.4" clip-path="url(#terminal-201145496-line-8)">$&#160;</text><text class="terminal-201145496-r2" x="24.4" y="215.2" textLength="1134.6" clip-path="url(#terminal-201145496-line-8)">echo&#160;&#x27;{&quot;tool_name&quot;:&quot;Edit&quot;,&quot;tool_input&quot;:{&quot;file_path&quot;:&quot;clean-app/shop/domain/order.py&quot;}}&#x27;&#160;|&#160;sh&#160;</text><text class="terminal-201145496-r3" x="1439.6" y="215.2" textLength="12.2" clip-path="url(#terminal-201145496-line-8)">
-</text><text class="terminal-201145496-r2" x="0" y="239.6" textLength="841.8" clip-path="url(#terminal-201145496-line-9)">.claude/hooks/stratum.sh&#160;2&gt;&#160;seen-by-claude.json;&#160;echo&#160;&quot;hook&#160;exit:&#160;$?&quot;</text><text class="terminal-201145496-r3" x="1439.6" y="239.6" textLength="12.2" clip-path="url(#terminal-201145496-line-9)">
-</text><text class="terminal-201145496-r3" x="0" y="264" textLength="146.4" clip-path="url(#terminal-201145496-line-10)">hook&#160;exit:&#160;2</text><text class="terminal-201145496-r3" x="1439.6" y="264" textLength="12.2" clip-path="url(#terminal-201145496-line-10)">
-</text><text class="terminal-201145496-r3" x="1439.6" y="288.4" textLength="12.2" clip-path="url(#terminal-201145496-line-11)">
-</text><text class="terminal-201145496-r1" x="0" y="312.8" textLength="24.4" clip-path="url(#terminal-201145496-line-12)">$&#160;</text><text class="terminal-201145496-r2" x="24.4" y="312.8" textLength="902.8" clip-path="url(#terminal-201145496-line-12)">jq&#160;&#x27;.diagnostics[0]&#160;|&#160;{code,&#160;line,&#160;fix:&#160;.fix.summary}&#x27;&#160;seen-by-claude.json</text><text class="terminal-201145496-r3" x="1439.6" y="312.8" textLength="12.2" clip-path="url(#terminal-201145496-line-12)">
-</text><text class="terminal-201145496-r2" x="0" y="337.2" textLength="12.2" clip-path="url(#terminal-201145496-line-13)">{</text><text class="terminal-201145496-r3" x="1439.6" y="337.2" textLength="12.2" clip-path="url(#terminal-201145496-line-13)">
-</text><text class="terminal-201145496-r4" x="24.4" y="361.6" textLength="73.2" clip-path="url(#terminal-201145496-line-14)">&quot;code&quot;</text><text class="terminal-201145496-r2" x="97.6" y="361.6" textLength="12.2" clip-path="url(#terminal-201145496-line-14)">:</text><text class="terminal-201145496-r5" x="122" y="361.6" textLength="97.6" clip-path="url(#terminal-201145496-line-14)">&quot;STR001&quot;</text><text class="terminal-201145496-r2" x="219.6" y="361.6" textLength="12.2" clip-path="url(#terminal-201145496-line-14)">,</text><text class="terminal-201145496-r3" x="1439.6" y="361.6" textLength="12.2" clip-path="url(#terminal-201145496-line-14)">
-</text><text class="terminal-201145496-r4" x="24.4" y="386" textLength="73.2" clip-path="url(#terminal-201145496-line-15)">&quot;line&quot;</text><text class="terminal-201145496-r2" x="97.6" y="386" textLength="12.2" clip-path="url(#terminal-201145496-line-15)">:</text><text class="terminal-201145496-r3" x="122" y="386" textLength="24.4" clip-path="url(#terminal-201145496-line-15)">14</text><text class="terminal-201145496-r2" x="146.4" y="386" textLength="12.2" clip-path="url(#terminal-201145496-line-15)">,</text><text class="terminal-201145496-r3" x="1439.6" y="386" textLength="12.2" clip-path="url(#terminal-201145496-line-15)">
-</text><text class="terminal-201145496-r4" x="24.4" y="410.4" textLength="61" clip-path="url(#terminal-201145496-line-16)">&quot;fix&quot;</text><text class="terminal-201145496-r2" x="85.4" y="410.4" textLength="12.2" clip-path="url(#terminal-201145496-line-16)">:</text><text class="terminal-201145496-r5" x="109.8" y="410.4" textLength="695.4" clip-path="url(#terminal-201145496-line-16)">&quot;Depend&#160;on&#160;an&#160;abstraction&#160;owned&#160;by&#160;\&quot;domain\&quot;&#160;instead&#160;of&#160;</text><text class="terminal-201145496-r3" x="1439.6" y="410.4" textLength="12.2" clip-path="url(#terminal-201145496-line-16)">
-</text><text class="terminal-201145496-r5" x="0" y="434.8" textLength="671" clip-path="url(#terminal-201145496-line-17)">\&quot;shop.infrastructure.sql_orders.SqlOrderRepository\&quot;.&quot;</text><text class="terminal-201145496-r3" x="1439.6" y="434.8" textLength="12.2" clip-path="url(#terminal-201145496-line-17)">
-</text><text class="terminal-201145496-r2" x="0" y="459.2" textLength="12.2" clip-path="url(#terminal-201145496-line-18)">}</text><text class="terminal-201145496-r3" x="1439.6" y="459.2" textLength="12.2" clip-path="url(#terminal-201145496-line-18)">
-</text><text class="terminal-201145496-r3" x="1439.6" y="483.6" textLength="12.2" clip-path="url(#terminal-201145496-line-19)">
+    <g class="terminal-2380741701-matrix">
+    <text class="terminal-2380741701-r1" x="0" y="20" textLength="24.4" clip-path="url(#terminal-2380741701-line-0)">$&#160;</text><text class="terminal-2380741701-r2" x="24.4" y="20" textLength="341.6" clip-path="url(#terminal-2380741701-line-0)">cat&#160;.claude/hooks/inwards.sh</text><text class="terminal-2380741701-r3" x="1439.6" y="20" textLength="12.2" clip-path="url(#terminal-2380741701-line-0)">
+</text><text class="terminal-2380741701-r3" x="0" y="44.4" textLength="109.8" clip-path="url(#terminal-2380741701-line-1)">#!/bin/sh</text><text class="terminal-2380741701-r3" x="1439.6" y="44.4" textLength="12.2" clip-path="url(#terminal-2380741701-line-1)">
+</text><text class="terminal-2380741701-r3" x="0" y="68.8" textLength="805.2" clip-path="url(#terminal-2380741701-line-2)">#&#160;.claude/settings.json&#160;-&gt;&#160;hooks.PostToolUse,&#160;matcher&#160;&quot;Edit|Write&quot;</text><text class="terminal-2380741701-r3" x="1439.6" y="68.8" textLength="12.2" clip-path="url(#terminal-2380741701-line-2)">
+</text><text class="terminal-2380741701-r3" x="0" y="93.2" textLength="524.6" clip-path="url(#terminal-2380741701-line-3)">f=$(jq&#160;-r&#160;&#x27;.tool_input.file_path&#160;//&#160;empty&#x27;)</text><text class="terminal-2380741701-r3" x="1439.6" y="93.2" textLength="12.2" clip-path="url(#terminal-2380741701-line-3)">
+</text><text class="terminal-2380741701-r3" x="0" y="117.6" textLength="146.4" clip-path="url(#terminal-2380741701-line-4)">case&#160;&quot;$f&quot;&#160;in</text><text class="terminal-2380741701-r3" x="1439.6" y="117.6" textLength="12.2" clip-path="url(#terminal-2380741701-line-4)">
+</text><text class="terminal-2380741701-r3" x="0" y="142" textLength="695.4" clip-path="url(#terminal-2380741701-line-5)">&#160;&#160;*.py)&#160;inwards&#160;check&#160;&quot;$f&quot;&#160;--format&#160;json&#160;&gt;&amp;2&#160;||&#160;exit&#160;2&#160;;;</text><text class="terminal-2380741701-r3" x="1439.6" y="142" textLength="12.2" clip-path="url(#terminal-2380741701-line-5)">
+</text><text class="terminal-2380741701-r3" x="0" y="166.4" textLength="48.8" clip-path="url(#terminal-2380741701-line-6)">esac</text><text class="terminal-2380741701-r3" x="1439.6" y="166.4" textLength="12.2" clip-path="url(#terminal-2380741701-line-6)">
+</text><text class="terminal-2380741701-r3" x="1439.6" y="190.8" textLength="12.2" clip-path="url(#terminal-2380741701-line-7)">
+</text><text class="terminal-2380741701-r1" x="0" y="215.2" textLength="24.4" clip-path="url(#terminal-2380741701-line-8)">$&#160;</text><text class="terminal-2380741701-r2" x="24.4" y="215.2" textLength="1134.6" clip-path="url(#terminal-2380741701-line-8)">echo&#160;&#x27;{&quot;tool_name&quot;:&quot;Edit&quot;,&quot;tool_input&quot;:{&quot;file_path&quot;:&quot;clean-app/shop/domain/order.py&quot;}}&#x27;&#160;|&#160;sh&#160;</text><text class="terminal-2380741701-r3" x="1439.6" y="215.2" textLength="12.2" clip-path="url(#terminal-2380741701-line-8)">
+</text><text class="terminal-2380741701-r2" x="0" y="239.6" textLength="841.8" clip-path="url(#terminal-2380741701-line-9)">.claude/hooks/inwards.sh&#160;2&gt;&#160;seen-by-claude.json;&#160;echo&#160;&quot;hook&#160;exit:&#160;$?&quot;</text><text class="terminal-2380741701-r3" x="1439.6" y="239.6" textLength="12.2" clip-path="url(#terminal-2380741701-line-9)">
+</text><text class="terminal-2380741701-r3" x="0" y="264" textLength="146.4" clip-path="url(#terminal-2380741701-line-10)">hook&#160;exit:&#160;2</text><text class="terminal-2380741701-r3" x="1439.6" y="264" textLength="12.2" clip-path="url(#terminal-2380741701-line-10)">
+</text><text class="terminal-2380741701-r3" x="1439.6" y="288.4" textLength="12.2" clip-path="url(#terminal-2380741701-line-11)">
+</text><text class="terminal-2380741701-r1" x="0" y="312.8" textLength="24.4" clip-path="url(#terminal-2380741701-line-12)">$&#160;</text><text class="terminal-2380741701-r2" x="24.4" y="312.8" textLength="902.8" clip-path="url(#terminal-2380741701-line-12)">jq&#160;&#x27;.diagnostics[0]&#160;|&#160;{code,&#160;line,&#160;fix:&#160;.fix.summary}&#x27;&#160;seen-by-claude.json</text><text class="terminal-2380741701-r3" x="1439.6" y="312.8" textLength="12.2" clip-path="url(#terminal-2380741701-line-12)">
+</text><text class="terminal-2380741701-r2" x="0" y="337.2" textLength="12.2" clip-path="url(#terminal-2380741701-line-13)">{</text><text class="terminal-2380741701-r3" x="1439.6" y="337.2" textLength="12.2" clip-path="url(#terminal-2380741701-line-13)">
+</text><text class="terminal-2380741701-r4" x="24.4" y="361.6" textLength="73.2" clip-path="url(#terminal-2380741701-line-14)">&quot;code&quot;</text><text class="terminal-2380741701-r2" x="97.6" y="361.6" textLength="12.2" clip-path="url(#terminal-2380741701-line-14)">:</text><text class="terminal-2380741701-r5" x="122" y="361.6" textLength="97.6" clip-path="url(#terminal-2380741701-line-14)">&quot;INW001&quot;</text><text class="terminal-2380741701-r2" x="219.6" y="361.6" textLength="12.2" clip-path="url(#terminal-2380741701-line-14)">,</text><text class="terminal-2380741701-r3" x="1439.6" y="361.6" textLength="12.2" clip-path="url(#terminal-2380741701-line-14)">
+</text><text class="terminal-2380741701-r4" x="24.4" y="386" textLength="73.2" clip-path="url(#terminal-2380741701-line-15)">&quot;line&quot;</text><text class="terminal-2380741701-r2" x="97.6" y="386" textLength="12.2" clip-path="url(#terminal-2380741701-line-15)">:</text><text class="terminal-2380741701-r3" x="122" y="386" textLength="24.4" clip-path="url(#terminal-2380741701-line-15)">14</text><text class="terminal-2380741701-r2" x="146.4" y="386" textLength="12.2" clip-path="url(#terminal-2380741701-line-15)">,</text><text class="terminal-2380741701-r3" x="1439.6" y="386" textLength="12.2" clip-path="url(#terminal-2380741701-line-15)">
+</text><text class="terminal-2380741701-r4" x="24.4" y="410.4" textLength="61" clip-path="url(#terminal-2380741701-line-16)">&quot;fix&quot;</text><text class="terminal-2380741701-r2" x="85.4" y="410.4" textLength="12.2" clip-path="url(#terminal-2380741701-line-16)">:</text><text class="terminal-2380741701-r5" x="109.8" y="410.4" textLength="695.4" clip-path="url(#terminal-2380741701-line-16)">&quot;Depend&#160;on&#160;an&#160;abstraction&#160;owned&#160;by&#160;\&quot;domain\&quot;&#160;instead&#160;of&#160;</text><text class="terminal-2380741701-r3" x="1439.6" y="410.4" textLength="12.2" clip-path="url(#terminal-2380741701-line-16)">
+</text><text class="terminal-2380741701-r5" x="0" y="434.8" textLength="671" clip-path="url(#terminal-2380741701-line-17)">\&quot;shop.infrastructure.sql_orders.SqlOrderRepository\&quot;.&quot;</text><text class="terminal-2380741701-r3" x="1439.6" y="434.8" textLength="12.2" clip-path="url(#terminal-2380741701-line-17)">
+</text><text class="terminal-2380741701-r2" x="0" y="459.2" textLength="12.2" clip-path="url(#terminal-2380741701-line-18)">}</text><text class="terminal-2380741701-r3" x="1439.6" y="459.2" textLength="12.2" clip-path="url(#terminal-2380741701-line-18)">
+</text><text class="terminal-2380741701-r3" x="1439.6" y="483.6" textLength="12.2" clip-path="url(#terminal-2380741701-line-19)">
 </text>
     </g>
     </g>

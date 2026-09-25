@@ -1,4 +1,4 @@
-# Stratum: bootstrap tasks
+# Inwards (formerly Stratum): bootstrap tasks
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 
@@ -9,7 +9,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 ## Phase 2: Monorepo scaffold and CI/CD
 - [x] Root: `pyproject.toml`, `package.json` (Bun workspaces), `tsconfig.base.json`, `biome.json`, `.gitignore`, `README.md`
 - [x] `src/core/`: engine package (tree-sitter import extraction, layer rule, diagnostics)
-- [x] `src/cli/`: `stratum check` entry point
+- [x] `src/cli/`: `inwards check` entry point
 - [x] `src/vscode-extension/`: LSP client/server stub sharing core
 - [x] `.github/workflows/ci.yml`: lint, typecheck, tests, docs build
 - [x] `.github/workflows/cd.yml`: on `v*` tag, Bun cross-compile binaries, upload as GitHub Artifacts
@@ -44,11 +44,17 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 - [x] Bun 1.4.2 installed globally (~/.bun, PATH added to ~/.zshrc)
 - [x] Coloured CLI output (TTY / FORCE_COLOR / NO_COLOR) + tests
 - [x] Console screenshots: scripts/screenshots.py -> docs/chapters/assets/screens/*.svg, embedded in 5 chapters
-- [x] Private repo SirCypkowskyy/stratum, secrets set, pushed; CI green
-- [!] Docs deploy: token from ~/qv-cloudflare.env is Tunnel-scoped, Cloudflare answers "No access" on Workers deploy
-- [!] Update DOCS_BASE to the real workers.dev URL (needs a working token), then regenerate screenshots
+- [x] Private repo SirCypkowskyy/inwards, secrets set, pushed; CI green
+- [x] ~~Cloudflare deploy~~ replaced by GitHub Pages (Tunnel-scoped token had no Workers access)
+- [x] DOCS_BASE updated (GitHub Pages), screenshots regenerated
+
+## Round 3 (2026-09-25)
+- [x] Rename Stratum -> Inwards everywhere (code, config table, INW rule codes, schema id, docs, lockfiles, screenshots), ADR-011
+- [x] GitHub repo renamed to SirCypkowskyy/inwards, remote updated
+- [x] Docs on GitHub Pages (docs.yml), Cloudflare kept as manual docs-cloudflare.yml, ADR-012
+- [x] DOCS_BASE -> https://sircypkowskyy.github.io/inwards, diagnostics link to the rule catalogue
 
 ## Blocked on the user
-- Cloudflare API token with Account > Workers Scripts > Edit (template "Edit Cloudflare Workers"); then DOCS_BASE in src/core/src/meta.ts
-- Name decision (see recommendation in chat)
+- Optional: Cloudflare token with Workers Scripts > Edit, only if moving docs back to Cloudflare
+- Local folder is still ~/Documents/GitHub/stratum (not renamed, to avoid breaking open sessions)
 - Design partners for the business-hypothesis metrics

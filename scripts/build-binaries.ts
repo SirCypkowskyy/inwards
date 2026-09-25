@@ -1,10 +1,10 @@
 /**
- * Cross-compiles `stratum` into single-file executables, one per target.
+ * Cross-compiles `inwards` into single-file executables, one per target.
  *
  *   bun run scripts/build-binaries.ts                 # every target
  *   bun run scripts/build-binaries.ts bun-linux-x64   # just one
  *
- * Output: dist/stratum-<os>-<arch>[.exe]
+ * Output: dist/inwards-<os>-<arch>[.exe]
  */
 import { mkdirSync } from "node:fs";
 
@@ -22,7 +22,7 @@ const targets = requested.length > 0 ? requested : ALL_TARGETS;
 mkdirSync("dist", { recursive: true });
 
 for (const target of targets) {
-  const name = `stratum-${target.replace(/^bun-/, "")}`;
+  const name = `inwards-${target.replace(/^bun-/, "")}`;
   const outfile = `dist/${name}${target.includes("windows") ? ".exe" : ""}`;
   const result = await Bun.build({
     entrypoints: ["src/cli/src/main.ts"],

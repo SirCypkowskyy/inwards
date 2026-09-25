@@ -1,4 +1,4 @@
-import type { GrammarBinaries } from "@stratum-lint/core";
+import type { GrammarBinaries } from "@inwards/core";
 // `type: "file"` makes `bun build --compile` embed both blobs in the binary.
 // At dev time the same imports resolve to paths inside node_modules.
 import pythonPath from "tree-sitter-python/tree-sitter-python.wasm" with { type: "file" };

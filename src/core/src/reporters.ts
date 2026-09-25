@@ -57,7 +57,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: number): string {
   return JSON.stringify(
     {
-      schema: "stratum/diagnostics@1",
+      schema: "inwards/diagnostics@1",
       summary: {
         filesChecked,
         violations: diagnostics.length,
@@ -80,7 +80,7 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
         {
           tool: {
             driver: {
-              name: "stratum",
+              name: "inwards",
               informationUri: DOCS_BASE,
               version: VERSION,
               rules: [

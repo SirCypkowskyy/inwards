@@ -3,9 +3,9 @@ import { DOCS_BASE } from "./meta.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 export const LAYER_RULE = {
-  code: "STR001",
+  code: "INW001",
   name: "layer-dependency",
-  docs: `${DOCS_BASE}/rules/STR001`,
+  docs: `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`,
 } as const;
 
 /** Index of the layer that owns `module`, or -1. The longest matching prefix wins. */
@@ -24,7 +24,7 @@ export function layerIndexOf(module: string, layers: readonly LayerSpec[]): numb
   return best;
 }
 
-/** STR001: dependencies point inward. An inner layer never imports an outer one. */
+/** INW001: dependencies point inward. An inner layer never imports an outer one. */
 export function checkLayers(
   file: SourceFile,
   imports: readonly ImportRef[],
@@ -65,7 +65,7 @@ function fixFor(source: LayerSpec, target: LayerSpec, ref: ImportRef): Diagnosti
   return {
     summary: `Depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
     steps: [
-      `Delete \`${ref.statement}\`. Do not move the import into a function or behind TYPE_CHECKING; Stratum checks those too.`,
+      `Delete \`${ref.statement}\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.`,
       `Declare a typing.Protocol in \`${home}\` (for example \`${home}.ports\`) that describes only what this module needs from \`${symbol}\`.`,
       `Type this module against that Protocol and receive the implementation through a constructor or function parameter.`,
       `Make the class in "${target.name}" satisfy the Protocol, and wire it in the outermost layer (the composition root).`,

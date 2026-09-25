@@ -31,18 +31,18 @@ jobs:
         run: bun run scripts/build-binaries.ts
       - name: Checksums
         working-directory: dist
-        run: sha256sum stratum-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
       - name: Build VS Code extension (.vsix)
         working-directory: src/vscode-extension
         run: |
           bun run build
           bun x @vscode/vsce package --no-dependencies --allow-missing-repository \
-            -o "../../dist/stratum-vscode-${GITHUB_REF_NAME}.vsix"
+            -o "../../dist/inwards-vscode-${GITHUB_REF_NAME}.vsix"
       - uses: actions/upload-artifact@v7
         with:
-          name: stratum-${{ github.ref_name }}
+          name: inwards-${{ github.ref_name }}
           path: |
-            dist/stratum-*
+            dist/inwards-*
             dist/SHA256SUMS
             !dist/*.map
           if-no-files-found: error
@@ -54,16 +54,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, bin: stratum-linux-x64 }
-          - { os: ubuntu-24.04-arm, bin: stratum-linux-arm64 }
-          - { os: macos-latest, bin: stratum-darwin-arm64 }
-          - { os: windows-latest, bin: stratum-windows-x64.exe }
+          - { os: ubuntu-latest, bin: inwards-linux-x64 }
+          - { os: ubuntu-24.04-arm, bin: inwards-linux-arm64 }
+          - { os: macos-latest, bin: inwards-darwin-arm64 }
+          - { os: windows-latest, bin: inwards-windows-x64.exe }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          name: stratum-${{ github.ref_name }}
+          name: inwards-${{ github.ref_name }}
           path: dist
       - name: Binary starts and lints the example app
         shell: bash

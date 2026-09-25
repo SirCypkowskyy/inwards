@@ -1,10 +1,10 @@
 {
-  "name": "stratum-vscode",
-  "displayName": "Stratum",
-  "description": "Architecture rules for Python, live in the editor. Same engine as `stratum check`.",
+  "name": "inwards-vscode",
+  "displayName": "Inwards",
+  "description": "Architecture rules for Python, live in the editor. Same engine as `inwards check`.",
   "version": "0.1.0",
   "private": true,
-  "publisher": "stratum-lint",
+  "publisher": "inwards",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -18,12 +18,12 @@
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Stratum",
+      "title": "Inwards",
       "properties": {
-        "stratum.enable": {
+        "inwards.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Run Stratum architecture checks on Python files."
+          "description": "Run Inwards architecture checks on Python files."
         }
       }
     }
@@ -34,7 +34,7 @@
     "package": "bunx @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
-    "@stratum-lint/core": "workspace:*",
+    "@inwards/core": "workspace:*",
     "vscode-languageclient": "^10.1.2",
     "vscode-languageserver": "^10.1.2",
     "vscode-languageserver-textdocument": "^1.0.15",

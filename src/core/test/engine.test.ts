@@ -2,13 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { ConfigError, parseConfig, render } from "../src/index.ts";
 import { engine, file } from "./helpers.ts";
 
-describe("STR001 layer-dependency", () => {
+describe("INW001 layer-dependency", () => {
   test("domain importing infrastructure is a violation with a fix", () => {
     const [d, ...rest] = engine.checkFile(
       file("shop/domain/order.py", "from shop.infrastructure.db import OrderTable\n"),
     );
     expect(rest).toHaveLength(0);
-    expect(d?.code).toBe("STR001");
+    expect(d?.code).toBe("INW001");
     expect(d?.line).toBe(1);
     expect(d?.message).toContain('"domain"');
     expect(d?.message).toContain('"infrastructure"');
@@ -28,7 +28,7 @@ describe("STR001 layer-dependency", () => {
 
   test("`from pkg import submodule` cannot sneak past the rule", () => {
     const [d] = engine.checkFile(file("shop/domain/order.py", "from shop import infrastructure\n"));
-    expect(d?.code).toBe("STR001");
+    expect(d?.code).toBe("INW001");
   });
 
   test("imports hidden in functions and TYPE_CHECKING blocks are still checked", () => {
@@ -57,7 +57,7 @@ describe("reporters", () => {
 
   test("json is versioned and carries the fix", () => {
     const json = JSON.parse(render(report, "json"));
-    expect(json.schema).toBe("stratum/diagnostics@1");
+    expect(json.schema).toBe("inwards/diagnostics@1");
     expect(json.diagnostics[0].fix.steps.length).toBeGreaterThan(0);
   });
 

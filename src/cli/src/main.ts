@@ -11,16 +11,16 @@ import {
   render,
   type SourceFile,
   VERSION,
-} from "@stratum-lint/core";
+} from "@inwards/core";
 import { collectPythonFiles } from "./files.ts";
 import { loadGrammars } from "./grammars.ts";
 
 // Exit codes follow Ruff: 0 clean, 1 violations, 2 usage or config error.
-const USAGE = `stratum ${VERSION}
+const USAGE = `inwards ${VERSION}
 
-Usage: stratum check [PATHS...] [--format text|json|sarif] [--config pyproject.toml]
+Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml]
 
-Checks Python imports against the layers declared in [tool.stratum].`;
+Checks Python imports against the layers declared in [tool.inwards].`;
 
 async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
@@ -42,7 +42,7 @@ async function main(argv: string[]): Promise<number> {
   if (!["text", "json", "sarif"].includes(format)) return print(`Unknown --format ${format}`, 2);
 
   const configPath = values.config ? resolve(values.config) : findConfig(process.cwd());
-  if (!configPath) return print("No pyproject.toml with [tool.stratum] found.", 2);
+  if (!configPath) return print("No pyproject.toml with [tool.inwards] found.", 2);
 
   const started = performance.now();
   const config = parseConfig(readFileSync(configPath, "utf8"));
@@ -68,11 +68,11 @@ async function main(argv: string[]): Promise<number> {
   return diagnostics.length > 0 ? 1 : 0;
 }
 
-/** Walks up from `dir` to the first pyproject.toml that has a [tool.stratum] table. */
+/** Walks up from `dir` to the first pyproject.toml that has a [tool.inwards] table. */
 function findConfig(dir: string): string | undefined {
   for (let d = dir; ; d = dirname(d)) {
     const candidate = resolve(d, "pyproject.toml");
-    if (existsSync(candidate) && readFileSync(candidate, "utf8").includes("[tool.stratum")) {
+    if (existsSync(candidate) && readFileSync(candidate, "utf8").includes("[tool.inwards")) {
       return candidate;
     }
     if (dirname(d) === d) return undefined;

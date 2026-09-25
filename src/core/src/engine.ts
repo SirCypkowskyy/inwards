@@ -1,5 +1,5 @@
 import type { Parser } from "web-tree-sitter";
-import type { StratumConfig } from "./config.ts";
+import type { InwardsConfig } from "./config.ts";
 import { checkLayers } from "./layers.ts";
 import { importSkeleton } from "./prescan.ts";
 import { createPythonParser, extractImports, type GrammarBinaries, parsePython } from "./python.ts";
@@ -9,10 +9,10 @@ import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 export class Engine {
   private constructor(
     private readonly parser: Parser,
-    private readonly config: StratumConfig,
+    private readonly config: InwardsConfig,
   ) {}
 
-  static async create(wasm: GrammarBinaries, config: StratumConfig): Promise<Engine> {
+  static async create(wasm: GrammarBinaries, config: InwardsConfig): Promise<Engine> {
     return new Engine(await createPythonParser(wasm), config);
   }
 
