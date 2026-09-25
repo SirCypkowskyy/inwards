@@ -22,10 +22,12 @@ describe("Stop gate", () => {
     expect(first.code).toBe(2);
     expect(first.stderr).toContain('"code":"INW001"');
     expect(stop(root, { stop_hook_active: true }).code).toBe(2);
-    expect(stop(root, { stop_hook_active: true }).code).toBe(2);
+    const last = stop(root, { stop_hook_active: true });
+    expect(last.code).toBe(2);
+    expect(last.stderr).toContain("ask how to proceed");
     const yielded = stop(root, { stop_hook_active: true });
-    expect(yielded.code).toBe(1); // shown to the user; escalation (#22) takes over from here
-    expect(yielded.stderr).toContain("blocked this turn 3 times");
+    expect(yielded.code).toBe(0);
+    expect(JSON.parse(yielded.stdout).systemMessage).toContain("shop/domain/order.py");
     expect(stop(root).code).toBe(2); // a new turn starts the count again
   });
 

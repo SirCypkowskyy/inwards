@@ -168,7 +168,10 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 
 ### When the agent can't fix it
 
-Sometimes the right fix needs a decision the agent shouldn't make alone, such as a new port that changes a public API. Without a limit, the stop hook keeps blocking until the host gives up on its own. The planned `inwards hook` command reads the run log, and when the same violation (same code, file and target) survives three attempts, it switches its message: *stop editing, summarise the violation, and ask the user how to proceed*. It then exits 0 so the turn can end cleanly with a question instead of a loop.
+Sometimes the right fix needs a decision the agent shouldn't make alone, such as a new port that changes a public API. Without a limit, the hooks would keep blocking until the host gives up on its own, and an agent that is only ever blocked learns to game the check. So Inwards escalates after `escalate-after` attempts (default 3, set in `[tool.inwards]`):
+
+- **Per edit:** the session state counts how often each violation (same rule, module and message) has been reported. The edit that reaches the limit exits 0, and its report goes to the model as `additionalContext`, headed *stop editing, summarise the violation, and ask the user how to proceed*. Escalation isn't sticky: the next edit with the same violation blocks again.
+- **At Stop:** the gate blocks a turn up to the limit. The last block adds the same instruction. The Stop after it (with `stop_hook_active` set) lets the turn end and puts the unresolved violations in a `systemMessage` that the user sees. It also records them in `.inwards/state/unresolved.json`, and the next session's `SessionStart` hands that list to the model once, so the question isn't forgotten.
 
 ## Stopping the agent from gaming the check
 

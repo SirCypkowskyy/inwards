@@ -31,6 +31,7 @@ Inwards turns those wiki rules into a check that runs in milliseconds and talks 
 root = "src"
 required-version = "0.0.1"  # oldest Inwards allowed; `inwards init` sets it
 ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
+escalate-after = 3  # attempts at one violation before the agent is told to ask you (optional)
 layers = [
   { name = "domain",         modules = ["shop.domain"] },
   { name = "application",    modules = ["shop.application"] },

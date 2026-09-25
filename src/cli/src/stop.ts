@@ -12,15 +12,17 @@
  * record, a `[tool.inwards]` table that differs from the start snapshot (a
  * `sed -i` through Bash), a changed file governed by a config that didn't
  * exist at start, or Claude Code settings that dropped the Inwards hooks. It
- * blocks a turn at most MAX_BLOCKS times, then lets it end and tells the user
- * (escalation, #22, takes over from there). If the gate itself fails, it
+ * blocks a turn at most `escalate-after` times (default 3); the last block
+ * tells the agent to ask the user, and the Stop after it lets the turn end
+ * with the unresolved violations shown to the user (see `escalation.ts`). If the gate itself fails, it
  * blocks once with the error, then lets the turn end.
  */
 import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
-import { type InwardsConfig, type Report, render } from "@inwards/core";
+import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
 import { settingsProblem } from "./claude-settings.ts";
+import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { newPrefixErrors } from "./prefixes.ts";
@@ -28,8 +30,6 @@ import { runCheck } from "./project.ts";
 import { isSessionId, readSession, recordPass, recordStop, type SessionState } from "./session.ts";
 import { projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
 
-/** Blocks per turn before the gate lets it end. */
-const MAX_BLOCKS = 3;
 const PYTHON_FILE = /\.pyi?$/u;
 
 /**
@@ -79,12 +79,6 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
       undefined,
     );
   }
-  if (active && state.stops >= MAX_BLOCKS) {
-    return print(
-      `inwards: the Stop gate blocked this turn ${MAX_BLOCKS} times and is letting it end. Run \`inwards check\` and review the changes.`,
-      1,
-    );
-  }
   const problems = trustProblems(project, configs, state);
   const manifest = projectManifest(project, configs);
   const { report, strangers } = await checkChanged(
@@ -105,8 +99,59 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     }
     return 0;
   }
-  recordStop(project, id, !active);
-  return block(problems, report);
+  const turn = {
+    streak: active ? state.stops : 0,
+    limit: escalationLimit(configs),
+    fresh: !active,
+  };
+  return blockOrYield(project, id, turn, { problems, report });
+}
+
+/**
+ * Blocks the turn, or lets it end once the limit is reached. The last block
+ * tells the agent to ask the user; after it, the turn ends with the
+ * unresolved problems shown to the user.
+ *
+ * @param project - the real project root.
+ * @param id - the session id.
+ * @param turn - blocks so far in this turn, blocks allowed, and whether this is the turn's first Stop.
+ * @param found - the problems and the report.
+ * @returns 2 to block, 0 to let the turn end.
+ */
+function blockOrYield(
+  project: string,
+  id: string,
+  turn: { streak: number; limit: number; fresh: boolean },
+  found: { problems: string[]; report: Report },
+): number {
+  const { streak, limit, fresh } = turn;
+  const { problems, report } = found;
+  if (streak >= limit) {
+    return yieldTurn(project, problems, errorsOf(report));
+  }
+  recordStop(project, id, fresh);
+  const last = streak + 1 === limit ? [askUser(limit)] : [];
+  return block([...problems, ...last], report);
+}
+
+/**
+ * Picks the block limit: the smallest `escalate-after` among the configs.
+ *
+ * @param configs - the valid configs now.
+ * @returns how many times the gate blocks a turn before escalating.
+ */
+function escalationLimit(configs: Record<string, InwardsConfig>): number {
+  return Math.min(...Object.values(configs).map((c) => c.escalateAfter ?? DEFAULT_ESCALATE_AFTER));
+}
+
+/**
+ * Keeps the errors of a report, the violations left unresolved.
+ *
+ * @param report - the check of the changed files.
+ * @returns its error diagnostics.
+ */
+function errorsOf(report: Report): Diagnostic[] {
+  return report.diagnostics.filter((d) => d.severity === "error");
 }
 
 /**

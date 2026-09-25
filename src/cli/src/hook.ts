@@ -4,12 +4,20 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
-import { ConfigError, type Diagnostic, render } from "@inwards/core";
+import { ConfigError, type Diagnostic, parseConfig, render } from "@inwards/core";
+import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
 import { configGuard } from "./guard.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
-import { isSessionId, readSessionStart, recordEdit, recordStart } from "./session.ts";
+import {
+  fingerprint,
+  isSessionId,
+  readSession,
+  readSessionStart,
+  recordEdit,
+  recordStart,
+} from "./session.ts";
 import { projectPath } from "./snapshot.ts";
 import { stopGate } from "./stop.ts";
 
@@ -72,6 +80,13 @@ function sessionStart(input: Record<string, unknown>): number {
   const source = typeof input["source"] === "string" ? input["source"] : "resume";
   try {
     recordStart(project, id, source);
+    const unresolved =
+      source === "startup" || source === "clear" ? takeUnresolved(project) : undefined;
+    if (unresolved !== undefined) {
+      const additionalContext = `${unresolved}\nAsk the user how they want these handled before changing that code.`;
+      const hookSpecificOutput = { hookEventName: "SessionStart", additionalContext };
+      process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
+    }
     return 0;
   } catch (err) {
     return print(
@@ -108,17 +123,19 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   }
   try {
     const report = await runCheck(configPath, [target.file], target.cwd);
+    const limit = escalatesAt(target.project, input["session_id"], configPath, report.diagnostics);
     rememberEdit(target.project, input["session_id"], target.file, report.diagnostics);
     if (report.diagnostics.length === 0) {
       return 0;
     }
     const json = render(report, "json", { pretty: false });
-    if (report.diagnostics.some((d) => d.severity === "error")) {
+    if (report.diagnostics.some((d) => d.severity === "error") && limit === undefined) {
       process.stderr.write(`${json}\n`);
       return 2;
     }
-    // Warnings only: the edit stands, and the report reaches the model as context.
-    const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: json };
+    // Warnings only, or an escalation: the report reaches the model as context.
+    const context = limit === undefined ? json : `inwards: ${askUser(limit)}\n${json}`;
+    const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: context };
     process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
     return 0;
   } catch (err) {
@@ -127,6 +144,35 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     }
     return print(`inwards hook: ${err instanceof Error ? err.message : String(err)}`, 1);
   }
+}
+
+/**
+ * Tells whether this run escalates: an error in it has now been reported
+ * exactly `escalate-after` times this session. Only that run escalates; the
+ * next one with the same violation blocks again.
+ *
+ * @param project - the real project root.
+ * @param id - the payload's `session_id`.
+ * @param configPath - the config the file was checked with.
+ * @param diagnostics - this run's findings.
+ * @returns the limit when this run reaches it, else undefined.
+ */
+function escalatesAt(
+  project: string,
+  id: unknown,
+  configPath: string,
+  diagnostics: readonly Diagnostic[],
+): number | undefined {
+  const seen = isSessionId(id) ? readSession(project, id)?.seen : undefined;
+  if (seen === undefined) {
+    return undefined;
+  }
+  const limit =
+    parseConfig(readFileSync(configPath, "utf8")).escalateAfter ?? DEFAULT_ESCALATE_AFTER;
+  const reached = diagnostics.some(
+    (d) => d.severity === "error" && (seen.get(fingerprint(d)) ?? 0) + 1 === limit,
+  );
+  return reached ? limit : undefined;
 }
 
 /**
