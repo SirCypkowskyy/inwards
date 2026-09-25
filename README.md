@@ -9,7 +9,8 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha scaffold. One rule (INW001, layer dependency direction) works end to end.
+Status: pre-alpha (0.0.1). INW001 (layer dependency direction) and INW000 (source encodings that
+could hide imports) work end to end, including the Claude Code hook (`inwards hook claude-code`).
 
 ## Layout
 

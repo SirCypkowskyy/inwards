@@ -110,4 +110,4 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 | [7. Glossary](07-Glossary.md) | The vocabulary, from "port" to "import skeleton" |
 
 !!! info "Status"
-    Pre-alpha. One rule (INW001, layer direction) works end to end in the CLI, the engine and the VS Code server. Everything marked :material-progress-clock: in these docs is planned, not built.
+    Pre-alpha (0.0.1). Two rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, and each `v*` tag drafts a GitHub Release with binaries for six platforms. Everything marked :material-progress-clock: in these docs is planned, not built.

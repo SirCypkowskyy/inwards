@@ -81,4 +81,4 @@ flowchart LR
 The [glossary](07-Glossary.md) defines every term from "port" to "import skeleton".
 
 !!! info "Project status"
-    Pre-alpha. The engine, the CLI and a VS Code language server work end to end for one rule (INW001). The monorepo, CI, release pipeline and these docs are in place. Items marked :material-progress-clock: are planned.
+    Pre-alpha (0.0.1). Two rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, and each `v*` tag drafts a GitHub Release with binaries for six platforms. CI runs on Linux, macOS and Windows. Items marked :material-progress-clock: are planned.

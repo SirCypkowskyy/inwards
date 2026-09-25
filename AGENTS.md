@@ -148,6 +148,26 @@ act push -W .github/workflows/cd.yml -n                                       # 
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
 
+## Finishing a piece of work
+
+Before you hand back or merge, update the docs and the issues. Work is not
+done until both match the code.
+
+- **Docs** (`docs/chapters/`, `README.md`, `eval/README.md`, `AGENTS.md`):
+  describe what the code does now. Drop "planned" from anything that shipped,
+  fix numbers that changed (tests, corpus sizes, timings), and write an ADR
+  for any decision a later reader would question. Run the strict docs build.
+- **Every issue you touched** gets a closing comment in three parts:
+  - *Done*: what changed, with commits or the PR;
+  - *Verified*: how you know it works (tests, CI run, `act`, a manual check);
+  - *Left*: what is still open. Each open item gets its own issue, linked,
+    or stays as an unticked acceptance box with a reason.
+  Then tick the acceptance boxes that are met and set the board status.
+- **The epic** of the milestone: tick exit criteria that are met, and comment
+  on the milestone's state when a batch of its issues closes.
+- Anything moved to another milestone is moved on GitHub (milestone,
+  sub-issue link to the new epic, board), not just mentioned in a comment.
+
 ## Code rules
 
 - **Strict typing, no escape hatches** (tsc, Biome). No `any`, no non-null `!`,
