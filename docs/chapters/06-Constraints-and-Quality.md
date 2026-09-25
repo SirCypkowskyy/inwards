@@ -47,7 +47,8 @@ All numbers come from the scaffold in this repository. Nothing here is projected
 | Single file, wall time incl. process start (30 runs) | p50 48.6 ms, p95 80.4 ms | p95 < 100 ms | :white_check_mark: with little headroom |
 | Single file, engine time reported by the CLI | 16 to 30 ms | n/a | |
 | `inwards --version` (process start only) | about 10 ms | n/a | |
-| Prescan refusals on the CPython 3.14 stdlib | 8.2 % of 1,921 files | lower is faster | :white_check_mark: |
+| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter) | < 1 s | :white_check_mark: |
+| Prescan refusals on the CPython 3.14 stdlib | 8.3 % of 1,921 files | lower is faster | :white_check_mark: |
 | Prescan missed imports on the same corpus | 0 | 0 | :white_check_mark: |
 | Peak memory, full synthetic run | about 120 MB RSS | n/a | |
 | Binary size, Linux x64 | 82 MB | n/a | :material-alert: large |

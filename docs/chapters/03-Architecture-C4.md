@@ -121,8 +121,8 @@ flowchart LR
         rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>reporters.ts<br/>text · json · sarif</small>"]
-        engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles</small>"]
-        modgraph["Module index + graph<br/><small>first-party modules, cycles</small>"]
+        engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
+        modgraph["<b>Module index</b><br/><small>project.ts: first-party modules,<br/>importers on demand</small>"]
     end
 
     cfgtext --> config --> engine
@@ -132,14 +132,14 @@ flowchart LR
     rules --> fix
     rules --> engine
     engine -. "confirm with full parse" .-> parser
-    extract -.-> modgraph -.-> rules
+    engine --> modgraph
+    modgraph -. "imports of candidate files" .-> extract
     engine --> report
 
     classDef comp fill:#7e57c2,color:#fff,stroke:#4527a0
     classDef planned fill:#ede7f6,color:#4527a0,stroke:#7e57c2,stroke-dasharray:5 5
     classDef port fill:#eceff1,color:#263238,stroke:#90a4ae
-    class config,pre,parser,extract,rules,fix,report,engine comp
-    class modgraph planned
+    class config,pre,parser,extract,rules,fix,report,engine,modgraph comp
     class files,cfgtext,wasm port
 ```
 
@@ -153,6 +153,7 @@ flowchart LR
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call |
+| Module index | `Engine.index(files)` returns every first-party module and answers "who imports module X" on demand, parsing only files whose text mentions X's last name segment | Used by the Stop gate (#20) and INW006 (#21). Cycles are not detected yet |
 
 ### How one check flows
 
@@ -269,8 +270,9 @@ src/
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / json / sarif
 │   │   ├── engine.ts      # facade
+│   │   ├── project.ts     # module index, importers on demand
 │   │   └── meta.ts        # VERSION, DOCS_BASE
 │   └── test/              # bun test
-├── cli/src/               # inwards binary: args, files, grammars
+├── cli/src/               # main (commands), hook, project (load sources), paths, files, grammars
 └── vscode-extension/src/  # extension.ts (client), server.ts (LSP)
 ```

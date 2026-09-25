@@ -8,11 +8,13 @@
   // in core's tests and scripts, and the extension's scripts/copy-wasm.ts.
   // eslint-plugin-jsdoc is loaded by oxlint through .oxlintrc.jsonc "jsPlugins".
   "ignoreDependencies": ["tree-sitter-python", "eslint-plugin-jsdoc"],
-  // Called by the CLI on the Engine that Engine.create() returns; fallow does not
-  // follow the type of an awaited factory result.
   // Fail CI when more than 3% of the code is duplicated (it is 0% today).
   "duplicates": { "threshold": 3 },
-  "usedClassMembers": ["checkFiles"],
+  // checkFiles and index: called by the CLI on the Engine that Engine.create()
+  // returns; fallow does not follow the type of an awaited factory result.
+  // importersOf: only tests call it until the Stop gate (#20) lands; drop it
+  // from this list in that PR.
+  "usedClassMembers": ["checkFiles", "index", "importersOf"],
   "boundaries": {
     // A file belongs to the first zone that matches, so index.ts comes before
     // the rest of the engine.

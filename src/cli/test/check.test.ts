@@ -42,3 +42,13 @@ test("a stub next to its module is checked too", () => {
   const { code } = inwards(["check", "--format", "json"], { cwd: root });
   expect(code).toBe(1);
 });
+
+test("a module under shop/domain/build/ is checked", () => {
+  const root = project({
+    "pyproject.toml": LAYERS,
+    "shop/domain/build/leak.py": "import shop.infrastructure.db\n",
+  });
+  const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+  expect(code).toBe(1);
+  expect(JSON.parse(stdout).diagnostics[0].module).toBe("shop.domain.build.leak");
+});
