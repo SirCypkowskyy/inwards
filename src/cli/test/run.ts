@@ -8,7 +8,7 @@ const CMD = process.env.INWARDS_BIN
   ? [resolve(REPO, process.env.INWARDS_BIN)]
   : [process.execPath, join(REPO, "src/cli/src/main.ts")];
 
-export function inwards(args: string[], opts: { cwd: string; stdin?: string }) {
+export function inwards(args: string[], opts: { cwd: string; stdin?: string | undefined }) {
   const p = Bun.spawnSync([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: opts.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
