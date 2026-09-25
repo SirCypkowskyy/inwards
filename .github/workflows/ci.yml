@@ -63,6 +63,16 @@ jobs:
         run: |
           dist/${{ matrix.bin }} --version
           dist/${{ matrix.bin }} check --format json > /dev/null
+      - name: SARIF from this OS validates against the 2.1.0 schema, with forward slashes
+        run: |
+          mkdir -p "$RUNNER_TEMP/sarif/shop/domain/deep"
+          cd "$RUNNER_TEMP/sarif"
+          printf '[tool.inwards]\nlayers = [{ name = "domain", modules = ["shop.domain"] }, { name = "infra", modules = ["shop.infra"] }]\n' > pyproject.toml
+          echo 'import shop.infra.db' > shop/domain/deep/order.py
+          "$GITHUB_WORKSPACE/dist/${{ matrix.bin }}" check --format sarif > out.json || test $? -eq 1
+          grep -q '"uri":"shop/domain/deep/order.py"' out.json
+          curl -sSfL https://json.schemastore.org/sarif-2.1.0.json -o schema.json
+          npx -y -p ajv-cli@5 -p ajv-formats@3 ajv validate --spec=draft7 -c ajv-formats --strict=false -s schema.json -d out.json
 
   docs:
     name: Docs build
