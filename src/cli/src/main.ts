@@ -104,7 +104,6 @@ async function checkCommand(
     return print("No pyproject.toml with [tool.inwards] found.", 2);
   }
 
-  const started = performance.now();
   const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : undefined;
   const report = await runCheck(configPath, targets, process.cwd());
 
@@ -116,7 +115,7 @@ async function checkCommand(
   const project = realpath(dirname(configPath));
   if (project) {
     noteRun(project, targets ?? [project], report.diagnostics);
-    logRun(project, { event: "check", exit, started, force: log });
+    logRun(project, { event: "check", exit, force: log });
   }
   return exit;
 }

@@ -48,12 +48,11 @@ export async function hookClaudeCode(usage: string): Promise<number> {
   if (input === null) {
     return print("inwards hook: stdin is not a Claude Code hook payload.", 1);
   }
-  const started = performance.now();
   const event = input["hook_event_name"];
   const exit = await dispatch(event, input);
   const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
   if (project && typeof event === "string") {
-    logRun(project, { event, input, exit, started });
+    logRun(project, { event, input, exit });
   }
   return exit;
 }

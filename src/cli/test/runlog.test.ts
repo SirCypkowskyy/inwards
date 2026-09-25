@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import process from "node:process";
 import { inwards, LAYERS, payload, project } from "./run.ts";
 import { LEAK, put, session } from "./stop-helpers.ts";
 
@@ -80,5 +81,65 @@ describe("run log", () => {
     writeOrder(root, ON);
     expect(existsSync(join(root, ".inwards/runs.1.jsonl"))).toBe(true);
     expect(runs(root)).toHaveLength(1);
+  });
+});
+
+describe("run log: review round 1", () => {
+  test("a broken config can't turn a hook's exit or output into a crash", () => {
+    if (process.platform === "win32" || process.getuid?.() === 0) {
+      return; // chmod means nothing on Windows or to root
+    }
+    const root = session();
+    chmodSync(join(root, "pyproject.toml"), 0o000);
+    const stdin = payload("post-write-readme", root, { session_id: "stop-test" });
+    const run = inwards(["hook", "claude-code"], { cwd: root, stdin });
+    chmodSync(join(root, "pyproject.toml"), 0o644);
+    expect(run).toEqual({ code: 0, stdout: "", stderr: "" });
+  });
+
+  test("the env switch writes nothing in a project without Inwards, and 0 wins over the config", () => {
+    const plain = project({ "app.py": "" });
+    const stdin = payload("pre-write-readme", plain, { session_id: "s" });
+    inwards(["hook", "claude-code"], { cwd: plain, stdin, env: ON });
+    expect(existsSync(join(plain, ".inwards"))).toBe(false);
+    const configured = project({
+      "pyproject.toml": LAYERS.replace("[tool.inwards]", "[tool.inwards]\nrun-log = true"),
+      "shop/domain/order.py": "",
+    });
+    inwards(["check"], { cwd: configured, env: { INWARDS_RUN_LOG: "0" } });
+    expect(existsSync(join(configured, ".inwards/runs.jsonl"))).toBe(false);
+  });
+
+  test("an Edit counts the lines it changed, not the context it repeats", () => {
+    const root = session();
+    put(root, "shop/domain/order.py", "X = 1\nY = 2\n");
+    const stdin = payload("post-edit-order", root, {
+      session_id: "stop-test",
+      tool_input: {
+        file_path: join(root, "shop/domain/order.py"),
+        old_string: "X = 1\n",
+        new_string: "X = 1\nY = 2\n",
+      },
+    });
+    inwards(["hook", "claude-code"], { cwd: root, stdin, env: ON });
+    const [line] = runs(root).filter((r) => r["event"] === "PostToolUse");
+    expect(line?.["lines"]).toEqual([{ file: "shop/domain/order.py", added: 1, removed: 0 }]);
+  });
+
+  test("files that weren't checked get no line counts", () => {
+    const root = session();
+    const stdin = payload("post-write-readme", root, { session_id: "stop-test" });
+    inwards(["hook", "claude-code"], { cwd: root, stdin, env: ON });
+    expect(runs(root).filter((r) => r["event"] === "PostToolUse")).toMatchObject([
+      { files: [], lines: [] },
+    ]);
+  });
+
+  test("a whole-project check logs '.', and init keeps the log out of git for every agent", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "" });
+    inwards(["init", "--agent", "aider"], { cwd: root });
+    expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain(".inwards/");
+    inwards(["check", "--log"], { cwd: root });
+    expect(runs(root)).toMatchObject([{ event: "check", files: ["."] }]);
   });
 });

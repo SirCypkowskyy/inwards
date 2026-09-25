@@ -3,8 +3,9 @@
  * the business hypothesis (fixed within one retry, violations per 1,000
  * agent-written lines) can be measured from real sessions. Off by default,
  * local only, and never sent anywhere. It is on when `INWARDS_RUN_LOG=1` or
- * the project's root config says `run-log = true`. At 5 MB the file is
- * rotated to `runs.1.jsonl`, replacing the previous one.
+ * the project's root config says `run-log = true` (`INWARDS_RUN_LOG=0` wins
+ * over the config), and only in a project that uses Inwards. At 5 MiB the
+ * file is rotated to `runs.1.jsonl`, replacing the previous one.
  *
  * Line schema `inwards/run@1` (documented in docs/chapters/08-Run-Log.md):
  * `{ v, at, session_id, event, tool, files, lines, fingerprints, exit, durationMs }`.
@@ -16,28 +17,30 @@ import { type Diagnostic, parseConfig } from "@inwards/core";
 import { findConfig } from "./paths.ts";
 import { fingerprint } from "./session.ts";
 import { projectPath } from "./snapshot.ts";
-import { appendLine, stateDir } from "./state-files.ts";
+import { appendLine, existingStateDir, stateDir } from "./state-files.ts";
 
 /** Size at which the log is rotated: 5 MiB. */
 const MAX_BYTES = 5_242_880;
 const LINE_BREAK = /\r\n|\r|\n/u;
 
-/** Lines an edit added and removed in one file, as the tool call says. */
+/** Lines an edit added and removed in one file, from the tool call. */
 interface LineCount {
   file: string;
   added: number;
   removed: number;
 }
 
-/** What a hook handler found, collected for the log line. */
-const noted: { files: string[]; fingerprints: string[] } = { files: [], fingerprints: [] };
+/**
+ * What a handler checked, collected for the log line. The CLI runs one
+ * command per process, so a module-level note is enough.
+ */
+const noted: { files: string[]; diagnostics: Diagnostic[] } = { files: [], diagnostics: [] };
 
 /**
  * Notes files and violations a handler checked, for this run's log line.
- * The CLI runs one command per process, so a module-level note is enough.
  *
  * @param project - the real project root.
- * @param files - absolute paths of the files checked.
+ * @param files - absolute paths of the files or directories checked.
  * @param diagnostics - what the check reported.
  */
 export function noteRun(
@@ -45,69 +48,67 @@ export function noteRun(
   files: readonly string[],
   diagnostics: readonly Diagnostic[],
 ): void {
-  noted.files.push(...files.map((file) => projectPath(project, file)));
-  noted.fingerprints.push(...diagnostics.map(fingerprint));
+  noted.files.push(...files.map((file) => projectPath(project, file) || "."));
+  noted.diagnostics.push(...diagnostics);
 }
 
 /**
- * Tells whether the run log is on for a project.
- *
- * @param project - the project root.
- * @returns true with `INWARDS_RUN_LOG=1` (or `true`), or `run-log = true` in the root config.
- */
-function runLogEnabled(project: string): boolean {
-  const env = process.env["INWARDS_RUN_LOG"];
-  if (env === "1" || env === "true") {
-    return true;
-  }
-  const config = findConfig(project, project);
-  try {
-    return config !== undefined && parseConfig(readFileSync(config, "utf8")).runLog === true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Appends one run to the log, if it is on. Best effort: logging never changes
- * what the hook or check returns.
+ * Appends one run to the log, if it is on. Best effort: nothing in here,
+ * not even deciding whether the log is on, can change what the hook or
+ * check returns.
  *
  * @param project - the real project root.
- * @param run - the event, tool input, exit code and start time; `force` logs even when the log is off (`check --log`).
+ * @param run - the event, the hook payload, the exit code; `force` for `check --log`.
  */
 export function logRun(
   project: string,
-  run: {
-    event: string;
-    input?: Record<string, unknown>;
-    exit: number;
-    started: number;
-    force?: boolean;
-  },
+  run: { event: string; input?: Record<string, unknown>; exit: number; force?: boolean },
 ): void {
-  if (!(run.force === true || runLogEnabled(project))) {
-    return;
-  }
   try {
+    if (!runLogEnabled(project, run.force === true)) {
+      return;
+    }
     const path = join(dirname(stateDir(project)), "runs.jsonl");
     rotate(path);
     const { input } = run;
+    const files = [...new Set(noted.files)];
     const line = {
       v: 1,
       at: new Date().toISOString(),
       session_id: typeof input?.["session_id"] === "string" ? input["session_id"] : null,
       event: run.event,
       tool: typeof input?.["tool_name"] === "string" ? input["tool_name"] : null,
-      files: [...new Set(noted.files)],
-      lines: input === undefined ? [] : lineCounts(project, input),
-      fingerprints: noted.fingerprints,
+      files,
+      lines: run.event === "PostToolUse" && input ? lineCounts(project, input, files) : [],
+      fingerprints: noted.diagnostics.map(fingerprint),
       exit: run.exit,
-      durationMs: Math.round((performance.now() - run.started) * 10) / 10,
+      // Since the process started (Bun's performance clock), so startup counts too.
+      durationMs: Math.round(performance.now() * 10) / 10,
     };
     appendLine(path, `${JSON.stringify(line)}\n`);
   } catch {
     // best effort, see above
   }
+}
+
+/**
+ * Tells whether the run log is on for a project.
+ *
+ * @param project - the project root.
+ * @param force - `check --log`: on regardless of the switches.
+ * @returns true when switched on and the project uses Inwards (a root config or session state).
+ */
+function runLogEnabled(project: string, force: boolean): boolean {
+  const env = process.env["INWARDS_RUN_LOG"];
+  const config = findConfig(project, project);
+  const usesInwards = config !== undefined || existingStateDir(project) !== undefined;
+  if (!usesInwards || (!force && (env === "0" || env === "false"))) {
+    return false;
+  }
+  if (force || env === "1" || env === "true") {
+    return true;
+  }
+  return config !== undefined && parseConfig(readFileSync(config, "utf8")).runLog === true;
 }
 
 /**
@@ -123,44 +124,94 @@ function rotate(path: string): void {
 }
 
 /**
- * Counts the lines an Edit, Write or MultiEdit added and removed.
- * A Write replaces the whole file, so only its added lines are known.
+ * Counts the lines an Edit, Write or MultiEdit changed in the file the hook
+ * checked. Lines an edit repeats unchanged around its change (context) don't
+ * count. A Write replaces the whole file, so every line counts as added;
+ * `replace_all` counts one occurrence.
  *
  * @param project - the real project root.
  * @param input - the hook payload.
- * @returns one count per edited file, or none for other tools.
+ * @param checked - project-relative files the run checked.
+ * @returns one count for the edited file, or none when it wasn't checked.
  */
-function lineCounts(project: string, input: Record<string, unknown>): LineCount[] {
+function lineCounts(
+  project: string,
+  input: Record<string, unknown>,
+  checked: readonly string[],
+): LineCount[] {
   const tool = input["tool_input"];
   if (typeof tool !== "object" || tool === null || !("file_path" in tool)) {
     return [];
   }
-  const file = projectPath(project, String(tool.file_path));
+  if (typeof tool.file_path !== "string") {
+    return [];
+  }
+  const file = projectPath(project, tool.file_path);
+  if (!checked.includes(file)) {
+    return [];
+  }
   if ("content" in tool) {
-    return [{ file, added: lines(tool.content), removed: 0 }];
+    return [{ file, added: lines(tool.content).length, removed: 0 }];
   }
   const edits = "edits" in tool && Array.isArray(tool.edits) ? tool.edits : [tool];
-  let added = 0;
-  let removed = 0;
-  for (const edit of edits) {
-    if (typeof edit === "object" && edit !== null) {
-      added += "new_string" in edit ? lines(edit.new_string) : 0;
-      removed += "old_string" in edit ? lines(edit.old_string) : 0;
-    }
-  }
-  return [{ file, added, removed }];
+  const counts = edits.map(editCount);
+  return [
+    {
+      file,
+      added: counts.reduce((n, c) => n + c.added, 0),
+      removed: counts.reduce((n, c) => n + c.removed, 0),
+    },
+  ];
 }
 
 /**
- * Counts lines in a string the way an editor shows them.
+ * Counts the lines one `old_string` → `new_string` edit changes.
+ *
+ * @param edit - one edit from an Edit or MultiEdit call.
+ * @returns lines added and removed, zero for anything that isn't an edit.
+ */
+function editCount(edit: unknown): { added: number; removed: number } {
+  if (typeof edit !== "object" || edit === null) {
+    return { added: 0, removed: 0 };
+  }
+  const before = lines("old_string" in edit ? edit.old_string : "");
+  return diffLines(before, lines("new_string" in edit ? edit.new_string : ""));
+}
+
+/**
+ * Counts changed lines between two versions of a snippet, leaving out the
+ * lines they share at the start and at the end.
+ *
+ * @param before - the old lines.
+ * @param after - the new lines.
+ * @returns lines added and removed.
+ */
+function diffLines(before: string[], after: string[]): { added: number; removed: number } {
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) {
+    start += 1;
+  }
+  let end = 0;
+  while (
+    end < before.length - start &&
+    end < after.length - start &&
+    before.at(-1 - end) === after.at(-1 - end)
+  ) {
+    end += 1;
+  }
+  return { added: after.length - start - end, removed: before.length - start - end };
+}
+
+/**
+ * Splits text into lines the way an editor shows them.
  *
  * @param text - any value from the payload.
- * @returns the line count, 0 for an empty or non-string value.
+ * @returns the lines, none for an empty or non-string value.
  */
-function lines(text: unknown): number {
+function lines(text: unknown): string[] {
   if (typeof text !== "string" || text === "") {
-    return 0;
+    return [];
   }
   const parts = text.split(LINE_BREAK);
-  return parts.at(-1) === "" ? parts.length - 1 : parts.length;
+  return parts.at(-1) === "" ? parts.slice(0, -1) : parts;
 }
