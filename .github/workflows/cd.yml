@@ -1,0 +1,73 @@
+name: CD
+
+# Tag a release with `git tag v0.1.0 && git push origin v0.1.0`.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Cross-compile binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Tag must match the engine version
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have="$(sed -nE 's/^export const VERSION = "(.*)";$/\1/p' src/core/src/meta.ts)"
+          if [ "$want" != "$have" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $have in src/core/src/meta.ts"
+            exit 1
+          fi
+      - run: bun test
+      - name: Compile every target with Bun
+        run: bun run scripts/build-binaries.ts
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum stratum-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS
+      - name: Build VS Code extension (.vsix)
+        working-directory: src/vscode-extension
+        run: |
+          bun run build
+          bun x @vscode/vsce package --no-dependencies --allow-missing-repository \
+            -o "../../dist/stratum-vscode-${GITHUB_REF_NAME}.vsix"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: stratum-${{ github.ref_name }}
+          path: |
+            dist/stratum-*
+            dist/SHA256SUMS
+            !dist/*.map
+          if-no-files-found: error
+
+  verify:
+    name: Run on ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, bin: stratum-linux-x64 }
+          - { os: ubuntu-24.04-arm, bin: stratum-linux-arm64 }
+          - { os: macos-latest, bin: stratum-darwin-arm64 }
+          - { os: windows-latest, bin: stratum-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: stratum-${{ github.ref_name }}
+          path: dist
+      - name: Binary starts and lints the example app
+        shell: bash
+        run: |
+          chmod +x "dist/${{ matrix.bin }}" || true
+          "dist/${{ matrix.bin }}" --version
+          "dist/${{ matrix.bin }}" check --format json

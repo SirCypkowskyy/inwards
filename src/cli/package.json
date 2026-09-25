@@ -1,0 +1,19 @@
+{
+  "name": "@stratum-lint/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The `stratum` command line. Compiled to a single binary with `bun build --compile`.",
+  "bin": {
+    "stratum": "./src/main.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@stratum-lint/core": "workspace:*",
+    "tree-sitter-python": "0.25.0",
+    "web-tree-sitter": "0.27.0"
+  },
+  "license": "MIT"
+}

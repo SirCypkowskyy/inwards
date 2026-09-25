@@ -1,0 +1,148 @@
+<svg width="1458" height="611" class="rich-terminal" viewBox="0 0 1458 611.1999999999999" xmlns="http://www.w3.org/2000/svg">
+    <!-- Generated with Rich https://www.textualize.io -->
+    <style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-3975067233-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-3975067233-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-3975067233-r1 { fill: #98a84b;font-weight: bold }
+.terminal-3975067233-r2 { fill: #c5c8c6;font-weight: bold }
+.terminal-3975067233-r3 { fill: #c5c8c6 }
+.terminal-3975067233-r4 { fill: #cc555a;font-weight: bold }
+.terminal-3975067233-r5 { fill: #98a84b }
+.terminal-3975067233-r6 { fill: #68a0b3 }
+.terminal-3975067233-r7 { fill: #868887 }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-3975067233-clip-terminal">
+      <rect x="0" y="0" width="1438.6" height="560.1999999999999" />
+    </clipPath>
+    <clipPath id="terminal-3975067233-line-0">
+    <rect x="0" y="1.5" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-1">
+    <rect x="0" y="25.9" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-2">
+    <rect x="0" y="50.3" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-3">
+    <rect x="0" y="74.7" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-4">
+    <rect x="0" y="99.1" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-5">
+    <rect x="0" y="123.5" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-6">
+    <rect x="0" y="147.9" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-7">
+    <rect x="0" y="172.3" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-8">
+    <rect x="0" y="196.7" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-9">
+    <rect x="0" y="221.1" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-10">
+    <rect x="0" y="245.5" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-11">
+    <rect x="0" y="269.9" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-12">
+    <rect x="0" y="294.3" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-13">
+    <rect x="0" y="318.7" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-14">
+    <rect x="0" y="343.1" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-15">
+    <rect x="0" y="367.5" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-16">
+    <rect x="0" y="391.9" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-17">
+    <rect x="0" y="416.3" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-18">
+    <rect x="0" y="440.7" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-19">
+    <rect x="0" y="465.1" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-20">
+    <rect x="0" y="489.5" width="1439.6" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-3975067233-line-21">
+    <rect x="0" y="513.9" width="1439.6" height="24.65"/>
+            </clipPath>
+    </defs>
+
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1456" height="609.2" rx="8"/><text class="terminal-3975067233-title" fill="#c5c8c6" text-anchor="middle" x="728" y="27">stratum&#160;check</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
+            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
+            <circle cx="44" cy="0" r="7" fill="#28c840"/>
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-3975067233-clip-terminal)">
+    
+    <g class="terminal-3975067233-matrix">
+    <text class="terminal-3975067233-r1" x="0" y="20" textLength="24.4" clip-path="url(#terminal-3975067233-line-0)">$&#160;</text><text class="terminal-3975067233-r2" x="24.4" y="20" textLength="463.6" clip-path="url(#terminal-3975067233-line-0)">tail&#160;-1&#160;clean-app/shop/domain/order.py</text><text class="terminal-3975067233-r3" x="1439.6" y="20" textLength="12.2" clip-path="url(#terminal-3975067233-line-0)">
+</text><text class="terminal-3975067233-r3" x="0" y="44.4" textLength="744.2" clip-path="url(#terminal-3975067233-line-1)">from&#160;shop.infrastructure.sql_orders&#160;import&#160;SqlOrderRepository</text><text class="terminal-3975067233-r3" x="1439.6" y="44.4" textLength="12.2" clip-path="url(#terminal-3975067233-line-1)">
+</text><text class="terminal-3975067233-r3" x="1439.6" y="68.8" textLength="12.2" clip-path="url(#terminal-3975067233-line-2)">
+</text><text class="terminal-3975067233-r1" x="0" y="93.2" textLength="24.4" clip-path="url(#terminal-3975067233-line-3)">$&#160;</text><text class="terminal-3975067233-r2" x="24.4" y="93.2" textLength="158.6" clip-path="url(#terminal-3975067233-line-3)">stratum&#160;check</text><text class="terminal-3975067233-r3" x="1439.6" y="93.2" textLength="12.2" clip-path="url(#terminal-3975067233-line-3)">
+</text><text class="terminal-3975067233-r2" x="0" y="117.6" textLength="451.4" clip-path="url(#terminal-3975067233-line-4)">clean-app/shop/domain/order.py:14:44:</text><text class="terminal-3975067233-r4" x="463.6" y="117.6" textLength="73.2" clip-path="url(#terminal-3975067233-line-4)">STR001</text><text class="terminal-3975067233-r3" x="536.8" y="117.6" textLength="292.8" clip-path="url(#terminal-3975067233-line-4)">&#160;Layer&#160;&quot;domain&quot;&#160;imports&#160;</text><text class="terminal-3975067233-r3" x="1439.6" y="117.6" textLength="12.2" clip-path="url(#terminal-3975067233-line-4)">
+</text><text class="terminal-3975067233-r3" x="0" y="142" textLength="1415.2" clip-path="url(#terminal-3975067233-line-5)">&quot;shop.infrastructure.sql_orders.SqlOrderRepository&quot;&#160;from&#160;outer&#160;layer&#160;&quot;infrastructure&quot;.&#160;Allowed&#160;direction:&#160;domain&#160;&lt;-&#160;</text><text class="terminal-3975067233-r3" x="1439.6" y="142" textLength="12.2" clip-path="url(#terminal-3975067233-line-5)">
+</text><text class="terminal-3975067233-r3" x="0" y="166.4" textLength="524.6" clip-path="url(#terminal-3975067233-line-6)">application&#160;&lt;-&#160;infrastructure&#160;&lt;-&#160;interface.</text><text class="terminal-3975067233-r3" x="1439.6" y="166.4" textLength="12.2" clip-path="url(#terminal-3975067233-line-6)">
+</text><text class="terminal-3975067233-r5" x="24.4" y="190.8" textLength="48.8" clip-path="url(#terminal-3975067233-line-7)">fix:</text><text class="terminal-3975067233-r3" x="73.2" y="190.8" textLength="1305.4" clip-path="url(#terminal-3975067233-line-7)">&#160;Depend&#160;on&#160;an&#160;abstraction&#160;owned&#160;by&#160;&quot;domain&quot;&#160;instead&#160;of&#160;&quot;shop.infrastructure.sql_orders.SqlOrderRepository&quot;.</text><text class="terminal-3975067233-r3" x="1439.6" y="190.8" textLength="12.2" clip-path="url(#terminal-3975067233-line-7)">
+</text><text class="terminal-3975067233-r6" x="48.8" y="215.2" textLength="24.4" clip-path="url(#terminal-3975067233-line-8)">1.</text><text class="terminal-3975067233-r3" x="73.2" y="215.2" textLength="1366.4" clip-path="url(#terminal-3975067233-line-8)">&#160;Delete&#160;`from&#160;shop.infrastructure.sql_orders&#160;import&#160;SqlOrderRepository`.&#160;Do&#160;not&#160;move&#160;the&#160;import&#160;into&#160;a&#160;function&#160;</text><text class="terminal-3975067233-r3" x="1439.6" y="215.2" textLength="12.2" clip-path="url(#terminal-3975067233-line-8)">
+</text><text class="terminal-3975067233-r3" x="0" y="239.6" textLength="610" clip-path="url(#terminal-3975067233-line-9)">or&#160;behind&#160;TYPE_CHECKING;&#160;Stratum&#160;checks&#160;those&#160;too.</text><text class="terminal-3975067233-r3" x="1439.6" y="239.6" textLength="12.2" clip-path="url(#terminal-3975067233-line-9)">
+</text><text class="terminal-3975067233-r6" x="48.8" y="264" textLength="24.4" clip-path="url(#terminal-3975067233-line-10)">2.</text><text class="terminal-3975067233-r3" x="73.2" y="264" textLength="1317.6" clip-path="url(#terminal-3975067233-line-10)">&#160;Declare&#160;a&#160;typing.Protocol&#160;in&#160;`shop.domain`&#160;(for&#160;example&#160;`shop.domain.ports`)&#160;that&#160;describes&#160;only&#160;what&#160;this&#160;</text><text class="terminal-3975067233-r3" x="1439.6" y="264" textLength="12.2" clip-path="url(#terminal-3975067233-line-10)">
+</text><text class="terminal-3975067233-r3" x="0" y="288.4" textLength="475.8" clip-path="url(#terminal-3975067233-line-11)">module&#160;needs&#160;from&#160;`SqlOrderRepository`.</text><text class="terminal-3975067233-r3" x="1439.6" y="288.4" textLength="12.2" clip-path="url(#terminal-3975067233-line-11)">
+</text><text class="terminal-3975067233-r6" x="48.8" y="312.8" textLength="24.4" clip-path="url(#terminal-3975067233-line-12)">3.</text><text class="terminal-3975067233-r3" x="73.2" y="312.8" textLength="1281" clip-path="url(#terminal-3975067233-line-12)">&#160;Type&#160;this&#160;module&#160;against&#160;that&#160;Protocol&#160;and&#160;receive&#160;the&#160;implementation&#160;through&#160;a&#160;constructor&#160;or&#160;function&#160;</text><text class="terminal-3975067233-r3" x="1439.6" y="312.8" textLength="12.2" clip-path="url(#terminal-3975067233-line-12)">
+</text><text class="terminal-3975067233-r3" x="0" y="337.2" textLength="122" clip-path="url(#terminal-3975067233-line-13)">parameter.</text><text class="terminal-3975067233-r3" x="1439.6" y="337.2" textLength="12.2" clip-path="url(#terminal-3975067233-line-13)">
+</text><text class="terminal-3975067233-r6" x="48.8" y="361.6" textLength="24.4" clip-path="url(#terminal-3975067233-line-14)">4.</text><text class="terminal-3975067233-r3" x="73.2" y="361.6" textLength="1342" clip-path="url(#terminal-3975067233-line-14)">&#160;Make&#160;the&#160;class&#160;in&#160;&quot;infrastructure&quot;&#160;satisfy&#160;the&#160;Protocol,&#160;and&#160;wire&#160;it&#160;in&#160;the&#160;outermost&#160;layer&#160;(the&#160;composition&#160;</text><text class="terminal-3975067233-r3" x="1439.6" y="361.6" textLength="12.2" clip-path="url(#terminal-3975067233-line-14)">
+</text><text class="terminal-3975067233-r3" x="0" y="386" textLength="73.2" clip-path="url(#terminal-3975067233-line-15)">root).</text><text class="terminal-3975067233-r3" x="1439.6" y="386" textLength="12.2" clip-path="url(#terminal-3975067233-line-15)">
+</text><text class="terminal-3975067233-r7" x="24.4" y="410.4" textLength="622.2" clip-path="url(#terminal-3975067233-line-16)">docs:&#160;https://stratum-docs.workers.dev/rules/STR001</text><text class="terminal-3975067233-r3" x="1439.6" y="410.4" textLength="12.2" clip-path="url(#terminal-3975067233-line-16)">
+</text><text class="terminal-3975067233-r3" x="1439.6" y="434.8" textLength="12.2" clip-path="url(#terminal-3975067233-line-17)">
+</text><text class="terminal-3975067233-r4" x="0" y="459.2" textLength="61" clip-path="url(#terminal-3975067233-line-18)">Found</text><text class="terminal-3975067233-r3" x="61" y="459.2" textLength="305" clip-path="url(#terminal-3975067233-line-18)">&#160;1&#160;violation&#160;in&#160;10&#160;files&#160;</text><text class="terminal-3975067233-r7" x="366" y="459.2" textLength="109.8" clip-path="url(#terminal-3975067233-line-18)">(24.2&#160;ms)</text><text class="terminal-3975067233-r3" x="475.8" y="459.2" textLength="12.2" clip-path="url(#terminal-3975067233-line-18)">.</text><text class="terminal-3975067233-r3" x="1439.6" y="459.2" textLength="12.2" clip-path="url(#terminal-3975067233-line-18)">
+</text><text class="terminal-3975067233-r3" x="1439.6" y="483.6" textLength="12.2" clip-path="url(#terminal-3975067233-line-19)">
+</text><text class="terminal-3975067233-r1" x="0" y="508" textLength="24.4" clip-path="url(#terminal-3975067233-line-20)">$&#160;</text><text class="terminal-3975067233-r2" x="24.4" y="508" textLength="85.4" clip-path="url(#terminal-3975067233-line-20)">echo&#160;$?</text><text class="terminal-3975067233-r3" x="1439.6" y="508" textLength="12.2" clip-path="url(#terminal-3975067233-line-20)">
+</text><text class="terminal-3975067233-r3" x="0" y="532.4" textLength="12.2" clip-path="url(#terminal-3975067233-line-21)">1</text><text class="terminal-3975067233-r3" x="1439.6" y="532.4" textLength="12.2" clip-path="url(#terminal-3975067233-line-21)">
+</text><text class="terminal-3975067233-r3" x="1439.6" y="556.8" textLength="12.2" clip-path="url(#terminal-3975067233-line-22)">
+</text>
+    </g>
+    </g>
+</svg>

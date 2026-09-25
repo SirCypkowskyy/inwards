@@ -1,0 +1,11 @@
+// Static-assets-only Worker serving the Zensical build. No Worker script:
+// Cloudflare serves docs/site/ straight from its edge.
+{
+  "name": "stratum-docs",
+  "compatibility_date": "2026-09-25",
+  "assets": {
+    "directory": "./site",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}

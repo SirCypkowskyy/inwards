@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Biome (lint + format)
+        run: bun x biome ci .
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Unit tests
+        run: bun test
+      - name: Prescan never misses an import (differential test on the Python stdlib)
+        run: bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+      - name: Dogfood - stratum checks its own example app
+        run: bun run check:self
+      - name: Smoke-test the compiled binary (catches WASM embedding regressions)
+        run: |
+          bun run scripts/build-binaries.ts bun-linux-x64
+          ./dist/stratum-linux-x64 --version
+          ./dist/stratum-linux-x64 check --format json > /dev/null
+      - name: Build VS Code extension
+        working-directory: src/vscode-extension
+        run: bun run build
+
+  docs:
+    name: Docs build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - name: Build site (strict)
+        run: uv run zensical build -f docs/zensical.toml --clean --strict

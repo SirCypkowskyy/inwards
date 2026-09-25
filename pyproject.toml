@@ -1,0 +1,48 @@
+# Root project for the Stratum monorepo.
+#
+# The engine is TypeScript (see package.json and src/). This file does two jobs:
+#   1. It holds the Python-side tooling: Zensical for the docs site.
+#   2. It is the future home of the `stratum-lint` PyPI package (the bare `stratum` name is taken), a thin wheel that
+#      ships the Bun-compiled binary so users can `uv add --dev stratum-lint`
+#      (the same distribution trick Ruff and ty use). PyPI publishing is out of
+#      scope for now, so the project is marked as non-packaged for uv.
+#
+# It also dogfoods Stratum: [tool.stratum] below is the reference config that
+# the docs and the example app use.
+
+[project]
+name = "stratum-lint"
+version = "0.1.0"
+description = "Architecture linter for Python that keeps AI coding agents inside your layers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["linter", "architecture", "ddd", "clean-architecture", "ai-agents"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[dependency-groups]
+docs = ["zensical>=0.0.65"]
+
+[tool.uv]
+package = false
+default-groups = ["docs"]
+
+# Reference configuration, consumed by `stratum check`.
+[tool.stratum]
+root = "examples/clean-app"
+# Layers are listed from the innermost (most stable) to the outermost.
+# A module may import its own layer or any layer listed before it.
+layers = [
+  { name = "domain", modules = ["shop.domain"] },
+  { name = "application", modules = ["shop.application"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"] },
+  { name = "interface", modules = ["shop.api", "shop.cli"] },
+]

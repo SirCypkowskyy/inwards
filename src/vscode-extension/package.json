@@ -1,0 +1,49 @@
+{
+  "name": "stratum-vscode",
+  "displayName": "Stratum",
+  "description": "Architecture rules for Python, live in the editor. Same engine as `stratum check`.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "stratum-lint",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "workspaceContains:pyproject.toml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Stratum",
+      "properties": {
+        "stratum.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run Stratum architecture checks on Python files."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "build": "bun build src/extension.ts src/server.ts --outdir dist --target node --format cjs --external vscode && bun run scripts/copy-wasm.ts",
+    "package": "bunx @vscode/vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@stratum-lint/core": "workspace:*",
+    "vscode-languageclient": "^10.1.2",
+    "vscode-languageserver": "^10.1.2",
+    "vscode-languageserver-textdocument": "^1.0.15",
+    "tree-sitter-python": "0.25.0",
+    "web-tree-sitter": "0.27.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.95.0",
+    "@types/node": "^24.0.0"
+  },
+  "license": "MIT"
+}

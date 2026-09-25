@@ -1,0 +1,80 @@
+# Zensical site for the Stratum architecture docs.
+#   uv run zensical serve -f docs/zensical.toml          # live preview
+#   uv run zensical build -f docs/zensical.toml --clean  # writes docs/site/
+# docs/wrangler.jsonc then ships docs/site/ to Cloudflare Workers static assets.
+
+[project]
+site_name = "Stratum"
+site_description = "Architecture linter for Python that keeps AI coding agents inside your layers."
+site_author = "Stratum maintainers"
+copyright = "Copyright &copy; 2026 Stratum maintainers"
+docs_dir = "chapters"
+site_dir = "site"
+
+nav = [
+  { "Home" = "index.md" },
+  { "1. Introduction" = "01-Introduction.md" },
+  { "2. Business context" = "02-Business-Context.md" },
+  { "3. Architecture (C4)" = "03-Architecture-C4.md" },
+  { "4. AI integration" = "04-AI-Integration.md" },
+  { "5. Decisions (ADR)" = "05-ADR.md" },
+  { "6. Constraints and quality" = "06-Constraints-and-Quality.md" },
+  { "7. Glossary" = "07-Glossary.md" },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.code.copy",
+  "content.code.annotate",
+  "content.tabs.link",
+  "navigation.footer",
+  "navigation.instant",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[project.theme.icon]
+logo = "material/layers-triple"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "deep purple"
+accent = "amber"
+toggle.icon = "material/weather-night"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "deep purple"
+accent = "amber"
+toggle.icon = "material/weather-sunny"
+toggle.name = "Switch to light mode"
+
+# Setting markdown_extensions replaces Zensical's defaults, so list all we use.
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.mark = {}
+pymdownx.tasklist.custom_checkbox = true
+pymdownx.tabbed.alternate_style = true
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
