@@ -116,8 +116,10 @@ and any high-conflict file it owns.
 ## Before every commit
 
 ```sh
-bun x biome ci .        # lint + format, zero warnings
-bun run typecheck       # tsgo, strict
+bun x biome ci .        # lint + format, every rule group at error
+bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
+bun run typecheck       # tsgo, strictest flags (tsconfig.base.json)
+bun run fallow          # dead code, unused deps, boundaries, duplication
 bun test                # unit + CLI + E2E snapshots
 ```
 
@@ -126,29 +128,32 @@ tests against the compiled binary on Linux, macOS and Windows.
 
 ## Code rules
 
-- **Strict typing, no escape hatches.** No `any`, no non-null `!`, no `as`
-  casts except at a trust boundary right after validation (parsed JSON, TOML,
-  hook payloads), with a comment saying what was checked. Prefer `unknown`
-  plus a type guard. Explicit return types on exported functions.
-- **Every function is documented** with a TSDoc block, including private
-  helpers and arrow functions bound to a name:
+- **Strict typing, no escape hatches** (tsc, Biome). No `any`, no non-null `!`,
+  no `as` casts except at a trust boundary right after validation, with a
+  `biome-ignore lint/nursery/noUnsafeTypeAssertion: <what was checked>`.
+  Prefer `unknown` plus a type guard. Explicit types on every function.
+  Rule exceptions live in `biome.jsonc`, each with its reason.
+- **Every function is documented** (`lint:docs`) with a TSDoc block,
+  including private helpers and arrow functions bound to a name:
   - first line: a title that says what it does;
   - then 1-3 lines of description (what, and why when it isn't obvious);
   - a longer section when the behaviour has edge cases, invariants or a
     non-obvious reason (see `importSkeleton` in `src/core/src/prescan.ts`);
   - `@param` for every parameter and `@returns` for every non-void return.
 - **Ports and adapters where it pays.** The engine (`src/core`) is the
-  hexagon: pure, no I/O, no `Bun`/`Deno`/`node:fs` (Biome enforces the Bun
-  and Deno half). Anything it needs from outside comes through a port, an
+  hexagon: pure, no I/O, no `Bun`/`Deno`/`node:fs`. Anything it needs from outside comes through a port, an
   interface the core owns (`GrammarBinaries`, `SourceFile`), and adapters
-  (CLI, LSP, tests) implement it. Add a port only when a second adapter or a
-  test needs it; one interface with one implementation and no test seam is
-  just indirection.
+  (CLI, LSP, tests) implement it. Adapters import `@inwards/core` only, never
+  core internals (fallow boundaries in `.fallowrc.jsonc`; Biome bans Node,
+  Bun and env access in `src/core/src`). Add a port only when a second
+  adapter or a test needs it; one interface with one implementation and no
+  test seam is just indirection.
 - Machine output (JSON, SARIF, hook stderr) goes through
   `process.stdout/stderr.write`, never `console.*` (Bun colours
-  `console.error` under `FORCE_COLOR`).
+  `console.error` under `FORCE_COLOR`). Biome's noConsole enforces it outside
+  scripts.
 - Anything an agent reads is a contract: `inwards/diagnostics@1` fields are
-  only ever added, and E2E snapshots pin exit codes and output.
+  only ever added, and E2E snapshots (`bun test`) pin exit codes and output.
 
 ## Writing
 

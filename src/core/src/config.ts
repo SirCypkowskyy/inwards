@@ -17,35 +17,75 @@ export class ConfigError extends Error {
   override name = "ConfigError";
 }
 
-/** Reads `[tool.inwards]` from the text of a `pyproject.toml`. */
+/**
+ * Reads `[tool.inwards]` from the text of a `pyproject.toml`.
+ * Validates every field the engine relies on and throws a ConfigError that
+ * names the bad key, so adapters can show the message as is.
+ *
+ * `root` defaults to `.` and has backslashes turned into slashes. Layer names
+ * must be unique and non-empty; each layer needs a list of non-empty module
+ * prefixes. The TOML parser's own error is kept as `cause`.
+ *
+ * @param pyprojectText - the full text of the `pyproject.toml` file.
+ * @returns the validated configuration.
+ * @throws {ConfigError} when the TOML is invalid or the table is missing or malformed.
+ */
 export function parseConfig(pyprojectText: string): InwardsConfig {
-  let doc: { tool?: { inwards?: unknown } };
+  let doc: unknown;
   try {
-    doc = parse(pyprojectText) as typeof doc;
+    doc = parse(pyprojectText);
   } catch (err) {
-    throw new ConfigError(`pyproject.toml is not valid TOML: ${(err as Error).message}`);
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new ConfigError(`pyproject.toml is not valid TOML: ${detail}`, { cause: err });
   }
-  const raw = doc.tool?.inwards;
-  if (!raw || typeof raw !== "object") {
+  const tool = isRecord(doc) ? doc["tool"] : undefined;
+  const raw = isRecord(tool) ? tool["inwards"] : undefined;
+  if (!isRecord(raw)) {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
   }
-  const { root = ".", layers } = raw as { root?: unknown; layers?: unknown };
-  if (typeof root !== "string") throw new ConfigError("tool.inwards.root must be a string.");
+  const { root = ".", layers } = raw;
+  if (typeof root !== "string") {
+    throw new ConfigError("tool.inwards.root must be a string.");
+  }
   if (!Array.isArray(layers) || layers.length === 0) {
     throw new ConfigError("tool.inwards.layers must be a non-empty array.");
   }
   const seen = new Set<string>();
-  const parsed = layers.map((layer, i): LayerSpec => {
-    const { name, modules } = (layer ?? {}) as { name?: unknown; modules?: unknown };
+  const parsed = layers.map((layer: unknown, i): LayerSpec => {
+    const { name, modules } = isRecord(layer) ? layer : {};
     if (typeof name !== "string" || name === "") {
       throw new ConfigError(`tool.inwards.layers[${i}].name must be a non-empty string.`);
     }
-    if (seen.has(name)) throw new ConfigError(`Layer "${name}" is declared twice.`);
+    if (seen.has(name)) {
+      throw new ConfigError(`Layer "${name}" is declared twice.`);
+    }
     seen.add(name);
-    if (!Array.isArray(modules) || !modules.every((m) => typeof m === "string" && m !== "")) {
+    if (!isModuleList(modules)) {
       throw new ConfigError(`tool.inwards.layers[${i}].modules must be a list of module names.`);
     }
     return { name, modules };
   });
   return { root: root.replaceAll("\\", "/"), layers: parsed };
+}
+
+/**
+ * Tells whether a parsed value is a table (or array) whose keys can be read.
+ * Used to walk untrusted TOML without casts.
+ *
+ * @param value - any value from the parsed document.
+ * @returns true when the value is a non-null object.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * Tells whether a layer's `modules` value is a list of module prefixes.
+ * An empty list passes; an empty string inside it does not.
+ *
+ * @param value - the raw `modules` value of one layer.
+ * @returns true when every entry is a non-empty string.
+ */
+function isModuleList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((m) => typeof m === "string" && m !== "");
 }

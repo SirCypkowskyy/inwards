@@ -10,6 +10,14 @@ export interface GrammarBinaries {
   python: Uint8Array;
 }
 
+/**
+ * Creates a tree-sitter parser for Python from the adapter's WASM bytes.
+ * Initialises the tree-sitter runtime, then loads the Python grammar into a
+ * new parser. Async because both steps compile WASM.
+ *
+ * @param wasm - the tree-sitter runtime and Python grammar as WASM bytes.
+ * @returns a parser ready to parse Python source.
+ */
 export async function createPythonParser(wasm: GrammarBinaries): Promise<Parser> {
   await Parser.init({ wasmBinary: wasm.runtime });
   const parser = new Parser();
@@ -17,89 +25,192 @@ export async function createPythonParser(wasm: GrammarBinaries): Promise<Parser>
   return parser;
 }
 
+/**
+ * Parses Python source into a syntax tree.
+ * tree-sitter recovers from syntax errors, so a tree comes back for any text;
+ * null means the parser had no language or the parse was cancelled.
+ * The caller must `delete()` the tree: WASM memory is not garbage collected.
+ *
+ * @param parser - parser with the Python grammar loaded.
+ * @param text - Python source.
+ * @returns the syntax tree.
+ * @throws {Error} when tree-sitter returns no tree.
+ */
 export function parsePython(parser: Parser, text: string): Tree {
   const tree = parser.parse(text);
-  if (!tree) throw new Error("tree-sitter returned no tree");
+  if (!tree) {
+    throw new Error("tree-sitter returned no tree");
+  }
   return tree;
 }
 
+const LEADING_BOM = /^\uFEFF/u;
+const LONE_CR = /\r(?!\n)/gu;
+
 /**
+ * Normalises source text before parsing.
  * Drops a BOM (editors don't count it as a column) and turns a lone \r into \n.
  * Python ends a line at a lone \r but tree-sitter doesn't, so `# c\rimport x`
- * would otherwise hide a real import inside a comment.
+ * would otherwise hide a real import inside a comment. CRLF is left alone.
+ *
+ * @param text - raw file text.
+ * @returns the text with line breaks and columns as Python sees them.
  */
 export function normalizeSource(text: string): string {
-  return text.replace(/^\uFEFF/, "").replace(/\r(?!\n)/g, "\n");
+  return text.replace(LEADING_BOM, "").replace(LONE_CR, "\n");
 }
 
-/** Every import in the file, including ones nested in functions or `if TYPE_CHECKING:`. */
+const IMPORT_STATEMENTS = ["import_statement", "import_from_statement"];
+
+/**
+ * Lists every import in a parsed file.
+ * Includes imports nested in functions, classes and `if TYPE_CHECKING:`
+ * blocks, since those still create a dependency. Relative imports are
+ * resolved against the file's module.
+ *
+ * @param tree - the parsed file.
+ * @param file - the file the tree came from; its module resolves relative imports.
+ * @returns one entry per imported name, in source order.
+ */
 export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
   const refs: ImportRef[] = [];
-  for (const stmt of tree.rootNode.descendantsOfType([
-    "import_statement",
-    "import_from_statement",
-  ])) {
-    if (!stmt) continue;
-    const statement = stmt.text;
-    const at = (node: Node, target: string): ImportRef => ({
-      target,
-      statement,
-      line: node.startPosition.row + 1,
-      column: node.startPosition.column + 1,
-      endLine: node.endPosition.row + 1,
-      endColumn: node.endPosition.column + 1,
-    });
+  for (const stmt of tree.rootNode.descendantsOfType(IMPORT_STATEMENTS)) {
+    refs.push(...(stmt.type === "import_statement" ? plainImports(stmt) : fromImports(stmt, file)));
+  }
+  return refs;
+}
 
-    if (stmt.type === "import_statement") {
-      // import a.b, c.d as e
-      for (const name of stmt.childrenForFieldName("name")) {
-        const dotted = name.type === "aliased_import" ? name.childForFieldName("name") : name;
-        if (dotted) refs.push(at(name, dotted.text));
-      }
-      continue;
-    }
-
-    // from X import a, b   |   from ..X import a   |   from . import a
-    const moduleNode = stmt.childForFieldName("module_name");
-    if (!moduleNode) continue;
-    const base = resolveModule(moduleNode, file);
-    if (base === null) continue;
-    const names = stmt.childrenForFieldName("name");
-    if (names.length === 0) {
-      refs.push(at(moduleNode, base)); // from X import *
-      continue;
-    }
-    for (const name of names) {
-      const dotted = name.type === "aliased_import" ? name.childForFieldName("name") : name;
-      if (!dotted) continue;
-      // `from shop import infrastructure` must count as importing shop.infrastructure.
-      refs.push(at(name, base ? `${base}.${dotted.text}` : dotted.text));
+/**
+ * Lists the modules named by an `import a.b, c as d` statement.
+ * Aliases are dropped: `import c as d` imports `c`.
+ *
+ * @param stmt - an `import_statement` node.
+ * @returns one entry per imported module.
+ */
+function plainImports(stmt: Node): ImportRef[] {
+  // import a.b, c.d as e
+  const refs: ImportRef[] = [];
+  for (const name of stmt.childrenForFieldName("name")) {
+    const dotted = importedName(name);
+    if (dotted) {
+      refs.push(refAt(name, dotted.text, stmt.text));
     }
   }
   return refs;
 }
 
-/** Turns `..repo` inside `shop.application.orders` into `shop.repo`. Null if it escapes the root. */
+/**
+ * Lists the targets of a `from X import a, b` statement.
+ * Each name counts as `X.name`, because `from shop import infrastructure` may
+ * import a submodule. `from X import *` counts as `X`. A relative import that
+ * climbs above the root yields nothing.
+ *
+ * @param stmt - an `import_from_statement` node.
+ * @param file - the importing file, used to resolve relative imports.
+ * @returns one entry per imported name.
+ */
+function fromImports(stmt: Node, file: SourceFile): ImportRef[] {
+  // from X import a, b   |   from ..X import a   |   from . import a
+  const moduleNode = stmt.childForFieldName("module_name");
+  if (!moduleNode) {
+    return [];
+  }
+  const base = resolveModule(moduleNode, file);
+  if (base === null) {
+    return [];
+  }
+  const names = stmt.childrenForFieldName("name");
+  if (names.length === 0) {
+    return [refAt(moduleNode, base, stmt.text)]; // from X import *
+  }
+  const refs: ImportRef[] = [];
+  for (const name of names) {
+    const dotted = importedName(name);
+    if (!dotted) {
+      continue;
+    }
+    // `from shop import infrastructure` must count as importing shop.infrastructure.
+    refs.push(refAt(name, base ? `${base}.${dotted.text}` : dotted.text, stmt.text));
+  }
+  return refs;
+}
+
+/**
+ * Returns the imported name of an import list entry, without its alias.
+ *
+ * @param name - a `dotted_name` or `aliased_import` node.
+ * @returns the dotted name node, or null if the alias node has none.
+ */
+function importedName(name: Node): Node | null {
+  return name.type === "aliased_import" ? name.childForFieldName("name") : name;
+}
+
+/**
+ * Builds an import reference that spans a syntax node.
+ * tree-sitter rows and columns are 0-based; editors and SARIF use 1-based.
+ *
+ * @param node - the node whose span the diagnostic will point at.
+ * @param target - the resolved dotted module name.
+ * @param statement - the whole import statement as written.
+ * @returns the reference with 1-based line and column.
+ */
+function refAt(node: Node, target: string, statement: string): ImportRef {
+  return {
+    target,
+    statement,
+    line: node.startPosition.row + 1,
+    column: node.startPosition.column + 1,
+    endLine: node.endPosition.row + 1,
+    endColumn: node.endPosition.column + 1,
+  };
+}
+
+/**
+ * Resolves the module part of a `from` import to a dotted name.
+ * Turns `..repo` inside `shop.application.orders` into `shop.repo`. One dot
+ * is the current package: the file's own module for `__init__.py`, its parent
+ * otherwise.
+ *
+ * @param node - the `module_name` node of the statement.
+ * @param file - the importing file.
+ * @returns the dotted module name, or null if the dots climb above the root.
+ */
 function resolveModule(node: Node, file: SourceFile): string | null {
-  if (node.type !== "relative_import") return node.text;
+  if (node.type !== "relative_import") {
+    return node.text;
+  }
   const prefix = node.children.find((c) => c?.type === "import_prefix")?.text ?? "";
   const rest = node.children.find((c) => c?.type === "dotted_name")?.text;
   const pkg = file.module.split(".");
-  if (!file.isPackage) pkg.pop();
+  if (!file.isPackage) {
+    pkg.pop();
+  }
   const up = prefix.length - 1;
-  if (up > pkg.length) return null;
+  if (up > pkg.length) {
+    return null;
+  }
   const parts = pkg.slice(0, pkg.length - up);
-  if (rest) parts.push(rest);
+  if (rest) {
+    parts.push(rest);
+  }
   return parts.join(".");
 }
 
-/** `shop/domain/order.py` → `shop.domain.order`, `shop/__init__.py` → `shop`. */
+const PYTHON_SUFFIX = /\.pyi?$/u;
+
+/**
+ * Derives the dotted module name of a Python file from its path.
+ * `shop/domain/order.py` becomes `shop.domain.order` and `shop/__init__.py`
+ * becomes `shop` (a package). Accepts `\` or `/` separators and `.py` or `.pyi`.
+ *
+ * @param relativePath - path of the file relative to the configured root.
+ * @returns the module name and whether the file is a package's `__init__`.
+ */
 export function moduleNameFor(relativePath: string): { module: string; isPackage: boolean } {
-  const parts = relativePath
-    .replace(/\\/g, "/")
-    .replace(/\.pyi?$/, "")
-    .split("/");
+  const parts = relativePath.replaceAll("\\", "/").replace(PYTHON_SUFFIX, "").split("/");
   const isPackage = parts.at(-1) === "__init__";
-  if (isPackage) parts.pop();
+  if (isPackage) {
+    parts.pop();
+  }
   return { module: parts.filter(Boolean).join("."), isPackage };
 }
