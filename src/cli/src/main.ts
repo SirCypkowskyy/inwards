@@ -1,18 +1,19 @@
 #!/usr/bin/env bun
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { ConfigError, type Format, render, VERSION } from "@inwards/core";
 import { hookClaudeCode } from "./hook.ts";
 import { AGENTS, initCommand, isAgent } from "./init.ts";
 import { print } from "./output.ts";
-import { findConfig } from "./paths.ts";
+import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
+import { logRun, noteRun } from "./runlog.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
 
-Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml]
+Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml] [--log]
        inwards init --agent claude|aider|agents-md [--dry-run]
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -38,6 +39,7 @@ async function main(argv: string[]): Promise<number> {
       help: { type: "boolean", short: "h" },
       agent: { type: "string" },
       "dry-run": { type: "boolean" },
+      log: { type: "boolean" },
     },
   });
 
@@ -58,7 +60,7 @@ async function main(argv: string[]): Promise<number> {
   if (values.help || command !== "check") {
     return print(USAGE, command ? 2 : 0);
   }
-  return await checkCommand(paths, values.format, values.config);
+  return await checkCommand(paths, values.format, values.config, values.log === true);
 }
 
 const FORMATS: readonly Format[] = ["text", "json", "sarif"];
@@ -84,12 +86,14 @@ function isFormat(value: string): value is Format {
  * @param paths - files or directories to check; empty means the config root.
  * @param format - the `--format` value, validated here.
  * @param config - the `--config` path, if given.
+ * @param log - `--log`: append this run to `.inwards/runs.jsonl` even when the run log is off.
  * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad format or no config.
  */
 async function checkCommand(
   paths: string[],
   format: string,
   config: string | undefined,
+  log: boolean,
 ): Promise<number> {
   if (!isFormat(format)) {
     return print(`Unknown --format ${format}`, 2);
@@ -100,6 +104,7 @@ async function checkCommand(
     return print("No pyproject.toml with [tool.inwards] found.", 2);
   }
 
+  const started = performance.now();
   const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : undefined;
   const report = await runCheck(configPath, targets, process.cwd());
 
@@ -107,7 +112,13 @@ async function checkCommand(
   const pretty = process.stdout.isTTY === true;
   const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
   process.stdout.write(`${render(report, format, { pretty, color })}\n`);
-  return report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
+  const exit = report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
+  const project = realpath(dirname(configPath));
+  if (project) {
+    noteRun(project, targets ?? [project], report.diagnostics);
+    logRun(project, { event: "check", exit, started, force: log });
+  }
+  return exit;
 }
 
 // exitCode, not exit(): Node-style exit() may drop writes still queued for a

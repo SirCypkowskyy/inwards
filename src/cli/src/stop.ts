@@ -27,6 +27,7 @@ import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { newPrefixErrors } from "./prefixes.ts";
 import { runCheck } from "./project.ts";
+import { noteRun } from "./runlog.ts";
 import {
   fingerprint,
   isSessionId,
@@ -88,13 +89,15 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   }
   const problems = trustProblems(project, configs, state);
   const manifest = projectManifest(project, configs);
+  const changed = changedFiles(project, state, manifest);
   const { report, strangers, governing } = await checkChanged(
     project,
-    changedFiles(project, state, manifest),
+    changed,
     state.start,
     configs,
   );
   report.diagnostics.unshift(...newPrefixErrors(project, configs, state.start.manifest, manifest));
+  noteRun(project, changed, report.diagnostics);
   for (const [file, config] of strangers) {
     problems.push(
       `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,

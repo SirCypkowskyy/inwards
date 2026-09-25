@@ -10,6 +10,7 @@ import { configGuard } from "./guard.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
+import { logRun, noteRun } from "./runlog.ts";
 import {
   fingerprint,
   isSessionId,
@@ -47,7 +48,24 @@ export async function hookClaudeCode(usage: string): Promise<number> {
   if (input === null) {
     return print("inwards hook: stdin is not a Claude Code hook payload.", 1);
   }
+  const started = performance.now();
   const event = input["hook_event_name"];
+  const exit = await dispatch(event, input);
+  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
+  if (project && typeof event === "string") {
+    logRun(project, { event, input, exit, started });
+  }
+  return exit;
+}
+
+/**
+ * Hands a hook payload to the handler for its event.
+ *
+ * @param event - the payload's `hook_event_name`.
+ * @param input - the hook payload.
+ * @returns the handler's exit code; 0 for events Inwards doesn't handle.
+ */
+async function dispatch(event: unknown, input: Record<string, unknown>): Promise<number> {
   if (event === "SessionStart") {
     return sessionStart(input);
   }
@@ -125,6 +143,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   }
   try {
     const report = await runCheck(configPath, [target.file], target.cwd);
+    noteRun(target.project, [target.file], report.diagnostics);
     const escalation = escalationOf(
       target.project,
       input["session_id"],

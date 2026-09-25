@@ -24,6 +24,7 @@ nav = [
   { "5. Decisions (ADR)" = "05-ADR.md" },
   { "6. Constraints and quality" = "06-Constraints-and-Quality.md" },
   { "7. Glossary" = "07-Glossary.md" },
+  { "8. Run log" = "08-Run-Log.md" },
 ]
 
 [project.theme]
