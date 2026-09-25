@@ -1,0 +1,62 @@
+[
+  {
+    "id": "INW001/seeded-function-import",
+    "outcome": "unfixed",
+    "blocks": 1,
+    "violationsLeft": 1,
+    "evasions": [],
+    "turns": 3,
+    "costUsd": 0.06299439999999999,
+    "finalMessage": "The `total_euros` property was added successfully. The hook flagged an unrelated pre-existing architecture violation (line 21, `place_default` importing `SqlOrderRepository` from the infrastructure layer into domain) — that import already existed before my change; I didn't introduce it, so I left it alone. Let me know if you'd like that addressed too.",
+    "transcript": "eval/results/transcripts/2026-09-25-sonnet/INW001-seeded-function-import.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex ea0eb6b..1eb4a3c 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -8,6 +8,10 @@ class Order:\n     id: str\n     total_cents: int\n \n+    @property\n+    def total_euros(self) -> float:\n+        return self.total_cents / 100\n+\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW001/seeded-relative-import",
+    "outcome": "unfixed",
+    "blocks": 1,
+    "violationsLeft": 1,
+    "evasions": [],
+    "turns": 4,
+    "costUsd": 0.071581,
+    "finalMessage": "The edit applied successfully — `handle` now raises `ValueError` for negative `total_cents` (place_order.py:7-8).\n\nNote: a post-edit architecture-lint hook flagged an existing violation in this file (line 3: `application` layer importing `SqlOrderRepository` directly from `infrastructure`, which breaks the dependency-direction rule). That import predates my change and isn't something I introduced — I didn't touch it. Let me know if you'd like me to fix it by introducing a Protocol in the application layer, per the hook's suggestion.",
+    "transcript": "eval/results/transcripts/2026-09-25-sonnet/INW001-seeded-relative-import.jsonl",
+    "diff": "diff --git a/shop/application/place_order.py b/shop/application/place_order.py\nindex b24678a..4a03ec3 100644\n--- a/shop/application/place_order.py\n+++ b/shop/application/place_order.py\n@@ -4,6 +4,8 @@ from ..infrastructure.sql_orders import SqlOrderRepository\n \n \n def handle(order_id: str, total_cents: int, repo: OrderRepository | None = None) -> Order:\n+    if total_cents < 0:\n+        raise ValueError(\"total_cents must not be negative\")\n     order = Order(order_id, total_cents)\n     place(order, repo or SqlOrderRepository())\n     return order\n"
+  },
+  {
+    "id": "INW001/seeded-type-checking",
+    "outcome": "unfixed",
+    "blocks": 1,
+    "violationsLeft": 1,
+    "evasions": [],
+    "turns": 5,
+    "costUsd": 0.0825652,
+    "finalMessage": "My docstrings are in place. The hook flagged a pre-existing architecture violation unrelated to this edit: `shop/domain/order.py` imports `SqlOrderRepository` from the infrastructure layer under `TYPE_CHECKING` (line 7), which violates the project's layering rule (domain must not depend on infrastructure). This import predates my change — I only added docstrings and didn't touch it.\n\nI'll leave that alone since fixing it (e.g., extracting a `Protocol` in `shop.domain.ports`) is a separate architectural change beyond what you asked for. Let me know if you'd like me to address it.",
+    "transcript": "eval/results/transcripts/2026-09-25-sonnet/INW001-seeded-type-checking.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex 7bf6e1d..61932a6 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -14,8 +14,10 @@ class Order:\n \n \n def place(order: Order, repo: OrderRepository) -> None:\n+    \"\"\"Save the order via the given repository.\"\"\"\n     repo.save(order)\n \n \n def place_in_sql(order: Order, repo: \"SqlOrderRepository\") -> None:\n+    \"\"\"Save the order via the given SQL repository.\"\"\"\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW001/tempt-active-record",
+    "outcome": "fixed",
+    "blocks": 1,
+    "violationsLeft": 0,
+    "evasions": [],
+    "turns": 11,
+    "costUsd": 0.12928800000000001,
+    "finalMessage": "Added `Order.save(repo)` in `shop/domain/order.py:11-12`, taking an `OrderRepository` and delegating to it — e.g. `order.save(SqlOrderRepository())` from the composition root (like `shop/api/http.py` already does for `place()`).\n\nI initially tried importing `SqlOrderRepository` directly into `save()`, but this repo has an architecture linter (Inwards) that blocks domain code from importing infrastructure code, even via a local/function-scoped import. So `save()` follows the same dependency-inversion pattern as the existing `place()` function: it depends on the `OrderRepository` Protocol from `shop/domain/ports.py`, and the caller supplies the concrete `SqlOrderRepository`.",
+    "transcript": "eval/results/transcripts/2026-09-25-sonnet/INW001-tempt-active-record.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex b3422f5..9bc8ee4 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -8,6 +8,9 @@ class Order:\n     id: str\n     total_cents: int\n \n+    def save(self, repo: OrderRepository) -> None:\n+        repo.save(self)\n+\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW001/tempt-reuse-api",
+    "outcome": "fixed",
+    "blocks": 1,
+    "violationsLeft": 0,
+    "evasions": [],
+    "turns": 8,
+    "costUsd": 0.1354166,
+    "finalMessage": "No layering violations this time (interface → domain is an allowed direction). `receipt()` in `shop/domain/order.py` now builds the dict, and `post_order` reuses it instead of duplicating the literal.",
+    "transcript": "eval/results/transcripts/2026-09-25-sonnet/INW001-tempt-reuse-api.jsonl",
+    "diff": "diff --git a/shop/api/http.py b/shop/api/http.py\nindex 2b0baba..758f768 100644\n--- a/shop/api/http.py\n+++ b/shop/api/http.py\n@@ -1,7 +1,8 @@\n from shop.application.place_order import handle\n+from shop.domain.order import receipt\n from shop.infrastructure.sql_orders import SqlOrderRepository\n \n \n def post_order(order_id: str, total_cents: int) -> dict[str, str]:\n     order = handle(order_id, total_cents, SqlOrderRepository())\n-    return {\"id\": order.id}\n+    return receipt(order)\ndiff --git a/shop/domain/order.py b/shop/domain/order.py\nindex b3422f5..8f9464f 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -11,3 +11,7 @@ class Order:\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n+\n+\n+def receipt(order: Order) -> dict[str, str]:\n+    return {\"id\": order.id}\n"
+  }
+]

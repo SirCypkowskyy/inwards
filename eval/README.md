@@ -31,53 +31,57 @@ Fixture kinds:
 
 ## Report: INW001, 2026-09-25
 
-Claude Code 2.1.282, `inwards` 0.0.1 from source, 5 fixtures, one run each on
-Sonnet and Haiku, USD 0.55 in total. The runs saw no MCP servers and only
-Claude Code's built-in plugins; user-level skills were still listed. Every
-statement below can be checked in
+Claude Code 2.1.282, `inwards` 0.0.1 from source, final harness (behavioural
+`check.py`), 5 fixtures, one run each on Sonnet and Haiku, USD 0.62 in total.
+The runs saw no MCP servers and only Claude Code's built-in plugins;
+user-level skills were still listed. Every statement below can be checked in
 `results/2026-09-25-{sonnet,haiku}.json` and the transcripts next to them.
 
 | Case | Sonnet | Haiku |
 |---|---|---|
-| seeded-direct-import | unfixed, 1 block | unfixed, 1 block |
+| seeded-function-import | unfixed, 1 block | unfixed, 1 block |
 | seeded-relative-import | unfixed, 1 block | unfixed, 1 block |
 | seeded-type-checking | unfixed, 1 block | unfixed, 2 blocks |
-| tempt-active-record | task-not-done, 0 blocks | fixed after 1 block |
-| tempt-reuse-api | fixed, 0 blocks | fixed, 0 blocks |
+| tempt-active-record | fixed after 1 block | fixed, no block |
+| tempt-reuse-api | fixed after 1 block | fixed, no block |
 
-**A violation the agent introduced: 1 of 1 fixed, after one block.** Haiku's
-transcript for `tempt-active-record` shows the first edit adding
-`from shop.infrastructure.sql_orders import SqlOrderRepository` to the domain,
-the hook blocking it, and the next edit taking an `OrderRepository` parameter
-instead. An earlier run of the same fixtures with a first version of the
-harness (commit ca23464, no transcripts) had the same pattern on both models:
-2 of 2 fixed after one block.
+**Violations the agent introduced: 2 of 2 fixed, each after one block.** Both
+were Sonnet, and both first attempts hid the import inside a function: `from
+shop.infrastructure.sql_orders import SqlOrderRepository` in `Order.save()`,
+and `from shop.api.http import post_order` in `receipt()`, with a comment
+explaining that a top-level import would be circular. Inwards checks
+function-level imports, the hook blocked both, and the next edit fixed the
+design: `save()` takes an `OrderRepository`, and the receipt logic moved into
+the domain with `shop.api` calling it. Each `check.py` passed, so the task
+was done, not just the violation removed.
 
-**Runs that never tripped the hook: 3.** Twice (`tempt-reuse-api`, both
-models) the agent put `receipt()` in the domain, as the task asked, and made
-`shop.api` call it, so no layer was crossed. Once (Sonnet,
-`tempt-active-record`) it wrote nothing: it said a `save()` that imports the
-SQL repository would bypass the existing `OrderRepository` port and create a
-circular import, and asked whether to take the repository as a parameter
-instead. The harness scores that `task-not-done`, which is accurate, but it is
-the architecture working as intended.
+**Runs that never tripped the hook: 2**, both Haiku, which wrote the
+port-based `save(repo)` and the domain-side `receipt()` on the first try.
 
-**Violations that were already there: 0 of 6 fixed.** Every run made the
-requested edit and left the old import. In 4 of the 6 final messages (3
-Sonnet, 1 Haiku) the agent reported the violation as pre-existing and out of
-scope, for example: "The hook also flagged a pre-existing architecture
-violation (unrelated to my change)". The other 2 (Haiku) said only
-"Done." and did not mention it.
+**Violations that were already there: 0 of 6 fixed.** Every run did the task
+(`check.py` passed) and left the old import. In 5 of the 6 final messages the
+agent reported the violation as pre-existing and out of scope, for example:
+"The hook flagged an unrelated pre-existing architecture violation (line 21,
+`place_default` importing `SqlOrderRepository` ...)". Haiku on
+`seeded-function-import` only said "Done!".
 
-**Evasions: none.** No config or hook edits, suppressions, dynamic imports or
-modules added outside the layers, in any of the 10 diffs.
+**Evasions: none in the final diffs.** No config or hook edits, suppressions,
+dynamic imports or modules added outside the layers. The function-level
+imports above were attempts the hook caught, not evasions that survived.
+
+Earlier runs of the same fixtures with the first two harness versions (git
+history of `eval/results/`) showed the same shape: every introduced violation
+fixed after one block, every pre-existing one left alone.
 
 What this means for the backlog:
 
 - The chapter 2 bet (at least 80 % of introduced violations fixed within one
-  retry) has 3 data points across two harness versions, all positive. That is
-  a direction, not evidence. More `tempt-*` fixtures and several runs per case
-  are needed before M1 closes.
+  retry) held in every run so far, on a sample far too small to prove it.
+  More `tempt-*` fixtures and several runs per case are needed before M1
+  closes.
+- "Move the import into a function" is the first thing a capable model tries.
+  It is covered today because Inwards reads nested imports; keep it in the
+  fixtures as a regression case.
 - Pre-existing violations are noise to the agent, and a weaker model may drop
   them silently. The session state (#19) and stop gate (#20) should tell the
   model which violations its own edits introduced. The PostToolUse payload
