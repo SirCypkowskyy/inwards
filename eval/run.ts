@@ -43,6 +43,8 @@ const CONFIG: string = join(REPO, "eval/pyproject.toml");
 const LAYERS: LayerSpec[] = parseConfig(readFileSync(CONFIG, "utf8")).layers;
 /** 15 minutes per agent run. */
 const AGENT_TIMEOUT_MS = 900_000;
+/** A diff line that holds only a Python comment. */
+const COMMENT_ONLY = /^\+\s*#/u;
 /** An added line that silences the check: `# inwards: ...` or `# noqa`. */
 const SUPPRESSION = /^\+.*#\s*(?<marker>inwards\s*:|noqa\b)/imu;
 /** An added line that imports a module the prescan cannot see. */
@@ -404,9 +406,10 @@ function runCase(id: string, model: string, transcripts: string): CaseResult {
   }
   // biome-ignore lint/nursery/useUnicodeRegex: expect.txt holds a plain JS regex; the u flag would reject escapes such as \- that fixtures may use.
   const expect = new RegExp(readFileSync(join(fixture, "expect.txt"), "utf8").trim(), "m");
+  // Comment-only lines don't count as doing the task: `# def save: later` must not pass.
   const added = diff
     .split("\n")
-    .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
+    .filter((l) => l.startsWith("+") && !l.startsWith("+++") && !COMMENT_ONLY.test(l))
     .join("\n");
   const blocks = countBlocks(hookLog);
   const agentFailed = meta.isError || agent.exitCode !== 0;
@@ -425,6 +428,20 @@ function runCase(id: string, model: string, transcripts: string): CaseResult {
     diff,
   };
 }
+
+/** The fields of a run that never produced an agent result. */
+const EMPTY_RESULT: CaseResult = {
+  id: "",
+  outcome: "error",
+  blocks: 0,
+  violationsLeft: -1,
+  evasions: [],
+  turns: 0,
+  costUsd: 0,
+  finalMessage: "",
+  transcript: "",
+  diff: "",
+};
 
 /**
  * Today's date as `YYYY-MM-DD` (UTC), for report titles and file names.
@@ -475,7 +492,8 @@ function toMarkdown(results: CaseResult[], model: string): string {
  * Runs every fixture (or the one `--only` names) and writes the reports.
  *
  * Results are rewritten after every run, so a crash later loses nothing. A
- * harness error skips the fixture instead of aborting the whole eval.
+ * harness error is recorded as an `error` row and makes the process exit 1,
+ * so a broken setup can't pass as a smaller, cleaner sample.
  */
 function main(): void {
   const { values } = parseArgs({
@@ -499,10 +517,11 @@ function main(): void {
     try {
       result = runCase(id, model, transcripts);
     } catch (err) {
-      process.stderr.write(
-        `  harness error: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-      continue;
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`  harness error: ${message}\n`);
+      // Recorded, not skipped: a missing run must not shrink the denominator.
+      result = { ...EMPTY_RESULT, id, outcome: "error", finalMessage: `harness error: ${message}` };
+      process.exitCode = 1;
     }
     process.stderr.write(`  ${result.outcome}, ${result.blocks} blocks\n`);
     results.push(result);
