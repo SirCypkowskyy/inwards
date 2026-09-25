@@ -1,7 +1,7 @@
 # Name placeholders (issue #9)
 
 Both registries reclaim empty squats, so these are small working packages:
-`inwards --version` points to GitHub Releases and every other command exits 2,
+`inwards --version` says the linter isn't released yet and every other command exits 2,
 so a dependency bump to a placeholder fails CI instead of passing every check.
 
 Publish once, from this directory, with the project account (2FA on, and a
@@ -9,7 +9,8 @@ token scoped to this one project):
 
 ```sh
 npm view inwards; curl -s -o /dev/null -w "%{http_code}\n" https://pypi.org/pypi/inwards/json  # both must say 404
-(cd pypi && uv build && uvx twine check dist/* && uv publish)   # UV_PUBLISH_TOKEN
+# Build from a copy outside the repo: hatchling otherwise ships the repo's .gitignore.
+B=$(mktemp -d) && cp -r pypi/. "$B" && (cd "$B" && uv build && uvx twine check dist/* && uv publish)  # UV_PUBLISH_TOKEN
 (cd npm && npm publish)                                          # after `npm login`
 ```
 
