@@ -1,0 +1,156 @@
+# Inwards: working rules
+
+Edit this file (`AGENTS.md`). `CLAUDE.md` holds only `@AGENTS.md`, which
+Claude Code expands on load; Codex, Cursor and other agents read this file
+directly. Never add content to `CLAUDE.md`.
+
+Architecture linter for Python, written in TypeScript on Bun. Engine in
+`src/core`, CLI in `src/cli`, VS Code extension in `src/vscode-extension`,
+docs in `docs/` (Zensical). The plan lives in GitHub issues on
+`SirCypkowskyy/inwards`: epics #1 to #7 are milestones M0 to M6, and every
+other issue is a sub-issue of one of them.
+
+Bun lives in `~/.bun/bin`; prefix `PATH` in non-interactive shells.
+
+## Source of truth: issues, then the board
+
+1. **GitHub issues** hold scope, acceptance criteria and decisions. Code
+   comments, local files and chat are not a source of truth: if it matters,
+   it goes on the issue.
+2. **The "Inwards" Project board**
+   ([user project 3](https://github.com/users/SirCypkowskyy/projects/3))
+   holds who is doing what right now. Status is one of Todo, In progress,
+   Blocked, In review, Done. If the board and an issue disagree, the issue
+   wins; fix the board.
+
+`.claude/plan/backlog.yaml` and `scripts/sync-backlog.py` are retired seeds;
+don't edit or run them. The issue table in an epic's body is a seed-time
+snapshot; its sub-issue list is what counts.
+
+Check the board before picking up work, and set Status at every transition:
+
+- **Starting an issue.** Take only an item in Todo with no assignee. Assign
+  yourself, set In progress, and comment the branch and worktree you work in,
+  plus the plan when it isn't obvious from the issue.
+- **While working.** Comment on decisions, scope changes and findings someone
+  else will need. Tick acceptance checkboxes in the body as they are met.
+- **Stuck.** Set Blocked and comment what blocks it and who or what can
+  unblock it. If another issue blocks it, add a native dependency, not just a
+  mention.
+- **Done.** Commits say `Closes #N`, or `Refs #N` for partial work. Status is
+  In review while a PR is open or the branch waits for merge, and Done when
+  the issue closes. Every acceptance checkbox is ticked or has a comment
+  saying why not.
+- **New work found along the way** becomes a new issue with `type:`, `area:`,
+  `priority:` and `size:` labels and a milestone, linked as a sub-issue of
+  that milestone's epic, and added to the board in Todo. Never a TODO in code.
+
+`gh project` runs on GraphQL, and every agent shares one 5,000-point hourly
+limit. Read the board once when you pick up work, not in a loop.
+
+```sh
+R=SirCypkowskyy/inwards
+gh issue edit N --add-assignee @me
+gh issue comment N --body "Claimed. Branch feat/N-slug, worktree ../inwards-N-slug."
+gh issue comment N --body "Status: Blocked. Waiting on #M (engine API)."
+gh issue view N --json body -q .body > body.md   # tick boxes, then:
+gh issue edit N --body-file body.md
+
+# Project board: user project 3
+gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo no:assignee"  # free
+gh project item-list 3 --owner SirCypkowskyy -L 300 --query "-status:Todo -status:Done" # taken
+gh project item-list 3 --owner SirCypkowskyy --query "assignee:@me -status:Done"       # mine
+gh project item-add 3 --owner SirCypkowskyy --url https://github.com/$R/issues/N
+gh project item-edit 3 --owner SirCypkowskyy --url https://github.com/$R/issues/N \
+  --field Status --value "In progress"   # one field per call
+gh project field-list 3 --owner SirCypkowskyy     # field and option IDs, if needed
+
+# New issue, linked to its epic (sub_issue_id and issue_id are REST ids, not numbers)
+gh issue create -t "..." -F body.md -m "M1 · Agent loop MVP (v0.1)" \
+  -l type:feature,area:cli,priority:P1,size:S
+ID=$(gh api repos/$R/issues/N --jq .id)
+gh api repos/$R/issues/EPIC/sub_issues -F sub_issue_id=$ID
+gh api repos/$R/issues/N/dependencies/blocked_by -F issue_id=$BLOCKER_ID
+```
+
+## Parallel agents and worktrees
+
+Several agents may run at once. Every agent uses the same GitHub account, so
+the claim comment, not the assignee, says which agent owns an issue.
+
+- **One issue, one branch, one worktree.** Branch `<type>/<N>-<slug>`
+  (`feat/42-sarif-output`), worktree `../inwards-<N>-<slug>` next to this
+  checkout, created by hand off the base branch the coordinator names:
+  `git worktree add ../inwards-42-sarif-output -b feat/42-sarif-output main`,
+  then `bun install` inside it.
+- **Claim before the first edit.** Assign yourself, set In progress, post the
+  claim comment. Never pick up an item that is In progress, Blocked, In
+  review or assigned; pick another or ask the coordinator.
+- **Stay in your lane.** Never edit files, run git, or install in another
+  agent's worktree or on its branch. Never `git stash`, `checkout`, `switch`,
+  `reset` or `rebase` in the shared main checkout: others have uncommitted
+  work there.
+- **No shared mutable state.** Run `bun install` in each worktree (isolated
+  linker, nothing shared). Temp files go in your own `mktemp -d`, never a
+  fixed path in `/tmp` or the repo. No fixed ports for dev servers.
+- **High-conflict files have one owner at a time:** `bun.lock`, `uv.lock`,
+  `package.json`, `pyproject.toml`, `AGENTS.md`, `.github/workflows/`,
+  `src/cli/test/__snapshots__/`. The coordinator names the owner in the
+  prompt; everyone else leaves them alone and asks. Never merge a lockfile by
+  hand: take the base version and rerun `bun install` or `uv lock`.
+  Regenerate snapshots after a rebase and review the diff.
+- **Commit on your branch only.** Rebase on the base branch and rerun the
+  checks below before handing back. Don't merge, and don't push to `main` or
+  the base branch; the coordinator merges one branch at a time.
+- **Blocked means stop.** Set Blocked, comment the reason on the issue, and
+  report it to the coordinator.
+- **Clean up.** Once the branch is merged or dropped, whoever created the
+  worktree runs `git worktree remove ../inwards-<N>-<slug>` and
+  `git branch -d <branch>`.
+
+A coordinator claims the item on the board before it spawns a subagent, so
+two agents never race for it. Each subagent prompt names the issue, the base
+branch, the branch, the worktree path, the files or directories it may touch,
+and any high-conflict file it owns.
+
+## Before every commit
+
+```sh
+bun x biome ci .        # lint + format, zero warnings
+bun run typecheck       # tsgo, strict
+bun test                # unit + CLI + E2E snapshots
+```
+
+CI also runs `prescan-diff` (the prescan must never miss an import) and the
+tests against the compiled binary on Linux, macOS and Windows.
+
+## Code rules
+
+- **Strict typing, no escape hatches.** No `any`, no non-null `!`, no `as`
+  casts except at a trust boundary right after validation (parsed JSON, TOML,
+  hook payloads), with a comment saying what was checked. Prefer `unknown`
+  plus a type guard. Explicit return types on exported functions.
+- **Every function is documented** with a TSDoc block, including private
+  helpers and arrow functions bound to a name:
+  - first line: a title that says what it does;
+  - then 1-3 lines of description (what, and why when it isn't obvious);
+  - a longer section when the behaviour has edge cases, invariants or a
+    non-obvious reason (see `importSkeleton` in `src/core/src/prescan.ts`);
+  - `@param` for every parameter and `@returns` for every non-void return.
+- **Ports and adapters where it pays.** The engine (`src/core`) is the
+  hexagon: pure, no I/O, no `Bun`/`Deno`/`node:fs` (Biome enforces the Bun
+  and Deno half). Anything it needs from outside comes through a port, an
+  interface the core owns (`GrammarBinaries`, `SourceFile`), and adapters
+  (CLI, LSP, tests) implement it. Add a port only when a second adapter or a
+  test needs it; one interface with one implementation and no test seam is
+  just indirection.
+- Machine output (JSON, SARIF, hook stderr) goes through
+  `process.stdout/stderr.write`, never `console.*` (Bun colours
+  `console.error` under `FORCE_COLOR`).
+- Anything an agent reads is a contract: `inwards/diagnostics@1` fields are
+  only ever added, and E2E snapshots pin exit codes and output.
+
+## Writing
+
+Docs, commit messages and PR text in English, plain and specific (the
+`humanizer` skill's rules): no filler, no em dashes, numbers over adjectives.

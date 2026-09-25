@@ -1,4 +1,9 @@
-# Inwards backlog: source of truth for GitHub issues, epics and milestones.
+# RETIRED (2026-09-25). This file seeded the GitHub issues once and is kept for
+# history only. GitHub issues are the source of truth for the plan now. Don't
+# edit this file to change the plan, and don't run scripts/sync-backlog.py: it
+# would overwrite edits made on GitHub. See "Source of truth" in CLAUDE.md.
+#
+# Inwards backlog: original seed for GitHub issues, epics and milestones.
 # One epic = one milestone. Issues reference each other by `key`; scripts/sync-backlog.py
 # turns keys into issue numbers and native sub-issue / dependency links.
 # Revised after review rounds 1, 2 and 3 (2026-09-25).
