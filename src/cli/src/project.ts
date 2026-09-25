@@ -25,7 +25,7 @@ interface Project {
   lexicalRoot: string;
   /** The config root with symlinks resolved. */
   realRoot: string;
-  /** Real paths of the layer package directories, walked without skips. */
+  /** The layer package directories (as written and real), walked without skips. */
   layerDirs: string[];
 }
 
@@ -54,14 +54,17 @@ async function openProject(configPath: string): Promise<Project> {
  *
  * @param configPath - absolute path of the pyproject.toml.
  * @param config - its parsed config.
- * @returns real paths of the existing layer package directories.
+ * @returns each existing layer package, as written and as its real path.
  */
 export function layerDirs(configPath: string, config: InwardsConfig): string[] {
   const root = resolve(dirname(configPath), config.root);
   return config.layers
     .flatMap((layer) => layer.modules)
-    .map((prefix) => realpath(join(root, ...prefix.split("."))))
-    .filter((dir) => dir !== undefined);
+    .flatMap((prefix) => {
+      const dir = join(root, ...prefix.split("."));
+      const real = realpath(dir);
+      return real === undefined ? [] : [...new Set([dir, real])];
+    });
 }
 
 /**

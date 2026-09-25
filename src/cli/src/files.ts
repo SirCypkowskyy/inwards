@@ -19,12 +19,14 @@ const SKIP = new Set(["node_modules", "__pycache__"]);
  * chain of directories above the current one; unreadable directories are
  * skipped.
  *
- * Inside a layer's package (`open`) nothing but hidden entries is skipped:
- * Python imports `shop.domain.node_modules.x` or a package that holds a
- * pyvenv.cfg just fine, so neither may hide code from its layer.
+ * Inside a layer's package (`open`), and on the way down to one, nothing but
+ * hidden entries is skipped: Python imports `shop.domain.node_modules.x` or a
+ * package that holds a pyvenv.cfg just fine, so neither may hide code from
+ * its layer. A directory counts as inside by the path it was reached through
+ * as well as its real path, since Python names a module after the former.
  *
  * @param paths - files or directories.
- * @param open - real paths of directories walked without the skip rules (layer packages).
+ * @param open - directories walked without the skip rules (layer packages, as written and real).
  * @returns unique paths, sorted.
  */
 export function collectPythonFiles(paths: string[], open: readonly string[] = []): string[] {
@@ -37,7 +39,7 @@ export function collectPythonFiles(paths: string[], open: readonly string[] = []
  *
  * @param paths - files or directories; a file is kept as is.
  * @param match - tells whether a file name is wanted.
- * @param open - real paths of directories walked without the skip rules.
+ * @param open - directories walked without the skip rules.
  * @returns unique paths, sorted.
  */
 export function collectFiles(
@@ -114,18 +116,20 @@ function skipped(name: string, full: string): boolean {
 }
 
 /**
- * Tells whether a directory lies in a layer package, where nothing is skipped.
+ * Tells whether a directory is in a layer package or above one, where nothing is skipped.
  *
- * @param dir - a directory path.
- * @param open - real paths of layer package directories.
- * @returns true when its real path is one of them or below one.
+ * @param dir - a directory path, as reached.
+ * @param open - layer package directories, as written and real.
+ * @returns true when the path as reached, or its real path, is inside or above one of them.
  */
 function isOpen(dir: string, open: readonly string[]): boolean {
   if (open.length === 0) {
     return false;
   }
-  const real = realOrUndefined(dir);
-  return open.some((top) => isWithin(top, real));
+  const spellings = [dir, realOrUndefined(dir)];
+  return open.some((top) =>
+    spellings.some((path) => isWithin(top, path) || (path !== undefined && isWithin(path, top))),
+  );
 }
 
 /**

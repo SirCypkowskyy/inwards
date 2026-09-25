@@ -43,6 +43,8 @@ interface SessionStart {
   head: string | null;
   /** Every `[tool.inwards]` table in the project, by project-relative pyproject.toml path. */
   configs: Record<string, InwardsConfig>;
+  /** pyproject.toml files whose `[tool.inwards]` was already invalid (absent in older state files). */
+  invalid?: string[];
   /** Project-relative path of every Python file in the project, to its SHA-256. */
   manifest: Record<string, string>;
 }
@@ -51,7 +53,8 @@ interface SessionStart {
 type SessionEvent =
   | { t: "edit"; at: string; file: string; fingerprints: string[] }
   | { t: "resume"; at: string; source: string }
-  | { t: "stop"; at: string; fresh: boolean };
+  | { t: "stop"; at: string; fresh: boolean }
+  | { t: "pass"; at: string };
 
 /** The session as the Stop gate and escalation see it. */
 export interface SessionState {
@@ -60,7 +63,7 @@ export interface SessionState {
   edited: string[];
   /** Fingerprint of every violation reported in this session, to how often it was seen. */
   seen: Map<string, number>;
-  /** How many times in a row the Stop gate has blocked the current turn. */
+  /** How many times in a row the Stop gate has blocked, since the last turn start or clean pass. */
   stops: number;
 }
 
@@ -110,7 +113,7 @@ export function recordStart(project: string, id: string, source: string): void {
   if (existsSync(startFile)) {
     return; // a start is written once; a repeated startup can't reset the baseline
   }
-  const configs = projectConfigs(project);
+  const { valid: configs, invalid } = projectConfigs(project);
   if (Object.keys(configs).length === 0) {
     return;
   }
@@ -118,7 +121,7 @@ export function recordStart(project: string, id: string, source: string): void {
   const head = git(project, ["rev-parse", "HEAD"])?.trim() ?? null;
   const dir = stateDir(project);
   prune(dir, id);
-  const start: SessionStart = { at: new Date().toISOString(), head, configs, manifest };
+  const start: SessionStart = { at: new Date().toISOString(), head, configs, invalid, manifest };
   const temp = join(dir, `.${id}.${process.pid}.tmp`);
   writeFileSync(temp, JSON.stringify(start), { flag: "wx" });
   renameSync(temp, startFile); // rename replaces a planted symlink, never follows it
@@ -159,6 +162,16 @@ export function recordStop(project: string, id: string, fresh: boolean): void {
 }
 
 /**
+ * Records that the Stop gate passed clean, which ends a streak of blocks.
+ *
+ * @param project - the real project root.
+ * @param id - a session id that passed `isSessionId`.
+ */
+export function recordPass(project: string, id: string): void {
+  append(project, id, { t: "pass", at: new Date().toISOString() });
+}
+
+/**
  * Reads a session's state.
  * Returns undefined when the start file is missing or unreadable, so callers
  * can fail closed: a session whose history is gone can't prove it is clean.
@@ -179,25 +192,35 @@ export function readSession(project: string, id: string): SessionState | undefin
   } catch {
     // no edits yet
   }
-  const edited: string[] = [];
-  const seen = new Map<string, number>();
-  let stops = 0;
+  const state: SessionState = { start, edited: [], seen: new Map(), stops: 0 };
   for (const line of log.split("\n")) {
     const event = parseEvent(line);
-    if (event?.t === "stop") {
-      stops = event.fresh ? 1 : stops + 1;
-    }
-    if (event?.t !== "edit") {
-      continue;
-    }
-    if (!edited.includes(event.file)) {
-      edited.push(event.file);
-    }
-    for (const print of event.fingerprints) {
-      seen.set(print, (seen.get(print) ?? 0) + 1);
+    if (event !== undefined) {
+      tally(state, event);
     }
   }
-  return { start, edited, seen, stops };
+  return state;
+}
+
+/**
+ * Folds one log event into the session state.
+ *
+ * @param state - the state so far, updated in place.
+ * @param event - one parsed log line.
+ */
+function tally(state: SessionState, event: SessionEvent): void {
+  if (event.t === "stop") {
+    state.stops = event.fresh ? 1 : state.stops + 1;
+  } else if (event.t === "pass") {
+    state.stops = 0;
+  } else if (event.t === "edit") {
+    if (!state.edited.includes(event.file)) {
+      state.edited.push(event.file);
+    }
+    for (const print of event.fingerprints) {
+      state.seen.set(print, (state.seen.get(print) ?? 0) + 1);
+    }
+  }
 }
 
 /**
@@ -238,6 +261,9 @@ function parseEvent(line: string): SessionEvent | undefined {
     const value: unknown = JSON.parse(line);
     if (isRecord(value) && value["t"] === "stop") {
       return { t: "stop", at: String(value["at"]), fresh: value["fresh"] === true };
+    }
+    if (isRecord(value) && value["t"] === "pass") {
+      return { t: "pass", at: String(value["at"]) };
     }
     if (
       isRecord(value) &&

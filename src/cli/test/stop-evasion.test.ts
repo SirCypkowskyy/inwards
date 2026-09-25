@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { agentWrites, git, LEAK, put, session, stop } from "./stop-helpers.ts";
@@ -71,6 +71,21 @@ describe("Stop gate: edits made around the hooks", () => {
         git(root, "commit", "-qm", "sneaky");
       },
     ],
+    [
+      "a pyvenv.cfg above the layer",
+      (root: string): void => {
+        put(root, "shop/pyvenv.cfg", "");
+        put(root, "shop/domain/order.py", LEAK);
+      },
+    ],
+    [
+      "a symlink from the layer into a disguised directory",
+      (root: string): void => {
+        put(root, "vendor/pyvenv.cfg", "");
+        put(root, "vendor/leak.py", LEAK);
+        symlinkSync(join(root, "vendor"), join(root, "shop/domain/sub"), "dir");
+      },
+    ],
   ])("an edit hidden by %s is still checked", (_, hide) => {
     const root = session();
     hide(root);
@@ -90,7 +105,7 @@ describe("Stop gate: edits made around the hooks", () => {
     put(root, "shop/domain/impl/leak.py", LEAK);
     const { code, stderr } = stop(root);
     expect(code).toBe(2);
-    expect(stderr).toContain("which had no valid [tool.inwards] when the session started");
+    expect(stderr).toContain("which didn't exist when the session started");
   });
 
   test("a FIFO named like a module doesn't hang the gate", () => {
@@ -116,9 +131,13 @@ describe("Stop gate: edits made around the hooks", () => {
     expect(stop(root, { stop_hook_active: true }).code).toBe(1);
   });
 
-  test("an invalid [tool.inwards] fixture elsewhere doesn't break the session", () => {
-    const root = session({ "tests/fixtures/bad/pyproject.toml": "[tool.inwards]\nlayers = 5\n" });
+  test("an invalid [tool.inwards] fixture doesn't break the session, nor block edits under it", () => {
+    const root = session({
+      "tests/fixtures/bad/pyproject.toml": "[tool.inwards]\nlayers = 5\n",
+      "tests/fixtures/bad/x.py": "X = 1\n",
+    });
     agentWrites(root, "shop/domain/order.py", "X = 2\n");
+    agentWrites(root, "tests/fixtures/bad/x.py", "X = 2\n");
     expect(stop(root).code).toBe(0);
   });
 

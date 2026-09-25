@@ -24,7 +24,7 @@ import { settingsProblem } from "./claude-settings.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
-import { isSessionId, readSession, recordStop, type SessionState } from "./session.ts";
+import { isSessionId, readSession, recordPass, recordStop, type SessionState } from "./session.ts";
 import { projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
 
 /** Blocks per turn before the gate lets it end. */
@@ -65,7 +65,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   if (!project) {
     return 0;
   }
-  const configs = projectConfigs(project);
+  const { valid: configs } = projectConfigs(project);
   const state = isSessionId(id) ? readSession(project, id) : undefined;
   if (!(isSessionId(id) && state)) {
     if (Object.keys(configs).length === 0 || active) {
@@ -84,6 +84,42 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
       1,
     );
   }
+  const problems = trustProblems(project, configs, state);
+  const { report, strangers } = await checkChanged(
+    project,
+    changedFiles(project, state, configs),
+    state.start,
+    configs,
+  );
+  for (const [file, config] of strangers) {
+    problems.push(
+      `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,
+    );
+  }
+  if (problems.length === 0 && report.diagnostics.length === 0) {
+    if (state.stops > 0) {
+      recordPass(project, id); // ends the streak, so a later turn starts counting at 0
+    }
+    return 0;
+  }
+  recordStop(project, id, !active);
+  return block(problems, report);
+}
+
+/**
+ * Lists what makes the session untrustworthy regardless of the code: a
+ * changed `[tool.inwards]`, or Claude Code settings without the Inwards hooks.
+ *
+ * @param project - the real project root.
+ * @param configs - the valid configs now.
+ * @param state - the session state.
+ * @returns the problems, one sentence each.
+ */
+function trustProblems(
+  project: string,
+  configs: Record<string, InwardsConfig>,
+  state: SessionState,
+): string[] {
   const problems: string[] = [];
   if (JSON.stringify(configs) !== JSON.stringify(state.start.configs)) {
     problems.push(
@@ -94,21 +130,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   if (hooks !== undefined) {
     problems.push(`${hooks} Restore them (\`inwards init --agent claude\`) or ask the user.`);
   }
-  const { report, strangers } = await checkChanged(
-    project,
-    changedFiles(project, state, configs),
-    state.start.configs,
-  );
-  for (const [file, config] of strangers) {
-    problems.push(
-      `${file} is governed by ${config}, which had no valid [tool.inwards] when the session started. Remove that config or ask the user.`,
-    );
-  }
-  if (problems.length === 0 && report.diagnostics.length === 0) {
-    return 0;
-  }
-  recordStop(project, id, !active);
-  return block(problems, report);
+  return problems;
 }
 
 /**
@@ -157,18 +179,23 @@ function changedFiles(
 
 /**
  * Checks changed files, each against its own config. A file whose config
- * wasn't a valid one at session start is not checked with it: a new nested
+ * didn't exist at session start is not checked with it: a new nested
  * pyproject.toml with a permissive table would otherwise waive the layers.
+ * A file under a config that was already invalid is skipped, since that
+ * config governs nothing, and so is one under a config that is invalid now
+ * (the config comparison reports that).
  *
  * @param project - the real project root.
  * @param files - absolute changed files.
- * @param known - the configs at session start, by project-relative path.
+ * @param start - the session start, with its valid and invalid configs.
+ * @param now - the valid configs now.
  * @returns the merged report, and each file governed by an unknown config with that config.
  */
 async function checkChanged(
   project: string,
   files: string[],
-  known: Record<string, InwardsConfig>,
+  start: SessionState["start"],
+  now: Record<string, InwardsConfig>,
 ): Promise<{ report: Report; strangers: [string, string][] }> {
   const byConfig = new Map<string, string[]>();
   const strangers: [string, string][] = [];
@@ -178,9 +205,12 @@ async function checkChanged(
       continue;
     }
     const rel = projectPath(project, config);
-    if (known[rel] === undefined) {
+    if (start.invalid?.includes(rel)) {
+      continue;
+    }
+    if (start.configs[rel] === undefined) {
       strangers.push([projectPath(project, file), rel]);
-    } else {
+    } else if (now[rel] !== undefined) {
       byConfig.set(config, [...(byConfig.get(config) ?? []), file]);
     }
   }

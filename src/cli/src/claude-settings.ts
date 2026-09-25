@@ -9,6 +9,8 @@
  * deletes the Stop hook switches the gate off at once; this check can't see
  * that. It catches the hooks the gate depends on (SessionStart, PostToolUse)
  * going missing, and the config guard (#23) is what stops the edit itself.
+ * It matches names, not programs: an entry that runs some other `inwards`
+ * binary or `main.ts` passes, so it proves the configuration, not what runs.
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";

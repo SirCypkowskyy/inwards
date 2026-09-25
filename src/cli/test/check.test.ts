@@ -53,6 +53,22 @@ test("a module under shop/domain/build/ is checked", () => {
   expect(JSON.parse(stdout).diagnostics[0].module).toBe("shop.domain.build.leak");
 });
 
+test("a pyvenv.cfg above a layer, or a symlink into a disguised directory, can't hide it", () => {
+  const root = project({
+    "pyproject.toml": LAYERS,
+    "shop/pyvenv.cfg": "",
+    "shop/domain/order.py": "import shop.infrastructure.db\n",
+    "vendor/pyvenv.cfg": "",
+    "vendor/leak.py": "import shop.infrastructure.db\n",
+  });
+  symlinkSync(join(root, "vendor"), join(root, "shop/domain/sub"), "dir");
+  const { stdout } = inwards(["check", "--format", "json"], { cwd: root });
+  expect(JSON.parse(stdout).diagnostics.map((d: { file: string }) => d.file)).toEqual([
+    "shop/domain/order.py",
+    "shop/domain/sub/leak.py",
+  ]);
+});
+
 test.each([
   ["a pyvenv.cfg", "shop/domain/sub/pyvenv.cfg"],
   ["a node_modules name", "shop/domain/node_modules/__init__.py"],

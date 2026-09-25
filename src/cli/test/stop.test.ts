@@ -29,6 +29,18 @@ describe("Stop gate", () => {
     expect(stop(root).code).toBe(2); // a new turn starts the count again
   });
 
+  test("a clean pass ends the streak, even if another hook keeps the turn going", () => {
+    const root = session();
+    agentWrites(root, "shop/domain/order.py", LEAK);
+    for (const active of [false, true, true]) {
+      expect(stop(root, { stop_hook_active: active }).code).toBe(2);
+    }
+    agentWrites(root, "shop/domain/order.py", "X = 2\n");
+    expect(stop(root).code).toBe(0);
+    agentWrites(root, "shop/domain/order.py", LEAK);
+    expect(stop(root, { stop_hook_active: true }).code).toBe(2);
+  });
+
   test("an old violation that imports the edited module doesn't block", () => {
     const root = session({
       "shop/domain/legacy.py": LEAK,
