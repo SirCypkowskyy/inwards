@@ -106,8 +106,9 @@ jobs:
       # external links weekly. 404.html is skipped: its theme links are absolute
       # (/inwards/...) and its skip link targets an anchor that page lacks.
       - name: Internal links in the built site resolve (lychee)
-        uses: lycheeverse/lychee-action@v2.9.0
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
+          token: "" # offline: no GitHub API calls, so no token for the action to hold
           args: >-
             --offline --no-progress --include-fragments --index-files index.html
             --exclude-path docs/site/404.html docs/site

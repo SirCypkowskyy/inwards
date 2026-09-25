@@ -6,6 +6,7 @@ so readers never find it (issue #26). CI runs this before the docs build:
     uv run scripts/check-docs-nav.py
 """
 
+import posixpath
 import sys
 import tomllib
 from pathlib import Path
@@ -16,7 +17,7 @@ DOCS = Path(__file__).resolve().parent.parent / "docs"
 def nav_pages(entry: object) -> set[str]:
     """Collect the page paths in a nav entry, at any depth of sections."""
     if isinstance(entry, str):
-        return {entry}
+        return {posixpath.normpath(entry)}
     if isinstance(entry, list):
         return set().union(*map(nav_pages, entry))
     if isinstance(entry, dict):
@@ -26,7 +27,12 @@ def nav_pages(entry: object) -> set[str]:
 
 project = tomllib.loads((DOCS / "zensical.toml").read_text())["project"]
 pages_dir = DOCS / project.get("docs_dir", "docs")
-pages = {page.relative_to(pages_dir).as_posix() for page in pages_dir.rglob("*.md")}
+# Zensical doesn't build dotfiles or files in dot-directories, so they need no nav entry.
+pages = {
+    rel.as_posix()
+    for rel in (page.relative_to(pages_dir) for page in pages_dir.rglob("*.md"))
+    if not any(part.startswith(".") for part in rel.parts)
+}
 missing = sorted(pages - nav_pages(project.get("nav", [])))
 for page in missing:
     print(

@@ -15,7 +15,7 @@ name = "inwards"
 version = "0.0.1"
 description = "Architecture linter for Python that keeps AI coding agents inside your layers."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"  # scripts/check-docs-nav.py uses tomllib
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["linter", "architecture", "ddd", "clean-architecture", "ai-agents"]
