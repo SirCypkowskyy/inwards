@@ -3,6 +3,7 @@ import type { InwardsConfig } from "./config.ts";
 import { checkEncoding } from "./encoding.ts";
 import { checkLayers, layerIndexOf } from "./layers.ts";
 import { skeletonImports } from "./prescan.ts";
+import { ProjectIndex } from "./project.ts";
 import {
   createPythonParser,
   extractImports,
@@ -88,6 +89,21 @@ export class Engine {
     } finally {
       tree.delete(); // WASM memory is not garbage collected
     }
+  }
+
+  /**
+   * Builds the project-wide index over every source file of a project.
+   * Cheap: only the module set is computed now. The reverse-import map is
+   * built on first use, reading imports skeleton-first like `checkFile`.
+   *
+   * @param files - every source file under the config root, as the adapter read them.
+   * @returns the index; `importersOf` reads imports lazily.
+   */
+  index(files: readonly SourceFile[]): ProjectIndex {
+    return new ProjectIndex(files, (file) => {
+      const src = { ...file, text: normalizeSource(file.text) };
+      return skeletonImports(this.parser, src) ?? this.imports(src);
+    });
   }
 
   /**

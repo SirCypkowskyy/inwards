@@ -5,35 +5,58 @@
  */
 import { readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-import { Engine, moduleNameFor, parseConfig, type Report, type SourceFile } from "@inwards/core";
+import {
+  Engine,
+  moduleNameFor,
+  type ProjectIndex,
+  parseConfig,
+  type Report,
+  type SourceFile,
+} from "@inwards/core";
 import { collectPythonFiles } from "./files.ts";
 import { loadGrammars } from "./grammars.ts";
 import { isInside, posix, realpath } from "./paths.ts";
 
+/** A loaded project: its config, where its root is, and an engine for it. */
+interface Project {
+  engine: Engine;
+  /** The config root as written. */
+  lexicalRoot: string;
+  /** The config root with symlinks resolved. */
+  realRoot: string;
+}
+
 /**
- * Loads the config and engine, then checks the Python files under the targets.
- * Files outside the config root are dropped: they have no module name in the
- * project. The duration covers config, grammar loading, reading and checking.
+ * Reads the config and builds an engine for it.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
- * @param targets - absolute files or directories; undefined means the config root.
- * @param base - directory that report paths are made relative to.
- * @returns the report, with forward-slash paths on every OS.
+ * @returns the engine and the config root, as written and resolved.
  * @throws {ConfigError} when the config is invalid.
  */
-export async function runCheck(
-  configPath: string,
-  targets: string[] | undefined,
-  base: string,
-): Promise<Report> {
-  const started = performance.now();
+async function openProject(configPath: string): Promise<Project> {
   const config = parseConfig(readFileSync(configPath, "utf8"));
   const lexicalRoot = resolve(dirname(configPath), config.root);
-  const realRoot = realpath(lexicalRoot) ?? lexicalRoot;
-  const engine = await Engine.create(await loadGrammars(), config);
+  return {
+    engine: await Engine.create(await loadGrammars(), config),
+    lexicalRoot,
+    realRoot: realpath(lexicalRoot) ?? lexicalRoot,
+  };
+}
+
+/**
+ * Reads the Python files under the targets, once per module name they have.
+ * Files outside the config root are dropped: they have no module name in the
+ * project. A file reached through an alias and through its real path gets one
+ * entry per distinct (module, real file), so it is never reported twice.
+ *
+ * @param project - the loaded project.
+ * @param targets - absolute files or directories; undefined means the config root.
+ * @param base - directory that report paths are made relative to.
+ * @returns the source files, with forward-slash paths on every OS.
+ */
+function loadSources(project: Project, targets: string[] | undefined, base: string): SourceFile[] {
+  const { lexicalRoot, realRoot } = project;
   const files: SourceFile[] = [];
-  // One entry per (module, file): a file reached through an alias and through
-  // its real path has the same real name, and must not be reported twice.
   const seen = new Set<string>();
   for (const abs of collectPythonFiles(targets ?? [lexicalRoot])) {
     const text = readFileSync(abs, "utf8");
@@ -48,8 +71,43 @@ export async function runCheck(
       }
     }
   }
-  const diagnostics = engine.checkFiles(files);
+  return files;
+}
+
+/**
+ * Loads the config and engine, then checks the Python files under the targets.
+ * The duration covers config, grammar loading, reading and checking.
+ *
+ * @param configPath - absolute path of the pyproject.toml to use.
+ * @param targets - absolute files or directories; undefined means the config root.
+ * @param base - directory that report paths are made relative to.
+ * @returns the report, with forward-slash paths on every OS.
+ * @throws {ConfigError} when the config is invalid.
+ */
+export async function runCheck(
+  configPath: string,
+  targets: string[] | undefined,
+  base: string,
+): Promise<Report> {
+  const started = performance.now();
+  const project = await openProject(configPath);
+  const files = loadSources(project, targets, base);
+  const diagnostics = project.engine.checkFiles(files);
   return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
+}
+
+/**
+ * Indexes every module under the config root (for the Stop gate and INW006).
+ * Reads every file now; the reverse-import map is built on first use.
+ *
+ * @param configPath - absolute path of the pyproject.toml to use.
+ * @param base - directory that source paths are made relative to.
+ * @returns the project index.
+ * @throws {ConfigError} when the config is invalid.
+ */
+export async function indexProject(configPath: string, base: string): Promise<ProjectIndex> {
+  const project = await openProject(configPath);
+  return project.engine.index(loadSources(project, undefined, base));
 }
 
 /**
