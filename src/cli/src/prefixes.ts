@@ -22,15 +22,15 @@ import { isInside, posix } from "./paths.ts";
  *
  * @param project - the real project root.
  * @param configs - the valid configs now, by project-relative path (the same as at start, or the gate fails anyway).
- * @param before - project-relative Python paths at session start.
- * @param now - project-relative Python paths now.
+ * @param before - the session-start manifest: project-relative Python path to content hash.
+ * @param now - the manifest now.
  * @returns the new errors, located in each pyproject.toml.
  */
 export function newPrefixErrors(
   project: string,
   configs: Record<string, InwardsConfig>,
-  before: readonly string[],
-  now: readonly string[],
+  before: Readonly<Record<string, string>>,
+  now: Readonly<Record<string, string>>,
 ): Diagnostic[] {
   return Object.entries(configs).flatMap(([rel, config]) => {
     const path = join(project, rel);
@@ -38,8 +38,9 @@ export function newPrefixErrors(
     const file = { path: rel, text: readFileSync(path, "utf8") };
     const was = modulesUnder(project, root, before);
     const is = modulesUnder(project, root, now);
-    const atStart = new Set(checkPrefixes(config, was, file).map((d) => d.message));
-    const emptied = checkPrefixes(config, is, file, was).filter(
+    const [wasSet, isSet] = [new Set(was.keys()), new Set(is.keys())];
+    const atStart = new Set(checkPrefixes(config, wasSet, file).map((d) => d.message));
+    const emptied = checkPrefixes(config, isSet, file, wasSet).filter(
       (d) => d.severity === "error" && !atStart.has(d.message),
     );
     return [...emptied, ...checkMoves(config, was, is, file)];
@@ -51,15 +52,19 @@ export function newPrefixErrors(
  *
  * @param project - the real project root.
  * @param root - the config root.
- * @param paths - project-relative Python paths.
- * @returns their dotted module names.
+ * @param manifest - project-relative Python path to content hash.
+ * @returns dotted module name to content hash.
  */
-function modulesUnder(project: string, root: string, paths: readonly string[]): Set<string> {
-  const modules = new Set<string>();
-  for (const path of paths) {
+function modulesUnder(
+  project: string,
+  root: string,
+  manifest: Readonly<Record<string, string>>,
+): Map<string, string> {
+  const modules = new Map<string, string>();
+  for (const [path, hash] of Object.entries(manifest)) {
     const abs = join(project, path);
     if (isInside(root, abs)) {
-      modules.add(moduleNameFor(posix(relative(root, abs))).module);
+      modules.set(moduleNameFor(posix(relative(root, abs))).module, hash);
     }
   }
   return modules;

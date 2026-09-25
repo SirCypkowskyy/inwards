@@ -93,9 +93,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     state.start,
     configs,
   );
-  report.diagnostics.unshift(
-    ...newPrefixErrors(project, configs, Object.keys(state.start.manifest), Object.keys(manifest)),
-  );
+  report.diagnostics.unshift(...newPrefixErrors(project, configs, state.start.manifest, manifest));
   for (const [file, config] of strangers) {
     problems.push(
       `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,

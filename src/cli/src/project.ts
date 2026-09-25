@@ -59,9 +59,10 @@ async function openProject(configPath: string): Promise<Project> {
 }
 
 /**
- * Finds the directory of every layer prefix that is a package on disk, e.g.
- * `<root>/shop/domain` for `shop.domain`. The file walk skips nothing inside
- * them, so a virtualenv marker or a node_modules name can't hide layer code.
+ * Finds the top-level package directory of every layer prefix, e.g.
+ * `<root>/shop` for `shop.domain`. The file walk skips nothing inside them,
+ * so a virtualenv marker or a node_modules name can't hide layer code, nor
+ * code moved out of a layer next to it.
  *
  * @param configPath - absolute path of the pyproject.toml.
  * @param config - its parsed config.
@@ -72,7 +73,9 @@ export function layerDirs(configPath: string, config: InwardsConfig): string[] {
   return config.layers
     .flatMap((layer) => layer.modules)
     .flatMap((prefix) => {
-      const dir = join(root, ...prefix.split("."));
+      // The whole top-level package: code moved from shop/domain to a
+      // disguised shop/core must still be seen.
+      const dir = join(root, prefix.split(".")[0] ?? prefix);
       const real = realpath(dir);
       return real === undefined ? [] : [...new Set([dir, real])];
     });

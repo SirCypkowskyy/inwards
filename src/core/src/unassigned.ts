@@ -292,55 +292,82 @@ export function checkPrefixes(
   return found;
 }
 
+/** SHA-256 of an empty file: every empty `__init__.py` has it, so it proves no move. */
+// biome-ignore lint/security/noSecrets: the well-known hash of empty input, not a credential
+const EMPTY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
 /**
- * Catches layer code moved out of every layer during a session: a layer lost
- * modules while modules appeared outside every layer (and outside `ignore`).
- * An empty `__init__.py` left behind keeps the prefix alive, so
- * `checkPrefixes` alone doesn't see such a move.
+ * Catches layer code moved out of every layer during a session: a layer
+ * module disappeared and a module outside every layer appeared with the same
+ * file name or the same (non-empty) content. An empty `__init__.py` left
+ * behind keeps the prefix alive, so `checkPrefixes` alone doesn't see such a
+ * move. `ignore` doesn't exempt the new module: tooling doesn't come from a layer.
  *
- * @param config - the layers and ignore entries.
- * @param before - the modules at session start.
- * @param now - the modules now.
+ * @param config - the layers.
+ * @param before - module name to content hash, at session start.
+ * @param now - module name to content hash, now.
  * @param file - the pyproject.toml, to point at the layer.
- * @returns one error per layer that lost modules, when unassigned modules appeared.
+ * @returns one error per layer that lost modules to a move.
  */
 export function checkMoves(
   config: InwardsConfig,
-  before: ReadonlySet<string>,
-  now: ReadonlySet<string>,
+  before: ReadonlyMap<string, string>,
+  now: ReadonlyMap<string, string>,
   file: ConfigFile,
 ): Diagnostic[] {
-  const { layers, ignore = [] } = config;
+  const { layers } = config;
   const appeared = [...now].filter(
-    (m) =>
+    ([m]) =>
       !before.has(m) &&
       layerIndexOf(m, layers) === -1 &&
-      unassignedPackage(m, layers) !== undefined &&
-      !isIgnored(m, ignore),
+      unassignedPackage(m, layers) !== undefined,
   );
-  if (appeared.length === 0) {
-    return [];
-  }
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
   return layers.flatMap((layer, i) => {
-    const lost = [...before].filter((m) => !now.has(m) && layerIndexOf(m, layers) === i);
-    if (lost.length === 0) {
+    const lost = [...before].filter(([m]) => !now.has(m) && layerIndexOf(m, layers) === i);
+    const moved = appeared.filter(([m, hash]) => lost.some((l) => sameFile(l, [m, hash])));
+    if (moved.length === 0) {
       return [];
     }
+    const names = moved.map(([m]) => m).join(", ");
     return [
       diagnostic(RULES.INW006, source, {
         span: spanOf(file.text, layer.modules[0] ?? layer.name),
-        message: `Layer "${layer.name}" lost ${lost.join(", ")} while ${appeared.join(", ")} appeared outside every layer. Code moved out of a layer isn't checked.`,
+        message: `${names} moved out of layer "${layer.name}" to outside every layer, where nothing checks it.`,
         fix: {
           summary: "Move the code back into its layer, or ask the user.",
           steps: [
-            `Undo the move: put ${appeared.join(", ")} back under "${layer.name}".`,
+            `Undo the move: put ${names} back under "${layer.name}".`,
             "If the code really belongs outside the layers, stop and ask the user; don't edit [tool.inwards] yourself.",
           ],
         },
       }),
     ];
   });
+}
+
+/**
+ * Tells whether a vanished module and a new one look like the same file:
+ * the same last name segment (not `__init__`), or the same non-empty content.
+ *
+ * @param lost - the vanished module and its hash.
+ * @param found - the new module and its hash.
+ * @returns true when the new module is probably the old one, moved.
+ */
+function sameFile(lost: readonly [string, string], found: readonly [string, string]): boolean {
+  const name = lastSegment(found[0]);
+  const sameName = lastSegment(lost[0]) === name && name !== "__init__";
+  return sameName || (lost[1] === found[1] && found[1] !== EMPTY_HASH);
+}
+
+/**
+ * Takes the last segment of a dotted name.
+ *
+ * @param module - e.g. `shop.domain.order`.
+ * @returns e.g. `order`.
+ */
+function lastSegment(module: string): string {
+  return module.split(".").at(-1) ?? module;
 }
 
 /**

@@ -126,7 +126,7 @@ describe("INW006: moves the prefix check alone would miss", () => {
     agentWrites(root, "shop/domain/__init__.py", "");
     const { code, stderr } = stop(root);
     expect(code).toBe(2);
-    expect(stderr).toContain("appeared outside every layer");
+    expect(stderr).toContain("moved out of layer");
   });
 
   test("deleting a layer module and adding an ignored script is fine", () => {
@@ -137,6 +137,30 @@ describe("INW006: moves the prefix check alone would miss", () => {
     });
     rmSync(join(root, "shop/domain/old.py"));
     agentWrites(root, "scripts/seed.py", "");
+    expect(stop(root).code).toBe(0);
+  });
+
+  test.each([
+    ["a disguised directory", "shop/core", ["shop/core/pyvenv.cfg"]],
+    ["a node_modules name", "shop/node_modules", []],
+    ["an ignored directory", "shop/tests", []],
+  ])("a layer moved into %s still fails the gate", (_, to, markers) => {
+    const root = session({
+      "pyproject.toml": LAYERS.replace("[tool.inwards]", '[tool.inwards]\nignore = ["tests"]'),
+      "shop/infrastructure/db.py": "",
+    });
+    git(root, "mv", "shop/domain", to);
+    for (const marker of markers) {
+      put(root, marker, "");
+    }
+    agentWrites(root, "shop/domain/__init__.py", "");
+    expect(stop(root).code).toBe(2);
+  });
+
+  test("an unrelated cleanup plus a new tooling file doesn't look like a move", () => {
+    const root = session({ "shop/domain/old.py": "OLD = 1\n" });
+    rmSync(join(root, "shop/domain/old.py"));
+    agentWrites(root, "setup.py", "from setuptools import setup\n");
     expect(stop(root).code).toBe(0);
   });
 });
