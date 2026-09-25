@@ -14,10 +14,13 @@ type ImportReader = (file: SourceFile) => readonly ImportRef[];
 /**
  * Every module of a project, and who imports a given module, answered on demand.
  * Reading every file's imports costs about as much as a full check, so
- * `importersOf` only parses files whose text mentions the module's last name
- * segment. An import can't name a module without spelling that segment
- * (identifiers can't be split across lines), and the text is NFKC-normalised
- * first, as Python does with identifiers.
+ * `importersOf` only parses candidate files:
+ *
+ * - files whose NFKC-normalised text mentions the module's last name segment
+ *   (an absolute import spells it; identifiers can't be split across lines);
+ * - files inside the module's package, because a relative import such as
+ *   `from . import *` or `from .. import helper` reaches a package without
+ *   spelling its name.
  */
 export class ProjectIndex {
   /** Dotted names of every first-party module, e.g. `shop.domain.order`. */
@@ -61,6 +64,10 @@ export class ProjectIndex {
 
   /**
    * Lists the modules that import a module directly.
+   * For a package, that means imports that resolve to the package itself
+   * (`import shop.domain`, `from shop.domain import helper` where `helper` is
+   * not a module): the longest matching module wins. Importing a submodule
+   * also runs the package's `__init__.py`, but does not count here.
    * Imports the prescan finds inside strings can add a spurious importer.
    * That makes a caller re-check a file too many, never too few. A file whose
    * declared encoding hides its text (INW000) is only found here if the
@@ -77,11 +84,8 @@ export class ProjectIndex {
     const segment = module.split(".").at(-1) ?? module;
     const found = new Set<string>();
     for (const file of this.files) {
-      if (
-        file.module !== module &&
-        this.mentions(file, segment) &&
-        this.fileImports(file, module)
-      ) {
+      const candidate = file.module.startsWith(`${module}.`) || this.mentions(file, segment);
+      if (file.module !== module && candidate && this.fileImports(file, module)) {
         found.add(file.module);
       }
     }

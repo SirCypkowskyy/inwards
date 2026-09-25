@@ -45,3 +45,21 @@ test("importers are found however the import is spelled", async () => {
     "shop.domain.spaced",
   ]);
 });
+
+test("relative imports of a package are found without its name in the text", async () => {
+  const root = project({
+    "pyproject.toml": LAYERS,
+    "shop/__init__.py": "",
+    "shop/domain/__init__.py": "helper = 1\n",
+    "shop/domain/star.py": "from . import *\n",
+    "shop/domain/rel_attr.py": "from . import helper\n",
+    "shop/domain/sub/__init__.py": "",
+    "shop/domain/sub/up.py": "from .. import helper\n",
+  });
+  const index = await indexProject(join(root, "pyproject.toml"), root);
+  expect([...index.importersOf("shop.domain")].sort()).toEqual([
+    "shop.domain.rel_attr",
+    "shop.domain.star",
+    "shop.domain.sub.up",
+  ]);
+});
