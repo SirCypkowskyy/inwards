@@ -1,0 +1,29 @@
+name: Docs links
+
+# External links rot on their own schedule, and a slow or rate-limiting site
+# would fail unrelated PRs, so they are checked weekly here instead of in CI.
+# The docs job in ci.yml checks internal links and anchors on every PR.
+# A failed scheduled run emails the repository owner.
+on:
+  schedule:
+    - cron: "23 6 * * 1" # Mondays, 06:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  external:
+    name: External links
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
+      - name: Build site (strict)
+        run: uv run zensical build -f docs/zensical.toml --clean --strict
+      - name: Every link in the built site resolves (lychee)
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          args: >-
+            --no-progress --max-retries 3 --index-files index.html
+            --exclude-path docs/site/404.html docs/site
