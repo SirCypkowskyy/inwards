@@ -97,10 +97,9 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
       return print(`inwards init: ${change}`, 2);
     }
     changes.push(change);
-    if (agent === "claude") {
-      changes.push(gitignore(join(project, ".gitignore")));
-    }
   }
+  // Every agent: session state and the run log (`check --log`) both live in .inwards/.
+  changes.push(gitignore(join(project, ".gitignore")));
   return apply(
     changes.filter((c) => c.before !== c.after),
     dryRun,
@@ -300,7 +299,7 @@ function withoutOurHook(group: unknown): unknown {
 }
 
 /**
- * Adds `.inwards/` (session state) to the project's .gitignore.
+ * Adds `.inwards/` (session state, run log) to the project's .gitignore.
  *
  * @param path - the project's .gitignore.
  * @returns the change (unchanged when already ignored).

@@ -30,6 +30,8 @@ export interface InwardsConfig {
    * and tell the agent to ask the user (`escalate-after`, default 3).
    */
   escalateAfter?: number;
+  /** Write the opt-in run log `.inwards/runs.jsonl` (`run-log`, default off). */
+  runLog?: boolean;
 }
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
@@ -48,6 +50,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "required-version",
   "ignore",
   "escalate-after",
+  "run-log",
 ]);
 const LAYER_KEYS: ReadonlySet<string> = new Set(["name", "modules"]);
 
@@ -148,8 +151,12 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
  */
 function optionalKeys(
   raw: Record<string, unknown>,
-): Pick<InwardsConfig, "requiredVersion" | "ignore" | "escalateAfter"> {
+): Pick<InwardsConfig, "requiredVersion" | "ignore" | "escalateAfter" | "runLog"> {
   const { "required-version": required, ignore, "escalate-after": escalateAfter } = raw;
+  const runLog = raw["run-log"];
+  if (runLog !== undefined && typeof runLog !== "boolean") {
+    throw new ConfigError("tool.inwards.run-log must be true or false.");
+  }
   const requiredVersion = checkRequiredVersion(required);
   if (ignore !== undefined && !isModuleList(ignore)) {
     throw new ConfigError("tool.inwards.ignore must be a list of module names.");
@@ -162,6 +169,7 @@ function optionalKeys(
     ...(requiredVersion === undefined ? {} : { requiredVersion }),
     ...(ignore === undefined ? {} : { ignore }),
     ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
+    ...(runLog === undefined ? {} : { runLog }),
   };
 }
 

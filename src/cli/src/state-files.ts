@@ -26,6 +26,8 @@ const MAX_SESSIONS = 50;
 const SESSION_FILE = /\.(?:start\.json|jsonl|unresolved\.json)$/u;
 /** O_NOFOLLOW where the OS has it (not on Windows), so a planted symlink isn't followed. */
 const NO_FOLLOW: number = constants.O_NOFOLLOW ?? 0;
+/** Mode for new state files: readable by the user only, since they name files and sessions. */
+const OWNER_ONLY = 0o600;
 
 /**
  * Appends one event as one line, with O_APPEND so concurrent hooks interleave
@@ -42,6 +44,7 @@ export function appendLine(path: string, line: string): void {
     path,
     // biome-ignore lint/suspicious/noBitwiseOperators: open(2) flags are a bit set.
     constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | NO_FOLLOW,
+    OWNER_ONLY,
   );
   try {
     writeSync(fd, line);

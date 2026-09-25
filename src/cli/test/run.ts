@@ -13,10 +13,13 @@ const CMD: string[] = process.env["INWARDS_BIN"]
 export const CLAUDE_USER_DIR: string = mkdtempSync(join(tmpdir(), "inwards-claude-user-"));
 
 // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
-// CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code.
+// CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code,
+// and INWARDS_RUN_LOG so a developer's own setting can't change the results.
 const ENV: Record<string, string | undefined> = {
   ...Object.fromEntries(
-    Object.entries(process.env).filter(([name]) => name !== "CLAUDE_PROJECT_DIR"),
+    Object.entries(process.env).filter(
+      ([name]) => name !== "CLAUDE_PROJECT_DIR" && name !== "INWARDS_RUN_LOG",
+    ),
   ),
   NO_COLOR: "",
   FORCE_COLOR: "1",
