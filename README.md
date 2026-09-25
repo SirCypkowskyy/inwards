@@ -35,9 +35,11 @@ bun run scripts/build-binaries.ts bun-linux-x64 # dist/inwards-linux-x64
 uv run zensical serve -f docs/zensical.toml     # docs preview
 ```
 
-Releases: push a `v*` tag (`v0.1.0`, or `v0.1.0-rc.1` for a pre-release). `cd.yml`
-cross-compiles binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform
-wheel (`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its
-native runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
-`SHA256SUMS`. Publish the draft by hand. Build provenance attestations switch on once the repo
-is public.
+Releases (ADR-016, ADR-017): PRs are squash-merged with Conventional Commit titles, and
+release-please keeps a `chore: release X.Y.Z` PR open with the next version and the new
+`CHANGELOG.md` section. Merging it tags `vX.Y.Z` and starts `cd.yml`, which cross-compiles
+binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform wheel
+(`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its native
+runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
+`SHA256SUMS`. Publish the draft by hand. A release candidate is a hand-pushed tag with a
+suffix (`v0.2.0-rc.1`). Build provenance attestations switch on once the repo is public.

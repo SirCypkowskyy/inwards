@@ -37,7 +37,7 @@ Check the board before picking up work, and set Status at every transition:
 - **Stuck.** Set Blocked and comment what blocks it and who or what can
   unblock it. If another issue blocks it, add a native dependency, not just a
   mention.
-- **Done.** Commits say `Closes #N`, or `Refs #N` for partial work. Status is
+- **Done.** The PR description says `Closes #N`, or `Refs #N` for partial work. Status is
   In review while a PR is open or the branch waits for merge, and Done when
   the issue closes. Every acceptance checkbox is ticked or has a comment
   saying why not.
@@ -95,6 +95,7 @@ the claim comment, not the assignee, says which agent owns an issue.
   fixed path in `/tmp` or the repo. No fixed ports for dev servers.
 - **High-conflict files have one owner at a time:** `bun.lock`, `uv.lock`,
   `package.json`, `pyproject.toml`, `AGENTS.md`, `.github/workflows/`,
+  `release-please-config.json`, `.release-please-manifest.json`,
   `src/cli/test/__snapshots__/`. The coordinator names the owner in the
   prompt; everyone else leaves them alone and asks. Never merge a lockfile by
   hand: take the base version and rerun `bun install` or `uv lock`.
@@ -105,8 +106,9 @@ the claim comment, not the assignee, says which agent owns an issue.
 - **Blocked means stop.** Set Blocked, comment the reason on the issue, and
   report it to the coordinator.
 - **Clean up.** Once the branch is merged or dropped, whoever created the
-  worktree runs `git worktree remove ../inwards-<N>-<slug>` and
-  `git branch -d <branch>`.
+  worktree runs `git worktree remove ../inwards-<N>-<slug>` and, once
+  `gh pr view --json state` says MERGED, `git branch -D <branch>` (a
+  squash-merged branch is not an ancestor of `main`, so `-d` refuses it).
 
 A coordinator claims the item on the board before it spawns a subagent, so
 two agents never race for it. Each subagent prompt names the issue, the base
@@ -149,6 +151,27 @@ act push -W .github/workflows/cd.yml -n                                       # 
   stays the gate.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
+
+## Commits, PR titles and releases
+
+PRs are squash-merged ([ADR-017](docs/chapters/05-ADR.md)): the PR title is
+the one commit on `main` and its CHANGELOG line, and the PR description is its
+body. Commits inside a branch can say anything.
+
+- **Title:** `type(scope): summary`, checked by `pr-title.yml`. Types that
+  reach the changelog: `feat`, `fix`, `perf`, `deps`, `revert`, `docs`.
+  Hidden: `refactor`, `test`, `build`, `ci`, `chore`. The scope is optional
+  (`core`, `cli`, `hook`, `vscode`, `wheels`, `docs`). The summary says in the
+  imperative what a user gets, with no trailing period.
+- **Breaking change** (a config key removed or renamed, an exit code changed,
+  a `diagnostics@1` field removed, a CLI flag removed): `feat!:` in the title
+  and a `BREAKING CHANGE: <what to do>` paragraph in the description.
+- **Never** edit `CHANGELOG.md`, `VERSION` or any `version` field, and never
+  push tags. release-please keeps the release PR (ADR-016); the owner merges
+  it and publishes the draft release. `scripts/check-version.sh` fails CI when
+  version fields disagree.
+- To fix a changelog line after a merge, edit the merged PR's description with
+  a `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block.
 
 ## Finishing a piece of work
 
