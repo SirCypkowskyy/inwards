@@ -26,8 +26,16 @@ jobs:
         run: bun x biome ci .
       - name: Typecheck
         run: bun run typecheck
+      # A full CPython: Ubuntu 26.04's python3 ships its stdlib tests in a separate
+      # package, which shrinks the corpus from ~1,900 files to ~600.
+      - uses: actions/setup-python@v7
+        id: python
+        with:
+          python-version: "3.14"
       - name: Prescan never misses an import (generated spellings + the Python stdlib)
-        run: bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+        run: |
+          stdlib="$("${{ steps.python.outputs.python-path }}" -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+          bun run src/core/scripts/prescan-diff.ts "$stdlib"
       - name: Dogfood - inwards checks its own example app
         run: bun run check:self
       - name: Build VS Code extension
