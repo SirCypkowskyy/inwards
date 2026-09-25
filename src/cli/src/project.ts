@@ -3,7 +3,7 @@
  * and a check run over them. The engine does no I/O (ADR-006), so all file
  * reading happens here.
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
   checkPrefixes,
@@ -113,16 +113,15 @@ function loadSources(project: Project, targets: string[] | undefined, base: stri
  * Finds first-party modules on disk under the config root, for INW006.
  *
  * @param root - the config root.
- * @returns a lookup that probes `a/b.py`, `a/b.pyi` and package directories.
+ * @returns a lookup over the files and directories under it.
  */
 function moduleLookup(root: string): ModuleLookup {
-  return probeLookup((segments) => {
-    const base = join(root, ...segments);
-    return (
-      existsSync(`${base}.py`) ||
-      existsSync(`${base}.pyi`) ||
-      (statSync(base, { throwIfNoEntry: false })?.isDirectory() ?? false)
-    );
+  return probeLookup((rel) => {
+    const stat = statSync(join(root, rel), { throwIfNoEntry: false });
+    if (stat?.isDirectory()) {
+      return "dir";
+    }
+    return stat?.isFile() ? "file" : undefined;
   });
 }
 

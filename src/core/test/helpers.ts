@@ -58,22 +58,25 @@ export function file(path: string, text: string): SourceFile {
 
 export const engine: Engine = await Engine.create(grammars(), CONFIG);
 
-/** The packages and modules the test project has on disk, for INW006. */
-const ON_DISK = new Set([
-  "shop",
-  "shop.domain",
-  "shop.domain.order",
-  "shop.application",
-  "shop.infrastructure",
-  "shop.infrastructure.db",
-  "shop.api",
-  "shop.persistence",
-  "shop.persistence.repo",
-  "scripts",
+/** The files and directories the test project has on disk, for INW006. */
+const ON_DISK: ReadonlyMap<string, "file" | "dir"> = new Map([
+  ["shop", "dir"],
+  ["shop/__init__.py", "file"],
+  ["shop/domain", "dir"],
+  ["shop/domain/order.py", "file"],
+  ["shop/application", "dir"],
+  ["shop/infrastructure", "dir"],
+  ["shop/infrastructure/db.py", "file"],
+  ["shop/api", "dir"],
+  ["shop/persistence", "dir"],
+  ["shop/persistence/repo.py", "file"],
+  ["scripts", "dir"],
+  ["scripts/__init__.py", "file"],
+  ["logging", "dir"],
 ]);
 
 /** Finds first-party modules among `ON_DISK`. */
-export const OWNERS: ModuleLookup = probeLookup((segments) => ON_DISK.has(segments.join(".")));
+export const OWNERS: ModuleLookup = probeLookup((rel) => ON_DISK.get(rel));
 
 /**
  * Checks one file with the test engine and the test project's modules.
@@ -98,5 +101,7 @@ const TARGET = /imports "(?<t>[^"]+)"/u;
  * @returns `[code, target]` for each diagnostic, the target read from the message.
  */
 export function found(src: string, path = "shop/domain/order.py"): [string, string][] {
-  return check(file(path, src)).map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
+  return check(file(path, src))
+    .filter((d) => d.code === "INW011")
+    .map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
 }

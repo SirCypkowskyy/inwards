@@ -1,17 +1,24 @@
 /**
- * INW006 prefix checks for a session: which layer prefixes stopped matching
- * modules between SessionStart and now. `git mv shop/domain shop/core` takes
- * every domain module out of the check, so an emptied prefix is an error.
+ * INW006 layout checks for a session: which layer prefixes stopped matching
+ * modules between SessionStart and now, and whether layer code moved out of
+ * every layer. `git mv shop/domain shop/core` takes every domain module out of
+ * the check, whether or not an empty file keeps the old prefix alive.
  * Findings that already held at session start never block, so a legacy
  * config with an empty layer doesn't stop every turn.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { checkPrefixes, type Diagnostic, type InwardsConfig, moduleNameFor } from "@inwards/core";
+import {
+  checkMoves,
+  checkPrefixes,
+  type Diagnostic,
+  type InwardsConfig,
+  moduleNameFor,
+} from "@inwards/core";
 import { isInside, posix } from "./paths.ts";
 
 /**
- * Finds the prefix errors this session introduced, per config.
+ * Finds the layout errors this session introduced, per config.
  *
  * @param project - the real project root.
  * @param configs - the valid configs now, by project-relative path (the same as at start, or the gate fails anyway).
@@ -30,10 +37,12 @@ export function newPrefixErrors(
     const root = resolve(dirname(path), config.root);
     const file = { path: rel, text: readFileSync(path, "utf8") };
     const was = modulesUnder(project, root, before);
+    const is = modulesUnder(project, root, now);
     const atStart = new Set(checkPrefixes(config, was, file).map((d) => d.message));
-    return checkPrefixes(config, modulesUnder(project, root, now), file, was).filter(
+    const emptied = checkPrefixes(config, is, file, was).filter(
       (d) => d.severity === "error" && !atStart.has(d.message),
     );
+    return [...emptied, ...checkMoves(config, was, is, file)];
   });
 }
 

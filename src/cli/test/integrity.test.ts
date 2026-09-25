@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 import { agentWrites, git, put, session, stop } from "./stop-helpers.ts";
@@ -48,11 +49,11 @@ describe("INW006 in the CLI", () => {
       "shop/domain/order.py": "",
       "tests/test_order.py": "import shop.domain.order\n",
       "scripts/seed.py": "import shop.infrastructure.db\n",
-      "shop/domain/conftest.py": "",
+      "conftest.py": "",
     });
     const before = inwards(["check", "--format", "json"], { cwd: root });
     expect(before.code).toBe(0);
-    expect(findings(before.stdout)).toEqual(["INW006/warning", "INW006/warning"]);
+    expect(findings(before.stdout)).toEqual(["INW006/warning", "INW006/warning", "INW006/warning"]);
     inwards(["init", "--agent", "agents-md"], { cwd: root });
     const after = inwards(["check", "--format", "json"], { cwd: root });
     expect(after).toMatchObject({ code: 0 });
@@ -114,6 +115,28 @@ describe("INW006 in the Stop gate", () => {
   test("a new unassigned package warns but doesn't block", () => {
     const root = session();
     agentWrites(root, "shop/persistence/repo.py", "X = 1\n");
+    expect(stop(root).code).toBe(0);
+  });
+});
+
+describe("INW006: moves the prefix check alone would miss", () => {
+  test("an empty file left behind doesn't keep a moved layer alive", () => {
+    const root = session();
+    git(root, "mv", "shop/domain", "shop/core");
+    agentWrites(root, "shop/domain/__init__.py", "");
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain("appeared outside every layer");
+  });
+
+  test("deleting a layer module and adding an ignored script is fine", () => {
+    const root = session({
+      "pyproject.toml": LAYERS.replace("[tool.inwards]", '[tool.inwards]\nignore = ["scripts"]'),
+      "shop/domain/old.py": "",
+      "shop/infrastructure/db.py": "",
+    });
+    rmSync(join(root, "shop/domain/old.py"));
+    agentWrites(root, "scripts/seed.py", "");
     expect(stop(root).code).toBe(0);
   });
 });

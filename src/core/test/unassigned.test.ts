@@ -18,10 +18,25 @@ describe("INW006 unassigned-module", () => {
 
   test.each([
     ["third-party code", "import requests\n"],
-    ["a name from a package that only holds layers", "from shop import VERSION\n"],
     ["an inner layer", "from shop.domain import order\n"],
   ])("importing %s is fine", (_, src) => {
     expect(check(file("shop/application/place_order.py", src))).toEqual([]);
+  });
+
+  test.each([
+    ["a name from the package above the layers", "from shop import VERSION\n"],
+    ["that package itself", "import shop\n"],
+    ["a star import from it", "from shop import *\n"],
+    [
+      "a dynamic import of unassigned code",
+      'import importlib\nimportlib.import_module("shop.persistence.repo")\n',
+    ],
+  ])("importing %s is an error: nothing checks what it re-exports", (_, src) => {
+    expect(check(file("shop/domain/order.py", src)).map((d) => d.code)).toContain("INW006");
+  });
+
+  test("a bare top-level directory is not first-party: it loses to the stdlib", () => {
+    expect(check(file("shop/domain/order.py", "import logging\n"))).toEqual([]);
   });
 
   test("a file outside every layer gets one warning naming its package", () => {

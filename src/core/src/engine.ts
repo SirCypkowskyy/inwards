@@ -123,7 +123,15 @@ export class Engine {
       const found = this.importFindings(file, extractImports(tree, file), ownerOf);
       if (dynamic) {
         const refs = extractDynamicImports(this.parser, tree, file);
-        found.push(...checkDynamicImports(file, refs, layers));
+        found.push(
+          ...checkDynamicImports(file, refs, layers),
+          ...checkUnassignedImports(
+            file,
+            refs.filter((ref) => ref.unreadable === null),
+            layers,
+            ownerOf,
+          ),
+        );
       }
       return found.sort((a, b) => a.line - b.line || a.column - b.column);
     } finally {

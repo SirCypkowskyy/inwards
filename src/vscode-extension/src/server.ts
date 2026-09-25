@@ -33,7 +33,7 @@ connection.onInitialize(async (params) => {
         config,
       );
       const root = resolve(dirname(configPath), config.root);
-      state = { engine, root, ownerOf: probeLookup((segments) => isModulePath(root, segments)) };
+      state = { engine, root, ownerOf: probeLookup((rel) => pathKind(root, rel)) };
     } catch (err) {
       connection.console.warn(`Inwards disabled: ${String(err)}`);
     }
@@ -59,19 +59,18 @@ documents.onDidChangeContent(({ document }) => {
 });
 
 /**
- * Tells whether a module path exists under the config root, as a file or a package directory.
+ * Tells what is at a path under the config root, for the INW006 module probe.
  *
  * @param root - the config root.
- * @param segments - the module's name segments.
- * @returns true for `a/b.py`, `a/b.pyi` or a directory `a/b`.
+ * @param rel - a forward-slash path relative to it.
+ * @returns "file", "dir", or undefined when nothing is there.
  */
-function isModulePath(root: string, segments: readonly string[]): boolean {
-  const base = join(root, ...segments);
-  return (
-    existsSync(`${base}.py`) ||
-    existsSync(`${base}.pyi`) ||
-    (statSync(base, { throwIfNoEntry: false })?.isDirectory() ?? false)
-  );
+function pathKind(root: string, rel: string): "file" | "dir" | undefined {
+  const stat = statSync(join(root, rel), { throwIfNoEntry: false });
+  if (stat?.isDirectory()) {
+    return "dir";
+  }
+  return stat?.isFile() ? "file" : undefined;
 }
 
 /**

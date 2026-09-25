@@ -23,25 +23,59 @@ import type { Diagnostic, ImportRef, SourceFile, Span } from "./types.ts";
  */
 export type ModuleLookup = (target: string) => string | undefined;
 
+/** What an adapter's file system says is at a path: a file, a directory, or nothing. */
+export type PathKind = (relPath: string) => "file" | "dir" | undefined;
+
 /**
- * Builds a ModuleLookup from a probe the adapter implements with its file
- * system: does `a/b/c.py`, `a/b/c.pyi` or a directory `a/b/c` exist under the
- * config root? A directory counts, since Python imports a namespace package
- * (no `__init__.py`) too. The longest existing prefix of a target wins.
+ * Builds a ModuleLookup from the adapter's file system, following Python's
+ * import rules for a first-party module under the config root:
  *
- * @param exists - tells whether a module path, as name segments, exists under the root.
+ * - `a/b.py` or `a/b.pyi` is module `a.b`;
+ * - a directory `a/b` below a top-level package is a package (a namespace
+ *   package needs no `__init__.py`);
+ * - a top-level directory counts only with an `__init__.py`: a bare `logging/`
+ *   or `docker/` folder loses to the stdlib or site-packages module of that name.
+ *
+ * The longest existing prefix of a target wins.
+ *
+ * @param kind - tells what is at a forward-slash path relative to the config root.
  * @returns the lookup.
  */
-export function probeLookup(exists: (segments: readonly string[]) => boolean): ModuleLookup {
+export function probeLookup(kind: PathKind): ModuleLookup {
   return (target: string): string | undefined => {
     const parts = target.split(".");
     let end = parts.length;
-    while (end > 0 && !exists(parts.slice(0, end))) {
+    while (end > 0 && !isModule(kind, parts.slice(0, end))) {
       end -= 1;
     }
     return end === 0 ? undefined : parts.slice(0, end).join(".");
   };
 }
+
+/**
+ * Tells whether a dotted name is a first-party module on disk (see `probeLookup`).
+ *
+ * @param kind - the adapter's view of the file system.
+ * @param segments - the module name, split on dots.
+ * @returns true for a module file, a nested package directory, or a top-level package with `__init__`.
+ */
+function isModule(kind: PathKind, segments: readonly string[]): boolean {
+  const base = segments.join("/");
+  if (kind(`${base}.py`) === "file" || kind(`${base}.pyi`) === "file") {
+    return true;
+  }
+  if (kind(base) !== "dir") {
+    return false;
+  }
+  return (
+    segments.length > 1 ||
+    kind(`${base}/__init__.py`) === "file" ||
+    kind(`${base}/__init__.pyi`) === "file"
+  );
+}
+
+/** The `[tool.inwards]` header line, however it is spaced. */
+const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\]/mu;
 
 /** The pyproject.toml the layers came from, so config findings can point into it. */
 export interface ConfigFile {
@@ -98,11 +132,13 @@ function isIgnored(module: string, ignore: readonly string[]): boolean {
 
 /**
  * Applies INW006 to a file's imports: a file in a layer must not import
- * first-party code that belongs to no layer. Third-party imports, and
- * packages that only hold layers (`from shop import VERSION`), pass.
+ * first-party code that belongs to no layer. That includes the package that
+ * only holds layers (`shop` above `shop.domain`): `from shop import x` runs
+ * `shop/__init__.py`, which no rule checks, so it could re-export anything.
+ * Third-party imports, and imports that land in a layer, pass.
  *
  * @param file - the file the imports come from.
- * @param imports - the imports found in that file.
+ * @param imports - the imports found in that file, static or dynamic.
  * @param layers - the configured layers, innermost first.
  * @param ownerOf - finds the first-party module an import target lives in.
  * @returns one error per import into unassigned first-party code.
@@ -120,24 +156,69 @@ export function checkUnassignedImports(
   const found: Diagnostic[] = [];
   for (const ref of imports) {
     const owner = layerIndexOf(ref.target, layers) === -1 ? ownerOf(ref.target) : undefined;
-    const pkg = owner === undefined ? undefined : unassignedPackage(owner, layers);
-    if (pkg !== undefined) {
+    if (owner !== undefined) {
+      const pkg = unassignedPackage(owner, layers);
       found.push(
         diagnostic(RULES.INW006, file, {
           span: ref,
-          message: `Layer "${source.name}" imports "${ref.target}", which belongs to no layer, so nothing checks what "${pkg}" imports.`,
-          fix: {
-            summary: `Move the code into a layer, or ask the user which layer "${pkg}" belongs to.`,
-            steps: [
-              `If the code belongs to "${source.name}" or an inner layer, move it under that layer's package and import it from there.`,
-              `Otherwise ask the user to add "${pkg}" to a layer in [tool.inwards]. Don't edit [tool.inwards] yourself.`,
-            ],
-          },
+          ...(pkg === undefined
+            ? aboveLayers(source, ref, owner)
+            : outsideLayers(source, ref, pkg)),
         }),
       );
     }
   }
   return found;
+}
+
+/**
+ * Words an import into a package outside every layer.
+ *
+ * @param source - the importing layer.
+ * @param ref - the import.
+ * @param pkg - the unassigned package it lands in.
+ * @returns the message and fix.
+ */
+function outsideLayers(
+  source: LayerSpec,
+  ref: ImportRef,
+  pkg: string,
+): { message: string; fix: Diagnostic["fix"] } {
+  return {
+    message: `Layer "${source.name}" imports "${ref.target}", which belongs to no layer, so nothing checks what "${pkg}" imports.`,
+    fix: {
+      summary: `Move the code into a layer, or ask the user which layer "${pkg}" belongs to.`,
+      steps: [
+        `If the code belongs to "${source.name}" or an inner layer, move it under that layer's package and import it from there.`,
+        `Otherwise ask the user to add "${pkg}" to a layer in [tool.inwards]. Don't edit [tool.inwards] yourself.`,
+      ],
+    },
+  };
+}
+
+/**
+ * Words an import from the package that holds the layers (its `__init__.py`).
+ *
+ * @param source - the importing layer.
+ * @param ref - the import.
+ * @param owner - the layer-holding package.
+ * @returns the message and fix.
+ */
+function aboveLayers(
+  source: LayerSpec,
+  ref: ImportRef,
+  owner: string,
+): { message: string; fix: Diagnostic["fix"] } {
+  return {
+    message: `Layer "${source.name}" imports "${ref.target}" from "${owner}", the package above the layers. Its __init__ belongs to no layer, so it can re-export anything.`,
+    fix: {
+      summary: `Import from the module in a layer that defines it, not from "${owner}".`,
+      steps: [
+        `Replace \`${ref.statement}\` with an import from the layer module that defines the name.`,
+        `If the code lives in "${owner}"'s __init__.py, move it into a layer.`,
+      ],
+    },
+  };
 }
 
 /**
@@ -212,6 +293,57 @@ export function checkPrefixes(
 }
 
 /**
+ * Catches layer code moved out of every layer during a session: a layer lost
+ * modules while modules appeared outside every layer (and outside `ignore`).
+ * An empty `__init__.py` left behind keeps the prefix alive, so
+ * `checkPrefixes` alone doesn't see such a move.
+ *
+ * @param config - the layers and ignore entries.
+ * @param before - the modules at session start.
+ * @param now - the modules now.
+ * @param file - the pyproject.toml, to point at the layer.
+ * @returns one error per layer that lost modules, when unassigned modules appeared.
+ */
+export function checkMoves(
+  config: InwardsConfig,
+  before: ReadonlySet<string>,
+  now: ReadonlySet<string>,
+  file: ConfigFile,
+): Diagnostic[] {
+  const { layers, ignore = [] } = config;
+  const appeared = [...now].filter(
+    (m) =>
+      !before.has(m) &&
+      layerIndexOf(m, layers) === -1 &&
+      unassignedPackage(m, layers) !== undefined &&
+      !isIgnored(m, ignore),
+  );
+  if (appeared.length === 0) {
+    return [];
+  }
+  const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
+  return layers.flatMap((layer, i) => {
+    const lost = [...before].filter((m) => !now.has(m) && layerIndexOf(m, layers) === i);
+    if (lost.length === 0) {
+      return [];
+    }
+    return [
+      diagnostic(RULES.INW006, source, {
+        span: spanOf(file.text, layer.modules[0] ?? layer.name),
+        message: `Layer "${layer.name}" lost ${lost.join(", ")} while ${appeared.join(", ")} appeared outside every layer. Code moved out of a layer isn't checked.`,
+        fix: {
+          summary: "Move the code back into its layer, or ask the user.",
+          steps: [
+            `Undo the move: put ${appeared.join(", ")} back under "${layer.name}".`,
+            "If the code really belongs outside the layers, stop and ask the user; don't edit [tool.inwards] yourself.",
+          ],
+        },
+      }),
+    ];
+  });
+}
+
+/**
  * Tells whether a layer prefix matches any module.
  *
  * @param prefix - a layer prefix.
@@ -259,15 +391,18 @@ function prefixFix(prefix: string, vanished: boolean): Diagnostic["fix"] {
 
 /**
  * Locates a prefix's quoted string in pyproject.toml, for the diagnostic span.
- * ponytail: first quoted occurrence anywhere in the file; parse positions from TOML if this ever points wrong.
+ * The search starts at the `[tool.inwards]` header, so `"shop"` doesn't land
+ * on `name = "shop"` in `[project]`.
+ * ponytail: first quoted occurrence after the header; parse positions from TOML if this ever points wrong.
  *
  * @param text - the pyproject.toml text.
  * @param prefix - the prefix to find.
  * @returns the span of the string, or line 1 column 1 when it isn't spelled plainly.
  */
 function spanOf(text: string, prefix: string): Span {
+  const from = TABLE_HEADER.exec(text)?.index ?? 0;
   const [at] = [`"${prefix}"`, `'${prefix}'`]
-    .map((quoted) => text.indexOf(quoted))
+    .map((quoted) => text.indexOf(quoted, from))
     .filter((i) => i !== -1)
     .sort((a, b) => a - b);
   if (at === undefined) {
