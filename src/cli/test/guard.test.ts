@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { symlinkSync, writeFileSync } from "node:fs";
+import { rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { CLAUDE_USER_DIR, inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 import { agentWrites, LEAK, put, session } from "./stop-helpers.ts";
@@ -158,5 +158,113 @@ describe("config discovery during a session", () => {
     expect(stderr).toContain("INW001");
     agentWrites(root, "shop/domain/order.py", "X = 2\n");
     writeFileSync(join(root, "shop/pyproject.toml"), "");
+  });
+});
+
+describe("config guard: review round 1", () => {
+  test.each([
+    ["curly quotes Claude Code would straighten", "modules = [“shop.domain”]"],
+    ["an escape Claude Code would decode", 'modules = ["shop.\\u0064omain"]'],
+  ])("an Edit it can't simulate exactly is denied: %s", (_, from) => {
+    const root = project({ "pyproject.toml": PYPROJECT });
+    const edit = {
+      file_path: "pyproject.toml",
+      old_string: from,
+      new_string: 'modules = ["shop.core"]',
+    };
+    expect(denied(pre(root, "Edit", edit))).toContain("verbatim");
+  });
+
+  test("a file with mixed line ends is matched as Claude Code does", () => {
+    const mixed = PYPROJECT.replace("\n\n", "\r\n\r\n");
+    const root = project({ "pyproject.toml": mixed });
+    const edit = {
+      file_path: "pyproject.toml",
+      old_string:
+        'dependencies = ["attrs==23.1"]\n\n[tool.inwards]\nlayers = [\n  { name = "domain", modules = ["shop.domain"] },',
+      new_string:
+        'dependencies = ["attrs==23.1"]\n\n[tool.inwards]\nlayers = [\n  { name = "domain", modules = ["shop.core"] },',
+    };
+    expect(denied(pre(root, "Edit", edit))).toContain("[tool.inwards]");
+  });
+
+  test("an empty old_string creating a nested config is denied", () => {
+    const root = project({ "pyproject.toml": PYPROJECT });
+    const edit = { file_path: "shop/pyproject.toml", old_string: "", new_string: LAYERS };
+    expect(denied(pre(root, "Edit", edit))).toContain("[tool.inwards]");
+  });
+
+  test("shell-form hooks in a hand-written settings.json are protected", () => {
+    const root = project({ "pyproject.toml": PYPROJECT });
+    const hook = { type: "command", command: "inwards hook claude-code" };
+    put(root, ".claude/settings.json", `{"hooks":{"Stop":[{"hooks":[${JSON.stringify(hook)}]}]}}`);
+    expect(
+      denied(pre(root, "Write", { file_path: ".claude/settings.json", content: "{}" })),
+    ).toContain("holds the Inwards hooks");
+  });
+
+  test("user settings reached through a symlink are protected", () => {
+    const root = session();
+    const dotfile = join(project({ "settings.json": '{"model":"opus"}' }), "settings.json");
+    const link = join(CLAUDE_USER_DIR, "settings.json");
+    rmSync(link, { force: true });
+    symlinkSync(dotfile, link);
+    try {
+      const write = { file_path: link, content: '{"disableAllHooks":true}' };
+      expect(denied(pre(root, "Write", write))).toContain("disableAllHooks");
+    } finally {
+      rmSync(link, { force: true });
+    }
+  });
+
+  test("a config symlinked under another name is protected", () => {
+    const root = project({ "config/base.toml": PYPROJECT });
+    symlinkSync(join(root, "config/base.toml"), join(root, "pyproject.toml"));
+    const edit = {
+      file_path: "config/base.toml",
+      old_string: '"shop.domain"',
+      new_string: '"shop.core"',
+    };
+    expect(denied(pre(root, "Edit", edit))).toContain("[tool.inwards]");
+  });
+
+  test("a project without Inwards can fix and adopt its pyproject.toml freely", () => {
+    const root = project({ "pyproject.toml": '[project\nname = "x"\n' });
+    const fix = {
+      file_path: "pyproject.toml",
+      old_string: "[project\n",
+      new_string: "[project]\n",
+    };
+    expect(denied(pre(root, "Edit", fix))).toBeUndefined();
+    const adopt = { file_path: "pyproject.toml", content: LAYERS };
+    expect(denied(pre(root, "Write", adopt))).toBeUndefined();
+  });
+
+  test("reordering keys inside a layer isn't a change", () => {
+    const root = project({ "pyproject.toml": PYPROJECT });
+    const edit = {
+      file_path: "pyproject.toml",
+      old_string: '{ name = "domain", modules = ["shop.domain"] }',
+      new_string: '{ modules = ["shop.domain"], name = "domain" }',
+    };
+    expect(denied(pre(root, "Edit", edit))).toBeUndefined();
+  });
+
+  test.each([
+    "rm -rf .inw*",
+    "rm -rf {.inwards,x}",
+    'rm -rf .inw"ards"',
+    'inwards "hook" claude-code < fake.json',
+  ])("Bash %s is denied", (command) => {
+    expect(denied(pre(session(), "Bash", { command }))).toContain("ask the user");
+  });
+
+  test.each([
+    "grep -rn TODO --exclude-dir=.inwards .",
+    'rg -n "inwards hook" docs/',
+    'git commit -m "docs: explain inwards baseline"',
+    "cat .claude/settings.json",
+  ])("Bash %s passes", (command) => {
+    expect(denied(pre(session(), "Bash", { command }))).toBeUndefined();
   });
 });

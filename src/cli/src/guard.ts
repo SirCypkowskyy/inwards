@@ -3,52 +3,60 @@
  * constrained by them, so edits that would change them are denied before
  * they happen, with a reason that tells the agent to ask the user.
  *
- * - Edit, Write or MultiEdit of any pyproject.toml in the project: the edit is
- *   applied in memory and denied when the parsed `[tool.inwards]` table
- *   differs (added, removed, changed or made unparseable).
- * - Any tool on `.inwards/` (session state), or on a Claude Code settings file
- *   (user, project, local) that holds the Inwards hooks or would get
- *   `disableAllHooks`.
- * - Bash that names `.inwards`, the Claude Code settings files, or runs
- *   `inwards hook` / `inwards baseline`.
+ * - Edit, Write or MultiEdit of a pyproject.toml, in a project that uses
+ *   Inwards: the edit is simulated (`edit-sim.ts`) and denied when the parsed
+ *   `[tool.inwards]` table would change, appear, disappear or stop parsing.
+ * - Any file tool on `.inwards/` (session state).
+ * - A Claude Code settings file (user, project or local, also through a
+ *   symlink) that holds the Inwards hooks, or would get `disableAllHooks`.
+ * - An edit to a protected file that can't be simulated exactly is denied too.
+ * - Bash that names `.inwards` or the settings files (unless it only reads
+ *   them), or runs `inwards hook` / `inwards baseline`.
  *
- * Bash can reach the same files in ways no pattern sees (`python -c ...`), so
- * the Bash rules are a speed bump; the Stop gate re-checks the config, the
- * hooks and every changed file before the turn ends.
+ * The Bash rules are a speed bump: a shell can reach the same files in ways
+ * no pattern sees, and chapter 4 says which of those nothing else catches.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { inwardsTable } from "@inwards/core";
-import { isOurHook } from "./claude-settings.ts";
-import { findConfig, isInside, physicalRealpath, realpath } from "./paths.ts";
+import { holdsInwardsHooks } from "./claude-settings.ts";
+import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-sim.ts";
+import { findConfig, isInside, realpath } from "./paths.ts";
 
-const SETTINGS_FILES: ReadonlySet<string> = new Set(["settings.json", "settings.local.json"]);
-/** `.inwards` as a path segment in a shell command. */
-const STATE_IN_SHELL = /(?:^|[\s"'=:/\\(<>|;&`$])\.inwards(?:$|[\s"'/\\;&|)<>`])/u;
-const SETTINGS_IN_SHELL = /\.claude[/\\]+settings(?:\.local)?\.json/u;
-const INWARDS_COMMAND = /\binwards(?:\.exe)?["']?\s+(?:hook|baseline)\b/u;
+const SETTINGS_FILES = ["settings.json", "settings.local.json"];
+/** `.inwards`, or a prefix of it (`.inw*`), as a path segment in a shell command. */
+const STATE_IN_SHELL = /(?:^|[\s"'=:/\\(<>|;&`${},])\.inw/u;
+const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
+/** `inwards hook` or `inwards baseline` in command position, quoted or not. */
+const INWARDS_COMMAND =
+  /(?:^|[;&|(\n]|\$\()\s*(?:[^\s;&|]*[\\/])?inwards(?:\.exe)?\s+["']?(?:hook|baseline)\b/u;
+/** A command that only reads: no redirection, chaining, substitution or in-place flag. */
+const READ_ONLY =
+  /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;
 const ASK_USER = "If this really must change, stop and ask the user to do it.";
+const UNSURE =
+  "Inwards can't tell what this edit does: old_string isn't in the file verbatim. Re-read the file and use its exact text.";
 
 /**
- * Runs the guard for one PreToolUse payload.
+ * Runs the guard for one PreToolUse payload. If the guard itself fails, the
+ * call is denied: letting it through unchecked would fail open.
  *
  * @param input - the hook payload (`tool_name`, `tool_input`, `cwd`).
  * @returns 0; a denial is printed to stdout as the PreToolUse decision JSON.
  */
 export function configGuard(input: Record<string, unknown>): number {
   const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
-  const tool = input["tool_name"];
-  const toolInput = isRecord(input["tool_input"]) ? input["tool_input"] : {};
   if (!project) {
     return 0;
   }
-  const cwd = typeof input["cwd"] === "string" ? input["cwd"] : project;
-  const reason =
-    tool === "Bash"
-      ? shellProblem(project, toolInput["command"])
-      : fileProblem(project, cwd, tool, toolInput);
+  let reason: string | undefined;
+  try {
+    reason = problemWith(project, input);
+  } catch (err) {
+    reason = `the config guard failed (${err instanceof Error ? err.message : String(err)}).`;
+  }
   if (reason !== undefined) {
     const hookSpecificOutput = {
       hookEventName: "PreToolUse",
@@ -61,43 +69,85 @@ export function configGuard(input: Record<string, unknown>): number {
 }
 
 /**
- * Decides whether a file edit touches what the guard protects.
+ * Routes a tool call to the file or shell check.
  *
  * @param project - the real project root.
- * @param cwd - the directory a relative `file_path` is resolved against.
- * @param tool - the tool name.
- * @param toolInput - the tool's input.
- * @returns why the edit is denied, or undefined to let it through.
+ * @param input - the hook payload.
+ * @returns why the call is denied, or undefined to let it through.
  */
-function fileProblem(
-  project: string,
-  cwd: string,
-  tool: unknown,
-  toolInput: Record<string, unknown>,
-): string | undefined {
+function problemWith(project: string, input: Record<string, unknown>): string | undefined {
+  const toolInput = isRecord(input["tool_input"]) ? input["tool_input"] : {};
+  const tool = input["tool_name"];
+  if (tool === "Bash") {
+    return shellProblem(project, toolInput["command"]);
+  }
   const file = toolInput["file_path"];
   if (typeof file !== "string") {
     return undefined;
   }
-  const target = landingPath(cwd, file);
-  if (target === undefined || !(isInside(project, target) || isSettingsFile(project, target))) {
-    return undefined;
-  }
-  if (target === join(project, ".inwards") || isInside(join(project, ".inwards"), target)) {
+  const cwd = typeof input["cwd"] === "string" ? input["cwd"] : project;
+  const path = { lexical: lexicalPath(cwd, file), real: landingPath(cwd, file) };
+  return fileProblem(project, path, (text) => applyEdit(text, tool, toolInput));
+}
+
+/**
+ * Decides whether a file edit touches what the guard protects.
+ *
+ * @param project - the real project root.
+ * @param path - the target as written and where it would land.
+ * @param edit - applies the tool call to the file's normalised text.
+ * @returns why the edit is denied, or undefined to let it through.
+ */
+function fileProblem(
+  project: string,
+  path: { lexical: string; real: string | undefined },
+  edit: (text: string) => string | undefined,
+): string | undefined {
+  const spellings = [path.lexical, path.real].filter((p) => p !== undefined).map(fold);
+  const state = fold(join(project, ".inwards"));
+  if (spellings.some((p) => p === state || isInside(state, p))) {
     return ".inwards/ holds the session record the Stop gate relies on; it can't be edited.";
   }
-  const before = existsSync(target) ? readFileSync(target, "utf8") : "";
-  const after = applyEdit(before, tool, toolInput);
-  if (isSettingsFile(project, target)) {
+  const settings = settingsPaths(project);
+  const isSettings = spellings.some((p) => settings.has(p));
+  const isPyproject =
+    spellings.some((p) => basename(p) === "pyproject.toml") || isConfigTarget(project, path);
+  if (!(isSettings || (isPyproject && usesInwards(project)))) {
+    return undefined;
+  }
+  const target = path.real ?? path.lexical;
+  const before = existsSync(target) ? normalised(readFileSync(target, "utf8")) : "";
+  const after = edit(before);
+  if (isSettings) {
     return settingsEditProblem(basename(target), before, after);
   }
-  const changed =
-    basename(target) === "pyproject.toml" &&
-    after !== undefined &&
-    JSON.stringify(inwardsTable(before)) !== JSON.stringify(inwardsTable(after));
-  return changed
+  if (after === undefined) {
+    return UNSURE;
+  }
+  const [was, is] = [inwardsTable(before), inwardsTable(after)];
+  const involved = isRecord(was) || isRecord(is);
+  return involved && canonical(was) !== canonical(is)
     ? "this edit changes [tool.inwards], the layer rules you are checked against."
     : undefined;
+}
+
+/**
+ * Tells whether a file is the config under another name: a pyproject.toml
+ * (at the root, or the one governing the file's directory) is a symlink to it.
+ *
+ * @param project - the real project root.
+ * @param path - the target as written and where it would land.
+ * @returns true when that config's real path is the target.
+ */
+function isConfigTarget(
+  project: string,
+  path: { lexical: string; real: string | undefined },
+): boolean {
+  if (path.real === undefined) {
+    return false;
+  }
+  const configs = [join(project, "pyproject.toml"), findConfig(dirname(path.lexical), project)];
+  return configs.some((c) => c !== undefined && realpath(c) === path.real);
 }
 
 /**
@@ -105,7 +155,7 @@ function fileProblem(
  *
  * @param name - the file's name, for the message.
  * @param before - its current text.
- * @param after - its text after the edit, or undefined when the edit would fail.
+ * @param after - its text after the edit, or undefined when it can't be simulated.
  * @returns why the edit is denied, or undefined to let it through.
  */
 function settingsEditProblem(
@@ -113,12 +163,13 @@ function settingsEditProblem(
   before: string,
   after: string | undefined,
 ): string | undefined {
-  if (holdsOurHooks(before)) {
+  if (holdsInwardsHooks(before)) {
     return `${name} holds the Inwards hooks; it can't be edited.`;
   }
-  return after !== undefined && disablesHooks(after)
-    ? "disableAllHooks would switch off the Inwards hooks."
-    : undefined;
+  if (after === undefined) {
+    return UNSURE;
+  }
+  return disablesHooks(after) ? "disableAllHooks would switch off the Inwards hooks." : undefined;
 }
 
 /**
@@ -133,106 +184,69 @@ function shellProblem(project: string, command: unknown): string | undefined {
   if (typeof command !== "string" || !usesInwards(project)) {
     return undefined;
   }
-  if (STATE_IN_SHELL.test(command)) {
-    return "commands on .inwards/ are not allowed; it holds the session record the Stop gate relies on.";
-  }
-  if (SETTINGS_IN_SHELL.test(command)) {
-    return "commands on the Claude Code settings files are not allowed while they hold the Inwards hooks.";
-  }
   if (INWARDS_COMMAND.test(command)) {
     return "`inwards hook` and `inwards baseline` are run by Claude Code and the user, not by the agent.";
+  }
+  if (READ_ONLY.test(command)) {
+    return undefined;
+  }
+  if (STATE_IN_SHELL.test(command)) {
+    return "commands that change .inwards/ are not allowed; it holds the session record the Stop gate relies on.";
+  }
+  if (SETTINGS_IN_SHELL.test(command)) {
+    return "commands that change the Claude Code settings files are not allowed while they hold the Inwards hooks.";
   }
   return undefined;
 }
 
 /**
- * Applies an Edit, Write or MultiEdit to a file's text, as the tool would.
- * Claude Code matches CRLF files with LF strings, so both spellings are tried.
- *
- * @param before - the current text ("" for a new file).
- * @param tool - the tool name.
- * @param input - the tool's input.
- * @returns the new text, or undefined when the tool would fail (then there's nothing to guard).
- */
-function applyEdit(
-  before: string,
-  tool: unknown,
-  input: Record<string, unknown>,
-): string | undefined {
-  if (tool === "Write") {
-    return typeof input["content"] === "string" ? input["content"] : undefined;
-  }
-  let edits: unknown;
-  if (tool === "MultiEdit") {
-    edits = input["edits"];
-  } else if (tool === "Edit") {
-    edits = [input];
-  }
-  if (!Array.isArray(edits)) {
-    return undefined;
-  }
-  let text: string | undefined = before;
-  for (const edit of edits) {
-    text = text === undefined || !isRecord(edit) ? undefined : replaceOnce(text, edit);
-  }
-  return text;
-}
-
-/**
- * Applies one `old_string` → `new_string` replacement.
- *
- * @param text - the text so far.
- * @param edit - `old_string`, `new_string` and optional `replace_all`.
- * @returns the replaced text, or undefined when `old_string` isn't found.
- */
-function replaceOnce(text: string, edit: Record<string, unknown>): string | undefined {
-  const { old_string: from, new_string: to, replace_all: all } = edit;
-  if (typeof from !== "string" || typeof to !== "string" || from === "") {
-    return undefined;
-  }
-  const crlf = text.includes("\r\n") && !text.includes(from);
-  const [a, b] = crlf ? [from.replaceAll("\n", "\r\n"), to.replaceAll("\n", "\r\n")] : [from, to];
-  if (!text.includes(a)) {
-    return undefined;
-  }
-  return all === true ? text.replaceAll(a, b) : text.replace(a, () => b);
-}
-
-/**
- * Resolves where a path would land if written: the real path of its nearest
- * existing ancestor, plus the rest. A symlink can't make `.inwards` look like
- * another directory.
- *
- * @param base - the directory a relative path is resolved against.
- * @param file - the path as given.
- * @returns the real landing path, or undefined when nothing on the way exists.
- */
-function landingPath(base: string, file: string): string | undefined {
-  const real = physicalRealpath(base, file);
-  if (real !== undefined) {
-    return real;
-  }
-  const full = resolve(base, file);
-  const parent = dirname(full);
-  if (parent === full) {
-    return undefined;
-  }
-  const landed = landingPath(base, parent);
-  return landed === undefined ? undefined : join(landed, basename(full));
-}
-
-/**
- * Tells whether a path is one of the Claude Code settings files that apply to
- * the project: the user's, the project's or the local one.
+ * Lists every spelling of the settings files that apply to the project: the
+ * user's, the project's and the local one, as written and through symlinks.
  *
  * @param project - the real project root.
- * @param target - a real path.
- * @returns true for one of the three.
+ * @returns folded paths.
  */
-function isSettingsFile(project: string, target: string): boolean {
+function settingsPaths(project: string): Set<string> {
   const userDir = process.env["CLAUDE_CONFIG_DIR"] || join(homedir(), ".claude");
-  const dirs = [join(project, ".claude"), realpath(userDir) ?? userDir];
-  return SETTINGS_FILES.has(basename(target)) && dirs.includes(dirname(target));
+  const paths = new Set<string>();
+  for (const dir of [join(project, ".claude"), userDir]) {
+    const realDir = realpath(dir);
+    for (const name of SETTINGS_FILES) {
+      const spellings = [
+        join(dir, name),
+        realpath(join(dir, name)),
+        realDir && join(realDir, name),
+      ];
+      for (const p of spellings) {
+        if (p) {
+          paths.add(fold(p));
+        }
+      }
+    }
+  }
+  return paths;
+}
+
+/**
+ * Folds a path's case where the file system ignores it (macOS, Windows).
+ *
+ * @param path - a path.
+ * @returns the path, lower-cased off Linux.
+ */
+function fold(path: string): string {
+  return process.platform === "linux" ? path : path.toLowerCase();
+}
+
+/**
+ * Serialises a value with object keys sorted, so reordering keys isn't a change.
+ *
+ * @param value - a parsed TOML value.
+ * @returns its canonical JSON.
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key: string, v: unknown): unknown =>
+    isRecord(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v,
+  );
 }
 
 /**
@@ -251,32 +265,6 @@ function disablesHooks(text: string): boolean {
 }
 
 /**
- * Tells whether a Claude Code settings file currently runs Inwards.
- *
- * @param text - the settings file's current text.
- * @returns true when any hook entry in it is an Inwards hook.
- */
-function holdsOurHooks(text: string): boolean {
-  try {
-    const settings: unknown = JSON.parse(text);
-    const hooks = isRecord(settings) ? settings["hooks"] : undefined;
-    return (
-      isRecord(hooks) &&
-      Object.values(hooks).some(
-        (groups) =>
-          Array.isArray(groups) &&
-          groups.some(
-            (group: unknown) =>
-              isRecord(group) && Array.isArray(group["hooks"]) && group["hooks"].some(isOurHook),
-          ),
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Tells whether the project uses Inwards: it has session state, or a config at its root.
  *
  * @param project - the real project root.
@@ -287,9 +275,9 @@ function usesInwards(project: string): boolean {
 }
 
 /**
- * Tells whether a parsed JSON value is a plain object.
+ * Tells whether a parsed value is a plain object.
  *
- * @param value - any parsed JSON value.
+ * @param value - any parsed value.
  * @returns true for a non-null, non-array object.
  */
 function isRecord(value: unknown): value is Record<string, unknown> {

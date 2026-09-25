@@ -109,14 +109,49 @@ function hasInwardsHook(settings: Record<string, unknown> | undefined, event: st
     if (!(REQUIRED_TOOLS.get(event) ?? []).every((tool) => matches(group, tool))) {
       return false;
     }
-    return entries.some(
-      (entry: unknown) =>
-        isOurHook(entry) ||
-        (isRecord(entry) &&
-          typeof entry["command"] === "string" &&
-          SHELL_FORM.test(entry["command"])),
-    );
+    return entries.some(runsInwards);
   });
+}
+
+/**
+ * Tells whether a hook entry runs Inwards, in exec form (as `init` writes it)
+ * or in the documented shell form.
+ *
+ * @param entry - one hook entry.
+ * @returns true for an Inwards hook.
+ */
+function runsInwards(entry: unknown): boolean {
+  return (
+    isOurHook(entry) ||
+    (isRecord(entry) && typeof entry["command"] === "string" && SHELL_FORM.test(entry["command"]))
+  );
+}
+
+/**
+ * Tells whether settings text holds any Inwards hook, for any event.
+ *
+ * @param text - a settings file's text.
+ * @returns true when some hook entry runs Inwards; false for other or unparseable text.
+ */
+export function holdsInwardsHooks(text: string): boolean {
+  let settings: unknown;
+  try {
+    settings = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  const hooks = isRecord(settings) ? settings["hooks"] : undefined;
+  return (
+    isRecord(hooks) &&
+    Object.values(hooks).some(
+      (groups) =>
+        Array.isArray(groups) &&
+        groups.some(
+          (group: unknown) =>
+            isRecord(group) && Array.isArray(group["hooks"]) && group["hooks"].some(runsInwards),
+        ),
+    )
+  );
 }
 
 /**
