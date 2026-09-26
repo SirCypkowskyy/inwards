@@ -10,6 +10,7 @@ import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { logRun, noteRun } from "./runlog.ts";
+import { statsCommand } from "./stats-command.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
@@ -17,6 +18,7 @@ const USAGE = `inwards ${VERSION}
 Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml] [--log]
        inwards baseline [--config pyproject.toml]    (accept today's violations)
        inwards init --agent claude|aider|agents-md [--dry-run]
+       inwards stats [DIR] [--format text|json]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
@@ -49,7 +51,7 @@ async function main(argv: string[]): Promise<number> {
     return print(VERSION, 0);
   }
   const [command, ...paths] = positionals;
-  if (!values.help && (command === "hook" || command === "init" || command === "baseline")) {
+  if (!values.help && isSetupCommand(command)) {
     return await setupCommand(command, paths, values);
   }
   if (values.help || command !== "check") {
@@ -58,26 +60,47 @@ async function main(argv: string[]): Promise<number> {
   return await checkCommand(paths, values.format, values.config, values.log === true);
 }
 
+/** The commands besides `check`. */
+type SetupCommand = "hook" | "init" | "baseline" | "stats";
+const SETUP_COMMANDS: readonly string[] = ["hook", "init", "baseline", "stats"];
+
 /**
- * Runs the commands besides `check`: the hook, `init` and `baseline`.
+ * Tells whether a positional names one of the commands besides `check`.
+ *
+ * @param command - the first positional.
+ * @returns true for hook, init, baseline or stats.
+ */
+function isSetupCommand(command: string | undefined): command is SetupCommand {
+  return command !== undefined && SETUP_COMMANDS.includes(command);
+}
+
+/**
+ * Runs the commands besides `check`: the hook, `init`, `baseline` and `stats`.
  *
  * @param command - which one.
  * @param paths - the positionals after it.
  * @param values - the parsed options.
  * @param values.agent - `--agent`, for init.
  * @param values."dry-run" - `--dry-run`, for init.
- * @param values.config - `--config`, for baseline.
+ * @param values.config - `--config`, for baseline (stats refuses it).
+ * @param values.format - `--format`, for stats.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
-  command: "hook" | "init" | "baseline",
+  command: SetupCommand,
   paths: string[],
   values: {
     agent?: string | undefined;
     "dry-run"?: boolean | undefined;
     config?: string | undefined;
+    format?: string | undefined;
   },
 ): Promise<number> {
+  if (command === "stats") {
+    return paths.length <= 1 && values.config === undefined
+      ? statsCommand(values.format ?? "text", paths[0])
+      : print(USAGE, 2);
+  }
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(USAGE)
