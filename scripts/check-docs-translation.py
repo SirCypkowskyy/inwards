@@ -168,8 +168,12 @@ def main() -> int:
             continue
         text = target.read_text()
         meta = fields(text)
-        if STALE_MARKER in text and not args.mark_stale and fix is None:
-            report("error", target, "has the stale banner, which only CI adds: re-translate, then --fix-hashes")
+        fixing = fix is not None and (not fix or target.resolve() in fix)
+        # Only --mark-stale adds the banner, and CI runs it on a fresh checkout,
+        # so a banner already in the file was committed by mistake.
+        banner_found = STALE_MARKER in text
+        if banner_found and not fixing:
+            report("error", target, "has a committed stale banner: re-translate, then --fix-hashes, which removes it")
             errors += 1
         expected = source.relative_to(REPO).as_posix()
         if meta.get("source") != expected or not re.fullmatch(r"[0-9a-f]{64}", meta.get("source_hash", "")):
@@ -177,11 +181,11 @@ def main() -> int:
             errors += 1
             continue
         digest = sha256(source)
-        if meta["source_hash"] == digest:
-            continue
-        if fix is not None and (not fix or target.resolve() in fix):
+        if fixing and (meta["source_hash"] != digest or banner_found):
             set_hash(target, digest)
             print(f"{target.relative_to(REPO).as_posix()}: source_hash updated", file=sys.stderr)
+            continue
+        if meta["source_hash"] == digest:
             continue
         stale.append(page)
         report("warning", target, f"stale: {expected} changed since the translation; update it, then --fix-hashes")

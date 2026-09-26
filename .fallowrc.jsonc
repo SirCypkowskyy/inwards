@@ -38,7 +38,8 @@
       { "name": "scripts", "patterns": ["scripts/**"] },
       { "name": "eval", "patterns": ["eval/**"] },
       { "name": "bench", "patterns": ["bench/**"] },
-      { "name": "packaging", "patterns": ["packaging/**"] }
+      { "name": "packaging", "patterns": ["packaging/**"] },
+      { "name": "docs", "patterns": ["docs/**"] }
     ],
     "rules": [
       // The engine imports nothing of ours; adapters come to it.
@@ -58,7 +59,9 @@
       // The bench runs binaries as processes and imports nothing of ours.
       { "from": "bench", "allow": [] },
       // The npm placeholder ships alone and imports nothing.
-      { "from": "packaging", "allow": [] }
+      { "from": "packaging", "allow": [] },
+      // Browser scripts for the docs site and their tests import nothing of ours.
+      { "from": "docs", "allow": [] }
     ],
     // No I/O or runtime specifics in the engine: those come through a port.
     "calls": {
