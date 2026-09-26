@@ -130,6 +130,13 @@
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     },
     {
+      // Browser-only docs assets (Zensical extra_javascript): no process.stdout
+      // exists in a browser, so a console warning is the only way to surface a
+      // degraded state (e.g. a blocked CDN request) to someone debugging.
+      "includes": ["docs/chapters/javascripts/**"],
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
+    {
       // The eval harness is one script run by hand (`bun run eval/run.ts`): a
       // pipeline of short documented helpers that only it uses. Splitting it into
       // modules would scatter that pipeline without making any piece reusable.

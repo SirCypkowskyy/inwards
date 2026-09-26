@@ -1,3 +1,6 @@
+// fallow-ignore-file unused-file
+// Loaded via docs/zensical.toml's extra_javascript, a TOML config
+// fallow's JS import graph can't trace.
 // Zensical auto-themes flowchart/sequence/class/state/ER diagrams but not
 // quadrantChart or pie charts (confirmed in Zensical's own docs, "Other
 // diagram types"). This module fills that gap by computing Mermaid
@@ -19,9 +22,7 @@
 // throwing an uncaught error that could interrupt other page scripts.
 let mermaid;
 try {
-  ({ default: mermaid } = await import(
-    "https://unpkg.com/mermaid@11/dist/mermaid.esm.min.mjs"
-  ));
+  ({ default: mermaid } = await import("https://unpkg.com/mermaid@11/dist/mermaid.esm.min.mjs"));
 } catch (err) {
   console.warn(
     "inwards docs: could not load Mermaid from the CDN, quadrant/pie charts will use default (un-themed) colors.",
@@ -29,15 +30,21 @@ try {
   );
 }
 
-/** Reads one CSS custom property's current computed value from :root. */
+/**
+ * Reads one CSS custom property's current computed value from :root.
+ * @param {string} name The custom property's name, including the leading `--`.
+ * @param {string} fallback Value to use when the property is unset or empty.
+ * @returns {string} The resolved value, or `fallback`.
+ */
 function cssVar(name, fallback) {
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
 }
 
-/** Builds Mermaid themeVariables from the site's current palette. */
+/**
+ * Builds Mermaid themeVariables from the site's current palette.
+ * @returns {Record<string, string>} Theme variable keys for quadrant and pie charts.
+ */
 function buildThemeVariables() {
   const nodeBg = cssVar("--md-mermaid-node-bg-color", "#7e57c2");
   const edge = cssVar("--md-mermaid-edge-color", "#7e57c2");
@@ -76,7 +83,9 @@ function buildThemeVariables() {
 /** (Re-)initializes Mermaid with theme variables for the current palette.
  *  No-ops if the CDN import above failed. */
 function applyTheme() {
-  if (!mermaid) return;
+  if (!mermaid) {
+    return;
+  }
   mermaid.initialize({
     startOnLoad: false,
     theme: "base",
@@ -87,7 +96,9 @@ function applyTheme() {
 /** Re-renders every mermaid block already on the page under the new theme.
  *  No-ops if the CDN import above failed. */
 async function rerenderAll() {
-  if (!mermaid) return;
+  if (!mermaid) {
+    return;
+  }
   applyTheme();
   const blocks = document.querySelectorAll(".mermaid, pre.mermaid");
   if (blocks.length > 0) {
@@ -100,8 +111,10 @@ async function rerenderAll() {
  *  show the matching description from the page's #quadrant-descriptions
  *  list, if one exists on the current page. */
 function wireQuadrantDescriptions() {
-  const descList = document.getElementById("quadrant-descriptions");
-  if (!descList) return; // not on this page
+  const descList = document.querySelector("#quadrant-descriptions");
+  if (!descList) {
+    return; // not on this page
+  }
 
   const descriptions = {};
   for (const dt of descList.querySelectorAll("dt")) {
@@ -111,18 +124,20 @@ function wireQuadrantDescriptions() {
   // Mermaid renders each point as a <g> containing a <text> with the
   // point's label; match on that text content rather than a generated id,
   // since quadrant chart point ids aren't part of Mermaid's public API.
-  document.querySelectorAll(".mermaid text").forEach((textEl) => {
+  for (const textEl of document.querySelectorAll(".mermaid text")) {
     const label = textEl.textContent.trim();
-    if (!(label in descriptions)) return;
+    if (!(label in descriptions)) {
+      continue;
+    }
 
     textEl.setAttribute("tabindex", "0");
     textEl.setAttribute("title", descriptions[label]);
-  });
+  }
 }
 
 if (mermaid) {
   applyTheme();
-  window.mermaid = mermaid;
+  globalThis.mermaid = mermaid;
   wireQuadrantDescriptions();
 
   // Re-render on palette toggle (the attribute Zensical/Material sets on
@@ -137,7 +152,7 @@ if (mermaid) {
   // convention of a global `document$` observable; fall back to nothing
   // extra if it doesn't, since a full navigation already re-runs this
   // module's top-level `applyTheme()` call on the next page load.
-  if (window.document$ && typeof window.document$.subscribe === "function") {
-    window.document$.subscribe(() => rerenderAll());
+  if (globalThis.document$ && typeof globalThis.document$.subscribe === "function") {
+    globalThis.document$.subscribe(() => rerenderAll());
   }
 }

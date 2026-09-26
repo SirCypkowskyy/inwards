@@ -1,98 +1,103 @@
-/* Diagram color tokens, consumed by classDef in docs/chapters/*.md Mermaid
-   sources via var(). Light values match the colors already hardcoded in
-   the diagrams before this change; dark values are new. */
-[data-md-color-scheme="default"] {
-  --diagram-ext-bg: #eceff1;
-  --diagram-ext-fg: #263238;
-  --diagram-ext-border: #90a4ae;
+/* fallow-ignore-file unused-file */
+/* Loaded via docs/zensical.toml's extra_css, a TOML config fallow's JS
+   import graph can't trace. */
+@layer inwards-diagrams {
+  /* Diagram color tokens, consumed by classDef in docs/chapters/*.md Mermaid
+     sources via var(). Light values match the colors already hardcoded in
+     the diagrams before this change; dark values are new. */
+  [data-md-color-scheme="default"] {
+    --diagram-ext-bg: rgb(236 239 241);
+    --diagram-ext-fg: rgb(38 50 56);
+    --diagram-ext-border: rgb(144 164 174);
 
-  --diagram-planned-bg: #ede7f6;
-  --diagram-planned-fg: #4527a0;
-  --diagram-planned-border: #7e57c2;
-}
-
-[data-md-color-scheme="slate"] {
-  --diagram-ext-bg: #37474f;
-  --diagram-ext-fg: #eceff1;
-  --diagram-ext-border: #607d8b;
-
-  --diagram-planned-bg: #2a1f4d;
-  --diagram-planned-fg: #b39ddb;
-  --diagram-planned-border: #7e57c2;
-}
-
-/* Hover a diagram's arrow to see it "flow" toward its target. Zero markup
-   needed: targets Mermaid's own generated .edgePath class. Respects
-   prefers-reduced-motion. */
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .mermaid .edgePath:hover path {
-    stroke-dasharray: 6 4;
-    animation: diagram-edge-flow 0.6s linear infinite;
+    --diagram-planned-bg: rgb(237 231 246);
+    --diagram-planned-fg: rgb(69 39 160);
+    --diagram-planned-border: rgb(126 87 194);
   }
-}
 
-@keyframes diagram-edge-flow {
-  to {
-    stroke-dashoffset: -10;
+  [data-md-color-scheme="slate"] {
+    --diagram-ext-bg: rgb(55 71 79);
+    --diagram-ext-fg: rgb(236 239 241);
+    --diagram-ext-border: rgb(96 125 139);
+
+    --diagram-planned-bg: rgb(42 31 77);
+    --diagram-planned-fg: rgb(179 157 219);
+    --diagram-planned-border: rgb(126 87 194);
   }
-}
 
-.homepage-loop-wrap {
-  max-width: 100%;
-  overflow-x: auto;
-}
+  /* Hover a diagram's arrow to see it "flow" toward its target. Zero markup
+     needed: targets Mermaid's own generated .edgePath class. Respects
+     prefers-reduced-motion. */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .mermaid .edgePath:hover path {
+      stroke-dasharray: 6 4;
+      animation: diagram-edge-flow 0.6s linear infinite;
+    }
+  }
 
-#homepage-loop {
-  width: 100%;
-  height: auto;
-  font-family: var(--md-text-font-family, sans-serif);
-  font-size: 13px;
-}
+  @keyframes diagram-edge-flow {
+    to {
+      stroke-dashoffset: -10;
+    }
+  }
 
-#homepage-loop .hl-node rect {
-  fill: var(--md-primary-fg-color);
-  stroke: var(--md-primary-fg-color--dark);
-  stroke-width: 1.5;
-}
+  .homepage-loop-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 
-#homepage-loop .hl-node text {
-  fill: var(--md-primary-bg-color);
-  text-anchor: middle;
-  dominant-baseline: middle;
-}
+  #homepage-loop {
+    width: 100%;
+    height: auto;
+    font-family: var(--md-text-font-family, sans-serif);
+    font-size: 13px;
+  }
 
-#homepage-loop .hl-edge {
-  fill: none;
-  stroke: var(--md-default-fg-color--light);
-  stroke-width: 2;
-}
+  #homepage-loop .hl-node rect {
+    fill: var(--md-primary-fg-color);
+    stroke: var(--md-primary-fg-color--dark);
+    stroke-width: 1.5;
+  }
 
-#homepage-loop .hl-edge-dashed {
-  stroke-dasharray: 5 4;
-}
+  #homepage-loop .hl-node text {
+    fill: var(--md-primary-bg-color);
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
 
-#homepage-loop .hl-arrowhead {
-  fill: var(--md-default-fg-color--light);
-}
+  #homepage-loop .hl-edge {
+    fill: none;
+    stroke: var(--md-default-fg-color--light);
+    stroke-width: 2;
+  }
 
-/* Hovering (or focusing, for keyboard users) a node highlights the arrows
-   connected to it. Node IDs are known and stable (hand-written SVG, not
-   Mermaid-generated), so :has() can target them directly. */
-@media (prefers-reduced-motion: no-preference) {
-  #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-to-hook,
-  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-to-hook,
-  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-clean,
-  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-violation,
-  #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-violation {
+  #homepage-loop .hl-edge-dashed {
+    stroke-dasharray: 5 4;
+  }
+
+  #homepage-loop .hl-arrowhead {
+    fill: var(--md-default-fg-color--light);
+  }
+
+  /* Hovering (or focusing, for keyboard users) a node highlights the arrows
+     connected to it. Node IDs are known and stable (hand-written SVG, not
+     Mermaid-generated), so :has() can target them directly. */
+  @media (prefers-reduced-motion: no-preference) {
+    #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-to-hook,
+    #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-to-hook,
+    #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-clean,
+    #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-violation,
+    #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-violation {
+      stroke: var(--md-accent-fg-color);
+      stroke-dasharray: 6 4;
+      animation: diagram-edge-flow 0.6s linear infinite;
+    }
+  }
+
+  /* Touch fallback: tap toggles the same highlighted state via the
+     .is-active class set by homepage-loop.mjs, since touch devices never
+     trigger :hover. */
+  #homepage-loop .hl-edge.is-active {
     stroke: var(--md-accent-fg-color);
-    stroke-dasharray: 6 4;
-    animation: diagram-edge-flow 0.6s linear infinite;
   }
-}
-
-/* Touch fallback: tap toggles the same highlighted state via the
-   .is-active class set by homepage-loop.mjs, since touch devices never
-   trigger :hover. */
-#homepage-loop .hl-edge.is-active {
-  stroke: var(--md-accent-fg-color);
 }
