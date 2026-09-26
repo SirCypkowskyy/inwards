@@ -5,7 +5,7 @@
  * `__init__.py` of a package that just lost a required member.
  */
 import { type Dirent, readdirSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, sep } from "node:path";
+import { join, sep } from "node:path";
 import {
   checkRequired,
   checkShape,
@@ -99,23 +99,21 @@ function pythonFiles(root: string, rel: string, chain = new Set<string>()): stri
  * @returns true when `real` is `top` or below it.
  */
 function within(top: string, real: string | undefined): boolean {
-  if (real === undefined) {
-    return false;
-  }
-  const rel = relative(top, real);
-  return rel === "" || (rel.split(sep)[0] !== ".." && !isAbsolute(rel));
+  return real === top || (real?.startsWith(top.endsWith(sep) ? top : `${top}${sep}`) ?? false);
 }
 
 /**
  * Resolves a path to its real location.
  *
  * @param path - any path.
- * @returns the canonical path, or undefined when it doesn't exist.
+ * @returns the canonical path, or undefined when it (or a link's target) doesn't exist.
  */
 function realOrUndefined(path: string): string | undefined {
+  let real: string | undefined;
   try {
-    return realpathSync(path);
+    real = realpathSync(path);
   } catch {
-    return undefined;
+    // dangling, or deleted while the pass ran
   }
+  return real;
 }
