@@ -26,6 +26,7 @@ platforms and platform wheels for `uv add`; see the
 | `src/vscode-extension/` | LSP server + client. Uses the same engine as the CLI. |
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
 | `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
+| `examples/broken-app/` | One deliberate INW001 violation; `sarif.yml` expects it and annotates PRs with it. |
 | `eval/` | Agent eval harness: does an agent fix what the hook reports? |
 | `bench/` | The synthetic benchmark repo generator and the PR regression gate (`compare.ts`). |
 | `packaging/` | README for the platform wheels, and the PyPI/npm name placeholders. |
