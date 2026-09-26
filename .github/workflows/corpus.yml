@@ -1,0 +1,54 @@
+name: Corpus
+
+# Nightly: the prescan differential test and check timings on real Python
+# services pinned by commit (bench/corpus.json), with the compiled binary.
+# Also runs on a PR that changes the corpus or prescan-diff's output, so a new
+# pin or format is proven before it merges. Results go to the job summary and
+# the corpus-result artifact.
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - bench/corpus.json
+      - bench/corpus.ts
+      - bench/corpus-manifest.ts
+      - bench/corpus-fetch.ts
+      # bench/corpus.ts parses prescan-diff's summary line.
+      - src/core/scripts/prescan-diff.ts
+      - .github/workflows/corpus.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus:
+    name: Real-repo corpus
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Build the binary
+        run: bun run scripts/build-binaries.ts bun-linux-x64
+      - name: Fetch the corpus, run the prescan test, time the checks
+        shell: bash
+        run: |
+          bun run bench/corpus.ts --bin dist/inwards-linux-x64 --dir "$RUNNER_TEMP/corpus" \
+            --out corpus-result.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: corpus-result
+          path: corpus-result.json
+          if-no-files-found: error

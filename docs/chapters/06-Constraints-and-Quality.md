@@ -21,7 +21,7 @@ Ranked. When two goals conflict, the higher one wins.
 
 | Rank | Goal | Scenario | Measure |
 |---|---|---|---|
-| 1 | :material-shield-check: **No false negatives** | An agent hides a forbidden import in a function, behind `TYPE_CHECKING`, via a relative path or a package import | Every form is reported, including `shop . infrastructure` with spaces, a backslash inside the name, NFKC identifiers and symlinked aliases of a layer. Dynamic imports with constant targets (`importlib.import_module`, `__import__`, `exec`) are reported as INW011. Known gaps: computed targets ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)), and loaders reached through walrus, tuple assignment, attributes, `functools.partial` or other loading APIs ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). Unit tests plus the prescan differential test (0 misses on 65,262 generated and 1,921 stdlib files, dynamic imports included) |
+| 1 | :material-shield-check: **No false negatives** | An agent hides a forbidden import in a function, behind `TYPE_CHECKING`, via a relative path or a package import | Every form is reported, including `shop . infrastructure` with spaces, a backslash inside the name, NFKC identifiers and symlinked aliases of a layer. Dynamic imports with constant targets (`importlib.import_module`, `__import__`, `exec`) are reported as INW011. Known gaps: computed targets ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)), and loaders reached through walrus, tuple assignment, attributes, `functools.partial` or other loading APIs ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). Unit tests plus the prescan differential test (0 misses on 65,262 generated and 1,921 stdlib files, dynamic imports included, and nightly on 6,543 files from five open-source services) |
 | 2 | :material-lightning-bolt: **Agent-loop latency** | A hook checks one edited file | p95 < 100 ms wall time, process start included |
 | 3 | :material-robot-outline: **Actionable for agents** | An agent gets INW001 | It fixes the violation within one retry in ≥ 80 % of cases (measured with design partners, see [chapter 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministic** | Same repo, same config, two runs | Identical diagnostics in identical order. Only the timing fields in the summary (`durationMs`) change |
@@ -40,6 +40,28 @@ All numbers come from the scaffold in this repository. Nothing here is projected
 
 **Regression gate.** Every pull request runs `.github/workflows/bench.yml`. It builds the base branch and the PR, runs both on the synthetic repo in alternation (40 hook runs on one file, 12 full checks), and fails when the PR is more than 20% slower on either metric, or when either build fails a run (the synthetic repo is clean, so every run must exit 0). Each side is built with its own `.bun-version`, so a Bun upgrade is measured too. The change is the median of per-pair ratios, so load that drifts during the job cancels out within a pair. The gate covers hook and full-check time only, not memory, start-up or binary size. The job summary shows p50/p95 for both builds (with 12 full runs, p95 is the slowest one) and the runner it ran on, and the raw samples are kept as an artifact. Locally, a build made 30% slower fails the gate, and ten runs of identical builds didn't fail it once (`bench/compare.ts`, `bench/test/compare.test.ts`).
 
+**Real-repo corpus.** Stdlib and synthetic code don't look like a FastAPI or Django service, so `.github/workflows/corpus.yml` runs every night (and on any PR that changes the corpus or `prescan-diff.ts`) on five open-source repos pinned by commit in `bench/corpus.json`. `bench/corpus.ts` fetches each one shallow, only the pinned commit, and for three of them only the service directory (`backend/`, `server/`, `saleor/`; sparse cone mode also brings the files at the repo's top level), about 40 MB in all. It runs the prescan differential test on every `.py` file in the checkout and times the compiled binary: 5 full checks and 20 runs of `inwards check <file>` on one file per repo, after one warm-up each. None of these repos has a `[tool.inwards]` table, so the manifest gives each one a layering of ours (written to `inwards-corpus.toml` in the checkout and passed with `--config`). The violation counts come from that layering and say nothing about the projects. The job fails when the prescan misses an import, when a checkout's `.py` count differs from the manifest (a broken fetch would otherwise shrink the corpus), or when `inwards check` exits with anything but 0 or 1. A repo that still fails to fetch after three attempts, or whose run fails, is recorded in the results and fails the job; the other repos still run. The table goes to the job summary and the raw samples to the `corpus-result` artifact.
+
+| Repo | License | Why it's in | Checked with |
+|---|---|---|---|
+| [fastapi/full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) `cb740b6`, `backend/` | MIT | FastAPI's official template, the layout many small services start from | core, services, api |
+| [ivan-borovets/fastapi-clean-example](https://github.com/ivan-borovets/fastapi-clean-example) `9271723` | MIT | Clean architecture on FastAPI | core, outbound, inbound, main |
+| [pgorecki/python-ddd](https://github.com/pgorecki/python-ddd) `429cd4b` | MIT | DDD modular monolith, three bounded contexts | domain, application, infrastructure, interface |
+| [polarsource/polar](https://github.com/polarsource/polar) `cfae1ba`, `server/` | Apache-2.0 | A large FastAPI service in production, about 70 feature packages | kit, models, features, entrypoints |
+| [saleor/saleor](https://github.com/saleor/saleor) `5ff5648`, `saleor/` | BSD-3-Clause | A large Django service, bigger than the synthetic repo | core, apps, api |
+
+First run, on the laptop described under Setup (load average 3 to 4), `inwards` 0.1.0:
+
+| Repo | `.py` files | Lines | Prescan refused | Prescan missed | Full check p50 / max | One file p50 / p95 | Violations |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| full-stack-fastapi-template | 40 | 2,685 | 0 | 0 | 59 / 60 ms | 46 / 51 ms | 1 |
+| fastapi-clean-example | 209 | 6,764 | 0 | 0 | 80 / 87 ms | 46 / 49 ms | 2 |
+| python-ddd | 139 | 5,852 | 0 | 0 | 82 / 87 ms | 43 / 45 ms | 10 |
+| polar | 1,831 | 435,688 | 22 (1.2 %) | 0 | 1.16 / 1.37 s | 124 / 142 ms | 358 |
+| saleor | 4,324 | 847,875 | 13 (0.3 %) | 0 | 1.84 / 1.89 s | 59 / 62 ms | 491 |
+
+Two things the synthetic repo didn't show. `inwards check` on polar's `subscription/service.py` (4,482 lines, 175 KB, two violations) takes about 125 ms here and 280 ms on a GitHub runner (AMD EPYC 7763, 2 cores), over the 100 ms budget; a small file in the same repo takes about 55 ms. The budget is written for the Claude Code hook, which runs the same one-file check (`runCheck` on the edited file) after reading its payload, so the hook can only be slower. Tracked in [#122](https://github.com/SirCypkowskyy/inwards/issues/122). Rerun locally after bytecode compilation ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)) cut every one-file check by 20 to 40 ms: polar's file now takes 83 / 90 ms (p50 / p95), saleor's 27 / 30 ms. And a cold full check of saleor's 848,000 lines takes 1.8 s on one core (2.5 s on the GitHub runner), where the 496,000-line synthetic repo takes 0.4 s.
+
 ### Results
 
 | Scenario | Result | Budget | Status |
@@ -52,6 +74,7 @@ All numbers come from the scaffold in this repository. Nothing here is projected
 | Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter) | < 1 s | :white_check_mark: |
 | Prescan refusals on the CPython 3.14 stdlib | 8.3 % of 1,921 files | lower is faster | :white_check_mark: |
 | Prescan missed imports on the same corpus | 0 | 0 | :white_check_mark: |
+| Prescan missed imports on the real-repo corpus (6,543 files, five services) | 0 | 0 | :white_check_mark: |
 | Peak memory, full synthetic run | about 120 MB RSS | n/a | |
 | Binary size, Linux x64 | 82 MB | n/a | :material-alert: large |
 
@@ -134,12 +157,15 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 ```sh
 bun install
-bun test                                                    # 350 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, bench
+bun test                                                    # 372 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms
 bun run src/core/scripts/prescan-diff.ts "$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')"
+bun run bench/corpus.ts --bin dist/inwards-linux-x64 --dir ~/.cache/inwards-corpus  # real-repo corpus, about 90 s
 ```
+
+`bench/corpus.ts` reuses a checkout that is already at its pinned commit, so later runs download nothing. To add a repo, append it to `bench/corpus.json` with a full commit SHA, its `.py` count and a layering; the PR runs the corpus workflow.
 
 <figure markdown="span">
   ![bun test output](assets/screens/bun-test.svg){ loading=lazy }
@@ -154,8 +180,8 @@ The screenshots in these docs come from `scripts/screenshots.py`, which runs eac
 |---|:-:|:-:|---|
 | Astral ships layer contracts in ty or Ruff | Medium | High | Compete on agent integration and fix quality, which aren't Astral's focus. Keep the rules format simple enough to export |
 | import-linter adds JSON output and agent hooks | Medium | Medium | Stay ahead on latency, a standalone binary and per-violation fixes. Offer an import from `.importlinter` contracts |
-| Real repos break the 100 ms p95 | Low to medium | High | Resident process first, then a Rust/Zig WASM prescan (the fallback in ADR-001) |
-| The prescan misses an import on some unusual file | Low | High | Differential test in CI; grow the corpus with real repos from design partners |
+| Real repos break the 100 ms p95 | Happened: a 4,482-line polar file with violations took 125 to 280 ms before bytecode compilation, 90 ms p95 locally after ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | High | Resident process first, then a Rust/Zig WASM prescan (the fallback in ADR-001) |
+| The prescan misses an import on some unusual file | Low | High | Differential test in CI on the stdlib, nightly on five real services; grow that corpus with repos from design partners |
 | Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard and the session record ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
 | A binary silently ignores its bytecode (Bun falls back to parsing the source) and start-up doubles | Low | Low | Tests still pass in that case; the PR benchmark catches it on Linux only. Bytecode is tied to the Bun version that built it, and every binary embeds that same version |
