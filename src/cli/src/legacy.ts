@@ -26,7 +26,7 @@
  * that wasn't suppressed at session start goes back into the report.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
   type AgentSuppressions,
@@ -56,6 +56,13 @@ interface Check {
   configPath: string;
   base: string;
   baseline: boolean;
+  /**
+   * The path the agent wrote for a checked file, when the hook had to resolve
+   * a `..` to find it: absolute checked file to the payload's cwd joined with
+   * its path, `..` applied as text. The file has a start identity only if
+   * both name the same one (`identityOf`).
+   */
+  written?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -118,13 +125,12 @@ export async function agentSuppressions(
   }
   const now = suppressed.map((s) => s.diagnostic);
   const ids = now.flatMap((d): [string, string][] => {
-    const abs = resolve(check.base, d.file);
-    const rel = startPath(project, abs);
-    return rel === undefined ? [] : [[rel, abs]];
+    const rel = identityOf(project, check, d);
+    return rel === undefined ? [] : [[rel, resolve(check.base, d.file)]];
   });
   const same = start ? unchangedFiles(start, ids) : new Set<string>();
   const touched = now.filter((d) => {
-    const rel = startPath(project, resolve(check.base, d.file));
+    const rel = identityOf(project, check, d);
     return rel === undefined || !same.has(rel);
   });
   const before =
@@ -217,12 +223,14 @@ export function unchangedFiles(
  * written (`..` already applied as text), relative to the real project root.
  * The root is found as the outermost directory on that path whose real path
  * is the project, so a cwd spelled through a link to the whole project
- * (`/var` for `/private/var`) still matches. A path with a symlink anywhere
- * below the root gets no identity, and so no start allowance: the agent can
- * create a symlinked directory or file (`alias -> original`,
- * `cart.py -> cart.pyi`) that the start record has no entry for, and a
- * path through one names another file than it did at start. Memoised, since
- * one run asks for the same files many times.
+ * (`/var` for `/private/var`) still matches. The invariant: a file has an
+ * identity only when that lexical path equals its physical one (its real
+ * path relative to the real root) and the file itself isn't a symlink.
+ * Otherwise it gets no start hash, no start text, no #134 excuse and no
+ * suppression allowance: the agent can create a symlinked directory or file
+ * (`alias -> original`, `cart.py -> cart.pyi`), or replace a file with a
+ * link to identical bytes, and a path through one names another file than it
+ * did at start. Memoised, since one run asks for the same files many times.
  *
  * @param project - the real project root.
  * @param file - the file, absolute, as checked.
@@ -231,12 +239,13 @@ export function unchangedFiles(
 function startPath(project: string, file: string): string | undefined {
   if (!startPaths.has(file)) {
     const ancestors: string[] = [];
-    for (let dir = file; ancestors.at(-1) !== dir; dir = dirname(dir)) {
+    for (let dir = dirname(file); ancestors.at(-1) !== dir; dir = dirname(dir)) {
       ancestors.push(dir);
     }
-    const root = ancestors.reverse().find((dir) => realpath(dir) === project);
+    const root = ancestors.reverse().find((dir) => realDir(dir) === project);
     const rel = root === undefined ? undefined : posix(relative(root, file));
-    const direct = rel !== undefined && realpath(file) === join(project, rel);
+    const link = lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink() !== false;
+    const direct = rel !== undefined && !link && realpath(file) === join(project, rel);
     startPaths.set(file, direct ? rel : undefined);
   }
   return startPaths.get(file);
@@ -244,6 +253,57 @@ function startPath(project: string, file: string): string | undefined {
 
 /** `startPath` answers, by absolute file. */
 const startPaths = new Map<string, string | undefined>();
+
+/**
+ * Resolves a directory, memoised: `startPath` asks for the same ancestors of
+ * every file.
+ *
+ * @param dir - an absolute directory.
+ * @returns its real path, or undefined when it doesn't exist.
+ */
+function realDir(dir: string): string | undefined {
+  if (!realDirs.has(dir)) {
+    realDirs.set(dir, realpath(dir));
+  }
+  return realDirs.get(dir);
+}
+
+/** `realDir` answers. */
+const realDirs = new Map<string, string | undefined>();
+
+/**
+ * The start identity of a finding's file (`startPath`), or none when the
+ * path the agent wrote for it (`Check.written`) names another identity: a
+ * `..` through a symlinked directory the hook had to resolve to find the file.
+ *
+ * @param project - the real project root.
+ * @param check - the report's base and the written paths.
+ * @param d - the finding.
+ * @returns the project-relative identity, or undefined.
+ */
+function identityOf(project: string, check: Check, d: Diagnostic): string | undefined {
+  const abs = resolve(check.base, d.file);
+  const rel = startPath(project, abs);
+  const written = check.written?.get(abs);
+  return written === undefined || startPath(project, written) === rel ? rel : undefined;
+}
+
+/**
+ * Lists the start-manifest files whose path no longer has a start identity:
+ * the file, or a directory on its path, has become a symlink. Their content
+ * hash can be unchanged (`mv a.py saved.txt; ln -s saved.txt a.py`), so the
+ * Stop gate checks them as changed files.
+ *
+ * @param project - the real project root.
+ * @param manifest - the start manifest.
+ * @returns project-relative paths that still exist and lost their identity.
+ */
+export function relinked(project: string, manifest: Record<string, string>): string[] {
+  return Object.keys(manifest).filter((rel) => {
+    const file = join(project, rel);
+    return existsSync(file) && startPath(project, file) !== rel;
+  });
+}
 
 /**
  * Checks the files some findings are in again, as they were at session start.
@@ -262,7 +322,7 @@ async function atStart(
 ): Promise<Report | undefined> {
   const texts = new Map<string, string>();
   for (const d of found) {
-    const rel = startPath(project, resolve(check.base, d.file));
+    const rel = identityOf(project, check, d);
     const text = rel === undefined ? undefined : startText(project, start, rel);
     if (text !== undefined) {
       texts.set(resolve(check.base, d.file), text);

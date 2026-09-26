@@ -144,8 +144,8 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     return 0;
   }
   try {
-    const check = { configPath, base: target.cwd, baseline: true };
-    // A suppression the agent added may not count (`agent-suppressions`, see `legacy.ts`).
+    // Identity follows the path as written; an agent's suppression may not count (legacy.ts).
+    const check = { configPath, base: target.cwd, baseline: true, written: target.written };
     const { report, rejected } = await agentSuppressions(
       target.project,
       start,
@@ -328,13 +328,14 @@ function readHookPayload(): Record<string, unknown> | null {
  * @param payloadCwd - the payload's `cwd` field; the process cwd if not a string.
  * @param file - the payload's `tool_input.file_path`, absolute or relative to cwd.
  * @returns the file and cwd as written (Python names modules after that
- *   path) and the real project root; undefined when the file is outside the
- *   project, missing, or not a regular file.
+ *   path), the real project root, and the file's path exactly as written
+ *   (`..` applied as text) for start identity (`Check.written` in legacy.ts);
+ *   undefined when the file is outside the project, missing, or not a regular file.
  */
 function hookTarget(
   payloadCwd: unknown,
   file: string,
-): { file: string; cwd: string; project: string } | undefined {
+): { file: string; cwd: string; project: string; written: Map<string, string> } | undefined {
   const lexicalCwd = typeof payloadCwd === "string" ? payloadCwd : process.cwd();
   const cwd = realpath(lexicalCwd);
   const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
@@ -352,7 +353,8 @@ function hookTarget(
   if (real && lexical && isInside(project, real) && statSync(real).isFile()) {
     // Report paths against the cwd as written: on macOS /var is a link to
     // /private/var, and mixing the two spellings gives ../../var/... paths.
-    return { file: lexical, cwd: resolve(lexicalCwd), project };
+    const written = new Map([[lexical, resolve(lexicalCwd, file)]]);
+    return { file: lexical, cwd: resolve(lexicalCwd), project, written };
   }
   return undefined;
 }

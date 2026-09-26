@@ -31,7 +31,7 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import { changedBaselines } from "./baseline.ts";
 import { settingsProblem } from "./claude-settings.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
-import { agentSuppressions, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
+import { agentSuppressions, oldErrors, oldNote, rejectedNote, relinked } from "./legacy.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { newLayoutErrors, preexistingShape } from "./prefixes.ts";
@@ -296,8 +296,9 @@ function spotOf(d: Diagnostic): string {
 }
 
 /**
- * Collects the Python files this session changed: the edits the hook saw and
- * the manifest diff since SessionStart.
+ * Collects the Python files this session changed: the edits the hook saw,
+ * the manifest diff since SessionStart, and the start files whose path lost
+ * its start identity to a symlink, even with the same bytes (`relinked`).
  *
  * @param project - the real project root.
  * @param state - the session state.
@@ -309,7 +310,7 @@ function changedFiles(
   state: SessionState,
   manifest: Record<string, string>,
 ): string[] {
-  const changed = new Set(state.edited);
+  const changed = new Set([...state.edited, ...relinked(project, state.start.manifest)]);
   for (const [path, hash] of Object.entries(manifest)) {
     if (state.start.manifest[path] !== hash) {
       changed.add(path);
