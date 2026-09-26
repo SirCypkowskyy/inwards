@@ -78,20 +78,20 @@ export function logDirs(project: string, configs: readonly string[]): string[] {
   return [project, ...configs.map((rel) => join(project, dirname(rel)))];
 }
 /**
- * Collects what each session's Stop runs reported.
+ * Collects each session's Stop runs, with what each reported.
  *
- * @param lines - the log.
- * @returns fingerprints by session.
+ * @param lines - the log, in time order.
+ * @returns the Stop runs by session, in time order.
  */
-export function stopFingerprints(lines: readonly RunLine[]): Map<string, Set<string>> {
-  const bySession = new Map<string, Set<string>>();
+export function stopRuns(
+  lines: readonly RunLine[],
+): Map<string, { at: number; prints: string[] }[]> {
+  const bySession = new Map<string, { at: number; prints: string[] }[]>();
   for (const line of lines) {
     if (line.event === "Stop" && line.session_id !== null) {
-      const prints = bySession.get(line.session_id) ?? new Set<string>();
-      for (const print of line.fingerprints) {
-        prints.add(print);
-      }
-      bySession.set(line.session_id, prints);
+      const runs = bySession.get(line.session_id) ?? [];
+      runs.push({ at: Date.parse(line.at), prints: line.fingerprints });
+      bySession.set(line.session_id, runs);
     }
   }
   return bySession;
@@ -128,9 +128,10 @@ export function ruleCodes(lines: readonly RunLine[]): Map<string, string> {
 /**
  * Collects, for each session, what `check` runs reported before the
  * session's first edit, so violations that were already there don't count.
+ * One sweep over the checks and the sessions, both in time order.
  *
  * @param lines - the log, in time order.
- * @param hooks - the hook runs.
+ * @param hooks - the hook runs, in time order.
  * @returns fingerprints by session.
  */
 export function preexisting(
@@ -145,12 +146,16 @@ export function preexisting(
     }
   }
   const checks = lines.filter((l) => l.event === "check");
+  const seen = new Set<string>();
   const old = new Map<string, Set<string>>();
+  let next = 0;
   for (const [session, at] of firstEdit) {
-    old.set(
-      session,
-      new Set(checks.filter((c) => Date.parse(c.at) < at).flatMap((c) => c.fingerprints)),
-    );
+    for (; next < checks.length && Date.parse(checks[next]?.at ?? "") < at; next += 1) {
+      for (const print of checks[next]?.fingerprints ?? []) {
+        seen.add(print);
+      }
+    }
+    old.set(session, new Set(seen));
   }
   return old;
 }

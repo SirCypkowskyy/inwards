@@ -3,7 +3,7 @@
  * (docs/chapters/08-Run-Log.md), next to the thresholds chapter 2 sets.
  * The log is read by runs.ts and the report printed by stats-command.ts.
  */
-import { errorsOf, preexisting, type RunLine, ruleCodes, stopFingerprints } from "./runs.ts";
+import { errorsOf, preexisting, type RunLine, ruleCodes, stopRuns } from "./runs.ts";
 
 /** How many first-reported violations were gone at the next hook run for the same file. */
 export interface RetryCount {
@@ -56,6 +56,8 @@ interface FileState {
   seen: Set<string>;
   /** Fingerprints first reported at the previous run for this file, waiting for the next. */
   pending: string[];
+  /** When the pending fingerprints were reported. */
+  pendingAt: number;
 }
 
 /** Everything one pass over the log accumulates. */
@@ -104,11 +106,12 @@ export function computeStats(lines: readonly RunLine[], skipped = 0): Stats {
       observe(pass, run, file);
     }
   }
-  const atStop = stopFingerprints(lines);
+  const stops = stopRuns(lines);
   for (const [key, state] of pass.states) {
-    const stopped = atStop.get(key.split(SEP)[0] ?? "");
+    const later = (stops.get(key.split(SEP)[0] ?? "") ?? []).filter((s) => s.at >= state.pendingAt);
     for (const print of state.pending) {
-      pass.settled.push({ print, fixed: stopped?.has(print) ? false : undefined });
+      const stillThere = later.some((s) => s.prints.includes(print));
+      pass.settled.push({ print, fixed: stillThere ? false : undefined });
     }
   }
   return summarise(hooks, pass, ruleCodes(lines), skipped);
@@ -129,6 +132,7 @@ function observe(pass: Pass, run: RunLine, file: string): void {
     pass.settled.push({ print, fixed: !run.fingerprints.includes(print) });
   }
   state.pending = errorsOf(run).filter((print) => !state.seen.has(print));
+  state.pendingAt = Date.parse(run.at);
   for (const print of state.pending) {
     state.seen.add(print);
     pass.introduced.add(`${session}${SEP}${print}`);
@@ -152,7 +156,8 @@ function fileState(pass: Pass, session: string, file: string): FileState {
   if (state === undefined) {
     const last = pass.lastRun.get(file);
     const inherited = last && last.session !== session ? last.prints : [];
-    state = { seen: new Set([...(pass.old.get(session) ?? []), ...inherited]), pending: [] };
+    const seen = new Set([...(pass.old.get(session) ?? []), ...inherited]);
+    state = { seen, pending: [], pendingAt: 0 };
     pass.states.set(key, state);
   }
   return state;

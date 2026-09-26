@@ -193,6 +193,11 @@ describe("inwards stats: review cases", () => {
       line(2, { event: "Stop", tool: null, fingerprints: ["p"] }),
     ]);
     expect(stats.fixedWithinOneRetry).toMatchObject({ reported: 1, fixed: 0, noRetry: 0 });
+    const earlierStop = statsOf([
+      line(0, { event: "Stop", tool: null, fingerprints: ["p"] }),
+      edit(1, "s1", "a.py", { added: 1, prints: ["p"], ms: 1 }),
+    ]);
+    expect(earlierStop.fixedWithinOneRetry).toMatchObject({ reported: 0, noRetry: 1 });
   });
 
   test("a violation left by an earlier session isn't counted again", () => {
