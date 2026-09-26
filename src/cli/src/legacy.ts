@@ -110,9 +110,15 @@ export async function agentSuppressions(
   if (suppressed.length === 0 || modeOf(project, start, check.configPath) === "allow") {
     return { report, rejected: [] };
   }
-  const touched = suppressed
-    .map((s) => s.diagnostic)
-    .filter((d) => !(start && unchanged(project, start, resolve(check.base, d.file))));
+  const now = suppressed.map((s) => s.diagnostic);
+  const same = start
+    ? unchangedFiles(
+        project,
+        start,
+        now.map((d) => resolve(check.base, d.file)),
+      )
+    : new Set<string>();
+  const touched = now.filter((d) => !same.has(resolve(check.base, d.file)));
   const before =
     start && touched.length > 0 ? await atStart(project, start, check, touched) : undefined;
   const kept = carried(touched, before?.suppressed?.map((s) => s.diagnostic) ?? []);
@@ -165,24 +171,33 @@ function modeOf(project: string, start: Start | undefined, configPath: string): 
 }
 
 /**
- * Tells whether a file is byte for byte what it was at session start, from
- * the start manifest's SHA-256. The same bytes mean the same suppressions,
- * committed or not, so the agent didn't add any.
+ * Finds the files that are byte for byte what they were at session start,
+ * from the start manifest's SHA-256. The same bytes mean the same
+ * suppressions, committed or not, so the agent didn't add any. Each file is
+ * read and hashed once, however many findings it has.
  *
  * @param project - the real project root.
  * @param start - the session's start record.
- * @param file - the file, absolute.
- * @returns true when the file's hash now is its start hash.
+ * @param files - absolute files, repeats allowed (one per finding).
+ * @param read - reads a file's bytes; the tests count the calls.
+ * @returns the files whose hash now is their start hash.
  */
-function unchanged(project: string, start: Start, file: string): boolean {
-  const hash = start.manifest[projectPath(project, file)];
-  try {
-    return (
-      hash !== undefined && createHash("sha256").update(readFileSync(file)).digest("hex") === hash
-    );
-  } catch {
-    return false; // gone or unreadable: not provably unchanged
-  }
+export function unchangedFiles(
+  project: string,
+  start: Pick<Start, "manifest">,
+  files: readonly string[],
+  read: (file: string) => Uint8Array = readFileSync,
+): Set<string> {
+  return new Set(
+    [...new Set(files)].filter((file) => {
+      const hash = start.manifest[projectPath(project, file)];
+      try {
+        return hash !== undefined && createHash("sha256").update(read(file)).digest("hex") === hash;
+      } catch {
+        return false; // gone or unreadable: not provably unchanged
+      }
+    }),
+  );
 }
 
 /**
@@ -219,8 +234,10 @@ async function atStart(
 
 /**
  * Picks the findings the start check had too: a finding is carried over
- * while the start has one with the same fingerprint (rule, module, message)
- * left to match, so a second copy is new.
+ * while the same file had one with the same fingerprint (rule, module,
+ * message) left to match at start, so a second copy is new. The file counts
+ * because `order.py` and `order.pyi` share a module: without it, a
+ * suppression moved from one into the other would still match.
  *
  * @param now - the findings now.
  * @param before - the start check's findings of the same kind.
@@ -229,12 +246,12 @@ async function atStart(
 function carried(now: readonly Diagnostic[], before: readonly Diagnostic[]): Diagnostic[] {
   const left = new Map<string, number>();
   for (const d of before) {
-    left.set(fingerprint(d), (left.get(fingerprint(d)) ?? 0) + 1);
+    left.set(inFile(d), (left.get(inFile(d)) ?? 0) + 1);
   }
   return now.filter((d) => {
-    const n = left.get(fingerprint(d)) ?? 0;
+    const n = left.get(inFile(d)) ?? 0;
     if (n > 0) {
-      left.set(fingerprint(d), n - 1);
+      left.set(inFile(d), n - 1);
     }
     return n > 0;
   });
@@ -277,4 +294,14 @@ function startText(project: string, start: Start, file: string): string | undefi
   return [raw, crlf].find(
     (text) => text !== undefined && createHash("sha256").update(text).digest("hex") === hash,
   );
+}
+
+/**
+ * Keys a finding by its file and fingerprint, for `carried`.
+ *
+ * @param d - the finding.
+ * @returns the report path and the fingerprint joined.
+ */
+function inFile(d: Diagnostic): string {
+  return `${d.file}\u0000${fingerprint(d)}`;
 }

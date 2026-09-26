@@ -13,11 +13,13 @@
  * `[tool.inwards.rules]` isn't reported as unused.
  *
  * Comments are read from a full parse, so text inside a string never counts
- * as one. That parse runs only for a file whose text mentions the marker; the
- * import prescan is untouched. A file with INW000 is left alone: under its
+ * as one. The engine sends a file whose text mentions the marker straight to
+ * its full parse and reads the comments from that tree (`commentsIn`), so a
+ * marked file costs one parse, as a file with a violation does; the import
+ * prescan itself is untouched. A file with INW000 is left alone: under its
  * declared encoding a "comment" may be code.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node, Parser, Tree } from "web-tree-sitter";
 import { parsePython } from "./python.ts";
 import { type RuleSettings, ruleLevel } from "./rule-config.ts";
 import { diagnostic, RULES } from "./rules.ts";
@@ -35,7 +37,7 @@ export interface Suppressed {
 }
 
 /** One `# inwards: ignore` comment as read. */
-interface Comment {
+export interface SuppressionComment {
   span: Span;
   codes: string[];
   reason: string;
@@ -60,13 +62,26 @@ const EXAMPLE = '# inwards: ignore[INW001] reason="why this import is allowed"';
 const FIXED: ReadonlySet<string> = new Set(["INW000", "INW007", "INW008", "INW009"]);
 
 /**
+ * Tells whether a file may hold a suppression comment, before any parse.
+ *
+ * @param text - the normalised file text.
+ * @returns true when the text mentions `inwards: ignore`.
+ */
+export function mentionsSuppression(text: string): boolean {
+  return MARKER.test(text);
+}
+
+/**
  * Hides the findings a valid suppression comment covers and reports the
  * comments that are invalid or unused (INW009). A no-op, without a parse,
  * for a file that doesn't mention the marker.
  *
  * @param parser - parser with the Python grammar loaded.
  * @param file - the source file, with normalised text.
- * @param found - the file's findings, before `[tool.inwards.rules]`.
+ * @param checked - the file's findings, before `[tool.inwards.rules]`, and
+ *   its comments when the caller already parsed it (`commentsIn`).
+ * @param checked.found - the findings.
+ * @param checked.comments - the comments, if read.
  * @param rules - the project's `[tool.inwards.rules]`, to skip rules that are off.
  * @returns the findings left with INW009 added, in source order when the file
  *   has a suppression comment, and the findings suppressed.
@@ -74,13 +89,13 @@ const FIXED: ReadonlySet<string> = new Set(["INW000", "INW007", "INW008", "INW00
 export function suppress(
   parser: Parser,
   file: SourceFile,
-  found: Diagnostic[],
+  { found, comments: read }: { found: Diagnostic[]; comments?: readonly SuppressionComment[] },
   rules: RuleSettings | undefined,
 ): { kept: Diagnostic[]; suppressed: Suppressed[] } {
   if (!MARKER.test(file.text) || found.some((d) => d.code === "INW000")) {
     return { kept: found, suppressed: [] };
   }
-  const comments = readComments(parser, file.text);
+  const comments = read ?? parsedComments(parser, file.text);
   const kept: Diagnostic[] = [];
   const suppressed: Suppressed[] = [];
   const used = new Set<string>();
@@ -102,22 +117,33 @@ export function suppress(
 }
 
 /**
- * Reads every suppression comment from a full parse of the file.
+ * Reads every suppression comment from a parse of its own, for a file the
+ * engine didn't parse in full (one outside every layer).
  *
  * @param parser - parser with the Python grammar loaded.
  * @param text - the normalised file text.
  * @returns the comments that hold the directive, valid or not.
  */
-function readComments(parser: Parser, text: string): Comment[] {
+function parsedComments(parser: Parser, text: string): SuppressionComment[] {
   const tree = parsePython(parser, text);
   try {
-    return tree.rootNode.descendantsOfType("comment").flatMap((node) => {
-      const rest = node ? DIRECTIVE.exec(node.text.trimEnd())?.groups?.["rest"] : undefined;
-      return node && rest !== undefined ? [readComment(node, rest)] : [];
-    });
+    return commentsIn(tree);
   } finally {
     tree.delete(); // WASM memory is not garbage collected
   }
+}
+
+/**
+ * Reads every suppression comment from a full parse of the file.
+ *
+ * @param tree - the file's syntax tree.
+ * @returns the comments that hold the directive, valid or not.
+ */
+export function commentsIn(tree: Tree): SuppressionComment[] {
+  return tree.rootNode.descendantsOfType("comment").flatMap((node) => {
+    const rest = node ? DIRECTIVE.exec(node.text.trimEnd())?.groups?.["rest"] : undefined;
+    return node && rest !== undefined ? [readComment(node, rest)] : [];
+  });
 }
 
 /**
@@ -127,7 +153,7 @@ function readComments(parser: Parser, text: string): Comment[] {
  * @param rest - the text after `# inwards: ignore`.
  * @returns the comment.
  */
-function readComment(node: Node, rest: string): Comment {
+function readComment(node: Node, rest: string): SuppressionComment {
   const span = {
     line: node.startPosition.row + 1,
     column: node.startPosition.column + 1,
@@ -182,7 +208,7 @@ function codeProblem(code: string): string[] {
  */
 function commentFindings(
   file: SourceFile,
-  comment: Comment,
+  comment: SuppressionComment,
   used: ReadonlySet<string>,
   rules: RuleSettings | undefined,
 ): Diagnostic[] {

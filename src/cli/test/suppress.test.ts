@@ -4,41 +4,19 @@
  * default keeps an agent from silencing a violation with a comment.
  */
 import { describe, expect, test } from "bun:test";
-import { appendFileSync, readFileSync, renameSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { denied, pre } from "./guard-helpers.ts";
-import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
-import { git, ID, put, session, stop } from "./stop-helpers.ts";
-
-const ORDER = "shop/domain/order.py";
-const HIDE = '# inwards: ignore[INW001] reason="legacy, tracked in #12"';
-const SUPPRESSED = `import shop.infrastructure.db  ${HIDE}\n`;
-const ALLOW = `${LAYERS}agent-suppressions = "allow"\n`;
-const PROJECT_GATE = `${LAYERS}stop-gate = "project"\n`;
-const LEGACY = "shop/domain/legacy.py";
-
-/**
- * Whether this git has `--no-lazy-fetch` (2.44+). Without it the hooks can't
- * read a file's start content, so every suppression counts as new.
- */
-const NO_LAZY_FETCH = Bun.spawnSync(["git", "--no-lazy-fetch", "version"]).exitCode === 0;
-
-/**
- * Writes a file the way an agent's Write tool does, then sends PostToolUse.
- *
- * @param root - the project directory.
- * @param text - the new content of the domain module.
- * @param env - extra environment.
- * @returns the hook's exit code and output.
- */
-function agentWrites(root: string, text: string, env: Record<string, string> = {}): RunResult {
-  put(root, ORDER, text);
-  const input = payload("post-write-order", root, {
-    session_id: ID,
-    tool_input: { file_path: join(root, ORDER) },
-  });
-  return inwards(["hook", "claude-code"], { cwd: root, stdin: input, env });
-}
+import { inwards, LAYERS, project } from "./run.ts";
+import { put, session, stop } from "./stop-helpers.ts";
+import {
+  ALLOW,
+  agentWritesOrder,
+  HIDE,
+  NO_LAZY_FETCH,
+  ORDER,
+  SUPPRESSED,
+} from "./suppress-helpers.ts";
 
 describe("inwards check", () => {
   test("a valid suppression passes and is counted", () => {
@@ -79,7 +57,7 @@ describe("inwards check", () => {
 describe("agent-suppressions in the Claude Code hooks", () => {
   test("by default, a suppression the agent adds blocks the edit and the Stop gate", () => {
     const root = session();
-    const edit = agentWrites(root, SUPPRESSED);
+    const edit = agentWritesOrder(root, SUPPRESSED);
     expect(edit.code).toBe(2);
     expect(edit.stderr).toContain("wasn't in the file when the session started");
     expect(edit.stderr).toContain('"code":"INW001"');
@@ -91,13 +69,16 @@ describe("agent-suppressions in the Claude Code hooks", () => {
 
   test('with agent-suppressions = "allow", the agent\'s suppression counts', () => {
     const root = session({ "pyproject.toml": ALLOW, "shop/infrastructure/db.py": "" });
-    expect(agentWrites(root, SUPPRESSED).code).toBe(0);
+    expect(agentWritesOrder(root, SUPPRESSED).code).toBe(0);
     expect(stop(root).code).toBe(0);
   });
 
   test("a reasonless suppression blocks in either mode", () => {
     const root = session({ "pyproject.toml": ALLOW, "shop/infrastructure/db.py": "" });
-    const edit = agentWrites(root, "import shop.infrastructure.db  # inwards: ignore[INW001]\n");
+    const edit = agentWritesOrder(
+      root,
+      "import shop.infrastructure.db  # inwards: ignore[INW001]\n",
+    );
     expect(edit.code).toBe(2);
     expect(edit.stderr).toContain('"code":"INW009"');
     expect(stop(root).code).toBe(2);
@@ -116,7 +97,7 @@ describe("agent-suppressions in the Claude Code hooks", () => {
   test("allow written through Bash mid-session changes nothing, and fails the Stop gate", () => {
     const root = session();
     put(root, "pyproject.toml", ALLOW);
-    expect(agentWrites(root, SUPPRESSED).code).toBe(2);
+    expect(agentWritesOrder(root, SUPPRESSED).code).toBe(2);
     const gate = stop(root);
     expect(gate.code).toBe(2);
     expect(gate.stderr).toContain("[tool.inwards] changed");
@@ -125,8 +106,8 @@ describe("agent-suppressions in the Claude Code hooks", () => {
   test("the run log records the rejection, and stats counts it once", () => {
     const root = session();
     const env = { INWARDS_RUN_LOG: "1" };
-    agentWrites(root, SUPPRESSED, env);
-    agentWrites(root, `${SUPPRESSED}X = 1\n`, env);
+    agentWritesOrder(root, SUPPRESSED, env);
+    agentWritesOrder(root, `${SUPPRESSED}X = 1\n`, env);
     const lines = readFileSync(join(root, ".inwards/runs.jsonl"), "utf8").trim().split("\n");
     const last = JSON.parse(lines.at(-1) ?? "{}");
     expect(last).toMatchObject({ event: "PostToolUse", suppressed: 0 });
@@ -145,7 +126,7 @@ describe.skipIf(!NO_LAZY_FETCH)("suppressions already in the file at session sta
 
   test("still count after an unrelated edit, and the run log counts them", () => {
     const root = session(start);
-    const edit = agentWrites(root, `${SUPPRESSED}\nTOTAL = 1\n`, { INWARDS_RUN_LOG: "1" });
+    const edit = agentWritesOrder(root, `${SUPPRESSED}\nTOTAL = 1\n`, { INWARDS_RUN_LOG: "1" });
     expect(edit.code).toBe(0);
     const lines = readFileSync(join(root, ".inwards/runs.jsonl"), "utf8").trim().split("\n");
     expect(JSON.parse(lines.at(-1) ?? "{}")).toMatchObject({ suppressed: 1, rejected: [] });
@@ -154,14 +135,14 @@ describe.skipIf(!NO_LAZY_FETCH)("suppressions already in the file at session sta
 
   test("still count when only the reason changes", () => {
     const root = session(start);
-    const edit = agentWrites(root, SUPPRESSED.replace("legacy", "old code"));
+    const edit = agentWritesOrder(root, SUPPRESSED.replace("legacy", "old code"));
     expect(edit.code).toBe(0);
     expect(stop(root).code).toBe(0);
   });
 
   test("a copy on another import is the agent's, and blocks", () => {
     const root = session(start);
-    const edit = agentWrites(root, `${SUPPRESSED}import shop.infrastructure.cache  ${HIDE}\n`);
+    const edit = agentWritesOrder(root, `${SUPPRESSED}import shop.infrastructure.cache  ${HIDE}\n`);
     expect(edit.code).toBe(2);
     expect(edit.stderr).toContain("shop.infrastructure.cache");
     expect(edit.stderr).not.toContain('\\"shop.infrastructure.db\\"');
@@ -171,7 +152,7 @@ describe.skipIf(!NO_LAZY_FETCH)("suppressions already in the file at session sta
   test("moved to another import, it no longer hides the first one or the second", () => {
     const root = session(start);
     const moved = `import shop.infrastructure.db\nimport shop.infrastructure.cache  ${HIDE}\n`;
-    const edit = agentWrites(root, moved);
+    const edit = agentWritesOrder(root, moved);
     expect(edit.code).toBe(2);
     expect(edit.stderr).toContain("shop.infrastructure.cache");
     expect(edit.stderr).toContain("shop.infrastructure.db");
@@ -183,111 +164,9 @@ describe.skipIf(!NO_LAZY_FETCH)("suppressions already in the file at session sta
       "import shop.infrastructure.db",
       "import shop.infrastructure.db; import sqlalchemy",
     );
-    const edit = agentWrites(root, widened);
+    const edit = agentWritesOrder(root, widened);
     expect(edit.code).toBe(2);
     expect(edit.stderr).toContain('"code":"INW005"');
     expect(edit.stderr).not.toContain('"code":"INW001"');
-  });
-});
-
-/**
- * Starts a session after the user changed files that are already committed,
- * or added new ones: they are in the start manifest, but git has no start
- * content for them.
- *
- * @param files - project files, committed.
- * @param dirty - files written after the commit, before the session starts.
- * @returns the project directory.
- */
-function startedDirty(files: Record<string, string>, dirty: Record<string, string>): string {
-  const root = project({ "shop/infrastructure/db.py": "", [ORDER]: "X = 1\n", ...files });
-  git(root, "init", "-q");
-  git(root, "add", "-A");
-  git(root, "commit", "-qm", "start");
-  for (const [rel, text] of Object.entries(dirty)) {
-    put(root, rel, text);
-  }
-  inwards(["init", "--agent", "claude"], { cwd: root });
-  const start = payload("session-start", root, { session_id: ID, source: "startup" });
-  inwards(["hook", "claude-code"], { cwd: root, stdin: start });
-  return root;
-}
-
-describe('stop-gate = "project"', () => {
-  test("a suppression in a file the user changed but didn't commit before the session doesn't block", () => {
-    const root = startedDirty(
-      { "pyproject.toml": PROJECT_GATE, [LEGACY]: SUPPRESSED },
-      { [LEGACY]: `${SUPPRESSED}TOTAL = 1\n` },
-    );
-    expect(agentWrites(root, "X = 2\n").code).toBe(0);
-    expect(stop(root).code).toBe(0);
-  });
-
-  test("nor does one in a file that was untracked when the session started", () => {
-    const root = startedDirty({ "pyproject.toml": PROJECT_GATE }, { [LEGACY]: SUPPRESSED });
-    expect(agentWrites(root, "X = 2\n").code).toBe(0);
-    expect(stop(root).code).toBe(0);
-  });
-
-  test("a suppression the agent adds still blocks, in any file", () => {
-    const root = startedDirty({ "pyproject.toml": PROJECT_GATE }, {});
-    put(root, LEGACY, SUPPRESSED); // through Bash: no PostToolUse
-    const gate = stop(root);
-    expect(gate.code).toBe(2);
-    expect(gate.stderr).toContain("or the file wasn't committed at session start");
-    expect(gate.stderr).toContain("shop/domain/legacy.py");
-  });
-});
-
-describe("new and renamed files", () => {
-  test("a suppression in a file the agent creates blocks", () => {
-    const root = session();
-    put(root, "shop/domain/fresh.py", SUPPRESSED);
-    const input = payload("post-write-order", root, {
-      session_id: ID,
-      tool_input: { file_path: join(root, "shop/domain/fresh.py") },
-    });
-    expect(inwards(["hook", "claude-code"], { cwd: root, stdin: input }).code).toBe(2);
-    expect(stop(root).code).toBe(2);
-  });
-
-  test("a file with a suppression renamed by the agent counts as new, and blocks", () => {
-    const root = session({ [LEGACY]: SUPPRESSED });
-    renameSync(join(root, LEGACY), join(root, "shop/domain/renamed.py"));
-    const gate = stop(root);
-    expect(gate.code).toBe(2);
-    expect(gate.stderr).toContain("shop/domain/renamed.py");
-  });
-});
-
-describe("a rejected suppression is treated as if the comment weren't there", () => {
-  test("a violation the baseline accepts stays accepted", () => {
-    const root = session({ [ORDER]: "import shop.infrastructure.db\n" }, (dir) => {
-      inwards(["baseline"], { cwd: dir });
-    });
-    const edit = agentWrites(root, SUPPRESSED);
-    expect(edit.code).toBe(0);
-    expect(edit.stderr).toBe("");
-    expect(stop(root).code).toBe(0);
-  });
-
-  test("a second, new copy still blocks", () => {
-    const root = session({ [ORDER]: "import shop.infrastructure.db\n" }, (dir) => {
-      inwards(["baseline"], { cwd: dir });
-    });
-    appendFileSync(join(root, ORDER), SUPPRESSED);
-    const edit = agentWrites(root, readFileSync(join(root, ORDER), "utf8"));
-    expect(edit.code).toBe(2);
-    expect(stop(root).code).toBe(2);
-  });
-});
-
-describe.skipIf(!NO_LAZY_FETCH)("a rejected suppression on an old violation", () => {
-  test("leaves it context, as the violation the file had at session start", () => {
-    const root = session({ [ORDER]: "import shop.infrastructure.db\n" });
-    const edit = agentWrites(root, SUPPRESSED);
-    expect(edit.code).toBe(0);
-    expect(edit.stdout).toContain("already in the file when the session started");
-    expect(stop(root).code).toBe(0);
   });
 });
