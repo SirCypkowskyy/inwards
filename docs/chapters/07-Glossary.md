@@ -71,7 +71,7 @@ Baseline
 :   The violations a project already had when it adopted Inwards, recorded by `inwards baseline` in `inwards-baseline.json` next to `pyproject.toml`. They don't fail the check; new ones do (UC6). Entries match by rule, module and message, not by line.
 
 Config guard
-:   The `PreToolUse` hook that denies an agent's edits to `[tool.inwards]`, to `.inwards/` and to the Claude Code settings that hold the Inwards hooks, before they happen. See [chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
+:   The `PreToolUse` hook that denies an agent's edits to `[tool.inwards]`, to `.inwards/`, to `inwards-baseline.json` and to the Claude Code settings that hold the Inwards hooks, before they happen. See [chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
 
 Confirming parse
 :   The full tree-sitter parse the engine runs when the import skeleton reports a violation, so that only real imports are ever reported. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse).

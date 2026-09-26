@@ -316,14 +316,16 @@ src/
 │   └── test/              # bun test
 ├── cli/
 │   ├── src/
-│   │   ├── main.ts        # commands: check, init, hook claude-code
+│   │   ├── main.ts        # commands: check, baseline, init, hook claude-code
 │   │   ├── project.ts     # load the config and sources, run a check
+│   │   ├── baseline.ts    # inwards-baseline.json: write, apply, hash for the Stop gate
 │   │   ├── files.ts       # file walk: skips, symlinks, layer packages walked in full
 │   │   ├── paths.ts       # real paths, containment, config discovery (ADR-013)
 │   │   ├── grammars.ts    # .wasm files embedded in the binary
 │   │   ├── output.ts      # stdout / stderr without console.*
 │   │   ├── hook.ts        # hook entry: SessionStart, PostToolUse, dispatch
 │   │   ├── guard.ts       # PreToolUse config guard
+│   │   ├── shell.ts       # reads Bash commands for `inwards hook` / `inwards baseline`
 │   │   ├── edit-sim.ts    # applies an Edit/Write/MultiEdit in memory for the guard
 │   │   ├── stop.ts        # Stop gate
 │   │   ├── prefixes.ts    # INW006 layout checks against the session start
