@@ -172,3 +172,14 @@ day, or delete them under Settings > Actions > Runners.
   runners, or a compromise of those services, can take over the host, and with
   it these runners and this PAT. Containers on the default bridge and on the
   other Docker networks can reach the host, the LAN and the tailnet.
+
+### Accepted risk
+
+The owner accepted the host risk on 2026-09-26 (#136): PR code from this
+private repository runs on irysek, a machine where `traefik`, `watchtower` and
+the privileged `pace-github-runner-irysek-*` runners hold the Docker socket,
+and where `kpostek` is a second `docker` group member. Any of them can take
+over the host and, with it, these runners and the PAT. What limits the damage:
+jobs that hold write tokens, OIDC or secrets stay on GitHub-hosted runners;
+job containers are unprivileged, deleted after each job and cut off from the
+host and the LAN; the PAT covers this one repository.
