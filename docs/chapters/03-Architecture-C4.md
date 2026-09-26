@@ -316,7 +316,7 @@ src/
 │   └── test/              # bun test
 ├── cli/
 │   ├── src/
-│   │   ├── main.ts        # commands: check, baseline, init, hook claude-code
+│   │   ├── main.ts        # commands: check, baseline, stats, init, hook claude-code
 │   │   ├── project.ts     # load the config and sources, run a check
 │   │   ├── baseline.ts    # inwards-baseline.json: write, apply, hash for the Stop gate
 │   │   ├── files.ts       # file walk: skips, symlinks, layer packages walked in full
@@ -334,6 +334,9 @@ src/
 │   │   ├── snapshot.ts    # configs, content hashes and HEAD of the project now
 │   │   ├── state-files.ts # .inwards/state writes, symlink checks, pruning
 │   │   ├── runlog.ts      # opt-in .inwards/runs.jsonl
+│   │   ├── runs.ts        # reads the run logs back for stats
+│   │   ├── stats.ts       # the hypothesis numbers from the run log
+│   │   ├── stats-command.ts  # inwards stats: finds the logs, prints the report
 │   │   ├── init.ts        # inwards init --agent
 │   │   ├── claude-settings.ts  # finds the Inwards hooks in Claude Code settings
 │   │   └── diff.ts        # line diff for init --dry-run
