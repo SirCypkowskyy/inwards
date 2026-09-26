@@ -11,7 +11,7 @@ test("indexes every module, including one under a build/ directory", async () =>
     "shop/domain/build/leak.py": "import shop.infrastructure.db\n",
     "shop/infrastructure/db.py": "from shop.domain.order import X\n",
   });
-  const index = await indexProject(join(root, "pyproject.toml"), root);
+  const index = await indexProject(join(root, "pyproject.toml"));
   expect([...index.modules].sort()).toEqual([
     "shop",
     "shop.domain.build.leak",
@@ -38,7 +38,7 @@ test("importers are found however the import is spelled", async () => {
     "shop/domain/spaced.py": "from shop . domain . order import X\n",
     "shop/domain/unrelated.py": "import shop.domain\n",
   });
-  const index = await indexProject(join(root, "pyproject.toml"), root);
+  const index = await indexProject(join(root, "pyproject.toml"));
   expect([...index.importersOf("shop.domain.order")].sort()).toEqual([
     "shop.domain.fullwidth",
     "shop.domain.relative",
@@ -56,7 +56,7 @@ test("relative imports of a package are found without its name in the text", asy
     "shop/domain/sub/__init__.py": "",
     "shop/domain/sub/up.py": "from .. import helper\n",
   });
-  const index = await indexProject(join(root, "pyproject.toml"), root);
+  const index = await indexProject(join(root, "pyproject.toml"));
   expect([...index.importersOf("shop.domain")].sort()).toEqual([
     "shop.domain.rel_attr",
     "shop.domain.star",

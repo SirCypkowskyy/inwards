@@ -107,7 +107,7 @@ Import skeleton
 :   A copy of a file where every non-import line is blank and import lines are dedented. Line numbers are preserved, and it parses far faster than the whole file.
 
 Module index
-:   Every first-party module of a project, with the importers of any one module worked out on demand (`Engine.index`). Built, but no rule uses it yet; INW010 will.
+:   The engine's view of a project's first-party modules (`Engine.index`), which every adapter passes to each check: the owner of an import, the list of modules, and the importers of any one module, each worked out on demand. INW006 uses the owner; INW010 will use the list.
 
 Prescan refusal
 :   The prescan declining a file because `import` appears somewhere it can't account for. The file then gets a full parse. 8.3 % of CPython's stdlib files are refused.

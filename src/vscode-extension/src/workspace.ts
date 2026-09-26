@@ -1,10 +1,11 @@
 /**
- * The language server's workspace pass: INW007 and INW008 for every Python
- * file under the config root, from a directory listing alone. Nothing is
- * read or parsed, so the pass reaches files the user hasn't opened, and the
- * `__init__.py` of a package that just lost a required member.
+ * The language server's view of the project on disk: the workspace pass
+ * (INW007 and INW008 for every Python file under the config root, from a
+ * directory listing alone) and the files behind the engine's module index.
+ * The pass reads and parses nothing, so it reaches files the user hasn't
+ * opened, and the `__init__.py` of a package that just lost a required member.
  */
-import { type Dirent, readdirSync, realpathSync, statSync } from "node:fs";
+import { type Dirent, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import {
   checkRequired,
@@ -13,6 +14,8 @@ import {
   type InwardsConfig,
   membersFrom,
   moduleNameFor,
+  type PathKind,
+  type ProjectFiles,
   packagesOf,
 } from "@inwards/core";
 
@@ -45,6 +48,43 @@ export function workspaceDiagnostics(
     found.set(abs, [...(found.get(abs) ?? []), d]);
   }
   return found;
+}
+
+/**
+ * Gives the engine the files under the config root, for its module index.
+ * Nothing is touched until the engine asks; the listing is the workspace
+ * pass's, and a file that vanished reads as empty.
+ *
+ * @param root - the config root, absolute.
+ * @returns the probe, listing and reader, with root-relative forward-slash paths.
+ */
+export function projectFiles(root: string): ProjectFiles {
+  return {
+    kind: (rel: string): ReturnType<PathKind> => pathKind(root, rel),
+    list: (): string[] => pythonFiles(root, ""),
+    read: (rel: string): string => {
+      try {
+        return readFileSync(join(root, rel), "utf8");
+      } catch {
+        return ""; // deleted since the listing
+      }
+    },
+  };
+}
+
+/**
+ * Tells what is at a path under the config root, for the module probe.
+ *
+ * @param root - the config root.
+ * @param rel - a forward-slash path relative to it.
+ * @returns "file", "dir", or undefined when nothing is there.
+ */
+function pathKind(root: string, rel: string): ReturnType<PathKind> {
+  const stat = statSync(join(root, rel), { throwIfNoEntry: false });
+  if (stat?.isDirectory()) {
+    return "dir";
+  }
+  return stat?.isFile() ? "file" : undefined;
 }
 
 /**

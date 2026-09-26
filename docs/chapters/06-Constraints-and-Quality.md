@@ -71,7 +71,7 @@ Two things the synthetic repo didn't show. `inwards check` on polar's `subscript
 | Single file, wall time incl. process start (30 runs) | p50 48.6 ms, p95 80.4 ms | p95 < 100 ms | :white_check_mark: with little headroom |
 | Single file, engine time reported by the CLI | 16 to 30 ms | n/a | |
 | `inwards --version` (process start only) | about 10 ms | n/a | |
-| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter) | < 1 s | :white_check_mark: |
+| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter). Since #44 the index reads nothing up front: listing the 2,100 modules takes 0.05 to 0.08 s, and the importers read the files they need. Alternating runs against the eager index on a busy machine took the same total time (1.1 to 1.7 s each) | < 1 s | :white_check_mark: |
 | Prescan refusals on the CPython 3.14 stdlib | 8.3 % of 1,921 files | lower is faster | :white_check_mark: |
 | Prescan missed imports on the same corpus | 0 | 0 | :white_check_mark: |
 | Prescan missed imports on the real-repo corpus (6,543 files, five services) | 0 | 0 | :white_check_mark: |

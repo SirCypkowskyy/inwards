@@ -133,7 +133,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - :material-plus-circle-outline: The editor checks the unsaved buffer, and the CLI checks the file on disk, with the same function.
 - :material-plus-circle-outline: Tests need no temp directories. They pass strings.
-- :material-minus-circle-outline: Cross-file rules (cycles, unknown modules) need the adapter to supply the module index. The engine's API grows a "project" input when those rules arrive.
+- :material-minus-circle-outline: Cross-file rules (cycles, unknown modules) need the adapter to supply the module index. Since [#44](https://github.com/SirCypkowskyy/inwards/issues/44) that input is a port, `ProjectFiles` (probe a path, list the Python files, read one), which `Engine.index` wraps and `checkFile` takes; the engine calls it only when a rule asks.
 
 **Alternatives.** *Engine reads files itself*: simpler at first, but it would lock the engine to one runtime's file API and make the editor case awkward.
 

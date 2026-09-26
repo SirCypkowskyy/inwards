@@ -128,7 +128,14 @@ allow = []
       grammars(),
       parseConfig(FASTAPI.replace('modules = ["app"]', 'modules = ["app.core"]')),
     );
-    const found = engine.checkFile(file("app/orders/helpers.py", "def ("), () => undefined);
+    const found = engine.checkFile(
+      file("app/orders/helpers.py", "def ("),
+      engine.index({
+        kind: (): undefined => undefined,
+        list: (): [] => [],
+        read: (): string => "",
+      }),
+    );
     expect(found.map((d) => d.code)).toEqual(["INW007", "INW006"]);
   });
 });

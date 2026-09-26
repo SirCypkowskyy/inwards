@@ -4,10 +4,9 @@ import {
   type Diagnostic,
   Engine,
   type GrammarBinaries,
-  type ModuleLookup,
   moduleNameFor,
+  type ProjectIndex,
   parseConfig,
-  probeLookup,
   type SourceFile,
 } from "../src/index.ts";
 import { createPythonParser } from "../src/python.ts";
@@ -75,8 +74,12 @@ const ON_DISK: ReadonlyMap<string, "file" | "dir"> = new Map([
   ["logging", "dir"],
 ]);
 
-/** Finds first-party modules among `ON_DISK`. */
-export const OWNERS: ModuleLookup = probeLookup((rel) => ON_DISK.get(rel));
+/** The test project's module index, over `ON_DISK`; its files are empty. */
+export const OWNERS: ProjectIndex = engine.index({
+  kind: (rel: string): "file" | "dir" | undefined => ON_DISK.get(rel),
+  list: (): string[] => [...ON_DISK].flatMap(([rel, kind]) => (kind === "file" ? [rel] : [])),
+  read: (): string => "",
+});
 
 /**
  * Checks one file with the test engine and the test project's modules.

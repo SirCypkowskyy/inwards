@@ -23,7 +23,8 @@
   // returns; fallow does not follow the type of an awaited factory result.
   // importersOf: only tests call it until the Stop gate (#20) lands; drop it
   // from this list in that PR.
-  "usedClassMembers": ["checkFiles", "index", "importersOf"],
+  // modules: only tests read it until INW010 (#45) lands; drop it in that PR.
+  "usedClassMembers": ["checkFiles", "index", "importersOf", "modules"],
   "boundaries": {
     // A file belongs to the first zone that matches, so index.ts comes before
     // the rest of the engine.
@@ -31,6 +32,7 @@
       { "name": "core-api", "patterns": ["src/core/src/index.ts"] },
       { "name": "core", "patterns": ["src/core/src/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
+      { "name": "adapter-parity", "patterns": ["src/cli/test/lsp-parity.test.ts"] },
       { "name": "cli", "patterns": ["src/cli/**"] },
       { "name": "vscode", "patterns": ["src/vscode-extension/**"] },
       { "name": "scripts", "patterns": ["scripts/**"] },
@@ -47,6 +49,8 @@
       // Adapters use the engine through `@inwards/core` (index.ts) only.
       { "from": "cli", "allow": ["core-api"] },
       { "from": "vscode", "allow": ["core-api"] },
+      // The one test that builds the module index through both adapters (#44).
+      { "from": "adapter-parity", "allow": ["core-api", "cli", "vscode"] },
       { "from": "scripts", "allow": [] },
       // The eval harness reads layers the way the CLI does, through the public API,
       // and recognises config guard denials by the CLI's own ASK_USER text.
