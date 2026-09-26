@@ -1,0 +1,1 @@
+Callers of `handle` in `shop/application/place_order.py` all build a `SqlOrderRepository` by hand first. Add a `place_default(order_id, total_cents)` helper that does it for them and returns the order.

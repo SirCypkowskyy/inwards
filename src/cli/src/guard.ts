@@ -35,7 +35,8 @@ const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
 /** A command that only reads: no redirection, chaining, substitution or in-place flag. */
 const READ_ONLY =
   /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;
-const ASK_USER = "If this really must change, stop and ask the user to do it.";
+/** Ends every denial. The agent eval (eval/evidence.ts) counts denials by it. */
+export const ASK_USER = "If this really must change, stop and ask the user to do it.";
 const UNSURE =
   "Inwards can't tell what this edit does: old_string isn't in the file verbatim. Re-read the file and use its exact text.";
 

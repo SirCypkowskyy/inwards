@@ -1,0 +1,5 @@
+{"v":1,"at":"2026-09-26T09:34:12.965Z","session_id":null,"event":"check","tool":null,"files":["."],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":22}
+{"v":1,"at":"2026-09-26T09:34:13.257Z","session_id":"e439c1fd-1245-4b12-afd2-8e5a3bd55bed","event":"SessionStart","tool":null,"files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":15.5}
+{"v":1,"at":"2026-09-26T09:34:24.253Z","session_id":"e439c1fd-1245-4b12-afd2-8e5a3bd55bed","event":"PreToolUse","tool":"Edit","files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":9.5}
+{"v":1,"at":"2026-09-26T09:34:24.284Z","session_id":"e439c1fd-1245-4b12-afd2-8e5a3bd55bed","event":"PostToolUse","tool":"Edit","files":["shop/domain/order.py"],"lines":[{"file":"shop/domain/order.py","added":3,"removed":0}],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":18.1}
+{"v":1,"at":"2026-09-26T09:34:27.781Z","session_id":"e439c1fd-1245-4b12-afd2-8e5a3bd55bed","event":"Stop","tool":null,"files":["shop/domain/order.py"],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":23.2}

@@ -1,0 +1,11 @@
+{
+  "schema": "inwards/baseline@1",
+  "violations": [
+    {
+      "code": "INW001",
+      "module": "shop.domain.order",
+      "message": "Layer \"domain\" imports \"shop.infrastructure.sql_orders.SqlOrderRepository\" from outer layer \"infrastructure\".",
+      "count": 1
+    }
+  ]
+}
