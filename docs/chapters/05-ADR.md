@@ -6,7 +6,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 |---|---|---|
 | [001](#adr-001-typescript-for-the-engine) | TypeScript for the engine | :white_check_mark: Accepted |
 | [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), not native bindings | :white_check_mark: Accepted |
-| [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted |
+| [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted, built with `--bytecode` since [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
 | [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :white_check_mark: Accepted |
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :white_check_mark: Accepted |
 | [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted |
@@ -71,7 +71,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - :material-plus-circle-outline: No runtime prerequisites. Measured: about 25 ms wall time for a one-file check including process start.
 - :material-plus-circle-outline: Tags produce verified binaries automatically (`cd.yml`).
-- :material-minus-circle-outline: 85 MB per binary, and each platform wheel will carry one. Over 80 MB of it is the Bun runtime, so build flags can't shrink it: minification saves 0.1 MB, and `--bytecode`, adopted after [#39](https://github.com/SirCypkowskyy/inwards/issues/39), adds 2.5 MB but halves start-up ([chapter 6](06-Constraints-and-Quality.md#spike-bytecode-and-minification)).
+- :material-minus-circle-outline: 82 MB per binary, and each platform wheel will carry one. Bun's `--bytecode` flag and minification are the first things to try for startup and size.
 - :material-minus-circle-outline: We depend on Bun's release cadence and on its compile feature staying stable.
 
 **Alternatives.** *npm package*: needs Node on the user's machine. *Node SEA (single executable applications)*: workable, but Bun gives us cross-compilation, asset embedding, the bundler and the test runner in one tool. *Deno compile*: viable, but Bun's test runner, bundler and package manager in one tool keep the monorepo simpler.
