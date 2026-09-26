@@ -137,3 +137,20 @@ export function found(src: string, path = "shop/domain/order.py"): [string, stri
     .filter((d) => d.code === "INW011")
     .map((d) => [d.code, TARGET.exec(d.message)?.groups?.["t"] ?? ""]);
 }
+
+const UNVERIFIABLE_MESSAGE =
+  /^Layer "[^"]+" makes a dynamic import \([^)]+\) with an argument Inwards can't read/u;
+
+/**
+ * Checks a snippet and labels each INW011 diagnostic: "unverifiable" when its
+ * message says so, else the message itself.
+ *
+ * @param src - Python source.
+ * @param path - where the file sits; a domain module by default.
+ * @returns one label per INW011 diagnostic.
+ */
+export function unverifiable(src: string, path = "shop/domain/order.py"): string[] {
+  return check(file(path, src))
+    .filter((d) => d.code === "INW011")
+    .map((d) => (UNVERIFIABLE_MESSAGE.test(d.message) ? "unverifiable" : d.message));
+}

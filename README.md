@@ -9,7 +9,7 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha. Eight rules (INW001 layer direction, INW011 literal dynamic imports,
+Status: pre-alpha. Eight rules (INW001 layer direction, INW011 dynamic imports,
 INW005 libraries per layer, INW006 code outside every layer, INW010 imports of first-party modules that don't exist, INW007/INW008 package shape, INW000 encodings that could hide
 imports) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,

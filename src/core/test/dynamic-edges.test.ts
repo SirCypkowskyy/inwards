@@ -44,14 +44,8 @@ describe("INW011: edge cases", () => {
     expect(found(src)).toEqual([["INW011", "shop.infrastructure.db"]]);
   });
 
-  test.each([
-    ["an f-string field with a conversion", "exec(f\"import shop.{'infrastructure'!s}.db\")\n"],
-    [
-      "a str source with a coding declaration (ignored by CPython)",
-      'exec("# coding: utf-7\\n+AGk-mport shop.infrastructure.db")\n',
-    ],
-  ])("%s is not reported", (_, src) => {
-    expect(found(src)).toEqual([]);
+  test("a str source with a coding declaration (ignored by CPython) is not reported", () => {
+    expect(found('exec("# coding: utf-7\\n+AGk-mport shop.infrastructure.db")\n')).toEqual([]);
   });
 
   test("known false positive: a rebound builtin still counts, so re.compile patterns are read as code", () => {

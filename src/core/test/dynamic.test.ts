@@ -137,8 +137,6 @@ describe("INW011: relative and partial targets", () => {
 
 describe("INW011: what is not reported", () => {
   test.each([
-    ["a computed target", "import importlib\nimportlib.import_module(name)\n"],
-    ["an f-string with a field", 'exec(f"import {mod}")\n'],
     ["an inward target", 'import importlib\nimportlib.import_module("shop.domain.money")\n'],
     ["a third-party target", 'import importlib\nimportlib.import_module("json")\n'],
     ["re.compile", 'import re\nre.compile("import shop.infrastructure.db")\n'],
