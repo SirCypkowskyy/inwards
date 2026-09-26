@@ -183,7 +183,8 @@ uv run scripts/check-docs-nav.py  # every page in docs/chapters is in the nav
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
-tests against the compiled binary on Linux, macOS and Windows.
+tests against the compiled binary: on Linux for every PR; on macOS, Windows
+and the older Ubuntu only when started by hand, and in `cd.yml` at a release.
 
 ## Before pushing to a PR
 
@@ -205,6 +206,12 @@ act push -W .github/workflows/cd.yml -n                                       # 
 - **What act can't do:** the macOS and Windows matrix rows, OIDC and
   attestations, releases, and Pages deploys. Those run only on GitHub, so CI
   stays the gate.
+- **macOS and Windows never run on PRs or on a schedule** (#126): the
+  owner's Actions budget is small, and those runners bill at 10x (macOS)
+  and 2x (Windows). A PR only proves Linux. Never start the full matrix
+  yourself; the owner (or the coordinator, when asked) runs it once before
+  a release with `gh workflow run ci.yml --ref develop`, and `cd.yml`
+  verifies each binary on its own OS at the tag.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
 - **`setup-bun` fails with "Unable to locate executable file"**: act's local
@@ -239,7 +246,9 @@ PR description is its body. Commits inside a branch can say anything.
   date and stops at the last release commit, so a PR squash-merged into
   `develop` before a release PR merges, but promoted after it, is silently
   left out of the changelog and the version bump.
-  1. Stop merging into `develop`.
+  1. Stop merging into `develop`, then run the full test matrix once
+     (`gh workflow run ci.yml --ref develop`) and fix any red macOS or
+     Windows row first.
   2. Promote: `gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promotes develop for the next release."`,
      then `gh pr merge N --merge`. Never squash it: release-please reads the
      feature commits through the merge. Keep the description free of

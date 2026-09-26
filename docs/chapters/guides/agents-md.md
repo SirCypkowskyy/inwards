@@ -1,7 +1,7 @@
 # AGENTS.md (Codex, Cursor, and others)
 
 !!! info "Verified 2026-09-25"
-    Linux by hand: `init`, the section it writes, and `inwards check --format json`. No agent was run. On macOS (arm64) and Windows, CI runs `init` with the compiled binary on every push; a by-hand check there is still open.
+    Linux by hand: `init`, the section it writes, and `inwards check --format json`. No agent was run. On macOS (arm64) and Windows, CI runs `init` with the compiled binary before each release; a by-hand check there is still open.
 
 Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repository for project instructions, including OpenAI Codex, Cursor, and Jules. Inwards adds a short section there that tells the agent to run the check before finishing, and how to read the result.
 
