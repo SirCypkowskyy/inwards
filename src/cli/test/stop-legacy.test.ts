@@ -1,0 +1,156 @@
+/**
+ * #134: a violation a file already had at session start is context, not a
+ * block, in both the PostToolUse hook and the Stop gate. The projects mirror
+ * the eval's seeded-* cases: the example app, the eval config, the fixture's
+ * files, committed, then the edit the task asks for.
+ */
+import { describe, expect, test } from "bun:test";
+import { cpSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { inwards, payload, type RunResult } from "./run.ts";
+import { git, ID, put, session, stop } from "./stop-helpers.ts";
+
+const REPO = join(import.meta.dir, "../../..");
+const FIXTURES = join(REPO, "eval/fixtures/INW001");
+const ORDER = "shop/domain/order.py";
+const PLACE = "shop/application/place_order.py";
+
+/**
+ * Starts a session on the example app with one eval fixture's files committed.
+ *
+ * @param fixture - the fixture's directory name under eval/fixtures/INW001.
+ * @returns the project directory.
+ */
+function seeded(fixture: string): string {
+  return session({}, (root) => {
+    cpSync(join(REPO, "examples/clean-app/shop"), join(root, "shop"), { recursive: true });
+    cpSync(join(REPO, "eval/pyproject.toml"), join(root, "pyproject.toml"));
+    cpSync(join(FIXTURES, fixture, "files"), root, { recursive: true });
+  });
+}
+
+/**
+ * Rewrites a file the way the agent's Edit tool does, then sends PostToolUse.
+ *
+ * @param root - the project directory.
+ * @param rel - the file, relative to the project.
+ * @param edit - the text to replace, everywhere in the file, and its replacement.
+ * @returns the hook's exit code and output.
+ */
+function agentEdits(root: string, rel: string, [from, to]: [string, string]): RunResult {
+  const before = readFileSync(join(root, rel), "utf8");
+  if (!before.includes(from)) {
+    throw new Error(`${rel} has no ${JSON.stringify(from)}; the fixture changed`);
+  }
+  put(root, rel, before.replaceAll(from, to));
+  const input = payload("post-write-order", root, {
+    session_id: ID,
+    tool_input: { file_path: join(root, rel) },
+  });
+  return inwards(["hook", "claude-code"], { cwd: root, stdin: input });
+}
+
+/**
+ * Reads the context a PostToolUse run handed back to the model.
+ *
+ * @param run - the hook's result.
+ * @returns the `additionalContext` text.
+ */
+function contextOf(run: RunResult): string {
+  return String(JSON.parse(run.stdout).hookSpecificOutput.additionalContext);
+}
+
+/** The seeded-function-import task: a `total_euros` property on `Order`. */
+const EUROS: [string, string] = [
+  "    total_cents: int\n",
+  "    total_cents: int\n\n    @property\n    def total_euros(self) -> float:\n        return self.total_cents / 100\n",
+];
+
+/** Each seeded fixture, the file its task edits, and the edit the task asks for. */
+const TASKS: [string, string, [string, string]][] = [
+  ["seeded-function-import", ORDER, EUROS],
+  [
+    "seeded-relative-import",
+    PLACE,
+    [
+      "    order = Order(",
+      '    if total_cents < 0:\n        raise ValueError("total_cents must not be negative")\n    order = Order(',
+    ],
+  ],
+  [
+    "seeded-type-checking",
+    ORDER,
+    ["-> None:\n    repo.save", '-> None:\n    """Save the order."""\n    repo.save'],
+  ],
+];
+
+/** The old import of seeded-function-import, as a second, top-level copy. */
+const SECOND_COPY: [string, string] = [
+  "from dataclasses",
+  "from shop.infrastructure.sql_orders import SqlOrderRepository\nfrom dataclasses",
+];
+
+describe("violations a file had at session start", () => {
+  for (const [fixture, file, task] of TASKS) {
+    test(`${fixture}: the task's edit and the Stop pass, the old violation is context`, () => {
+      const root = seeded(fixture);
+      const edit = agentEdits(root, file, task);
+      expect(edit.code).toBe(0);
+      expect(contextOf(edit)).toContain("already in the file when the session started");
+      expect(contextOf(edit)).toContain("INW001");
+      expect(stop(root).code).toBe(0);
+    });
+  }
+
+  test("a second copy of the old import still blocks, and the old one is named as context", () => {
+    const root = seeded("seeded-function-import");
+    const edit = agentEdits(root, ORDER, SECOND_COPY);
+    expect(edit.code).toBe(2);
+    expect(edit.stderr).toContain("already in the file when the session started");
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain("already in the file when the session started");
+    // Copies match by rule, module and message, not by line: one of the two blocks.
+    expect(stderr).toContain('"violations":1,');
+  });
+
+  test("a different violation in the same file blocks", () => {
+    const root = seeded("seeded-relative-import");
+    agentEdits(root, PLACE, [
+      "from ..domain.order",
+      "from shop.api.http import post_order\nfrom ..domain.order",
+    ]);
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain("shop.api.http");
+  });
+
+  test("a change through Bash, which PostToolUse never sees, is judged the same way", () => {
+    const root = seeded("seeded-type-checking");
+    put(root, ORDER, `${readFileSync(join(root, ORDER), "utf8")}\nX = 1\n`);
+    expect(stop(root).code).toBe(0);
+  });
+
+  test("a commit mid-session doesn't make the old violation new", () => {
+    const root = seeded("seeded-function-import");
+    agentEdits(root, ORDER, EUROS);
+    git(root, "commit", "-qam", "agent");
+    expect(stop(root).code).toBe(0);
+  });
+
+  test("a file uncommitted at session start has no known start content, so it blocks as before", () => {
+    const root = session({}, (dir) => put(dir, "shop/domain/order.py", "X = 1\n"));
+    put(root, ORDER, "import shop.infrastructure.db\n");
+    // A new session sees the uncommitted violation at its start.
+    inwards(["hook", "claude-code"], {
+      cwd: root,
+      stdin: payload("session-start", root, { session_id: "dirty", source: "startup" }),
+    });
+    put(root, ORDER, "import shop.infrastructure.db\nX = 2\n");
+    const run = inwards(["hook", "claude-code"], {
+      cwd: root,
+      stdin: payload("stop", root, { session_id: "dirty" }),
+    });
+    expect(run.code).toBe(2);
+  });
+});
