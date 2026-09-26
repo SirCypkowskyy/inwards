@@ -18,7 +18,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted, deployed from `develop` since 019 |
 | [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted |
 | [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :white_check_mark: Accepted |
-| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted |
+| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted, unreadable targets reported since 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :material-swap-horizontal: Branching model superseded by 019 |
 | [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted, squashed into `develop` since 019 |
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
@@ -29,6 +29,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
 | [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted |
+| [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Report unreadable dynamic-import targets in inner layers | :white_check_mark: Accepted |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
@@ -609,6 +610,30 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *Read `__init__.py` to check `from X import name`:* a star import or a module-level `__getattr__` can define any name, so a text check would guess.
 - *Skip imports inside `try/except ImportError`:* an agent could then silence the rule by wrapping the import, the escape hatch the fix steps close.
 - *Drop the probe cache in the language server:* stays correct, but an open document would still show a stale error until the next keystroke. That is what a client without file events gets.
+
+## ADR-026: Report unreadable dynamic-import targets in inner layers
+
+**Status:** Accepted · 2026-09-26 · [#46](https://github.com/SirCypkowskyy/inwards/issues/46)
+
+**Context.** [ADR-015](#adr-015-check-literal-dynamic-imports-as-inw011) checks a dynamic import only when its target is a constant string, and left the rest for a separate decision. Everything else passed silently: `importlib.import_module(name)`, `import_module(f"shop.{layer}.db")`, `exec(code)`, a relative `import_module` whose `package` is a variable, and a literal with a `\N{...}` escape (decoding one needs the Unicode name table, which the engine doesn't ship). For an agent that INW011 has just blocked, putting the module name in a variable is the next dodge, and Inwards can't evaluate it without running user code (C4).
+
+**Decision.**
+
+- A loader call whose target Inwards can't read is reported as INW011, severity error, with a message saying the target can't be verified. That covers `import_module` with a name that isn't a literal, or a relative name whose `package` is given but isn't a literal, `__package__` or `__name__`; `__import__` with a computed name or `level`, or a `fromlist` that isn't `None` or a list or tuple of literals; `run_module` with a computed name; and `exec` or `eval` with a computed source. Loaders are recognised through the same aliases as in ADR-015, and a computed call inside a literal `exec` source counts at the outer call.
+- It is reported only in layers that have an outer layer. In the outermost layer every first-party target is allowed by direction, so there is nothing to verify, and that is where plugin loaders and composition roots belong. Files outside every layer stay unchecked.
+- The fix gives two ways out: write the target as a literal (or as an import statement), or move the loader to the outermost layer and pass what it loads in through a parameter typed against a `typing.Protocol` of the inner layer.
+- `compile` with a computed source is not reported. It only builds a code object, and running that takes `exec` or `eval`, which are. This also keeps `from re import compile` followed by `compile(pattern)` quiet, since ADR-015 always reads `compile` as the builtin.
+- Calls that fail at runtime stay unreported: a relative `import_module` with no `package` or `package=None`, a relative `run_module`, an empty name.
+- Severity error, like the rest of INW011. Warnings pass the CLI exit code, the hook and the Stop gate, and they are not baselined, so a warning would let the dodge through.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The variable-name dodge is reported, through every alias ADR-015 follows. Tests cover each loader, the aliases, f-strings, variables, `\N{...}` literals and a relative `import_module` with an unknown package. The loader hint needs no change, and `prescan-diff` still misses nothing.
+- :material-minus-circle-outline: Legitimate runtime loaders in inner layers are reported. On the real-repo corpus (5 repositories, 6,543 files) the change adds 4 findings, each an `import_module(path)` that loads a configured class or plugin: one in python-ddd's `seedwork.application`, three in saleor (`saleor.core.telemetry`, `saleor.plugins`, `saleor.schedulers`). Their teams would move each loader outward or baseline it.
+- :material-minus-circle-outline: Constant targets that aren't literals (a module-level `TARGET = "..."`, `str.format`, `%`, f-string conversions such as `{'shop'!s}`) are now reported as unverifiable instead of passing. Folding them, and so reporting them exactly, is [#79](https://github.com/SirCypkowskyy/inwards/issues/79).
+- :material-minus-circle-outline: The report is about direction only. In the outermost layer an unverifiable call can still reach first-party code outside every layer (INW006) without a report, and a `compile` code object run by something other than `exec` or `eval` (`types.FunctionType`) is missed.
+
+**Alternatives.** *Report in every layer, the outermost too*: flags composition roots and plugin registries, where a runtime loader is the right design. *Warning instead of error*: passes the hook and the Stop gate, so the agent's dodge would still land. *Resolve known prefixes* (`f"shop.plugins.{name}"` can only reach `shop.plugins`): fewer reports where the prefix sits in an inner layer, but more code for a case the corpus doesn't have yet; a later issue can add it if real projects need it. *Flag every loader call in an inner layer, literal or not* (an ADR-015 alternative): reports `import_module("json")` too.
 
 ## ADR-027: Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table
 

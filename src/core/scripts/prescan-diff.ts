@@ -218,6 +218,10 @@ const FORMS = [
   "(exec)('import M')",
   "vars(importlib)['import_module']('M')",
   "exec('import ' + 'M')",
+  // Computed targets (INW011 reports them as unverifiable): the hint must see them too.
+  "importlib.import_module(M_name)",
+  "__import__(f'{M}')",
+  "exec(M)",
 ];
 
 // Strings and comments: the forms that can swallow or be swallowed by their neighbours.

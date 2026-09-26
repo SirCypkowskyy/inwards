@@ -15,10 +15,15 @@
  * - `exec`, `eval` and `compile` with a literal source: the source is parsed
  *   as Python, and every import in it, static or dynamic, counts at the call.
  *
- * Aliases are resolved in `callees.ts`, literals are read in `literals.ts`.
+ * Aliases are resolved in `callees.ts`, literals are read in `literals.ts`,
+ * the targets of module loaders in `loader-targets.ts`.
  *
- * Not read: targets computed at runtime, and literals that use a `\N{...}`
- * escape (decoding those needs the Unicode name table).
+ * A target Inwards can't read (a variable, an f-string field, a literal with a
+ * `\N{...}` escape, whose decoding needs the Unicode name table, or a relative
+ * `import_module` whose `package` isn't known) makes the call unverifiable. It
+ * is reported in every layer but the outermost, which may import anything
+ * first-party. `compile` is the exception: it only builds a code object, and
+ * running that takes `exec` or `eval`, which are reported themselves.
  */
 import type { Node, Parser, Tree } from "web-tree-sitter";
 import {
@@ -26,28 +31,15 @@ import {
   builtinBindings,
   collectBindings,
   LOADERS,
-  type LoaderKind,
   qualify,
   syntaxOf,
 } from "./callees.ts";
 import type { LayerSpec } from "./config.ts";
 import { unreadableEncoding } from "./encoding.ts";
 import { allowedDirection, layerIndexOf, outwardImports, portSteps } from "./layers.ts";
-import {
-  argumentAt,
-  identifierName,
-  integerLiteral,
-  literalSource,
-  literalString,
-  namedChildren,
-} from "./literals.ts";
-import {
-  extractImports,
-  normalizeSource,
-  packageOf,
-  parsePython,
-  resolveRelative,
-} from "./python.ts";
+import { argumentAt, literalSource } from "./literals.ts";
+import { COMPUTED, type Loaded, moduleTargets, type Unreadable } from "./loader-targets.ts";
+import { extractImports, normalizeSource, parsePython } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
@@ -55,11 +47,8 @@ import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 export interface DynamicImportRef extends ImportRef {
   /** The loading call as written in the report, e.g. `importlib.import_module` or `exec`. */
   via: string;
-  /**
-   * The codec a bytes source for `exec` or `compile` declares when Inwards
-   * can't read it (PEP 263, as for files); `target` is then empty. Null otherwise.
-   */
-  unreadable: string | null;
+  /** Why the target can't be read; `target` is then empty. Null when it was read. */
+  unreadable: Unreadable | null;
 }
 
 /**
@@ -128,6 +117,8 @@ export function extractDynamicImports(
  * Same direction rule as INW001, with a fix that tells the agent the loader
  * itself is the problem. A call whose bytes source declares an encoding
  * Inwards can't read is reported in any layer, since its imports are unknown.
+ * A computed target is reported in every layer but the outermost, the only
+ * one where any first-party target is allowed.
  *
  * @param file - the file the imports come from.
  * @param refs - the dynamic imports found in that file.
@@ -156,13 +147,55 @@ export function checkDynamicImports(
       },
     });
   });
-  if (layerIndexOf(file.module, layers) === -1) {
+  const own = layers[layerIndexOf(file.module, layers)];
+  const outermost = layers.at(-1);
+  if (!(own && outermost)) {
     return outward;
   }
-  const unreadable = refs.flatMap((ref) =>
-    ref.unreadable === null ? [] : [unreadableSource(file, ref, ref.unreadable)],
-  );
+  const inner = own !== outermost;
+  const unreadable = refs.flatMap((ref) => {
+    const why = ref.unreadable;
+    if (why?.kind === "encoding") {
+      return [unreadableSource(file, ref, why.encoding)];
+    }
+    return why?.kind === "computed" && inner ? [unverifiableTarget(file, ref, own, layers)] : [];
+  });
   return [...outward, ...unreadable];
+}
+
+/**
+ * Reports a loader call in an inner layer whose target Inwards can't read.
+ *
+ * @param file - the calling file.
+ * @param ref - the call.
+ * @param source - the layer the file belongs to, not the outermost.
+ * @param layers - the configured layers, innermost first.
+ * @returns the INW011 diagnostic.
+ */
+function unverifiableTarget(
+  file: SourceFile,
+  ref: DynamicImportRef,
+  source: LayerSpec,
+  layers: readonly LayerSpec[],
+): Diagnostic {
+  const outermost = layers.at(-1)?.name ?? source.name;
+  const home = source.modules[0] ?? source.name;
+  const message =
+    `Layer "${source.name}" makes a dynamic import (${ref.via}) whose module name or source is not ` +
+    "a string literal Inwards can read, so Inwards can't verify that it points toward inner layers. " +
+    `Allowed direction: ${allowedDirection(layers)}.`;
+  return diagnostic(RULES.INW011, file, {
+    span: ref,
+    message,
+    fix: {
+      summary: `Name the target with a string literal, or move the dynamic import to the outermost layer "${outermost}".`,
+      steps: [
+        `If the module is fixed, replace \`${ref.statement}\` with an import statement, or give the loader a plain string literal (no variables, f-string fields or \\N{...} escapes) so Inwards can check it.`,
+        `If the module is chosen at runtime (plugins, settings), move the loader to the outermost layer "${outermost}" (the composition root) and pass what it loads into this module as a parameter.`,
+        `Type that parameter against a typing.Protocol declared in \`${home}\` (for example \`${home}.ports\`).`,
+      ],
+    },
+  });
 }
 
 /**
@@ -194,15 +227,9 @@ function unreadableSource(file: SourceFile, ref: DynamicImportRef, encoding: str
 const BUILTINS_PREFIX = /^builtins\./u;
 
 /** A module a call loads, and the call as the report names it. */
-interface Load {
-  target: string;
+interface Load extends Loaded {
   via: string;
-  /** Set instead of `target` when the call's bytes source can't be read. */
-  unreadable: string | null;
 }
-
-/** What a loader call loads, before the loader's name is attached. */
-type Loaded = Omit<Load, "via">;
 
 /**
  * Finds the loading calls under a node and what each one loads.
@@ -249,116 +276,16 @@ function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Binding
     const kind = LOADERS.get(qualified);
     if (kind) {
       const via = qualified.replace(BUILTINS_PREFIX, "");
-      const loaded: Loaded[] =
+      // compile() only builds a code object: running it takes exec or eval, reported themselves.
+      const computed = via === "compile" ? [] : [COMPUTED];
+      const loaded =
         kind === "source"
-          ? sourceTargets(parser, call, file, bindings)
-          : moduleTargets(kind, call, file).map((target) => ({ target, unreadable: null }));
+          ? (sourceTargets(parser, call, file, bindings) ?? computed)
+          : moduleTargets(kind, call, file);
       loads.push(...loaded.map((load) => ({ ...load, via })));
     }
   }
   return loads;
-}
-
-/**
- * Resolves the module an `import_module`, `__import__` or `run_module` call loads.
- *
- * @param kind - which loader the call is.
- * @param call - the `call` node.
- * @param file - the calling file, for relative names.
- * @returns the loaded modules, empty when the target is not a literal.
- */
-function moduleTargets(kind: LoaderKind, call: Node, file: SourceFile): string[] {
-  switch (kind) {
-    case "import_module":
-      return importModuleTargets(call, file);
-    case "__import__":
-      return dunderImportTargets(call, file);
-    case "run_module": {
-      const name = literalString(argumentAt(call, 0, "mod_name"));
-      return name && !name.startsWith(".") ? [name] : [];
-    }
-    default:
-      return [];
-  }
-}
-
-const LEADING_DOTS = /^\.*/u;
-
-/**
- * Resolves `importlib.import_module(name, package)`.
- * A relative name needs its package as a literal, `__package__` or `__name__`,
- * as it does at runtime; without one the call is skipped.
- *
- * @param call - the `call` node.
- * @param file - the calling file.
- * @returns the loaded module, or nothing when it can't be resolved.
- */
-function importModuleTargets(call: Node, file: SourceFile): string[] {
-  const name = literalString(argumentAt(call, 0, "name"));
-  if (!name) {
-    return [];
-  }
-  const level = LEADING_DOTS.exec(name)?.[0].length ?? 0;
-  if (level === 0) {
-    return [name];
-  }
-  const pkg = packageArgument(argumentAt(call, 1, "package"), file);
-  const target = pkg ? resolveRelative(pkg, level, name.slice(level) || undefined) : null;
-  return target ? [target] : [];
-}
-
-/**
- * Reads the `package` argument of `import_module` as name parts.
- *
- * @param node - the argument, if given.
- * @param file - the calling file, which `__package__` and `__name__` refer to.
- * @returns the package split into parts, or null when it isn't known statically.
- */
-function packageArgument(node: Node | null, file: SourceFile): string[] | null {
-  if (node?.type === "identifier") {
-    const name = identifierName(node);
-    if (name === "__package__") {
-      return packageOf(file);
-    }
-    return name === "__name__" ? file.module.split(".") : null;
-  }
-  const pkg = literalString(node);
-  return pkg ? pkg.split(".") : null;
-}
-
-/** Positions of `fromlist` and `level` in `__import__(name, globals, locals, fromlist, level)`. */
-const DUNDER_FROMLIST = 3;
-const DUNDER_LEVEL = 4;
-
-/**
- * Resolves `__import__(name, globals, locals, fromlist, level)`.
- * The call imports `name`, and with a literal `fromlist` also `name.x` for each
- * entry, as `from name import x` does. A positive literal `level` resolves
- * `name` against the calling file's package; a computed one skips the call.
- *
- * @param call - the `call` node.
- * @param file - the calling file.
- * @returns the loaded modules.
- */
-function dunderImportTargets(call: Node, file: SourceFile): string[] {
-  const name = literalString(argumentAt(call, 0, "name"));
-  const levelNode = argumentAt(call, DUNDER_LEVEL, "level");
-  const level = levelNode ? integerLiteral(levelNode) : 0;
-  if (name === null || level === null) {
-    return [];
-  }
-  const base = level > 0 ? resolveRelative(packageOf(file), level, name || undefined) : name;
-  if (!base) {
-    return [];
-  }
-  const fromlist = argumentAt(call, DUNDER_FROMLIST, "fromlist");
-  const names =
-    fromlist && ["list", "tuple"].includes(fromlist.type) ? namedChildren(fromlist) : [];
-  const members = names.flatMap((n) => {
-    const entry = literalString(n);
-    return entry && entry !== "*" ? [`${base}.${entry}`] : [];
-  });
-  return [base, ...members];
 }
 
 /**
@@ -373,17 +300,22 @@ function dunderImportTargets(call: Node, file: SourceFile): string[] {
  * @param call - the `call` node.
  * @param file - the calling file.
  * @param bindings - names bound in the calling file.
- * @returns the modules the source imports, empty when it isn't a literal.
+ * @returns the modules the source imports, or null when the source isn't a literal.
  */
-function sourceTargets(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): Loaded[] {
+function sourceTargets(
+  parser: Parser,
+  call: Node,
+  file: SourceFile,
+  bindings: Bindings,
+): Loaded[] | null {
   const source = literalSource(argumentAt(call, 0, "source"));
   if (source === null) {
-    return [];
+    return null;
   }
   const text = normalizeSource(source.text);
-  const unreadable = source.bytes ? unreadableEncoding(text) : null;
-  if (unreadable !== null) {
-    return [{ target: "", unreadable }];
+  const encoding = source.bytes ? unreadableEncoding(text) : null;
+  if (encoding !== null) {
+    return [{ target: "", unreadable: { kind: "encoding", encoding } }];
   }
   const tree = parsePython(parser, text);
   try {
