@@ -8,7 +8,7 @@
  * file is rotated to `runs.1.jsonl`, replacing the previous one.
  *
  * Line schema `inwards/run@1` (documented in docs/chapters/08-Run-Log.md):
- * `{ v, at, session_id, event, tool, files, lines, fingerprints, codes, exit, durationMs }`.
+ * `{ v, at, session_id, event, tool, files, lines, fingerprints, codes, severities, exit, durationMs }`.
  * `inwards stats` (stats.ts) turns it into the hypothesis numbers.
  */
 import { readFileSync, renameSync, statSync } from "node:fs";
@@ -83,6 +83,7 @@ export function logRun(
       lines: run.event === "PostToolUse" && input ? lineCounts(project, input, files) : [],
       fingerprints: noted.diagnostics.map(fingerprint),
       codes: noted.diagnostics.map((d) => d.code),
+      severities: noted.diagnostics.map((d) => d.severity),
       exit: run.exit,
       // Since the process started (Bun's performance clock), so startup counts too.
       durationMs: Math.round(performance.now() * 10) / 10,

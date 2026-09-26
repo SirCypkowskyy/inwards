@@ -60,6 +60,7 @@ describe("run log", () => {
     });
     expect(line?.["fingerprints"]).toHaveLength(1);
     expect(line?.["codes"]).toEqual(["INW001"]);
+    expect(line?.["severities"]).toEqual(["error"]);
   });
 
   test("run-log = true in the config turns it on, and check --log logs a single run", () => {
