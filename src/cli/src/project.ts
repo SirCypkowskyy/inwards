@@ -167,7 +167,8 @@ export async function runCheck(
 }
 
 /**
- * Indexes every module under the config root (for the Stop gate and INW006).
+ * Indexes every module under the config root. Only the tests use it today;
+ * #44 (the index as an engine input) and INW010 (#45) will.
  * Reads every file now; the reverse-import map is built on first use.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
