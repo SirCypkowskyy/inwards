@@ -60,8 +60,8 @@ jobs:
         run: exit 1
 ```
 
-- **Check** writes SARIF 2.1.0 and records the exit code instead of failing, so the next steps still run. Exit code 2 (no config, bad config) fails at once. The check reads `inwards-baseline.json` if you committed one, so on a legacy codebase only new violations fail.
-- **Annotate the pull request** turns each result into a [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands). The violation shows on its line under "Files changed" and in the run summary, with the fix steps as the message. It needs no code scanning. GitHub shows at most 10 error annotations per step and 50 per job.
+- **Check** writes SARIF 2.1.0 and records the exit code instead of failing, so the next steps still run. Exit code 2 (no config, bad config) fails at once. The check reads `inwards-baseline.json` if you committed one, so on a legacy codebase only new violations fail; `inwards baseline` needs a release newer than v0.1.0-rc.1.
+- **Annotate the pull request** turns each result into a [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands). The violation shows on its line under "Files changed" and in the run summary, with the fix steps as the message. It needs no code scanning. GitHub shows at most 10 error annotations per step and 50 per job. Paths come from the SARIF, where they are URI-encoded, so a file whose name has a space or a non-ASCII character is annotated in the run summary rather than on its line.
 - **Upload to code scanning** sends the same file to [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github). Alerts get a history, a dismiss button and the rule's help link. Code scanning shows new alerts on a pull request by comparing it with the base branch, hence the `push` trigger.
 - **Fail on violations** fails the job last, after the findings are out.
 
@@ -69,7 +69,7 @@ Keep one of the two annotation steps once code scanning works, or each violation
 
 ## Code scanning availability
 
-Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does until it goes public. The token of a pull request from a fork can't write security events either, so the upload fails there too.
+Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does while it is private (`continue-on-error: ${{ github.event.repository.private }}`).
 
 ## While Inwards is private
 

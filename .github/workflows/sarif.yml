@@ -47,7 +47,7 @@ jobs:
             | "::\(if .level == "error" then "error" else "warning" end) file=\($l.artifactLocation.uri),line=\($l.region.startLine),col=\($l.region.startColumn),title=\(.ruleId)::\(.message.text | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A"))"' inwards.sarif
       - name: Upload to code scanning
         uses: github/codeql-action/upload-sarif@v4
-        continue-on-error: true
+        continue-on-error: ${{ github.event.repository.private }}
         with:
           sarif_file: inwards.sarif
           category: inwards
