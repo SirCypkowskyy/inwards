@@ -1,3 +1,8 @@
+# Weekly, one PR per group (four in all), so parallel agents
+# see a few PRs a week, not one per package. PRs target the default branch
+# (develop). Prefixes keep PR titles Conventional Commits (ADR-017): `deps`
+# reaches the changelog, `ci` and `build` stay hidden. Labels follow the repo's
+# taxonomy instead of Dependabot's defaults.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -5,4 +10,51 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: ci # PR titles must be Conventional Commits (ADR-017)
+      prefix: ci
+    labels: ["type:chore", "area:ci"]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Bun reads the workspace from the root bun.lock (src/core, src/cli,
+  # src/vscode-extension). The bun ecosystem has no prefix-development or
+  # dependency-type grouping and no security updates, so runtime packages are
+  # listed by name and everything else lands in `dev`. The prefix is `build`,
+  # which keeps the frequent toolchain bumps out of the changelog; retitle the
+  # rarer `runtime` PR to `deps:` before merging, since users get those.
+  #
+  # @types/vscode moves with engines.vscode by hand: a newer range than the
+  # engine makes `vsce package` fail at release time, which CI doesn't run.
+  # @types/node follows the Node the VS Code extension host ships, not the latest.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    labels: ["type:chore", "area:distribution"]
+    ignore:
+      - dependency-name: "@types/vscode"
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      runtime: # shipped in the binary, wheels or .vsix
+        patterns:
+          - smol-toml
+          - tree-sitter-python
+          - web-tree-sitter
+          - vscode-language*
+      dev: # Biome, TypeScript, oxlint, fallow, types, vsce
+        patterns: ["*"]
+
+  # uv.lock holds only the docs toolchain (Zensical); the wheel has no deps.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    labels: ["type:chore", "area:docs"]
+    groups:
+      docs:
+        patterns: ["*"]

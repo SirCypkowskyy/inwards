@@ -1,0 +1,49 @@
+name: Bug
+description: Inwards reports something wrong, misses a violation, or crashes.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran and its full output. Paste JSON or SARIF as is.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest reproduction
+      description: The `[tool.inwards]` config and the Python files it needs. A few lines beats a link to a repo.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `inwards --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - CLI
+        - Agent hook (Claude Code, Aider, AGENTS.md)
+        - VS Code extension
+        - Wheel or install
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and architecture
+      placeholder: macOS 15, arm64
