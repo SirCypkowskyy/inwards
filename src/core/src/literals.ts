@@ -55,6 +55,20 @@ export function argumentAt(call: Node, index: number, keyword: string): Node | n
 }
 
 /**
+ * Tells whether a call passes `*args` or `**kwargs`, behind which any
+ * argument `argumentAt` doesn't find may hide.
+ *
+ * @param call - the `call` node.
+ * @returns true when the argument list holds a splat.
+ */
+export function hasSplat(call: Node): boolean {
+  const list = call.childForFieldName("arguments");
+  return list?.type === "argument_list"
+    ? namedChildren(list).some((a) => a.type === "list_splat" || a.type === "dictionary_splat")
+    : false;
+}
+
+/**
  * Reads the name of a keyword argument.
  *
  * @param arg - a `keyword_argument` node.

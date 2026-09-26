@@ -222,6 +222,7 @@ const FORMS = [
   "importlib.import_module(M_name)",
   "__import__(f'{M}')",
   "exec(M)",
+  "importlib.import_module('.x', **{'package': 'M'})",
 ];
 
 // Strings and comments: the forms that can swallow or be swallowed by their neighbours.

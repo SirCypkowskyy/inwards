@@ -163,7 +163,7 @@ interface ImportBinding {
  * @param stmt - an `import_statement` or `import_from_statement` node.
  * @returns each bound local name with its meaning.
  */
-function importBindings(stmt: Node): ImportBinding[] {
+export function importBindings(stmt: Node): ImportBinding[] {
   const entries = stmt.childrenForFieldName("name").map(importEntry);
   if (stmt.type === "import_statement") {
     return entries.map(({ name, alias }) => {

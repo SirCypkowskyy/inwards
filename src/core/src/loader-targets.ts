@@ -8,6 +8,7 @@ import type { Node } from "web-tree-sitter";
 import type { LoaderKind } from "./callees.ts";
 import {
   argumentAt,
+  hasSplat,
   identifierName,
   integerLiteral,
   literalString,
@@ -75,8 +76,9 @@ const LEADING_DOTS = /^\.*/u;
 /**
  * Resolves `importlib.import_module(name, package)`.
  * A relative name needs its package as a literal, `__package__` or `__name__`.
- * Without a package (or with `None`) the call fails at runtime and is skipped;
- * any other package makes the target computed.
+ * Without a package (or with `None` or `""`) the call fails at runtime and is
+ * skipped; any other package, or one that `*args` may hide, makes the target
+ * computed.
  *
  * @param call - the `call` node.
  * @param file - the calling file.
@@ -92,7 +94,10 @@ function importModuleTargets(call: Node, file: SourceFile): Loaded[] {
     return name ? [read(name)] : [];
   }
   const pkgNode = argumentAt(call, 1, "package");
-  if (!pkgNode || pkgNode.type === "none") {
+  if (!pkgNode) {
+    return hasSplat(call) ? [COMPUTED] : [];
+  }
+  if (pkgNode.type === "none" || literalString(pkgNode) === "") {
     return [];
   }
   const pkg = packageArgument(pkgNode, file);
@@ -132,7 +137,8 @@ const DUNDER_LEVEL = 4;
  * entry, as `from name import x` does. A positive literal `level` resolves
  * `name` against the calling file's package. A computed name or level makes
  * the call computed, and so does a `fromlist` that isn't `None` or a list or
- * tuple of literals, on top of `name` itself.
+ * tuple of literals, on top of `name` itself. A level or fromlist that `*args`
+ * may hide counts as computed.
  *
  * @param call - the `call` node.
  * @param file - the calling file.
@@ -141,8 +147,9 @@ const DUNDER_LEVEL = 4;
 function dunderImportTargets(call: Node, file: SourceFile): Loaded[] {
   const name = literalString(argumentAt(call, 0, "name"));
   const levelNode = argumentAt(call, DUNDER_LEVEL, "level");
+  const splat = hasSplat(call);
   const level = levelNode ? integerLiteral(levelNode) : 0;
-  if (name === null || level === null) {
+  if (name === null || level === null || (!levelNode && splat)) {
     return [COMPUTED];
   }
   const base = level > 0 ? resolveRelative(packageOf(file), level, name || undefined) : name;
@@ -150,7 +157,10 @@ function dunderImportTargets(call: Node, file: SourceFile): Loaded[] {
     return [];
   }
   const fromlist = argumentAt(call, DUNDER_FROMLIST, "fromlist");
-  if (!fromlist || fromlist.type === "none") {
+  if (!fromlist) {
+    return splat ? [read(base), COMPUTED] : [read(base)];
+  }
+  if (fromlist.type === "none") {
     return [read(base)];
   }
   const entries = ["list", "tuple"].includes(fromlist.type)

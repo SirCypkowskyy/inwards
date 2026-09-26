@@ -34,11 +34,12 @@ import {
   qualify,
   syntaxOf,
 } from "./callees.ts";
+import { computedSource } from "./computed-source.ts";
 import type { LayerSpec } from "./config.ts";
 import { unreadableEncoding } from "./encoding.ts";
 import { allowedDirection, layerIndexOf, outwardImports, portSteps } from "./layers.ts";
 import { argumentAt, literalSource } from "./literals.ts";
-import { COMPUTED, type Loaded, moduleTargets, type Unreadable } from "./loader-targets.ts";
+import { type Loaded, moduleTargets, type Unreadable } from "./loader-targets.ts";
 import { extractImports, normalizeSource, parsePython } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
@@ -158,7 +159,7 @@ export function checkDynamicImports(
     if (why?.kind === "encoding") {
       return [unreadableSource(file, ref, why.encoding)];
     }
-    return why?.kind === "computed" && inner ? [unverifiableTarget(file, ref, own, layers)] : [];
+    return why?.kind === "computed" && inner ? [unverifiableTarget(file, ref, own, outermost)] : [];
   });
   return [...outward, ...unreadable];
 }
@@ -169,29 +170,27 @@ export function checkDynamicImports(
  * @param file - the calling file.
  * @param ref - the call.
  * @param source - the layer the file belongs to, not the outermost.
- * @param layers - the configured layers, innermost first.
+ * @param outermost - the outermost layer, where the loader may live.
  * @returns the INW011 diagnostic.
  */
 function unverifiableTarget(
   file: SourceFile,
   ref: DynamicImportRef,
   source: LayerSpec,
-  layers: readonly LayerSpec[],
+  outermost: LayerSpec,
 ): Diagnostic {
-  const outermost = layers.at(-1)?.name ?? source.name;
   const home = source.modules[0] ?? source.name;
   const message =
-    `Layer "${source.name}" makes a dynamic import (${ref.via}) whose module name or source is not ` +
-    "a string literal Inwards can read, so Inwards can't verify that it points toward inner layers. " +
-    `Allowed direction: ${allowedDirection(layers)}.`;
+    `Layer "${source.name}" makes a dynamic import (${ref.via}) with an argument Inwards can't read, ` +
+    "such as a variable, an f-string field or *args, so Inwards can't verify that it points toward inner layers.";
   return diagnostic(RULES.INW011, file, {
     span: ref,
     message,
     fix: {
-      summary: `Name the target with a string literal, or move the dynamic import to the outermost layer "${outermost}".`,
+      summary: `Name the target with string literals, or move the dynamic import to the outermost layer "${outermost.name}".`,
       steps: [
-        `If the module is fixed, replace \`${ref.statement}\` with an import statement, or give the loader a plain string literal (no variables, f-string fields or \\N{...} escapes) so Inwards can check it.`,
-        `If the module is chosen at runtime (plugins, settings), move the loader to the outermost layer "${outermost}" (the composition root) and pass what it loads into this module as a parameter.`,
+        `If the module is fixed, replace \`${ref.statement}\` with an import statement, or pass the loader only string literals (no variables, f-string fields, \\N{...} escapes or *args) so Inwards can check it.`,
+        `If the module is chosen at runtime (plugins, settings), move the loader to the outermost layer "${outermost.name}" (the composition root) and pass what it loads into this module as a parameter.`,
         `Type that parameter against a typing.Protocol declared in \`${home}\` (for example \`${home}.ports\`).`,
       ],
     },
@@ -276,16 +275,20 @@ function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Binding
     const kind = LOADERS.get(qualified);
     if (kind) {
       const via = qualified.replace(BUILTINS_PREFIX, "");
-      // compile() only builds a code object: running it takes exec or eval, reported themselves.
-      const computed = via === "compile" ? [] : [COMPUTED];
       const loaded =
         kind === "source"
-          ? (sourceTargets(parser, call, file, bindings) ?? computed)
+          ? (sourceTargets(parser, call, file, bindings) ?? computedSource(call, via, bindings))
           : moduleTargets(kind, call, file);
       loads.push(...loaded.map((load) => ({ ...load, via })));
     }
   }
-  return loads;
+  // A name bound to two loaders would report the same load twice.
+  const unique = new Map<string, Load>();
+  for (const load of loads) {
+    const key = `${load.target} ${load.unreadable?.kind ?? ""}`;
+    unique.set(key, unique.get(key) ?? load);
+  }
+  return [...unique.values()];
 }
 
 /**
