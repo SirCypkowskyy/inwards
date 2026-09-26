@@ -96,6 +96,7 @@ describe("session state", () => {
     const files: Record<string, string> = { "pyproject.toml": LAYERS };
     for (let i = 0; i < 20; i += 1) {
       files[`shop/domain/f${i}.py`] = `import shop.infrastructure.m${i}\n`;
+      files[`shop/infrastructure/m${i}.py`] = "";
     }
     const root = project(files);
     start(root);

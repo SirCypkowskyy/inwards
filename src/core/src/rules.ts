@@ -22,7 +22,15 @@ export interface RuleMeta {
 const CATALOGUE = `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`;
 
 /** Codes of every registered rule. */
-type RuleCode = "INW000" | "INW001" | "INW005" | "INW006" | "INW007" | "INW008" | "INW011";
+type RuleCode =
+  | "INW000"
+  | "INW001"
+  | "INW005"
+  | "INW006"
+  | "INW007"
+  | "INW008"
+  | "INW010"
+  | "INW011";
 
 /** Each entry's `code` must equal its key, so the registry can't drift. */
 export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: Code } } = {
@@ -67,6 +75,13 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     name: "missing-member",
     severity: "error",
     summary: "A package holds every member its configured shape requires.",
+    docs: CATALOGUE,
+  },
+  INW010: {
+    code: "INW010",
+    name: "unknown-first-party",
+    severity: "error",
+    summary: "An imported first-party module must exist.",
     docs: CATALOGUE,
   },
   INW011: {

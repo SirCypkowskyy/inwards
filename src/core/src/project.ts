@@ -4,16 +4,20 @@
  * given module. It is the engine's project input (ADR-006): every adapter
  * (the CLI's check, hook and Stop gate, the language server) builds one with
  * `Engine.index` over its own file system and passes it to `checkFile` or
- * `checkFiles`. INW006 asks it for the owner of an import; INW010 (#45) will
- * ask it whether a first-party module exists and which real ones are close.
+ * `checkFiles`. INW006 asks it for the owner of an import; INW010 asks
+ * `ownerOf` whether a first-party module exists, and `listDir` what the
+ * package it would live in holds.
  *
  * Building one reads nothing, so the hook pays only for what a rule asks.
  */
 import { moduleNameFor } from "./python.ts";
+import type { ListDir } from "./shape.ts";
 import type { ImportRef, SourceFile } from "./types.ts";
 import { type ModuleLookup, type PathKind, probeLookup } from "./unassigned.ts";
 
 const NON_ASCII = /[^ -~\t\n\r\f]/u;
+/** What a package's `__init__.py` spells when it merges with packages elsewhere (pkgutil or pkg_resources style). */
+const EXTENDS_PATH = /__path__|declare_namespace/u;
 
 /** Reads the imports of one file; the engine supplies it, so this module needs no parser. */
 type ImportReader = (file: SourceFile) => readonly ImportRef[];
@@ -34,15 +38,17 @@ export interface ProjectFiles {
   kind: PathKind;
   /** Lists every Python file under the config root. Called at most once, on first use of `modules` or `importersOf`. */
   list: () => readonly string[];
-  /** Reads a listed file's text. Called only by `importersOf`, at most once per file. */
+  /** Reads a file's text: a listed file for `importersOf`, a package's `__init__.py` for `extendsPath`; each at most once. */
   read: (path: string) => string;
+  /** Lists one directory: INW010 reads the package a missing module would live in. */
+  listDir: ListDir;
 }
 
 /**
  * A project's first-party modules, answered on demand.
  *
- * - `ownerOf` probes the file system for each query (see `probeLookup`), so
- *   it is never stale and never walks the tree. It follows Python, not the
+ * - `ownerOf` probes the file system (see `probeLookup`), each path at most
+ *   once, and never walks the tree. It follows Python, not the
  *   listing, and so does `importersOf`, which resolves owners through it: it
  *   can return a name missing from `modules`, such as a namespace package (a
  *   directory without `__init__.py`), a module under a virtualenv or
@@ -55,16 +61,19 @@ export interface ProjectFiles {
  *   `from . import *` or `from .. import helper` reaches a package without
  *   spelling its name.
  *
- * Incremental updates: the index caches the listing and the texts it has
- * read, and never sees later changes. A long-lived adapter (the language
- * server) builds a new one when a Python file is created, deleted or
- * renamed; building is free until a rule asks. Editing a file changes
- * neither `ownerOf` nor `modules`, only `importersOf`, so an adapter that
- * relies on `importersOf` rebuilds on saves too.
+ * Incremental updates: the index caches the listing, the paths it has
+ * probed and the texts it has read, and never sees later changes. A
+ * long-lived adapter (the language server) builds a new one when any file
+ * or directory is created, deleted or renamed; building is free until a rule
+ * asks. Editing a file changes neither `ownerOf` nor `modules`, only
+ * `importersOf` and `extendsPath`, so an adapter that relies on those
+ * rebuilds on saves too.
  */
 export class ProjectIndex {
   /** Finds the first-party module an import target lives in, e.g. `shop.domain.order` for `shop.domain.order.Order`. */
   readonly ownerOf: ModuleLookup;
+  /** Lists one directory under the config root, uncached. */
+  readonly listDir: ListDir;
   private readonly source: ProjectFiles;
   private readonly readImports: ImportReader;
   private listed: readonly Listed[] | undefined;
@@ -73,6 +82,7 @@ export class ProjectIndex {
   private readonly normalised = new Map<string, string>();
   private readonly texts = new Map<string, string>();
   private readonly importers = new Map<string, ReadonlySet<string>>();
+  private readonly extended = new Map<string, boolean>();
 
   /**
    * Wraps an adapter's file system. Nothing is listed or read yet.
@@ -83,7 +93,17 @@ export class ProjectIndex {
   constructor(source: ProjectFiles, readImports: ImportReader) {
     this.source = source;
     this.readImports = readImports;
-    this.ownerOf = probeLookup(source.kind);
+    this.listDir = source.listDir;
+    // Imports share prefixes, so each path is probed once: INW010 asks for every import.
+    // A long-lived adapter must rebuild the index when a path that could be a module is
+    // created or deleted; the language server does, or builds one per check without file events.
+    const kinds = new Map<string, ReturnType<PathKind>>();
+    this.ownerOf = probeLookup((rel: string): ReturnType<PathKind> => {
+      if (!kinds.has(rel)) {
+        kinds.set(rel, source.kind(rel));
+      }
+      return kinds.get(rel);
+    });
   }
 
   /**
@@ -126,6 +146,28 @@ export class ProjectIndex {
     }
     this.importers.set(module, found);
     return found;
+  }
+
+  /**
+   * Tells whether a package, or one above it, extends its `__path__` in its
+   * `__init__.py` (`pkgutil.extend_path`, `pkg_resources.declare_namespace`):
+   * its submodules may then live outside the project, such as an installed
+   * SDK that shares the top-level name. Reads each `__init__.py` once.
+   *
+   * @param module - a dotted package name.
+   * @returns true when any `__init__.py` on the way down mentions `__path__` or `declare_namespace`.
+   */
+  extendsPath(module: string): boolean {
+    const parts = module.split(".");
+    return parts.some((_, i) => {
+      const init = `${parts.slice(0, i + 1).join("/")}/__init__.py`;
+      let found = this.extended.get(init);
+      if (found === undefined) {
+        found = this.source.kind(init) === "file" && EXTENDS_PATH.test(this.source.read(init));
+        this.extended.set(init, found);
+      }
+      return found;
+    });
   }
 
   /**

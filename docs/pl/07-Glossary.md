@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: ad5bf5e45348a07f70dfe1a6504162a46eb8a80088ebb10805bbe95f87ed9765
+source_hash: 696cf867aef1ed67d86d4ad785697b6c3c4e71c87bbc8ab43f33ba15e0bfe8a0
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -106,13 +106,13 @@ GrammarBinaries
 :   Port, przez który adaptery przekazują silnikowi środowisko uruchomieniowe tree-sittera i gramatykę Pythona jako bajty.
 
 Zmyślony moduł (hallucinated module)
-:   Import własnego modułu, który nie istnieje, taki jak `shop.domain.pricing`, gdy nie ma żadnego `pricing`. Agenci tworzą takie importy, bo nazwa wygląda wiarygodnie. INW010 (planowana) wyłapuje je na podstawie indeksu modułów, zanim uruchomi się jakikolwiek test.
+:   Import własnego modułu, który nie istnieje, taki jak `shop.domain.pricing`, gdy nie ma żadnego `pricing`. Agenci tworzą takie importy, bo nazwa wygląda wiarygodnie. INW010 wyłapuje je na podstawie indeksu modułów, zanim uruchomi się jakikolwiek test.
 
 Szkielet importów (import skeleton)
 :   Kopia pliku, w której każda linia niebędąca importem jest pusta, a linie importów mają usunięte wcięcie. Numery linii są zachowane, a parsuje się ją dużo szybciej niż cały plik.
 
 Indeks modułów (module index)
-:   To, jak silnik widzi własne moduły projektu (`Engine.index`); każdy adapter przekazuje go do każdego sprawdzenia: właściciel importu, lista modułów oraz moduły importujące dowolny moduł, każde z nich wyliczane na żądanie. INW006 korzysta z właściciela; INW010 będzie korzystać z listy.
+:   To, jak silnik widzi własne moduły projektu (`Engine.index`); każdy adapter przekazuje go do każdego sprawdzenia: właściciel importu, lista modułów oraz moduły importujące dowolny moduł, każde z nich wyliczane na żądanie. INW006 korzysta z właściciela; INW010 korzysta z właściciela, żeby ustalić, czy moduł istnieje, a z zawartości pakietu, w którym by się znajdował, żeby podpowiedzieć najbliższe prawdziwe moduły.
 
 Odmowa prescanu (prescan refusal)
 :   Prescan rezygnuje z pliku, bo `import` pojawia się w miejscu, którego nie umie wyjaśnić. Plik dostaje wtedy pełne parsowanie. Odmowę dostaje 8,3 % plików biblioteki standardowej CPythona.

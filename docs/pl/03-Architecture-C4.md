@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: cab28c893a19fe65ed1d8119eaca7f40706becbe8c5f4e331a7f5a3450360406
+source_hash: c9639c6785be95a76734d83c98e6f2e8c681c93e1423f7aa3df21e73705a41e9
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -84,9 +84,9 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW011 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
-| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
+| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` dla `claude`, `aider` i `agents-md` |
 | **Stan sesji i run log** | Pliki JSON i JSON Lines, tylko lokalnie | `.inwards/state/`, `.inwards/runs.jsonl` | :white_check_mark: (run log opcjonalny, [rozdział 8](08-Run-Log.md)) |
@@ -115,7 +115,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>rules.ts: rejestr<br/>layers.ts: INW001<br/>libraries.ts: INW005<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>shape.ts: INW007 + INW008<br/>encoding.ts: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>rules.ts: rejestr<br/>layers.ts: INW001<br/>libraries.ts: INW005<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>unknown.ts: INW010<br/>shape.ts: INW007 + INW008<br/>encoding.ts: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>reporters.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
@@ -141,11 +141,11 @@ flowchart LR
 | Prescan szkieletu importów | Zostawia tylko linie importów, usuwa im wcięcie, a resztę czyści, żeby numery linii się nie przesunęły | Odmawia przetworzenia pliku, gdy `import` pojawia się w miejscu, którego nie umie wyjaśnić, co wymusza pełne parsowanie. Zobacz [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Adapter parsera | Inicjalizuje web-tree-sitter z bajtów i parsuje | Jawnie zwalnia każde drzewo, bo pamięć WASM nie jest odśmiecana |
 | Ekstraktor importów | Znajduje węzły `import` / `from ... import` w dowolnym miejscu drzewa i rozwiązuje importy względne | `from shop import infrastructure` jest zapisywane jako `shop.infrastructure`, więc nie prześlizgnie się |
-| Reguły | Czyste funkcje z `(file, imports, config)` do `Diagnostic[]`. Kod, nazwa, domyślny poziom, podsumowanie i link do dokumentacji każdej reguły żyją w jednym rejestrze (`rules.ts`); z niego budowane jest `rules[]` w SARIF | INW001, INW005 dla bibliotek, które warstwa może importować, INW006 dla kodu poza wszystkimi warstwami, INW007/INW008 dla kształtu pakietu, INW011 dla importów dynamicznych z dosłownymi celami i INW000 dla plików, których kodowanie mogłoby ukryć importy. Zaplanowane reguły są wymienione niżej |
+| Reguły | Czyste funkcje z `(file, imports, config)` do `Diagnostic[]`. Kod, nazwa, domyślny poziom, podsumowanie i link do dokumentacji każdej reguły żyją w jednym rejestrze (`rules.ts`); z niego budowane jest `rules[]` w SARIF | INW001, INW005 dla bibliotek, które warstwa może importować, INW006 dla kodu poza wszystkimi warstwami, INW010 dla własnych modułów, które nie istnieją, INW007/INW008 dla kształtu pakietu, INW011 dla importów dynamicznych z dosłownymi celami i INW000 dla plików, których kodowanie mogłoby ukryć importy. Zaplanowane reguły są wymienione niżej |
 | Kompozytor poprawek | Buduje ponumerowane kroki naprawy z faktycznych nazw importu i warstw | Kroki podają prawdziwe moduły, a nie symbole zastępcze |
 | Reportery | Tekst dla ludzi, JSON `inwards/diagnostics@1` dla agentów, SARIF 2.1.0 dla GitHuba | Pola JSON można dodawać, ale nigdy nie usuwać ani nie zmieniać ich nazw |
 | Fasada silnika | Koordynuje prescan, reguły i potwierdzające pełne parsowanie | Jedyne, co wywołują adaptery. Kształt pakietu (INW007) jest sprawdzany najpierw, na podstawie samej ścieżki. Plik poza wszystkimi warstwami nie jest parsowany (dostaje najwyżej ostrzeżenie INW006). Plik w warstwie, którego tekst wymienia loader modułów, pomija prescan (zobacz niżej) |
-| Indeks modułów | `Engine.index(files)` opakowuje port `ProjectFiles` adaptera: `ownerOf` znajduje własny moduł, do którego trafia import, sondując po jednej ścieżce naraz; `modules` wypisuje każdy własny moduł; `importersOf` odpowiada na pytanie „kto importuje moduł X”, parsując tylko pliki, których tekst zawiera ostatni segment nazwy X | Wejście projektu dla silnika ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)): każdy adapter buduje je i przekazuje do `checkFile` i `checkFiles`. Zbudowanie go niczego nie dotyka; każde pytanie wykonuje tylko własne operacje wejścia-wyjścia, więc hook nie płaci za pytania, których nie zadaje żadna reguła. INW006 pyta `ownerOf`; INW010 i wykrywanie cykli skorzystają z reszty. Długo działający adapter buduje go od nowa, gdy plik Pythona powstaje, znika albo zmienia nazwę |
+| Indeks modułów | `Engine.index(files)` opakowuje port `ProjectFiles` adaptera: `ownerOf` znajduje własny moduł, do którego trafia import, sondując po jednej ścieżce naraz, każdą tylko raz; `modules` wypisuje każdy własny moduł; `importersOf` odpowiada na pytanie „kto importuje moduł X”, parsując tylko pliki, których tekst zawiera ostatni segment nazwy X | Wejście projektu dla silnika ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)): każdy adapter buduje je i przekazuje do `checkFile` i `checkFiles`. Zbudowanie go niczego nie dotyka; każde pytanie wykonuje tylko własne operacje wejścia-wyjścia, więc hook nie płaci za pytania, których nie zadaje żadna reguła. INW006 pyta `ownerOf`; INW010 pyta `ownerOf`, czy moduł istnieje, a `listDir`, co zawiera pakiet, w którym by się znajdował (skompilowane moduły rozszerzeń, najbliższe nazwy); wykrywanie cykli skorzysta z `importersOf`. Długo działający adapter buduje go od nowa, gdy plik lub katalog powstaje, znika albo zmienia nazwę |
 
 ### Przebieg jednego sprawdzenia { #how-one-check-flows }
 
@@ -165,7 +165,7 @@ sequenceDiagram
         E-->>A: INW000
     else plik wymienia loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(pełny tekst)
-        E->>R: INW001 + INW005 + INW006 + INW011
+        E->>R: INW001 + INW005 + INW006 + INW010 + INW011
         R-->>E: diagnostyki
         E-->>A: diagnostyki
     else wszystko inne
@@ -174,21 +174,21 @@ sequenceDiagram
             P-->>E: szkielet (same importy)
             E->>T: parse(szkielet)
             T-->>E: maleńkie drzewo
-            E->>R: INW001 + INW005 + INW006 (importy)
+            E->>R: INW001 + INW005 + INW006 + INW010 (importy)
             alt brak naruszeń (typowy przypadek)
                 R-->>E: []
                 E-->>A: []
             else znaleziono naruszenia
                 E->>T: parse(pełny tekst)
                 T-->>E: pełne drzewo
-                E->>R: INW001 + INW005 + INW006 (importy z pełnego drzewa)
+                E->>R: INW001 + INW005 + INW006 + INW010 (importy z pełnego drzewa)
                 R-->>E: potwierdzone diagnostyki
                 E-->>A: diagnostyki
             end
         else szkielet odrzucony (nietypowe położenie importu)
             P-->>E: null
             E->>T: parse(pełny tekst)
-            E->>R: INW001 + INW005 + INW006
+            E->>R: INW001 + INW005 + INW006 + INW010
             R-->>E: diagnostyki
             E-->>A: diagnostyki
         end
@@ -336,6 +336,7 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
     - loadery osiągane przez operator morsa, przypisanie krotek, atrybuty klasy albo instancji, `functools.partial`, nazwę związaną wewnątrz `exec` albo przez obiekt (`print.__self__.exec`): [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
     - inne API ładujące: `pkgutil.resolve_name`, `importlib.util.find_spec` z `exec_module` oraz `SourceFileLoader(...).load_module()`: [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
     - fałszywy alarm, zaakceptowany zamiast przeoczenia: `exec`, `eval`, `compile` i `__import__` zawsze są traktowane jak funkcje wbudowane, więc po `from re import compile` wywołanie `compile("from shop.infrastructure import x")` zostaje zgłoszone.
+- INW010 sprawdza tylko tę część importu statycznego, która jest modułem ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` przechodzi, gdy `shop/domain` jest pakietem, bo `pricing` może być nazwą zdefiniowaną w jego `__init__.py`, a importy dynamiczne nie są sprawdzane. Moduł generowany przy budowaniu (`_version.py`, `*_pb2.py`) jest zgłaszany, dopóki nie pojawi się w checkoucie ([#160](https://github.com/SirCypkowskyy/inwards/issues/160)), podobnie jak opcjonalny import za `try/except ImportError`. Pakiet przestrzeni nazw współdzielony z zainstalowaną dystrybucją jest zgłaszany jako brakujący ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). Serwer języka nie zauważa, że `__init__.py` zaczął rozszerzać swój `__path__`, dopóki jakiś plik nie powstanie albo nie zniknie.
 - Moduły, które nie należą do żadnej warstwy, nie są same sprawdzane. INW006 to uwidacznia (ostrzeżenie na pakiet, błąd dla importu do takiego pakietu z warstwy i martwe prefiksy), ale importy wewnątrz nieprzypisanego pakietu pozostają niesprawdzone, dopóki użytkownik go nie przypisze. Moduły bez źródeł, głębokość `ignore`, przemianowane pakiety najwyższego poziomu i sprawdzanie prefiksów w zakresie ścieżek są otwarte w [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Katalog reguł { #rule-catalogue }
@@ -351,7 +352,7 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 | INW006 | `unassigned-module` | Import z warstwy do własnego kodu, który nie należy do żadnej warstwy, w tym do pakietu nad warstwami (`from shop import x` uruchamia `shop/__init__.py`, który nie należy do żadnej warstwy), statyczny albo dynamiczny (błąd); kod warstwy przeniesiony w trakcie sesji poza wszystkie warstwy (błąd); pakiet poza wszystkimi warstwami i poza `ignore` (ostrzeżenie); prefiks warstwy, który nie pasuje do żadnego modułu (ostrzeżenie), warstwa bez żywego prefiksu albo prefiks opróżniony w trakcie sesji (błąd). Nieznane klucze i nakładające się prefiksy to błędy konfiguracji | :white_check_mark: |
 | INW007 | `package-shape` | Element pakietu, na który `[[tool.inwards.shape]]` nie pozwala (błąd albo ostrzeżenie przy `extra = "warning"`) albo którego zabrania, taki jak nowy `helpers.py` obok `service.py`; nazwa elementu poza jej pakietami `only-in` z `[[tool.inwards.names]]`, taka jak `test_x.py` w aplikacji (błąd); selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie, w pyproject.toml). Komunikat nigdy nie wypisuje dozwolonych elementów; poprawka podaje prawdopodobny cel. Zobacz [Kształt pakietu](guides/package-shape.md) | :white_check_mark: |
 | INW008 | `missing-member` | Brakuje elementu, którego wymaga kształt pakietu; zgłaszane w jego `__init__.py`. Uruchomienia dla całego projektu zgłaszają każdy taki brak; Stop gate blokuje tylko te, które pojawiły się od początku sesji | :white_check_mark: |
-| INW010 | `unknown-first-party` | Import własnego modułu, który nie istnieje, typowa halucynacja agenta | :material-progress-clock: wymaga indeksu modułów, [#45](https://github.com/SirCypkowskyy/inwards/issues/45) |
+| INW010 | `unknown-first-party` | Import statyczny w warstwie, który wskazuje własny moduł, który nie istnieje, typowa halucynacja agenta (`from shop.domain.pricing import X` bez żadnego `pricing`), oraz import względny, który wychodzi ponad pakiet najwyższego poziomu, czego Python nigdy nie przyjmuje. Sprawdzana jest część będąca modułem: `X` w `from X import name`, a w pozostałych przypadkach cała nazwa. Istnienie jest sondowane na dysku, więc liczą się pakiety przestrzeni nazw, zaślepki i skompilowane moduły rozszerzeń (`.so`, `.pyd`, `.pyx`); poprawka wymienia trzy najbliższe moduły z tego samego pakietu. Taki import nie dostaje dodatkowo INW006, a import skierowany na zewnątrz, który zgłasza INW001, nie dostaje INW010. Pakiety, które rozszerzają swój `__path__`, są pomijane. Zobacz [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :white_check_mark: |
 | INW011 | `dynamic-import` | Import dynamiczny z celem w postaci literału napisowego, który sięga do warstwy zewnętrznej: `importlib.import_module`, `__import__` (także `builtins.` i `importlib.`), `runpy.run_module` oraz instrukcje importu wewnątrz dosłownego kodu dla `exec` / `eval` / `compile` (bajty, których zadeklarowanego kodowania Inwards nie umie czytać, są zgłaszane jako niesprawdzone). Śledzone są aliasy importów, przypisania `name = loader`, `getattr(m, "name")`, `m.__dict__["name"]` i `vars(m)["name"]`; `+` między literałami i f-stringi z dosłownymi polami są składane. Popularny sposób obejścia INW001. Znane luki są wymienione wyżej | :white_check_mark: dosłowne cele |
 
 ## Mapa kodu { #code-map }
@@ -371,6 +372,7 @@ src/
 │   │   ├── stdlib.ts      # standard-library module names (INW005)
 │   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
 │   │   ├── unassigned.ts  # INW006: code outside every layer, first-party probe
+│   │   ├── unknown.ts     # INW010: first-party modules that don't exist, closest names
 │   │   ├── layout.ts      # INW006: dead prefixes, layer code moved out of every layer
 │   │   ├── shape.ts       # INW007 + INW008: package shape, ListMembers port
 │   │   ├── shape-config.ts  # [[tool.inwards.shape]] / [[tool.inwards.names]], selectors, patterns

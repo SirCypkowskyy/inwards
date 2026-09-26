@@ -16,11 +16,13 @@ import {
   DiagnosticSeverity,
   DidChangeWatchedFilesNotification,
   FileChangeType,
+  type FileSystemWatcher,
   ProposedFeatures,
   TextDocuments,
+  WatchKind,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { projectFiles, workspaceDiagnostics } from "./workspace.ts";
+import { mayHoldModule, projectFiles, workspaceDiagnostics } from "./workspace.ts";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -29,11 +31,22 @@ let state: { engine: Engine; config: InwardsConfig; root: string; index: Project
 let workspace = new Map<string, CoreDiagnostic[]>();
 /** The full check of each open document, by absolute path. */
 const opened = new Map<string, { uri: string; found: CoreDiagnostic[] }>();
+/** What the client reports: every path, created or deleted (a rename is both). */
+const WATCHED: FileSystemWatcher = {
+  globPattern: "**/*",
+  kind: WatchKind.Create + WatchKind.Delete,
+};
+/**
+ * Whether the client reports file events. Without them the index can't be
+ * rebuilt at the right time, so each check builds its own (see `check`).
+ */
+let watching = false;
 /** How long file events are collected before the workspace pass reruns. */
 const DEBOUNCE_MS = 100;
 let pending: ReturnType<typeof setTimeout> | undefined;
 
 connection.onInitialize(async (params) => {
+  watching = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
   const folder = params.workspaceFolders?.[0]?.uri;
   const configPath = folder ? join(fileURLToPath(folder), "pyproject.toml") : undefined;
   if (configPath && existsSync(configPath)) {
@@ -53,7 +66,17 @@ connection.onInitialize(async (params) => {
 });
 
 // Same engine, same rules as `inwards check`, run on every keystroke.
-documents.onDidChangeContent(({ document }) => {
+documents.onDidChangeContent(({ document }) => check(document));
+
+/**
+ * Checks an open document against the module index and publishes the result.
+ * Without file events the shared index could keep a probe from before a
+ * module was created, so each check then builds a fresh one (building is
+ * free; only the probes the check makes cost anything).
+ *
+ * @param document - the open document.
+ */
+function check(document: TextDocument): void {
   if (!state) {
     return;
   }
@@ -64,11 +87,11 @@ documents.onDidChangeContent(({ document }) => {
       text: document.getText(),
       ...moduleNameFor(relative(state.root, path)),
     },
-    state.index,
+    watching ? state.index : state.engine.index(projectFiles(state.root)),
   );
   opened.set(path, { uri: document.uri, found });
   publish(path);
-});
+}
 
 documents.onDidClose(({ document }) => {
   const path = fileURLToPath(document.uri);
@@ -76,31 +99,44 @@ documents.onDidClose(({ document }) => {
   publish(path);
 });
 
-// The workspace pass runs once at start and again when a Python file is
-// created or deleted; a content change can't change a shape. The module index
-// is rebuilt then too (free until a rule asks), as its contract says. Events are
+// The workspace pass runs once at start and again when a file or directory
+// that could be a module is created or deleted; a content change can't change
+// a shape. The module index is rebuilt then too (free until a rule asks), as
+// its contract says, and the open documents are checked again: creating the
+// module an import names, as a .py, a .pyi, a compiled extension or a renamed
+// directory, clears its INW010 without waiting for a keystroke. Events are
 // batched for a moment, so a branch switch runs one pass. The server asks the
-// client to watch the files, so any LSP client works, not only VS Code.
+// client to watch the files, so any LSP client that supports it works, not
+// only VS Code; a client that doesn't gets a fresh index per check instead.
 connection.onInitialized(() => {
-  if (state) {
+  if (state && watching) {
     connection.client
-      .register(DidChangeWatchedFilesNotification.type, { watchers: [{ globPattern: "**/*.py" }] })
-      .catch((err: unknown) =>
-        connection.console.warn(`Inwards can't watch files: ${String(err)}`),
-      );
+      .register(DidChangeWatchedFilesNotification.type, { watchers: [WATCHED] })
+      .catch((err: unknown) => {
+        watching = false;
+        connection.console.warn(`Inwards can't watch files: ${String(err)}`);
+      });
   }
   refresh();
 });
 connection.onDidChangeWatchedFiles(({ changes }) => {
-  if (changes.every((change) => change.type === FileChangeType.Changed)) {
-    return;
+  const root = state?.root;
+  const relevant = changes.filter(
+    (change) =>
+      change.type !== FileChangeType.Changed &&
+      root !== undefined &&
+      mayHoldModule(root, fileURLToPath(change.uri)),
+  );
+  if (relevant.length === 0) {
+    return; // .git, caches, virtualenvs, docs: nothing a module lookup reads
   }
   clearTimeout(pending);
   pending = setTimeout(refresh, DEBOUNCE_MS);
 });
 
 /**
- * Reruns the workspace pass and republishes the files whose findings changed.
+ * Rebuilds the module index, rechecks the open documents against it, reruns
+ * the workspace pass and republishes the other files whose findings changed.
  */
 function refresh(): void {
   if (!state) {
@@ -109,8 +145,12 @@ function refresh(): void {
   const before = workspace;
   state.index = state.engine.index(projectFiles(state.root));
   workspace = workspaceDiagnostics(state.config, state.root);
+  for (const document of documents.all()) {
+    check(document);
+  }
   for (const path of new Set([...before.keys(), ...workspace.keys()])) {
-    if (JSON.stringify(before.get(path)) !== JSON.stringify(workspace.get(path))) {
+    const changed = JSON.stringify(before.get(path)) !== JSON.stringify(workspace.get(path));
+    if (changed && !opened.has(path)) {
       publish(path);
     }
   }

@@ -54,11 +54,13 @@ First run, on the laptop described under Setup (load average 3 to 4), `inwards` 
 
 | Repo | `.py` files | Lines | Prescan refused | Prescan missed | Full check p50 / max | One file p50 / p95 | Violations |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| full-stack-fastapi-template | 40 | 2,685 | 0 | 0 | 59 / 60 ms | 46 / 51 ms | 1 |
+| full-stack-fastapi-template | 40 | 2,685 | 0 | 0 | 59 / 60 ms | 46 / 51 ms | 8 |
 | fastapi-clean-example | 209 | 6,764 | 0 | 0 | 80 / 87 ms | 46 / 49 ms | 2 |
 | python-ddd | 139 | 5,852 | 0 | 0 | 82 / 87 ms | 43 / 45 ms | 10 |
-| polar | 1,831 | 435,688 | 22 (1.2 %) | 0 | 1.16 / 1.37 s | 124 / 142 ms | 358 |
-| saleor | 4,324 | 847,875 | 13 (0.3 %) | 0 | 1.84 / 1.89 s | 59 / 62 ms | 491 |
+| polar | 1,831 | 435,688 | 22 (1.2 %) | 0 | 1.16 / 1.37 s | 124 / 142 ms | 494 |
+| saleor | 4,324 | 847,875 | 13 (0.3 %) | 0 | 1.84 / 1.89 s | 59 / 62 ms | 758 |
+
+The Violations column is from a later run (the INW010 review in [#45](https://github.com/SirCypkowskyy/inwards/issues/45)), after INW005 and INW010 landed; saleor's count includes INW010's four broken imports.
 
 Two things the synthetic repo didn't show. `inwards check` on polar's `subscription/service.py` (4,482 lines, 175 KB, two violations) takes about 125 ms here and 280 ms on a GitHub runner (AMD EPYC 7763, 2 cores), over the 100 ms budget; a small file in the same repo takes about 55 ms. The budget is written for the Claude Code hook, which runs the same one-file check (`runCheck` on the edited file) after reading its payload, so the hook can only be slower. Tracked in [#122](https://github.com/SirCypkowskyy/inwards/issues/122). Rerun locally after bytecode compilation ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)) cut every one-file check by 20 to 40 ms: polar's file now takes 83 / 90 ms (p50 / p95), saleor's 27 / 30 ms. And a cold full check of saleor's 848,000 lines takes 1.8 s on one core (2.5 s on the GitHub runner), where the 496,000-line synthetic repo takes 0.4 s.
 

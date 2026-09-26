@@ -18,10 +18,19 @@ export interface SourceFile {
 }
 
 export interface ImportRef extends Span {
-  /** Fully resolved dotted target, e.g. `shop.infrastructure.db.OrderTable`. */
+  /**
+   * Fully resolved dotted target, e.g. `shop.infrastructure.db.OrderTable`.
+   * Empty for a relative import that climbs above the top-level package.
+   */
   target: string;
   /** The import statement exactly as written. */
   statement: string;
+  /**
+   * The resolved `X` of `from X import name`, which must be a module, while
+   * `name` may be a submodule or a name `X` defines. Absent when the whole
+   * target is a module (`import X`, `from X import *`, dynamic imports).
+   */
+  from?: string;
 }
 
 /** Machine-actionable repair advice. Written for an LLM first, a human second. */

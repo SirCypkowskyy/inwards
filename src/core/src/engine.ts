@@ -3,7 +3,7 @@ import { acceptedModules } from "./baseline.ts";
 import type { InwardsConfig } from "./config.ts";
 import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
-import { checkLayers, layerIndexOf } from "./layers.ts";
+import { checkLayers, layerIndexOf, outwardImports } from "./layers.ts";
 import { checkLibraries } from "./libraries.ts";
 import { skeletonImports } from "./prescan.ts";
 import { type ProjectFiles, ProjectIndex } from "./project.ts";
@@ -17,7 +17,8 @@ import {
 import { applyRules } from "./rule-config.ts";
 import { shapeFindings } from "./shape.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
-import { checkUnassignedImports, type ModuleLookup, unassignedWarning } from "./unassigned.ts";
+import { checkUnassignedImports, unassignedWarning } from "./unassigned.ts";
+import { checkUnknownImports } from "./unknown.ts";
 
 /** A file after the prescan, before any full parse. */
 interface Scan {
@@ -88,9 +89,8 @@ export class Engine {
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    const { ownerOf } = project;
     return applyRules(
-      [...shapeFindings(src, this.config), ...this.confirm(src, this.scan(src, ownerOf), ownerOf)],
+      [...shapeFindings(src, this.config), ...this.confirm(src, this.scan(src, project), project)],
       this.config.rules,
     );
   }
@@ -99,10 +99,10 @@ export class Engine {
    * Applies the text rules that need no full parse, see `checkFile`.
    *
    * @param src - the source file, with normalised text.
-   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param project - the module index (INW006, INW010).
    * @returns the findings so far, and what the full parse would still have to do.
    */
-  private scan(src: SourceFile, ownerOf: ModuleLookup): Scan {
+  private scan(src: SourceFile, project: ProjectIndex): Scan {
     if (layerIndexOf(src.module, this.config.layers) === -1) {
       const warning = unassignedWarning(src, this.config);
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
@@ -113,7 +113,7 @@ export class Engine {
     }
     const dynamic = mentionsDynamicImport(src.text);
     const fast = dynamic ? null : skeletonImports(this.parser, src);
-    const found = fast ? this.importFindings(src, fast, ownerOf) : null;
+    const found = fast ? this.importFindings(src, fast, project) : null;
     return { found, exact: found?.length === 0, dynamic };
   }
 
@@ -123,35 +123,49 @@ export class Engine {
    *
    * @param src - the source file, with normalised text.
    * @param scan - its scan.
-   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param project - the module index (INW006, INW010).
    * @param skip - true to return the skeleton's findings unconfirmed.
    * @returns the violations found.
    */
-  private confirm(src: SourceFile, scan: Scan, ownerOf: ModuleLookup, skip = false): Diagnostic[] {
+  private confirm(src: SourceFile, scan: Scan, project: ProjectIndex, skip = false): Diagnostic[] {
     if (scan.found && (scan.exact || skip)) {
       return scan.found;
     }
-    return this.fullCheck(src, scan.dynamic, ownerOf);
+    return this.fullCheck(src, scan.dynamic, project);
   }
 
   /**
-   * Applies the rules that look at import statements: INW001, INW005 and INW006.
+   * Applies the rules that look at import statements: INW001, INW005, INW006 and INW010.
+   * An import of a module that doesn't exist gets INW010 alone, not INW006
+   * as well, and one that climbs above the top-level package (empty target)
+   * reaches no other rule. An outward import gets INW001 alone, even when its
+   * module doesn't exist either.
    *
    * @param file - the source file.
    * @param imports - its imports.
-   * @param ownerOf - finds the first-party module an import lands in.
+   * @param project - the module index.
    * @returns the violations found.
    */
   private importFindings(
     file: SourceFile,
     imports: readonly ImportRef[],
-    ownerOf: ModuleLookup,
+    project: ProjectIndex,
   ): Diagnostic[] {
     const { layers } = this.config;
+    // INW001's fix deletes an outward import; "create the module" would contradict it.
+    const outward = new Set(outwardImports(file, imports, layers).map((o) => o.ref));
+    const unknown = checkUnknownImports(
+      file,
+      imports.filter((ref) => !outward.has(ref)),
+      project,
+    );
+    const resolved = imports.filter((ref) => ref.target !== "");
+    const existing = resolved.filter((ref) => !unknown.missing.has(ref));
     return [
-      ...checkLayers(file, imports, layers),
-      ...checkLibraries(file, imports, layers, ownerOf),
-      ...checkUnassignedImports(file, imports, layers, ownerOf),
+      ...checkLayers(file, resolved, layers),
+      ...checkLibraries(file, resolved, layers, project.ownerOf),
+      ...checkUnassignedImports(file, existing, layers, project.ownerOf),
+      ...unknown.found,
     ];
   }
 
@@ -161,21 +175,21 @@ export class Engine {
    *
    * @param file - the source file, with normalised text.
    * @param dynamic - true to look for dynamic imports as well (INW011).
-   * @param ownerOf - finds the first-party module an import lands in.
+   * @param project - the module index.
    * @returns the violations found.
    */
-  private fullCheck(file: SourceFile, dynamic: boolean, ownerOf: ModuleLookup): Diagnostic[] {
+  private fullCheck(file: SourceFile, dynamic: boolean, project: ProjectIndex): Diagnostic[] {
     const { layers } = this.config;
     const tree = parsePython(this.parser, file.text);
     try {
-      const found = this.importFindings(file, extractImports(tree, file), ownerOf);
+      const found = this.importFindings(file, extractImports(tree, file), project);
       if (dynamic) {
         const refs = extractDynamicImports(this.parser, tree, file);
-        const readable = refs.filter((ref) => ref.unreadable === null);
+        const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
         found.push(
           ...checkDynamicImports(file, refs, layers),
-          ...checkLibraries(file, readable, layers, ownerOf),
-          ...checkUnassignedImports(file, readable, layers, ownerOf),
+          ...checkLibraries(file, readable, layers, project.ownerOf),
+          ...checkUnassignedImports(file, readable, layers, project.ownerOf),
         );
       }
       return found.sort((a, b) => a.line - b.line || a.column - b.column);
@@ -243,11 +257,10 @@ export class Engine {
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
   ): Diagnostic[] {
-    const { ownerOf } = project;
     const { rules } = this.config;
     const scanned = [...files].map((file) => {
       const src = { ...file, text: normalizeSource(file.text) };
-      return { src, scan: this.scan(src, ownerOf) };
+      return { src, scan: this.scan(src, project) };
     });
     const hidden = accepted
       ? acceptedModules(
@@ -264,7 +277,7 @@ export class Engine {
       const skip = hidden.has(src.module);
       for (const found of [
         ...shapeFindings(src, this.config),
-        ...this.confirm(src, scan, ownerOf, skip),
+        ...this.confirm(src, scan, project, skip),
       ]) {
         const once = found.severity === "warning" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {

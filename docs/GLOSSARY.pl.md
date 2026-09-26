@@ -91,6 +91,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | composition root | korzeń kompozycji (composition root) |
 | cold / warm run | zimne / ciepłe uruchomienie |
 | corpus | korpus |
+| compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
 | config error | błąd konfiguracji |
 | confirming parse | parsowanie potwierdzające |
@@ -102,6 +103,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | differential test | test różnicowy |
 | domain layer, application layer, infrastructure layer | warstwa domeny, warstwa aplikacji, warstwa infrastruktury |
 | dynamic import | import dynamiczny |
+| edit distance | odległość edycyjna |
 | edit | edycja |
 | engine | silnik |
 | entity | encja |
@@ -136,13 +138,16 @@ baseline'u); multi-word names are left uninflected where possible.
 | per-edit hook | hook edycji |
 | phase in (rules) | wprowadzać stopniowo (reguły) |
 | picker (`init` on a terminal) | kreator |
+| namespace package | pakiet przestrzeni nazw |
 | module index | indeks modułów |
 | package shape | kształt pakietu |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |
+| probe (the file system) | sondować, sondowanie |
 | promotion (PR `develop` → `main`) | promocja |
 | prescan refusal | odmowa prescanu |
+| relative import | import względny |
 | release | wydanie |
 | redact (`--redact`) | pseudonimizować (not "anonimizować": keyed hashes still tell files apart) |
 | release candidate | kandydat do wydania |
@@ -162,6 +167,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | string (Python) | napis |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |
+| top-level package | pakiet najwyższego poziomu |
 | turn (of the agent) | tura |
 | upload | wysyłka |
 | use case | przypadek użycia |
