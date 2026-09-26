@@ -1,0 +1,557 @@
+---
+source: docs/chapters/05-ADR.md
+source_hash: 6b53d05ed06c5d1ee9862882de740f786e9f4e70d4e7064ca2fdb42b165c9fcb
+---
+
+# :material-scale-balance: Decyzje architektoniczne (ADR)
+
+Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosztuje, i to, co odrzuciliśmy. Zapisów nigdy nie edytuje się po przyjęciu. Zmiana zdania oznacza nowy ADR, który zastępuje stary.
+
+| ADR | Decyzja | Stan |
+|---|---|---|
+| [001](#adr-001-typescript-for-the-engine) | TypeScript dla silnika | :white_check_mark: Przyjęty |
+| [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), a nie natywne wiązania | :white_check_mark: Przyjęty |
+| [003](#adr-003-ship-a-bun-single-file-executable) | Dystrybucja jako jednoplikowy program wykonywalny Buna | :white_check_mark: Przyjęty, budowany z `--bytecode` od [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
+| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parsuj szkielet importów, potwierdzaj pełnym parsowaniem | :white_check_mark: Przyjęty, moduły w baseline'ie pomijają parsowanie potwierdzające od [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
+| [005](#adr-005-configuration-lives-in-pyprojecttoml) | Konfiguracja mieszka w `pyproject.toml` | :white_check_mark: Przyjęty |
+| [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :white_check_mark: Przyjęty |
+| [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi | :white_check_mark: Przyjęty |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6) |
+| [009](#adr-009-check-imports-wherever-they-appear) | Sprawdzaj importy, gdziekolwiek się pojawią | :white_check_mark: Przyjęty |
+| [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Dokumentacja budowana Zensicalem, serwowana przez Cloudflare Workers | :material-swap-horizontal: Hosting zastąpiony przez 012 |
+| [011](#adr-011-rename-stratum-to-inwards) | Zmiana nazwy ze Stratum na Inwards | :white_check_mark: Przyjęty |
+| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publikuj dokumentację na GitHub Pages, na razie | :white_check_mark: Przyjęty, wdrażana z `develop` od 019 |
+| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Rzeczywiste ścieżki dla granicy, ścieżki importu dla nazw modułów | :white_check_mark: Przyjęty |
+| [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Zgłaszaj pliki, których zadeklarowane kodowanie może ukryć importy | :white_check_mark: Przyjęty |
+| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Sprawdzaj dosłowne importy dynamiczne jako INW011 | :white_check_mark: Przyjęty |
+| [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Wersje i wydania wynikają z typów commitów, przez release PR | :material-swap-horizontal: Model gałęzi zastąpiony przez 019 |
+| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Scalanie przez squash z tytułami PR w formacie Conventional Commits | :white_check_mark: Przyjęty, squash do `develop` od 019 |
+| [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Selektory pakietów przyjmują globy od początku; monorepo podąża za workspace'ami uv | :white_check_mark: Przyjęty |
+| [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | Gałąź integracyjna `develop`; `main` przesuwa się tylko przy wydaniach | :white_check_mark: Przyjęty |
+| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | Selektor w `init` używa @clack/prompts, ładowanego z osobnego fragmentu | :white_check_mark: Przyjęty |
+| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publikuj wheele wydań na PyPI z osobnego workflow, przez trusted publishing | :white_check_mark: Przyjęty, włączany przez właściciela |
+| [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
+| [023](#adr-023-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
+
+## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Każdy szybki linter, któremu się przyjrzeliśmy (Ruff, ty, Biome, nowy rdzeń grimp, Tach), jest napisany w Ruście. Rust daje najlepszą surową szybkość i najmniejsze pliki binarne. Ale trudnym problemem Inwards nie jest szybkość parsowania. Jest nim powierzchnia produktu: semantyka reguł, tekst poprawek, integracje z agentami i rozszerzenie edytora. Ta powierzchnia wymaga szybkiej iteracji. Proces rozszerzeń VS Code uruchamia JavaScript, więc silnik w TypeScripcie działa tam w tym samym procesie, bez drugiego buildu.
+
+**Decyzja.** Napisać silnik w TypeScripcie i traktować szybkość jako problem architektury (co parsujemy i kiedy), a nie problem języka.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jeden język w silniku, CLI, serwerze języka i rozszerzeniu. Osoba, która poprawia regułę, widzi efekt we wszystkich trzech.
+- :material-plus-circle-outline: Duża pula programistów TypeScriptu i szybkie prototypowanie funkcji dla agentów.
+- :material-minus-circle-outline: Plik binarny Buna jest duży (82 MB dla Linuksa x64, zmierzone) w porównaniu z plikiem z Rusta.
+- :material-minus-circle-outline: Parsowanie jest wolniejsze. Tree-sitter w WASM osiąga w naszym benchmarku około 1,3 MB/s na rdzeń. [ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) istnieje właśnie z tego powodu.
+- :material-alert-outline: Jeśli hipoteza techniczna upadnie na prawdziwych repozytoriach, planem awaryjnym jest przeniesienie prescanu i grafu do modułu WASM w Ruście albo Zigu, który wywołuje silnik w TypeScripcie. Reszta zostaje.
+
+**Alternatywy.** *Rust*: najlepsza wydajność, ale zestaw dla agentów, reguły i rozszerzenie rozwijałyby się wolniej, a konkurowalibyśmy z Astral na jego terenie. *Python*: tak robią import-linter i pytest-archon. Wymaga środowiska użytkownika, a grimp i tak musiał przejść na Rusta dla szybkości.
+
+## ADR-002: web-tree-sitter (WASM), a nie natywne wiązania { #adr-002-web-tree-sitter-wasm-not-native-bindings }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** tree-sitter ma dwa wiązania dla JavaScriptu. Natywny dodatek dla Node (`tree-sitter` 0.25.1) jest szybszy, ale zgłoszenie tree-sittera #5939 dokumentuje, że nie działa pod `bun run` i `bun build --compile` („To load Node-API modules, use require()…”). Nie potrafi też rozwiązać ścieżek do swoich prebuildów wewnątrz skompilowanego pliku binarnego. Kompilacja skrośna oznaczałaby dostarczanie jednego prebuildu `.node` na platformę, a `tree-sitter-python` nie publikuje żadnego dla musl. Wiązanie WASM (`web-tree-sitter` 0.27.0) jest przenośne, a `tree-sitter-python` dostarcza gramatykę `.wasm` w swoim pakiecie npm.
+
+**Decyzja.** Używać `web-tree-sitter` z `tree-sitter-python.wasm`. CLI osadza oba pliki `.wasm` w pliku binarnym przez `import … with { type: "file" }`. Silnik dostaje bajty przez port `GrammarBinaries` i nigdy nie szuka ich na dysku. To omija też znaną pułapkę, w której web-tree-sitter szuka swojego `.wasm` obok swojego pliku JS.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jeden runner linuksowy kompiluje skrośnie wszystkie sześć platform. Potok CD udowadnia to przy każdym tagu, uruchamiając każdy plik binarny na jego natywnym systemie.
+- :material-plus-circle-outline: Te same bajty działają w Bunie, w Node, a później w przeglądarkowym playgroundzie.
+- :material-minus-circle-outline: Parsowanie w WASM jest wolniejsze niż natywne. Sami jeszcze nie zmierzyliśmy tej różnicy.
+- :material-minus-circle-outline: Drzewa żyją w pamięci WASM i trzeba je zwalniać ręcznie (`tree.delete()`). Silnik robi to w bloku `finally`.
+
+**Alternatywy.** *Natywny dodatek*: zablokowany przez problem z Bunem i przez kompilację skrośną. *Ręcznie napisany lekser importów*: szybki, ale musiałby odtworzyć reguły Pythona dotyczące napisów, nawiasów i kontynuacji linii. Prescan z ADR-004 bierze tanią część tego pomysłu i oddaje wszystko, co trudne, z powrotem tree-sitterowi.
+
+## ADR-003: Dystrybucja jako jednoplikowy program wykonywalny Buna { #adr-003-ship-a-bun-single-file-executable }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Użytkownicy oczekują `uv add --dev <linter>` i pliku binarnego, który startuje natychmiast, tak jak Ruff i ty. Proszenie zespołów pythonowych o instalację Node nie wchodzi w grę. `--compile` w Bunie obsługuje Linuksa (glibc i musl), macOS i Windows na x64 i arm64 oraz osadza zasoby.
+
+**Decyzja.** Dystrybuować `inwards` jako jeden plik wykonywalny na platformę, budowany przez `bun build --compile` (zobacz `scripts/build-binaries.ts`). Później opakować każdy plik binarny w wheel platformowy publikowany jako `inwards` na PyPI (nazwę opisuje [ADR-011](#adr-011-rename-stratum-to-inwards)).
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Bez wymagań co do środowiska. Zmierzone: około 25 ms czasu rzeczywistego na sprawdzenie jednego pliku, łącznie ze startem procesu.
+- :material-plus-circle-outline: Tagi automatycznie produkują zweryfikowane pliki binarne (`cd.yml`).
+- :material-minus-circle-outline: 82 MB na plik binarny, a każdy wheel platformowy będzie zawierał jeden taki plik. Flaga `--bytecode` Buna i minifikacja to pierwsze rzeczy do wypróbowania, jeśli chodzi o start i rozmiar.
+- :material-minus-circle-outline: Zależymy od rytmu wydań Buna i od tego, że jego funkcja kompilacji pozostanie stabilna.
+
+**Alternatywy.** *Pakiet npm*: wymaga Node na maszynie użytkownika. *Node SEA (single executable applications)*: wykonalne, ale Bun daje nam kompilację skrośną, osadzanie zasobów, bundler i test runner w jednym narzędziu. *Deno compile*: realne, ale test runner, bundler i menedżer pakietów Buna w jednym narzędziu utrzymują monorepo prostszym.
+
+## ADR-004: Parsuj szkielet importów, potwierdzaj pełnym parsowaniem { #adr-004-parse-the-import-skeleton-confirm-with-a-full-parse }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Nasza pierwsza implementacja parsowała w całości każdy plik. Na syntetycznym repozytorium z 2100 plikami i 496 tys. linii (8 MB) zimne uruchomienie trwało **7,5 s**, z czego 6,1 s zajmowało parsowanie tree-sitterem. Reguły architektury potrzebują tylko importów, a w prawdziwym kodzie importy stoją we własnych liniach logicznych. Parsowanie samych linii importów w tym samym repozytorium trwało 0,27 s.
+
+**Decyzja.** Przed parsowaniem zbudować *szkielet importów*: zachować linie, które zaczynają instrukcję importu (łącznie z kontynuacjami w nawiasach i po ukośniku wstecznym), usunąć im wcięcie, a każdą inną linię wyczyścić, żeby numery linii pozostały poprawne. Sparsować szkielet i uruchomić reguły. Jeśli prescan napotka słowo `import` w miejscu, którego nie umie wyjaśnić (`x = 1; import os`, `if a: import b`, linia docstringa), odmawia przetworzenia pliku, a silnik parsuje go w całości. Linie komentarzy są pomijane, bo komentarz nie może ukryć importu. Jeśli szkielet daje naruszenie, silnik potwierdza je pełnym parsowaniem przed zgłoszeniem, co usuwa fałszywe alarmy z tekstu wyglądającego jak import wewnątrz napisów.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Zimne pełne uruchomienie na tym samym repozytorium: **0,63 do 0,96 s**, około 8 do 12 razy szybciej, nadal na jednym rdzeniu.
+- :material-plus-circle-outline: Poprawność jest zakotwiczona w pełnym parsowaniu i to testujemy, zamiast zakładać. `src/core/scripts/prescan-diff.ts` wyciąga importy z każdego pliku korpusu na oba sposoby i kończy się błędem, jeśli szkielet któryś pominie. Na bibliotece standardowej CPythona 3.14 (1921 plików) nie pomija **żadnego**, znajduje 33 dodatkowe, które parsowanie potwierdzające odrzuca, i odmawia 8,3 % plików, które dostają wtedy pełne parsowanie. CI uruchamia go przy każdym pushu na pełnej bibliotece standardowej CPythona 3.14 (2273 pliki) i kończy się błędem, jeśli ten korpus ma mniej niż 1500 plików. Testy jednostkowe obejmują przypadki zagnieżdżone, w nawiasach, ze średnikami i w docstringach.
+
+<figure markdown="span">
+  ![test różnicowy prescanu na bibliotece standardowej CPythona](../assets/screens/prescan-diff.svg){ loading=lazy }
+  <figcaption>Test różnicowy na bibliotece standardowej CPythona 3.14. CI uruchamia ten sam skrypt przy każdym pushu.</figcaption>
+</figure>
+
+- :material-alert-outline: Przegląd znalazł prawdziwą lukę, której korpus nigdy nie pokazał: `from shop.infrastructure \` z `import sql_orders` w następnej linii było odczytywane jako `import sql_orders`, a naruszenie nie było zgłaszane. Prescan odmawia teraz każdego pliku, w którym linia wspominająca `import` następuje po kontynuacji ukośnikiem wstecznym. Biblioteka standardowa nie ma takich zapisów, więc `prescan-diff` generuje teraz także własny korpus: 58 zapisów importów (kontynuacje, średniki, jednolinijkowe `if`/`try`, napisy i komentarze wokół importów, spacje w nazwach z kropkami, tabulatory, CRLF, BOM), łączonych w pary oraz w trójki z kontekstem napisów: 52 338 plików w mniej niż 1 s. Jego pierwsze uruchomienie znalazło drugą lukę: napis zawierający `from a import (` doklejał następujący po nim prawdziwy kod do fałszywego importu. Silnik odrzuca teraz każdy szkielet, który nie parsuje się czysto, i wraca do pełnego parsowania. Kolejny przegląd znalazł tę samą sztuczkę z czystym parsowaniem: `import a; t = '''` wewnątrz jednego napisu otwiera w szkielecie nowy napis, który połyka prawdziwy import pod nim. Dlatego szkielet jest też odrzucany, jeśli zawiera cokolwiek poza instrukcjami importu i komentarzami. Oba zapisy są teraz w generatorze (972 przeoczenia bez drugiego zabezpieczenia, zero z nim), a odsetek odmów na bibliotece standardowej się nie zmienił.
+- :material-alert-outline: Samotne `\r` kończy linię w Pythonie, ale nie w tree-sitterze, więc `# note\rimport x` ukrywało prawdziwy import wewnątrz komentarza nawet przed pełnym parsowaniem. Silnik zamienia samotne `\r` na `\n` przed parsowaniem. Test różnicowy nie widzi tej klasy błędów, bo obie strony dzielą parser, więc przypina to test jednostkowy.
+- :material-minus-circle-outline: Pliki z naruszeniami płacą za dwa parsowania. W starszym repozytorium z wieloma naruszeniami zbliża się to do kosztu naiwnego podejścia, dopóki baseline (UC6) nie pozwoli silnikowi pomijać ponownego potwierdzania znanych naruszeń.
+- :material-minus-circle-outline: Przyszłe reguły, które potrzebują czegoś więcej niż importów (na przykład „żadnych dekoratorów frameworków w domenie”), nie mogą używać szkieletu i będą potrzebowały własnej szybkiej ścieżki albo pełnego parsowania.
+
+**Alternatywy.** *Pełne parsowanie z pamięcią podręczną po hashu zawartości*: i tak dodamy pamięć podręczną, ale nie pomaga ona zimnym uruchomieniom w CI ani pierwszemu uruchomieniu. *Przyrostowe parsowanie tree-sittera*: przydatne w edytorze, gdzie trzymamy stare drzewo, i bezużyteczne dla świeżego procesu CLI. *`ruff analyze graph` jako źródło importów*: szybkie i oparte na Ruście, ale robi z Ruffa twardą zależność, zgłasza krawędzie plik–plik bez linii i kolumny (więc bez precyzyjnych diagnostyk) i zaczynało jako polecenie w wersji preview.
+
+## ADR-005: Konfiguracja mieszka w `pyproject.toml` { #adr-005-configuration-lives-in-pyprojecttoml }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Narzędzia pythonowe zbiegły się na `[tool.<name>]` w `pyproject.toml` (Ruff, pytest, mypy, uv). import-linter używa też `.importlinter` albo `setup.cfg`.
+
+**Decyzja.** Czytać `[tool.inwards]` z najbliższego `pyproject.toml`, idąc w górę od katalogu roboczego, albo z `--config`. Warstwy to uporządkowana lista, od najbardziej wewnętrznej. Moduł może importować własną warstwę i każdą warstwę wymienioną przed nią.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Żadnego nowego pliku i jedno oczywiste miejsce, w którym trzeba szukać.
+- :material-plus-circle-outline: Uporządkowane warstwy sprawiają, że typowy przypadek (ścisła cebula) to konfiguracja na cztery linie.
+- :material-minus-circle-outline: Konfiguracja siedzi w pliku, który agenci często edytują ze względu na zależności. Jej ochrona wymaga hooka albo CODEOWNERS zamiast osobnego pliku z osobnymi uprawnieniami. Zabezpieczenie opisuje [rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
+- :material-minus-circle-outline: Reguły nieliniowe (wycinki, które nie mogą się nawzajem widzieć, „tylko przez `api.py`”) będą później wymagały więcej składni. Będą to osobne tabele, więc prosty przypadek pozostanie prosty.
+
+**Alternatywy.** *`inwards.toml`*: łatwiej go zablokować, ale to jeszcze jeden plik. Możemy go jeszcze obsłużyć jako opcję. *Konfiguracja w Pythonie (jak w pytest-archon)*: wymagałaby wykonywania kodu użytkownika, co kłóci się z ADR-006.
+
+## ADR-006: Silnik nie wykonuje operacji wejścia-wyjścia { #adr-006-the-engine-does-no-io }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Silnik działa w dwóch hostach z różnym wejściem-wyjściem: w pliku binarnym Buna z osadzonymi plikami i w serwerze języka na Node z plikami na dysku i niezapisanymi buforami w pamięci. Później będzie działał w testach, w serwerze MCP, a może w przeglądarce.
+
+**Decyzja.** `@inwards/core` przyjmuje zwykłe dane (`SourceFile[]`, tekst konfiguracji, `GrammarBinaries`) i zwraca zwykłe dane. Znajdowanie plików, ich czytanie, osadzanie gramatyk i wybór miejsca, do którego trafia wyjście, należą do adapterów. `biome.json` pilnuje strony środowiska uruchomieniowego, zakazując globalnych `Bun` i `Deno` w `src/core/src`.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Edytor sprawdza niezapisany bufor, a CLI plik na dysku, tą samą funkcją.
+- :material-plus-circle-outline: Testy nie potrzebują katalogów tymczasowych. Przekazują napisy.
+- :material-minus-circle-outline: Reguły międzyplikowe (cykle, nieznane moduły) wymagają, żeby adapter dostarczył indeks modułów. API silnika dostanie wejście „project”, gdy te reguły się pojawią.
+
+**Alternatywy.** *Silnik sam czyta pliki*: prostsze na początku, ale przywiązałoby silnik do API plików jednego środowiska i skomplikowało przypadek edytora.
+
+## ADR-007: Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi { #adr-007-a-versioned-output-contract-with-fix-steps-as-data }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Agenci i skrypty parsują nasze wyjście. Każda niezapowiedziana zmiana psuje komuś hook. SARIF to standard dla interfejsów code scanning, a GitHub przyjmuje go przez `github/codeql-action/upload-sarif`.
+
+**Decyzja.** Wyjście JSON zawiera `"schema": "inwards/diagnostics@1"`. W ramach głównej wersji pola można dodawać, ale nigdy nie zmieniać ich nazw ani ich nie usuwać. Każda diagnostyka ma `fix.summary` i `fix.steps[]`, zbudowane z faktycznych nazw importu i warstw. SARIF 2.1.0 niesie te same kroki w `message.text` i `properties.fix`. Gdy stdout nie jest terminalem, wyjście jest zwięzłe.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Hooki i agenci mogą polegać na tej strukturze.
+- :material-plus-circle-outline: Jakość poprawek staje się testowalna: testy sprawdzają kroki.
+- :material-minus-circle-outline: Tekst poprawek jest teraz API. Przeredagowanie go nie szkodzi modelom, ale może zepsuć testy snapshotowe, które ludzie piszą przeciwko nam.
+
+**Alternatywy.** *Niewersjonowany JSON*: częsty wybór (Biome oznacza swój reporter JSON jako eksperymentalny), ale przerzuca ryzyko na integracje, na których nam najbardziej zależy.
+
+## ADR-008: Serwer języka na Node wewnątrz rozszerzenia, na razie { #adr-008-language-server-on-node-inside-the-extension-for-now }
+
+**Stan:** Przyjęty, do ponownej oceny w M6 (v0.6) · 2026-09-25
+
+**Kontekst.** Ruff i ty dostarczają swój serwer języka w tym samym pliku binarnym (`ruff server`). Dzięki temu każdy edytor obsługujący LSP (Neovim, Zed, Helix) dostaje serwer za darmo. Scaffold Inwards zamiast tego dołącza serwer LSP na Node do rozszerzenia VS Code, obok plików gramatyk.
+
+**Decyzja.** Trzymać serwer na Node w rozszerzeniu, dopóki CLI nie będzie miał stabilnego podpolecenia `inwards server`. Wtedy rozszerzenie stanie się cienkim klientem, który uruchamia plik binarny, a serwer na Node zostanie usunięty.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Działa już dziś, bez pobierania pliku binarnego przez rozszerzenie.
+- :material-minus-circle-outline: Silnik jest pakowany na dwa sposoby. Uczciwość obu pilnują zabezpieczenie środowiska uruchomieniowego (ADR-006) i build rozszerzenia w CI.
+- :material-minus-circle-outline: Inne edytory czekają na `inwards server`.
+
+**Alternatywy.** *`inwards server` już teraz*: lepszy stan docelowy, ale wymaga obsługi LSP przez stdio w pliku binarnym i kroku pobierania w rozszerzeniu. To więcej, niż powinien dźwigać scaffold.
+
+## ADR-009: Sprawdzaj importy, gdziekolwiek się pojawią { #adr-009-check-imports-wherever-they-appear }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** pytest-archon pozwala użytkownikom pomijać importy z `TYPE_CHECKING` i patrzeć tylko na importy najwyższego poziomu. Dla ludzi to rozsądne opcje. Dla agentów to furtki: przeniesienie importu do ciała funkcji albo do bloku `TYPE_CHECKING` to najtańszy sposób, żeby uciszyć narzędzie, które je ignoruje.
+
+**Decyzja.** INW001 sprawdza każdy import w pliku: na najwyższym poziomie, zagnieżdżony w funkcjach albo klasach i pod `if TYPE_CHECKING:`. Importy względne i `from package import submodule` są najpierw rozwiązywane.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Typowe obejścia nie działają, a tekst poprawki mówi o tym z góry.
+- :material-minus-circle-outline: Zespoły, które celowo dopuszczają odwołania do warstw zewnętrznych tylko na potrzeby typów, będą chciały opcji wyłączenia. Jeśli ją dodamy, będzie ustawiana dla pary warstw i domyślnie wyłączona.
+
+**Alternatywy.** *Tylko importy najwyższego poziomu*: szybciej się to wyjaśnia i łatwo to obejść.
+
+## ADR-010: Dokumentacja budowana Zensicalem, serwowana przez Cloudflare Workers { #adr-010-docs-built-with-zensical-served-by-cloudflare-workers }
+
+**Stan:** Przyjęty · 2026-09-25 · część dotycząca hostingu zastąpiona przez [ADR-012](#adr-012-publish-the-docs-on-github-pages-for-now)
+
+**Kontekst.** Dokumentacja to Markdown z diagramami Mermaid i ikonami. Zensical, od zespołu Material for MkDocs, czyta `zensical.toml`, natywnie renderuje Mermaid i dołącza zestawy ikon Material. Jeśli chodzi o hosting, aktualna dokumentacja Cloudflare kieruje nowe strony statyczne do statycznych zasobów Workers, konfigurowanych blokiem `assets` w `wrangler.jsonc`.
+
+**Decyzja.** `docs/zensical.toml` buduje `docs/chapters/` do `docs/site/`. `docs/wrangler.jsonc` deklaruje Workera złożonego wyłącznie z zasobów (`inwards-docs`). `.github/workflows/docs.yml` buduje z `--clean --strict` i wdraża przez `cloudflare/wrangler-action@v4` przy pushach do `main`. CI buduje dokumentację przy każdym pull requeście, więc zepsuta strona oblewa sprawdzenie przed scaleniem.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Żadnego kodu Workera do utrzymania. Cloudflare serwuje pliki bezpośrednio, z prawdziwą stroną 404.
+- :material-minus-circle-outline: Zensical jest młody (0.0.x). Jego dokumentacja na razie odradza pamięć podręczną buildu w CI, stąd `--clean`.
+- :material-minus-circle-outline: Wymaga dwóch sekretów repozytorium: `CLOUDFLARE_API_TOKEN` i `CLOUDFLARE_ACCOUNT_ID`.
+
+**Alternatywy.** *GitHub Pages*: prostsze uwierzytelnianie, ale bez funkcji na brzegu sieci, gdybyśmy później chcieli przekierowań albo API do przeszukiwania reguł. *Cloudflare Pages*: nadal działa. Wybraliśmy Workers, żeby iść za aktualnymi zaleceniami Cloudflare i zostawić miejsce na małego Workera w przyszłości (przekierowania, endpoint wyszukiwania reguł).
+
+## ADR-011: Zmiana nazwy ze Stratum na Inwards { #adr-011-rename-stratum-to-inwards }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Robocza nazwa „Stratum” była zajęta na PyPI, npm i crates.io. Gorzej, w świecie Pythona nazywa protokół pul wydobywczych Bitcoina: pakiet `stratum` na PyPI to serwer wydobywczy oparty na Twisted, a najpopularniejsze repozytoria pythonowe na GitHubie o nazwie „stratum” to serwery i proxy wydobywcze. Programista szukający lintera trafiłby na oprogramowanie do kopania kryptowalut. 2026-09-25 sprawdziliśmy kilkanaście alternatyw na PyPI i npm.
+
+**Decyzja.** Projekt, polecenie i tabela konfiguracji nazywają się **Inwards**: `inwards check`, `[tool.inwards]`, pakiet `inwards` na PyPI i npm (oba wolne tego dnia) oraz kody reguł od `INW001` w górę. Nazwa wyraża regułę, której narzędzie pilnuje: zależności wskazują do środka (inwards).
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jedna nazwa wszędzie: repozytorium, plik binarny, wheel na PyPI, tabela konfiguracji i prefiks reguł.
+- :material-plus-circle-outline: Brak kolizji w naszym obszarze. Wyszukiwanie na GitHubie 2026-09-25 znalazło tylko małe, niezwiązane projekty o nazwie Inwards (panel z danymi o wodzie, widżet Fluttera, gra), żaden z nich nie jest narzędziem dla Pythona.
+- :material-minus-circle-outline: „Inwards” to zwykłe angielskie słowo, więc wyszukiwania wymagają dopisku „linter” albo „python”.
+- :material-minus-circle-outline: Identyfikator schematu JSON zmienił się na `inwards/diagnostics@1` przed jakimkolwiek wydaniem, więc nic poza tym repozytorium nie zależało od starego.
+
+**Alternatywy.** *Zostawić Stratum i publikować jako `stratum-lint`*: bez pracy nad zmianą nazwy, ale kolizja z protokołem wydobywczym zostaje na zawsze. *`strataguard`, `layerly`, `onion-lint`, `tierlint`*: wszystkie wolne, żadna nie mówi tak bezpośrednio, co robi narzędzie.
+
+## ADR-012: Publikuj dokumentację na GitHub Pages, na razie { #adr-012-publish-the-docs-on-github-pages-for-now }
+
+**Stan:** Przyjęty · 2026-09-25 · zastępuje część dotyczącą hostingu z [ADR-010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers)
+
+**Kontekst.** Pierwsze wdrożenie na Cloudflare się nie udało: jedyny dostępny token API był ograniczony do Cloudflare Tunnel, a API Workers odpowiadało „No access to the specified resource”. Dokumentacja nie powinna czekać na nowy token.
+
+**Decyzja.** `.github/workflows/docs.yml` buduje Zensicalem i publikuje `docs/site/` przez `actions/upload-pages-artifact` i `actions/deploy-pages`. Ścieżka Cloudflare zostaje gotowa, ale uśpiona: `docs/wrangler.jsonc` jest bez zmian, a `.github/workflows/docs-cloudflare.yml` wdraża ją przy ręcznym uruchomieniu, gdy pojawi się token z uprawnieniem *Workers Scripts: Edit*.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Żadnych poświadczeń od stron trzecich. Pages używa własnego tokena OIDC workflow.
+- :material-plus-circle-outline: Powrót to jeden sekret i jedno uruchomienie workflow. Nic na stronie nie zależy od hosta.
+- :material-minus-circle-outline: Strona żyje pod ścieżką (`/inwards/`), więc przy zmianie hosta `site_url` w `zensical.toml` i `DOCS_BASE` w silniku muszą się zmienić razem.
+- :material-minus-circle-outline: GitHub Pages dla prywatnego repozytorium wymaga płatnego planu GitHub.
+
+**Alternatywy.** *Poczekać na token Cloudflare*: dokumentacja byłaby niedostępna bez powodu technicznego. *Wdrażać z lokalnej maszyny*: nieodtwarzalne i pomija ścisły build w CI.
+
+## ADR-013: Rzeczywiste ścieżki dla granicy, ścieżki importu dla nazw modułów { #adr-013-real-paths-for-the-boundary-import-paths-for-module-names }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Dane wejściowe hooka pochodzą od agenta, więc każda ścieżka w nich jest niezaufana. Dwa przeglądy w M0 pokazały, że jeden rodzaj ścieżki nie może służyć obu celom. Sprawdzanie zawierania i nazywanie modułów na ścieżkach leksykalnych pozwala dowiązaniu symbolicznemu sięgnąć poza projekt. Robienie obu rzeczy na ścieżkach rzeczywistych (pierwsza poprawka) zmieniało nazwę dowiązanego `shop/domain/order.py` na `shared.order`, które nie należy do żadnej warstwy. Późniejsza wersja pomijała prawdziwy pakiet, gdy przejrzano już jego alias-dowiązanie, więc `ln -s shop/domain aaa` ukrywało całą warstwę domeny. Dwa szczegóły platform pogarszały sprawę. Na macOS `/var` to dowiązanie do `/private/var`. A `realpath` w Bunie składa `dlink/..` jako tekst, podczas gdy system operacyjny najpierw rozwiązuje `dlink`.
+
+**Decyzja.**
+
+- **O zawieraniu** decydują ścieżki rzeczywiste. Granicą jest `CLAUDE_PROJECT_DIR` albo katalog, w którym host uruchamia hook, nigdy `cwd` z danych wejściowych. `..` jest rozwiązywane tak, jak robi to system operacyjny, jedna ścieżka rzeczywista naraz.
+- **Nazwy modułów** są zgodne z Pythonem: moduł nazywa się według ścieżki, przez którą jest importowany. Plik osiągalny pod kilkoma nazwami (alias i jego ścieżka rzeczywista) jest sprawdzany pod każdą nazwą, która mieści się pod katalogiem głównym konfiguracji, raz na plik.
+- **Przeglądanie plików** podąża za dowiązaniami symbolicznymi tylko wtedy, gdy ich cel zostaje wewnątrz przeglądanego katalogu. Zatrzymuje się tylko na prawdziwym cyklu, znalezionym w łańcuchu katalogów nadrzędnych.
+- **Wyszukiwanie konfiguracji** decyduje na podstawie sparsowanego TOML, a w hooku ignoruje każdy `pyproject.toml`, którego ścieżka rzeczywista leży poza projektem.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Alias nie może wyprowadzić pliku z jego warstwy, a dowiązanie nie może wciągnąć plików spoza projektu do sprawdzenia ani do wyjścia hooka.
+- :material-minus-circle-outline: Kod współdzielony przez dowiązanie do katalogu poza projektem nie jest sprawdzany. Sprawdzenie go oznaczałoby czytanie poza projektem.
+- :material-minus-circle-outline: Plik, który naprawdę ma dwie nazwy modułu, może zostać zgłoszony dwa razy, raz dla każdej nazwy. Obie są prawdziwymi ścieżkami importu, więc oba zgłoszenia są prawdziwe.
+
+**Alternatywy.** *Tylko ścieżki rzeczywiste*: zmienia nazwy dowiązanych plików i ukrywa warstwy. *Tylko ścieżki leksykalne*: pozwala dowiązaniu sięgnąć poza projekt. *Brak obsługi dowiązań symbolicznych*: pakiety dowiązane do projektu pozostawałyby niesprawdzone bez żadnego ostrzeżenia.
+
+## ADR-014: Zgłaszaj pliki, których zadeklarowane kodowanie może ukryć importy { #adr-014-report-files-whose-declared-encoding-can-hide-imports }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** CPython respektuje deklarację PEP 263, taką jak `# coding: unicode_escape` w linii 1 albo 2. Przy tym kodeku tekst `#\u000aimport shop.infrastructure.db` jest komentarzem dla każdego czytnika, który traktuje plik jako UTF-8, a prawdziwym importem dla CPythona. Adaptery czytają pliki jako UTF-8, a silnik nie wykonuje operacji wejścia-wyjścia i nie zawiera tablic kodeków.
+
+**Decyzja.** Silnik znajduje deklarację według reguł tokenizera CPythona: linia 1 albo linia 2, gdy linia 1 jest pusta albo jest komentarzem, z obsługą CRLF i U+2028. Warianty UTF-8 i jednobajtowe kodeki zgodne z ASCII (ASCII, Latin-1, ISO-8859-*, cp125x) są czytane jak zwykle, bo żaden z ich bajtów nie może zamienić się w znak końca linii albo cudzysłów. Każdy inny zadeklarowany kodek daje jedną diagnostykę INW000 w linii 1 dla pliku w warstwie, a importy tego pliku nie są sprawdzane.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Plik, którego kodowanie może ukryć import, jest zgłaszany, zamiast przechodzić.
+- :material-minus-circle-outline: Prawidłowe pliki w kodekach takich jak Shift_JIS albo EUC-JP też dostają INW000. To ostrożne podejście, bo bajt wiodący Shift_JIS może połknąć ukośnik wsteczny. Poprawka to zapisanie pliku w UTF-8.
+
+**Alternatywy.** *Dekodować każdy kodek obsługiwany przez Pythona*: wymaga tablic kodeków w silniku i wciąż musi zgadzać się z CPythonem co do bajtu. *Ignorować deklarację*: ciche obejście.
+
+## ADR-015: Sprawdzaj dosłowne importy dynamiczne jako INW011 { #adr-015-check-literal-dynamic-imports-as-inw011 }
+
+**Stan:** Przyjęty · 2026-09-25
+
+**Kontekst.** Skoro INW001 wyłapuje importy w funkcjach i za `TYPE_CHECKING` ([ADR-009](#adr-009-check-imports-wherever-they-appear)), następnym najtańszym obejściem jest wywołanie: `importlib.import_module("shop.infrastructure.db")`, `__import__(...)`, `runpy.run_module(...)` albo `exec("from shop.infrastructure import db")`. Inwards nigdy nie uruchamia kodu użytkownika (C4), więc może czytać tylko cele, które są zapisane wprost. Szkielet importów ([ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse)) zachowuje wyłącznie instrukcje importu: plik, którego jedyną zależnością na zewnątrz jest wywołanie, przeszedłby szybką ścieżkę bez żadnych importów.
+
+**Decyzja.**
+
+- Cel w postaci literału napisowego w `importlib.import_module`, `__import__` (także jako `builtins.__import__` i `importlib.__import__`) albo `runpy.run_module` oraz każdy import wewnątrz dosłownego kodu dla `exec`, `eval` albo `compile` jest sprawdzany jak import. Dosłowny kod jest parsowany tą samą gramatyką, a jego importy (także dynamiczne) są zgłaszane w miejscu wywołania.
+- Jest zgłaszany jako osobna reguła, INW011 `dynamic-import`, a nie jako INW001. Poprawka wskazuje loader jako problem: usuń wywołanie i użyj portu, bo odbudowanie nazwy w czasie działania albo przeniesienie jej do innego loadera tylko ukrywa zależność.
+- Loadery są rozpoznawane przez aliasy importów (`from importlib import import_module as im`, `import builtins as b`, `from importlib import *`), zwykłe przypisania (`load = importlib.import_module`), `getattr(m, "name")`, `m["name"]`, `m.__dict__["name"]`, `vars(m)["name"]` i `__import__("importlib")`. Zasięgi są ignorowane, a `exec`, `eval`, `compile` i `__import__` zawsze są traktowane jak funkcje wbudowane, więc rozwiązywanie może dodać wyniki, ale nie może żadnego usunąć. Zaakceptowanym kosztem jest fałszywy alarm: po `from re import compile` wywołanie `compile("from shop.infrastructure import x")` zostaje zgłoszone.
+- Wiązania niewymienione wyżej nie są śledzone, więc loader osiągnięty przez nie zostaje przeoczony: operator morsa, przypisanie krotek, atrybuty klasy i instancji, `functools.partial`, nazwy związane wewnątrz `exec` oraz funkcje wbudowane osiągnięte przez obiekty (`print.__self__`). Inne API ładujące (`pkgutil.resolve_name`, `importlib.util.find_spec` z `exec_module`, `SourceFileLoader`) też nie są czytane. [#79](https://github.com/SirCypkowskyy/inwards/issues/79) śledzi je wszystkie.
+- Cel to stały napis: literały, niejawna konkatenacja, `+` między stałymi i f-stringi, których pola są stałymi napisami.
+- Bajty przekazane do `exec` albo `compile` są dekodowane tak, jak robi to CPython. Deklaracja PEP 263 się liczy, a kodek, którego Inwards nie umie czytać (reguły INW000, [ADR-014](#adr-014-report-files-whose-declared-encoding-can-hide-imports)), daje w każdej warstwie diagnostykę INW011 mówiącą, że kodu nie da się sprawdzić. Źródło typu `str` ignoruje deklarację, tak jak w CPythonie.
+- Cele względne są rozwiązywane tak jak w czasie działania: `import_module(".x", package=...)` z dosłownym pakietem, `__package__` albo `__name__` oraz `__import__` z dosłownym `level` względem pakietu pliku.
+- Przed prescanem sprawdzenie tekstu szuka nazw, które każde wywołanie ładujące musi zapisać: `importlib`, `runpy`, `builtins`, `__import__` albo `exec`, `eval` lub `compile` bez poprzedzającej kropki, w tekście po normalizacji NFKC. Plik w warstwie, który pasuje, pomija szkielet i dostaje pełne parsowanie. `prescan-diff` sprawdza tę wskazówkę na obu korpusach: import dynamiczny w pliku, który wskazówka odrzuca, to przeoczenie.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Typowe dynamiczne obejścia są zgłaszane z poprawką wymierzoną właśnie w nie. Testy obejmują każdą formę wywołania i każdy alias.
+- :material-minus-circle-outline: INW011 nie jest kompletne. Niewymienione wiązania i API ładujące wymienione wyżej oraz wyliczane cele pozostają fałszywie negatywnymi wynikami, dopóki nie wejdą [#79](https://github.com/SirCypkowskyy/inwards/issues/79) i [#46](https://github.com/SirCypkowskyy/inwards/issues/46).
+- :material-plus-circle-outline: Wskazówka wysyła do pełnego parsowania 209 z 1921 plików biblioteki standardowej CPythona 3.14, a płacą za to tylko pliki w warstwie. `re.compile` jej nie wyzwala.
+- :material-minus-circle-outline: Wyliczane cele (`import_module(name)`, f-stringi z polami), względne `import_module` bez czytelnego pakietu i literały z sekwencją `\N{...}` nie są czytane. Wyliczane cele wymagają osobnej decyzji: oznaczania każdego niedosłownego wywołania loadera w warstwie wewnętrznej ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)).
+- :material-minus-circle-outline: `prescan-diff` parsuje teraz każdy plik, którego nie może wykluczyć, więc wygenerowany korpus (65 262 pliki) zajmuje około 4 s zamiast 1 s.
+- :material-minus-circle-outline: Indeks modułów (`importersOf`) wciąż czyta tylko importy statyczne, więc moduł importujący inny dynamicznie nie jest wymieniany jako jego importer.
+
+**Alternatywy.** *Zgłaszać jako INW001*: agent przeczytałby „usuń import” i szukałby instrukcji importu, której nie ma. *Skanować nazwy wywołań w szkielecie*: szkielet musiałby zachowywać dowolne linie z wyrażeniami, co jest pełnym parsowaniem pod inną nazwą. *Oznaczać każde wywołanie loadera w warstwie wewnętrznej*: wyłapuje też wyliczane cele, ale zgłasza `importlib.import_module("json")`; zostawione na późniejsze zgłoszenie.
+
+## ADR-016: Wersje i wydania wynikają z typów commitów, przez release PR { #adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr }
+
+**Stan:** Przyjęty · 2026-09-26
+
+**Kontekst.** Do v0.1.0-rc.1 wydanie oznaczało ręczne podbijanie `VERSION` w pięciu plikach (`meta.ts`, trzy pliki `package.json`, `pyproject.toml`), wypchnięcie tagu `v*` i ręczne pisanie informacji o wydaniu. Ręcznie wpisywane tagi są żmudne i łatwo o błąd, a błędny tag drogo kosztuje: `cd.yml` odrzuca tag, który nie zgadza się z `VERSION`, a PyPI nigdy nie przyjmuje tej samej wersji dwa razy. Właściciel poprosił o wersje, które ustawiają się same, i changelog, którego nikt nie pisze. Inwards jest przed wersją 1.0 i w fazie pre-alpha. `required-version` (przypinane przez `inwards init`) ma oznaczać „najstarsze wydanie z funkcjami, których używa ta konfiguracja”.
+
+**Decyzja.**
+
+- **[release-please](https://github.com/googleapis/release-please) utrzymuje otwarty release PR** (`chore: release X.Y.Z`) z następną wersją, wersją wpisaną do każdego pliku i nową sekcją `CHANGELOG.md`. Scalenie go jest wydaniem: taguje `vX.Y.Z`, tworzy szkic GitHub Release i uruchamia `cd.yml`. Nikt nie wpisuje tagu ani wpisu w changelogu.
+- **Wersja wynika z typu commitu** każdego PR scalonego przez squash ([ADR-017](#adr-017-squash-merges-with-conventional-commit-pr-titles)). Przed 1.0 `feat` i `fix` podbijają wersję poprawki (patch), a zmiana niekompatybilna (`feat!`, `BREAKING CHANGE:`) podbija wersję pomniejszą (minor), jak w Cargo. Po 1.0 obowiązują zwykłe reguły SemVer.
+- **Wersje kamieni milowych są ustawiane celowo.** Zamknięcie kamienia milowego N ustawia `Release-As: 0.N.0` jako ostatni akapit opisu PR, żeby wydania zgadzały się z nazwami kamieni milowych (M2 to v0.2).
+- **Jest jedno źródło wersji:** `.release-please-manifest.json`. CI oblewa każdy PR, w którym inne pole wersji się z nim nie zgadza.
+- **Model gałęzi jest oparty na pniu (trunk-based).** Jest tylko `main`, z krótko żyjącymi gałęziami, bez gałęzi `develop`.
+- **Kandydat do wydania to opcjonalny, ręcznie wypychany tag** (`v0.2.0-rc.1`) na gałęzi release PR, `release-please--branches--main--components--inwards`. `main` trzyma starą wersję, dopóki release PR nie zostanie scalony, więc tag tam nie przeszedłby sprawdzenia wersji. To ten sam przepływ co przy v0.1.0-rc.1.
+- **Buildy deweloperskie z `main`** (`0.2.1-dev.N+g<sha>` dla plików binarnych, `0.2.1.devN` dla wheeli) zostają na później, aż design partnerzy będą potrzebowali nightly.
+- **Nie ma jeszcze wydania v0.1.0.** v0.1.0-rc.1 pozostaje opublikowaną wersją przedpremierową, a release PR czeka, aż któryś kamień milowy będzie wart pokazania.
+- **Kompatybilność przed 1.0:**
+  - Wydanie poprawkowe (patch) dodaje albo naprawia; nigdy nie psuje konfiguracji, która działała.
+  - Wydanie pomniejsze (minor) może zepsuć konfigurację albo CLI i mówi o tym w notce o zmianach niekompatybilnych w CHANGELOG.
+  - Wyjście `inwards/diagnostics@1` tylko zyskuje pola ([ADR-007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data)).
+  - `required-version` oznacza „najstarsze wydanie z funkcjami, których używa ta konfiguracja”.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Wydanie to jedno scalenie, a release PR pokazuje dokładnie, co zostanie dostarczone, zanim to nastąpi.
+- :material-plus-circle-outline: Numery wersji pozostają znaczące dla użytkowników i dla `required-version`.
+- :material-minus-circle-outline: Changelog jest tak dobry, jak tytuły PR ([ADR-017](#adr-017-squash-merges-with-conventional-commit-pr-titles)).
+- :material-minus-circle-outline: Dopóki repozytorium jest prywatne i używa domyślnego `GITHUB_TOKEN`, release PR nie dostaje własnego uruchomienia CI. Jego diff to tylko wpisane wersje i changelog, a `cd.yml` ponownie uruchamia testy na tagu. Token aplikacji GitHub App naprawi to, gdy repozytorium stanie się publiczne.
+- :material-minus-circle-outline: Wydanie z release-please uruchamia `cd.yml` przez `workflow_dispatch`, bo tag wypchnięty z `GITHUB_TOKEN` nie uruchamia żadnego workflow. Przejście później na token aplikacji oznacza usunięcie tego kroku, inaczej każde wydanie będzie budowane dwa razy.
+- :material-minus-circle-outline: Pierwszym wydaniem będzie v0.1.1 albo późniejsze (wybiera je `Release-As`), nigdy v0.1.0. Link porównawczy w jego changelogu wskazuje tag v0.1.0, który nie istnieje.
+
+**Alternatywy.**
+
+- *Podbijanie według gałęzi: minor przy każdym scaleniu do `main`, major przy każdym wydaniu i gałąź `develop` publikująca buildy `dev+sha`.* To był pierwszy pomysł właściciela, a jego cel (brak ręcznego tagowania) został zachowany. Minor przy każdym scaleniu doszedłby do 0.40 w ciągu kilku tygodni, spalałby numer wersji na każdy PR, którego nikt nie instaluje, i psułby `required-version`: kolega z zespołu jedno scalenie w tyle ciągle dostawałby „requires Inwards X or newer”. Major przy każdym wydaniu łamie SemVer, bo major oznacza niekompatybilność. Gałąź `develop` dokłada scalenia wsteczne i podwójne CI dla jednego opiekuna, który scala jeden PR naraz.
+- *semantic-release:* wydaje przy każdym pushu, bez kroku przeglądu, i nie obsługuje wersji 0.x.
+- *python-semantic-release:* commituje i taguje prosto na `main` przy każdym pushu i oddaje narzędziu w Pythonie kontrolę nad repozytorium opartym na Bunie.
+- *git-cliff plus własne zadanie tagujące:* najlepszy generator changelogów, ale podbijanie, wpisywanie wersji i tagowanie byłyby w całości własnej roboty.
+- *changesets:* wymaga ręcznie pisanego pliku changeset w każdym PR, a tego właśnie właściciel chciał uniknąć.
+
+## ADR-017: Scalanie przez squash z tytułami PR w formacie Conventional Commits { #adr-017-squash-merges-with-conventional-commit-pr-titles }
+
+**Stan:** Przyjęty · 2026-09-26
+
+**Kontekst.** Automatyczne wersje i changelogi ([ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)) czytają wiadomości commitów na `main`. Do 2026-09-25 PR-y były scalane commitami scalającymi, które przenosiły do `main` każdy commit z gałęzi: rundy „poprawek po przeglądzie”, commity z pracą w toku i commity `fix:`, które poprawiały pracę nigdy niewydaną. Tylko 19% tych commitów było zgodnych z Conventional Commits.
+
+**Decyzja.**
+
+- **Repozytorium pozwala tylko na scalanie przez squash.** Tytuł commitu squash to tytuł PR, a jego wiadomość to opis PR. Scalone gałęzie są usuwane automatycznie.
+- **Każdy tytuł PR to Conventional Commit**, `type(scope): summary`, sprawdzany w CI przez `pr-title.yml`.
+  - `feat`, `fix`, `perf`, `deps`, `revert` i `docs` pojawiają się w changelogu.
+  - `refactor`, `test`, `build`, `ci` i `chore` są ukryte.
+- **Zmiana niekompatybilna jest oznaczana w tytule i wyjaśniana w opisie:** `feat!:` w tytule oraz akapit `BREAKING CHANGE: <what to do>` w opisie PR.
+- **Commity wewnątrz gałęzi mogą mówić cokolwiek.** Nigdy nie trafiają do `main`.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jeden PR to jeden commit i jedna linia w changelogu.
+- :material-plus-circle-outline: Linię changelogu można poprawić po scaleniu, edytując opis PR, blokiem `BEGIN_COMMIT_OVERRIDE`.
+- :material-minus-circle-outline: `git bisect` na `main` zatrzymuje się na całym PR, a nie na pojedynczym commicie w nim.
+- :material-minus-circle-outline: Gałąź scalona przez squash nie jest przodkiem `main`, więc worktree sprząta się przez `git branch -D` po sprawdzeniu, że PR jest scalony.
+
+**Alternatywy.**
+
+- *Zostawić commity scalające i lintować każdy commit:* każdy commit z poprawkami po przeglądzie potrzebowałby typu, a poprawki wewnątrz gałęzi i tak trafiałyby do changelogu.
+- *Scalanie przez rebase:* ten sam problem, z jednym commitem na linię.
+- *Ręcznie pisane wpisy w changelogu:* odrzucone w [ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr).
+
+## ADR-018: Selektory pakietów przyjmują globy od początku; monorepo podąża za workspace'ami uv { #adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces }
+
+**Stan:** Przyjęty · 2026-09-26
+
+**Kontekst.** Kształt pakietu ([#95](https://github.com/SirCypkowskyy/inwards/issues/95)) i jego następcy (szablony [#97](https://github.com/SirCypkowskyy/inwards/issues/97), reguły ról [#98](https://github.com/SirCypkowskyy/inwards/issues/98)) wybierają pakiety po nazwie. Układy takie jak [fastapi-best-practices](https://github.com/zhanymkanov/fastapi-best-practices) dodają pakiet na każdą domenę biznesową, a Inwards musi obsłużyć zarówno jednopakietowy monolit, jak i monorepo z kilkoma projektami.
+
+**Decyzja.**
+
+- **Selektory przyjmują globy od v1**, w gramatyce import-lintera: `a.b` to dokładne dopasowanie, `a.*` to jeden segment, a `a.**` to dowolna głębokość poniżej `a`. Wygrywa pierwszy pasujący wpis, a dokładny wpis przesłonięty przez wcześniejszy glob to błąd konfiguracji. Schemat konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)) używa tej samej gramatyki.
+- **Monorepo podąża za workspace'ami uv** (`[tool.uv.workspace] members = [...]`).
+  - Każdy członek workspace ma własne `[tool.inwards]`, a dla każdego pliku obowiązuje najbliższa konfiguracja, tak jak dziś.
+  - Późniejsza konfiguracja na poziomie workspace może stosować jeden kształt albo szablon do każdego członka, korzystając z globów `members` z uv, żeby lista projektów nie powtarzała się w konfiguracji Inwards ([#57](https://github.com/SirCypkowskyy/inwards/issues/57)).
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Nową domenę (`src/payments/`) `src.*` obejmuje w chwili, gdy powstaje. Agent nie może obejść kształtu, dodając pakiet, którego konfiguracja jeszcze nie wymienia.
+- :material-plus-circle-outline: Użytkownicy monorepo opisują swoje projekty raz, w miejscu, które uv już czyta.
+- :material-minus-circle-outline: Pierwszeństwo globów trzeba wyjaśnić i przetestować. Glob może pasować do pakietów, o które użytkownikowi nie chodziło, więc selektor, który do niczego nie pasuje, jest zgłaszany, podobnie jak selektor przesłonięty przez wcześniejszy wpis.
+
+**Alternatywy.**
+
+- *W v1 tylko jawne nazwy pakietów, globy później:* prostsze na początku, ale każda nowa domena wymagałaby zmiany konfiguracji. Config guard ([#23](https://github.com/SirCypkowskyy/inwards/issues/23)) zabrania agentom takiej zmiany, więc każda nowa domena musiałaby się zatrzymać i czekać na użytkownika.
+- *Własna składnia workspace:* powielałaby to, co uv już definiuje, i by się z tym rozjeżdżała.
+
+## ADR-019: Gałąź integracyjna `develop`; `main` przesuwa się tylko przy wydaniach { #adr-019-a-develop-integration-branch-main-moves-only-at-releases }
+
+**Stan:** Przyjęty · 2026-09-26 · Zastępuje punkt o gałęziach z [ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)
+
+**Kontekst.** ADR-016 wybrał rozwój oparty na pniu, bo jeden opiekun scalał jeden PR naraz. To się zmieniło: właściciel chce, żeby agenci z innych środowisk (Codex, Cursor i inne) otwierali własne PR-y, podczas gdy pracuje agent koordynujący. Kilku autorów potrzebuje jednej chronionej gałęzi integracyjnej, a `main` powinien pokazywać tylko wydany kod. Wcześniej żadna z gałęzi nie miała żadnej ochrony.
+
+**Decyzja.** Właściciel wybrał ten model 2026-09-26:
+
+- **`develop` jest gałęzią domyślną.** Każdy PR, od dowolnego agenta albo człowieka, celuje w nią i jest scalany przez squash z tytułem w formacie Conventional Commits ([ADR-017](#adr-017-squash-merges-with-conventional-commit-pr-titles)). GitHub nie ma osobnego ustawienia „domyślnej bazy dla PR”, więc to gałąź domyślna sprawia, że PR z dowolnego narzędzia trafia do `develop` bez dodatkowej konfiguracji.
+- **`main` przesuwa się tylko przy wydaniu.** PR promujący `develop` → `main` jest scalany **commitem scalającym**, nigdy przez squash, więc release-please na `main` wciąż widzi przez to scalenie jeden commit na każdy PR z funkcją. Potem właściciel scala release PR z release-please do `main` (`target-branch: main` jest ustawione jawnie, bo inaczej release-please celowałby w gałąź domyślną).
+- **Wydanie odbywa się za jednym posiedzeniem, przy zamrożonym `develop`:** promocja, aktualizacja PR przez release-please, jego scalenie, a potem ponowne otwarcie `develop`. release-please czyta historię `main` w kolejności dat commitów i zatrzymuje się na ostatnim commicie wydania. Data commitu squash to czas scalenia, więc PR scalony do `develop` przed scaleniem release PR, ale wypromowany po nim, znalazłby się za punktem zatrzymania i nigdy nie trafiłby do changelogu. Promowanie tylko przy wydaniu i wydawanie zaraz po promocji zamyka to okno.
+- **Commit wydania zostaje na `main`; nic nie jest scalane z powrotem do `develop`.** release-please wpisuje wersje tylko w liniach, których agenci nigdy nie edytują: `CHANGELOG.md`, manifest, `meta.ts` (osobna, oznaczona linia), pola `version` w trzech plikach `package.json`, `pyproject.toml` i `uv.lock`. Przy następnej promocji git bierze te linie z `main` bez konfliktu. README i dokumentacja nie zawierają już wpisywanej wersji w akapitach o stanie projektu, bo agenci edytują te zdania, a wtedy każda promocja kończyłaby się konfliktem. Na `develop` pola wersji zostają na zawsze na `0.1.0`; są ze sobą zgodne, więc sprawdzenie wersji nadal przechodzi.
+- **Rulesety wymuszają ten przepływ.**
+  - Obie gałęzie: bez bezpośrednich pushy, bez force pushy, bez usuwania, a sprawdzenia CI i sprawdzenie tytułu PR muszą przejść. Gałęzie nie muszą być aktualne względem bazy, bo inaczej równolegli agenci bez końca rebase'owaliby się nawzajem. Zatwierdzenia nie są wymagane: każdy agent korzysta z konta właściciela i nie może zatwierdzić własnego PR.
+  - `develop` przyjmuje tylko scalanie przez squash i nikt nie może ominąć jego rulesetu.
+  - `main` przyjmuje tylko commity scalające, zarówno dla promocji, jak i dla release PR: promocja przez squash ukryłaby każdy commit z funkcją za jednym commitem `chore:`. Właściciel może ominąć sprawdzenia w PR, bo PR z release-please jest otwierany z `GITHUB_TOKEN` i nie dostaje uruchomienia CI. Każdy agent działa jako właściciel, więc agent też mógłby skorzystać z tego obejścia; AGENTS.md zabrania tego poza krokiem 3 wydania.
+- **CI uruchamia się przy pushach do obu gałęzi. Strona z dokumentacją wdraża się z `develop`**, bo rozdziały opisują kod takim, jaki jest, a `main` może być opóźniony o cały kamień milowy.
+- **Worktree leżą w `~/Documents/GitHub/worktrees/<repo>/<worktree>`**, poza każdym checkoutem, więc agenci z różnych środowisk znajdują je w jednym miejscu i żaden nie jest zagnieżdżony w innym repozytorium.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Dowolna liczba agentów może otwierać PR-y jednocześnie; to rulesety, a nie dyscyplina agentów, utrzymują `develop` na zielono, a `main` wyłącznie dla wydań.
+- :material-plus-circle-outline: `main` pokazuje dokładnie to, co użytkownicy mogą zainstalować. Strona repozytorium pokazuje `develop`, gałąź domyślną.
+- :material-minus-circle-outline: Wydanie to teraz trzy kroki (promocja, scalenie release PR, publikacja szkicu) zamiast dwóch.
+- :material-minus-circle-outline: `git log main` znowu zawiera commity scalające. Nie wpływa to na changelog: własny tytuł promocji to ukryte `chore:`, a jej opis nie może zaczynać akapitu od typu commitu.
+- :material-minus-circle-outline: Plik binarny zbudowany z `develop` zawsze zgłasza `0.1.0`, niezależnie od najnowszego wydania.
+- :material-minus-circle-outline: Wydanie zamraża `develop` na kilka minut, a release PR nie może czekać otwarty tygodniami, jak planował ADR-016: kandydaci do wydania są tagowani za tym samym posiedzeniem albo na gałęzi wydzielonej specjalnie dla nich.
+- :material-minus-circle-outline: Strona z dokumentacją może opisywać funkcje, których nie ma jeszcze w żadnym wydaniu. Rozdziały już oznaczają zaplanowaną pracę, a przewodnik instalacji podaje wydanie, którego dotyczy.
+
+**Alternatywy.**
+
+- *Zostać przy rozwoju opartym na pniu i chronić `main`:* najprostsza opcja, ale wtedy PR każdego agenta trafia prosto do gałęzi wydań, a właściciel chciał gałęzi pośredniej między agentami a wydaniami.
+- *`main` jako gałąź domyślna plus workflow, który przestawia PR-y na `develop`:* strona repozytorium pokazywałaby wydany kod. Ale każdy PR otwierałby się najpierw na `main`, jego pierwsze uruchomienie CI i benchmarku porównywałoby się ze złą bazą, a do tego dochodzi workflow do utrzymania. Właściciel wybrał `develop` jako gałąź domyślną.
+- *release-please na `develop`:* wydania powstawałyby z niewypromowanego kodu, a `main` straciłby jakąkolwiek rolę.
+- *Automatyczne scalanie wsteczne `main` do `develop` po każdym wydaniu:* w repozytorium należącym do konta osobistego GitHub Actions nie może być aktorem omijającym ruleset, więc push wymagałby sekretu z PAT albo GitHub App. Zrobienie tego przez PR wymaga z kolei obejścia administratora na `develop`, bo PR otwarty z `GITHUB_TOKEN` nie dostaje CI, a to obejście pozwoliłoby też dowolnemu agentowi na koncie właściciela scalić czerwony PR. Skoro bez tego nic nie jest w konflikcie, właściciel zdecydował, że nie będzie scalania wstecznego.
+
+## ADR-020: Selektor w `init` używa @clack/prompts, ładowanego z osobnego fragmentu { #adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk }
+
+**Stan:** Przyjęty · 2026-09-26 · [#92](https://github.com/SirCypkowskyy/inwards/issues/92)
+
+**Kontekst.** `inwards init` w terminalu, bez `--style` i `--agent`, pyta o styl architektury, scaffold i agenta ([#92](https://github.com/SirCypkowskyy/inwards/issues/92)). Biblioteka do zadawania pytań jest dostarczana wewnątrz jednego pliku binarnego ([ADR-003](#adr-003-ship-a-bun-single-file-executable)), ale `check` i hooki startują przy każdej edycji agenta i nie mogą płacić za pytania, których nigdy nie pokazują. Budżet w #92 to 3 ms startu.
+
+**Decyzja.**
+
+- **@clack/prompts, przypięte do dokładnej wersji (1.8.1).** Analiza w #92 zmierzyła je na około 61 KB w skompilowanym pliku binarnym. Ink z Reactem dodaje około 496 KB i od 10 do 29 ms startu, wysypuje się przy starcie pod `bun build --compile`, chyba że wtyczka zaślepi `react-devtools-core`, i ma świeże regresje renderowania na Windows. @inquirer/prompts ma otwarty błąd z wyborem na Windows.
+- **Ładowane dynamicznym `import()`** wewnątrz selektora i tylko wtedy, gdy stdin i stdout są TTY, a `CI` nie jest ustawione. Bez terminala init od razu kończy się kodem 2 z flagami; nigdy nie czeka na dane.
+- **`splitting: true` w `scripts/build-binaries.ts`.** Bez tego Bun wkleja dynamicznie importowany moduł do jednej paczki: jego kod wykonuje się dopiero przy imporcie, ale każdy start i tak go wczytuje. Zmierzone na Linuksie x64 względem `develop` zbudowanego z tymi samymi flagami, od 150 do 300 naprzemiennych uruchomień każde, mediana różnic w parach:
+
+    | Build | `--version` | mały `check` | uruchomienie hooka |
+    |---|---|---|---|
+    | Bez bajtkodu, bez podziału | +5,2 ms | +5,9 ms | +5,2 ms |
+    | Bajtkod ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)), bez podziału | +1,7 ms | +1,7 ms | +1,1 ms |
+    | Bajtkod i podział (przyjęte) | -0,1 ms | +0,0 ms | -0,1 ms |
+
+    Z podziałem biblioteka jest osobnym fragmentem wewnątrz pliku binarnego, czytanym tylko wtedy, gdy uruchamia się selektor. Benchmark z #29 się zgadza: hook -0,0%, pełne sprawdzenie -1,8%.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: `check` i hooki zachowują swój czas startu; koszt selektora spada na jedyne polecenie, które go pokazuje.
+- :material-plus-circle-outline: Późniejsza leniwie ładowana funkcja dostaje to samo za darmo.
+- :material-minus-circle-outline: Build zapisuje `chunk-*.js.map` obok każdego pliku binarnego w `dist/`. Wysyłka wydania i tak bierze tylko pliki `inwards-*`.
+- :material-minus-circle-outline: Selektora nie da się przetestować w CI, które nie ma TTY. Sterowano nim przez pseudoterminal na Linuksie; Windows Terminal, PowerShell i Terminal w macOS wciąż wymagają ręcznego sprawdzenia (#92).
+
+**Alternatywy.**
+
+- *Ink:* bogatsze układy, ale zobacz liczby wyżej.
+- *Ręcznie napisane pytania na surowym stdin:* bez zależności, ale obsługa kursora, zmiany rozmiaru i konsoli Windows to właśnie to, co biblioteka już robi dobrze.
+- *Sam bajtkod:* zmniejsza koszt biblioteki z około 5 ms do 1–2 ms, ale przy 10 ms startu wciąż trzeba go płacić przy każdym wywołaniu hooka za pytania, których hook nigdy nie pokazuje.
+
+## ADR-021: Publikuj wheele wydań na PyPI z osobnego workflow, przez trusted publishing { #adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing }
+
+**Stan:** Przyjęty · 2026-09-26 · [#32](https://github.com/SirCypkowskyy/inwards/issues/32)
+
+**Kontekst.** Design partnerzy powinni instalować przez `uv add --dev inwards`. `cd.yml` już buduje pięć wheeli platformowych, uruchamia każdy plik binarny i instaluje każdy wheel na jego własnym runnerze, a potem dołącza je do szkicu GitHub Release ([ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)). Właściciel publikuje ten szkic ręcznie. PyPI nigdy nie przyjmuje tej samej nazwy pliku dwa razy, więc błędnej wysyłki nie da się cofnąć, a właściciel nie chce żadnej przypadkowej wysyłki na PyPI. Repozytorium jest na razie prywatne, a każdy agent pracuje na koncie GitHub właściciela.
+
+**Decyzja.**
+
+- **Trusted publishing** (OIDC) z `pypa/gh-action-pypi-publish`, przypiętym do SHA commitu. Nigdzie nie jest przechowywany token PyPI.
+- **Osobny workflow, `pypi.yml`, a nie zadanie w `cd.yml`.** Uruchamia się, gdy wydanie zostaje opublikowane, nigdy na szkicu, albo ręcznie z tagiem i indeksem. `cd.yml` kończy się na szkicu i nie widzi, kiedy właściciel go publikuje. PyPI ufa tylko `pypi.yml`, który nie uruchamia żadnego kodu budującego ani testowego.
+- **Wysyła własne wheele wydania**, czyli pliki, które właściciel właśnie opublikował, po sprawdzeniu ich względem `SHA256SUMS` wydania, a gdy repozytorium będzie publiczne, także względem pochodzenia buildu. Nigdy ich nie przebudowuje.
+- **Najpierw TestPyPI, potem PyPI**, każde we własnym środowisku GitHuba (`testpypi`, `pypi`), z którym związany jest publisher na danym indeksie. Tylko dwa zadania wysyłające dostają `id-token: write`.
+- **Wersja przedpremierowa trafia tylko na TestPyPI**, niezależnie od tego, czy wydanie jest tak oznaczone, czy jego tag ma przyrostek (`-rc.1`). PyPI ma rezerwację 0.0.0 w wersji ostatecznej, więc uv i tak wybrałby ją zamiast każdej wersji przedpremierowej. Kandydat do wydania może wciąż trafić na PyPI przez ręczne uruchomienie z jego tagu.
+- **Prawdziwą bramką jest konto właściciela na pypi.org.** Każdy agent pracuje na koncie GitHub właściciela, więc zmienna, środowiska, tagi i ręczne uruchomienia są w zasięgu agenta, a PyPI nie sprawdza refu ani commitu uruchomienia. Publisher PyPI jest więc rejestrowany na końcu, przy uruchomieniu produkcyjnym, a jego usunięcie zatrzymuje każdą wysyłkę na PyPI. Po stronie GitHuba zmienna repozytorium `PYPI_PUBLISH` musi mieć wartość `true` dla każdej wysyłki na PyPI, z wydania albo z ręcznego uruchomienia; środowisko `pypi` wdraża tylko z tagów `v*`; a gdy GitHub na to pozwoli (publiczne repozytorium albo Enterprise), dostaje właściciela jako wymaganego recenzenta. To chroni przed pomyłkami, a nie przed agentem.
+- **Żadnych atestacji PEP 740, dopóki repozytorium jest prywatne.** Są podpisywane przez publiczny rejestr przejrzystości Sigstore i zawierają repozytorium, workflow i commit.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Wydanie trafia na PyPI z dokładnie tymi bajtami, które użytkownicy mogli już pobrać z GitHuba i które zostały uruchomione na każdej platformie.
+- :material-plus-circle-outline: Trusted publishing działa z prywatnego repozytorium: PyPI sprawdza właściciela, repozytorium, plik workflow i środowisko, a nie widoczność.
+- :material-minus-circle-outline: Gdy publisher PyPI już istnieje, agent działający jako właściciel może ustawić `PYPI_PUBLISH`, wypchnąć tag `v*` (żaden ruleset nie chroni tagów) i rozpocząć wysyłkę; nawet wymaganego recenzenta można zatwierdzić przez API jako właściciel. Agentów powstrzymuje wtedy tylko `AGENTS.md`, a właściciel może usuwać publishera między wydaniami.
+- :material-minus-circle-outline: Wheele i `SHA256SUMS` szkicu można ręcznie podmienić przed publikacją. Dopóki repozytorium jest prywatne, sprawdzenie sum kontrolnych dowodzi tylko, że są ze sobą zgodne.
+- :material-minus-circle-outline: Pięć wheeli v0.1.0-rc.1 waży razem 170 MB, przy domyślnym limicie PyPI 10 GB na projekt: to mniej więcej 60 wydań, zanim trzeba będzie prosić PyPI o więcej.
+- :material-minus-circle-outline: Wydanie zbudowane, gdy repozytorium było prywatne, nie ma informacji o pochodzeniu. Gdy repozytorium stanie się publiczne, `pypi.yml` odmówi jego wysłania.
+
+**Alternatywy.**
+
+- *Wysyłka z `cd.yml` zaraz po zadaniach weryfikujących:* PyPI dostałoby wersję, zanim właściciel obejrzałby szkic, a zaufany workflow uruchamiałby też `bun install` i build.
+- *Pobranie artefaktu buildu z uruchomienia `cd.yml`:* wygasa po 90 dniach, trzeba go szukać po identyfikatorze uruchomienia i nie jest tym, co opublikował właściciel.
+- *Token API ograniczony do projektu jako sekret środowiska:* długo żyjące poświadczenie do rotowania, które działa na każdej maszynie, na którą wycieknie.
+- *Workflow wielokrotnego użytku wywoływany z `cd.yml`:* PyPI nie może używać workflow wielokrotnego użytku jako zaufanego publishera.
+
+## ADR-022: Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów { #adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data }
+
+**Stan:** Przyjęty, tymczasowy · 2026-09-26 · [#42](https://github.com/SirCypkowskyy/inwards/issues/42) · Do ponownej oceny z danymi od partnerów ([#132](https://github.com/SirCypkowskyy/inwards/issues/132))
+
+**Kontekst.** M2 kończy się punktem kontrolnym: czy liczby z [hipotezy biznesowej](02-Business-Context.md#business-hypothesis) trzymają się na tyle dobrze, żeby poświęcić na nią M3–M6? Hipoteza miała być mierzona w repozytoriach design partnerów, ale właściciel przeniósł rekrutację partnerów na koniec planu rozwoju, więc danych od partnerów nie ma. Dowody dostępne 2026-09-26:
+
+| Zakład (rozdział 2) | Próg | Dowody | Odczyt |
+|---|---|---|---|
+| Kroki naprawy działają na modele | ≥ 80 % naprawionych w ramach jednej ponownej próby | Ewaluacja agentów ([#101](https://github.com/SirCypkowskyy/inwards/issues/101), `eval/README.md`): 11 fixture'ów, po jednym uruchomieniu na Sonnecie i Haiku, pełny zestaw hooków. `inwards stats`: 5 z 7 (71 %). 2 nienaprawione to zadanie „poluzuj konfigurację”, w którym agent słusznie się zatrzymał i zapytał użytkownika. Z 5 naprawionych 3 zakończyły się niewykonanym zadaniem (2 wycofały zmianę i zapytały użytkownika), więc tylko 2 były czystymi poprawkami z wykonanym zadaniem | Wskazuje we właściwą stronę (żadne naruszenie nie zostało, żadnych obejść), ale 7 podłożonych naruszeń niczego nie rozstrzyga |
+| Agenci łamią podział na warstwy na tyle często | ≥ 1 naruszenie na 1000 linii napisanych przez agenta | 25,5 na 1000 linii w ewaluacji, ale jej fixture'y są zbudowane tak, żeby kusiły do naruszenia | Brak dowodów w żadną stronę |
+| Szybkość to fosa | p50 hooka < 100 ms | Ewaluacja: p50 21 ms, p95 28 ms, na przykładowej aplikacji z 10 plikami. Lokalnie p50 hooka około 32 ms po przejściu na bajtkod ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). Pięć prawdziwych serwisów ([#36](https://github.com/SirCypkowskyy/inwards/issues/36)): od 55 do 83 ms na plik lokalnie; jeden plik z 4500 liniami trwał 280 ms na runnerze GitHuba przed przejściem na bajtkod ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Trzyma się, z jednym znanym odstępstwem |
+| Hooki to kanał | ≥ 60 % instalacji zachowuje hook | Tylko dane od partnerów; na razie brak | Nieznane |
+| Obok Astral jest miejsce | Wdrażany obok Ruffa i ty | Nic nowego od M0 | Nieznane |
+
+Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żadnym końcowym diffie nie było obejścia; config guard, reguły deny i Stop gate wytrzymały za każdym razem, gdy agent próbował poluzować reguły albo wyłączyć hooki. I jedną słabość: bez baseline'u Stop gate kazał agentom pracować, dopóki nie zniknęły naruszenia, które już były w edytowanych przez nich plikach, i we wszystkich 6 takich uruchomieniach przepisali kod, o którego zmianę nikt ich nie prosił ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)).
+
+**Decyzja.** Właściciel zdecydował kontynuować warunkowo:
+
+- **Kontynuować M3 zgodnie z planem**, z [#134](https://github.com/SirCypkowskyy/inwards/issues/134) (Stop gate blokuje tylko na naruszeniach nowych w każdym edytowanym pliku) przeniesionym na P0 na początku M3: agent przepisujący niezwiązany kod to najbardziej prawdopodobny powód, dla którego zespół wyłączy hooki, a to jest zakład o kanał.
+- **Decyzja jest tymczasowa.** Zostanie ponownie oceniona na danych od partnerów w ramach [#132](https://github.com/SirCypkowskyy/inwards/issues/132): ta sama tabela, wypełniona wynikami `inwards stats` z repozytoriów partnerów. Jeśli „naprawione w ramach jednej ponownej próby” zostanie poniżej 50 % albo hooki zostaną wyłączone w większości instalacji, plan dla M4–M6 zostanie otwarty na nowo.
+- **Ewaluacja pozostaje miarą tymczasową.** Przed przeglądem z partnerami zostanie powtórzona z 3 uruchomieniami na przypadek dla każdego modelu (`bun run eval/run.ts --runs 3`), co #101 zostawiło otwarte, żeby ograniczyć wydatki.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Praca trwa nad tą częścią hipotezy, którą wspierają dowody (szybkość, kroki naprawy, odporność na obejścia), bez czekania miesiącami na partnerów.
+- :material-plus-circle-outline: Kryteria, które otworzyłyby plan na nowo, są zapisane teraz, zanim dane mogłyby na nie wpłynąć.
+- :material-minus-circle-outline: Dwa zakłady (częstość naruszeń, adopcja hooków) nie mają żadnych dowodów; M3–M6 mogą zostać zbudowane dla problemu, którego partnerzy nie mają.
+- :material-minus-circle-outline: Fixture'y ewaluacji pochodzą od tych samych ludzi, którzy zbudowali narzędzie, więc są słabym zastępstwem prawdziwych repozytoriów.
+
+**Alternatywy.**
+
+- *Kontynuować bez warunków:* prościej to ogłosić, ale traktowałoby liczby z 7 podłożonych naruszeń tak, jakby rozstrzygały hipotezę.
+- *Wstrzymać do czasu danych od partnerów (przenieść rekrutację, #132, do M3):* najbardziej rygorystyczna opcja. Właściciel zostawił rekrutację na końcu planu, a mierzalne zakłady wskazują we właściwą stronę.
+- *Zatrzymać albo zmienić kierunek:* nic zmierzonego nie przeczy żadnemu progowi, więc nie ma argumentów ani za jednym, ani za drugim.
+
+## ADR-023: Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR { #adr-023-a-polish-translation-as-a-second-build-translated-in-the-same-pr }
+
+**Stan:** Przyjęty · 2026-09-26 · [#149](https://github.com/SirCypkowskyy/inwards/issues/149)
+
+**Kontekst.** Właściciel chce mieć dokumentację także po polsku, z przełącznikiem języka. Zensical 0.0.65 buduje jeden język na projekt: internacjonalizacja jest w jego planie rozwoju, a dziś selektor w nagłówku (`extra.alternate`) linkuje do innych buildów. Jego wbudowany przełącznik mapuje strony przez sitemapę drugiego buildu i zakłada równoległe katalogi główne (`/en/`, `/pl/`), ale angielska strona już żyje pod `/inwards/`, a linki `docs:` z CLI wskazują właśnie tam. Zensical nie potrafi wykluczyć pliku Markdown wewnątrz `docs_dir` i nie podąża za katalogami będącymi dowiązaniami symbolicznymi.
+
+**Decyzja.**
+
+- **Dwa buildy.** `docs/chapters/` zostaje po angielsku pod `/inwards/`. `docs/pl/` odzwierciedla każdą stronę z angielskiej nawigacji pod tą samą ścieżką, a `docs/zensical.pl.toml` buduje go do `docs/site/pl/`, więc jeden artefakt Pages zawiera oba. Polskie strony biorą obrazy, CSS i skrypty z angielskiej strony przez ścieżki `../`, zamiast kopii.
+- **Przełącznik zachowuje stronę.** Nadpisanie motywu (`docs/overrides/partials/alternate.html`) linkuje każdy język do tej samej strony w drugim buildzie, a `language-switch.mjs` przelicza to przy kliknięciu (nagłówek przetrwa nawigację natychmiastową) i wraca do strony głównej języka, gdy strona tam nie istnieje. Polskie nagłówki zachowują angielskie kotwice (`{ #id }`), więc przełączenie zachowuje też `#kotwicę`.
+- **Tłumaczy agent, w tym samym PR co zmianę po angielsku** (właściciel wybrał to zamiast tłumaczenia maszynowego w CI, maszynowego szkicu z przeglądem albo tłumaczenia przez społeczność). `docs/GLOSSARY.pl.md` ustala terminy i leży poza `docs_dir` obu buildów, więc nie jest publikowany. Subagent przegląda terminologię i znaczenie jak w każdym innym PR.
+- **Nieaktualność jest śledzona przez hash.** Każda polska strona zapisuje `source` i SHA-256 angielskiego pliku, z którego ją przetłumaczono. `scripts/check-docs-translation.py` oblewa CI przy brakującej albo osieroconej stronie i ostrzega przy nieaktualnej; wdrożenie dodaje do nieaktualnych stron w swoim checkoucie baner „może być nieaktualne”.
+- **Tłumaczone jest wszystko oprócz** bloków kodu, wyjścia CLI, kluczy konfiguracji, komunikatów diagnostyk, identyfikatorów i changelogu. Treść ADR-ów jest tłumaczona w całości.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Angielskie adresy i kotwice się nie zmieniają, a czytelnik, który przełącza język, trafia do tej samej sekcji.
+- :material-plus-circle-outline: Brakujące tłumaczenie nie może zostać scalone, a nieaktualne jest widoczne dla czytelników, zamiast po cichu wprowadzać w błąd.
+- :material-minus-circle-outline: Każdy PR z dokumentacją dotyka też `docs/pl/`, a tłumaczenie jest tak dobre, jak jego przegląd.
+- :material-minus-circle-outline: Polski build jest kompletny tylko wewnątrz angielskiego: `zensical serve -f docs/zensical.pl.toml` nie pokazuje zrzutów ekranu ani własnych stylów.
+- :material-minus-circle-outline: Hash zmienia się przy każdej edycji, także przy poprawce literówki, więc niektóre ostrzeżenia o nieaktualności wymagają tylko `--fix-hashes`.
+
+**Alternatywy.** *Angielski pod `/en/` obok `/pl/`:* wbudowany przełącznik by działał, ale przesunęłyby się wszystkie istniejące linki i adresy `docs:` z CLI. *Tłumaczenie maszynowe przy każdym scaleniu:* zawsze aktualne, ale wymaga sekretu i budżetu, terminologia rozjeżdża się między uruchomieniami i nikt go nie przegląda. *Kopie zasobów w `docs/pl/`:* samowystarczalne, ale każdy zrzut ekranu istniałby w dwóch kopiach, które trzeba utrzymywać identyczne.
+
