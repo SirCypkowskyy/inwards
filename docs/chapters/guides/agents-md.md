@@ -10,6 +10,8 @@ Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repo
 1. [Install Inwards](install.md) so that `inwards` is on `PATH` for everyone who runs the agent, and add `[tool.inwards]` to `pyproject.toml`.
 2. In the project, run:
 
+    <!-- e2e -->
+
     ```sh
     inwards init --agent agents-md
     ```

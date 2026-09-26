@@ -181,6 +181,8 @@ On a terminal, `inwards init` with neither `--style` nor `--agent` asks instead:
 
 Add `[tool.inwards]` to the `pyproject.toml` of the project you want to check, innermost layer first:
 
+<!-- e2e -->
+
 ```toml title="pyproject.toml"
 [tool.inwards]
 layers = [
@@ -192,6 +194,8 @@ layers = [
 
 Then check the whole project:
 
+<!-- e2e -->
+
 ```sh
 inwards check
 ```
@@ -201,6 +205,8 @@ inwards check
 ### On an existing codebase
 
 A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:
+
+<!-- e2e -->
 
 ```sh
 inwards baseline

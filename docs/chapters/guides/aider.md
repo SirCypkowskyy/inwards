@@ -10,6 +10,8 @@ Aider runs a lint command after each edit and asks the model to fix what it repo
 1. [Install Inwards](install.md) and add `[tool.inwards]` to `pyproject.toml`.
 2. In the project, run:
 
+    <!-- e2e -->
+
     ```sh
     inwards init --agent aider
     ```

@@ -10,6 +10,8 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 1. [Install Inwards](install.md) and add `[tool.inwards]` to `pyproject.toml`.
 2. In the project, run:
 
+    <!-- e2e -->
+
     ```sh
     inwards init --agent claude --dry-run   # shows what will change
     inwards init --agent claude
