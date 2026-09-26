@@ -165,7 +165,7 @@ export function preexisting(
  * @param raw - the line's text.
  * @returns the line, or undefined when it isn't an `inwards/run@1` object.
  */
-function parseLine(raw: string): RunLine | undefined {
+export function parseLine(raw: string): RunLine | undefined {
   let value: unknown;
   try {
     value = JSON.parse(raw);

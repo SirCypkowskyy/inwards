@@ -19,7 +19,7 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
                      [--config pyproject.toml] [--log]
        inwards baseline [--config pyproject.toml]    (accept today's violations)
        inwards init --agent claude|aider|agents-md [--dry-run]
-       inwards stats [DIR] [--format text|json]   (hypothesis numbers from the run logs)
+       inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
@@ -46,6 +46,8 @@ async function main(argv: string[]): Promise<number> {
       "dry-run": { type: "boolean" },
       log: { type: "boolean" },
       "max-diagnostics": { type: "string" },
+      export: { type: "string" },
+      redact: { type: "boolean" },
     },
   });
 
@@ -86,6 +88,8 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param values."dry-run" - `--dry-run`, for init.
  * @param values.config - `--config`, for baseline (stats refuses it).
  * @param values.format - `--format`, for stats.
+ * @param values.export - `--export FILE`, for stats.
+ * @param values.redact - `--redact`, for stats.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -96,6 +100,8 @@ async function setupCommand(
     "dry-run"?: boolean | undefined;
     config?: string | undefined;
     format?: string | undefined;
+    export?: string | undefined;
+    redact?: boolean | undefined;
   },
 ): Promise<number> {
   if (command === "stats") {
@@ -105,7 +111,9 @@ async function setupCommand(
         2,
       );
     }
-    return paths.length <= 1 ? statsCommand(values.format ?? "text", paths[0]) : print(USAGE, 2);
+    return paths.length <= 1
+      ? statsCommand(values.format ?? "text", paths[0], values)
+      : print(USAGE, 2);
   }
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1

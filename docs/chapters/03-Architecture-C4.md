@@ -341,6 +341,7 @@ src/
 │   │   ├── runs.ts        # reads the run logs back for stats
 │   │   ├── stats.ts       # the hypothesis numbers from the run log
 │   │   ├── stats-command.ts  # inwards stats: finds the logs, prints the report
+│   │   ├── log-export.ts  # stats --export [--redact]: one shareable log file
 │   │   ├── init.ts        # inwards init --agent
 │   │   ├── claude-settings.ts  # finds the Inwards hooks in Claude Code settings
 │   │   └── diff.ts        # line diff for init --dry-run
