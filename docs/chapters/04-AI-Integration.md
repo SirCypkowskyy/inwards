@@ -111,7 +111,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
     lint-cmd: "python: '/home/you/.local/bin/inwards' check --format text"
     ```
 
-    Aider passes the edited file names to the command. Text output is enough here, because Aider forwards it to the model as is. Aider has no Stop hook or config guard; the [Aider guide](guides/aider.md) covers what to do instead.
+    Aider runs the command from the git root, once per edited file, with that file's path appended. Text output is enough here, because Aider forwards it to the model as is. Aider has no Stop hook or config guard; the [Aider guide](guides/aider.md) covers what to do instead.
 
 === ":material-microsoft-visual-studio-code: Copilot (VS Code)"
 
