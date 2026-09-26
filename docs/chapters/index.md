@@ -104,7 +104,7 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
 
     ---
 
-    Eighteen decisions, among them "why TypeScript", "how a release is cut" and "how packages are selected".
+    Every architecture decision, among them "why TypeScript", "how a release is cut" and "how packages are selected".
 
 -   :material-speedometer:{ .lg .middle } __[Constraints and quality](06-Constraints-and-Quality.md)__
 
