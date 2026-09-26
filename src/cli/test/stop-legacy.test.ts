@@ -5,7 +5,7 @@
  * files, committed, then the edit the task asks for.
  */
 import { describe, expect, test } from "bun:test";
-import { cpSync, readFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, payload, type RunResult } from "./run.ts";
 import { git, ID, put, session, stop } from "./stop-helpers.ts";
@@ -35,19 +35,57 @@ function seeded(fixture: string): string {
  * @param root - the project directory.
  * @param rel - the file, relative to the project.
  * @param edit - the text to replace, everywhere in the file, and its replacement.
+ * @param opts - the session id (default the test session) and extra environment.
  * @returns the hook's exit code and output.
  */
-function agentEdits(root: string, rel: string, [from, to]: [string, string]): RunResult {
+function agentEdits(
+  root: string,
+  rel: string,
+  [from, to]: [string, string],
+  { id = ID, env = {} }: { id?: string; env?: Record<string, string> } = {},
+): RunResult {
   const before = readFileSync(join(root, rel), "utf8");
   if (!before.includes(from)) {
     throw new Error(`${rel} has no ${JSON.stringify(from)}; the fixture changed`);
   }
   put(root, rel, before.replaceAll(from, to));
   const input = payload("post-write-order", root, {
-    session_id: ID,
+    session_id: id,
     tool_input: { file_path: join(root, rel) },
   });
-  return inwards(["hook", "claude-code"], { cwd: root, stdin: input });
+  return inwards(["hook", "claude-code"], { cwd: root, stdin: input, env });
+}
+
+/**
+ * Sends a SessionStart or Stop event for a given session.
+ *
+ * @param root - the project directory.
+ * @param event - `session-start` or `stop`, the payload fixture's name.
+ * @param id - the session id.
+ * @param env - extra environment.
+ * @returns the hook's exit code and output.
+ */
+function send(
+  root: string,
+  event: "session-start" | "stop",
+  id: string,
+  env: Record<string, string> = {},
+): RunResult {
+  const stdin = payload(event, root, { session_id: id, source: "startup" });
+  return inwards(["hook", "claude-code"], { cwd: root, stdin, env });
+}
+
+/**
+ * Reads the violation fingerprints each run-log line recorded.
+ *
+ * @param root - the project directory.
+ * @returns one list per logged run, in order.
+ */
+function loggedPrints(root: string): unknown[] {
+  return readFileSync(join(root, ".inwards/runs.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line).fingerprints);
 }
 
 /**
@@ -152,5 +190,42 @@ describe("violations a file had at session start", () => {
       stdin: payload("stop", root, { session_id: "dirty" }),
     });
     expect(run.code).toBe(2);
+  });
+
+  test("a smudge filter or fsmonitor the agent planted in git's config never runs", () => {
+    const root = seeded("seeded-function-import");
+    const marker = join(root, "MARKER");
+    const run = `"sh -c 'echo pwned > ${marker}; cat'"`;
+    writeFileSync(join(root, ".gitattributes"), "*.py filter=pwn\n");
+    appendFileSync(
+      join(root, ".git/config"),
+      `[filter "pwn"]\n\tsmudge = ${run}\n\tprocess = ${run}\n[core]\n\tfsmonitor = ${run}\n`,
+    );
+    const edit = agentEdits(root, ORDER, EUROS);
+    expect(edit.code).toBe(0);
+    expect(contextOf(edit)).toContain("already in the file when the session started");
+    expect(stop(root).code).toBe(0);
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  test("a CRLF working tree over an LF commit (core.autocrlf) still proves the start content", () => {
+    const root = seeded("seeded-function-import");
+    put(root, ORDER, readFileSync(join(root, ORDER), "utf8").replaceAll("\n", "\r\n"));
+    send(root, "session-start", "crlf");
+    const edit = agentEdits(root, ORDER, ["    id: str\r\n", "    id: str\r\n    note: str\r\n"], {
+      id: "crlf",
+    });
+    expect(edit.code).toBe(0);
+    expect(send(root, "stop", "crlf").code).toBe(0);
+  });
+
+  test("excused violations stay out of the run log; a new one is logged", () => {
+    const root = seeded("seeded-function-import");
+    const env = { INWARDS_RUN_LOG: "1" };
+    agentEdits(root, ORDER, EUROS, { env });
+    send(root, "stop", ID, env);
+    expect(loggedPrints(root)).toEqual([[], []]);
+    agentEdits(root, ORDER, SECOND_COPY, { env });
+    expect(loggedPrints(root).at(-1)).toHaveLength(1);
   });
 });

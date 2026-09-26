@@ -4,9 +4,12 @@
  * blocking on them, so an agent isn't pushed to rewrite code its task didn't
  * need (#134). A violation the agent adds to the same file still blocks.
  *
- * The start content comes from git: the file at the commit the session
- * started on, with the working tree's filters (line endings) applied, and
- * only when its SHA-256 matches the start manifest. That costs nothing at
+ * The start content comes from git: the raw blob of the file at the commit
+ * the session started on, or that blob with CRLF line endings (what
+ * `core.autocrlf` checks out), whichever matches the start manifest's
+ * SHA-256. Never `cat-file --filters` or `git show --textconv`: they run
+ * filter drivers from .gitattributes and .git/config, which the agent can
+ * write, so they would run the agent's commands outside its permissions. That costs nothing at
  * SessionStart, and a git call plus one more check only for a file that has
  * errors now. A file that was uncommitted, untracked or outside git at
  * session start has no known start content, so all its errors count as new,
@@ -109,7 +112,9 @@ function startText(project: string, start: Start, file: string): string | undefi
     return undefined;
   }
   // `./` makes the path relative to the project, which may sit below the repo root.
-  const text = git(project, ["cat-file", "--filters", `${start.head}:./${rel}`]);
-  const same = text !== undefined && createHash("sha256").update(text).digest("hex") === hash;
-  return same ? text : undefined;
+  const raw = git(project, ["cat-file", "blob", `${start.head}:./${rel}`]);
+  const crlf = raw?.replace(/\r?\n/gu, "\r\n");
+  return [raw, crlf].find(
+    (text) => text !== undefined && createHash("sha256").update(text).digest("hex") === hash,
+  );
 }

@@ -116,7 +116,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     ...layout,
     ...notIn(layout, report.diagnostics).filter((d) => !preexistingShape(d, state.start.manifest)),
   ];
-  noteRun(project, changed, [...report.diagnostics, ...old]);
+  noteRun(project, changed, report.diagnostics); // old errors aren't the session's
   for (const [file, config] of strangers) {
     problems.push(
       `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,

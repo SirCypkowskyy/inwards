@@ -145,7 +145,6 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   }
   try {
     const report = await runCheck(configPath, [target.file], target.cwd, { required: true });
-    noteRun(target.project, [target.file], report.diagnostics);
     // A shape finding on a file that predates the session, and a missing member, are context.
     const existed = start?.manifest[projectPath(target.project, target.file)] !== undefined;
     const errors = report.diagnostics.filter(
@@ -156,6 +155,12 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     const old =
       start && errors.length > 0 ? await oldErrors(target.project, start, check, errors) : [];
     const blocking = errors.filter((d) => !old.includes(d));
+    // Old errors aren't the agent's, so `inwards stats` must not count them as introduced.
+    noteRun(
+      target.project,
+      [target.file],
+      report.diagnostics.filter((d) => !old.includes(d)),
+    );
     const escalation = escalationOf(target.project, id, configPath, blocking);
     // Only what blocks counts toward escalation: context isn't an attempt that failed.
     rememberEdit(target.project, id, target.file, blocking);
