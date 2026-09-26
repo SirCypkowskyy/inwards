@@ -241,6 +241,11 @@ function dormant(code: string, rules: RuleSettings | undefined): boolean {
  * baseline was taken, back at its default now) is still there, so its entry
  * doesn't count as fixed; the warning is reported as usual.
  *
+ * Findings an inline comment suppressed use up entries too, after the
+ * reported ones, so their entries don't count as fixed; an error that does is
+ * marked `baselined`, which keeps it hidden if the hooks don't honour its
+ * suppression (see `agentSuppressions` in `legacy.ts`).
+ *
  * @param accepted - accepted copies by baseline key, from `readBaseline`.
  * @param report - the check's report.
  * @param whole - true when the whole project was checked, so leftover entries were fixed.
@@ -265,8 +270,22 @@ export function applyBaseline(
     baselined += 1;
     return false;
   });
+  const suppressed = report.suppressed?.map((s) => {
+    const n = left.get(baselineKey(s.diagnostic)) ?? 0;
+    if (n === 0) {
+      return s;
+    }
+    left.set(baselineKey(s.diagnostic), n - 1);
+    return s.diagnostic.severity === "error" ? { ...s, baselined: true } : s;
+  });
   const resolved = whole ? [...left.values()].reduce((sum, n) => sum + n, 0) : undefined;
-  return { ...report, diagnostics, baselined, ...(resolved === undefined ? {} : { resolved }) };
+  return {
+    ...report,
+    diagnostics,
+    baselined,
+    ...(suppressed === undefined ? {} : { suppressed }),
+    ...(resolved === undefined ? {} : { resolved }),
+  };
 }
 
 /**

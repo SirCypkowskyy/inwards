@@ -1,5 +1,6 @@
 export { baselineKey, stableMessage } from "./baseline.ts";
 export {
+  type AgentSuppressions,
   declaresInwards,
   type InwardsConfig,
   inwardsTable,

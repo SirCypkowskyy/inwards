@@ -24,11 +24,11 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  type AgentSuppressions,
   type Diagnostic,
   type InwardsConfig,
   parseConfig,
   type Report,
-  type Suppressed,
   stableMessage,
 } from "@inwards/core";
 import { runCheck } from "./project.ts";
@@ -77,20 +77,28 @@ export async function oldErrors(
 
 /**
  * Applies `agent-suppressions` to a hook's report. Under `"deny"`, the
- * default, a finding is suppressed only if the file, as it was at session
- * start, had the same finding (rule, module, message) suppressed too, copy
- * for copy. So a suppression the agent added, one it moved to another import
- * or one it widened to another code puts its finding back into the report;
- * editing only an existing suppression's reason changes nothing. Without a
- * start record every suppression counts as new. The mode comes from the
- * config as it was at session start, so a Bash edit of it changes nothing
- * here (and fails the Stop gate).
+ * default, a suppression is honoured when its file is byte for byte what it
+ * was at session start (the start manifest's hash), since the agent didn't
+ * change it, or when the file as it was at session start had the same
+ * finding (rule, module, message) suppressed too, copy for copy. So a
+ * suppression the agent added, one it moved to another import or one it
+ * widened to another code isn't honoured; editing only an existing
+ * suppression's reason changes nothing. Without a start record every
+ * suppression counts as new. The mode comes from the config as it was at
+ * session start, so a Bash edit of it changes nothing here (and fails the
+ * Stop gate).
+ *
+ * A finding whose suppression isn't honoured is treated as if the comment
+ * weren't there: back in `diagnostics`, unless a baseline entry accepts it
+ * (`applyBaseline` marks it `baselined`), and the #134 old-error check the
+ * caller runs next applies to it like to any other.
  *
  * @param project - the real project root.
  * @param start - the session's start record, if there is one.
  * @param check - the config the report came from, its base and baseline setting.
  * @param report - the hook's check.
- * @returns the report with the rejected findings back in `diagnostics`, and those findings.
+ * @returns the report as if the rejected comments weren't there, and the
+ *   rejected findings the baseline doesn't accept.
  */
 export async function agentSuppressions(
   project: string,
@@ -102,19 +110,25 @@ export async function agentSuppressions(
   if (suppressed.length === 0 || modeOf(project, start, check.configPath) === "allow") {
     return { report, rejected: [] };
   }
-  const now = suppressed.map((s) => s.diagnostic);
-  const before = start ? await atStart(project, start, check, now) : undefined;
-  const kept = carried(now, before?.suppressed?.map((s) => s.diagnostic) ?? []);
-  const rejected = now.filter((d) => !kept.includes(d));
-  if (rejected.length === 0) {
-    return { report, rejected };
+  const touched = suppressed
+    .map((s) => s.diagnostic)
+    .filter((d) => !(start && unchanged(project, start, resolve(check.base, d.file))));
+  const before =
+    start && touched.length > 0 ? await atStart(project, start, check, touched) : undefined;
+  const kept = carried(touched, before?.suppressed?.map((s) => s.diagnostic) ?? []);
+  const lost = suppressed.filter(
+    (s) => touched.includes(s.diagnostic) && !kept.includes(s.diagnostic),
+  );
+  if (lost.length === 0) {
+    return { report, rejected: [] };
   }
-  const honoured: Suppressed[] = suppressed.filter((s) => kept.includes(s.diagnostic));
+  const rejected = lost.filter((s) => s.baselined !== true).map((s) => s.diagnostic);
   return {
     report: {
       ...report,
       diagnostics: [...report.diagnostics, ...rejected],
-      suppressed: honoured,
+      suppressed: suppressed.filter((s) => !lost.includes(s)),
+      baselined: (report.baselined ?? 0) + lost.length - rejected.length,
     },
     rejected,
   };
@@ -129,7 +143,7 @@ export async function agentSuppressions(
 export function rejectedNote(rejected: readonly Diagnostic[]): string {
   const lines = rejected.map((d) => `- ${d.file}:${d.line} ${d.code} ${stableMessage(d.message)}`);
   return [
-    "These findings have an inline suppression that wasn't in the file when the session started, and this project doesn't let an agent add one (agent-suppressions). Fix the code instead; if the suppression is really needed, remove it and ask the user to add it:",
+    "These findings have an inline suppression that wasn't in the file when the session started, or the file wasn't committed at session start, and this project doesn't let an agent add one (agent-suppressions). If you added it, fix the code instead, or remove the suppression and ask the user to add it; if it was already there, leave it and tell the user:",
     ...lines,
   ].join("\n");
 }
@@ -143,11 +157,32 @@ export function rejectedNote(rejected: readonly Diagnostic[]): string {
  * @param configPath - the config's absolute path.
  * @returns the mode; "deny" when the key isn't set.
  */
-function modeOf(project: string, start: Start | undefined, configPath: string): string {
+function modeOf(project: string, start: Start | undefined, configPath: string): AgentSuppressions {
   const config = start
     ? start.configs[projectPath(project, configPath)]
     : parseConfig(readFileSync(configPath, "utf8"));
   return config?.agentSuppressions ?? "deny";
+}
+
+/**
+ * Tells whether a file is byte for byte what it was at session start, from
+ * the start manifest's SHA-256. The same bytes mean the same suppressions,
+ * committed or not, so the agent didn't add any.
+ *
+ * @param project - the real project root.
+ * @param start - the session's start record.
+ * @param file - the file, absolute.
+ * @returns true when the file's hash now is its start hash.
+ */
+function unchanged(project: string, start: Start, file: string): boolean {
+  const hash = start.manifest[projectPath(project, file)];
+  try {
+    return (
+      hash !== undefined && createHash("sha256").update(readFileSync(file)).digest("hex") === hash
+    );
+  } catch {
+    return false; // gone or unreadable: not provably unchanged
+  }
 }
 
 /**

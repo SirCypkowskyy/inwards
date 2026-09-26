@@ -86,6 +86,14 @@ To accept one import for good, put a suppression on its line, with the rule's co
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
+The comment goes on the line the finding points at: for a parenthesised import, the imported name's line; for a dynamic import spread over several lines, the call's first line:
+
+```python title="shop/domain/plugins.py"
+importlib.import_module(  # inwards: ignore[INW011] reason="plugin loader, reviewed in #230"
+    "shop.infrastructure.plugins",
+)
+```
+
 A suppression with no reason, an unknown code or a malformed comment hides nothing and is reported as INW009, and so, as a warning, is one that matches no finding on its line. Every output format counts suppressed findings, and SARIF lists them as suppressed results. The Claude Code hooks ignore a suppression that wasn't in the file when the session started, so an agent can't silence a violation with a comment; `agent-suppressions = "allow"` in `[tool.inwards]` lets them count. [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) has the details.
 
 <div class="grid cards" markdown>

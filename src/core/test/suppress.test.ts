@@ -85,6 +85,25 @@ describe("a valid suppression", () => {
     expect(run(text.replace("\n", `  # inwards: ignore[INW010] ${REASON}\n`)).found).toEqual([]);
   });
 
+  test("covers a multi-line dynamic import from the call's first line (INW011)", () => {
+    const call = 'importlib.import_module(\n    "shop.infrastructure.db",\n)\n';
+    expect(run(`import importlib\n${call}`).found).toEqual(["2:INW011:error"]);
+    const first = call.replace("(\n", `(  # inwards: ignore[INW011] ${REASON}\n`);
+    expect(run(`import importlib\n${first}`).found).toEqual([]);
+    const inside = call.replace('",\n', `",  # inwards: ignore[INW011] ${REASON}\n`);
+    expect(run(`import importlib\n${inside}`).found).toEqual([
+      "2:INW011:error",
+      "3:INW009:warning",
+    ]);
+  });
+
+  test("covers a dynamic import whose target can't be read (INW011)", () => {
+    const text = "import importlib\nname = 'x'\nimportlib.import_module(name)\n";
+    expect(run(text).found).toEqual(["3:INW011:error"]);
+    const hidden = text.replace("(name)\n", `(name)  # inwards: ignore[INW011] ${REASON}\n`);
+    expect(run(hidden)).toEqual({ found: [], hidden: ["3:INW011:legacy, tracked in #12"] });
+  });
+
   test("the language server's single-file check honours it too", () => {
     const text = `import shop.infrastructure.db  # inwards: ignore[INW001] ${REASON}\n`;
     expect(engine.checkFile(file("shop/domain/order.py", text), PROJECT)).toEqual([]);
@@ -121,6 +140,12 @@ describe("an invalid suppression hides nothing and is an INW009 error", () => {
       const text = `import shop.infrastructure.db  # inwards: ignore[${code}] ${REASON}\n`;
       expect(inw009(text)).toContain(`${code} can't be suppressed inline`);
     }
+  });
+
+  test("with a second directive in the same comment", () => {
+    const text = `import shop.infrastructure.db  # inwards: ignore[INW001] ${REASON}  # inwards: ignore[INW005] ${REASON}\n`;
+    expect(run(text).found).toEqual(["1:INW001:error", "1:INW009:error"]);
+    expect(inw009(text)).toContain("second `inwards: ignore`");
   });
 
   test("when it isn't in the documented form", () => {

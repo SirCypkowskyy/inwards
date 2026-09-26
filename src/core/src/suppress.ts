@@ -27,6 +27,11 @@ import type { Diagnostic, SourceFile, Span } from "./types.ts";
 export interface Suppressed {
   diagnostic: Diagnostic;
   reason: string;
+  /**
+   * Set by an adapter's baseline: an entry accepts this finding too, so it
+   * stays hidden if the suppression isn't honoured (the hooks' `agent-suppressions`).
+   */
+  baselined?: boolean;
 }
 
 /** One `# inwards: ignore` comment as read. */
@@ -43,7 +48,7 @@ const MARKER = /inwards:\s*ignore\b/u;
 /** The directive inside a comment node's text. */
 const DIRECTIVE = /#\s*inwards:\s*ignore\b(?<rest>.*)$/u;
 /** What follows `ignore`: the codes, the reason, and optionally another comment. */
-const FORM = /^\[(?<codes>[^\]]*)\](?:\s+reason="(?<reason>[^"]*)")?\s*(?:#.*)?$/u;
+const FORM = /^\[(?<codes>[^\]]*)\](?:\s+reason="(?<reason>[^"]*)")?\s*(?<tail>#.*)?$/u;
 /** How the comment should look, for messages. */
 const EXAMPLE = '# inwards: ignore[INW001] reason="why this import is allowed"';
 
@@ -140,6 +145,9 @@ function readComment(node: Node, rest: string): Comment {
   }
   const problems = [
     ...(reason === "" ? ['It has no reason: say why in `reason="..."`.'] : []),
+    ...(MARKER.test(form["tail"] ?? "")
+      ? ["It holds a second `inwards: ignore`; put every code in the first one."]
+      : []),
     ...codes.flatMap(codeProblem),
   ];
   return { span, codes, reason, problems };
