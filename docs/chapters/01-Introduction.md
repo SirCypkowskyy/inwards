@@ -74,7 +74,7 @@ The diagnostic comes from the working scaffold in this repository, run on a copy
 
     ---
 
-    One file checks in about 25 ms including process start ([measured](06-Constraints-and-Quality.md#measurements)), so it can run after every agent edit.
+    One file checks in under 50 ms at the median, process start included ([measured](06-Constraints-and-Quality.md#measurements)), so it can run after every agent edit.
 
 -   :material-robot-outline:{ .lg .middle } __Written for agents__
 
@@ -86,7 +86,7 @@ The diagnostic comes from the working scaffold in this repository, run on a copy
 
     ---
 
-    A single executable compiled with Bun. Drop it in CI, a pre-commit hook or an agent hook.
+    A single executable compiled with Bun. Drop it in CI, a pre-commit hook or an agent hook, or add it with `uv add --dev` as a platform wheel with the binary inside.
 
 -   :material-microsoft-visual-studio-code:{ .lg .middle } __Same rules in the editor__
 
@@ -106,12 +106,18 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 | Chapter | Read it if you want to know |
 |---|---|
+| [Getting started](guides/install.md) | How to install Inwards and wire it into Claude Code, Aider or `AGENTS.md` |
 | [2. Business context](02-Business-Context.md) | Who else is in this space, why Inwards should exist, and the hypothesis we're testing |
 | [3. Architecture (C4)](03-Architecture-C4.md) | Context, containers and components, with diagrams |
 | [4. AI integration](04-AI-Integration.md) | How Inwards plugs into Claude Code, Aider, Copilot and friends |
 | [5. Decisions (ADR)](05-ADR.md) | Why TypeScript, why WASM tree-sitter, why Bun, and what we gave up |
 | [6. Constraints and quality](06-Constraints-and-Quality.md) | Performance budgets, measurements, risks |
 | [7. Glossary](07-Glossary.md) | The vocabulary, from "port" to "import skeleton" |
+| [8. Run log](08-Run-Log.md) | The opt-in local log design partners use to measure the hypothesis |
 
 !!! info "Status"
-    Pre-alpha. Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, with a Stop gate that checks what the session changed, and each `v*` tag drafts a GitHub Release with binaries for six platforms. Everything marked :material-progress-clock: in these docs is planned, not built.
+    Pre-alpha.
+    Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports).
+    `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section.
+    Each release is a GitHub Release with binaries for six platforms, five platform wheels and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
+    Everything marked :material-progress-clock: in these docs is planned, not built.

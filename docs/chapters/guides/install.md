@@ -1,13 +1,13 @@
 # Install Inwards
 
 !!! info "Verified 2026-09-25"
-    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary on every push; a by-hand check there is still open. The release download steps can't be tried until v0.1.0 is published.
+    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary on every push; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works.
 
 Inwards is one executable with no runtime to install. The latest release is the pre-release v0.1.0-rc.1; the first full release comes with a later milestone. You can also build from source.
 
 ## From a release
 
-Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform and `SHA256SUMS`. Build attestations are added once the repository is public.
+Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (`.vsix`) and `SHA256SUMS`. Build attestations are added once the repository is public.
 
 | Platform | File |
 |---|---|
@@ -29,6 +29,12 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
     ```
 
     If `inwards` isn't found, add `~/.local/bin` to `PATH` in your shell profile (`export PATH="$HOME/.local/bin:$PATH"`).
+
+    While the repository is private, GitHub answers these URLs with 404. Download with the GitHub CLI instead, then continue from the `sha256sum` line:
+
+    ```sh
+    gh release download "$VERSION" --repo SirCypkowskyy/inwards --pattern "$FILE" --pattern SHA256SUMS
+    ```
 
 === "Windows (PowerShell)"
 

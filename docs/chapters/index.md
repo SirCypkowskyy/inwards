@@ -40,6 +40,12 @@ flowchart LR
 
 <div class="grid cards" markdown>
 
+-   :material-rocket-launch-outline:{ .lg .middle } __[Getting started](guides/install.md)__
+
+    ---
+
+    Install the binary or the wheel, then wire Inwards into Claude Code, Aider or any agent that reads `AGENTS.md`.
+
 -   :material-book-open-page-variant:{ .lg .middle } __[Introduction](01-Introduction.md)__
 
     ---
@@ -68,7 +74,7 @@ flowchart LR
 
     ---
 
-    Twelve decisions, from "why TypeScript" to "why check imports inside functions".
+    Eighteen decisions, among them "why TypeScript", "how a release is cut" and "how packages are selected".
 
 -   :material-speedometer:{ .lg .middle } __[Constraints and quality](06-Constraints-and-Quality.md)__
 
@@ -81,4 +87,8 @@ flowchart LR
 The [glossary](07-Glossary.md) defines every term from "port" to "import skeleton".
 
 !!! info "Project status"
-    Pre-alpha. Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, with a Stop gate that checks what the session changed, and each `v*` tag drafts a GitHub Release with binaries for six platforms. CI runs on Linux, macOS and Windows. Items marked :material-progress-clock: are planned.
+    Pre-alpha.
+    Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports).
+    `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section.
+    Each release is a GitHub Release with binaries for six platforms, five platform wheels for `uv add` and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
+    CI runs on Linux, macOS and Windows. Items marked :material-progress-clock: are planned.
