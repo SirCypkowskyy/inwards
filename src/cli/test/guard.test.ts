@@ -59,6 +59,11 @@ describe("config guard: pyproject.toml", () => {
   test.each([
     ["an Edit to a layer", "Edit", { old_string: '"shop.domain"', new_string: '"shop.core"' }],
     [
+      "an Edit that sets the Stop gate mode",
+      "Edit",
+      { old_string: "[tool.inwards]\n", new_string: '[tool.inwards]\nstop-gate = "changed"\n' },
+    ],
+    [
       "a MultiEdit that drops a layer",
       "MultiEdit",
       {

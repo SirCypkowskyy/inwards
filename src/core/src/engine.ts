@@ -1,4 +1,5 @@
 import type { Parser } from "web-tree-sitter";
+import { acceptedModules } from "./baseline.ts";
 import type { InwardsConfig } from "./config.ts";
 import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
@@ -15,6 +16,16 @@ import {
 import { checkShape } from "./shape.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 import { checkUnassignedImports, type ModuleLookup, unassignedWarning } from "./unassigned.ts";
+
+/** A file after the prescan, before any full parse. */
+interface Scan {
+  /** The findings so far; null when the prescan was skipped or refused the file. */
+  found: Diagnostic[] | null;
+  /** True when `found` is final and needs no full parse. */
+  exact: boolean;
+  /** True when the full parse must also look for dynamic imports (INW011). */
+  dynamic: boolean;
+}
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
 export class Engine {
@@ -50,7 +61,8 @@ export class Engine {
    * Checks one file against every rule.
    * The package shape (INW007) comes first and reads only the path. Then only
    * the import skeleton is parsed. Violations are rare, so the full parse runs
-   * only to confirm one (or when the prescan declines the file).
+   * only to confirm one (or when the prescan declines the file), and not even
+   * then when a baseline accepts them all (see `checkFiles`).
    *
    * The text is normalised first (BOM dropped, lone \r turned into \n), so
    * reported lines and columns match what an editor shows. A file in a layer
@@ -71,33 +83,49 @@ export class Engine {
    */
   checkFile(file: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    return [...checkShape(src, this.config), ...this.layerFindings(src, ownerOf)];
+    return [
+      ...checkShape(src, this.config),
+      ...this.confirm(src, this.scan(src, ownerOf), ownerOf),
+    ];
   }
 
   /**
-   * Applies the rules that read the file's text, see `checkFile`.
+   * Applies the text rules that need no full parse, see `checkFile`.
    *
    * @param src - the source file, with normalised text.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
-   * @returns the violations found.
+   * @returns the findings so far, and what the full parse would still have to do.
    */
-  private layerFindings(src: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
+  private scan(src: SourceFile, ownerOf: ModuleLookup): Scan {
     if (layerIndexOf(src.module, this.config.layers) === -1) {
       const warning = unassignedWarning(src, this.config);
-      return warning ? [warning] : [];
+      return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
     const unreadable = checkEncoding(src);
     if (unreadable) {
-      return [unreadable];
+      return { found: [unreadable], exact: true, dynamic: false };
     }
     const dynamic = mentionsDynamicImport(src.text);
-    if (!dynamic) {
-      const fast = skeletonImports(this.parser, src);
-      if (fast && this.importFindings(src, fast, ownerOf).length === 0) {
-        return [];
-      }
+    const fast = dynamic ? null : skeletonImports(this.parser, src);
+    const found = fast ? this.importFindings(src, fast, ownerOf) : null;
+    return { found, exact: found?.length === 0, dynamic };
+  }
+
+  /**
+   * Finishes a scan: exact findings stand, anything else gets the full parse,
+   * unless `skip` says the baseline hides every skeleton finding anyway.
+   *
+   * @param src - the source file, with normalised text.
+   * @param scan - its scan.
+   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param skip - true to return the skeleton's findings unconfirmed.
+   * @returns the violations found.
+   */
+  private confirm(src: SourceFile, scan: Scan, ownerOf: ModuleLookup, skip = false): Diagnostic[] {
+    if (scan.found && (scan.exact || skip)) {
+      return scan.found;
     }
-    return this.fullCheck(src, dynamic, ownerOf);
+    return this.fullCheck(src, scan.dynamic, ownerOf);
   }
 
   /**
@@ -189,15 +217,41 @@ export class Engine {
    * Order follows the input, so a sorted file list gives sorted output. The
    * INW006 warning for an unassigned package is kept once, on its first file.
    *
+   * With `accepted`, the baseline's copies by key (see `baselineKey`), a
+   * module the baseline hides in full skips the confirming parse: every file
+   * of it is scanned first, and if the skeleton's findings, false positives
+   * included, add up to no more than the accepted copies of each key, the
+   * real ones do too, so the adapter's baseline hides them all either way.
+   * Those findings are returned unconfirmed. See `acceptedModules`.
+   *
    * @param files - the source files to check.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
-   * @returns every violation across all files.
+   * @param accepted - accepted copies by baseline key, when a baseline applies.
+   * @returns every violation across all files, baselined ones included.
    */
-  checkFiles(files: Iterable<SourceFile>, ownerOf: ModuleLookup): Diagnostic[] {
+  checkFiles(
+    files: Iterable<SourceFile>,
+    ownerOf: ModuleLookup,
+    accepted?: ReadonlyMap<string, number>,
+  ): Diagnostic[] {
+    const scanned = [...files].map((file) => {
+      const src = { ...file, text: normalizeSource(file.text) };
+      return { src, scan: this.scan(src, ownerOf) };
+    });
+    const hidden = accepted
+      ? acceptedModules(
+          scanned.map(({ src, scan }) => ({ module: src.module, found: scan.found })),
+          accepted,
+        )
+      : new Set<string>();
     const all: Diagnostic[] = [];
     const warned = new Set<string>();
-    for (const file of files) {
-      for (const found of this.checkFile(file, ownerOf)) {
+    for (const { src, scan } of scanned) {
+      const skip = hidden.has(src.module);
+      for (const found of [
+        ...checkShape(src, this.config),
+        ...this.confirm(src, scan, ownerOf, skip),
+      ]) {
         const once = found.severity === "warning" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {
           all.push(found);

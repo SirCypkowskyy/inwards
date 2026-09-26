@@ -4,6 +4,10 @@
     cd /tmp/inwards-bench && inwards check
 
 Every import points inward, so a correct run reports 0 violations.
+
+With --legacy, every module also imports an outer "legacy" layer, so each of
+the 2,000 modules has one violation: the legacy codebase of ADR-004's bad
+case. Take a baseline (`inwards baseline`) to time a fully baselined check.
 """
 
 import random
@@ -32,7 +36,10 @@ layers = [
 """
 
 
-def main(out: Path) -> None:
+LEGACY_LAYER = '  { name = "legacy", modules = ["shop.legacy"] },\n]\n'
+
+
+def main(out: Path, legacy: bool) -> None:
     rng = random.Random(1)
     for depth, layer in enumerate(LAYERS):
         for pkg in range(PACKAGES_PER_LAYER):
@@ -45,9 +52,17 @@ def main(out: Path) -> None:
                     f".m{rng.randrange(MODULES_PER_PACKAGE)} import f1"
                     for _ in range(IMPORTS_PER_MODULE)
                 ]
+                if legacy:
+                    imports.insert(0, "from shop.legacy import f1")
                 (package / f"m{mod}.py").write_text("\n".join(imports) + "\n\n" + BODY)
-    (out / "pyproject.toml").write_text(CONFIG)
+    config = CONFIG
+    if legacy:
+        (out / "src" / "shop" / "legacy").mkdir(exist_ok=True)
+        (out / "src" / "shop" / "legacy" / "__init__.py").write_text(BODY)
+        config = CONFIG.replace("\n]\n", "\n" + LEGACY_LAYER)
+    (out / "pyproject.toml").write_text(config)
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1] if len(sys.argv) > 1 else "inwards-bench"))
+    args = [a for a in sys.argv[1:] if a != "--legacy"]
+    main(Path(args[0] if args else "inwards-bench"), "--legacy" in sys.argv[1:])

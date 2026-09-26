@@ -19,12 +19,16 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
-import { ConfigError, type Diagnostic, type Report } from "@inwards/core";
+import {
+  baselineKey,
+  ConfigError,
+  type Diagnostic,
+  type Report,
+  stableMessage,
+} from "@inwards/core";
 
 export const BASELINE_FILE = "inwards-baseline.json";
 const SCHEMA = "inwards/baseline@1";
-/** INW001 and INW011 end with the whole layer order, which isn't part of the violation. */
-const DIRECTION = / Allowed direction: [^\n]*$/u;
 const REGENERATE = "Ask the user to regenerate it with `inwards baseline`.";
 
 /** One accepted violation, with how many times the module has it. */
@@ -43,26 +47,6 @@ interface Entry {
  */
 function baselinePath(configPath: string): string {
   return join(dirname(configPath), BASELINE_FILE);
-}
-
-/**
- * The key an entry and a diagnostic match on.
- *
- * @param d - a diagnostic or entry.
- * @returns rule, module and message joined.
- */
-function keyOf(d: Pick<Diagnostic, "code" | "module" | "message">): string {
-  return `${d.code}\u0000${d.module}\u0000${stable(d.message)}`;
-}
-
-/**
- * Drops the part of a message that depends on the rest of the config.
- *
- * @param message - a diagnostic message.
- * @returns the message without its "Allowed direction" sentence.
- */
-function stable(message: string): string {
-  return message.replace(DIRECTION, "");
 }
 
 /**
@@ -90,14 +74,14 @@ function byCodePoint(a: string, b: string): number {
 export function writeBaseline(configPath: string, diagnostics: readonly Diagnostic[]): number {
   const entries = new Map<string, Entry>();
   for (const d of diagnostics.filter((x) => x.severity === "error")) {
-    const entry = entries.get(keyOf(d)) ?? {
+    const entry = entries.get(baselineKey(d)) ?? {
       code: d.code,
       module: d.module,
-      message: stable(d.message),
+      message: stableMessage(d.message),
       count: 0,
     };
     entry.count += 1;
-    entries.set(keyOf(d), entry);
+    entries.set(baselineKey(d), entry);
   }
   const violations = [...entries.values()].sort(
     (a, b) =>
@@ -179,30 +163,47 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Reads the accepted violations of a config's baseline, for the engine and
+ * for `applyBaseline`.
+ *
+ * @param configPath - the pyproject.toml.
+ * @returns accepted copies by baseline key, or undefined when there is no baseline.
+ * @throws {ConfigError} when the file isn't a baseline this version understands.
+ */
+export function readBaseline(configPath: string): Map<string, number> | undefined {
+  const entries = readEntries(baselinePath(configPath));
+  if (entries === undefined) {
+    return undefined;
+  }
+  const accepted = new Map<string, number>();
+  for (const e of entries) {
+    accepted.set(baselineKey(e), (accepted.get(baselineKey(e)) ?? 0) + e.count);
+  }
+  return accepted;
+}
+
+/**
  * Drops the errors the baseline accepts, up to each entry's count, so a module
  * that gains a second copy of an accepted violation still fails.
  *
- * @param configPath - the pyproject.toml.
+ * @param accepted - accepted copies by baseline key, from `readBaseline`.
  * @param report - the check's report.
  * @param whole - true when the whole project was checked, so leftover entries were fixed.
  * @returns the report without accepted errors, with `baselined` (and `resolved` for a whole run).
  */
-export function applyBaseline(configPath: string, report: Report, whole: boolean): Report {
-  const entries = readEntries(baselinePath(configPath));
-  if (entries === undefined) {
-    return report;
-  }
-  const left = new Map<string, number>();
-  for (const e of entries) {
-    left.set(keyOf(e), (left.get(keyOf(e)) ?? 0) + e.count);
-  }
+export function applyBaseline(
+  accepted: ReadonlyMap<string, number>,
+  report: Report,
+  whole: boolean,
+): Report {
+  const left = new Map(accepted);
   let baselined = 0;
   const diagnostics = report.diagnostics.filter((d) => {
-    const n = d.severity === "error" ? (left.get(keyOf(d)) ?? 0) : 0;
+    const n = d.severity === "error" ? (left.get(baselineKey(d)) ?? 0) : 0;
     if (n === 0) {
       return true;
     }
-    left.set(keyOf(d), n - 1);
+    left.set(baselineKey(d), n - 1);
     baselined += 1;
     return false;
   });
