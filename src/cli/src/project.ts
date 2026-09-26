@@ -159,7 +159,8 @@ function projectFiles(project: Project): ProjectFiles {
  * package's required members (INW008). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
  * Errors the config's baseline accepts are left out, unless `baseline` is
- * false. The duration covers config, grammar loading, reading and checking.
+ * false; findings inline comments suppress go in `suppressed`. The duration
+ * covers config, grammar loading, reading and checking.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param targets - absolute files or directories; undefined means the config root.
@@ -186,7 +187,7 @@ export async function runCheck(
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(configPath, project.config.rules) : undefined;
   const index = project.engine.index(projectFiles(project));
-  const diagnostics = project.engine.checkFiles(files, index, accepted);
+  const { diagnostics, suppressed } = project.engine.check(files, index, accepted);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -203,6 +204,7 @@ export async function runCheck(
   }
   const report = {
     diagnostics,
+    suppressed,
     filesChecked: files.length,
     durationMs: performance.now() - started,
   };

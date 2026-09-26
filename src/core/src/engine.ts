@@ -16,6 +16,7 @@ import {
 } from "./python.ts";
 import { applyRules } from "./rule-config.ts";
 import { shapeFindings } from "./shape.ts";
+import { type Suppressed, suppress } from "./suppress.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 import { checkUnassignedImports, unassignedWarning } from "./unassigned.ts";
 import { checkUnknownImports } from "./unknown.ts";
@@ -28,6 +29,12 @@ interface Scan {
   exact: boolean;
   /** True when the full parse must also look for dynamic imports (INW011). */
   dynamic: boolean;
+}
+
+/** What `check` returns: the findings to report, and the ones inline suppressions hid. */
+export interface Checked {
+  diagnostics: Diagnostic[];
+  suppressed: Suppressed[];
 }
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
@@ -80,6 +87,8 @@ export class Engine {
    * A file outside every layer isn't parsed: besides its shape, it gets at
    * most an INW006 warning naming its package.
    *
+   * Inline suppression comments then hide the findings they cover and add
+   * INW009 for the ones that are invalid or unused (see `suppress.ts`).
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
@@ -89,10 +98,11 @@ export class Engine {
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    return applyRules(
-      [...shapeFindings(src, this.config), ...this.confirm(src, this.scan(src, project), project)],
-      this.config.rules,
-    );
+    const found = [
+      ...shapeFindings(src, this.config),
+      ...this.confirm(src, this.scan(src, project), project),
+    ];
+    return applyRules(suppress(this.parser, src, found, this.config.rules).kept, this.config.rules);
   }
 
   /**
@@ -257,6 +267,26 @@ export class Engine {
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
   ): Diagnostic[] {
+    return this.check(files, project, accepted).diagnostics;
+  }
+
+  /**
+   * `checkFiles`, plus the findings inline suppression comments hid, for the
+   * adapters that count or report them (the CLI: summary, SARIF, run log,
+   * and the hooks' `agent-suppressions`). Suppressions apply per file,
+   * before the INW006 warnings are deduplicated; the suppressed findings get
+   * `[tool.inwards.rules]` too, so a rule that is off has none.
+   *
+   * @param files - the source files to check.
+   * @param project - the project's module index (see `index`).
+   * @param accepted - accepted copies by baseline key, when a baseline applies.
+   * @returns the violations, as `checkFiles` returns them, and the suppressed findings.
+   */
+  check(
+    files: Iterable<SourceFile>,
+    project: ProjectIndex,
+    accepted?: ReadonlyMap<string, number>,
+  ): Checked {
     const { rules } = this.config;
     const scanned = [...files].map((file) => {
       const src = { ...file, text: normalizeSource(file.text) };
@@ -272,13 +302,18 @@ export class Engine {
         )
       : new Set<string>();
     const all: Diagnostic[] = [];
+    const suppressed: Suppressed[] = [];
     const warned = new Set<string>();
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
-      for (const found of [
-        ...shapeFindings(src, this.config),
-        ...this.confirm(src, scan, project, skip),
-      ]) {
+      const own = suppress(
+        this.parser,
+        src,
+        [...shapeFindings(src, this.config), ...this.confirm(src, scan, project, skip)],
+        rules,
+      );
+      suppressed.push(...own.suppressed);
+      for (const found of own.kept) {
         const once = found.severity === "warning" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {
           all.push(found);
@@ -288,6 +323,11 @@ export class Engine {
         }
       }
     }
-    return applyRules(all, rules);
+    return {
+      diagnostics: applyRules(all, rules),
+      suppressed: suppressed.flatMap(({ diagnostic, reason }) =>
+        applyRules([diagnostic], rules).map((d) => ({ diagnostic: d, reason })),
+      ),
+    };
   }
 }

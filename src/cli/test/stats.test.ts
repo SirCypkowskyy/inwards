@@ -26,6 +26,7 @@ const EXPECTED: Stats = {
   },
   violationsPer1000Lines: { violations: 3, linesAdded: 50, rate: 60, target: 1, met: true },
   hookLatencyMs: { runs: 6, p50: 40, p95: 200, target: 100, met: true },
+  rejectedSuppressions: 0,
 };
 
 describe("inwards stats", () => {

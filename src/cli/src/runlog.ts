@@ -8,7 +8,7 @@
  * file is rotated to `runs.1.jsonl`, replacing the previous one.
  *
  * Line schema `inwards/run@1` (documented in docs/chapters/08-Run-Log.md):
- * `{ v, at, session_id, event, tool, files, lines, fingerprints, codes, severities, exit, durationMs }`.
+ * `{ v, at, session_id, event, tool, files, lines, fingerprints, codes, severities, suppressed, rejected, exit, durationMs }`.
  * `inwards stats` (stats.ts) turns it into the hypothesis numbers.
  */
 import { readFileSync, renameSync, statSync } from "node:fs";
@@ -35,7 +35,12 @@ interface LineCount {
  * What a handler checked, collected for the log line. The CLI runs one
  * command per process, so a module-level note is enough.
  */
-const noted: { files: string[]; diagnostics: Diagnostic[] } = { files: [], diagnostics: [] };
+const noted: {
+  files: string[];
+  diagnostics: Diagnostic[];
+  suppressed: number;
+  rejected: Diagnostic[];
+} = { files: [], diagnostics: [], suppressed: 0, rejected: [] };
 
 /**
  * Notes files and violations a handler checked, for this run's log line.
@@ -51,6 +56,17 @@ export function noteRun(
 ): void {
   noted.files.push(...files.map((file) => projectPath(project, file) || "."));
   noted.diagnostics.push(...diagnostics);
+}
+
+/**
+ * Notes what inline suppressions did in this run, for its log line.
+ *
+ * @param suppressed - how many findings a suppression comment hid.
+ * @param rejected - findings whose suppression the hooks didn't honour (`agent-suppressions`).
+ */
+export function noteSuppressions(suppressed: number, rejected: readonly Diagnostic[]): void {
+  noted.suppressed += suppressed;
+  noted.rejected.push(...rejected);
 }
 
 /**
@@ -84,6 +100,8 @@ export function logRun(
       fingerprints: noted.diagnostics.map(fingerprint),
       codes: noted.diagnostics.map((d) => d.code),
       severities: noted.diagnostics.map((d) => d.severity),
+      suppressed: noted.suppressed,
+      rejected: noted.rejected.map(fingerprint),
       exit: run.exit,
       // Since the process started (Bun's performance clock), so startup counts too.
       durationMs: Math.round(performance.now() * 10) / 10,

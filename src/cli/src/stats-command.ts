@@ -91,6 +91,11 @@ function renderStatsText(stats: Stats): string {
       : []),
     `Violations per 1,000 agent-written lines: ${per.rate ?? "n/a"} (${per.violations} in ${per.linesAdded} lines). Target: at least ${per.target}. ${verdict(per.met)}`,
     `Hook latency: p50 ${lat.p50 ?? "n/a"} ms, p95 ${lat.p95 ?? "n/a"} ms over ${lat.runs} runs. Target: p50 under ${lat.target} ms. ${verdict(lat.met)}`,
+    ...(stats.rejectedSuppressions
+      ? [
+          `Inline suppressions the agent added and the hooks rejected: ${stats.rejectedSuppressions}.`,
+        ]
+      : []),
   ].join("\n");
 }
 /**

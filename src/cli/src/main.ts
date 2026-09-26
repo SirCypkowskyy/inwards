@@ -10,7 +10,7 @@ import { type InitFlags, initMain } from "./init-style.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
-import { logRun, noteRun } from "./runlog.ts";
+import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
 import { statsCommand } from "./stats-command.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
@@ -199,6 +199,7 @@ async function checkCommand(
   const project = realpath(dirname(configPath));
   if (project) {
     noteRun(project, targets ?? [project], report.diagnostics);
+    noteSuppressions(report.suppressed?.length ?? 0, []);
     logRun(project, { event: "check", exit, force: log });
   }
   return exit;

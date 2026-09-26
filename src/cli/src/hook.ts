@@ -7,11 +7,11 @@ import process from "node:process";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
 import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
 import { configGuard } from "./guard.ts";
-import { oldErrors, oldNote } from "./legacy.ts";
+import { agentSuppressions, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
-import { logRun, noteRun } from "./runlog.ts";
+import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
 import {
   fingerprint,
   isSessionId,
@@ -144,14 +144,20 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     return 0;
   }
   try {
-    const report = await runCheck(configPath, [target.file], target.cwd, { required: true });
+    const check = { configPath, base: target.cwd, baseline: true };
+    // A suppression the agent added may not count (`agent-suppressions`, see `legacy.ts`).
+    const { report, rejected } = await agentSuppressions(
+      target.project,
+      start,
+      check,
+      await runCheck(configPath, [target.file], target.cwd, { required: true }),
+    );
     // A shape finding on a file that predates the session, and a missing member, are context.
     const existed = start?.manifest[projectPath(target.project, target.file)] !== undefined;
     const errors = report.diagnostics.filter(
       (d) => d.severity === "error" && d.code !== "INW008" && !(existed && d.code === "INW007"),
     );
     // So is a violation the file already had at session start (see `legacy.ts`).
-    const check = { configPath, base: target.cwd, baseline: true };
     const old =
       start && errors.length > 0 ? await oldErrors(target.project, start, check, errors) : [];
     const blocking = errors.filter((d) => !old.includes(d));
@@ -161,10 +167,13 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
       [target.file],
       report.diagnostics.filter((d) => !old.includes(d)),
     );
+    noteSuppressions(report.suppressed?.length ?? 0, rejected);
     const escalation = escalationOf(target.project, id, configPath, blocking);
     // Only what blocks counts toward escalation: context isn't an attempt that failed.
     rememberEdit(target.project, id, target.file, blocking);
-    return report.diagnostics.length === 0 ? 0 : reply(report, { old, blocking }, escalation);
+    return report.diagnostics.length === 0
+      ? 0
+      : reply(report, { old, blocking, rejected }, escalation);
   } catch (err) {
     if (err instanceof ConfigError) {
       return print(`inwards: config error: ${err.message}`, 2);
@@ -177,22 +186,31 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
  * Answers the agent after a check that found something: blocking errors go
  * to stderr with exit 2; warnings and context, or errors that have just
  * escalated, go back as `additionalContext`. Old errors leave the JSON and
- * are listed as a note instead.
+ * are listed as a note instead. Findings whose suppression was rejected stay
+ * in the JSON and get a note of their own.
  *
  * @param report - the check of the edited file.
- * @param split - the errors the file already had at session start, and the ones that block.
+ * @param split - the errors the file already had at session start, the ones
+ *   that block, and the findings whose suppression was rejected.
  * @param escalation - the escalation limit, if this run reached it, from `escalationOf`.
  * @returns 2 to block, 0 when everything is context.
  */
 function reply(
   report: Report,
-  { old, blocking }: { old: Diagnostic[]; blocking: Diagnostic[] },
+  {
+    old,
+    blocking,
+    rejected,
+  }: { old: Diagnostic[]; blocking: Diagnostic[]; rejected: Diagnostic[] },
   escalation: { limit: number; every: boolean } | undefined,
 ): number {
   const shown = { ...report, diagnostics: report.diagnostics.filter((d) => !old.includes(d)) };
   const json = shown.diagnostics.length > 0 ? render(shown, "json", { pretty: false }) : "";
   const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
-  const note = old.length > 0 ? `inwards: ${oldNote(old)}\n` : "";
+  const note = [
+    ...(rejected.length > 0 ? [`inwards: ${rejectedNote(rejected)}\n`] : []),
+    ...(old.length > 0 ? [`inwards: ${oldNote(old)}\n`] : []),
+  ].join("");
   if (blocking.length > 0 && escalation?.every !== true) {
     process.stderr.write(`${ask}${note}${json}\n`); // a new violation still blocks
     return 2;
