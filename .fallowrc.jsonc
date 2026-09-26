@@ -3,11 +3,12 @@
   // Run by CI (`bun run src/core/scripts/prescan-diff.ts`), not from package.json.
   // eval/run.ts is the agent eval, run by hand with `bun run eval/run.ts`.
   // The placeholder bin.js is the `bin` of the npm name placeholder, run by `node`.
-  // bench/compare.ts is run by .github/workflows/bench.yml.
+  // bench/compare.ts is run by .github/workflows/bench.yml, bench/corpus.ts by corpus.yml.
   "entry": [
     "src/core/scripts/prescan-diff.ts",
     "eval/run.ts",
     "bench/compare.ts",
+    "bench/corpus.ts",
     "packaging/placeholder/npm/bin.js"
   ],
   // Loaded by path, never imported: Bun.resolveSync("tree-sitter-python/...wasm")
