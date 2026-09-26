@@ -3,8 +3,9 @@ name: Nightly E2E
 # Re-records the Claude Code hook payloads with a headless `claude -p` session
 # and compares their shape (field names and JSON types) with the fixtures in
 # src/cli/test/fixtures/claude-code. Drift opens an issue, or comments on the
-# open one. Needs the ANTHROPIC_API_KEY secret; without it the job skips with
-# a notice. Each run is one Haiku session, capped at $0.25.
+# open one. A session that fails or skips a call (twice) fails the run without
+# an issue. Needs the ANTHROPIC_API_KEY secret; without it the job skips with
+# a notice. Each run is one or two Haiku sessions, each capped at $0.25.
 # The doc-snippet E2E cases run on every PR in ci.yml's test job
 # (src/cli/test/docs.test.ts).
 on:
@@ -19,51 +20,70 @@ jobs:
   payloads:
     name: Claude Code hook payloads match the fixtures
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      issues: write
+    timeout-minutes: 15
+    # Only the record step sees the key; this job runs npm code, so no write token.
     env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    outputs:
+      code: ${{ steps.drift.outputs.code }}
+      report: ${{ steps.drift.outputs.report }}
     steps:
       - name: Skip without the ANTHROPIC_API_KEY secret
-        if: env.ANTHROPIC_API_KEY == ''
+        if: env.HAS_KEY != 'true'
         run: echo "::notice::ANTHROPIC_API_KEY is not set; hook payloads were not re-recorded."
       - uses: actions/checkout@v7
-        if: env.ANTHROPIC_API_KEY != ''
+        if: env.HAS_KEY == 'true'
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
-        if: env.ANTHROPIC_API_KEY != ''
+        if: env.HAS_KEY == 'true'
         with:
           bun-version-file: .bun-version
       - name: Install Claude Code
-        if: env.ANTHROPIC_API_KEY != ''
+        if: env.HAS_KEY == 'true'
         run: npm install -g @anthropic-ai/claude-code
       - name: Record and compare
         id: drift
-        if: env.ANTHROPIC_API_KEY != ''
-        shell: bash # -o pipefail, so a failed check fails the step through tee
-        run: bun run scripts/claude-payload-drift.ts "$RUNNER_TEMP/rec" | tee -a "$GITHUB_STEP_SUMMARY" "$RUNNER_TEMP/drift.md"
+        if: env.HAS_KEY == 'true'
+        shell: bash
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +e
+          bun run scripts/claude-payload-drift.ts "$RUNNER_TEMP/rec" > "$RUNNER_TEMP/drift.md"
+          code=$?
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/drift.md"
+          { echo "code=$code"; echo "report<<REPORT_EOF"; cat "$RUNNER_TEMP/drift.md"; echo "REPORT_EOF"; } >> "$GITHUB_OUTPUT"
+          exit "$code"
       - uses: actions/upload-artifact@v7
-        if: always() && env.ANTHROPIC_API_KEY != ''
+        if: always() && env.HAS_KEY == 'true'
         with:
           name: claude-code-payloads
-          path: ${{ runner.temp }}/rec/payloads
+          path: |
+            ${{ runner.temp }}/rec/payloads
+            ${{ runner.temp }}/rec/retry/payloads
           if-no-files-found: ignore
+
+  issue:
+    name: Open or update the drift issue
+    needs: payloads
+    # Exit code 1 is drift; 3 (the session failed or skipped a call) is not.
+    if: failure() && needs.payloads.outputs.code == '1'
+    runs-on: ubuntu-26.04
+    permissions:
+      issues: write
+    steps:
       - name: Open or update the drift issue
-        if: failure() && steps.drift.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TITLE: Claude Code hook payloads drifted from the recorded fixtures
+          REPORT: ${{ needs.payloads.outputs.report }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
-            if [ -s "$RUNNER_TEMP/drift.md" ]; then
-              cat "$RUNNER_TEMP/drift.md"
-            else
-              echo "The recording failed before any comparison (a Claude Code or API error); see the run log."
-            fi
-            printf '\nRun: %s (the recorded payloads are its artifact).\n' "$RUN"
+            printf '%s\n\n' "$REPORT"
+            printf 'Run: %s (the recorded payloads are its artifact).\n' "$RUN"
             printf 'Refresh the fixtures as src/cli/test/fixtures/claude-code/README.md describes, then review the snapshot diff.\n'
           } > body.md
           n="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number -q '.[0].number')"

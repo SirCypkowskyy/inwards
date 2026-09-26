@@ -5,12 +5,14 @@ Recorded from Claude Code 2.1.282 on 2026-09-25: real stdin of `SessionStart`,
 Absolute paths are replaced with `{{ROOT}}`; the transcript path is scrubbed.
 
 To re-record after a Claude Code release (needs `claude` logged in or
-`ANTHROPIC_API_KEY`; one Haiku session, capped at $0.25):
+`ANTHROPIC_API_KEY`; one or two Haiku sessions, each capped at $0.25):
 
-1. Run `bun run scripts/claude-payload-drift.ts "$(mktemp -d)"`. It runs a
-   headless `claude -p` session whose hooks save every payload to
-   `<dir>/payloads`, then reports any field added, removed or retyped against
-   these fixtures. Values are not compared.
+1. Run `d=$(mktemp -d); bun run scripts/claude-payload-drift.ts "$d"`. It runs
+   a headless `claude -p` session whose hooks save every payload to
+   `$d/payloads` (a second session in `$d/retry` if the first skipped a call),
+   then reports any field added, removed or retyped against these fixtures.
+   Values are not compared. Payload names start with a nanosecond timestamp
+   (GNU `date`), so they sort in the order the hooks ran.
 2. Copy the payloads you need over these files, keeping the names used here
    (`hook_event_name`, `tool_name` and `tool_input.file_path` tell which is
    which), replace the scratch directory path with `{{ROOT}}`, and scrub
@@ -19,5 +21,6 @@ To re-record after a Claude Code release (needs `claude` logged in or
    a change there is a change in what agents see.
 
 `.github/workflows/nightly-e2e.yml` runs step 1 every night and opens an issue
-(or comments on the open one) when the shape drifts. It needs the repository
-secret `ANTHROPIC_API_KEY`; without it the job skips with a notice.
+(or comments on the open one) when the shape drifts. A session that fails, or
+skips a call on both tries, fails the run without an issue. It needs the
+repository secret `ANTHROPIC_API_KEY`; without it the job skips with a notice.

@@ -13,6 +13,8 @@ import { CLAUDE_USER_DIR, CMD, project } from "./run.ts";
 const GUIDES = resolve(import.meta.dir, "../../../docs/chapters/guides");
 const TAGGED =
   /^(?<indent> *)<!-- e2e -->\n\n\k<indent>```(?<lang>\w+)(?<info>[^\n]*)\n(?<body>[\s\S]*?)\n\k<indent>```$/gmu;
+// Any spelling of the marker, so a near miss fails instead of silently not running.
+const MARKER = /<!--\s*e2e\s*-->/gu;
 const TITLE = /title="(?<file>[^"]+)"/u;
 
 /**
@@ -70,7 +72,7 @@ test("guides tag at least one runnable snippet", () => {
 
 test.each(guides)("every e2e marker in %s tags a fence", (guide) => {
   const markdown = readFileSync(join(GUIDES, guide), "utf8");
-  expect([...markdown.matchAll(TAGGED)].length).toBe(markdown.split("<!-- e2e -->").length - 1);
+  expect([...markdown.matchAll(TAGGED)].length).toBe([...markdown.matchAll(MARKER)].length);
 });
 
 test.each(guides)("tagged snippets in %s run", (guide) => {
@@ -78,16 +80,19 @@ test.each(guides)("tagged snippets in %s run", (guide) => {
     return; // the snippets are POSIX shell
   }
   const root = project(SEED);
-  Bun.spawnSync(["git", "init", "-q"], { cwd: root });
+  // No inherited GIT_* variables or user git config: the snippets see a plain repository.
   const env = {
     ...Object.fromEntries(
       Object.entries(process.env).filter(
-        ([name]) => name !== "CLAUDE_PROJECT_DIR" && name !== "INWARDS_RUN_LOG",
+        ([name]) =>
+          name !== "CLAUDE_PROJECT_DIR" && name !== "INWARDS_RUN_LOG" && !name.startsWith("GIT_"),
       ),
     ),
     PATH: `${BIN}:${process.env["PATH"] ?? ""}`,
     CLAUDE_CONFIG_DIR: CLAUDE_USER_DIR,
+    GIT_CONFIG_GLOBAL: "/dev/null",
   };
+  Bun.spawnSync(["git", "init", "-q"], { cwd: root, env });
   const body = script(readFileSync(join(GUIDES, guide), "utf8"));
   // -x traces each command, so a failure shows which documented line broke.
   const p = Bun.spawnSync(["bash", "-euxo", "pipefail", "-c", body], { cwd: root, env });

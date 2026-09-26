@@ -4,10 +4,12 @@
  *   bun run scripts/claude-payload-drift.ts <dir>
  *
  * Without `<dir>/payloads`, runs a headless `claude -p` session (Haiku, capped
- * at $0.25) in `<dir>` with hooks that save every payload there. Then compares
- * each payload with its fixture in src/cli/test/fixtures/claude-code by field
- * names and JSON types, never values. Prints a Markdown report and exits 1 on
- * drift. Run nightly by .github/workflows/nightly-e2e.yml.
+ * at $0.25) in `<dir>` with hooks that save every payload there, and a second
+ * session in `<dir>/retry` when the first skipped a call a fixture needs. Then
+ * compares the first payload per fixture in src/cli/test/fixtures/claude-code
+ * by field names and JSON types, never values. Prints a Markdown report.
+ * Exit codes: 0 no drift, 1 drift, 3 the session failed or never made a call
+ * (not drift). Run nightly by .github/workflows/nightly-e2e.yml.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -22,7 +24,11 @@ const PROMPT = [
   "2. Edit tool: in shop/domain/order.py, append the line: X = 1",
   "3. Write tool: create README.md containing the word: hi",
 ].join("\n");
+/** Exit code when the session failed or skipped a call: not drift, so no issue. */
+const SESSION_FAILED = 3;
 const JSON_FILE = /\.json$/u;
+// Fields a payload may leave out: Stop has no last message when the turn ends early.
+const OPTIONAL: Record<string, string[]> = { stop: ["last_assistant_message"] };
 const EXTENSION = /\.[^.]*$/u;
 
 /** Field path to JSON type, e.g. `tool_input.file_path` → `string`. `*` marks an empty array. */
@@ -140,11 +146,13 @@ function readObject(path: string): Record<string, unknown> {
 
 /**
  * Runs a headless Claude Code session in a project whose hooks save their stdin.
+ * Payload files are named `<ns since epoch>-<pid>.json`, so they sort in the order
+ * the hooks ran (GNU date; BSD date has no `%N`). Exits 3 when `claude` fails.
  *
  * @param project - the scratch project; payloads land in `project/payloads`.
  */
 function record(project: string): void {
-  const save = 'cat > "$(mktemp "$CLAUDE_PROJECT_DIR/payloads/XXXXXXXX")"';
+  const save = 'cat > "$CLAUDE_PROJECT_DIR/payloads/$(date +%s%N)-$$.json"';
   const hooks = Object.fromEntries(
     EVENTS.map((e) => [e, [{ matcher: "*", hooks: [{ type: "command", command: save }] }]]),
   );
@@ -162,7 +170,24 @@ function record(project: string): void {
   );
   process.stderr.write(p.stdout); // stdout carries only the report
   if (p.exitCode !== 0) {
-    throw new Error(`claude -p exited with ${p.exitCode}`);
+    process.stderr.write(`claude -p exited with ${p.exitCode}\n`);
+    process.exit(SESSION_FAILED);
+  }
+}
+
+/**
+ * Adds a project's payloads to `into`, keeping the first one per fixture name.
+ *
+ * @param project - the scratch project with a `payloads` directory.
+ * @param into - payloads by fixture name.
+ */
+function collect(project: string, into: Map<string, Record<string, unknown>>): void {
+  for (const f of readdirSync(join(project, "payloads")).sort()) {
+    const p = readObject(join(project, "payloads", f));
+    const name = nameOf(p);
+    if (name !== undefined && !into.has(name)) {
+      into.set(name, p);
+    }
   }
 }
 
@@ -171,39 +196,60 @@ if (dir === undefined) {
   process.stderr.write("usage: bun run scripts/claude-payload-drift.ts <dir>\n");
   process.exit(2);
 }
-if (!existsSync(join(dir, "payloads"))) {
+const fixtures = readdirSync(FIXTURES)
+  .filter((n) => JSON_FILE.test(n))
+  .map((n) => n.replace(JSON_FILE, ""))
+  .sort();
+const payloads = new Map<string, Record<string, unknown>>();
+const fresh = !existsSync(join(dir, "payloads"));
+if (fresh) {
   record(dir);
 }
-
-const payloads = new Map<string, Record<string, unknown>>();
-for (const f of readdirSync(join(dir, "payloads")).sort()) {
-  const p = readObject(join(dir, "payloads", f));
-  const name = nameOf(p);
-  if (name !== undefined && !payloads.has(name)) {
-    payloads.set(name, p);
-  }
+collect(dir, payloads);
+// The model sometimes merges or skips a call; one more session before giving up.
+if (fresh && fixtures.some((name) => !payloads.has(name))) {
+  record(join(dir, "retry"));
+  collect(join(dir, "retry"), payloads);
 }
 
-const report: string[] = [];
-for (const f of readdirSync(FIXTURES).filter((n) => JSON_FILE.test(n))) {
-  const name = f.replace(JSON_FILE, "");
+const drift: string[] = [];
+const missing: string[] = [];
+for (const name of fixtures) {
   const now = payloads.get(name);
   if (now === undefined) {
-    report.push(
-      `### ${name}\n\nNot recorded: the session made no such call, or the event changed.`,
-    );
+    missing.push(`- ${name}`);
     continue;
   }
-  const lines = diff(shape(readObject(join(FIXTURES, f))), shape(now));
+  const was = readObject(join(FIXTURES, `${name}.json`));
+  for (const field of OPTIONAL[name] ?? []) {
+    if (!(field in now)) {
+      delete was[field];
+    }
+  }
+  const lines = diff(shape(was), shape(now));
   if (lines.length > 0) {
-    report.push(`### ${name}\n\n\`\`\`diff\n${lines.join("\n")}\n\`\`\``);
+    drift.push(`### ${name}\n\n\`\`\`diff\n${lines.join("\n")}\n\`\`\``);
   }
 }
 
 const version = Bun.spawnSync(["claude", "--version"]).stdout.toString().trim();
-process.stdout.write(
-  report.length === 0
-    ? `No drift: ${payloads.size} payloads from Claude Code ${version} match the fixtures.\n`
-    : `## Hook payload drift in Claude Code ${version}\n\n${report.join("\n\n")}\n`,
-);
-process.exit(report.length === 0 ? 0 : 1);
+const sections: string[] = [];
+if (drift.length > 0) {
+  sections.push(`## Hook payload drift in Claude Code ${version}`, ...drift);
+}
+if (missing.length > 0) {
+  sections.push(
+    "## Not recorded",
+    `The session didn't make these calls${fresh ? ", even on a retry" : ""}, so they weren't compared:\n\n${missing.join("\n")}`,
+  );
+}
+if (sections.length === 0) {
+  sections.push(
+    `No drift: ${payloads.size} payloads from Claude Code ${version} match the fixtures.`,
+  );
+}
+process.stdout.write(`${sections.join("\n\n")}\n`);
+if (drift.length > 0) {
+  process.exit(1);
+}
+process.exit(missing.length > 0 ? SESSION_FAILED : 0);
