@@ -1,48 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
-import { CLAUDE_USER_DIR, inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
+import { join } from "node:path";
+import { denied, pre } from "./guard-helpers.ts";
+import { CLAUDE_USER_DIR, inwards, LAYERS, payload, project } from "./run.ts";
 import { agentWrites, LEAK, put, session } from "./stop-helpers.ts";
 
 const PYPROJECT = `[project]\nname = "shop"\ndependencies = ["attrs==23.1"]\n\n${LAYERS}`;
-
-/**
- * Sends a PreToolUse event for one tool call.
- *
- * @param root - the project directory.
- * @param tool - the tool name.
- * @param input - the tool input; `file_path` is taken relative to the project.
- * @returns the hook's exit code and output.
- */
-function pre(root: string, tool: string, input: Record<string, unknown>): RunResult {
-  const file = input["file_path"];
-  const relative = typeof file === "string" && !isAbsolute(file);
-  const toolInput = relative ? { ...input, file_path: join(root, file) } : input;
-  const stdin = payload("pre-edit-order", root, { tool_name: tool, tool_input: toolInput });
-  return inwards(["hook", "claude-code"], { cwd: root, stdin });
-}
-
-/**
- * Reads the deny reason out of a PreToolUse response.
- *
- * @param result - the hook run.
- * @returns the reason, or undefined when the call was let through.
- */
-function denied(result: RunResult): string | undefined {
-  if (result.code !== 0) {
-    throw new Error(`PreToolUse exited ${result.code}: ${result.stderr}`);
-  }
-  if (result.stdout === "") {
-    return undefined;
-  }
-  const out: {
-    hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
-  } = JSON.parse(result.stdout);
-  if (out.hookSpecificOutput.permissionDecision !== "deny") {
-    throw new Error(`unexpected decision ${out.hookSpecificOutput.permissionDecision}`);
-  }
-  return out.hookSpecificOutput.permissionDecisionReason;
-}
 
 describe("config guard: pyproject.toml", () => {
   const root = project({ "pyproject.toml": PYPROJECT });
