@@ -48,9 +48,19 @@ Check the board before picking up work, and set Status at every transition:
     Code, Opus 5.5" or "Codex"), the branch, the worktree and the plan when
     it isn't obvious from the issue.
 
-  If you stop without finishing, post "Released: <why, and what's done>",
-  delete the linked branch if nothing on it is worth keeping, and set the
-  status back to Todo.
+  Right after claiming, run `gh issue develop N --list` again: two agents
+  can pass the checks at the same moment. If there are two linked branches,
+  the later claimant releases.
+
+  If your harness can't reach GitHub or write outside its checkout (Codex's
+  default sandbox, for example), ask the coordinator to claim the issue and
+  create the worktree for you.
+
+  If you stop without finishing, release the issue so the next agent sees it
+  free: push anything worth keeping, then post "Released: <why, what's done,
+  and the commit SHA of anything worth keeping>", delete the linked branch
+  (`git push origin --delete <branch>`, `git worktree remove <path>`,
+  `git branch -D <branch>`), and set the status back to Todo.
 - **While working.** Comment on decisions, scope changes and findings someone
   else will need. Tick acceptance checkboxes in the body as they are met.
 - **Stuck.** Set Blocked and comment what blocks it and who or what can
@@ -73,14 +83,13 @@ gh issue develop N --list                         # a linked branch means it's t
 gh issue view N --comments                        # an open "Claimed by" means it's taken
 gh issue develop N --name feat/N-slug --base develop --checkout \
   --worktree ~/Documents/GitHub/worktrees/inwards/N-slug
-gh issue edit N --add-assignee @me
 gh issue comment N --body "Claimed by Claude Code (Opus 5.5). Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug. Plan: …"
 gh issue comment N --body "Status: Blocked. Waiting on #M (engine API)."
 gh issue view N --json body -q .body > body.md   # tick boxes, then:
 gh issue edit N --body-file body.md
 
 # Project board: user project 3
-gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo no:assignee"  # free
+gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo"  # free (then check links and comments)
 gh project item-list 3 --owner SirCypkowskyy -L 300 --query "-status:Todo -status:Done" # taken
 gh project item-list 3 --owner SirCypkowskyy --query "assignee:@me -status:Done"       # mine
 gh project item-add 3 --owner SirCypkowskyy --url https://github.com/$R/issues/N
@@ -154,10 +163,13 @@ the claim comment, not the assignee, says which agent owns an issue.
   and, once `gh pr view --json state` says MERGED, `git branch -D <branch>`
   (a squash-merged branch is not an ancestor of `develop`, so `-d` refuses it).
 
-A coordinator claims the item on the board before it spawns a subagent, so
-two agents never race for it. Each subagent prompt names the issue, the base
-branch, the branch, the worktree path, the files or directories it may touch,
-and any high-conflict file it owns.
+A coordinator that spawns a subagent does the whole claim itself (the checks,
+`gh issue develop`, In progress, and a claim comment naming the subagent)
+before the subagent starts, so two agents never race for it; the subagent
+skips the claim. Each subagent prompt names the issue, the base branch, the
+branch, the worktree path, the files or directories it may touch, and any
+high-conflict file it owns. The coordinator removes the worktree after the
+merge.
 
 ## Before every commit
 
@@ -208,7 +220,8 @@ PR description is its body. Commits inside a branch can say anything.
 - **Title:** `type(scope): summary`, checked by `pr-title.yml`. Types that
   reach the changelog: `feat`, `fix`, `perf`, `deps`, `revert`, `docs`.
   Hidden: `refactor`, `test`, `build`, `ci`, `chore`. The scope is optional
-  (`core`, `cli`, `hook`, `vscode`, `wheels`, `docs`). The summary says in the
+  and free-form; the usual ones are `core`, `cli`, `hook`, `rules`, `vscode`,
+  `wheels`, `bench` and `docs`. The summary says in the
   imperative what a user gets, with no trailing period.
 - **Breaking change** (a config key removed or renamed, an exit code changed,
   a `diagnostics@1` field removed, a CLI flag removed): `feat!:` in the title
@@ -242,6 +255,18 @@ PR description is its body. Commits inside a branch can say anything.
   (`git fetch -q origin main && git log -1 --format=%s origin/main`
   doesn't start with `chore: promote`). The second check covers the seconds
   before release-please opens its PR, or a failed release-please run.
+- **Dependabot PRs** (weekly, into `develop`, `.github/dependabot.yml`):
+  - The Bun groups come titled `build:`, which keeps toolchain bumps out of
+    the changelog. Retitle a `runtime` group PR (tree-sitter, smol-toml, the
+    LSP libraries) to `deps:` before merging, since users get those.
+  - They touch `bun.lock` or `uv.lock`, so they merge one at a time like any
+    lockfile change; everyone else rebases and reruns `bun install` or
+    `uv lock` afterwards.
+  - Never push to a Dependabot branch. Comment `@dependabot rebase` or
+    `@dependabot recreate` instead.
+  - A `web-tree-sitter` or `tree-sitter-python` bump changes the parser:
+    check the E2E snapshots and the `prescan-diff` job before merging.
+  - `@types/vscode` is bumped by hand, together with `engines.vscode`.
 - A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
   `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with
