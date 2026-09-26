@@ -1,0 +1,176 @@
+import { afterAll, expect, test } from "bun:test";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import {
+  lspHarness,
+  PYPROJECT,
+  QUIET_MS,
+  type Server,
+  until,
+  WATCHING,
+  write,
+} from "./lsp-harness.ts";
+
+// The language server re-reads pyproject.toml when it changes, and shows a
+// config error in the editor instead of only in its output channel (#163).
+const {
+  tmp: TMP,
+  published,
+  startServer,
+  codesOnceIncluding,
+  diagnosticsOnce,
+  popups,
+  cleanup,
+} = lspHarness();
+afterAll(cleanup);
+
+/** A config the rule table breaks: INW099 is no rule. */
+const UNKNOWN_CODE = `${PYPROJECT}\n[tool.inwards.rules]\nignore = ["INW099"]\n`;
+
+/**
+ * Starts a server on a project whose router imports a missing module, and
+ * opens the router.
+ *
+ * @param name - the project's directory under the test root.
+ * @param id - the initialize request's id.
+ * @param pyproject - the config the project starts with.
+ * @param capabilities - the client capabilities to announce.
+ * @returns the server, the paths of the config and the router, and a way to
+ *   rewrite the config and report the change as a client with watchers would.
+ */
+async function openProject(
+  name: string,
+  id: number,
+  pyproject: string,
+  capabilities: Record<string, unknown>,
+): Promise<{
+  server: Server;
+  config: string;
+  router: string;
+  edit: (text: string) => void;
+}> {
+  const root = join(TMP, name);
+  write(root, {
+    "pyproject.toml": pyproject,
+    "app/__init__.py": "",
+    "app/orders/__init__.py": "",
+    "app/orders/router.py": "",
+    "app/orders/service.py": "",
+  });
+  const server = await startServer(root, id, capabilities);
+  const config = join(root, "pyproject.toml");
+  const router = join(root, "app/orders/router.py");
+  const textDocument = {
+    uri: pathToFileURL(router).href,
+    languageId: "python",
+    version: 1,
+    text: "import app.pricing\n",
+  };
+  server.send({ method: "textDocument/didOpen", params: { textDocument } });
+  /**
+   * Rewrites the config and reports it changed.
+   *
+   * @param text - the new pyproject.toml.
+   */
+  function edit(text: string): void {
+    writeFileSync(config, text);
+    const changes = [{ uri: pathToFileURL(config).href, type: 2 }];
+    server.send({ method: "workspace/didChangeWatchedFiles", params: { changes } });
+  }
+  return { server, config, router, edit };
+}
+
+test("a config error pops up once, sits on pyproject.toml, and clears when fixed", async () => {
+  const from = popups().length;
+  const { server, config, router, edit } = await openProject("broken", 3, PYPROJECT, WATCHING);
+  try {
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+
+    // Broken TOML: the diagnostic sits on the parser's line, checking stops.
+    edit(`${PYPROJECT}\n[tool.inwards.rules]\nignore = \n`);
+    const syntax = await diagnosticsOnce(config, (found) => found.length === 1);
+    expect(syntax.map((d) => [d.severity, d.range.start.line])).toEqual([[1, 9]]);
+    expect(syntax[0]?.message).toContain("not valid TOML");
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+    await until(() => popups().slice(from).length === 1);
+    expect(popups().at(from)).toContain("Inwards is off until pyproject.toml is fixed");
+
+    // Another error pops up again; the same one after another edit doesn't.
+    edit(UNKNOWN_CODE);
+    const unknown = await diagnosticsOnce(config, (found) =>
+      (found[0]?.message ?? "").includes("INW099"),
+    );
+    expect(unknown.map((d) => d.range.start.line)).toEqual([0]);
+    await until(() => popups().slice(from).length === 2);
+    edit(`${UNKNOWN_CODE}# a comment\n`);
+    await Bun.sleep(QUIET_MS);
+    expect(popups().slice(from)).toHaveLength(2);
+    expect(popups().at(from + 1)).toContain("INW099");
+
+    // Fixed: the diagnostic goes, checking resumes without a restart.
+    edit(PYPROJECT);
+    expect(await diagnosticsOnce(config, (found) => found.length === 0)).toEqual([]);
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("a change to [tool.inwards.rules] takes effect without a restart", async () => {
+  const { server, router, edit } = await openProject("relevel", 4, PYPROJECT, WATCHING);
+  try {
+    const before = await diagnosticsOnce(router, (found) => found.length === 1);
+    expect(before.map((d) => [d.code, d.severity])).toEqual([["INW010", 1]]);
+    edit(`${PYPROJECT}\n[tool.inwards.rules]\nseverity = { INW010 = "warning" }\n`);
+    const after = await diagnosticsOnce(router, (found) => found[0]?.severity === 2);
+    expect(after.map((d) => [d.code, d.severity])).toEqual([["INW010", 2]]);
+    edit(`${PYPROJECT}\n[tool.inwards.rules]\nignore = ["INW010"]\n`);
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("without watched-file support, saving pyproject.toml re-reads the config", async () => {
+  const from = popups().length;
+  const { server, config, router } = await openProject("saved", 5, UNKNOWN_CODE, {});
+  try {
+    const uri = pathToFileURL(config).href;
+    const textDocument = { uri, languageId: "toml", version: 1, text: UNKNOWN_CODE };
+    server.send({ method: "textDocument/didOpen", params: { textDocument } });
+    const broken = await diagnosticsOnce(config, (found) => found.length === 1);
+    expect(broken[0]?.message).toContain("INW099");
+    await until(() => popups().slice(from).length === 1);
+    expect(popups().slice(from)).toHaveLength(1);
+
+    writeFileSync(config, PYPROJECT);
+    server.send({
+      method: "textDocument/didChange",
+      params: { textDocument: { uri, version: 2 }, contentChanges: [{ text: PYPROJECT }] },
+    });
+    server.send({ method: "textDocument/didSave", params: { textDocument: { uri } } });
+    expect(await diagnosticsOnce(config, (found) => found.length === 0)).toEqual([]);
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("a pyproject.toml without [tool.inwards] is not an error", async () => {
+  const from = popups().length;
+  const { server, config, router } = await openProject(
+    "other",
+    6,
+    '[project]\nname = "other"\n',
+    WATCHING,
+  );
+  try {
+    await Bun.sleep(QUIET_MS);
+    expect(popups().slice(from)).toEqual([]);
+    expect(published.has(pathToFileURL(config).href)).toBe(false);
+    expect(published.has(pathToFileURL(router).href)).toBe(false);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
