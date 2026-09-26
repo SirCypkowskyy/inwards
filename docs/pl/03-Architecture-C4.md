@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c9639c6785be95a76734d83c98e6f2e8c681c93e1423f7aa3df21e73705a41e9
+source_hash: f0fb9176b38f548306c2c90fdb6810a2c06b489f916cb64618c2ed4024f9a1eb
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }

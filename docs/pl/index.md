@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: c2df125ce43747fbb893b2a90aa3d35a529542442d87c7eb95ac88ed2b196eca
+source_hash: 93e1f11cc88a1ddeb1dfae29cec8e4d6ffd183d9fe49423bc1b853c5386f55c4
 hide:
   - navigation
 ---

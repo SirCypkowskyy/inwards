@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: db4f20f2aa70f588c5c2d04dabcea8537c207467e943262d5ece8ea0badd7f46
+source_hash: 47f6be0f77b178e473dc2b3f2fcb77d833e4d968d7df296d2db2b88cbe9731a4
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
