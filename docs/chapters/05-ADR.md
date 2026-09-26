@@ -23,6 +23,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted, squashed into `develop` since 019 |
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
 | [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | A `develop` integration branch; `main` moves only at releases | :white_check_mark: Accepted |
+| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
 
 ## ADR-001: TypeScript for the engine
 
@@ -421,3 +422,35 @@ Each record states the decision, the context it was made in, what it costs us, a
 - *`main` as the default branch, plus a workflow that retargets PRs to `develop`:* the repository page would show released code. But every PR would first open against `main`, its first CI and benchmark run would compare with the wrong base, and it adds a workflow to maintain. The owner chose `develop` as the default.
 - *release-please on `develop`:* releases would be cut from unpromoted code, and `main` would have no role left.
 - *An automatic back-merge of `main` into `develop` after each release:* on a repository owned by a personal account, GitHub Actions can't be a ruleset bypass actor, so the push would need a PAT or a GitHub App secret. Doing it through a PR instead needs an admin bypass on `develop`, because a PR opened with `GITHUB_TOKEN` gets no CI, and that bypass would also let any agent on the owner's account merge a red PR. Since nothing conflicts without it, the owner chose not to back-merge.
+
+## ADR-021: Publish the release wheels to PyPI from their own workflow, with trusted publishing
+
+**Status:** Accepted · 2026-09-26 · [#32](https://github.com/SirCypkowskyy/inwards/issues/32)
+
+**Context.** Design partners should install with `uv add --dev inwards`. `cd.yml` already builds five platform wheels, runs each binary and installs each wheel on its own runner, and attaches them to a draft GitHub Release ([ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)). The owner publishes that draft by hand. PyPI never accepts the same file name twice, so a wrong upload can't be undone, and the owner wants no PyPI upload by accident. The repository is private for now, and every agent works under the owner's GitHub account.
+
+**Decision.**
+
+- **Trusted publishing** (OIDC) with `pypa/gh-action-pypi-publish`, pinned by commit SHA. No PyPI token is stored anywhere.
+- **Its own workflow, `pypi.yml`, not a job in `cd.yml`.** It starts when a release is published, never on a draft, or by hand with a tag and an index. `cd.yml` ends at the draft and can't see the owner publish it. PyPI trusts only `pypi.yml`, which runs no build or test code.
+- **It uploads the release's own wheels**, the files the owner just published, after checking them against the release's `SHA256SUMS`, and against the build provenance once the repository is public. It never rebuilds them.
+- **TestPyPI first, then PyPI**, each in its own GitHub environment (`testpypi`, `pypi`) that the publisher on each index is bound to. Only the two upload jobs get `id-token: write`.
+- **A pre-release goes to TestPyPI only**, whether the release is marked as one or its tag has a suffix (`-rc.1`). PyPI has a 0.0.0 final placeholder, so uv would pick it over any pre-release anyway. An rc can still go to PyPI by a manual run from its tag.
+- **The real gate is the owner's pypi.org account.** Every agent works under the owner's GitHub account, so the variable, the environments, tags and manual runs are all within an agent's reach, and PyPI doesn't check a run's ref or commit. The PyPI publisher is therefore registered last, at go-live, and deleting it stops every PyPI upload. On the GitHub side, the repository variable `PYPI_PUBLISH` must be `true` for any PyPI upload, from a release or a manual run; the `pypi` environment deploys only from `v*` tags; and it gets the owner as required reviewer once GitHub offers that (public repository, or Enterprise). These catch mistakes, not an agent.
+- **No PEP 740 attestations while the repository is private.** They are signed through Sigstore's public transparency log with the repository, workflow and commit in them.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A release reaches PyPI with the exact bytes users could already download from GitHub, and that were run on every platform.
+- :material-plus-circle-outline: Trusted publishing works from a private repository: PyPI checks the owner, repository, workflow file and environment, not the visibility.
+- :material-minus-circle-outline: Once the PyPI publisher exists, an agent acting as the owner can set `PYPI_PUBLISH`, push a `v*` tag (no ruleset protects tags) and start an upload; even a required reviewer can be approved through the API as the owner. Only `AGENTS.md` holds agents back then, and the owner can delete the publisher between releases.
+- :material-minus-circle-outline: A draft's wheels and `SHA256SUMS` can be replaced by hand before publishing. While private, the checksum check proves only that they agree with each other.
+- :material-minus-circle-outline: The five wheels of v0.1.0-rc.1 weigh 170 MB together, against PyPI's default limit of 10 GB per project: roughly 60 releases before asking PyPI for more.
+- :material-minus-circle-outline: A release built while private has no provenance. Once the repository is public, `pypi.yml` refuses to upload it.
+
+**Alternatives.**
+
+- *Upload from `cd.yml` right after the verify jobs:* PyPI would get a version before the owner has looked at the draft, and the trusted workflow would also run `bun install` and the build.
+- *Download the build artifact of the `cd.yml` run:* it expires after 90 days, has to be found by run ID, and isn't what the owner published.
+- *A project-scoped API token as an environment secret:* a long-lived credential to rotate, and one that works from any machine it leaks to.
+- *A reusable workflow called from `cd.yml`:* PyPI can't use a reusable workflow as a trusted publisher.

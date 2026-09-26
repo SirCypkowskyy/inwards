@@ -52,7 +52,23 @@ Once attestations are published, `gh attestation verify <file> --repo SirCypkows
 
 ## As a uv dev dependency
 
-Each release also has one wheel per platform with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the binary). uv installs it like any other package, and `inwards` lands in the project's virtual environment:
+Each release also has one wheel per platform with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the binary). uv installs it like any other package, and `inwards` lands in the project's virtual environment.
+
+### From PyPI (from the first PyPI release)
+
+No release is on PyPI yet. Once one is, installing takes one line, and uv picks the wheel for each platform:
+
+```sh
+uv add --dev inwards
+uv run inwards check
+uvx inwards --version   # one-off, no project
+```
+
+Until then, `inwards` on PyPI is a 0.0.0 name placeholder: `--version` says the linter isn't released yet and every other command exits 2. Use the wheels from a GitHub release below. Releases reach PyPI through [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); the first one comes with a later milestone, not with v0.1.0-rc.1.
+
+`uv add --dev inwards` takes the newest full release and skips pre-releases. To try a pre-release that is on PyPI, ask for it: `uv add --dev "inwards>=0.2.0rc1"`.
+
+### From a GitHub release
 
 ```sh
 TAG=v0.1.0-rc.1; VER=0.1.0rc1   # the release, and its Python version
@@ -98,8 +114,6 @@ No marker tells glibc from musl, so on Alpine `uv sync` stops with "incompatible
     ```
 
 `inwards --version` prints the release it was built from without the pre-release suffix (`0.1.0` for `0.1.0rc1`).
-
-Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), this becomes `uv add --dev inwards`.
 
 ## From source
 

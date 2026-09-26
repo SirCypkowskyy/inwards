@@ -4,7 +4,8 @@ name: CD
 # (ADR-016): it tags vX.Y.Z and dispatches this workflow on the tag. A release
 # candidate is still a hand-pushed tag with a suffix (v0.2.0-rc.1), pushed on
 # the release PR's branch (it already holds the new version): it builds the
-# same version and drafts a pre-release.
+# same version and drafts a pre-release. Publishing the draft by hand starts
+# pypi.yml, which uploads these same wheels to TestPyPI and PyPI (ADR-021).
 on:
   push:
     tags: ["v*"]
