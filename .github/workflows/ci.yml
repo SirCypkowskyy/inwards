@@ -112,19 +112,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
-      - name: Every page under docs/chapters is in the nav
+      - name: Every page under docs/chapters and docs/pl is in its nav
         run: uv run scripts/check-docs-nav.py
+      # Fails on a missing Polish page; a stale one is a warning and gets a banner.
+      - name: Every English page has a Polish translation
+        run: uv run scripts/check-docs-translation.py --mark-stale
       - name: Build site (strict)
         run: uv run zensical build -f docs/zensical.toml --clean --strict
+      - name: Build Polish site into docs/site/pl (strict)
+        run: uv run zensical build -f docs/zensical.pl.toml --clean --strict
       # The strict build already rejects Markdown links to missing pages or
       # anchors; lychee also covers raw HTML hrefs, theme links and assets.
       # Offline, so a third-party outage never fails a PR: docs-links.yml checks
-      # external links weekly. 404.html is skipped: its theme links are absolute
-      # (/inwards/...) and its skip link targets an anchor that page lacks.
+      # external links weekly. The 404 pages are skipped: their theme links are
+      # absolute (/inwards/...) and their skip link targets an anchor they lack.
+      # docs/site/pl/ is checked too, including every language-switch link.
       - name: Internal links in the built site resolve (lychee)
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           token: "" # offline: no GitHub API calls, so no token for the action to hold
           args: >-
             --offline --no-progress --include-fragments --index-files index.html
-            --exclude-path docs/site/404.html docs/site
+            --exclude-path docs/site/404.html --exclude-path docs/site/pl/404.html docs/site

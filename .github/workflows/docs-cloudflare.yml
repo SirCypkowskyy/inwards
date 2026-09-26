@@ -16,6 +16,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
       - run: uv run zensical build -f docs/zensical.toml --clean --strict
+      - run: uv run scripts/check-docs-translation.py --mark-stale # banners on stale Polish pages
+        continue-on-error: true
+      - run: uv run zensical build -f docs/zensical.pl.toml --clean --strict
       # Wrangler runs through npx on purpose: wrangler-action installs it into the
       # repo with npm, which can't resolve Bun's `workspace:*` dependencies.
       - name: Deploy to Cloudflare Workers

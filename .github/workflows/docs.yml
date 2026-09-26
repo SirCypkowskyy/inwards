@@ -3,7 +3,7 @@ name: Docs
 on:
   push:
     branches: [develop]
-    paths: ["docs/**", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "scripts/check-docs-translation.py", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
   workflow_dispatch:
 
 # Only the deploy job can write to Pages or mint an OIDC token, and it runs
@@ -28,7 +28,13 @@ jobs:
       - uses: actions/configure-pages@v6
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
       # Zensical asks for clean builds on CI while its cache format settles.
+      # English first (its --clean empties docs/site/), then Polish into docs/site/pl/.
       - run: uv run zensical build -f docs/zensical.toml --clean --strict
+      # Stale Polish pages get a "may be out of date" banner in this checkout only.
+      # ci.yml already fails a PR on a missing translation; don't block the deploy.
+      - run: uv run scripts/check-docs-translation.py --mark-stale
+        continue-on-error: true
+      - run: uv run zensical build -f docs/zensical.pl.toml --clean --strict
       - uses: actions/upload-pages-artifact@v5
         with:
           path: docs/site

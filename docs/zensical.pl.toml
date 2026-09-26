@@ -1,0 +1,120 @@
+# Zensical site for the Polish translation of the Inwards docs (issue #149).
+# docs/pl/ mirrors every page of docs/chapters/ at the same path; English is
+# the source of truth. Build the English site first (its --clean empties
+# docs/site/), then this one into docs/site/pl/:
+#   uv run zensical build -f docs/zensical.toml --clean --strict
+#   uv run zensical build -f docs/zensical.pl.toml --clean --strict
+# Images, CSS and scripts come from the English site through "../" paths, so
+# preview the pair with a static server on docs/site/, not `zensical serve`.
+# scripts/check-docs-translation.py checks that every page is translated and
+# up to date; docs/GLOSSARY.pl.md fixes the terminology.
+# Keep the theme features and markdown_extensions identical to
+# docs/zensical.toml: the translation check compares them.
+
+[project]
+site_name = "Inwards"
+site_url = "https://sircypkowskyy.github.io/inwards/pl/"
+repo_url = "https://github.com/SirCypkowskyy/inwards"
+repo_name = "SirCypkowskyy/inwards"
+site_description = "Linter architektury dla Pythona, który trzyma agentów AI wewnątrz twoich warstw."
+site_author = "Opiekunowie projektu Inwards"
+copyright = "Copyright &copy; 2026 opiekunowie projektu Inwards"
+docs_dir = "pl"
+site_dir = "site/pl"
+
+extra_css = [
+  "../stylesheets/extra.css",
+]
+
+extra_javascript = [
+  "../javascripts/homepage-loop.mjs",
+  "../javascripts/language-switch.mjs",
+]
+
+nav = [
+  { "Start" = "index.md" },
+  { "Pierwsze kroki" = [
+    { "Instalacja" = "guides/install.md" },
+    { "Claude Code" = "guides/claude-code.md" },
+    { "Aider" = "guides/aider.md" },
+    { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
+    { "GitHub Actions" = "guides/ci.md" },
+    { "Kształt pakietu" = "guides/package-shape.md" },
+    { "Design partnerzy" = "guides/design-partners.md" },
+  ] },
+  { "1. Wprowadzenie" = "01-Introduction.md" },
+  { "2. Kontekst biznesowy" = "02-Business-Context.md" },
+  { "3. Architektura (C4)" = "03-Architecture-C4.md" },
+  { "4. Integracja z AI" = "04-AI-Integration.md" },
+  { "5. Decyzje (ADR)" = "05-ADR.md" },
+  { "6. Ograniczenia i jakość" = "06-Constraints-and-Quality.md" },
+  { "7. Słownik" = "07-Glossary.md" },
+  { "8. Run log" = "08-Run-Log.md" },
+]
+
+# The header's language selector. Links are relative to this site's root;
+# docs/overrides/partials/alternate.html keeps the current page.
+[project.extra]
+alternate = [
+  { name = "English", link = "../", lang = "en" },
+  { name = "Polski", link = "./", lang = "pl" },
+]
+
+[project.theme]
+language = "pl"
+custom_dir = "overrides"
+features = [
+  "content.code.copy",
+  "content.code.annotate",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.instant",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[project.theme.icon]
+logo = "material/layers-triple"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "deep purple"
+accent = "amber"
+toggle.icon = "material/weather-night"
+toggle.name = "Przełącz na tryb ciemny"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "deep purple"
+accent = "amber"
+toggle.icon = "material/weather-sunny"
+toggle.name = "Przełącz na tryb jasny"
+
+# Setting markdown_extensions replaces Zensical's defaults, so list all we use.
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.mark = {}
+pymdownx.tasklist.custom_checkbox = true
+pymdownx.tabbed.alternate_style = true
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
