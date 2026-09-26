@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
+import { exportRunLogs } from "./log-export.ts";
 import { print } from "./output.ts";
 import { realpath } from "./paths.ts";
 import { logDirs, readRunLogs } from "./runs.ts";
@@ -16,16 +17,28 @@ const PERCENT = 100;
 
 /**
  * Runs `inwards stats`. The project is DIR, else `CLAUDE_PROJECT_DIR`, else
- * the git work tree around the working directory, else the folder `projectRoot` finds:
- * the hooks log at that root and `check` next to each config below it.
+ * the git work tree around the working directory, else the folder
+ * `projectRoot` finds: the hooks log at that root and `check` next to each
+ * config below it. With `--export FILE`, it writes the merged log instead of
+ * the numbers, with `--redact` hashing every path.
  *
  * @param format - `text` or `json`.
  * @param dir - the DIR argument, if given.
- * @returns 0, or 2 for a bad format or a missing directory.
+ * @param sharing - `--export` and `--redact`.
+ * @param sharing.export - the file to write the merged log to.
+ * @param sharing.redact - hash the paths in it.
+ * @returns 0, or 2 for a bad format, `--redact` without `--export`, or a missing directory.
  */
-export function statsCommand(format: string, dir: string | undefined): number {
+export function statsCommand(
+  format: string,
+  dir: string | undefined,
+  sharing: { export?: string | undefined; redact?: boolean | undefined } = {},
+): number {
   if (format !== "text" && format !== "json") {
     return print("inwards stats supports --format text or json", 2);
+  }
+  if (sharing.redact && !sharing.export) {
+    return print("--redact goes with --export FILE: it hashes the paths in the exported log.", 2);
   }
   const cwd = process.cwd();
   const root =
@@ -38,7 +51,16 @@ export function statsCommand(format: string, dir: string | undefined): number {
     return print(`No such directory: ${root}`, 2);
   }
   const { valid, invalid } = projectConfigs(project);
-  const { lines, skipped } = readRunLogs(logDirs(project, [...Object.keys(valid), ...invalid]));
+  const dirs = logDirs(project, [...Object.keys(valid), ...invalid]);
+  if (sharing.export) {
+    const written = exportRunLogs(dirs, sharing.export, sharing.redact ? { project } : undefined);
+    const how = sharing.redact ? ", paths and fingerprints hashed with .inwards/export-key" : "";
+    return print(
+      `Wrote ${written} log lines to ${sharing.export}${how}. Read it before you send it.`,
+      0,
+    );
+  }
+  const { lines, skipped } = readRunLogs(dirs);
   const stats = computeStats(lines, skipped);
   const pretty = process.stdout.isTTY ? 2 : undefined;
   return print(format === "json" ? JSON.stringify(stats, null, pretty) : renderStatsText(stats), 0);
