@@ -93,11 +93,37 @@ async function rerenderAll() {
   if (blocks.length > 0) {
     await mermaid.run({ nodes: blocks });
   }
+  wireQuadrantDescriptions();
+}
+
+/** Wires hover/focus/tap on a rendered quadrant chart's point labels to
+ *  show the matching description from the page's #quadrant-descriptions
+ *  list, if one exists on the current page. */
+function wireQuadrantDescriptions() {
+  const descList = document.getElementById("quadrant-descriptions");
+  if (!descList) return; // not on this page
+
+  const descriptions = {};
+  for (const dt of descList.querySelectorAll("dt")) {
+    descriptions[dt.textContent.trim()] = dt.nextElementSibling?.textContent.trim() ?? "";
+  }
+
+  // Mermaid renders each point as a <g> containing a <text> with the
+  // point's label; match on that text content rather than a generated id,
+  // since quadrant chart point ids aren't part of Mermaid's public API.
+  document.querySelectorAll(".mermaid text").forEach((textEl) => {
+    const label = textEl.textContent.trim();
+    if (!(label in descriptions)) return;
+
+    textEl.setAttribute("tabindex", "0");
+    textEl.setAttribute("title", descriptions[label]);
+  });
 }
 
 if (mermaid) {
   applyTheme();
   window.mermaid = mermaid;
+  wireQuadrantDescriptions();
 
   // Re-render on palette toggle (the attribute Zensical/Material sets on
   // <body> when the user switches light/dark, no page reload).

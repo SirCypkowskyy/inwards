@@ -113,6 +113,18 @@ quadrantChart
     Inwards target: [0.9, 0.9]
 ```
 
+<dl id="quadrant-descriptions" hidden>
+  <dt>Ruff</dt><dd>Fast, but rules are generic — no notion of architectural layers.</dd>
+  <dt>ty</dt><dd>Astral's type checker; type-level correctness, not import direction.</dd>
+  <dt>Biome</dt><dd>Formatter/linter for JS/TS; no Python support at all.</dd>
+  <dt>React Doctor</dt><dd>Agent-aware, but scoped to React conventions, not Python layers.</dd>
+  <dt>ArchLint</dt><dd>Closest existing tool to Inwards' target, still maturing.</dd>
+  <dt>import-linter</dt><dd>Mature layer contracts, but no agent-facing fix steps or hook story.</dd>
+  <dt>pytest-archon</dt><dd>Architecture assertions as tests; runs in CI, not on every edit.</dd>
+  <dt>Tach</dt><dd>Module boundaries with a fast Rust core; less layer-shaped than Inwards.</dd>
+  <dt>Inwards target</dt><dd>Agent-loop speed, layer-shaped rules, fix steps built in.</dd>
+</dl>
+
 Inwards' position in one sentence: **import-linter's rules, React Doctor's agent integration, Ruff's distribution.**
 
 ### :material-target-account: Who it's for first
