@@ -33,10 +33,12 @@ const BASELINE_IN_SHELL = /inwards-baseline\.json/iu;
 const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
 /**
  * `inwards hook` or `inwards baseline` in command position, quoted or not,
- * also behind a runner or wrapper (`uvx`, `uv run`, `env`, `sudo`, …).
+ * also behind a known runner or wrapper (`uvx`, `uv run`, `env VAR=1`, `sudo`,
+ * `python -m`, …) with its options. Only those words may come first, so a
+ * commit message or a grep that mentions the command isn't caught.
  */
 const INWARDS_COMMAND =
-  /(?:^|[;&|(\n]|\$\()\s*(?:[^\s;&|'"]+\s+)*?(?:[^\s;&|]*[\\/])?inwards(?:\.exe)?\s+["']?(?:hook|baseline)\b/u;
+  /(?:^|[;&|(\n]|\$\()\s*(?:(?:uvx|bunx|npx|env|sudo|command|exec|nice|time|uv\s+run|bun\s+x|pipx\s+run|python3?\s+-m)(?:\s+(?:-[^\s;&|]*(?:\s+[^\s;&|=-][^\s;&|=]*)?|\w+=[^\s;&|]*))*\s+)*(?:[^\s;&|]*[\\/])?inwards(?:\.exe)?\s+["']?(?:hook|baseline)\b/u;
 /** A command that only reads: no redirection, chaining, substitution or in-place flag. */
 const READ_ONLY =
   /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;

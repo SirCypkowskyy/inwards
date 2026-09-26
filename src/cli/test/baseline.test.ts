@@ -172,7 +172,16 @@ describe("baseline with the Claude Code hooks", () => {
     expect(run("Bash", { command: "inwards baseline" })).toContain("deny");
     expect(run("Bash", { command: "uvx --from inwards inwards baseline" })).toContain("deny");
     expect(run("Bash", { command: "env FOO=1 inwards hook claude-code" })).toContain("deny");
-    expect(run("Bash", { command: 'git commit -m "docs: explain inwards baseline"' })).toBe("");
+    expect(run("Bash", { command: "python3 -m inwards baseline" })).toContain("deny");
+    for (const allowed of [
+      'git commit -m "docs: explain inwards baseline"',
+      "git commit -m \"$(cat <<'EOF'\nfeat(cli): inwards baseline accepts existing violations\nEOF\n)\"",
+      "gh pr create --body \"$(cat <<'EOF'\n- adds inwards baseline for legacy code\nEOF\n)\"",
+      "grep -n inwards hook.ts",
+      "rg inwards baseline.ts",
+    ]) {
+      expect(run("Bash", { command: allowed })).toBe("");
+    }
     expect(run("Bash", { command: `cat ${BASELINE}` })).toBe("");
   });
 });

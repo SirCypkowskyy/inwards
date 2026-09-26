@@ -8,7 +8,15 @@
  * must not bring every accepted violation back.
  */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { ConfigError, type Diagnostic, type Report } from "@inwards/core";
@@ -103,7 +111,12 @@ export function writeBaseline(configPath: string, diagnostics: readonly Diagnost
   writeFileSync(temp, `${JSON.stringify({ schema: SCHEMA, violations }, null, 2)}\n`, {
     flag: "wx",
   });
-  renameSync(temp, path);
+  try {
+    renameSync(temp, path);
+  } catch (err) {
+    rmSync(temp, { force: true });
+    throw new ConfigError(`can't write ${path}; is it a directory?`, { cause: err });
+  }
   return violations.reduce((sum, v) => sum + v.count, 0);
 }
 
