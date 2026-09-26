@@ -12,6 +12,12 @@ export interface LayerSpec {
   allowLibraries?: string[];
   /** Libraries the layer may not import (`deny-libraries`), stdlib included (INW005). */
   denyLibraries?: string[];
+  /**
+   * Libraries added to the layer's deny list (`extend-deny-libraries`): to
+   * `deny-libraries` when set, else to the default list the innermost layer
+   * gets, else to nothing (INW005).
+   */
+  extendDenyLibraries?: string[];
 }
 
 export interface InwardsConfig {
@@ -81,6 +87,7 @@ const LAYER_KEYS: ReadonlySet<string> = new Set([
   "modules",
   "allow-libraries",
   "deny-libraries",
+  "extend-deny-libraries",
 ]);
 
 /** An import name: dotted Python identifiers, e.g. `http.client` (INW005 library lists). */
@@ -261,20 +268,23 @@ function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
   }
   const allow = libraryList(layer, i, "allow-libraries");
   const deny = libraryList(layer, i, "deny-libraries");
+  const extend = libraryList(layer, i, "extend-deny-libraries");
   return {
     name,
     modules,
     ...(allow === undefined ? {} : { allowLibraries: allow }),
     ...(deny === undefined ? {} : { denyLibraries: deny }),
+    ...(extend === undefined ? {} : { extendDenyLibraries: extend }),
   };
 }
 
 /**
- * Validates a layer's `allow-libraries` or `deny-libraries` (INW005).
+ * Validates a layer's `allow-libraries`, `deny-libraries` or
+ * `extend-deny-libraries` (INW005).
  *
  * @param layer - the raw layer entry.
  * @param i - its index, for messages.
- * @param key - which of the two keys to read.
+ * @param key - which of the three keys to read.
  * @returns the module names, or undefined when the key is absent.
  * @throws {ConfigError} when the value isn't a list of dotted Python identifiers.
  */

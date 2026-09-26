@@ -77,7 +77,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | English | Polish |
 |---|---|
 | adapter | adapter |
-| allowlist, deny list (`allow-libraries`, `deny-libraries`) | lista dozwolonych, lista zakazów |
+| allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
 | architecture linter | linter architektury |
 | binary (the executable) | plik binarny |

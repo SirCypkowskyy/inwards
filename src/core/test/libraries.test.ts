@@ -148,6 +148,72 @@ layers = [{ name = "d", modules = ["shop.domain"] }, { name = "i", modules = ["s
     expect(withKeys('deny-libraries = ["pydantic"]', "pydantic.BaseModel")).toHaveLength(1);
   });
 
+  test("extend-deny-libraries adds to the default list", () => {
+    const keys = 'extend-deny-libraries = ["pydantic"]';
+    const [d, ...rest] = withKeys(keys, "pydantic.BaseModel");
+    expect(rest).toEqual([]);
+    expect(d?.fix.summary).toBe(
+      'Use "pydantic" in an outer layer, behind a port owned by "domain".',
+    );
+    expect(d?.fix.steps.at(-1)).toContain('add "pydantic" to that layer\'s allow-libraries');
+    expect(withKeys(keys, "sqlalchemy.orm")).toHaveLength(1);
+    expect(withKeys(keys, "attrs")).toEqual([]);
+  });
+
+  test("extend-deny-libraries adds to deny-libraries when that is set", () => {
+    const keys = 'deny-libraries = ["requests"], extend-deny-libraries = ["os"]';
+    expect(withKeys(keys, "os.path")).toHaveLength(1);
+    expect(withKeys(keys, "requests")).toHaveLength(1);
+    expect(withKeys(keys, "sqlalchemy")).toEqual([]);
+    expect(withKeys('deny-libraries = [], extend-deny-libraries = ["os"]', "sqlalchemy")).toEqual(
+      [],
+    );
+  });
+
+  test("allow-libraries still wins over extend-deny-libraries", () => {
+    expect(
+      withKeys('extend-deny-libraries = ["pydantic"], allow-libraries = ["pydantic"]', "pydantic"),
+    ).toEqual([]);
+    const keys = 'extend-deny-libraries = ["os"], allow-libraries = ["os.path"]';
+    expect(withKeys(keys, "os.path.join")).toEqual([]);
+    expect(withKeys(keys, "os.environ")).toHaveLength(1);
+    const allowDefault = 'extend-deny-libraries = ["os"], allow-libraries = ["sqlalchemy"]';
+    expect(withKeys(allowDefault, "sqlalchemy.orm")).toEqual([]);
+    expect(withKeys(allowDefault, "os.environ")).toHaveLength(1);
+  });
+
+  test("the fix names the longest matching entry, from the default or the extension", () => {
+    const keys = 'extend-deny-libraries = ["http"]';
+    expect(withKeys(keys, "http.client.HTTPConnection")[0]?.fix.summary).toContain(
+      'Use "http.client"',
+    );
+    expect(withKeys(keys, "http.cookies")[0]?.fix.summary).toContain('Use "http"');
+  });
+
+  test("repeated entries and entries already in the default report once", () => {
+    const keys = 'extend-deny-libraries = ["sqlalchemy", "pydantic", "pydantic"]';
+    expect(withKeys(keys, "sqlalchemy.orm")).toHaveLength(1);
+    expect(withKeys(keys, "pydantic")).toHaveLength(1);
+  });
+
+  test("on an outer layer or a single layer, extend-deny-libraries is the whole list", () => {
+    const { layers } = parseConfig(`[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.domain"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"], extend-deny-libraries = ["pika"] },
+]
+`);
+    const infra = file("shop/infrastructure/db.py", "");
+    expect(checkLibraries(infra, [importOf("pika")], layers, OWNERS)).toHaveLength(1);
+    expect(checkLibraries(infra, [importOf("sqlalchemy")], layers, OWNERS)).toEqual([]);
+    const single = parseConfig(
+      '[tool.inwards]\nlayers = [{ name = "app", modules = ["shop"], extend-deny-libraries = ["pika"] }]\n',
+    ).layers;
+    const api = file("shop/api.py", "");
+    expect(checkLibraries(api, [importOf("pika")], single, () => undefined)).toHaveLength(1);
+    expect(checkLibraries(api, [importOf("fastapi")], single, () => undefined)).toEqual([]);
+  });
+
   test("with no outer layer allowed to use it, the fix asks the user", () => {
     const { layers } = parseConfig(`[tool.inwards]
 layers = [
@@ -169,6 +235,14 @@ layers = [
     ['allow-libraries = ["python-dateutil"]', "no distribution names"],
     ['deny-libraries = ["http..client"]', "deny-libraries must be"],
     ['deny-libraries = ["1password"]', "deny-libraries must be"],
+    ['extend-deny-libraries = "pydantic"', "extend-deny-libraries must be a list of import names"],
+    ["extend-deny-libraries = [1]", "extend-deny-libraries must be"],
+    ['extend-deny-libraries = ["pydantic.*"]', "no globs"],
+    ['extend-deny-libraries = ["python-dateutil"]', "no distribution names"],
+    [
+      'extend-deny-library = ["pydantic"]',
+      "Unknown key tool.inwards.layers[0].extend-deny-library",
+    ],
   ])("%s is a config error", (keys, message) => {
     const text = `[tool.inwards]\nlayers = [{ name = "d", modules = ["d"], ${keys} }]\n`;
     expect(() => parseConfig(text)).toThrow(ConfigError);
