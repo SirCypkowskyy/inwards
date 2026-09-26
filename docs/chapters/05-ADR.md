@@ -23,6 +23,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted, squashed into `develop` since 019 |
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
 | [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | A `develop` integration branch; `main` moves only at releases | :white_check_mark: Accepted |
+| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | The `init` picker uses @clack/prompts, loaded from a split chunk | :white_check_mark: Accepted |
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
 
 ## ADR-001: TypeScript for the engine
@@ -422,6 +423,31 @@ Each record states the decision, the context it was made in, what it costs us, a
 - *`main` as the default branch, plus a workflow that retargets PRs to `develop`:* the repository page would show released code. But every PR would first open against `main`, its first CI and benchmark run would compare with the wrong base, and it adds a workflow to maintain. The owner chose `develop` as the default.
 - *release-please on `develop`:* releases would be cut from unpromoted code, and `main` would have no role left.
 - *An automatic back-merge of `main` into `develop` after each release:* on a repository owned by a personal account, GitHub Actions can't be a ruleset bypass actor, so the push would need a PAT or a GitHub App secret. Doing it through a PR instead needs an admin bypass on `develop`, because a PR opened with `GITHUB_TOKEN` gets no CI, and that bypass would also let any agent on the owner's account merge a red PR. Since nothing conflicts without it, the owner chose not to back-merge.
+
+## ADR-020: The `init` picker uses @clack/prompts, loaded from a split chunk
+
+**Status:** Accepted · 2026-09-26 · [#92](https://github.com/SirCypkowskyy/inwards/issues/92)
+
+**Context.** `inwards init` on a terminal, with no `--style` or `--agent`, asks for the architecture style, the scaffold and the agent ([#92](https://github.com/SirCypkowskyy/inwards/issues/92)). The prompt library ships inside the one binary ([ADR-003](#adr-003-ship-a-bun-single-file-executable)), but `check` and the hooks start on every agent edit and must not pay for a prompt they never show. The budget in #92 is 3 ms of start-up.
+
+**Decision.**
+
+- **@clack/prompts, pinned to an exact version (1.8.1).** The analysis on #92 measured it at about 61 KB in the compiled binary. Ink plus React adds about 496 KB and 10 to 29 ms of start-up, crashes at start-up under `bun build --compile` unless a plugin stubs `react-devtools-core`, and has recent Windows rendering regressions. @inquirer/prompts has an open Windows select bug.
+- **Loaded with a dynamic `import()`** inside the picker, and only when stdin and stdout are TTYs and `CI` is unset. Without a terminal, init exits 2 at once with the flags; it never waits for input.
+- **`splitting: true` in `scripts/build-binaries.ts`.** Without it, Bun inlines the dynamically imported module into the one bundle: its code runs only when imported, but every start still parses it. Measured on Linux x64, alternating 150 to 200 runs of each binary against a `develop` build, median of per-pair differences: +5.2 ms on `--version`, +5.9 ms on a small `check`, +5.2 ms on a hook run. With splitting, the library is its own chunk inside the binary, read only when the picker runs, and the difference is within noise: -0.01 ms, -0.26 ms and -0.29 ms over 300 runs each, and -1.5% (hook) and -1.2% (full check) on the #29 benchmark.
+
+**Consequences.**
+
+- :material-plus-circle-outline: `check` and the hooks keep their start-up; the picker's cost falls on the one command that shows it.
+- :material-plus-circle-outline: A later lazily loaded feature gets the same treatment for free.
+- :material-minus-circle-outline: The build writes a `chunk-*.js.map` next to each binary in `dist/`. The release upload already takes only `inwards-*` files.
+- :material-minus-circle-outline: The picker can't be tested in CI, which has no TTY. It was driven through a pseudo-terminal on Linux; Windows Terminal, PowerShell and macOS Terminal still need a check by hand (#92).
+
+**Alternatives.**
+
+- *Ink:* richer layouts, but see the numbers above.
+- *Hand-written prompts on raw stdin:* no dependency, but cursor handling, resize and Windows consoles are what the library already gets right.
+- *`--bytecode` instead of splitting:* the #92 analysis measured about 2 ms for clack with bytecode. It changes how the whole binary loads, which is a bigger decision than this feature, and splitting alone already moves the cost off the start-up path.
 
 ## ADR-021: Publish the release wheels to PyPI from their own workflow, with trusted publishing
 

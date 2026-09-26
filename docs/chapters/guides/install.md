@@ -129,6 +129,56 @@ inwards --version
 
 ## Configure the layers
 
+### A new project: start from a preset
+
+`inwards init --style` writes `[tool.inwards]` for a known architecture, and `--scaffold` adds a small example package that passes the check. uv creates the project; Inwards only adds the layers:
+
+```sh
+uv init --package app && cd app
+inwards init --style hexagonal --scaffold
+```
+
+```text
+inwards init: wrote the hexagonal preset to pyproject.toml and 14 example files.
+
+src/app/  (hexagonal)
+├── adapters/
+│   ├── inbound/   inbound: may import domain, application, outbound
+│   └── outbound/  outbound: may import domain, application
+├── application/   application: may import domain
+├── bootstrap.py   bootstrap: may import every other layer
+└── domain/        domain: imports no other layer
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m app.bootstrap book 2
+Wire an agent: inwards init --agent claude|aider|agents-md
+```
+
+Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
+
+Three presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
+
+| Style | Layers | What it can't forbid |
+|---|---|---|
+| `layered` | domain, persistence, services, presentation, bootstrap | presentation calling persistence directly (open layers) |
+| `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importing infrastructure |
+| `hexagonal` | domain, application, outbound (`adapters.outbound`), inbound (`adapters.inbound`), bootstrap | inbound adapters importing outbound ones |
+
+Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer.
+
+What `--style` writes and when it stops:
+
+- **The table:** the layers, `root` (`src` for a src layout, else `.`), `required-version`, the default `ignore` list and a comment naming the preset and the Inwards version. The package comes from `[project].name`, normalised the way uv does it (`my-app` becomes `my_app`), or from `--package`.
+- **It never rewrites layers.** If `[tool.inwards]` already exists, init exits 2 and writes nothing. Without a `pyproject.toml` it exits 2 and suggests `uv init --package`.
+- **`--scaffold`** writes an entity, a port (`typing.Protocol`), a use case, an adapter that implements the port, a command-line driving adapter, the composition root and one test in `tests/`. It never overwrites a file: if one exists, init exits 2, lists it and writes nothing. An existing `__init__.py`, such as the one uv creates, is left as it is.
+- **`--dry-run`** prints every change as a diff and writes nothing. **`--agent`** combines with `--style`: `inwards init --style clean --agent claude` writes the layers and the Claude Code hooks in one run.
+- After writing, init runs the check in process and prints the tree above. Without `--scaffold`, each layer package is marked `(missing)` and fails the check until it has a module.
+
+On a terminal, `inwards init` with neither `--style` nor `--agent` asks instead: the style (the highlighted one shows its layers), whether to scaffold, and which agent to wire. It ends by printing the same command with flags. Without a terminal (stdin or stdout isn't a TTY, or `CI` is set), it never waits for input: it exits 2 at once and lists the flags and the styles. Agents run init this way.
+
+### Any project: write the table by hand
+
 Add `[tool.inwards]` to the `pyproject.toml` of the project you want to check, innermost layer first:
 
 ```toml title="pyproject.toml"

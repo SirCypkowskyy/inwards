@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import { ConfigError, type Format, render, VERSION } from "@inwards/core";
 import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
 import { hookClaudeCode } from "./hook.ts";
-import { AGENTS, initCommand, isAgent } from "./init.ts";
+import { type InitFlags, initMain } from "./init-style.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
@@ -18,7 +18,8 @@ const USAGE = `inwards ${VERSION}
 Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
                      [--config pyproject.toml] [--log]
        inwards baseline [--config pyproject.toml]    (accept today's violations)
-       inwards init --agent claude|aider|agents-md [--dry-run]
+       inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
+       inwards init --agent claude|aider|agents-md [--dry-run]   (--list-styles: the presets)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -48,6 +49,10 @@ async function main(argv: string[]): Promise<number> {
       "max-diagnostics": { type: "string" },
       export: { type: "string" },
       redact: { type: "boolean" },
+      style: { type: "string" },
+      scaffold: { type: "boolean" },
+      package: { type: "string" },
+      "list-styles": { type: "boolean" },
     },
   });
 
@@ -84,7 +89,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param command - which one.
  * @param paths - the positionals after it.
  * @param values - the parsed options.
- * @param values.agent - `--agent`, for init.
+ * @param values.agent - `--agent`, for init (so are the other InitFlags).
  * @param values."dry-run" - `--dry-run`, for init.
  * @param values.config - `--config`, for baseline (stats refuses it).
  * @param values.format - `--format`, for stats.
@@ -95,9 +100,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
 async function setupCommand(
   command: SetupCommand,
   paths: string[],
-  values: {
-    agent?: string | undefined;
-    "dry-run"?: boolean | undefined;
+  values: InitFlags & {
     config?: string | undefined;
     format?: string | undefined;
     export?: string | undefined;
@@ -121,9 +124,7 @@ async function setupCommand(
       : print(USAGE, 2);
   }
   if (command === "init") {
-    return paths.length === 0 && isAgent(values.agent)
-      ? initCommand(values.agent, values["dry-run"] === true)
-      : print(`${USAGE}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
+    return await initMain(paths, values, USAGE);
   }
   return paths.length === 0 ? await baselineCommand(values.config) : print(USAGE, 2);
 }
