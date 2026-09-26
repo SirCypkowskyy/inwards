@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 469085b67313d53cd9e5d4faac0745e9ce8769d5c9214a53e316f9bbf9f2e0b2
+source_hash: b7d1aed5372b08ac330663149b02d3f424d5714c4631dc5fde9ae3838dd55afe
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -14,7 +14,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [003](#adr-003-ship-a-bun-single-file-executable) | Dystrybucja jako jednoplikowy program wykonywalny Buna | :white_check_mark: Przyjęty, budowany z `--bytecode` od [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
 | [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parsuj szkielet importów, potwierdzaj pełnym parsowaniem | :white_check_mark: Przyjęty, moduły w baseline'ie pomijają parsowanie potwierdzające od [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Konfiguracja mieszka w `pyproject.toml` | :white_check_mark: Przyjęty |
-| [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :white_check_mark: Przyjęty |
+| [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :white_check_mark: Przyjęty, od [#44](03-Architecture-C4.md#c3-components-of-the-engine) adapter dostarcza indeks modułów przez port ProjectFiles |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi | :white_check_mark: Przyjęty |
 | [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Sprawdzaj importy, gdziekolwiek się pojawią | :white_check_mark: Przyjęty |
@@ -31,7 +31,8 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | Kreator w `init` używa @clack/prompts, ładowanego z osobnego fragmentu | :white_check_mark: Przyjęty |
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publikuj wheele wydań na PyPI z osobnego workflow, przez trusted publishing | :white_check_mark: Przyjęty, włączany przez właściciela |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
-| [023](#adr-023-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
+| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy | :white_check_mark: Przyjęty |
+| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -531,7 +532,29 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Wstrzymać do czasu danych od partnerów (przenieść rekrutację, #132, do M3):* najbardziej rygorystyczna opcja. Właściciel zostawił rekrutację na końcu planu, a mierzalne zakłady wskazują we właściwą stronę.
 - *Zatrzymać albo zmienić kierunek:* nic zmierzonego nie przeczy żadnemu progowi, więc nie ma argumentów ani za jednym, ani za drugim.
 
-## ADR-023: Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR { #adr-023-a-polish-translation-as-a-second-build-translated-in-the-same-pr }
+## ADR-023: Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy { #adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer }
+
+**Stan:** Przyjęty · 2026-09-26 · [#47](https://github.com/SirCypkowskyy/inwards/issues/47)
+
+**Kontekst.** INW001 widzi tylko własne warstwy, więc `from sqlalchemy.orm import Session` w domenie ją przechodzi, a to najczęstszy wyciek w warstwowym kodzie Pythona. Odróżnienie biblioteki od własnego kodu nie może wymagać virtualenva (C4): Inwards nigdy nie importuje kodu użytkownika, więc nie może zapytać Pythona, skąd pochodzi moduł.
+
+**Decyzja.**
+
+- INW005 `pure-domain` sprawdza każdy import pliku w warstwie, który nie jest własnym kodem (należy do warstwy albo znajduje go sondowanie systemu plików z INW006) ani nie jest dozwolony przez `allow-libraries` / `deny-libraries` tej warstwy. Wpisy to nazwy modułów, które obejmują swoje podmoduły; decyduje najdłuższy pasujący wpis, a przy remisie `allow`.
+- `allow-libraries` zamienia warstwę w listę dozwolonych tylko dla kodu zewnętrznego. Biblioteka standardowa pozostaje dozwolona i jest rozpoznawana po dołączonej liście: sumie `sys.stdlib_module_names` z CPythona 3.11–3.14 oraz modułów, które miały starsze wersje.
+- Wpisy muszą być identyfikatorami Pythona z kropkami. Glob albo nazwa dystrybucji do niczego by nie pasowały, a w najbardziej wewnętrznej warstwie po cichu wyłączyłyby ustawienie domyślne.
+- Najbardziej wewnętrzna warstwa konfiguracji z dwiema lub więcej warstwami zabrania ustalonej listy frameworków, klientów baz danych i sieci oraz operacji wejścia-wyjścia z biblioteki standardowej, chyba że ustawia `deny-libraries`, które zastępuje tę listę, zamiast ją rozszerzać. Konfiguracja z jedną warstwą nie dostaje ustawienia domyślnego: jej jedyna warstwa to cała aplikacja, a nie domena.
+- Komunikat podaje pakiet najwyższego poziomu biblioteki, nigdy skonfigurowanych list, więc wpis w baseline'ie przetrwa ich zmianę. Poprawka podaje wpis zakazu, który pasował (`http.client`, którego `allow-libraries = ["http"]` by nie znosiło), i każdą warstwę zewnętrzną, której konfiguracja pozwala używać tej biblioteki; agent wybiera tę, która zawiera adaptery, bo kolejność warstw nie mówi, która to jest w układzie heksagonalnym.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Istniejące konfiguracje z dwiema lub więcej warstwami wyłapują SQLAlchemy, FastAPI albo Requests w domenie bez zmiany konfiguracji.
+- :material-minus-circle-outline: To także nowe źródło błędów po aktualizacji w projektach, których domena celowo używa takiej biblioteki. Wyłącza je `deny-libraries = []` albo wpis w `allow-libraries`, a `inwards baseline` akceptuje to, co już jest.
+- :material-minus-circle-outline: Dopasowywane są nazwy importu, a nie nazwy dystrybucji (`PyYAML` to `yaml`), a moduł biblioteki standardowej nowszy niż dołączona lista liczy się jako zewnętrzny.
+
+**Alternatywy.** *Czytać zainstalowane dystrybucje z virtualenva*: dokładne, ale łamie C4 i zawodzi w obrazach CI bez zależności. *Domyślny zakaz dla każdej warstwy poza najbardziej zewnętrzną*: za dużo zgaduje o tym, czego może używać warstwa aplikacji. *Wymieniać skonfigurowaną listę w komunikacie*: zmieniona lista przywróciłaby każde naruszenie z baseline'u.
+
+## ADR-024: Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR { #adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr }
 
 **Stan:** Przyjęty · 2026-09-26 · [#149](https://github.com/SirCypkowskyy/inwards/issues/149)
 

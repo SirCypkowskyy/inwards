@@ -40,6 +40,7 @@ nav = [
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
     { "GitHub Actions" = "guides/ci.md" },
     { "Kształt pakietu" = "guides/package-shape.md" },
+    { "Biblioteki w warstwach" = "guides/libraries.md" },
     { "Design partnerzy" = "guides/design-partners.md" },
   ] },
   { "1. Wprowadzenie" = "01-Introduction.md" },

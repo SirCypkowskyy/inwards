@@ -77,6 +77,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | English | Polish |
 |---|---|
 | adapter | adapter |
+| allowlist, deny list (`allow-libraries`, `deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
 | architecture linter | linter architektury |
 | binary (the executable) | plik binarny |
@@ -120,9 +121,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | import skeleton | szkielet importów |
 | job (CI) | zadanie |
 | language server | serwer języka |
+| libraries per layer (INW005 guide) | biblioteki w warstwach |
 | legacy codebase, repo, violation | starszy kod, starsze repozytorium, stare naruszenie |
 | literal (target, dynamic import) | dosłowny (cel, import dynamiczny) |
 | layer | warstwa |
+| library; third-party library; standard library | biblioteka; biblioteka zewnętrzna; biblioteka standardowa |
 | inner, outer layer; innermost, outermost | warstwa wewnętrzna, zewnętrzna; najbardziej wewnętrzna, najbardziej zewnętrzna |
 | maintainer | opiekun projektu |
 | member (of a package) | element (pakietu) |

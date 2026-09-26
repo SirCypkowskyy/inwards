@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: 05b6c7133a704d360f379ab9da6952f92259a38a7e113d332eb3f878807d318b
+source_hash: e47f89e38851d4f937f790bec3c7e0a0e05edc2aa4547b98ad21af7e417718eb
 hide:
   - navigation
 ---
@@ -120,7 +120,7 @@ Deklarujesz swoje warstwy w `pyproject.toml`. `inwards check` zgłasza błąd, g
 
 !!! info "Stan projektu"
     Pre-alpha.
-    Sześć reguł działa od początku do końca w CLI, w silniku i w serwerze VS Code: INW001 (kierunek warstw), INW011 (dosłowne importy dynamiczne), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
+    Siedem reguł działa od początku do końca w CLI, w silniku i w serwerze VS Code: INW001 (kierunek warstw), INW011 (dosłowne importy dynamiczne), INW005 ([biblioteki w warstwach](guides/libraries.md): domyślnie żadnych frameworków ani operacji wejścia-wyjścia w domenie), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Każde wydanie to GitHub Release z plikami binarnymi dla sześciu platform, pięcioma wheelami platformowymi dla `uv add` i plikiem `.vsix`. Jak dotąd jedynym wydaniem jest wersja przedpremierowa v0.1.0-rc.1.
     CI testuje każdy pull request na Linuksie, a na macOS i Windows – przed każdym wydaniem. Elementy oznaczone :material-progress-clock: są zaplanowane.

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 19fe4d06caa26dca8dc0684b0f818cf645edf94125466a8fa008b4185fa181c2
+source_hash: 82a4351e2ea4f1d5eb3e9bcbbba363c11bee336c0d867d2160f0b3434fbcfa9c
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -219,6 +219,8 @@ git add inwards-baseline.json
 ```
 
 `inwards baseline` sprawdza cały projekt w ramach jednej konfiguracji i zapisuje każde naruszenie do `inwards-baseline.json` obok jego `pyproject.toml`. Zacommituj ten plik: czytają go `inwards check`, hooki agentów i CI. W monorepo uruchom polecenie raz dla każdego pakietu, który ma własne `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), bo każdy plik jest sprawdzany względem baseline'u leżącego obok jego konfiguracji. Zaakceptowany import może przenieść się do innej linii i nadal przechodzić, bo wpisy są dopasowywane po regule, module i komunikacie, bez zdania „Allowed direction” z komunikatu, więc dodanie warstwy nie sprawia, że wracają. Druga kopia tego samego importu w tym samym module nie przechodzi. Gdy sprawdzenie całego projektu stwierdzi, że zaakceptowanych naruszeń już nie ma, mówi o tym. Uruchom wtedy ponownie `inwards baseline`, żeby je usunąć. Z `--format json` i istniejącym baseline'em podsumowanie liczy jedno i drugie: `baselined` przy każdym uruchomieniu, `resolved` przy sprawdzeniu całego projektu. Agenci nie mogą edytować tego pliku ani uruchamiać tego polecenia: hooki Claude Code odrzucają jedno i drugie, a Stop gate oblewa sesję, która go zmieniła, i sprawdza pliki tej sesji zupełnie bez baseline'u.
+
+Uruchom je też, zanim włączysz hooki agenta. Hooki Claude Code już traktują naruszenie, które zacommitowany plik miał na początku sesji, jako kontekst, a nie blokadę ([rozdział 4](../04-AI-Integration.md)), ale plik z niezacommitowanymi zmianami na początku sesji nie ma znanej zawartości startowej, więc blokują wszystkie jego naruszenia, a agent, którego pcha się do ich naprawy, może przepisać kod niepotrzebny do zadania. Baseline utrzymuje też na zielono `inwards check` i CI.
 
 Gdy projekt ma baseline, `stop-gate = "project"` w `[tool.inwards]` sprawia, że Stop gate w Claude Code sprawdza cały projekt względem baseline'u, a nie tylko pliki zmienione w sesji, więc naruszenie w dowolnym miejscu blokuje turę ([rozdział 4](../04-AI-Integration.md)). Sprawdzenie pomija parsowanie potwierdzające tam, gdzie baseline akceptuje wszystko, co znalazł prescan, więc w pełni pokryte baseline'em sprawdzenie kosztuje mniej więcej tyle, co czyste.
 

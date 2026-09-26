@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: 4e07a0163659be1cf0934fdbfec8f6290a7fea2a556acc3359546733cbf5aec3
+source_hash: ad5bf5e45348a07f70dfe1a6504162a46eb8a80088ebb10805bbe95f87ed9765
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -112,7 +112,7 @@ Szkielet importów (import skeleton)
 :   Kopia pliku, w której każda linia niebędąca importem jest pusta, a linie importów mają usunięte wcięcie. Numery linii są zachowane, a parsuje się ją dużo szybciej niż cały plik.
 
 Indeks modułów (module index)
-:   Wszystkie własne moduły projektu, z modułami importującymi dowolny moduł wyliczanymi na żądanie (`Engine.index`). Jest zbudowany, ale żadna reguła jeszcze go nie używa; użyje go INW010.
+:   To, jak silnik widzi własne moduły projektu (`Engine.index`); każdy adapter przekazuje go do każdego sprawdzenia: właściciel importu, lista modułów oraz moduły importujące dowolny moduł, każde z nich wyliczane na żądanie. INW006 korzysta z właściciela; INW010 będzie korzystać z listy.
 
 Odmowa prescanu (prescan refusal)
 :   Prescan rezygnuje z pliku, bo `import` pojawia się w miejscu, którego nie umie wyjaśnić. Plik dostaje wtedy pełne parsowanie. Odmowę dostaje 8,3 % plików biblioteki standardowej CPythona.
