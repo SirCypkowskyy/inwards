@@ -27,6 +27,7 @@ Each line is one JSON object:
 | `files` | string[] | Project-relative files the run checked. For `check`, its path arguments, or `"."` for the whole project |
 | `lines` | object[] | `PostToolUse` only, for the file the hook checked: `{ "file", "added", "removed" }`, counted from the tool call without the lines the edit repeats unchanged around its change. A `Write` counts every line as added; `replace_all` counts one occurrence |
 | `fingerprints` | string[] | One per violation reported (rule code, module and message, hashed), the same as in the session state. Two identical imports in one file give the same fingerprint twice |
+| `codes` | string[] | The rule code of each fingerprint, in the same order (e.g. `INW001`). Lines written before this field existed lack it |
 | `exit` | number | The exit code Inwards returned |
 | `durationMs` | number | Time since the process started, process startup included, to 0.1 ms |
 
@@ -34,15 +35,31 @@ Each line is one JSON object:
 {"v":1,"at":"2026-09-25T20:14:03.512Z","session_id":"7a425a88-...","event":"PostToolUse",
  "tool":"Edit","files":["shop/domain/order.py"],
  "lines":[{"file":"shop/domain/order.py","added":2,"removed":1}],
- "fingerprints":["4c1f0e9a2b7d3e10"],"exit":2,"durationMs":24.8}
+ "fingerprints":["4c1f0e9a2b7d3e10"],"codes":["INW001"],"exit":2,"durationMs":24.8}
 ```
 
 ## Reading it
 
-- **Fixed within one retry:** for each `PostToolUse` line with fingerprints, look at the next `PostToolUse` line for the same file in the same session. A fingerprint that is gone there was fixed in one retry.
-- **Violations per 1,000 agent-written lines:** sum `added` over `PostToolUse` lines, and count the distinct fingerprints first reported in them.
-- **Hook latency:** `durationMs` of `PostToolUse` lines.
+`inwards stats` reads `.inwards/runs.1.jsonl` and `.inwards/runs.jsonl` next to the config and prints the three numbers, each next to its [chapter 2 threshold](02-Business-Context.md#business-hypothesis). `--format json` prints the same numbers as `inwards/stats@1`. Nothing leaves the machine.
 
-A hook checks the whole file, so its fingerprints include violations that were there before the session. The log doesn't mark them. To count only the agent's, run `inwards check --format json --log` when the session starts, and leave out the fingerprints that run reported. The first two recipes also treat a fingerprint as fixed only when every copy of it is gone.
+```text title="inwards stats"
+Run log: 2 sessions, 6 hook runs, 1 unreadable line skipped.
+
+Fixed within one retry: 1 of 2 (50%). Target: at least 80%. Not met.
+    INW001  1 of 1 (100%)
+    INW011  0 of 1 (0%)
+    unknown  0 of 0
+    1 more had no later hook run for their file yet.
+Violations per 1,000 agent-written lines: 60 (3 in 50 lines). Target: at least 1. Met.
+Hook latency: p50 40 ms, p95 200 ms over 6 runs. Target: p50 under 100 ms. Met.
+```
+
+What it counts:
+
+- **Fixed within one retry:** a violation counts once per session and file, at the first `PostToolUse` line that reports it. It is fixed when the next `PostToolUse` line for that file no longer has its fingerprint, so every copy of it has to be gone. A first report with no later run for that file yet is listed apart, not counted as unfixed. The per-rule split uses `codes`; fingerprints from lines written before `codes` existed count under `unknown`.
+- **Violations per 1,000 agent-written lines:** distinct fingerprints first reported in a session's `PostToolUse` lines, over the sum of `added` in those lines.
+- **Hook latency:** p50 and p95 of `durationMs` over `PostToolUse` lines, by the nearest-rank method.
+
+A hook checks the whole file, so its fingerprints include violations that were there before the session. `inwards stats` leaves out every fingerprint a `check` line reported before a session's first line. Run `inwards check --format json --log` when a session starts to keep old violations out of both rates; without that run, they count as the agent's.
 
 Hook adoption, the share of installs with an agent hook, isn't in the log: one project can't see the others. Partners report it.

@@ -59,6 +59,7 @@ describe("run log", () => {
       exit: 2,
     });
     expect(line?.["fingerprints"]).toHaveLength(1);
+    expect(line?.["codes"]).toEqual(["INW001"]);
   });
 
   test("run-log = true in the config turns it on, and check --log logs a single run", () => {

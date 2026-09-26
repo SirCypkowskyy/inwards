@@ -10,6 +10,7 @@ import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { logRun, noteRun } from "./runlog.ts";
+import { computeStats, readRunLog, renderStatsText } from "./stats.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
@@ -17,6 +18,7 @@ const USAGE = `inwards ${VERSION}
 Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml] [--log]
        inwards baseline [--config pyproject.toml]    (accept today's violations)
        inwards init --agent claude|aider|agents-md [--dry-run]
+       inwards stats [--format text|json] [--config pyproject.toml]   (hypothesis numbers from the run log)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
@@ -49,7 +51,7 @@ async function main(argv: string[]): Promise<number> {
     return print(VERSION, 0);
   }
   const [command, ...paths] = positionals;
-  if (!values.help && (command === "hook" || command === "init" || command === "baseline")) {
+  if (!values.help && isSetupCommand(command)) {
     return await setupCommand(command, paths, values);
   }
   if (values.help || command !== "check") {
@@ -58,26 +60,47 @@ async function main(argv: string[]): Promise<number> {
   return await checkCommand(paths, values.format, values.config, values.log === true);
 }
 
+/** The commands besides `check`. */
+type SetupCommand = "hook" | "init" | "baseline" | "stats";
+const SETUP_COMMANDS: readonly string[] = ["hook", "init", "baseline", "stats"];
+
 /**
- * Runs the commands besides `check`: the hook, `init` and `baseline`.
+ * Tells whether a positional names one of the commands besides `check`.
+ *
+ * @param command - the first positional.
+ * @returns true for hook, init, baseline or stats.
+ */
+function isSetupCommand(command: string | undefined): command is SetupCommand {
+  return command !== undefined && SETUP_COMMANDS.includes(command);
+}
+
+/**
+ * Runs the commands besides `check`: the hook, `init`, `baseline` and `stats`.
  *
  * @param command - which one.
  * @param paths - the positionals after it.
  * @param values - the parsed options.
  * @param values.agent - `--agent`, for init.
  * @param values."dry-run" - `--dry-run`, for init.
- * @param values.config - `--config`, for baseline.
+ * @param values.config - `--config`, for baseline and stats.
+ * @param values.format - `--format`, for stats.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
-  command: "hook" | "init" | "baseline",
+  command: SetupCommand,
   paths: string[],
   values: {
     agent?: string | undefined;
     "dry-run"?: boolean | undefined;
     config?: string | undefined;
+    format?: string | undefined;
   },
 ): Promise<number> {
+  if (command === "stats") {
+    return paths.length === 0
+      ? statsCommand(values.format ?? "text", values.config)
+      : print(USAGE, 2);
+  }
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(USAGE)
@@ -89,6 +112,28 @@ async function setupCommand(
       : print(`${USAGE}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
   }
   return paths.length === 0 ? await baselineCommand(values.config) : print(USAGE, 2);
+}
+
+/**
+ * Runs `inwards stats`: reads the run log next to the config and prints the
+ * hypothesis numbers (chapter 8), each next to its chapter-2 threshold.
+ *
+ * @param format - `text` or `json`.
+ * @param config - the `--config` path, if given.
+ * @returns 0, or 2 for a bad format or no config.
+ */
+function statsCommand(format: string, config: string | undefined): number {
+  if (format !== "text" && format !== "json") {
+    return print("inwards stats supports --format text or json", 2);
+  }
+  const configPath = config ? resolve(config) : findConfig(process.cwd());
+  if (!configPath) {
+    return print("No pyproject.toml with [tool.inwards] found.", 2);
+  }
+  const { lines, skipped } = readRunLog(dirname(configPath));
+  const stats = computeStats(lines, skipped);
+  const pretty = process.stdout.isTTY ? 2 : undefined;
+  return print(format === "json" ? JSON.stringify(stats, null, pretty) : renderStatsText(stats), 0);
 }
 
 const FORMATS: readonly Format[] = ["text", "json", "sarif"];
