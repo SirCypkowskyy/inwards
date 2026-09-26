@@ -182,7 +182,7 @@ export async function runCheck(
   const project = await openProject(configPath);
   const files = loadSources(project, targets, base, texts);
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
-  const accepted = baseline ? readBaseline(configPath) : undefined;
+  const accepted = baseline ? readBaseline(configPath, project.config.rules) : undefined;
   const index = project.engine.index(projectFiles(project));
   const diagnostics = project.engine.checkFiles(files, index, accepted);
   const shownRoot = posix(relative(base, project.lexicalRoot));

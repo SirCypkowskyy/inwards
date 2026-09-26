@@ -28,7 +28,7 @@ Each line is one JSON object:
 | `lines` | object[] | `PostToolUse` only, for the file the hook checked: `{ "file", "added", "removed" }`, counted from the tool call without the lines the edit repeats unchanged around its change. A `Write` counts every line as added; `replace_all` counts one occurrence |
 | `fingerprints` | string[] | One per violation reported (rule code, module and message, hashed), the same as in the session state. Two identical imports in one file give the same fingerprint twice |
 | `codes` | string[] | The rule code of each fingerprint, in the same order (e.g. `INW001`). Lines written before this field existed lack it |
-| `severities` | string[] | `error` or `warning` for each fingerprint, in the same order. Lines written before this field existed lack it and are read as errors |
+| `severities` | string[] | `error` or `warning` for each fingerprint, in the same order, as `[tool.inwards.rules]` set it. Lines written before this field existed lack it and are read as errors |
 | `exit` | number | The exit code Inwards returned |
 | `durationMs` | number | Time since the process started, process startup included, to 0.1 ms |
 

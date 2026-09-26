@@ -95,6 +95,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | config error | błąd konfiguracji |
 | confirming parse | parsowanie potwierdzające |
 | dead prefix | martwy prefiks |
+| dormant (baseline entry) | uśpiony (wpis) |
 | decision (ADR) | decyzja |
 | dependency rule | reguła zależności |
 | diagnostic | diagnostyka (pl. diagnostyki) |
@@ -133,6 +134,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | owner (the repo's) | właściciel |
 | payload (hook input) | dane wejściowe (hooka) |
 | per-edit hook | hook edycji |
+| phase in (rules) | wprowadzać stopniowo (reguły) |
 | picker (`init` on a terminal) | kreator |
 | module index | indeks modułów |
 | package shape | kształt pakietu |

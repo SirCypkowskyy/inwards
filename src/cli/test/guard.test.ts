@@ -39,6 +39,37 @@ describe("config guard: pyproject.toml", () => {
         ],
       },
     ],
+    [
+      "an Edit that ignores a rule in a [tool.inwards.rules] section",
+      "Edit",
+      {
+        old_string: 'attrs==23.1"]\n',
+        new_string: 'attrs==23.1"]\n\n[tool.inwards.rules]\nignore = ["INW001"]\n',
+      },
+    ],
+    [
+      "an Edit that selects rules with a dotted key",
+      "Edit",
+      { old_string: "[tool.inwards]\n", new_string: '[tool.inwards]\nrules.select = ["INW005"]\n' },
+    ],
+    [
+      "a MultiEdit that adds [tool.inwards.rules] next to a harmless edit",
+      "MultiEdit",
+      {
+        edits: [
+          { old_string: "attrs==23.1", new_string: "attrs==24.2" },
+          {
+            old_string: "[tool.inwards]\n",
+            new_string: '[tool.inwards]\nrules = { ignore = ["INW006"] }\n',
+          },
+        ],
+      },
+    ],
+    [
+      "a Write that downgrades a rule",
+      "Write",
+      { content: `${PYPROJECT}\n[tool.inwards.rules.severity]\nINW001 = "warning"\n` },
+    ],
     ["a Write that removes the table", "Write", { content: '[project]\nname = "shop"\n' }],
     [
       "an edit that breaks the TOML",

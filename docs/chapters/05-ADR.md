@@ -28,6 +28,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
+| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -574,3 +575,35 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 
 **Alternatives.** *English under `/en/` next to `/pl/`:* the built-in switcher would work, but every existing link and the CLI's `docs:` URLs would move. *Machine translation on each merge:* always in sync, but it needs a secret and a budget, terminology drifts between runs, and nobody reviews it. *Copies of the assets in `docs/pl/`:* self-contained, but two copies of every screenshot to keep equal.
 
+## ADR-027: Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table
+
+**Status:** Accepted · 2026-09-26 · [#43](https://github.com/SirCypkowskyy/inwards/issues/43)
+
+**Context.** A team adopting Inwards on a legacy codebase wants to turn rules on one at a time, or see a rule's findings as warnings before they block. Ruff users expect `select` and `ignore`, but `[tool.inwards]` already has an `ignore` key: module names left out of the INW006 unassigned-package warning, which `inwards init` writes. Diagnostics come from the engine and from five checks the adapters call directly (`checkShape`, `checkRequired`, `checkSelectors`, `checkPrefixes`, `checkMoves`), and the Stop gate compares configs as JSON.
+
+**Decision.**
+
+- **A sub-table.** `[tool.inwards.rules]` holds `select` and `ignore`, lists of rule codes, and `severity`, a table from code to `"error"` or `"warning"`. The top-level `ignore` keeps its meaning. Without `select` every rule reports; `ignore` wins over `select`. `severity` sets the level of every finding of a rule, including findings a rule reports at a level of its own: with `INW006 = "error"`, the per-package warning becomes an error.
+- **Exact codes, validated.** A code the registry doesn't have is a config error, like an unknown key. No prefixes: codes aren't grouped by category, and a prefix such as `INW00` would silently take in rules that ship later. An empty `select` is an error too, since turning rules off is `ignore`'s job.
+- **INW000 is fixed.** `ignore` and `severity` can't list it, and `select` doesn't turn it off. A file whose declared encoding can hide imports gets INW000 instead of a check, so turning INW000 off or down would let that file pass unchecked.
+- **The session layout check is fixed too.** The Stop gate's INW006 comparison with the session start (a prefix emptied since then, layer code moved out of every layer) ignores the table. It is the defence against `mv shop/domain shop/core`, a dodge rather than a rule a team phases in, and with `select = ["INW001"]` or `ignore = ["INW006"]` that move would pass.
+- **Applied in the core, last.** Every other core function that returns diagnostics to an adapter applies the table, so `inwards check`, the hooks, the Stop gate and the language server agree. `Engine.checkFiles` applies it after keeping INW006's per-package warning once per package, so a configured severity doesn't change how many copies are reported. The rules still run; their findings are dropped or re-levelled afterwards.
+- **A warning is a warning.** A rule set to `"warning"` shows up in every format but, like any warning, doesn't change the exit code, block the per-edit hook or the Stop gate, or go into the baseline.
+- **Baseline.** `inwards baseline` records only what the check reports, so it leaves out rules that are off or at warning. Entries already in the file for such a rule are dormant: they don't count as fixed (`resolved`), `inwards baseline` keeps them, and they apply again once the rule is back at error. The other way round, an entry taken while a rule was raised to error is used up by the matching warning once the rule is back at its default, so it doesn't count as fixed either.
+- **SARIF.** `rules[]` still lists every registered rule with the registry's default in `defaultConfiguration.level`. Each result carries the configured `level`, which is what viewers show. A rule that is off has no results.
+- **Run log.** `codes` and `severities` record what was reported, after the table.
+- **Guarded like the rest.** The table is inside `[tool.inwards]`, so the config guard denies an edit that changes it and the Stop gate fails a change made through Bash. Tests pin both.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A team can phase rules in without a baseline, and show a rule as warnings before it blocks.
+- :material-plus-circle-outline: No per-adapter code path: the language server picks up the table with no change of its own.
+- :material-minus-circle-outline: `rules.ignore` and the top-level `ignore` share a word but not a meaning. Renaming the top-level key is a breaking change, left for the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)).
+- :material-minus-circle-outline: A rule that is off still costs its check time. Skipping it would mean passing the table into every rule, to save a few milliseconds.
+- :material-minus-circle-outline: A config that names a rule only a newer Inwards knows fails with exit 2; `required-version` gives the clearer message.
+- :material-minus-circle-outline: INW006 can't be fully turned off: the session layout check still blocks a layer moved away.
+- :material-minus-circle-outline: The language server reads the table when it starts, so a change needs a restart, and a config error (an unknown code, say) only reaches its output channel ([#163](https://github.com/SirCypkowskyy/inwards/issues/163)).
+- :material-minus-circle-outline: After a Bash edit of the table, the Stop gate fails on the change but checks with the edited config, so it doesn't list what the edit hides ([#164](https://github.com/SirCypkowskyy/inwards/issues/164)).
+- :material-minus-circle-outline: No per-file or per-path settings. Those belong with suppressions ([#50](https://github.com/SirCypkowskyy/inwards/issues/50)).
+
+**Alternatives.** *Top-level `select` and `ignore`, as in Ruff:* familiar, but `ignore` is taken, and telling `INW001` from a module named `tests` by its shape is a guess. *One key per rule, `INW001 = "off"`, as in ESLint:* compact, but it can't say "only these rules". *Code prefixes:* see above. *Filtering in each adapter:* four call sites (the check, the Stop gate's layout check, two in the language server) that could drift apart.

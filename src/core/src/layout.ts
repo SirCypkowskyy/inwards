@@ -3,9 +3,16 @@
  * module (a warning for one dead prefix, an error when a whole layer matches
  * nothing or a prefix stopped matching during the session), and layer code
  * moved out of every layer during a session.
+ *
+ * `[tool.inwards.rules]` applies to `checkPrefixes` without a session start
+ * only. The session comparison (a prefix emptied since the start, layer code
+ * moved out of every layer) is the Stop gate's defence against moving a layer
+ * away, not a rule a team phases in, so like INW000 the table can't turn it
+ * off (ADR-027).
  */
 import type { InwardsConfig } from "./config.ts";
 import { layerIndexOf } from "./layers.ts";
+import { applyRules } from "./rule-config.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, SourceFile, Span } from "./types.ts";
 import { holdsLayer, unassignedPackage } from "./unassigned.ts";
@@ -29,7 +36,8 @@ export interface ConfigFile {
  * @param config - the layers.
  * @param modules - every first-party module now.
  * @param file - the pyproject.toml, to point at each prefix.
- * @param before - the modules at session start, when a session is being checked.
+ * @param before - the modules at session start, when a session is being checked;
+ *   then `[tool.inwards.rules]` doesn't apply.
  * @returns the findings, located at each prefix in the file.
  */
 export function checkPrefixes(
@@ -37,6 +45,25 @@ export function checkPrefixes(
   modules: ReadonlySet<string>,
   file: ConfigFile,
   before?: ReadonlySet<string>,
+): Diagnostic[] {
+  const found = prefixFindings(config, modules, file, before);
+  return before === undefined ? applyRules(found, config.rules) : found;
+}
+
+/**
+ * Finds the prefix findings `checkPrefixes` reports, before `[tool.inwards.rules]`.
+ *
+ * @param config - the layers.
+ * @param modules - every first-party module now.
+ * @param file - the pyproject.toml, to point at each prefix.
+ * @param before - the modules at session start, when a session is being checked.
+ * @returns the findings, located at each prefix in the file.
+ */
+function prefixFindings(
+  config: InwardsConfig,
+  modules: ReadonlySet<string>,
+  file: ConfigFile,
+  before: ReadonlySet<string> | undefined,
 ): Diagnostic[] {
   const found: Diagnostic[] = [];
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };

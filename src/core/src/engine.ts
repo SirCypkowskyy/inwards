@@ -14,7 +14,8 @@ import {
   normalizeSource,
   parsePython,
 } from "./python.ts";
-import { checkShape } from "./shape.ts";
+import { applyRules } from "./rule-config.ts";
+import { shapeFindings } from "./shape.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 import { checkUnassignedImports, type ModuleLookup, unassignedWarning } from "./unassigned.ts";
 
@@ -78,6 +79,9 @@ export class Engine {
    * A file outside every layer isn't parsed: besides its shape, it gets at
    * most an INW006 warning naming its package.
    *
+   * `[tool.inwards.rules]` applies last: findings of rules that are off are
+   * dropped, the rest get their configured severity (see `applyRules`).
+   *
    * @param file - the source file as read by the adapter.
    * @param project - the project's module index (see `index`).
    * @returns the violations found, empty when the file is clean.
@@ -85,10 +89,10 @@ export class Engine {
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
     const { ownerOf } = project;
-    return [
-      ...checkShape(src, this.config),
-      ...this.confirm(src, this.scan(src, ownerOf), ownerOf),
-    ];
+    return applyRules(
+      [...shapeFindings(src, this.config), ...this.confirm(src, this.scan(src, ownerOf), ownerOf)],
+      this.config.rules,
+    );
   }
 
   /**
@@ -223,7 +227,11 @@ export class Engine {
    * of it is scanned first, and if the skeleton's findings, false positives
    * included, add up to no more than the accepted copies of each key, the
    * real ones do too, so the adapter's baseline hides them all either way.
-   * Those findings are returned unconfirmed. See `acceptedModules`.
+   * Those findings are returned unconfirmed. See `acceptedModules`, which
+   * sees the findings after `[tool.inwards.rules]`, as the baseline does.
+   *
+   * `[tool.inwards.rules]` applies after the INW006 warnings are deduplicated,
+   * so a configured severity doesn't change how many copies are kept.
    *
    * @param files - the source files to check.
    * @param project - the project's module index (see `index`).
@@ -236,13 +244,17 @@ export class Engine {
     accepted?: ReadonlyMap<string, number>,
   ): Diagnostic[] {
     const { ownerOf } = project;
+    const { rules } = this.config;
     const scanned = [...files].map((file) => {
       const src = { ...file, text: normalizeSource(file.text) };
       return { src, scan: this.scan(src, ownerOf) };
     });
     const hidden = accepted
       ? acceptedModules(
-          scanned.map(({ src, scan }) => ({ module: src.module, found: scan.found })),
+          scanned.map(({ src, scan }) => ({
+            module: src.module,
+            found: scan.found && applyRules(scan.found, rules),
+          })),
           accepted,
         )
       : new Set<string>();
@@ -251,7 +263,7 @@ export class Engine {
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
       for (const found of [
-        ...checkShape(src, this.config),
+        ...shapeFindings(src, this.config),
         ...this.confirm(src, scan, ownerOf, skip),
       ]) {
         const once = found.severity === "warning" ? found.message : undefined;
@@ -263,6 +275,6 @@ export class Engine {
         }
       }
     }
-    return all;
+    return applyRules(all, rules);
   }
 }

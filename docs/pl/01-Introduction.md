@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: dd9b76abfb0fcb73400669ad7f99ca52ca9c522d6386293672f7022a74f1de06
+source_hash: 9dd486749c9ffcf77623a2b99370d32b2be57b589552fc601268aeda58075c10
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -73,6 +73,17 @@ Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować wła
 ```
 
 Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii `examples/clean-app` z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
+
+Żeby wprowadzać reguły stopniowo, tabela `[tool.inwards.rules]` ustala, które reguły zgłaszają naruszenia i na jakim poziomie:
+
+```toml title="pyproject.toml"
+[tool.inwards.rules]
+ignore = ["INW007", "INW008"]      # these rules never report (optional)
+severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent (optional)
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+```
+
+Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją przy starcie, więc po zmianie uruchom je ponownie. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
 
 <div class="grid cards" markdown>
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
-import { ConfigError, type Format, render, VERSION } from "@inwards/core";
+import { ConfigError, type Format, parseConfig, render, VERSION } from "@inwards/core";
 import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
 import { hookClaudeCode } from "./hook.ts";
 import { type InitFlags, initMain } from "./init-style.ts";
@@ -218,7 +219,9 @@ async function baselineCommand(config: string | undefined): Promise<number> {
     return print("No pyproject.toml with [tool.inwards] found.", 2);
   }
   const report = await runCheck(configPath, undefined, process.cwd(), { baseline: false });
-  const accepted = writeBaseline(configPath, report.diagnostics);
+  // runCheck has parsed the config already, so this can't throw.
+  const { rules } = parseConfig(readFileSync(configPath, "utf8"));
+  const accepted = writeBaseline(configPath, report.diagnostics, rules);
   return print(
     `Wrote ${BASELINE_FILE} with ${accepted} violation${accepted === 1 ? "" : "s"}. Commit it; new violations still fail.`,
     0,

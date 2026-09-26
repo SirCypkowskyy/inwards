@@ -7,6 +7,10 @@
  * already held at session start never block, so a legacy config with an
  * empty layer, or a package that never had its `service.py`, doesn't stop
  * every turn.
+ *
+ * `[tool.inwards.rules]` doesn't apply to the prefix and move checks: they
+ * catch a layer moved away, a dodge, not a rule to phase in (ADR-027). It
+ * does apply to INW008.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -55,7 +59,8 @@ export function newLayoutErrors(
       posix(relative(project, root)),
     ).filter((d) => !hadMissing.has(d.message));
     const [wasSet, isSet] = [new Set(was.keys()), new Set(is.keys())];
-    const atStart = new Set(checkPrefixes(config, wasSet, file).map((d) => d.message));
+    // The start set as `before` too, so the table doesn't hide a finding here that `emptied` keeps.
+    const atStart = new Set(checkPrefixes(config, wasSet, file, wasSet).map((d) => d.message));
     const emptied = checkPrefixes(config, isSet, file, wasSet).filter(
       (d) => d.severity === "error" && !atStart.has(d.message),
     );

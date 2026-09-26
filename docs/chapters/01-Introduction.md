@@ -69,6 +69,17 @@ Layers are listed innermost first. A module may import its own layer and anythin
 
 The diagnostic comes from the working scaffold in this repository, run on a copy of `examples/clean-app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
 
+To phase rules in, a `[tool.inwards.rules]` table sets which rules report and how loudly:
+
+```toml title="pyproject.toml"
+[tool.inwards.rules]
+ignore = ["INW007", "INW008"]      # these rules never report (optional)
+severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent (optional)
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+```
+
+Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select`. INW000 always reports as an error, because a file whose declared encoding can hide imports isn't checked at all, and the Stop gate's check that no layer was moved away during the session ignores the table too. `inwards check`, the hooks, the Stop gate and the VS Code extension all apply the table; the extension reads it when it starts, so restart it after a change. It is part of `[tool.inwards]`, so the config guard stops an agent from changing it. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) covers the baseline and SARIF.
+
 <div class="grid cards" markdown>
 
 -   :material-lightning-bolt:{ .lg .middle } __Fast enough for every edit__

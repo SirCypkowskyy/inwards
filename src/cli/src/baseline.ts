@@ -24,6 +24,8 @@ import {
   ConfigError,
   type Diagnostic,
   type Report,
+  type RuleSettings,
+  ruleLevel,
   stableMessage,
 } from "@inwards/core";
 
@@ -66,13 +68,24 @@ function byCodePoint(a: string, b: string): number {
 /**
  * Writes the baseline from a whole-project check: its errors, grouped and sorted
  * so that the file diffs well. Warnings don't fail a check, so they stay out.
+ * The old file's dormant entries (rules `[tool.inwards.rules]` turns off or
+ * down to a warning, which the check can't see) are kept, so that turning the
+ * rule back on doesn't bring back violations the user had accepted.
  *
  * @param configPath - the pyproject.toml.
  * @param diagnostics - the whole-project check's diagnostics.
- * @returns how many violations the baseline now accepts.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
+ * @returns how many violations the baseline now accepts, dormant ones included.
  */
-export function writeBaseline(configPath: string, diagnostics: readonly Diagnostic[]): number {
+export function writeBaseline(
+  configPath: string,
+  diagnostics: readonly Diagnostic[],
+  rules: RuleSettings | undefined,
+): number {
   const entries = new Map<string, Entry>();
+  for (const e of dormantEntries(configPath, rules)) {
+    entries.set(baselineKey(e), e);
+  }
   for (const d of diagnostics.filter((x) => x.severity === "error")) {
     const entry = entries.get(baselineKey(d)) ?? {
       code: d.code,
@@ -102,6 +115,25 @@ export function writeBaseline(configPath: string, diagnostics: readonly Diagnost
     throw new ConfigError(`can't write ${path}; is it a directory?`, { cause: err });
   }
   return violations.reduce((sum, v) => sum + v.count, 0);
+}
+
+/**
+ * Reads the entries of the current baseline that `[tool.inwards.rules]` makes
+ * dormant. A baseline this version can't read has none: it is being replaced.
+ *
+ * @param configPath - the pyproject.toml.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
+ * @returns the dormant entries.
+ */
+function dormantEntries(configPath: string, rules: RuleSettings | undefined): Entry[] {
+  if (rules === undefined) {
+    return [];
+  }
+  try {
+    return (readEntries(baselinePath(configPath)) ?? []).filter((e) => dormant(e.code, rules));
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -164,27 +196,50 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Reads the accepted violations of a config's baseline, for the engine and
- * for `applyBaseline`.
+ * for `applyBaseline`. Entries of a rule that `[tool.inwards.rules]` turns
+ * off or down to a warning are left out: that rule reports no errors to
+ * accept, and its entries must not count as fixed. They apply again once the
+ * rule is back; `inwards baseline` keeps them (see `writeBaseline`).
  *
  * @param configPath - the pyproject.toml.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns accepted copies by baseline key, or undefined when there is no baseline.
  * @throws {ConfigError} when the file isn't a baseline this version understands.
  */
-export function readBaseline(configPath: string): Map<string, number> | undefined {
+export function readBaseline(
+  configPath: string,
+  rules: RuleSettings | undefined,
+): Map<string, number> | undefined {
   const entries = readEntries(baselinePath(configPath));
   if (entries === undefined) {
     return undefined;
   }
   const accepted = new Map<string, number>();
-  for (const e of entries) {
+  for (const e of entries.filter((entry) => !dormant(entry.code, rules))) {
     accepted.set(baselineKey(e), (accepted.get(baselineKey(e)) ?? 0) + e.count);
   }
   return accepted;
 }
 
 /**
+ * Tells whether a rule's baseline entries are dormant: the rule reports no
+ * errors, being off or turned down to a warning.
+ *
+ * @param code - the entry's rule code.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
+ * @returns true when the entry can't match anything now.
+ */
+function dormant(code: string, rules: RuleSettings | undefined): boolean {
+  const level = ruleLevel(code, rules);
+  return level === "off" || level === "warning";
+}
+
+/**
  * Drops the errors the baseline accepts, up to each entry's count, so a module
- * that gains a second copy of an accepted violation still fails.
+ * that gains a second copy of an accepted violation still fails. A warning
+ * that matches an entry (a rule `[tool.inwards.rules]` raised to error when the
+ * baseline was taken, back at its default now) is still there, so its entry
+ * doesn't count as fixed; the warning is reported as usual.
  *
  * @param accepted - accepted copies by baseline key, from `readBaseline`.
  * @param report - the check's report.
@@ -199,11 +254,14 @@ export function applyBaseline(
   const left = new Map(accepted);
   let baselined = 0;
   const diagnostics = report.diagnostics.filter((d) => {
-    const n = d.severity === "error" ? (left.get(baselineKey(d)) ?? 0) : 0;
+    const n = left.get(baselineKey(d)) ?? 0;
     if (n === 0) {
       return true;
     }
     left.set(baselineKey(d), n - 1);
+    if (d.severity !== "error") {
+      return true; // uses up the entry, but a warning is never hidden
+    }
     baselined += 1;
     return false;
   });
