@@ -1,0 +1,54 @@
+name: Bench
+
+# Builds the base branch and the PR, runs both on the synthetic repo
+# (bench/generate.py) in alternation, and fails when the PR is more than 20%
+# slower on a metric. Same job, same runner, so runner noise hits both alike.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    name: Performance against the base branch
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Build the PR's binary
+        run: |
+          bun install --frozen-lockfile
+          bun run scripts/build-binaries.ts bun-linux-x64
+          cp dist/inwards-linux-x64 "$RUNNER_TEMP/head-inwards"
+      - name: Build the base branch's binary
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "$BASE"
+          cd "$RUNNER_TEMP/base"
+          bun install --frozen-lockfile
+          bun run scripts/build-binaries.ts bun-linux-x64
+          cp dist/inwards-linux-x64 "$RUNNER_TEMP/base-inwards"
+      - name: Synthetic repo (2,100 files)
+        run: python3 bench/generate.py "$RUNNER_TEMP/inwards-bench"
+      - name: Compare
+        shell: bash
+        run: |
+          bun run bench/compare.ts --base "$RUNNER_TEMP/base-inwards" --head "$RUNNER_TEMP/head-inwards" \
+            --repo "$RUNNER_TEMP/inwards-bench" --out bench-result.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-result
+          path: bench-result.json
+          if-no-files-found: ignore
