@@ -381,6 +381,7 @@ src/
 │   │   ├── shape.ts       # INW007 + INW008: package shape, ListMembers port
 │   │   ├── shape-config.ts  # [[tool.inwards.shape]] / [[tool.inwards.names]], selectors, patterns
 │   │   ├── shape-fix.ts   # INW007/INW008 wording, likely target
+│   │   ├── glob.ts        # fnmatch globs, matched without regex backtracking
 │   │   ├── callees.ts     # which calls are loaders, through aliases
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports

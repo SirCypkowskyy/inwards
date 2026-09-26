@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: f7decdb2b758e3cbbd441866c6578f9ea48927a8e5613db63d963d41e0a14856
+source_hash: 6ff568bbee689741f5a67c791d9cfde146593783393e45c82dbaa082780b2851
 ---
 
 # GitHub Actions { #github-actions }
@@ -81,8 +81,8 @@ Zadanie CI sprawdza świeży checkout, w którym jest tylko to, co zacommitowano
 generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 ```
 
-- Wzorzec to nazwa modułu z kropkami, a każdy segment może używać `*`, `?` i `[seq]`. Pasuje do całych segmentów w dowolnym miejscu nazwy modułu, tak jak `ignore`: `*_pb2` obejmuje `shop.api.orders_pb2`, `_version` obejmuje `shop._version`, a `shop.api.gen` wszystko w `shop/api/gen/`. `*` nigdy nie przechodzi przez kropkę.
-- Pusty segment, znak, którego nie może być w nazwie modułu, albo wzorzec złożony z samych symboli wieloznacznych (`*`, `*.*`) to błąd konfiguracji, a sprawdzenie kończy się kodem 2. Żeby wyłączyć INW010, użyj `ignore = ["INW010"]` w `[tool.inwards.rules]`.
+- Wzorzec to nazwa modułu z kropkami, a każdy segment może używać `*` i `?`. Pasuje do całych segmentów w dowolnym miejscu nazwy modułu, tak jak `ignore`: `*_pb2` obejmuje `shop.api.orders_pb2`, `_version` obejmuje `shop._version`, a `shop.api.gen` wszystko w `shop/api/gen/`. `*` nigdy nie przechodzi przez kropkę.
+- Pusty segment, znak, którego nie może być w nazwie modułu (w tym zbiór w nawiasach, taki jak `[a-z]`), albo wzorzec złożony z samych symboli wieloznacznych (`*`, `*.*`) to błąd konfiguracji, a sprawdzenie kończy się kodem 2. Żeby wyłączyć INW010, użyj `ignore = ["INW010"]` w `[tool.inwards.rules]`.
 - `generated = []` wyłącza listę domyślną. Wtedy uruchom generator (`python -m grpc_tools.protoc ...`) przed `inwards check`, bo inaczej INW010 zgłosi każdy import modułu, który ten generator zapisuje.
 - Klucz czyta tylko INW010. Pozostałe reguły widzą moduł generowany, którego nie ma na dysku, jako brakujący: import takiego modułu skierowany na zewnątrz to nadal INW001, a INW006 wskazuje najbliższy istniejący pakiet. [Znane ograniczenia](../03-Architecture-C4.md#known-limitations) w rozdziale o architekturze wymieniają przypadki, w których przez to diagnostyka różni się między dwoma checkoutami.
 - Config guard odrzuca edycję tego klucza przez agenta, tak jak każdego klucza w `[tool.inwards]`.

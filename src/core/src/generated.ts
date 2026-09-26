@@ -5,14 +5,17 @@
  * setuptools-scm; a fresh CI checkout doesn't, so without this the same
  * commit would pass locally and fail in CI.
  *
- * A pattern is a dotted module name whose segments may be fnmatch globs
- * (`*`, `?`, `[seq]`, `[!seq]`). It matches when its segments match
- * consecutive whole segments of a module name, anywhere in it, like the
- * `ignore` key: `*_pb2` covers `shop.api.orders_pb2`, `shop.gen` covers
- * everything under `shop/gen/`. A glob never crosses a dot.
+ * A pattern is a dotted module name whose segments may use `*` and `?`. It
+ * matches when its segments match consecutive whole segments of a module
+ * name, anywhere in it, like the `ignore` key: `*_pb2` covers
+ * `shop.api.orders_pb2`, `shop.gen` covers everything under `shop/gen/`. A
+ * wildcard never crosses a dot. There are no bracket sets: a set can hold any
+ * character, so `[!/]*` would cover every segment past the validation.
+ * Matching never uses a regular expression (see `glob.ts`), since the module
+ * name comes from an import an agent writes.
  */
 
-import { globRegex } from "./shape-config.ts";
+import { globMatches } from "./glob.ts";
 import { ConfigError } from "./toml.ts";
 
 /**
@@ -23,20 +26,18 @@ import { ConfigError } from "./toml.ts";
  */
 export const DEFAULT_GENERATED: readonly string[] = ["*_pb2", "*_pb2_grpc", "_version"];
 
-/**
- * One segment of a pattern: identifier characters, `*`, `?` and bracket sets
- * (`[ab]`, `[!ab]`, `[a-z]`).
- */
-const SEGMENT = /^(?:[\p{XID_Continue}*?]|\[!?[^\]!][^\]]*\])+$/u;
+/** One segment of a pattern: identifier characters, `*` and `?`. */
+const SEGMENT = /^[\p{XID_Continue}*?]+$/u;
 /** A pattern made only of wildcards and dots, which would cover almost any module. */
 const WILDCARDS_ONLY = /^[*?.]+$/u;
 /** What the config error says a pattern looks like. */
 const HINT =
-  'a list of module patterns such as "*_pb2" or "shop.gen": dotted names whose segments may use *, ? and [seq]';
+  'a list of module patterns such as "*_pb2" or "shop.gen": dotted names whose segments may use * and ?';
 
 /**
- * Validates `generated`. A segment can't be empty, and a pattern made only of
- * wildcards is refused, since it would switch INW010 off, which is
+ * Validates `generated`. A segment can't be empty or hold anything but
+ * identifier characters, `*` and `?`, and a pattern made only of wildcards is
+ * refused, since it would switch INW010 off, which is
  * `[tool.inwards.rules]`'s job.
  *
  * @param value - the raw `generated` value, if any.
@@ -51,7 +52,8 @@ export function parseGenerated(value: unknown): { generated?: string[] } {
     throw new ConfigError(`tool.inwards.generated must be ${HINT}.`);
   }
   const bad = value.find(
-    (pattern) => WILDCARDS_ONLY.test(pattern) || !pattern.split(".").every(isSegment),
+    (pattern) =>
+      WILDCARDS_ONLY.test(pattern) || !pattern.split(".").every((seg) => SEGMENT.test(seg)),
   );
   if (bad !== undefined) {
     throw new ConfigError(
@@ -64,7 +66,8 @@ export function parseGenerated(value: unknown): { generated?: string[] } {
 }
 
 /**
- * Tells whether a pattern covers a module (see the file comment).
+ * Tells whether a pattern covers a module (see the file comment), in
+ * O(pattern × name) time per start segment.
  *
  * @param module - a dotted module name.
  * @param patterns - validated `generated` patterns.
@@ -73,30 +76,12 @@ export function parseGenerated(value: unknown): { generated?: string[] } {
 export function isGenerated(module: string, patterns: readonly string[]): boolean {
   const name = module.split(".");
   return patterns.some((pattern) => {
-    const want = pattern.split(".").map(globRegex);
+    const want = pattern.split(".");
     return name.some((_, start) =>
       want.every((glob, i) => {
         const segment = name[start + i];
-        return segment !== undefined && glob.test(segment);
+        return segment !== undefined && globMatches(glob, segment);
       }),
     );
   });
-}
-
-/**
- * Tells whether one segment of a pattern is a glob Inwards can match.
- *
- * @param segment - the text between two dots.
- * @returns false for an empty segment, a character that can't be in a module name, or a bad set such as `[z-a]`.
- */
-function isSegment(segment: string): boolean {
-  if (!SEGMENT.test(segment)) {
-    return false;
-  }
-  try {
-    globRegex(segment);
-    return true;
-  } catch {
-    return false;
-  }
 }

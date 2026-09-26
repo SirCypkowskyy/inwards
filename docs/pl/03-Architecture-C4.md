@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 4f5e11ed22f9dd958676a18c3426f6673f352c103991bf8a3ba541aded372a25
+source_hash: 62cf985d8caea9e136bb3c601ec76cbcdd370573cb7f61ce56f39dc5eab7b856
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -386,6 +386,7 @@ src/
 │   │   ├── shape.ts       # INW007 + INW008: package shape, ListMembers port
 │   │   ├── shape-config.ts  # [[tool.inwards.shape]] / [[tool.inwards.names]], selectors, patterns
 │   │   ├── shape-fix.ts   # INW007/INW008 wording, likely target
+│   │   ├── glob.ts        # fnmatch globs, matched without regex backtracking
 │   │   ├── callees.ts     # which calls are loaders, through aliases
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports

@@ -42,9 +42,8 @@ export interface InwardsConfig {
   /**
    * Modules a build step writes (`generated`), which INW010 treats as existing
    * when they aren't on disk, such as protoc's `*_pb2` or setuptools-scm's
-   * `_version`. Each entry is a dotted name whose segments may be fnmatch
-   * globs; it matches whole segments anywhere in a module name, like
-   * `ignore`. Absent when not set, and then INW010 uses `DEFAULT_GENERATED`;
+   * `_version`. Each entry is a dotted name whose segments may use `*` and
+   * `?`; it matches whole segments anywhere in a module name, like `ignore`. Absent when not set, and then INW010 uses `DEFAULT_GENERATED`;
    * a list, even an empty one, replaces that default.
    */
   generated?: string[];

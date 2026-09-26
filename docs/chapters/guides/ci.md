@@ -76,8 +76,8 @@ A CI job checks a fresh checkout, which has only what is committed. Modules that
 generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 ```
 
-- A pattern is a dotted module name, and each segment may use `*`, `?` and `[seq]`. It matches whole segments anywhere in the module name, as `ignore` does: `*_pb2` covers `shop.api.orders_pb2`, `_version` covers `shop._version`, and `shop.api.gen` covers everything under `shop/api/gen/`. A `*` never crosses a dot.
-- An empty segment, a character that can't be in a module name, or a pattern made only of wildcards (`*`, `*.*`) is a config error, and the check exits 2. To turn INW010 off, use `ignore = ["INW010"]` in `[tool.inwards.rules]`.
+- A pattern is a dotted module name, and each segment may use `*` and `?`. It matches whole segments anywhere in the module name, as `ignore` does: `*_pb2` covers `shop.api.orders_pb2`, `_version` covers `shop._version`, and `shop.api.gen` covers everything under `shop/api/gen/`. A `*` never crosses a dot.
+- An empty segment, a character that can't be in a module name (a bracket set such as `[a-z]` included), or a pattern made only of wildcards (`*`, `*.*`) is a config error, and the check exits 2. To turn INW010 off, use `ignore = ["INW010"]` in `[tool.inwards.rules]`.
 - `generated = []` turns the default off. Then run the generator (`python -m grpc_tools.protoc ...`) before `inwards check`, or INW010 reports every import of a module it writes.
 - Only INW010 reads the key. The other rules see a generated module that isn't on disk as missing: an outward import of one is still INW001, and INW006 names the nearest package that exists. The Architecture chapter's [known limitations](../03-Architecture-C4.md#known-limitations) list the cases where that makes a finding differ between the two checkouts.
 - The config guard denies an agent's edit of the key, as for every key in `[tool.inwards]`.

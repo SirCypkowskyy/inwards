@@ -87,6 +87,16 @@ describe("generated modules and INW010 (#160)", () => {
     ]);
   });
 
+  test("many stars against a long name stay fast: no regex backtracking", async () => {
+    // The agent writes the import. A regex translation of this pattern took
+    // over 300 ms here with four stars; six would take minutes.
+    const stars = await engineWith('["*_*_*_*_*_*_pb2"]');
+    const src = `import shop.domain.${"_".repeat(240)}x\n`;
+    const start = performance.now();
+    expect(codes(stars, src).map((c) => c.split(" ")[0])).toEqual(["INW010"]);
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
   test("a glob stays inside one segment", async () => {
     const custom = await engineWith('["domain*pb2"]');
     expect(codes(custom, "import shop.domain.orders_pb2\n")).toEqual([
@@ -118,7 +128,7 @@ describe("generated in [tool.inwards]", () => {
     expect(parseConfig(`[tool.inwards]\ngenerated = []\n${LAYERS}`).generated).toEqual([]);
   });
 
-  test.each(["_version", "*_pb2", "[!_]*_pb2", "shop.gen", "shop.*.gen", "api_v?", "[a-z]*_pb2"])(
+  test.each(["_version", "*_pb2", "shop.gen", "shop.*.gen", "api_v?", "żółw_*"])(
     "%j is a valid pattern",
     (pattern) => {
       const text = `[tool.inwards]\ngenerated = [${JSON.stringify(pattern)}]\n${LAYERS}`;
@@ -133,8 +143,10 @@ describe("generated in [tool.inwards]", () => {
     ['["shop..gen"]', '"shop..gen" is not a module pattern'],
     ['["shop/gen"]', '"shop/gen" is not a module pattern'],
     ['["orders-pb2"]', '"orders-pb2" is not a module pattern'],
-    ['["[abc"]', '"[abc" is not a module pattern'],
-    ['["[z-a]"]', '"[z-a]" is not a module pattern'],
+    ['["[abc]*_pb2"]', '"[abc]*_pb2" is not a module pattern'],
+    // A bracket set can hold any character, so it would slip past the check above.
+    ['["[!/]*"]', '"[!/]*" is not a module pattern'],
+    ['["shop.[a-z]"]', '"shop.[a-z]" is not a module pattern'],
     ['["*"]', '"*" has no fixed character'],
     ['["*.*"]', '"*.*" has no fixed character'],
     ['["?"]', 'ignore = ["INW010"] in [tool.inwards.rules]'],

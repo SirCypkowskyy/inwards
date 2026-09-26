@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: a009eefcf7667de87e28dd881021ead14fe4bcb58441e912dcbb7796aeaaa28a
+source_hash: 14ebd071bae69b0d8fc6c88f140fa795e9d60ec8e27c45c0026152ae130a5753
 ---
 
 # Kształt pakietu { #package-shape }
@@ -29,7 +29,7 @@ only-in = ["tests", "tests.**"]
 
 - **Selektory** (`packages`, `only-in`) dopasowują pakiety, w [gramatyce import-lintera](../05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces): `a.b` to dokładne dopasowanie, `a.*` to jeden segment poniżej `a`, a `a.**` to dowolna głębokość poniżej `a` (bez samego `a`). Nową domenę, taką jak `app/payments/`, `app.*` obejmuje w chwili, gdy powstaje.
 - **Wygrywa pierwszy pasujący wpis.** Dokładne wpisy umieszczaj przed globami, które też by do nich pasowały. Wpis, którego selektor jest już pokryty przez wcześniejszy, nigdy nie mógłby zadziałać, więc jest błędem konfiguracji: `app.orders` po `app.*`, powtórzony selektor albo `app.*` po `app.**`. Glob, który tylko częściowo pokrywa się z wcześniejszym (`app.**` po `app.*`), jest w porządku. Segmenty selektora to identyfikatory Pythona, `*` albo `**`.
-- **Wzorce elementów** to globy fnmatch (`*`, `?`, `[seq]`). `name` to moduł albo podpakiet, `name/` tylko podpakiet, `name.py` tylko moduł (zaślepki `.pyi` liczą się jako moduły). `__init__` jest zawsze dozwolony, podobnie jak wszystko z `require`. Bez `allow` każdy element jest dozwolony i działają tylko `require` oraz `forbid`.
+- **Wzorce elementów** to globy fnmatch (`*`, `?`, `[seq]`, `[!seq]`), dopasowywane tak jak w Pythonowym `fnmatch.fnmatchcase`: wewnątrz `[...]` znaki `*` i `?` są dosłowne. Niezamknięty `[` albo odwrócony zakres, taki jak `[z-a]`, to błąd konfiguracji. `name` to moduł albo podpakiet, `name/` tylko podpakiet, `name.py` tylko moduł (zaślepki `.pyi` liczą się jako moduły). `__init__` jest zawsze dozwolony, podobnie jak wszystko z `require`. Bez `allow` każdy element jest dozwolony i działają tylko `require` oraz `forbid`.
 - **Kształt obejmuje bezpośrednie elementy pakietu.** `app/orders/services/x.py` jest elementem `services/` pakietu `app.orders`; pliki wewnątrz `services/` podlegają kształtowi dla `app.orders.services`, jeśli taki istnieje. Elementy są nazywane według systemu plików: `utils.helpers.py` to jeden element-moduł, a nie `utils/`, więc nie pasuje ani do `utils`, ani do `helpers`. Ukryte pliki i katalogi są pomijane, tak jak pomija je każde przeglądanie plików w Inwards.
 - **Reguły nazw** działają na każdym poziomie: element pasujący do `pattern` w dowolnym miejscu poza pakietami `only-in` to błąd INW007.
 

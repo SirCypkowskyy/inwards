@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: aba9a7f01c7d44affd96201ba59124b9b567d7402a90e06fc3f1019a46f51d6f
+source_hash: a0d463f78d4c17268730effa317316ea8eaff9fe9a9943b5f3cccb7a7af230b3
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -717,9 +717,10 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 **Decyzja.**
 
 - **Klucz `generated`** w `[tool.inwards]`: wzorce modułów, które INW010 traktuje jako istniejące, gdy sonda ich nie znajduje.
-- **Wzorce to nazwy z kropkami z globami w segmentach**: `*`, `?`, `[seq]` i `[!seq]`, czyli globy fnmatch z wzorców członków w kształcie pakietu. Wzorzec pasuje do całych segmentów w dowolnym miejscu nazwy modułu, tak jak `ignore` na najwyższym poziomie, a glob nigdy nie przechodzi przez kropkę: `*_pb2` obejmuje `shop.api.orders_pb2`, `_version` obejmuje `shop._version`, `shop.api.gen` wszystko w `shop/api/gen/`. Porównywana jest rozwiązana część importu będąca modułem, więc `from .orders_pb2 import Order` w `shop.api` to `shop.api.orders_pb2`.
-- **Walidowane.** Pusty segment, znak, którego nie może być w nazwie modułu, zbiór w nawiasach, który się nie kompiluje (`[z-a]`), albo wzorzec złożony z samych symboli wieloznacznych i kropek (`*`, `*.*`) to błąd konfiguracji. Ten ostatni wyłączyłby INW010, a to zadanie `[tool.inwards.rules]`.
+- **Wzorce to nazwy z kropkami z `*` i `?` w segmentach.** Bez zbiorów w nawiasach: zbiór może zawierać dowolny znak, więc `[!/]*` przeszedłby sprawdzenie znaków, a i tak obejmowałby każdy segment. Wzorzec pasuje do całych segmentów w dowolnym miejscu nazwy modułu, tak jak `ignore` na najwyższym poziomie, a symbol wieloznaczny nigdy nie przechodzi przez kropkę: `*_pb2` obejmuje `shop.api.orders_pb2`, `_version` obejmuje `shop._version`, `shop.api.gen` wszystko w `shop/api/gen/`. Porównywana jest rozwiązana część importu będąca modułem, więc `from .orders_pb2 import Order` w `shop.api` to `shop.api.orders_pb2`.
+- **Walidowane.** Pusty segment, znak, którego nie może być w nazwie modułu (w tym `[` i `]`), albo wzorzec złożony z samych symboli wieloznacznych i kropek (`*`, `*.*`) to błąd konfiguracji. Ten ostatni wyłączyłby INW010, a to zadanie `[tool.inwards.rules]`.
 - **Domyślnie włączone.** Bez tego klucza lista to `["*_pb2", "*_pb2_grpc", "_version"]`. Takie nazwy nadają narzędzia, rzadko ludzie, więc brak takiego modułu prawie zawsze oznacza krok budowania, który się nie wykonał. Ustawienie klucza zastępuje listę domyślną, tak jak `deny-libraries` zastępuje swoją ([ADR-023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer)), a `generated = []` ją wyłącza.
+- **Dopasowanie bez wyrażeń regularnych.** Nazwa modułu pochodzi z importu, który pisze agent, a tłumaczenie na wyrażenie regularne (`.*` za każdą gwiazdkę) się cofa: `*_*_*_*_pb2` na segmencie o długości 240 znaków zajmowało w hooku ponad 300 ms. Iteracyjne dopasowanie dwoma wskaźnikami, które wznawia tylko za ostatnią gwiazdką, kosztuje O(wzorzec × segment). Wzorce elementów kształtu pakietu korzystają z tego samego dopasowania, co naprawia ich zbiory w nawiasach, w których tłumaczenie na wyrażenie regularne zamieniało `?` i `*` w symbole wieloznaczne.
 - **Czyta go tylko INW010.** Indeks modułów nadal widzi moduł jako brakujący, więc pozostałe reguły oceniają go jak każdy brakujący moduł: INW001 patrzy na nazwę i zgłasza import skierowany na zewnątrz niezależnie od tego, co jest na dysku, INW005 uznaje go za własny przez najbliższy istniejący pakiet, a INW006 wskazuje ten pakiet.
 - **Chronione** jak każdy klucz w `[tool.inwards]`: config guard odrzuca jego edycję przez agenta, a Stop gate oblewa zmianę zrobioną przez Bash. Test przypina config guard.
 - **Bez ignorowania INW010 dla pliku.** Wyciszenie w linii już jest wyjściem dla jednej linii, a wyciszenia według ścieżki w konfiguracji zostają dla schematu konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), jak zdecydowało ADR-028.
@@ -741,3 +742,4 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Dopasowanie tylko całej nazwy:* `*_pb2` potrzebowałby wtedy w każdym wzorcu formy „na dowolnej głębokości”, takiej jak `**` z selektorów kształtu.
 - *Nauczyć indeks modułów, że moduły generowane istnieją, dla wszystkich reguł:* INW006 miałby tę samą treść w obu checkoutach, ale INW005, INW006 i serwer języka wierzyłyby w pliki, których nie ma, a indeks potrzebowałby konfiguracji.
 - *Ignorowanie INW010 dla pliku w konfiguracji:* jeszcze jedno miejsce do utrzymywania w zgodzie z kodem, a wyciszenie w linii już istnieje.
+- *Zbiory w nawiasach fnmatch, jak we wzorcach elementów kształtu:* zawartość zbioru omija sprawdzenie znaków, a `*` i `?` wystarczają na każdy przypadek z issue.
