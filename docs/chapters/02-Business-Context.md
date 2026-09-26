@@ -93,45 +93,73 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 
 The coordinates are our qualitative reading of the research above, not a measurement. Inwards' dot marks where it's aiming, not where it is today.
 
-```mermaid
----
-config:
-  theme: base
-  themeVariables:
-    quadrant1Fill: "#37474f"
-    quadrant2Fill: "#37474f"
-    quadrant3Fill: "#37474f"
-    quadrant4Fill: "#37474f"
-    quadrant1TextFill: "#eceff1"
-    quadrant2TextFill: "#eceff1"
-    quadrant3TextFill: "#eceff1"
-    quadrant4TextFill: "#eceff1"
-    quadrantPointFill: "#ffca28"
-    quadrantPointTextFill: "#b0bec5"
-    quadrantXAxisTextFill: "#607d8b"
-    quadrantYAxisTextFill: "#607d8b"
-    quadrantInternalBorderStrokeFill: "#78909c"
-    quadrantExternalBorderStrokeFill: "#78909c"
-    quadrantTitleFill: "#607d8b"
----
-quadrantChart
-    title Where the tools sit
-    x-axis "Generic code rules" --> "Architecture rules"
-    y-axis "Built for humans" --> "Built for agent loops"
-    quadrant-1 "Inwards' target"
-    quadrant-2 "Agent-aware linters"
-    quadrant-3 "Classic linters"
-    quadrant-4 "Architecture tests"
-    Ruff: [0.15, 0.2]
-    ty: [0.2, 0.25]
-    Biome: [0.25, 0.45]
-    React Doctor: [0.3, 0.85]
-    ArchLint: [0.7, 0.7]
-    import-linter: [0.85, 0.3]
-    pytest-archon: [0.8, 0.1]
-    Tach: [0.75, 0.2]
-    Inwards target: [0.9, 0.9]
-```
+<div class="quadrant-chart-wrap">
+<svg id="quadrant-chart" viewBox="0 0 660 500" role="img"
+     aria-label="Where the tools sit: a 2x2 chart of generic vs architecture rules against built for humans vs built for agent loops. Inwards' target sits in the architecture-rules, agent-loops quadrant. See the list below the chart for what each plotted tool is.">
+  <text class="qc-title" x="330" y="20">Where the tools sit</text>
+
+  <rect class="qc-quadrant" x="70" y="40" width="270" height="210" />
+  <rect class="qc-quadrant" x="340" y="40" width="270" height="210" />
+  <rect class="qc-quadrant" x="70" y="250" width="270" height="210" />
+  <rect class="qc-quadrant" x="340" y="250" width="270" height="210" />
+  <line class="qc-divider" x1="340" y1="40" x2="340" y2="460" />
+  <line class="qc-divider" x1="70" y1="250" x2="610" y2="250" />
+
+  <text class="qc-quadrant-label" x="80" y="58">Agent-aware linters</text>
+  <text class="qc-quadrant-label" x="350" y="58">Inwards' target</text>
+  <text class="qc-quadrant-label" x="80" y="268">Classic linters</text>
+  <text class="qc-quadrant-label" x="350" y="268">Architecture tests</text>
+
+  <text class="qc-axis-label" x="340" y="485" text-anchor="middle">Generic code rules&#8194;&#8594;&#8194;Architecture rules</text>
+  <text class="qc-axis-label" x="0" y="0" transform="translate(20, 250) rotate(-90)" text-anchor="middle">Built for humans&#8194;&#8594;&#8194;Built for agent loops</text>
+
+  <g class="qc-point">
+    <circle cx="151" cy="376" r="6" />
+    <title>Ruff: fast, but rules are generic. No notion of architectural layers.</title>
+    <text x="151" y="392">Ruff</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="178" cy="355" r="6" />
+    <title>ty: Astral's type checker. Type-level correctness, not import direction.</title>
+    <text x="178" y="371">ty</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="205" cy="271" r="6" />
+    <title>Biome: formatter/linter for JS/TS. No Python support at all.</title>
+    <text x="205" y="287">Biome</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="232" cy="103" r="6" />
+    <title>React Doctor: agent-aware, but scoped to React conventions, not Python layers.</title>
+    <text x="232" y="119">React Doctor</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="448" cy="166" r="6" />
+    <title>ArchLint: closest existing tool to Inwards' target, still maturing.</title>
+    <text x="448" y="182">ArchLint</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="529" cy="334" r="6" />
+    <title>import-linter: mature layer contracts, but no agent-facing fix steps or hook story.</title>
+    <text x="529" y="350">import-linter</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="502" cy="418" r="6" />
+    <title>pytest-archon: architecture assertions as tests. Runs in CI, not on every edit.</title>
+    <text x="502" y="434">pytest-archon</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="475" cy="376" r="6" />
+    <title>Tach: module boundaries with a fast Rust core. Less layer-shaped than Inwards.</title>
+    <text x="475" y="392">Tach</text>
+  </g>
+  <g class="qc-point qc-point-target">
+    <circle cx="556" cy="82" r="7" />
+    <title>Inwards target: agent-loop speed, layer-shaped rules, fix steps built in.</title>
+    <text x="556" y="98">Inwards target</text>
+  </g>
+</svg>
+</div>
 
 ??? info "What each plotted tool is"
     Ruff
