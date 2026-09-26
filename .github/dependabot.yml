@@ -1,3 +1,7 @@
+# Weekly, one PR per group (four in all), so parallel agents
+# see a few PRs a week, not one per package. PRs target the default branch
+# (develop). Prefixes keep PR titles Conventional Commits (ADR-017): `deps`
+# reaches the changelog, `ci` and `build` stay hidden.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -5,4 +9,39 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: ci # PR titles must be Conventional Commits (ADR-017)
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Bun reads the workspace from the root bun.lock (src/core, src/cli,
+  # src/vscode-extension). The bun ecosystem has no prefix-development or
+  # dependency-type grouping and no security updates, so runtime packages are
+  # listed by name and everything else lands in `dev`. Retitle the `dev` PR to
+  # `build:` before merging so toolchain bumps stay out of the changelog.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      runtime: # shipped in the binary, wheels or .vsix
+        patterns:
+          - smol-toml
+          - tree-sitter-python
+          - web-tree-sitter
+          - vscode-language*
+      dev: # Biome, TypeScript, oxlint, fallow, types, vsce
+        patterns: ["*"]
+
+  # uv.lock holds only the docs toolchain (Zensical); the wheel has no deps.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      docs:
+        patterns: ["*"]

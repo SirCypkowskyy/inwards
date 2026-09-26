@@ -1,0 +1,31 @@
+name: Rule proposal
+description: A new INWxxx rule, or a change to what an existing rule reports.
+labels: [type:feature, area:rules]
+body:
+  - type: textarea
+    id: rule
+    attributes:
+      label: The rule
+      description: One sentence on what it forbids, and the architecture principle behind it.
+    validations:
+      required: true
+  - type: textarea
+    id: violation
+    attributes:
+      label: Code it should report
+      description: The `[tool.inwards]` config and a minimal Python example that breaks the rule.
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: The fix
+      description: The same code after the fix. The diagnostic's fix hint should lead an agent here.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: false-positives
+    attributes:
+      label: Code it must not report
+      description: Near misses that look like violations but aren't.

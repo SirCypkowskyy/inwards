@@ -30,6 +30,7 @@ platforms and platform wheels for `uv add`; see the
 | `bench/` | The synthetic benchmark repo generator and the PR regression gate (`compare.ts`). |
 | `packaging/` | README for the platform wheels, and the PyPI/npm name placeholders. |
 | `scripts/` | Build binaries and wheels, version and docs-nav checks, screenshots. |
+| `.github/` | CI, release and docs workflows, Dependabot config, issue forms (bug, feature, rule proposal). |
 
 ## Develop
 
@@ -49,3 +50,5 @@ binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform
 runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
 `SHA256SUMS`. Publish the draft by hand. A release candidate is a hand-pushed tag with a
 suffix (`v0.2.0-rc.1`) on the release PR's branch, which already holds the new version. Build provenance attestations switch on once the repo is public.
+
+Report security issues privately, not in a public issue; see [SECURITY.md](SECURITY.md).
