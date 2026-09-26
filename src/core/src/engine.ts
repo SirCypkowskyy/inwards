@@ -16,6 +16,13 @@ import {
 } from "./python.ts";
 import { applyRules } from "./rule-config.ts";
 import { shapeFindings } from "./shape.ts";
+import {
+  commentsIn,
+  mentionsSuppression,
+  type Suppressed,
+  type SuppressionComment,
+  suppress,
+} from "./suppress.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 import { checkUnassignedImports, unassignedWarning } from "./unassigned.ts";
 import { checkUnknownImports } from "./unknown.ts";
@@ -28,6 +35,19 @@ interface Scan {
   exact: boolean;
   /** True when the full parse must also look for dynamic imports (INW011). */
   dynamic: boolean;
+}
+
+/** A file's findings after the full parse, if it ran, and its suppression comments. */
+interface Confirmed {
+  found: Diagnostic[];
+  /** Read from the full parse of a file that mentions `inwards: ignore`; absent otherwise. */
+  comments?: SuppressionComment[];
+}
+
+/** What `check` returns: the findings to report, and the ones inline suppressions hid. */
+export interface Checked {
+  diagnostics: Diagnostic[];
+  suppressed: Suppressed[];
 }
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
@@ -80,6 +100,8 @@ export class Engine {
    * A file outside every layer isn't parsed: besides its shape, it gets at
    * most an INW006 warning naming its package.
    *
+   * Inline suppression comments then hide the findings they cover and add
+   * INW009 for the ones that are invalid or unused (see `suppress.ts`).
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
@@ -89,10 +111,8 @@ export class Engine {
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    return applyRules(
-      [...shapeFindings(src, this.config), ...this.confirm(src, this.scan(src, project), project)],
-      this.config.rules,
-    );
+    const { kept } = this.suppressIn(src, this.confirm(src, this.scan(src, project), project));
+    return applyRules(kept, this.config.rules);
   }
 
   /**
@@ -112,9 +132,27 @@ export class Engine {
       return { found: [unreadable], exact: true, dynamic: false };
     }
     const dynamic = mentionsDynamicImport(src.text);
-    const fast = dynamic ? null : skeletonImports(this.parser, src);
+    // A file with a suppression comment gets the full parse, which also reads the comments.
+    const fast =
+      dynamic || mentionsSuppression(src.text) ? null : skeletonImports(this.parser, src);
     const found = fast ? this.importFindings(src, fast, project) : null;
     return { found, exact: found?.length === 0, dynamic };
+  }
+
+  /**
+   * Adds the package-shape findings to a file's confirmed ones and applies
+   * its suppression comments (see `suppress.ts`).
+   *
+   * @param src - the source file, with normalised text.
+   * @param confirmed - its confirmed findings, and its comments if the full parse read them.
+   * @returns the findings left, INW009 included, and the ones suppressed.
+   */
+  private suppressIn(
+    src: SourceFile,
+    confirmed: Confirmed,
+  ): { kept: Diagnostic[]; suppressed: Suppressed[] } {
+    const found = [...shapeFindings(src, this.config), ...confirmed.found];
+    return suppress(this.parser, src, { ...confirmed, found }, this.config.rules);
   }
 
   /**
@@ -125,11 +163,11 @@ export class Engine {
    * @param scan - its scan.
    * @param project - the module index (INW006, INW010).
    * @param skip - true to return the skeleton's findings unconfirmed.
-   * @returns the violations found.
+   * @returns the violations found, and the suppression comments when the full parse read them.
    */
-  private confirm(src: SourceFile, scan: Scan, project: ProjectIndex, skip = false): Diagnostic[] {
+  private confirm(src: SourceFile, scan: Scan, project: ProjectIndex, skip = false): Confirmed {
     if (scan.found && (scan.exact || skip)) {
-      return scan.found;
+      return { found: scan.found };
     }
     return this.fullCheck(src, scan.dynamic, project);
   }
@@ -176,9 +214,9 @@ export class Engine {
    * @param file - the source file, with normalised text.
    * @param dynamic - true to look for dynamic imports as well (INW011).
    * @param project - the module index.
-   * @returns the violations found.
+   * @returns the violations found, and the suppression comments of a file that mentions them.
    */
-  private fullCheck(file: SourceFile, dynamic: boolean, project: ProjectIndex): Diagnostic[] {
+  private fullCheck(file: SourceFile, dynamic: boolean, project: ProjectIndex): Confirmed {
     const { layers } = this.config;
     const tree = parsePython(this.parser, file.text);
     try {
@@ -192,7 +230,8 @@ export class Engine {
           ...checkUnassignedImports(file, readable, layers, project.ownerOf),
         );
       }
-      return found.sort((a, b) => a.line - b.line || a.column - b.column);
+      found.sort((a, b) => a.line - b.line || a.column - b.column);
+      return mentionsSuppression(file.text) ? { found, comments: commentsIn(tree) } : { found };
     } finally {
       tree.delete(); // WASM memory is not garbage collected
     }
@@ -257,6 +296,26 @@ export class Engine {
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
   ): Diagnostic[] {
+    return this.check(files, project, accepted).diagnostics;
+  }
+
+  /**
+   * `checkFiles`, plus the findings inline suppression comments hid, for the
+   * adapters that count or report them (the CLI: summary, SARIF, run log,
+   * and the hooks' `agent-suppressions`). Suppressions apply per file,
+   * before the INW006 warnings are deduplicated; the suppressed findings get
+   * `[tool.inwards.rules]` too, so a rule that is off has none.
+   *
+   * @param files - the source files to check.
+   * @param project - the project's module index (see `index`).
+   * @param accepted - accepted copies by baseline key, when a baseline applies.
+   * @returns the violations, as `checkFiles` returns them, and the suppressed findings.
+   */
+  check(
+    files: Iterable<SourceFile>,
+    project: ProjectIndex,
+    accepted?: ReadonlyMap<string, number>,
+  ): Checked {
     const { rules } = this.config;
     const scanned = [...files].map((file) => {
       const src = { ...file, text: normalizeSource(file.text) };
@@ -272,14 +331,16 @@ export class Engine {
         )
       : new Set<string>();
     const all: Diagnostic[] = [];
+    const suppressed: Suppressed[] = [];
     const warned = new Set<string>();
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
-      for (const found of [
-        ...shapeFindings(src, this.config),
-        ...this.confirm(src, scan, project, skip),
-      ]) {
-        const once = found.severity === "warning" ? found.message : undefined;
+      const own = this.suppressIn(src, this.confirm(src, scan, project, skip));
+      suppressed.push(...own.suppressed);
+      for (const found of own.kept) {
+        // An unused-suppression warning (INW009) names no place: each comment is its own.
+        const once =
+          found.severity === "warning" && found.code !== "INW009" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {
           all.push(found);
         }
@@ -288,6 +349,11 @@ export class Engine {
         }
       }
     }
-    return applyRules(all, rules);
+    return {
+      diagnostics: applyRules(all, rules),
+      suppressed: suppressed.flatMap(({ diagnostic, reason }) =>
+        applyRules([diagnostic], rules).map((d) => ({ diagnostic: d, reason })),
+      ),
+    };
   }
 }

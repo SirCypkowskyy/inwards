@@ -80,6 +80,22 @@ severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block
 
 Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select`. INW000 always reports as an error, because a file whose declared encoding can hide imports isn't checked at all, and the Stop gate's check that no layer was moved away during the session ignores the table too. `inwards check`, the hooks, the Stop gate and the VS Code extension all apply the table; the extension reads it again whenever `pyproject.toml` changes, and shows a config error (an unknown code, say) on `pyproject.toml`. It is part of `[tool.inwards]`, so the config guard stops an agent from changing it. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) covers the baseline and SARIF.
 
+To accept one import for good, put a suppression on its line, with the rule's code and a reason:
+
+```python title="shop/domain/order.py"
+from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
+```
+
+The comment goes on the line the finding points at: for a parenthesised import, the imported name's line; for a dynamic import spread over several lines, the call's first line:
+
+```python title="shop/domain/plugins.py"
+importlib.import_module(  # inwards: ignore[INW011] reason="plugin loader, reviewed in #230"
+    "shop.infrastructure.plugins",
+)
+```
+
+A suppression with no reason, an unknown code or a malformed comment hides nothing and is reported as INW009, and so, as a warning, is one that matches no finding on its line. Every output format counts suppressed findings, and SARIF lists them as suppressed results. The Claude Code hooks ignore a suppression that wasn't in the file when the session started, so an agent can't silence a violation with a comment; `agent-suppressions = "allow"` in `[tool.inwards]` lets them count. [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) has the details.
+
 <div class="grid cards" markdown>
 
 -   :material-lightning-bolt:{ .lg .middle } __Fast enough for every edit__

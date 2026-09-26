@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
+import { tempDir } from "./temp.ts";
 
 // CI sets INWARDS_BIN to the compiled binary; locally the tests run the source.
 const REPO = resolve(import.meta.dir, "../../..");
@@ -11,7 +11,7 @@ export const CMD: string[] = process.env["INWARDS_BIN"]
   : [process.execPath, join(REPO, "src/cli/src/main.ts")];
 
 /** The user-level Claude settings directory the CLI sees in tests, so the real one never leaks in. */
-export const CLAUDE_USER_DIR: string = mkdtempSync(join(tmpdir(), "inwards-claude-user-"));
+export const CLAUDE_USER_DIR: string = tempDir("inwards-claude-user-");
 
 // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
 // CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code,
@@ -62,8 +62,7 @@ layers = [
 ]
 `;
 
-const TMP = mkdtempSync(join(tmpdir(), "inwards-e2e-"));
-process.on("exit", () => rmSync(TMP, { recursive: true, force: true }));
+const TMP = tempDir("inwards-e2e-");
 
 /**
  * Runs the CLI without blocking, so several copies can run at once.

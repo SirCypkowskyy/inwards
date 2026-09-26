@@ -167,6 +167,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | spike | eksperyment |
 | start-up (process) | start (startu) |
 | string (Python) | napis |
+| suppression, inline suppression (`# inwards: ignore[...]`) | wyciszenie, wyciszenie w linii |
+| reason (of a suppression) | powód |
+| finding | diagnostyka (as for diagnostic) |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |
 | top-level package | pakiet najwyższego poziomu |

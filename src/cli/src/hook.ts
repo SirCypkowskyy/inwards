@@ -2,16 +2,16 @@
  * `inwards hook claude-code`: the Claude Code hook entry point.
  */
 import { readFileSync, statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
 import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
 import { configGuard } from "./guard.ts";
-import { oldErrors, oldNote } from "./legacy.ts";
+import { agentSuppressions, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
-import { logRun, noteRun } from "./runlog.ts";
+import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
 import {
   fingerprint,
   isSessionId,
@@ -144,14 +144,20 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     return 0;
   }
   try {
-    const report = await runCheck(configPath, [target.file], target.cwd, { required: true });
+    // Identity follows the path as written; an agent's suppression may not count (legacy.ts).
+    const check = { configPath, base: target.cwd, baseline: true, written: target.written };
+    const { report, rejected } = await agentSuppressions(
+      target.project,
+      start,
+      check,
+      await runCheck(configPath, [target.file], target.cwd, { required: true }),
+    );
     // A shape finding on a file that predates the session, and a missing member, are context.
     const existed = start?.manifest[projectPath(target.project, target.file)] !== undefined;
     const errors = report.diagnostics.filter(
       (d) => d.severity === "error" && d.code !== "INW008" && !(existed && d.code === "INW007"),
     );
     // So is a violation the file already had at session start (see `legacy.ts`).
-    const check = { configPath, base: target.cwd, baseline: true };
     const old =
       start && errors.length > 0 ? await oldErrors(target.project, start, check, errors) : [];
     const blocking = errors.filter((d) => !old.includes(d));
@@ -161,10 +167,13 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
       [target.file],
       report.diagnostics.filter((d) => !old.includes(d)),
     );
+    noteSuppressions(report, rejected);
     const escalation = escalationOf(target.project, id, configPath, blocking);
     // Only what blocks counts toward escalation: context isn't an attempt that failed.
     rememberEdit(target.project, id, target.file, blocking);
-    return report.diagnostics.length === 0 ? 0 : reply(report, { old, blocking }, escalation);
+    return report.diagnostics.length === 0
+      ? 0
+      : reply(report, { old, blocking, rejected }, escalation);
   } catch (err) {
     if (err instanceof ConfigError) {
       return print(`inwards: config error: ${err.message}`, 2);
@@ -177,22 +186,31 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
  * Answers the agent after a check that found something: blocking errors go
  * to stderr with exit 2; warnings and context, or errors that have just
  * escalated, go back as `additionalContext`. Old errors leave the JSON and
- * are listed as a note instead.
+ * are listed as a note instead. Findings whose suppression was rejected stay
+ * in the JSON and get a note of their own.
  *
  * @param report - the check of the edited file.
- * @param split - the errors the file already had at session start, and the ones that block.
+ * @param split - the errors the file already had at session start, the ones
+ *   that block, and the findings whose suppression was rejected.
  * @param escalation - the escalation limit, if this run reached it, from `escalationOf`.
  * @returns 2 to block, 0 when everything is context.
  */
 function reply(
   report: Report,
-  { old, blocking }: { old: Diagnostic[]; blocking: Diagnostic[] },
+  {
+    old,
+    blocking,
+    rejected,
+  }: { old: Diagnostic[]; blocking: Diagnostic[]; rejected: Diagnostic[] },
   escalation: { limit: number; every: boolean } | undefined,
 ): number {
   const shown = { ...report, diagnostics: report.diagnostics.filter((d) => !old.includes(d)) };
   const json = shown.diagnostics.length > 0 ? render(shown, "json", { pretty: false }) : "";
   const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
-  const note = old.length > 0 ? `inwards: ${oldNote(old)}\n` : "";
+  const note = [
+    ...(rejected.length > 0 ? [`inwards: ${rejectedNote(rejected)}\n`] : []),
+    ...(old.length > 0 ? [`inwards: ${oldNote(old)}\n`] : []),
+  ].join("");
   if (blocking.length > 0 && escalation?.every !== true) {
     process.stderr.write(`${ask}${note}${json}\n`); // a new violation still blocks
     return 2;
@@ -310,13 +328,14 @@ function readHookPayload(): Record<string, unknown> | null {
  * @param payloadCwd - the payload's `cwd` field; the process cwd if not a string.
  * @param file - the payload's `tool_input.file_path`, absolute or relative to cwd.
  * @returns the file and cwd as written (Python names modules after that
- *   path) and the real project root; undefined when the file is outside the
- *   project, missing, or not a regular file.
+ *   path), the real project root, and the file's path exactly as written
+ *   (`..` applied as text) for start identity (`Check.written` in legacy.ts);
+ *   undefined when the file is outside the project, missing, or not a regular file.
  */
 function hookTarget(
   payloadCwd: unknown,
   file: string,
-): { file: string; cwd: string; project: string } | undefined {
+): { file: string; cwd: string; project: string; written: Map<string, string> } | undefined {
   const lexicalCwd = typeof payloadCwd === "string" ? payloadCwd : process.cwd();
   const cwd = realpath(lexicalCwd);
   const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
@@ -324,14 +343,18 @@ function hookTarget(
     return undefined;
   }
   const real = physicalRealpath(lexicalCwd, file);
-  // With `..` in the path, the name as written is not where the file is.
-  const lexical = PATH_SEPARATORS[Symbol.split](file).includes("..")
-    ? real
-    : resolve(lexicalCwd, file);
+  // With `..` in the path, the directory as written is not where the file is:
+  // resolve it as the OS does, but keep the file's own name, so a symlinked
+  // file (`cart.py -> cart.pyi`) is still checked as itself.
+  const dir = PATH_SEPARATORS[Symbol.split](file).includes("..")
+    ? physicalRealpath(lexicalCwd, dirname(file))
+    : undefined;
+  const lexical = dir === undefined ? resolve(lexicalCwd, file) : join(dir, basename(file));
   if (real && lexical && isInside(project, real) && statSync(real).isFile()) {
     // Report paths against the cwd as written: on macOS /var is a link to
     // /private/var, and mixing the two spellings gives ../../var/... paths.
-    return { file: lexical, cwd: resolve(lexicalCwd), project };
+    const written = new Map([[lexical, resolve(lexicalCwd, file)]]);
+    return { file: lexical, cwd: resolve(lexicalCwd), project, written };
   }
   return undefined;
 }

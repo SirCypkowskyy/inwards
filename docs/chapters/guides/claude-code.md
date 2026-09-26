@@ -37,6 +37,7 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 | "This project requires Inwards X or newer" | `required-version` is newer than your binary. Install the newer release. |
 | `config error: Unknown key tool.inwards.…` | A typo in `[tool.inwards]`. The message names the key and lists the known ones. |
 | Claude says an edit to `pyproject.toml` was refused | The edit touched `[tool.inwards]`. That's the config guard. Change the layers yourself if you mean to. |
+| "an inline suppression that wasn't in the file when the session started" | The hooks ignore a suppression added during the session, or one in a file that wasn't committed when the session started and was edited since ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)). If you added it, commit it and start a new session; to let Claude add them, set `agent-suppressions = "allow"` in `[tool.inwards]`. |
 | The turn ends with "unresolved architecture problems" | The same violation survived `escalate-after` attempts (default 3). Claude should ask you how to proceed. The list is also handed to the next session. |
 | Windows: the hook doesn't start | `init` writes the hook in exec form with the absolute path of the binary, so no shell or `PATH` is involved. If you moved the binary, run `init` again. |
 

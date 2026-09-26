@@ -41,6 +41,11 @@ export interface Stats {
     target: number;
     met: boolean | null;
   };
+  /**
+   * Distinct violations, per session, whose inline suppression the agent
+   * added and the hooks rejected (`agent-suppressions = "deny"`).
+   */
+  rejectedSuppressions: number;
 }
 
 /** Chapter 2's thresholds: the share fixed in one retry, violations per 1,000 lines, median hook ms. */
@@ -88,6 +93,8 @@ interface Pass {
  *   those a `check` run reported before it, and those the file's last hook
  *   run in another session had, until a run on the file no longer has them.
  * - Latency and run counts cover hook runs that checked a file.
+ * - A rejected suppression counts once per session and violation, from any
+ *   run that logged it.
  *
  * @param lines - the log, in time order.
  * @param skipped - unreadable lines, passed through for the report.
@@ -117,7 +124,11 @@ export function computeStats(lines: readonly RunLine[], skipped = 0): Stats {
       pass.settled.push({ print, fixed: stillThere ? false : undefined });
     }
   }
-  return summarise(hooks, pass, ruleCodes(lines), skipped);
+  const rejected = lines.flatMap((l) => (l.rejected ?? []).map((p) => `${l.session_id}${SEP}${p}`));
+  return {
+    ...summarise(hooks, pass, ruleCodes(lines), skipped),
+    rejectedSuppressions: new Set(rejected).size,
+  };
 }
 
 /**
@@ -199,7 +210,7 @@ function summarise(
   pass: Pass,
   codeOf: ReadonlyMap<string, string>,
   skipped: number,
-): Stats {
+): Omit<Stats, "rejectedSuppressions"> {
   const retry = emptyCount();
   const byRule: Record<string, RetryCount> = {};
   for (const { print, fixed } of pass.settled) {

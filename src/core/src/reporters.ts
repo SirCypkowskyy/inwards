@@ -1,5 +1,6 @@
 import { DOCS_BASE, VERSION } from "./meta.ts";
 import { RULES } from "./rules.ts";
+import type { Suppressed } from "./suppress.ts";
 import type { Diagnostic } from "./types.ts";
 
 /** A line break with the spaces around it; Unicode line and paragraph separators count too. */
@@ -13,6 +14,8 @@ export interface Report {
   baselined?: number;
   /** Baseline entries a whole-project run no longer found: fixed since the baseline. */
   resolved?: number;
+  /** Findings inline suppression comments hid; counted in every format, listed in SARIF. */
+  suppressed?: Suppressed[];
 }
 
 export type Format = "text" | "concise" | "json" | "sarif";
@@ -186,7 +189,10 @@ function footer(report: View, c: Paint): string[] {
     hidden.warnings === 0 ? "" : plural(hidden.warnings, "warning"),
   ].filter((part) => part !== "");
   const note = omitted.length === 0 ? [] : [`Not shown: ${omitted.join(", ")}.`];
-  return [tail, ...note, ...baselineNote(report)];
+  const suppressed = report.suppressed?.length ?? 0;
+  const inline =
+    suppressed === 0 ? [] : [`${plural(suppressed, "finding")} suppressed by inline comments.`];
+  return [tail, ...note, ...baselineNote(report), ...inline];
 }
 
 /**
@@ -243,7 +249,8 @@ function plural(n: number, word: string): string {
  * Renders the `inwards/diagnostics@1` JSON report.
  * Stable, versioned shape. Agents parse this, so fields are only ever added.
  * The duration is rounded to 0.1 ms. `summary` counts every diagnostic;
- * `omitted` appears only when a cap cut some.
+ * `omitted` appears only when a cap cut some, and `suppressed` only when
+ * inline comments hid some.
  *
  * @param report - the report and the diagnostics to print.
  * @param indent - spaces per level, or undefined for one line.
@@ -251,6 +258,7 @@ function plural(n: number, word: string): string {
  */
 function renderJson(report: View, indent?: number): string {
   const { diagnostics, filesChecked, durationMs, baselined, resolved, shown, cut } = report;
+  const suppressed = report.suppressed?.length ?? 0;
   return JSON.stringify(
     {
       schema: "inwards/diagnostics@1",
@@ -261,6 +269,7 @@ function renderJson(report: View, indent?: number): string {
         ...(baselined === undefined ? {} : { baselined }),
         ...(resolved === undefined ? {} : { resolved }),
         ...(cut.length === 0 ? {} : { omitted: cut.length }),
+        ...(suppressed === 0 ? {} : { suppressed }),
         durationMs: Math.round(durationMs * 10) / 10,
       },
       diagnostics: shown,
@@ -286,13 +295,15 @@ function toUriPath(path: string): string {
  * Renders the report as SARIF 2.1.0.
  * Enough for GitHub code scanning and most IDE viewers. Each result carries
  * the fix as text and as a `fix` property; file URIs are relative to
- * `%SRCROOT%`.
+ * `%SRCROOT%`. A finding an inline comment hid is a result too, with an
+ * `inSource` suppression whose justification is the comment's reason, so
+ * viewers show it as suppressed rather than lose it.
  *
- * @param report - the diagnostics to print; the counts and the cut are not part of SARIF.
+ * @param report - the diagnostics to print and the suppressed findings; the counts and the cut are not part of SARIF.
  * @param indent - spaces per level, or undefined for one line.
  * @returns the SARIF log.
  */
-function renderSarif({ shown }: View, indent?: number): string {
+function renderSarif({ shown, suppressed = [] }: View, indent?: number): string {
   return JSON.stringify(
     {
       // biome-ignore lint/style/useNamingConvention: SARIF names this key "$schema".
@@ -314,32 +325,48 @@ function renderSarif({ shown }: View, indent?: number): string {
               })),
             },
           },
-          results: shown.map((d) => ({
-            ruleId: d.code,
-            level: d.severity,
-            message: {
-              text: `${d.message}\nFix: ${d.fix.summary}\n${d.fix.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`,
-            },
-            locations: [
-              {
-                physicalLocation: {
-                  // Relative to where `inwards check` ran; CI runs it from the checkout root.
-                  artifactLocation: { uri: toUriPath(d.file), uriBaseId: "%SRCROOT%" },
-                  region: {
-                    startLine: d.line,
-                    startColumn: d.column,
-                    endLine: d.endLine,
-                    endColumn: d.endColumn,
-                  },
-                },
-              },
-            ],
-            properties: { fix: d.fix },
-          })),
+          results: [
+            ...shown.map(sarifResult),
+            ...suppressed.map(({ diagnostic, reason }) => ({
+              ...sarifResult(diagnostic),
+              suppressions: [{ kind: "inSource", justification: reason }],
+            })),
+          ],
         },
       ],
     },
     null,
     indent,
   );
+}
+
+/**
+ * Builds one SARIF result from a diagnostic.
+ *
+ * @param d - the diagnostic.
+ * @returns the result object.
+ */
+function sarifResult(d: Diagnostic): Record<string, unknown> {
+  return {
+    ruleId: d.code,
+    level: d.severity,
+    message: {
+      text: `${d.message}\nFix: ${d.fix.summary}\n${d.fix.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`,
+    },
+    locations: [
+      {
+        physicalLocation: {
+          // Relative to where `inwards check` ran; CI runs it from the checkout root.
+          artifactLocation: { uri: toUriPath(d.file), uriBaseId: "%SRCROOT%" },
+          region: {
+            startLine: d.line,
+            startColumn: d.column,
+            endLine: d.endLine,
+            endColumn: d.endColumn,
+          },
+        },
+      },
+    ],
+    properties: { fix: d.fix },
+  };
 }

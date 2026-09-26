@@ -127,6 +127,9 @@ Session state
 Stop gate
 :   The check run from the agent's `Stop` hook. It checks every Python file the session changed, plus whether the config and the hooks are still intact, and keeps the agent from ending the turn while they aren't.
 
+Suppression
+:   A comment on the line a finding points at, `# inwards: ignore[INW001] reason="why"`, that hides that finding. The reason is mandatory, every report counts suppressions, and by default the Claude Code hooks ignore one the agent added during the session. See [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default).
+
 ## Tooling terms
 
 C4 model

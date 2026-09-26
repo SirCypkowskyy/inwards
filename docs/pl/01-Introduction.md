@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 8a4c27eaf0be31df823585511d706b6d886ce3313e6fed248ca8584237cc5069
+source_hash: df043dfc1b7a1ad152ef69571706b1752eb45cafa3ad58dc38fb30b71cbaee35
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -84,6 +84,22 @@ severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block
 ```
 
 Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją ponownie przy każdej zmianie `pyproject.toml` i pokazuje błąd konfiguracji (na przykład nieznany kod) na `pyproject.toml`. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
+
+Żeby na stałe zaakceptować jeden import, dopisz w jego linii wyciszenie z kodem reguły i powodem:
+
+```python title="shop/domain/order.py"
+from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
+```
+
+Komentarz trafia do linii, na którą wskazuje diagnostyka: w imporcie w nawiasach do linii importowanej nazwy, a w imporcie dynamicznym rozpisanym na kilka linii do pierwszej linii wywołania:
+
+```python title="shop/domain/plugins.py"
+importlib.import_module(  # inwards: ignore[INW011] reason="plugin loader, reviewed in #230"
+    "shop.infrastructure.plugins",
+)
+```
+
+Wyciszenie bez powodu, z nieznanym kodem albo w złej postaci niczego nie ukrywa i jest zgłaszane jako INW009, a wyciszenie, które nie pasuje do żadnej diagnostyki w swojej linii, jako ostrzeżenie INW009. Każdy format wyjścia liczy wyciszone diagnostyki, a SARIF wymienia je jako wyniki oznaczone jako wyciszone. Hooki Claude Code pomijają wyciszenie, którego nie było w pliku na starcie sesji, więc agent nie może uciszyć naruszenia komentarzem; `agent-suppressions = "allow"` w `[tool.inwards]` pozwala takim wyciszeniom działać. Szczegóły są w [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default).
 
 <div class="grid cards" markdown>
 

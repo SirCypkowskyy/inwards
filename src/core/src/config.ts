@@ -58,7 +58,19 @@ export interface InwardsConfig {
   names?: NameRule[];
   /** Which rules report and at what severity, `[tool.inwards.rules]`. Absent when not set. */
   rules?: RuleSettings;
+  /**
+   * Whether the Claude Code hooks honour an inline suppression the agent
+   * added (`agent-suppressions`): `"deny"`, the default, treats a suppression
+   * that wasn't in the file at session start as absent; `"allow"` honours
+   * it. `inwards check` and the language server always honour suppressions.
+   * Absent when not set.
+   */
+  agentSuppressions?: AgentSuppressions;
 }
+
+/** What the hooks do with a suppression the agent added, see `InwardsConfig.agentSuppressions`. */
+export type AgentSuppressions = "deny" | "allow";
+const AGENT_SUPPRESSIONS: readonly string[] = ["deny", "allow"] satisfies AgentSuppressions[];
 
 /** What the Stop gate checks, see `InwardsConfig.stopGate`. */
 export type StopGate = "changed" | "project";
@@ -81,6 +93,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "shape",
   "names",
   "rules",
+  "agent-suppressions",
 ]);
 const LAYER_KEYS: ReadonlySet<string> = new Set([
   "name",
@@ -180,6 +193,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...stopGateKey(raw["stop-gate"]),
     ...parseShapeKeys(raw),
     ...parseRules(raw["rules"]),
+    ...agentSuppressionsKey(raw["agent-suppressions"]),
   };
   return config;
 }
@@ -230,6 +244,33 @@ function stopGateKey(value: unknown): Pick<InwardsConfig, "stopGate"> {
     throw new ConfigError('tool.inwards.stop-gate must be "changed" or "project".');
   }
   return { stopGate: value };
+}
+
+/**
+ * Validates `agent-suppressions`.
+ *
+ * @param value - the raw value, if any.
+ * @returns `{ agentSuppressions }` when it is set, else nothing.
+ * @throws {ConfigError} when it is neither "deny" nor "allow".
+ */
+function agentSuppressionsKey(value: unknown): Pick<InwardsConfig, "agentSuppressions"> {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isAgentSuppressions(value)) {
+    throw new ConfigError('tool.inwards.agent-suppressions must be "deny" or "allow".');
+  }
+  return { agentSuppressions: value };
+}
+
+/**
+ * Tells whether a raw value is an `agent-suppressions` mode.
+ *
+ * @param value - the raw value.
+ * @returns true for "deny" or "allow".
+ */
+function isAgentSuppressions(value: unknown): value is AgentSuppressions {
+  return typeof value === "string" && AGENT_SUPPRESSIONS.includes(value);
 }
 
 /**

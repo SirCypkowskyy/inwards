@@ -21,6 +21,8 @@ export interface RunLine {
   codes?: string[];
   /** `error` or `warning` for each fingerprint; absent in older lines, read as errors. */
   severities?: string[];
+  /** Fingerprints whose inline suppression the hooks rejected; absent in older lines. */
+  rejected?: string[];
   durationMs: number;
 }
 
@@ -189,6 +191,7 @@ export function parseLine(raw: string): RunLine | undefined {
   const prints = value["fingerprints"];
   const codes = value["codes"];
   const severities = value["severities"];
+  const rejected = value["rejected"];
   return {
     at: value["at"],
     session_id: typeof session === "string" ? session : null,
@@ -198,6 +201,7 @@ export function parseLine(raw: string): RunLine | undefined {
     fingerprints: prints,
     ...(isAligned(codes, prints) ? { codes } : {}),
     ...(isAligned(severities, prints) ? { severities } : {}),
+    ...(isStrings(rejected) ? { rejected } : {}),
     durationMs: value["durationMs"],
   };
 }

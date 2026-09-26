@@ -29,6 +29,7 @@ type RuleCode =
   | "INW006"
   | "INW007"
   | "INW008"
+  | "INW009"
   | "INW010"
   | "INW011";
 
@@ -75,6 +76,14 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     name: "missing-member",
     severity: "error",
     summary: "A package holds every member its configured shape requires.",
+    docs: CATALOGUE,
+  },
+  INW009: {
+    code: "INW009",
+    name: "suppression-comment",
+    severity: "error",
+    summary:
+      "An inline suppression names rules that can be suppressed, gives a reason, and hides a finding.",
     docs: CATALOGUE,
   },
   INW010: {

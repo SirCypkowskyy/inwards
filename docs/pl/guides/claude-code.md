@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: 51def230c8f05b71e7606a9c5b76b4520114ba5768f22312c18f7ed4d35c8ec1
+source_hash: 881563b6f85b084856d5f29194cfbaaeafdaa5a66f5426b30ea60e133a25cbd0
 ---
 
 # Claude Code { #claude-code }
@@ -42,6 +42,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 | „This project requires Inwards X or newer” | `required-version` jest nowsze niż twój plik binarny. Zainstaluj nowsze wydanie. |
 | `config error: Unknown key tool.inwards.…` | Literówka w `[tool.inwards]`. Komunikat podaje klucz i wypisuje znane klucze. |
 | Claude mówi, że edycja `pyproject.toml` została odrzucona | Edycja dotknęła `[tool.inwards]`. To config guard. Jeśli naprawdę chcesz zmienić warstwy, zrób to sam. |
+| Komunikat „an inline suppression that wasn't in the file when the session started” | Hooki pomijają wyciszenie dodane w trakcie sesji albo takie, które jest w pliku niezacommitowanym na starcie sesji i zedytowanym później ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)). Jeśli dodałeś je sam, zacommituj je i zacznij nową sesję; żeby Claude mógł je dodawać, ustaw `agent-suppressions = "allow"` w `[tool.inwards]`. |
 | Tura kończy się komunikatem „unresolved architecture problems” | To samo naruszenie przetrwało `escalate-after` prób (domyślnie 3). Claude powinien zapytać cię, co dalej. Lista trafia też do następnej sesji. |
 | Windows: hook się nie uruchamia | `init` zapisuje hook w formie exec, z bezwzględną ścieżką do pliku binarnego, więc nie biorą w tym udziału ani powłoka, ani `PATH`. Jeśli przeniesiono plik binarny, uruchom ponownie `init`. |
 
