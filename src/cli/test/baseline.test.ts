@@ -172,7 +172,22 @@ describe("baseline with the Claude Code hooks", () => {
     expect(run("Bash", { command: "inwards baseline" })).toContain("deny");
     expect(run("Bash", { command: "uvx --from inwards inwards baseline" })).toContain("deny");
     expect(run("Bash", { command: "env FOO=1 inwards hook claude-code" })).toContain("deny");
-    expect(run("Bash", { command: "python3 -m inwards baseline" })).toContain("deny");
+    for (const denied of [
+      "python3 -m inwards baseline",
+      "uv run --with x inwards baseline",
+      "uvx inwards@latest baseline",
+      "sudo -u me inwards hook claude-code",
+      "bash -c 'inwards baseline'",
+      "x; ./bin/inwards baseline",
+    ]) {
+      expect(run("Bash", { command: denied })).toContain("deny");
+    }
+    const started = performance.now();
+    expect(run("Bash", { command: `${"env -a ".repeat(40)}x; inwards baseline` })).toContain(
+      "deny",
+    );
+    expect(run("Bash", { command: `${"env -a ".repeat(5000)}inwards baseline` })).toContain("deny");
+    expect(performance.now() - started).toBeLessThan(2000);
     for (const allowed of [
       'git commit -m "docs: explain inwards baseline"',
       "git commit -m \"$(cat <<'EOF'\nfeat(cli): inwards baseline accepts existing violations\nEOF\n)\"",
