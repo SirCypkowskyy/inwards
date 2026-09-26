@@ -1,0 +1,22 @@
+/* Diagram color tokens, consumed by classDef in docs/chapters/*.md Mermaid
+   sources via var(). Light values match the colors already hardcoded in
+   the diagrams before this change; dark values are new. */
+[data-md-color-scheme="default"] {
+  --diagram-ext-bg: #eceff1;
+  --diagram-ext-fg: #263238;
+  --diagram-ext-border: #90a4ae;
+
+  --diagram-planned-bg: #ede7f6;
+  --diagram-planned-fg: #4527a0;
+  --diagram-planned-border: #7e57c2;
+}
+
+[data-md-color-scheme="slate"] {
+  --diagram-ext-bg: #37474f;
+  --diagram-ext-fg: #eceff1;
+  --diagram-ext-border: #607d8b;
+
+  --diagram-planned-bg: #2a1f4d;
+  --diagram-planned-fg: #b39ddb;
+  --diagram-planned-border: #7e57c2;
+}
