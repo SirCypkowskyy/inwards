@@ -70,6 +70,15 @@ describe("config guard: pyproject.toml", () => {
       "Write",
       { content: `${PYPROJECT}\n[tool.inwards.rules.severity]\nINW001 = "warning"\n` },
     ],
+    [
+      "an Edit that extends a layer's deny list",
+      "Edit",
+      {
+        old_string: '{ name = "domain", modules = ["shop.domain"] }',
+        new_string:
+          '{ name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["os"] }',
+      },
+    ],
     ["a Write that removes the table", "Write", { content: '[project]\nname = "shop"\n' }],
     [
       "an edit that breaks the TOML",
@@ -80,6 +89,22 @@ describe("config guard: pyproject.toml", () => {
     const reason = denied(pre(root, tool, { file_path: "pyproject.toml", ...input }));
     expect(reason).toContain("[tool.inwards]");
     expect(reason).toContain("ask the user");
+  });
+
+  test.each([
+    ["removing", '{ name = "domain", modules = ["shop.domain"] }'],
+    ["shrinking", '{ name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["os"] }'],
+  ])("%s extend-deny-libraries is denied", (_, newString) => {
+    const extended =
+      '{ name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["os", "pydantic"] }';
+    const withKey = project({
+      "pyproject.toml": PYPROJECT.replace(
+        '{ name = "domain", modules = ["shop.domain"] }',
+        extended,
+      ),
+    });
+    const edit = { file_path: "pyproject.toml", old_string: extended, new_string: newString };
+    expect(denied(pre(withKey, "Edit", edit))).toContain("[tool.inwards]");
   });
 
   test("a CRLF file edited with LF strings is still compared", () => {

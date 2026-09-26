@@ -9,7 +9,9 @@
  * third-party otherwise. The longest matching entry decides, `allow` on a
  * tie; with no match, a third-party import passes only when the layer sets
  * no `allow-libraries`, and stdlib always passes. The innermost of two or
- * more layers denies `DEFAULT_DENY` unless it sets `deny-libraries`.
+ * more layers denies `DEFAULT_DENY` unless it sets `deny-libraries`, and
+ * `extend-deny-libraries` adds to whichever of the two applies (#155). On
+ * any other layer without `deny-libraries` it adds to an empty list.
  */
 import type { LayerSpec } from "./config.ts";
 import { layerIndexOf } from "./layers.ts";
@@ -84,7 +86,8 @@ function longest(entries: readonly string[], target: string): string | undefined
 function denial(layers: readonly LayerSpec[], i: number, target: string): string | undefined {
   const layer = layers[i];
   const inner = i === 0 && layers.length > 1;
-  const deny = longest(layer?.denyLibraries ?? (inner ? DEFAULT_DENY : []), target);
+  const base = layer?.denyLibraries ?? (inner ? DEFAULT_DENY : []);
+  const deny = longest([...base, ...(layer?.extendDenyLibraries ?? [])], target);
   const allow = longest(layer?.allowLibraries ?? [], target);
   if (allow !== undefined || deny !== undefined) {
     return (allow?.length ?? -1) >= (deny?.length ?? -1) ? undefined : deny;
