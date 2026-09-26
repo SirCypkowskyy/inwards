@@ -1,5 +1,7 @@
 # Flags for `act` (local GitHub Actions runs, see AGENTS.md). There is no
-# ubuntu-26.04 image for act yet, so both Ubuntu labels run on 24.04.
+# ubuntu-26.04 image for act yet, so the Ubuntu labels run on 24.04. Jobs that
+# run on the self-hosted runners (ops/runner) match the `self-hosted` label.
+-P self-hosted=catthehacker/ubuntu:act-24.04
 -P ubuntu-26.04=catthehacker/ubuntu:act-24.04
 -P ubuntu-24.04=catthehacker/ubuntu:act-24.04
 -P ubuntu-latest=catthehacker/ubuntu:act-24.04

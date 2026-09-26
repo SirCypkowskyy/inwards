@@ -1,0 +1,15 @@
+[Unit]
+Description=Isolated Docker network and firewall rules for inwards-runner job containers
+Documentation=https://github.com/SirCypkowskyy/inwards/tree/develop/ops/runner
+Requires=docker.service
+After=docker.service firewalld.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Rules first, so no job container ever runs on the bridge without them.
+ExecStart=/usr/sbin/nft -f /opt/inwards-runner/inwards-ci.nft
+ExecStart=/bin/sh -c 'docker network inspect inwards-ci >/dev/null 2>&1 || docker network create --driver bridge --subnet 10.253.0.0/24 --opt com.docker.network.bridge.name=br-inwards --opt com.docker.network.bridge.enable_icc=false --label inwards-runner=network inwards-ci'
+
+[Install]
+WantedBy=multi-user.target

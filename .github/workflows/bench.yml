@@ -16,7 +16,7 @@ concurrency:
 jobs:
   bench:
     name: Performance against the base branch
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7

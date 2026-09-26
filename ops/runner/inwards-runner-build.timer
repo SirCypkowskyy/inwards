@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly rebuild of the inwards-runner image (GitHub stops queueing jobs to runners 30 days behind)
+
+[Timer]
+OnCalendar=Sun 04:00
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target
