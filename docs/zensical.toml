@@ -15,6 +15,14 @@ copyright = "Copyright &copy; 2026 Inwards maintainers"
 docs_dir = "chapters"
 site_dir = "site"
 
+extra_css = [
+  "stylesheets/extra.css",
+]
+
+extra_javascript = [
+  "javascripts/homepage-loop.mjs",
+]
+
 nav = [
   { "Home" = "index.md" },
   { "Getting started" = [
@@ -41,6 +49,7 @@ features = [
   "content.code.copy",
   "content.code.annotate",
   "content.tabs.link",
+  "content.tooltips",
   "navigation.footer",
   "navigation.instant",
   "navigation.sections",

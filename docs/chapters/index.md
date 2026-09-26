@@ -29,12 +29,42 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
     Found 1 violation in 1 file (16.8 ms).
     ```
 
-```mermaid
-flowchart LR
-    agent["🤖 Agent edits a file"] --> hook["⚡ Hook runs<br/>inwards check"]
-    hook -- "violation + fix steps" --> agent
-    hook -- "clean" --> cont["✅ Agent continues"]
-```
+<div class="homepage-loop-wrap">
+<svg id="homepage-loop" viewBox="0 0 820 160" role="img"
+     aria-label="Agent edits a file, then the hook runs inwards check. On a violation, the agent gets fix steps and loops back. When clean, the agent continues.">
+  <defs>
+    <marker id="hl-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="hl-arrowhead" />
+    </marker>
+  </defs>
+
+  <path id="hl-edge-to-hook" class="hl-edge" marker-end="url(#hl-arrow)"
+        d="M170,50 H330" />
+  <path id="hl-edge-violation" class="hl-edge hl-edge-dashed" marker-end="url(#hl-arrow)"
+        d="M400,70 C400,110 250,110 170,70" />
+  <text class="hl-edge-label" x="285" y="122">violation + fix steps</text>
+  <path id="hl-edge-clean" class="hl-edge" marker-end="url(#hl-arrow)"
+        d="M480,50 H610" />
+  <text class="hl-edge-label" x="545" y="40">clean</text>
+
+  <g id="hl-agent" class="hl-node" tabindex="0">
+    <rect x="20" y="20" width="150" height="60" rx="10" />
+    <text x="95" y="55">🤖 Agent edits a file</text>
+  </g>
+
+  <g id="hl-hook" class="hl-node" tabindex="0">
+    <rect x="340" y="20" width="140" height="60" rx="10" />
+    <text x="410" y="45">⚡ Hook runs</text>
+    <text x="410" y="62">inwards check</text>
+  </g>
+
+  <g id="hl-outcomes" class="hl-node">
+    <rect x="620" y="20" width="180" height="60" rx="10" />
+    <text x="710" y="55">✅ Agent continues</text>
+  </g>
+</svg>
+</div>
 
 ## Start here
 

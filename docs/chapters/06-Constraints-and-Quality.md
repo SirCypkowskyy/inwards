@@ -91,6 +91,21 @@ A repeat with the committed build and `bench/compare.ts` defaults (40 hook runs,
 Redone in the bytecode spike, with the bytecode build. Process start is `inwards --version`. The grammar and parse figures come from a script compiled the same way that times reading the embedded `.wasm` files, `Parser.init`, `Language.load` and one parse of `shop/domain/order.py` from the example app, median of 30 runs. "Config + I/O + rules" is the engine time the CLI reports (14.5 ms) minus those, not a measurement.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    pieSectionTextColor: "#ffffff"
+    pieLegendTextColor: "#607d8b"
+    pieStrokeColor: "#ffffff"
+    pieOpacity: "1"
+    pie1: "#4527a0"
+    pie2: "#673ab7"
+    pie3: "#7e57c2"
+    pie4: "#37474f"
+    pie5: "#455a64"
+    pie6: "#546e7a"
+---
 pie showData
     title One-file check, about 25 ms of work (engine + start-up)
     "Process start (Bun runtime)" : 10.5
