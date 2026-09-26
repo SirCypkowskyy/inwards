@@ -36,6 +36,10 @@ for (const target of targets) {
     // module semantics stay what they were without it.
     bytecode: true,
     format: "esm",
+    // Dynamic imports (the `init` picker's prompt library) become chunks
+    // embedded next to main, loaded only when imported: without this, every
+    // `check` and hook run loads them at start-up (1-2 ms with bytecode, #92).
+    splitting: true,
     // biome-ignore lint/nursery/noUnsafeTypeAssertion: argv goes straight to Bun.build, which rejects unknown targets.
     compile: { target: target as Bun.Build.CompileTarget, outfile },
   });

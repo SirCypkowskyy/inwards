@@ -14,7 +14,8 @@ INW006 code outside every layer, INW007/INW008 package shape, INW000 encodings t
 imports) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
 a config guard and escalation to the user (`--agent aider` and `--agent agents-md` cover Aider
-and `AGENTS.md`). The only release so far is the pre-release v0.1.0-rc.1, with binaries for six
+and `AGENTS.md`). On a new project, `inwards init --style hexagonal --scaffold` writes the layers
+(`layered` and `clean` too) and an example package that passes the check. The only release so far is the pre-release v0.1.0-rc.1, with binaries for six
 platforms and platform wheels for `uv add`; see the
 [install guide](https://sircypkowskyy.github.io/inwards/guides/install/).
 

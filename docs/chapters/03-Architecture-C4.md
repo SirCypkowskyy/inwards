@@ -93,7 +93,7 @@ flowchart TB
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
 | **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW006, INW007, INW008, INW011 |
-| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init`, `hook claude-code` |
+| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code` |
 | **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server.ts` | :white_check_mark: every per-file rule, on each change to an open file; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` for `claude`, `aider` and `agents-md` |
@@ -236,6 +236,7 @@ The other two commands reuse the same pieces:
 
 - `inwards hook claude-code` reads a Claude Code hook payload from stdin and dispatches on the event: SessionStart records the session state, PreToolUse runs the config guard, PostToolUse checks the edited file, and Stop runs the Stop gate over what the session changed. [Chapter 4](04-AI-Integration.md) describes each one.
 - `inwards init --agent claude|aider|agents-md` computes every file change first, so `--dry-run` can print it as a diff and a second run changes nothing.
+- `inwards init --style layered|clean|hexagonal [--scaffold]` writes a preset's `[tool.inwards]` (and an example package) only where nothing exists yet, then runs the check in process and prints the package as an annotated tree. On a terminal with no flags, a picker built on `@clack/prompts` asks instead; it is loaded with a dynamic import that the build puts in its own chunk ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
 ## Deployment and distribution
 
@@ -419,6 +420,12 @@ src/
 │   │   ├── stats-command.ts  # inwards stats: finds the logs, prints the report
 │   │   ├── log-export.ts  # stats --export [--redact]: one shareable log file
 │   │   ├── init.ts        # inwards init --agent
+│   │   ├── init-style.ts  # inwards init --style / --scaffold, the entry for every init
+│   │   ├── init-report.ts # the annotated tree and check after init --style
+│   │   ├── init-target.ts # the pyproject.toml, package and src layout init --style uses
+│   │   ├── init-write.ts  # scaffold writes: no symlinks, nothing outside, all or nothing
+│   │   ├── styles.ts      # the presets and the scaffold's Python templates
+│   │   ├── picker.ts      # the interactive init (@clack/prompts, loaded lazily)
 │   │   ├── claude-settings.ts  # finds the Inwards hooks in Claude Code settings
 │   │   └── diff.ts        # line diff for init --dry-run
 │   └── test/              # CLI, hook, Stop gate and E2E tests, snapshots

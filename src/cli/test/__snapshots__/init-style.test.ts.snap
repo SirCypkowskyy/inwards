@@ -1,0 +1,202 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`inwards init --style X --scaffold on a fresh uv project layered: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 11,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/bootstrap.py",
+    "src/my_app/domain/__init__.py",
+    "src/my_app/domain/order.py",
+    "src/my_app/persistence/__init__.py",
+    "src/my_app/persistence/in_memory_orders.py",
+    "src/my_app/persistence/orders.py",
+    "src/my_app/presentation/__init__.py",
+    "src/my_app/presentation/cli.py",
+    "src/my_app/services/__init__.py",
+    "src/my_app/services/place_order.py",
+    "tests/test_place_order.py",
+  ],
+  "stdout": 
+"inwards init: wrote the layered preset to pyproject.toml and 11 example files.
+
+src/my_app/  (layered)
+├── bootstrap.py   bootstrap: may import every other layer
+├── domain/        domain: imports no other layer
+├── persistence/   persistence: may import domain
+├── presentation/  presentation: may import domain, persistence, services
+└── services/      services: may import domain, persistence
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m my_app.bootstrap book 2
+Wire an agent: inwards init --agent claude|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "layered" (inwards init --style layered, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# Not enforced by this preset: presentation may call persistence without going through services (open layers).
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "domain", modules = ["my_app.domain"] },              # entities shared by every layer
+  { name = "persistence", modules = ["my_app.persistence"] },    # repositories and their Protocols
+  { name = "services", modules = ["my_app.services"] },          # business operations (use cases)
+  { name = "presentation", modules = ["my_app.presentation"] },  # CLI or HTTP handlers
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },        # composition root: wires the adapters into the use cases
+]
+"
+,
+}
+`;
+
+exports[`inwards init --style X --scaffold on a fresh uv project clean: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 13,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/application/__init__.py",
+    "src/my_app/application/ports/__init__.py",
+    "src/my_app/application/ports/orders.py",
+    "src/my_app/application/use_cases/__init__.py",
+    "src/my_app/application/use_cases/place_order.py",
+    "src/my_app/bootstrap.py",
+    "src/my_app/domain/__init__.py",
+    "src/my_app/domain/order.py",
+    "src/my_app/infrastructure/__init__.py",
+    "src/my_app/infrastructure/in_memory_orders.py",
+    "src/my_app/presentation/__init__.py",
+    "src/my_app/presentation/cli.py",
+    "tests/test_place_order.py",
+  ],
+  "stdout": 
+"inwards init: wrote the clean preset to pyproject.toml and 13 example files.
+
+src/my_app/  (clean)
+├── application/     application: may import domain
+├── bootstrap.py     bootstrap: may import every other layer
+├── domain/          domain: imports no other layer
+├── infrastructure/  infrastructure: may import domain, application
+└── presentation/    presentation: may import domain, application, infrastructure
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m my_app.bootstrap book 2
+Wire an agent: inwards init --agent claude|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "clean" (inwards init --style clean, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# Not enforced by this preset: presentation may import infrastructure; leave the wiring to bootstrap.
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "domain", modules = ["my_app.domain"] },                  # entities and business rules, no I/O
+  { name = "application", modules = ["my_app.application"] },        # use cases and the ports they need
+  { name = "infrastructure", modules = ["my_app.infrastructure"] },  # adapters that implement ports
+  { name = "presentation", modules = ["my_app.presentation"] },      # CLI or HTTP handlers
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },            # composition root: wires the adapters into the use cases
+]
+"
+,
+}
+`;
+
+exports[`inwards init --style X --scaffold on a fresh uv project hexagonal: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 14,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/adapters/__init__.py",
+    "src/my_app/adapters/inbound/__init__.py",
+    "src/my_app/adapters/inbound/cli.py",
+    "src/my_app/adapters/outbound/__init__.py",
+    "src/my_app/adapters/outbound/in_memory_orders.py",
+    "src/my_app/application/__init__.py",
+    "src/my_app/application/ports/__init__.py",
+    "src/my_app/application/ports/orders.py",
+    "src/my_app/application/use_cases/__init__.py",
+    "src/my_app/application/use_cases/place_order.py",
+    "src/my_app/bootstrap.py",
+    "src/my_app/domain/__init__.py",
+    "src/my_app/domain/order.py",
+    "tests/test_place_order.py",
+  ],
+  "stdout": 
+"inwards init: wrote the hexagonal preset to pyproject.toml and 14 example files.
+
+src/my_app/  (hexagonal)
+├── adapters/
+│   ├── inbound/   inbound: may import domain, application, outbound
+│   └── outbound/  outbound: may import domain, application
+├── application/   application: may import domain
+├── bootstrap.py   bootstrap: may import every other layer
+└── domain/        domain: imports no other layer
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m my_app.bootstrap book 2
+Wire an agent: inwards init --agent claude|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "hexagonal" (inwards init --style hexagonal, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# Not enforced by this preset: inbound adapters may import outbound ones; leave the wiring to bootstrap.
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "domain", modules = ["my_app.domain"] },               # entities and business rules, no I/O
+  { name = "application", modules = ["my_app.application"] },     # use cases and the ports they need
+  { name = "outbound", modules = ["my_app.adapters.outbound"] },  # driven adapters: implement ports
+  { name = "inbound", modules = ["my_app.adapters.inbound"] },    # driving adapters: call use cases
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },         # composition root: wires the adapters into the use cases
+]
+"
+,
+}
+`;
+
+exports[`inwards init without --style or --agent --list-styles prints each preset's layers 1`] = `
+"layered: N-tier: presentation calls services, services call persistence
+  1. domain        shop.domain        entities shared by every layer
+  2. persistence   shop.persistence   repositories and their Protocols
+  3. services      shop.services      business operations (use cases)
+  4. presentation  shop.presentation  CLI or HTTP handlers
+  5. bootstrap     shop.bootstrap     composition root: wires the adapters into the use cases
+  Gap: presentation may call persistence without going through services (open layers).
+
+clean: entities at the centre, use cases around them, frameworks outside
+  1. domain          shop.domain          entities and business rules, no I/O
+  2. application     shop.application     use cases and the ports they need
+  3. infrastructure  shop.infrastructure  adapters that implement ports
+  4. presentation    shop.presentation    CLI or HTTP handlers
+  5. bootstrap       shop.bootstrap       composition root: wires the adapters into the use cases
+  Gap: presentation may import infrastructure; leave the wiring to bootstrap.
+
+hexagonal: ports and adapters: the application talks to the world only through ports
+  1. domain       shop.domain             entities and business rules, no I/O
+  2. application  shop.application        use cases and the ports they need
+  3. outbound     shop.adapters.outbound  driven adapters: implement ports
+  4. inbound      shop.adapters.inbound   driving adapters: call use cases
+  5. bootstrap    shop.bootstrap          composition root: wires the adapters into the use cases
+  Gap: inbound adapters may import outbound ones; leave the wiring to bootstrap.
+"
+`;
