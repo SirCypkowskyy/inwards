@@ -16,7 +16,7 @@ layers = [
 Then:
 
 ```sh
-uv add --dev inwards        # once on PyPI; until then see the install guide
+uv add --dev inwards        # or uvx inwards check, with no project
 inwards check               # exit 1 lists each outward import with numbered fix steps
 inwards init --agent claude # Claude Code hooks: per-edit check, Stop gate, config guard
 ```

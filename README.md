@@ -50,7 +50,8 @@ release-please keeps a `chore: release X.Y.Z` PR open with the next version and 
 binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform wheel
 (`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its native
 runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
-`SHA256SUMS`. Publish the draft by hand. A release candidate is a hand-pushed tag with a
+`SHA256SUMS`. Publish the draft by hand; once the owner switches it on, that starts `pypi.yml`,
+which uploads the same wheels to TestPyPI and then PyPI with trusted publishing (ADR-021). A release candidate is a hand-pushed tag with a
 suffix (`v0.2.0-rc.1`) on the release PR's branch, which already holds the new version. Build provenance attestations switch on once the repo is public.
 
 Report security issues privately, not in a public issue; see [SECURITY.md](SECURITY.md).
