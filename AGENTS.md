@@ -212,7 +212,11 @@ PR description is its body. Commits inside a branch can say anything.
 
   Don't promote without releasing, and never merge a release PR that isn't
   right after a promotion. Before merging anything into `develop`, check that
-  `gh pr list --base main --label "autorelease: pending"` is empty.
+  no release is in progress: `gh pr list --base main --label "autorelease: pending"`
+  is empty **and** the tip of `main` isn't a promotion
+  (`git fetch -q origin main && git log -1 --format=%s origin/main`
+  doesn't start with `chore: promote`). The second check covers the seconds
+  before release-please opens its PR, or a failed release-please run.
 - A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
   `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with
