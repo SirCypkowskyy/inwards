@@ -8,7 +8,7 @@ This chapter covers the rules the design has to live within, the quality goals i
 |---|---|---|---|
 | C1 | Engine in TypeScript | Shared by CLI, language server and extension ([ADR-001](05-ADR.md#adr-001-typescript-for-the-engine)) | Raw parse speed, binary size |
 | C2 | Python parsed with tree-sitter, WASM build | Portable across Bun, Node and every target ([ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)) | About 12 ms of WASM start-up per process |
-| C3 | Distributed as a Bun single-file executable | No runtime prerequisites; installs as a dev dependency ([ADR-003](05-ADR.md#adr-003-ship-a-bun-single-file-executable)) | 82 MB per binary |
+| C3 | Distributed as a Bun single-file executable | No runtime prerequisites; installs as a dev dependency ([ADR-003](05-ADR.md#adr-003-ship-a-bun-single-file-executable)) | 85 MB per binary, over 80 MB of it the Bun runtime |
 | C4 | Never import or execute user code | Deterministic, safe on untrusted repos, no venv needed | Only dynamic imports with a literal target are visible (INW011); computed targets stay invisible |
 | C5 | No network access at check time | Works offline, in sandboxes and in locked-down CI | Rule packs must ship inside the binary or the repo |
 | C6 | Config in `pyproject.toml` under `[tool.inwards]` | Python convention ([ADR-005](05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml)) | Protecting the config needs hooks or CODEOWNERS |
@@ -61,23 +61,47 @@ All numbers come from the scaffold in this repository. Nothing here is projected
 </figure>
 
 !!! note "Spot check on 0.1.0 (2026-09-26)"
-    Same laptop (Intel Core Ultra 7 155H, 22 threads), a fresh `inwards-linux-x64` build, load average about 1, measured twice independently with the same result. Single-file check on the example app, 30 runs: p50 37 ms, p95 40 ms wall time, 14 ms engine time. `inwards --version`: about 19 ms, up from about 10 ms. Cold full run on the synthetic repo, 5 runs: 0.40 to 0.44 s. Peak RSS about 207 MB, up from about 120 MB. Binary size is unchanged at 82 MB (79 MiB). The start-up breakdown below is from M0 and needs redoing with the start-up spike ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). The CI benchmark ([#29](https://github.com/SirCypkowskyy/inwards/issues/29)) now fails any PR that makes the hook or the full check more than 20% slower; it doesn't track memory, start-up or binary size.
+    Same laptop (Intel Core Ultra 7 155H, 22 threads), a fresh `inwards-linux-x64` build, load average about 1, measured twice independently with the same result. Single-file check on the example app, 30 runs: p50 37 ms, p95 40 ms wall time, 14 ms engine time. `inwards --version`: about 19 ms, up from about 10 ms. Cold full run on the synthetic repo, 5 runs: 0.40 to 0.44 s. Peak RSS about 207 MB, up from about 120 MB. Binary size is unchanged at 82 MB (79 MiB). The bytecode spike below halved start-up after this check, and the start-up breakdown was redone with it. The CI benchmark ([#29](https://github.com/SirCypkowskyy/inwards/issues/29)) now fails any PR that makes the hook or the full check more than 20% slower; it doesn't track memory, start-up or binary size.
+
+### Spike: bytecode and minification
+
+[#39](https://github.com/SirCypkowskyy/inwards/issues/39) asked whether `bun build --compile` flags cut start-up or binary size. Since then `scripts/build-binaries.ts` builds with `--bytecode --format=esm` on top of `--minify --sourcemap=linked`.
+
+**Method.** Eight variants of `inwards-linux-x64` from one commit, Bun 1.4.2, the same laptop as above. Start-up: 200 rounds of `inwards --version`, every variant once per round in rotating order. Hook and full check: `bench/compare.ts` with the current build as base, 100 hook runs and 20 full checks per side, change as the median of per-pair ratios. Peak RSS: `/usr/bin/time -f %M`, median of 5 runs. MB means 10^6 bytes throughout. Other agents' builds shared the machine (load average 2 to 6 during the runs), so trust the ratios more than the absolute milliseconds; a base-against-base run moved 0.2% (hook) and 0.6% (full).
+
+| Variant | Size (Linux x64) | `inwards --version` p50 / p95 | Hook, one file | Full check | Peak RSS, full / hook |
+|---|---|---|---|---|---|
+| Before: `--minify --sourcemap=linked` | 82.4 MB (37.1 MB gzipped) | 22.3 / 30.9 ms | base | base | 202 / 54 MB |
+| Without `--minify` | 82.6 MB | +3.0% | +3.7% | +1.5% | 203 MB full |
+| Without the sourcemap | 82.2 MB | -0.7% | not run | not run | |
+| No `.env` or `bunfig.toml` autoload | 82.4 MB | -0.8% | -3.0% | +0.6% | 205 MB full |
+| `--bytecode` (CJS, Bun's default with it) | 85.0 MB | 10.0 / 14.6 ms (-56%) | -45.6% | -5.6% | 205 / 55 MB |
+| **`--bytecode --format=esm` (adopted)** | 84.9 MB (38.4 MB gzipped) | 10.5 / 14.3 ms (-53%) | -45.4% | -7.0% | 205 / 56 MB |
+
+A repeat with the committed build and `bench/compare.ts` defaults (40 hook runs, 12 full checks) gave hook p50 / p95 64.4 / 73.6 ms before and 32.6 / 37.4 ms after (-48.0%), and full check -9.9%. A second start-up run gave 25.0 ms before and 10.8 ms after. On the example app, 60 alternating single-file checks: p50 58.7 → 30.3 ms and p95 77.7 → 39.5 ms wall time, and the engine's own time fell from 21.7 to 14.5 ms, because the engine and web-tree-sitter's JS glue no longer get parsed on first call either.
+
+- **Bytecode is the win.** It moves JS parsing from every start to build time. It costs 2.5 MB per binary (1.3 MB gzipped) and 1 to 3 MB of RSS.
+- **Size can't be fixed with flags.** Everything Inwards adds is under 1 MB (176 KB of minified JS, 0.67 MB of WASM); the rest is the Bun runtime. Minification was already on and saves 0.1 MB; the sourcemap costs 0.26 MB and keeps stack traces pointing at the TypeScript source, so it stays.
+- **ESM, not CJS.** Head to head the two bytecode builds differ by +2.9% (hook) and +2.2% (full), within noise. ESM keeps the module semantics the binary had before.
+- **Checked.** The 350 tests pass against the compiled binary (`INWARDS_BIN=dist/inwards-linux-x64 bun test`), so do `--version` and both embedded `.wasm` files (every check parses). A test program built the same way still reports the TypeScript line of a thrown error through the linked sourcemap. All six targets cross-compile, and the musl build checks the synthetic repo inside Alpine. CI's test matrix builds and tests the macOS and Windows binaries natively.
+- **Not tried.** Bun's current docs list `--compile-jit-policy` and `--bytecode-order` (profile-guided bytecode layout); Bun 1.4.2's `bun build` has neither. Worth a look after a Bun upgrade.
 
 ### Where a single-file check spends its time
 
-Process start and the two WASM figures were measured on their own (`inwards --version`, and a script timing `Parser.init` and `Language.load`). The parse figure was measured the same way. "Config + I/O + rules" is the remainder, not a measurement.
+Redone in the bytecode spike, with the bytecode build. Process start is `inwards --version`. The grammar and parse figures come from a script compiled the same way that times reading the embedded `.wasm` files, `Parser.init`, `Language.load` and one parse of `shop/domain/order.py` from the example app, median of 30 runs. "Config + I/O + rules" is the engine time the CLI reports (14.5 ms) minus those, not a measurement.
 
 ```mermaid
 pie showData
-    title One-file check, about 30 ms of work (engine + start-up)
-    "Process start (Bun runtime)" : 10
-    "WASM runtime init" : 12
-    "Python grammar load (447 KB)" : 3.5
-    "Config + file I/O + rules (remainder)" : 3.5
-    "Parsing the file" : 1
+    title One-file check, about 25 ms of work (engine + start-up)
+    "Process start (Bun runtime)" : 10.5
+    "WASM runtime init" : 7.8
+    "Python grammar load (447 KB)" : 2.7
+    "Parsing the file (first parse)" : 2
+    "Config + file I/O + rules (remainder)" : 1.5
+    "Reading the embedded .wasm files" : 0.5
 ```
 
-Parsing the file is the smallest slice. Two thirds of the cost is paying the same start-up price on every hook call. The wall-time p95 of 80 ms sits well above this 30 ms of work. The rest is scheduling noise on a busy laptop plus the harness spawning the process, and an agent's hook runner pays that too.
+In M0 the same check was about 30 ms of work: 10 ms process start, 12 ms WASM init, 3.5 ms grammar load, 1 ms parse and 3.5 ms remainder, all without bytecode. Parsing the file is still a small slice. About 85% of the cost is paying the same start-up price on every hook call. The wall-time p50 of 30 ms sits above this 25 ms of work because the harness spawns the process, and an agent's hook runner pays that too.
 
 This changes the performance roadmap. For the agent loop, parse speed doesn't matter much. Start-up does.
 
@@ -85,8 +109,8 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 | Step | Expected effect | Targets |
 |---|---|---|
-| Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Removes ~25 ms of WASM and runtime start-up from every hook call | Single-file p95 |
-| `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)) | Faster JS start-up. Bun's docs cite a large CLI going from 1.0 s to 0.53 s cold. Our bundle is small, so the gain will be smaller and needs measuring | Single-file p95 |
+| Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Removes ~20 ms of WASM and runtime start-up from every hook call | Single-file p95 |
+| :white_check_mark: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), done | Measured: start-up 22 → 10 ms, hook call about 45% faster, 2.5 MB more per binary (see the spike above) | Single-file p95 |
 | Worker pool, one parser per core ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Near-linear speed-up on the cold full run; this laptop has 22 logical CPUs | Cold full run |
 | Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)) | Unchanged files skip parsing entirely | Warm full run, stop hook |
 | Replace `descendantsOfType` with a tree cursor walk on the full-parse path ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)) | Profiling showed 1.2 s spent there on the naive design | Refused files and confirmations |
@@ -119,5 +143,6 @@ The screenshots in these docs come from `scripts/screenshots.py`, which runs eac
 | The prescan misses an import on some unusual file | Low | High | Differential test in CI; grow the corpus with real repos from design partners |
 | Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard and the session record ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
+| A binary silently ignores its bytecode (Bun falls back to parsing the source) and start-up doubles | Low | Low | Tests still pass in that case; the PR benchmark catches it on Linux only. Bytecode is tied to the Bun version that built it, and every binary embeds that same version |
 | Zensical (0.0.x) changes its config format | Medium | Low | Docs build runs in CI on every PR; the config is small |
 | Fix steps are wrong for unusual layouts (no obvious place for a port) | Medium | Medium | Measure fix-within-one-retry per rule; let the config name the ports module |

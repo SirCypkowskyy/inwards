@@ -71,7 +71,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - :material-plus-circle-outline: No runtime prerequisites. Measured: about 25 ms wall time for a one-file check including process start.
 - :material-plus-circle-outline: Tags produce verified binaries automatically (`cd.yml`).
-- :material-minus-circle-outline: 82 MB per binary, and each platform wheel will carry one. Bun's `--bytecode` flag and minification are the first things to try for startup and size.
+- :material-minus-circle-outline: 85 MB per binary, and each platform wheel will carry one. Over 80 MB of it is the Bun runtime, so build flags can't shrink it: minification saves 0.1 MB, and `--bytecode`, adopted after [#39](https://github.com/SirCypkowskyy/inwards/issues/39), adds 2.5 MB but halves start-up ([chapter 6](06-Constraints-and-Quality.md#spike-bytecode-and-minification)).
 - :material-minus-circle-outline: We depend on Bun's release cadence and on its compile feature staying stable.
 
 **Alternatives.** *npm package*: needs Node on the user's machine. *Node SEA (single executable applications)*: workable, but Bun gives us cross-compilation, asset embedding, the bundler and the test runner in one tool. *Deno compile*: viable, but Bun's test runner, bundler and package manager in one tool keep the monorepo simpler.
