@@ -61,6 +61,12 @@ describe("[tool.inwards.rules] parsing", () => {
     expect(parseConfig(text).rules).toEqual({ severity: { INW006: "warning", INW007: "error" } });
   });
 
+  test("severity codes come out sorted, so reordering the table changes nothing", () => {
+    const one = withRules('severity = { INW005 = "warning", INW001 = "warning" }');
+    const two = withRules('severity = { INW001 = "warning", INW005 = "warning" }');
+    expect(JSON.stringify(one)).toBe(JSON.stringify(two));
+  });
+
   test("no table, no settings", () => {
     expect(parseConfig(LAYERS).rules).toBeUndefined();
   });

@@ -89,7 +89,9 @@ function codeList(value: unknown, key: "select" | "ignore"): string[] | undefine
 }
 
 /**
- * Validates the `severity` table.
+ * Validates the `severity` table. Codes come out sorted, so reordering the
+ * table changes nothing: the Stop gate compares configs as JSON, and the config
+ * guard lets a reorder through.
  *
  * @param value - the raw table, if any.
  * @returns severity by code, or undefined when the key is absent.
@@ -105,7 +107,7 @@ function severities(value: unknown): Record<string, Severity> | undefined {
     );
   }
   const levels: Record<string, Severity> = {};
-  for (const [code, level] of Object.entries(value)) {
+  for (const [code, level] of Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) {
     checkCode(code, "severity");
     if (!isSeverity(level)) {
       throw new ConfigError(`tool.inwards.rules.severity.${code} must be "error" or "warning".`);

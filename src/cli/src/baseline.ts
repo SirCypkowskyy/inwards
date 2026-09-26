@@ -206,7 +206,10 @@ function dormant(code: string, rules: RuleSettings | undefined): boolean {
 
 /**
  * Drops the errors the baseline accepts, up to each entry's count, so a module
- * that gains a second copy of an accepted violation still fails.
+ * that gains a second copy of an accepted violation still fails. A warning
+ * that matches an entry (a rule `[tool.inwards.rules]` raised to error when the
+ * baseline was taken, back at its default now) is still there, so its entry
+ * doesn't count as fixed; the warning is reported as usual.
  *
  * @param accepted - accepted copies by baseline key, from `readBaseline`.
  * @param report - the check's report.
@@ -221,11 +224,14 @@ export function applyBaseline(
   const left = new Map(accepted);
   let baselined = 0;
   const diagnostics = report.diagnostics.filter((d) => {
-    const n = d.severity === "error" ? (left.get(baselineKey(d)) ?? 0) : 0;
+    const n = left.get(baselineKey(d)) ?? 0;
     if (n === 0) {
       return true;
     }
     left.set(baselineKey(d), n - 1);
+    if (d.severity !== "error") {
+      return true; // uses up the entry, but a warning is never hidden
+    }
     baselined += 1;
     return false;
   });

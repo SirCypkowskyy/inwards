@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 4b510b59de4a4df4f3923b5be0430dbcb1b0a14be841e4a1ef4c2daf7286cf3a
+source_hash: f21dcfdac16a98c886200f15b6f2b851c8c899bef23fd332125373c8700afbe0
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -593,7 +593,7 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - **INW000 jest stała.** `ignore` ani `severity` nie mogą jej wymienić, a `select` jej nie wyłącza. Plik, którego zadeklarowane kodowanie może ukryć importy, dostaje INW000 zamiast sprawdzenia, więc wyłączenie INW000 albo obniżenie jej poziomu przepuściłoby taki plik niesprawdzony.
 - **Stosowana w rdzeniu, na końcu.** Każda funkcja rdzenia, która zwraca diagnostyki adapterowi, stosuje tabelę, więc `inwards check`, hooki, Stop gate i serwer języka są zgodne. `Engine.checkFiles` stosuje ją po tym, jak zostawi jedno ostrzeżenie INW006 na pakiet, więc skonfigurowany poziom nie zmienia liczby zgłoszonych kopii. Reguły nadal się wykonują; ich diagnostyki są potem odrzucane albo dostają nowy poziom.
 - **Ostrzeżenie to ostrzeżenie.** Reguła ustawiona na `"warning"` pojawia się w każdym formacie, ale jak każde ostrzeżenie nie zmienia kodu wyjścia, nie blokuje ani hooka edycji, ani Stop gate i nie trafia do baseline'u.
-- **Baseline.** `inwards baseline` zapisuje tylko to, co zgłasza sprawdzenie, więc pomija reguły wyłączone albo ustawione na ostrzeżenie. Wpisy takiej reguły, które już są w pliku, są uśpione: nie liczą się jako naprawione (`resolved`) i znów obowiązują, gdy reguła wróci do poziomu błędu, chyba że w międzyczasie baseline został zapisany od nowa.
+- **Baseline.** `inwards baseline` zapisuje tylko to, co zgłasza sprawdzenie, więc pomija reguły wyłączone albo ustawione na ostrzeżenie. Wpisy takiej reguły, które już są w pliku, są uśpione: nie liczą się jako naprawione (`resolved`) i znów obowiązują, gdy reguła wróci do poziomu błędu, chyba że w międzyczasie baseline został zapisany od nowa. W drugą stronę: wpis zapisany, gdy reguła była podniesiona do błędu, po powrocie reguły do domyślnego poziomu pasuje do odpowiadającego mu ostrzeżenia, więc też nie liczy się jako naprawiony.
 - **SARIF.** `rules[]` nadal wymienia każdą zarejestrowaną regułę z domyślnym poziomem z rejestru w `defaultConfiguration.level`. Każdy wynik ma skonfigurowany `level`, który pokazują przeglądarki SARIF. Wyłączona reguła nie ma wyników.
 - **Run log.** `codes` i `severities` zapisują to, co zostało zgłoszone, po zastosowaniu tabeli.
 - **Chroniona jak reszta.** Tabela jest wewnątrz `[tool.inwards]`, więc config guard odrzuca edycję, która ją zmienia, a zmiana przez Bash oblewa Stop gate. Oba przypadki mają testy.

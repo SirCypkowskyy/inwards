@@ -91,6 +91,22 @@ describe("[tool.inwards.rules] and the baseline", () => {
     put(root, "pyproject.toml", configWith('select = ["INW001"]'));
     expect(checkJson(root)).toMatchObject({ code: 0, summary: { baselined: 1, resolved: 0 } });
   });
+
+  test("an entry taken while a rule was raised to error isn't fixed when the rule is back at warning", () => {
+    const root = project({
+      "pyproject.toml": configWith('severity = { INW006 = "error" }'),
+      "shop/domain/order.py": "",
+      "shop/infrastructure/db.py": "",
+      "tools/run.py": "",
+    });
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    put(root, "pyproject.toml", LAYERS);
+    expect(checkJson(root)).toMatchObject({
+      code: 0,
+      summary: { baselined: 0, resolved: 0 },
+      found: ["INW006:warning"],
+    });
+  });
 });
 
 describe("[tool.inwards.rules] in the Claude Code hooks", () => {
