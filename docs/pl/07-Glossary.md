@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: 696cf867aef1ed67d86d4ad785697b6c3c4e71c87bbc8ab43f33ba15e0bfe8a0
+source_hash: 1bc91f1cda76c80e8cfd621f8b9ef33a3dc58a1b8ee1458a81a29c0270d4cdcc
 ---
 
 # :material-book-alphabet: Słownik { #glossary }

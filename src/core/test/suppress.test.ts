@@ -79,6 +79,12 @@ describe("a valid suppression", () => {
     expect(run(text).found).toEqual([]);
   });
 
+  test("works on an import of a first-party module that doesn't exist (INW010)", () => {
+    const text = "from shop.domain.pricing import DiscountPolicy\n";
+    expect(run(text).found).toEqual(["1:INW010:error"]);
+    expect(run(text.replace("\n", `  # inwards: ignore[INW010] ${REASON}\n`)).found).toEqual([]);
+  });
+
   test("the language server's single-file check honours it too", () => {
     const text = `import shop.infrastructure.db  # inwards: ignore[INW001] ${REASON}\n`;
     expect(engine.checkFile(file("shop/domain/order.py", text), PROJECT)).toEqual([]);
