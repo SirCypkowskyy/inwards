@@ -30,6 +30,12 @@ for (const target of targets) {
     entrypoints: ["src/cli/src/main.ts"],
     minify: true,
     sourcemap: "linked",
+    // Bytecode skips parsing the bundle at every start: `inwards --version`
+    // 22 -> 10 ms, a hook call about 45% faster, 2.5 MB more per binary
+    // (docs chapter 6, #39). ESM, not the CJS default for bytecode, so the
+    // module semantics stay what they were without it.
+    bytecode: true,
+    format: "esm",
     // biome-ignore lint/nursery/noUnsafeTypeAssertion: argv goes straight to Bun.build, which rejects unknown targets.
     compile: { target: target as Bun.Build.CompileTarget, outfile },
   });
