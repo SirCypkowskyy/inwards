@@ -9,7 +9,9 @@
  * every file whose content hash differs from the SessionStart manifest. The
  * manifest walks layer packages without skipping anything, so a commit,
  * `git update-index --assume-unchanged`, a gitignored or untracked file, or a
- * pyvenv.cfg disguise inside a layer all show up as changed.
+ * pyvenv.cfg disguise inside a layer all show up as changed. In a changed
+ * file, only violations it didn't have at session start block; the old ones
+ * go along as context when the gate blocks for something else (`legacy.ts`).
  *
  * The gate also fails closed when it can't trust the session: no start
  * record, a `[tool.inwards]` table that differs from the start snapshot (a
@@ -27,6 +29,7 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import { changedBaselines } from "./baseline.ts";
 import { settingsProblem } from "./claude-settings.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
+import { oldErrors, oldNote } from "./legacy.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { newLayoutErrors, preexistingShape } from "./prefixes.ts";
@@ -101,7 +104,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   const changed = changedFiles(project, state, manifest);
   // A baseline changed during the session can't be trusted, so none is applied,
   // and project mode falls back to the changed files.
-  const { report, strangers, governing } = await checkChanged(
+  const { report, old, strangers, governing } = await checkChanged(
     project,
     changed,
     { start: state.start, now: configs, found },
@@ -113,7 +116,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     ...layout,
     ...notIn(layout, report.diagnostics).filter((d) => !preexistingShape(d, state.start.manifest)),
   ];
-  noteRun(project, changed, report.diagnostics);
+  noteRun(project, changed, report.diagnostics); // old errors aren't the session's
   for (const [file, config] of strangers) {
     problems.push(
       `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,
@@ -128,7 +131,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   const limit = escalationLimit(state.start.configs, governing);
   const escalated = errorsOf(report).some((d) => (state.seen.get(fingerprint(d)) ?? 0) >= limit);
   const turn = { streak: active ? state.stops : 0, limit, fresh: !active, escalated };
-  return blockOrYield(project, id, turn, { problems, report });
+  return blockOrYield(project, id, turn, { problems, report, old });
 }
 
 /**
@@ -141,23 +144,24 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
  * @param id - the session id.
  * @param turn - blocks so far in this turn, blocks allowed, whether this is the
  *   turn's first Stop, and whether a violation has already escalated.
- * @param found - the problems and the report.
+ * @param found - the problems, the report, and the old errors left out of it.
  * @returns 2 to block, 0 to let the turn end.
  */
 function blockOrYield(
   project: string,
   id: string,
   turn: { streak: number; limit: number; fresh: boolean; escalated: boolean },
-  found: { problems: string[]; report: Report },
+  found: { problems: string[]; report: Report; old: Diagnostic[] },
 ): number {
   const { streak, limit, fresh, escalated } = turn;
-  const { problems, report } = found;
+  const { problems, report, old } = found;
   if (streak >= limit) {
     return yieldTurn(project, id, { problems, diagnostics: errorsOf(report) });
   }
   recordStop(project, id, fresh);
   const ask = escalated || streak + 1 === limit ? [askUser(limit)] : [];
-  return block([...problems, ...ask], report);
+  const context = old.length > 0 ? [oldNote(old)] : [];
+  return block([...problems, ...ask, ...context], report);
 }
 
 /**
@@ -328,8 +332,10 @@ function changedFiles(
  * @param configs.now - the valid configs now.
  * @param configs.found - where each valid config was found now.
  * @param baseline - false to report violations the baselines accept.
- * @returns the merged report, each file governed by an unknown config with
- *   that config, and the project-relative configs the checked files fall under.
+ * @returns the merged report without the errors the changed files already had
+ *   at session start, those errors (never in a whole-project check), each file
+ *   governed by an unknown config with that config, and the project-relative
+ *   configs the checked files fall under.
  */
 async function checkChanged(
   project: string,
@@ -344,7 +350,12 @@ async function checkChanged(
     found: Record<string, string[]>;
   },
   baseline: boolean,
-): Promise<{ report: Report; strangers: [string, string][]; governing: string[] }> {
+): Promise<{
+  report: Report;
+  old: Diagnostic[];
+  strangers: [string, string][];
+  governing: string[];
+}> {
   // Targets by config path; undefined checks the whole project.
   const byConfig = new Map<string, string[] | undefined>();
   const strangers: [string, string][] = [];
@@ -367,9 +378,15 @@ async function checkChanged(
     byConfig.set(path, undefined);
   }
   const reports = await Promise.all(
-    [...byConfig].map(([config, group]) => runCheck(config, group, project, { baseline })),
+    [...byConfig].map(async ([config, group]) => {
+      const report = await runCheck(config, group, project, { baseline });
+      const check = { configPath: config, base: project, baseline };
+      const old = group ? await oldErrors(project, start, check, report.diagnostics) : [];
+      return { ...report, diagnostics: report.diagnostics.filter((d) => !old.includes(d)), old };
+    }),
   );
   return {
+    old: reports.flatMap((r) => r.old),
     report: {
       diagnostics: reports.flatMap((r) => r.diagnostics),
       filesChecked: reports.reduce((n, r) => n + r.filesChecked, 0),

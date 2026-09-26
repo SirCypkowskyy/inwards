@@ -116,14 +116,18 @@ export function projectManifest(
 }
 
 /**
- * Runs git in the project.
+ * Runs git in the project. The hooks call it with an agent-writable
+ * .git/config, so only plumbing that runs no filters, hooks or pagers may go
+ * through here (`rev-parse`, `cat-file blob`); the overrides switch off the
+ * two config commands such plumbing could still reach.
  *
  * @param project - the real project root.
  * @param args - git arguments.
  * @returns stdout, or undefined when git fails or isn't installed.
  */
 export function git(project: string, args: string[]): string | undefined {
-  const run = spawnSync("git", args, { cwd: project, encoding: "utf8" });
+  const safe = ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"];
+  const run = spawnSync("git", [...safe, ...args], { cwd: project, encoding: "utf8" });
   return run.status === 0 ? run.stdout : undefined;
 }
 

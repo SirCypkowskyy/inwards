@@ -4,9 +4,10 @@
 import { readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
-import { ConfigError, type Diagnostic, render } from "@inwards/core";
+import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
 import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
 import { configGuard } from "./guard.ts";
+import { oldErrors, oldNote } from "./legacy.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
@@ -144,34 +145,63 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   }
   try {
     const report = await runCheck(configPath, [target.file], target.cwd, { required: true });
-    noteRun(target.project, [target.file], report.diagnostics);
     // A shape finding on a file that predates the session, and a missing member, are context.
     const existed = start?.manifest[projectPath(target.project, target.file)] !== undefined;
-    const blocking = report.diagnostics.filter(
+    const errors = report.diagnostics.filter(
       (d) => d.severity === "error" && d.code !== "INW008" && !(existed && d.code === "INW007"),
+    );
+    // So is a violation the file already had at session start (see `legacy.ts`).
+    const check = { configPath, base: target.cwd, baseline: true };
+    const old =
+      start && errors.length > 0 ? await oldErrors(target.project, start, check, errors) : [];
+    const blocking = errors.filter((d) => !old.includes(d));
+    // Old errors aren't the agent's, so `inwards stats` must not count them as introduced.
+    noteRun(
+      target.project,
+      [target.file],
+      report.diagnostics.filter((d) => !old.includes(d)),
     );
     const escalation = escalationOf(target.project, id, configPath, blocking);
     // Only what blocks counts toward escalation: context isn't an attempt that failed.
     rememberEdit(target.project, id, target.file, blocking);
-    if (report.diagnostics.length === 0) {
-      return 0;
-    }
-    const json = render(report, "json", { pretty: false });
-    const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
-    if (blocking.length > 0 && escalation?.every !== true) {
-      process.stderr.write(`${ask}${json}\n`); // a new violation still blocks
-      return 2;
-    }
-    // Warnings or context only, or every error has just reached the limit: the report is context.
-    const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: `${ask}${json}` };
-    process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
-    return 0;
+    return report.diagnostics.length === 0 ? 0 : reply(report, { old, blocking }, escalation);
   } catch (err) {
     if (err instanceof ConfigError) {
       return print(`inwards: config error: ${err.message}`, 2);
     }
     return print(`inwards hook: ${err instanceof Error ? err.message : String(err)}`, 1);
   }
+}
+
+/**
+ * Answers the agent after a check that found something: blocking errors go
+ * to stderr with exit 2; warnings and context, or errors that have just
+ * escalated, go back as `additionalContext`. Old errors leave the JSON and
+ * are listed as a note instead.
+ *
+ * @param report - the check of the edited file.
+ * @param split - the errors the file already had at session start, and the ones that block.
+ * @param escalation - the escalation limit, if this run reached it, from `escalationOf`.
+ * @returns 2 to block, 0 when everything is context.
+ */
+function reply(
+  report: Report,
+  { old, blocking }: { old: Diagnostic[]; blocking: Diagnostic[] },
+  escalation: { limit: number; every: boolean } | undefined,
+): number {
+  const shown = { ...report, diagnostics: report.diagnostics.filter((d) => !old.includes(d)) };
+  const json = shown.diagnostics.length > 0 ? render(shown, "json", { pretty: false }) : "";
+  const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
+  const note = old.length > 0 ? `inwards: ${oldNote(old)}\n` : "";
+  if (blocking.length > 0 && escalation?.every !== true) {
+    process.stderr.write(`${ask}${note}${json}\n`); // a new violation still blocks
+    return 2;
+  }
+  // Warnings or context only, or every error has just reached the limit: the report is context.
+  const additionalContext = `${ask}${note}${json}`.trimEnd();
+  const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext };
+  process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
+  return 0;
 }
 
 /**

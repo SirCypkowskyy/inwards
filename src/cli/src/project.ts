@@ -98,14 +98,20 @@ export function layerDirs(configPath: string, config: InwardsConfig): string[] {
  * @param project - the loaded project.
  * @param targets - absolute files or directories; undefined means the config root.
  * @param base - directory that report paths are made relative to.
+ * @param texts - content to check instead of what is on disk, by absolute path.
  * @returns the source files, with forward-slash paths on every OS.
  */
-function loadSources(project: Project, targets: string[] | undefined, base: string): SourceFile[] {
+function loadSources(
+  project: Project,
+  targets: string[] | undefined,
+  base: string,
+  texts?: ReadonlyMap<string, string>,
+): SourceFile[] {
   const { lexicalRoot, realRoot } = project;
   const files: SourceFile[] = [];
   const seen = new Set<string>();
   for (const abs of collectPythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
-    const text = readFileSync(abs, "utf8");
+    const text = texts?.get(abs) ?? readFileSync(abs, "utf8");
     const real = realpath(abs) ?? abs;
     for (const { rel, shown } of moduleNames(abs, lexicalRoot, realRoot)) {
       const named = moduleNameFor(rel);
@@ -157,7 +163,8 @@ function projectFiles(project: Project): ProjectFiles {
  * @param targets - absolute files or directories; undefined means the config root.
  * @param base - directory that report paths are made relative to.
  * @param options - `baseline: false` reports every violation (for `inwards baseline`),
- *   `required: true` adds INW008 for the targets' packages (for the hook).
+ *   `required: true` adds INW008 for the targets' packages (for the hook), `texts`
+ *   checks the given content instead of a file's (a file as it was at session start).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -165,11 +172,15 @@ export async function runCheck(
   configPath: string,
   targets: string[] | undefined,
   base: string,
-  { baseline = true, required = false }: { baseline?: boolean; required?: boolean } = {},
+  {
+    baseline = true,
+    required = false,
+    texts,
+  }: { baseline?: boolean; required?: boolean; texts?: ReadonlyMap<string, string> } = {},
 ): Promise<Report> {
   const started = performance.now();
   const project = await openProject(configPath);
-  const files = loadSources(project, targets, base);
+  const files = loadSources(project, targets, base, texts);
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(configPath) : undefined;
   const index = project.engine.index(projectFiles(project));
