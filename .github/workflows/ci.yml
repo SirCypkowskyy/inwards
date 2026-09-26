@@ -14,7 +14,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # By event too: a nightly run on develop is the only macOS/Windows coverage,
+  # so a push to develop must not cancel it, nor it a push run.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

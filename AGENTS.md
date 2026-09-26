@@ -183,7 +183,8 @@ uv run scripts/check-docs-nav.py  # every page in docs/chapters is in the nav
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
-tests against the compiled binary on Linux, macOS and Windows.
+tests against the compiled binary: on Linux for every PR, and on macOS,
+Windows and the older Ubuntu every night.
 
 ## Before pushing to a PR
 
