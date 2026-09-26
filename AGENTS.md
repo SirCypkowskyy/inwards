@@ -51,7 +51,7 @@ limit. Read the board once when you pick up work, not in a loop.
 ```sh
 R=SirCypkowskyy/inwards
 gh issue edit N --add-assignee @me
-gh issue comment N --body "Claimed. Branch feat/N-slug, worktree ../inwards-N-slug."
+gh issue comment N --body "Claimed. Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug."
 gh issue comment N --body "Status: Blocked. Waiting on #M (engine API)."
 gh issue view N --json body -q .body > body.md   # tick boxes, then:
 gh issue edit N --body-file body.md
@@ -73,22 +73,40 @@ gh api repos/$R/issues/EPIC/sub_issues -F sub_issue_id=$ID
 gh api repos/$R/issues/N/dependencies/blocked_by -F issue_id=$BLOCKER_ID
 ```
 
+## Branches
+
+`develop` is the default branch and the only target for work
+([ADR-019](docs/chapters/05-ADR.md)). Every PR goes to `develop` and is
+squash-merged. `main` holds released code and moves only at a release: the
+owner opens a promotion PR `develop` → `main` and merges it with a merge
+commit, then merges release-please's release PR. The release commit (versions,
+CHANGELOG) stays on `main` only, so `develop` keeps `0.1.0` in its version
+fields; that is expected, and one more reason never to edit those files.
+Rulesets enforce this: no direct pushes, no force pushes, required checks,
+squash only into `develop`, merge commits only into `main`.
+
+Agents from other harnesses work the same way as the coordinator's subagents:
+claim the issue, use their own worktree, open a PR to `develop`, and leave the
+merge to the coordinator or the owner.
+
 ## Parallel agents and worktrees
 
 Several agents may run at once. Every agent uses the same GitHub account, so
 the claim comment, not the assignee, says which agent owns an issue.
 
 - **One issue, one branch, one worktree.** Branch `<type>/<N>-<slug>`
-  (`feat/42-sarif-output`), worktree `../inwards-<N>-<slug>` next to this
-  checkout, created by hand off the base branch the coordinator names:
-  `git worktree add ../inwards-42-sarif-output -b feat/42-sarif-output main`,
-  then `bun install` inside it.
+  (`feat/42-sarif-output`). Worktrees live outside the checkout, in
+  `~/Documents/GitHub/worktrees/<repo>/<worktree>`, here
+  `~/Documents/GitHub/worktrees/inwards/<N>-<slug>`. Create one by hand off
+  `origin/develop` (or the base branch the coordinator names), then run
+  `bun install` inside it:
+  `git worktree add ~/Documents/GitHub/worktrees/inwards/42-sarif-output -b feat/42-sarif-output origin/develop`.
 - **Claim before the first edit.** Assign yourself, set In progress, post the
   claim comment. Never pick up an item that is In progress, Blocked, In
   review or assigned; pick another or ask the coordinator.
 - **Stay in your lane.** Never edit files, run git, or install in another
   agent's worktree or on its branch. Never `git stash`, `checkout`, `switch`,
-  `reset` or `rebase` in the shared main checkout: others have uncommitted
+  `reset` or `rebase` in the shared primary checkout (`~/Documents/GitHub/inwards`): others have uncommitted
   work there.
 - **No shared mutable state.** Run `bun install` in each worktree (isolated
   linker, nothing shared). Temp files go in your own `mktemp -d`, never a
@@ -100,15 +118,16 @@ the claim comment, not the assignee, says which agent owns an issue.
   prompt; everyone else leaves them alone and asks. Never merge a lockfile by
   hand: take the base version and rerun `bun install` or `uv lock`.
   Regenerate snapshots after a rebase and review the diff.
-- **Commit on your branch only.** Rebase on the base branch and rerun the
-  checks below before handing back. Don't merge, and don't push to `main` or
-  the base branch; the coordinator merges one branch at a time.
+- **Commit on your branch only.** Rebase on `origin/develop` and rerun the
+  checks below before handing back. Open the PR with `--base develop`. Don't
+  merge, and don't push to `develop` or `main`; the coordinator merges one
+  branch at a time.
 - **Blocked means stop.** Set Blocked, comment the reason on the issue, and
   report it to the coordinator.
 - **Clean up.** Once the branch is merged or dropped, whoever created the
-  worktree runs `git worktree remove ../inwards-<N>-<slug>` and, once
-  `gh pr view --json state` says MERGED, `git branch -D <branch>` (a
-  squash-merged branch is not an ancestor of `main`, so `-d` refuses it).
+  worktree runs `git worktree remove ~/Documents/GitHub/worktrees/inwards/<N>-<slug>`
+  and, once `gh pr view --json state` says MERGED, `git branch -D <branch>`
+  (a squash-merged branch is not an ancestor of `develop`, so `-d` refuses it).
 
 A coordinator claims the item on the board before it spawns a subagent, so
 two agents never race for it. Each subagent prompt names the issue, the base
@@ -151,12 +170,15 @@ act push -W .github/workflows/cd.yml -n                                       # 
   stays the gate.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
+- **`setup-bun` fails with "Unable to locate executable file"**: act's local
+  cache server restored a Bun cache saved under another worktree path. Rerun
+  with `--no-cache-server`.
 
 ## Commits, PR titles and releases
 
-PRs are squash-merged ([ADR-017](docs/chapters/05-ADR.md)): the PR title is
-the one commit on `main` and its CHANGELOG line, and the PR description is its
-body. Commits inside a branch can say anything.
+PRs are squash-merged into `develop` ([ADR-017](docs/chapters/05-ADR.md)): the
+PR title is the one commit on `develop`, and later its CHANGELOG line, and the
+PR description is its body. Commits inside a branch can say anything.
 
 - **Title:** `type(scope): summary`, checked by `pr-title.yml`. Types that
   reach the changelog: `feat`, `fix`, `perf`, `deps`, `revert`, `docs`.
@@ -174,6 +196,27 @@ body. Commits inside a branch can say anything.
   Don't start a paragraph with `fix:`, `feat:` or another type, because each
   one becomes an extra changelog entry. `Release-As: 0.N.0` only counts in the
   description's **last paragraph**.
+- **A release happens in one sitting, with `develop` frozen** (owner, or the
+  coordinator when asked). release-please walks `main`'s history by commit
+  date and stops at the last release commit, so a PR squash-merged into
+  `develop` before a release PR merges, but promoted after it, is silently
+  left out of the changelog and the version bump.
+  1. Stop merging into `develop`.
+  2. Promote: `gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promotes develop for the next release."`,
+     then `gh pr merge N --merge`. Never squash it: release-please reads the
+     feature commits through the merge. Keep the description free of
+     `feat:` or `fix:` paragraphs.
+  3. Wait for release-please to update its release PR, check the changelog,
+     and merge it (`gh pr merge N --merge --admin`: it gets no CI run).
+  4. Publish the draft release, then resume merging into `develop`.
+
+  Don't promote without releasing, and never merge a release PR that isn't
+  right after a promotion. Before merging anything into `develop`, check that
+  no release is in progress: `gh pr list --base main --label "autorelease: pending"`
+  is empty **and** the tip of `main` isn't a promotion
+  (`git fetch -q origin main && git log -1 --format=%s origin/main`
+  doesn't start with `chore: promote`). The second check covers the seconds
+  before release-please opens its PR, or a failed release-please run.
 - A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
   `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with
