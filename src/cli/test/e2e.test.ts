@@ -11,16 +11,20 @@ import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 const files = { "shop/domain/order.py": "import shop.infrastructure.db\n", "README.md": "hi" };
 const root = project({ "pyproject.toml": LAYERS, ...files });
 const DURATION = /"durationMs":[\d.]+/gu;
+const TEXT_DURATION = /\([\d.]+ ms\)/gu;
 const JSON_SUFFIX = /\.json$/u;
 
 /**
  * Masks the parts of CLI output that change between runs: duration and version.
  *
  * @param s - raw stdout or stderr.
- * @returns the text with `durationMs` set to 0 and the version as `<version>`.
+ * @returns the text with every duration set to 0 and the version as `<version>`.
  */
 function stable(s: string): string {
-  return s.replace(DURATION, '"durationMs":0').replaceAll(`"${VERSION}"`, '"<version>"');
+  return s
+    .replace(DURATION, '"durationMs":0')
+    .replace(TEXT_DURATION, "(0 ms)")
+    .replaceAll(`"${VERSION}"`, '"<version>"');
 }
 
 /**
@@ -45,8 +49,17 @@ test.each(fixtures)("hook claude-code < %s", (name) => {
   expect(run(root, ["hook", "claude-code"], payload(name, root))).toMatchSnapshot();
 });
 
-test.each(["json", "sarif"])("check --format %s", (format) => {
+test.each(["json", "sarif", "concise"])("check --format %s", (format) => {
   expect(run(root, ["check", "--format", format])).toMatchSnapshot();
+});
+
+test.each([
+  ["json", "0"],
+  ["concise", "0"],
+  ["sarif", "1"],
+  ["text", "some"],
+])("check --format %s --max-diagnostics %s", (format, max) => {
+  expect(run(root, ["check", "--format", format, "--max-diagnostics", max])).toMatchSnapshot();
 });
 
 test.each([

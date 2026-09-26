@@ -93,7 +93,7 @@ flowchart TB
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
 | **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW006, INW011 |
-| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/json/sarif), `init`, `hook claude-code` |
+| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init`, `hook claude-code` |
 | **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server.ts` | :white_check_mark: every per-file rule, on each change to an open file |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` for `claude`, `aider` and `agents-md` |
@@ -124,7 +124,7 @@ flowchart LR
         extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
         rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
-        report["<b>Reporters</b><br/><small>reporters.ts<br/>text · json · sarif</small>"]
+        report["<b>Reporters</b><br/><small>reporters.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
         modgraph["<b>Module index</b><br/><small>project.ts: first-party modules,<br/>importers on demand</small>"]
     end
@@ -306,7 +306,7 @@ src/
 │   │   ├── callees.ts     # which calls are loaders, through aliases
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
-│   │   ├── reporters.ts   # text / json / sarif
+│   │   ├── reporters.ts   # text / concise / json / sarif
 │   │   ├── engine.ts      # facade
 │   │   ├── project.ts     # module index, importers on demand
 │   │   ├── types.ts       # SourceFile, Diagnostic, Fix, Span
