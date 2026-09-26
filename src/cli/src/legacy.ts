@@ -16,13 +16,17 @@
  * session start has no known start content, so all its errors count as new,
  * as before: when in doubt, the gate blocks.
  *
+ * Start content is looked up by the path the file was checked under, never
+ * where a symlink points, so an alias the agent creates has none. Each
+ * lookup, failed ones included, happens once per process.
+ *
  * The same start content decides which inline suppressions the hooks honour
  * under `agent-suppressions = "deny"` (#50, ADR-028): a finding suppressed now
  * that wasn't suppressed at session start goes back into the report.
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, normalize, relative, resolve } from "node:path";
 import {
   type AgentSuppressions,
   type Diagnostic,
@@ -31,6 +35,7 @@ import {
   type Report,
   stableMessage,
 } from "@inwards/core";
+import { posix, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { fingerprint } from "./session.ts";
 import { git, projectPath } from "./snapshot.ts";
@@ -113,12 +118,11 @@ export async function agentSuppressions(
   const now = suppressed.map((s) => s.diagnostic);
   const same = start
     ? unchangedFiles(
-        project,
         start,
-        now.map((d) => resolve(check.base, d.file)),
+        now.map((d) => [checkedPath(project, check.base, d.file), resolve(check.base, d.file)]),
       )
     : new Set<string>();
-  const touched = now.filter((d) => !same.has(resolve(check.base, d.file)));
+  const touched = now.filter((d) => !same.has(checkedPath(project, check.base, d.file)));
   const before =
     start && touched.length > 0 ? await atStart(project, start, check, touched) : undefined;
   const kept = carried(touched, before?.suppressed?.map((s) => s.diagnostic) ?? []);
@@ -173,31 +177,50 @@ function modeOf(project: string, start: Start | undefined, configPath: string): 
 /**
  * Finds the files that are byte for byte what they were at session start,
  * from the start manifest's SHA-256. The same bytes mean the same
- * suppressions, committed or not, so the agent didn't add any. Each file is
- * read and hashed once, however many findings it has.
+ * suppressions, committed or not, so the agent didn't add any. A file is
+ * looked up by its path as checked, not where a symlink points: a new alias
+ * (`ln -s order.pyi order.py`) isn't in the manifest, so it gets no
+ * allowance. Each file is read and hashed once, however many findings it has.
  *
- * @param project - the real project root.
- * @param start - the session's start record.
- * @param files - absolute files, repeats allowed (one per finding).
+ * @param start - the session's start manifest.
+ * @param files - each finding's file: its project path as checked (`checkedPath`)
+ *   and its absolute path; repeats allowed.
  * @param read - reads a file's bytes; the tests count the calls.
- * @returns the files whose hash now is their start hash.
+ * @returns the project paths whose hash now is their start hash.
  */
 export function unchangedFiles(
-  project: string,
   start: Pick<Start, "manifest">,
-  files: readonly string[],
+  files: readonly (readonly [rel: string, abs: string])[],
   read: (file: string) => Uint8Array = readFileSync,
 ): Set<string> {
+  const byPath = new Map(files);
   return new Set(
-    [...new Set(files)].filter((file) => {
-      const hash = start.manifest[projectPath(project, file)];
+    [...byPath].flatMap(([rel, abs]) => {
+      const hash = start.manifest[rel];
       try {
-        return hash !== undefined && createHash("sha256").update(read(file)).digest("hex") === hash;
+        const same =
+          hash !== undefined && createHash("sha256").update(read(abs)).digest("hex") === hash;
+        return same ? [rel] : [];
       } catch {
-        return false; // gone or unreadable: not provably unchanged
+        return []; // gone or unreadable: not provably unchanged
       }
     }),
   );
+}
+
+/**
+ * Names a finding's file the way the start manifest does: project-relative,
+ * with symlinks in the report path left alone. Only the base the report
+ * paths are relative to is resolved, so a cwd spelled through a link
+ * (`/var` for `/private/var`) still lands inside the project.
+ *
+ * @param project - the real project root.
+ * @param base - the directory the report paths are relative to.
+ * @param file - a report path.
+ * @returns the project-relative path with forward slashes.
+ */
+function checkedPath(project: string, base: string, file: string): string {
+  return posix(normalize(join(relative(project, realpath(base) ?? base), file)));
 }
 
 /**
@@ -217,10 +240,9 @@ async function atStart(
 ): Promise<Report | undefined> {
   const texts = new Map<string, string>();
   for (const d of found) {
-    const file = resolve(check.base, d.file);
-    const text = texts.has(file) ? undefined : startText(project, start, file);
+    const text = startText(project, start, checkedPath(project, check.base, d.file));
     if (text !== undefined) {
-      texts.set(file, text);
+      texts.set(resolve(check.base, d.file), text);
     }
   }
   if (texts.size === 0) {
@@ -272,28 +294,61 @@ export function oldNote(old: readonly Diagnostic[]): string {
 }
 
 /**
+ * Start contents already looked up in this process, by commit, project path
+ * and start hash; null for a lookup that failed (a file dirty or untracked at
+ * start). The key names the exact content, so an entry can't go stale, and
+ * `agentSuppressions` and `oldErrors` share it.
+ */
+const startTexts = new Map<string, string | null>();
+
+/**
  * Reads a file as it was at session start, if git still has exactly that.
+ * The file is looked up by its path as checked (`checkedPath`), never where a
+ * symlink points, so a new alias has no start content. Each path is read
+ * from git at most once per process, whether or not that works.
  *
  * @param project - the real project root.
  * @param start - the session's start record.
- * @param file - the file, absolute.
+ * @param rel - the file's project path as checked.
+ * @param blob - reads `<commit>:./<path>` from git; the tests count the calls.
  * @returns the start content, or undefined when it can't be proven.
  */
-function startText(project: string, start: Start, file: string): string | undefined {
-  const rel = projectPath(project, file);
+export function startText(
+  project: string,
+  start: Pick<Start, "head" | "manifest">,
+  rel: string,
+  blob: (project: string, spec: string) => string | undefined = gitBlob,
+): string | undefined {
   const hash = start.manifest[rel];
   if (start.head === null || hash === undefined) {
     return undefined;
   }
-  // `./` makes the path relative to the project, which may sit below the repo root.
-  // --no-lazy-fetch: a partial clone the agent set up would otherwise fetch a
-  // missing blob through its remote, i.e. run its ext:: URL or sshCommand. Git
-  // before 2.44 rejects the flag; the file then has no start content, which is safe.
-  const raw = git(project, ["--no-lazy-fetch", "cat-file", "blob", `${start.head}:./${rel}`]);
-  const crlf = raw?.replace(/\r?\n/gu, "\r\n");
-  return [raw, crlf].find(
-    (text) => text !== undefined && createHash("sha256").update(text).digest("hex") === hash,
-  );
+  const key = `${start.head}\u0000${rel}\u0000${hash}`;
+  if (!startTexts.has(key)) {
+    const raw = blob(project, `${start.head}:./${rel}`);
+    const crlf = raw?.replace(/\r?\n/gu, "\r\n");
+    const text = [raw, crlf].find(
+      (t) => t !== undefined && createHash("sha256").update(t).digest("hex") === hash,
+    );
+    startTexts.set(key, text ?? null);
+  }
+  return startTexts.get(key) ?? undefined;
+}
+
+/**
+ * Reads one blob from git without running anything the agent could have set up.
+ * `./` makes the path relative to the project, which may sit below the repo
+ * root. --no-lazy-fetch: a partial clone the agent set up would otherwise
+ * fetch a missing blob through its remote, i.e. run its ext:: URL or
+ * sshCommand. Git before 2.44 rejects the flag; the file then has no start
+ * content, which is safe. Never `--filters` or `--textconv` (see the module comment).
+ *
+ * @param project - the real project root.
+ * @param spec - `<commit>:./<path>`.
+ * @returns the blob's raw content, or undefined when git can't give it.
+ */
+function gitBlob(project: string, spec: string): string | undefined {
+  return git(project, ["--no-lazy-fetch", "cat-file", "blob", spec]);
 }
 
 /**

@@ -5,9 +5,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { appendFileSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { unchangedFiles } from "../src/legacy.ts";
+import process from "node:process";
+import { startText, unchangedFiles } from "../src/legacy.ts";
 import { inwards, payload, project } from "./run.ts";
 import { git, ID, put, session, stop } from "./stop-helpers.ts";
 import {
@@ -167,10 +168,88 @@ describe("the unchanged-file check", () => {
     const a = join(root, "a.py");
     const b = join(root, "b.py");
     const manifest = { "a.py": hash, "b.py": hash };
-    const same = unchangedFiles(root, { manifest }, [a, a, a, b, a, b], read);
+    const files: [string, string][] = [
+      ["a.py", a],
+      ["a.py", a],
+      ["b.py", b],
+      ["a.py", a],
+      ["b.py", b],
+    ];
+    const same = unchangedFiles({ manifest }, files, read);
     expect(reads).toEqual([a, b]);
-    expect([...same]).toEqual([a]);
+    expect([...same]).toEqual(["a.py"]);
     writeFileSync(a, "changed\n");
-    expect(unchangedFiles(root, { manifest }, [a], read).size).toBe(0);
+    expect(unchangedFiles({ manifest }, [["a.py", a]], read).size).toBe(0);
+  });
+
+  test("asks git for each start content once, a failed lookup included", () => {
+    const text = "import os\n";
+    const manifest = {
+      "clean.py": createHash("sha256").update(text).digest("hex"),
+      "dirty.py": createHash("sha256").update("edited before the session\n").digest("hex"),
+    };
+    const start = { head: "0123456789abcdef", manifest };
+    const specs: string[] = [];
+    /**
+     * Stands in for `git cat-file blob` and records each call.
+     *
+     * @param _project - the project root (unused).
+     * @param spec - the blob asked for.
+     * @returns the committed content, which the dirty file no longer has.
+     */
+    function blob(_project: string, spec: string): string {
+      specs.push(spec);
+      return text;
+    }
+    for (let i = 0; i < 3; i += 1) {
+      expect(startText("/p", start, "clean.py", blob)).toBe(text);
+      expect(startText("/p", start, "dirty.py", blob)).toBeUndefined();
+    }
+    expect(specs).toEqual(["0123456789abcdef:./clean.py", "0123456789abcdef:./dirty.py"]);
+    expect(startText("/p", start, "new.py", blob)).toBeUndefined();
+    expect(specs).toHaveLength(2);
   });
 });
+
+describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
+  "a symlink the agent creates is a new file, whatever it points at",
+  () => {
+    test("a .py linked to a stub with a suppression gets no allowance", () => {
+      const root = session({ "shop/domain/cart.pyi": SUPPRESSED });
+      symlinkSync("cart.pyi", join(root, "shop/domain/cart.py"));
+      const edit = posted(root, "shop/domain/cart.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("shop/domain/cart.py:1");
+      const gate = stop(root);
+      expect(gate.code).toBe(2);
+      expect(gate.stderr).toContain("shop/domain/cart.py");
+    });
+
+    test("a .py linked to another .py with a suppression gets no allowance", () => {
+      const root = session({ [LEGACY]: SUPPRESSED });
+      symlinkSync("legacy.py", join(root, "shop/domain/alias.py"));
+      const edit = posted(root, "shop/domain/alias.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("shop/domain/alias.py:1");
+      expect(stop(root).code).toBe(2);
+    });
+
+    test("an alias of a file with an old violation doesn't inherit its excuse (#134)", () => {
+      const root = session({ [LEGACY]: "import shop.infrastructure.db\n" });
+      symlinkSync("legacy.py", join(root, "shop/domain/alias.py"));
+      const edit = posted(root, "shop/domain/alias.py");
+      expect(edit.code).toBe(2);
+      // The real file's own violation is old; the alias's is not.
+      expect(edit.stderr).toContain("- shop/domain/legacy.py:1 INW001");
+      expect(edit.stderr).not.toContain("- shop/domain/alias.py:1");
+      expect(edit.stderr).toContain('"file":"shop/domain/alias.py"');
+    });
+
+    test("the linked file itself keeps its suppression", () => {
+      const root = session({ [LEGACY]: SUPPRESSED });
+      put(root, LEGACY, `${SUPPRESSED}TOTAL = 1\n`);
+      expect(posted(root, LEGACY).code).toBe(0);
+      expect(stop(root).code).toBe(0);
+    });
+  },
+);
