@@ -1,4 +1,5 @@
 import type { Parser } from "web-tree-sitter";
+import { allAccepted, spendAccepted } from "./baseline.ts";
 import type { InwardsConfig } from "./config.ts";
 import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
@@ -50,7 +51,8 @@ export class Engine {
    * Checks one file against every rule.
    * The package shape (INW007) comes first and reads only the path. Then only
    * the import skeleton is parsed. Violations are rare, so the full parse runs
-   * only to confirm one (or when the prescan declines the file).
+   * only to confirm one (or when the prescan declines the file), and not even
+   * then when a baseline accepts them all (see `checkFiles`).
    *
    * The text is normalised first (BOM dropped, lone \r turned into \n), so
    * reported lines and columns match what an editor shows. A file in a layer
@@ -70,18 +72,51 @@ export class Engine {
    * @returns the violations found, empty when the file is clean.
    */
   checkFile(file: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
+    return this.checkOne(file, ownerOf, undefined);
+  }
+
+  /**
+   * Checks one file, see `checkFile`, using up the baseline's accepted copies.
+   *
+   * @param file - the source file as read by the adapter.
+   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param left - accepted copies not yet used, by baseline key; updated in place.
+   * @returns the violations found, the baselined ones included.
+   */
+  private checkOne(
+    file: SourceFile,
+    ownerOf: ModuleLookup,
+    left: Map<string, number> | undefined,
+  ): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    return [...checkShape(src, this.config), ...this.layerFindings(src, ownerOf)];
+    const found = [...checkShape(src, this.config), ...this.layerFindings(src, ownerOf, left)];
+    if (left) {
+      spendAccepted(found, left);
+    }
+    return found;
   }
 
   /**
    * Applies the rules that read the file's text, see `checkFile`.
    *
+   * Skeleton findings that the baseline accepts in full are returned without
+   * the confirming parse. That is safe because they are hidden anyway: the
+   * skeleton never misses an import (ADR-004), and an import's findings
+   * depend only on its target, which both parses read alike, so the real
+   * findings are among the skeleton's and the baseline hides all of them. A
+   * false positive (an import-shaped line in a string) is hidden too, and
+   * uses up an accepted copy.
+   *
    * @param src - the source file, with normalised text.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param left - accepted copies not yet used, by baseline key, if a baseline applies.
    * @returns the violations found.
    */
-  private layerFindings(src: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
+  private layerFindings(
+    src: SourceFile,
+    ownerOf: ModuleLookup,
+    left: ReadonlyMap<string, number> | undefined,
+  ): Diagnostic[] {
     if (layerIndexOf(src.module, this.config.layers) === -1) {
       const warning = unassignedWarning(src, this.config);
       return warning ? [warning] : [];
@@ -93,8 +128,9 @@ export class Engine {
     const dynamic = mentionsDynamicImport(src.text);
     if (!dynamic) {
       const fast = skeletonImports(this.parser, src);
-      if (fast && this.importFindings(src, fast, ownerOf).length === 0) {
-        return [];
+      const found = fast ? this.importFindings(src, fast, ownerOf) : undefined;
+      if (found && (found.length === 0 || (left !== undefined && allAccepted(found, left)))) {
+        return found;
       }
     }
     return this.fullCheck(src, dynamic, ownerOf);
@@ -189,15 +225,28 @@ export class Engine {
    * Order follows the input, so a sorted file list gives sorted output. The
    * INW006 warning for an unassigned package is kept once, on its first file.
    *
+   * With `accepted`, the baseline's keys and counts (see `baselineKey`), a
+   * file whose skeleton findings the baseline would all hide skips the
+   * confirming parse. Its findings are still returned, so the adapter's
+   * baseline hides them the same way. Copies are used up in input order, as
+   * the adapter's baseline does, so a module with more findings than accepted
+   * copies gets the full parse.
+   *
    * @param files - the source files to check.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
-   * @returns every violation across all files.
+   * @param accepted - accepted copies by baseline key, when a baseline applies.
+   * @returns every violation across all files, baselined ones included.
    */
-  checkFiles(files: Iterable<SourceFile>, ownerOf: ModuleLookup): Diagnostic[] {
+  checkFiles(
+    files: Iterable<SourceFile>,
+    ownerOf: ModuleLookup,
+    accepted?: ReadonlyMap<string, number>,
+  ): Diagnostic[] {
     const all: Diagnostic[] = [];
     const warned = new Set<string>();
+    const left = accepted && new Map(accepted);
     for (const file of files) {
-      for (const found of this.checkFile(file, ownerOf)) {
+      for (const found of this.checkOne(file, ownerOf, left)) {
         const once = found.severity === "warning" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {
           all.push(found);

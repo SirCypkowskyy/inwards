@@ -34,11 +34,22 @@ export interface InwardsConfig {
   escalateAfter?: number;
   /** Write the opt-in run log `.inwards/runs.jsonl` (`run-log`, default off). */
   runLog?: boolean;
+  /**
+   * What the Claude Code Stop gate checks (`stop-gate`): `"changed"`, the
+   * default, checks the files the session changed; `"project"` checks the
+   * whole project against its baseline, so a violation in a file the session
+   * never touched blocks too. Absent when not set.
+   */
+  stopGate?: StopGate;
   /** Package shapes, `[[tool.inwards.shape]]`, first match wins (INW007, INW008). */
   shape?: ShapeSpec[];
   /** Where member names may appear, `[[tool.inwards.names]]` (INW007). */
   names?: NameRule[];
 }
+
+/** What the Stop gate checks, see `InwardsConfig.stopGate`. */
+export type StopGate = "changed" | "project";
+const STOP_GATES: readonly string[] = ["changed", "project"] satisfies StopGate[];
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
 const PRERELEASE = /-.*$/u;
@@ -53,6 +64,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "ignore",
   "escalate-after",
   "run-log",
+  "stop-gate",
   "shape",
   "names",
 ]);
@@ -142,6 +154,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     root: root.replaceAll("\\", "/"),
     layers: parsed,
     ...optionalKeys(raw),
+    ...stopGateKey(raw["stop-gate"]),
     ...parseShapeKeys(raw),
   };
   return config;
@@ -176,6 +189,33 @@ function optionalKeys(
     ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
     ...(runLog === undefined ? {} : { runLog }),
   };
+}
+
+/**
+ * Validates `stop-gate`.
+ *
+ * @param value - the raw `stop-gate` value, if any.
+ * @returns `{ stopGate }` when it is set, else nothing.
+ * @throws {ConfigError} when it is neither "changed" nor "project".
+ */
+function stopGateKey(value: unknown): Pick<InwardsConfig, "stopGate"> {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isStopGate(value)) {
+    throw new ConfigError('tool.inwards.stop-gate must be "changed" or "project".');
+  }
+  return { stopGate: value };
+}
+
+/**
+ * Tells whether a raw value is a Stop gate mode.
+ *
+ * @param value - the raw `stop-gate` value.
+ * @returns true for "changed" or "project".
+ */
+function isStopGate(value: unknown): value is StopGate {
+  return typeof value === "string" && STOP_GATES.includes(value);
 }
 
 /**

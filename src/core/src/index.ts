@@ -1,3 +1,4 @@
+export { baselineKey, stableMessage } from "./baseline.ts";
 export {
   declaresInwards,
   type InwardsConfig,

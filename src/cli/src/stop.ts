@@ -1,6 +1,9 @@
 /**
  * The Stop gate: before the agent may end its turn, check what this session
  * changed, and nothing else, so a legacy repo's old violations never block.
+ * A config with `stop-gate = "project"` gets a whole-project check against
+ * its baseline instead, which also catches a violation in a file the session
+ * never touched.
  *
  * "What changed" is every Python file the PostToolUse hook saw edited, plus
  * every file whose content hash differs from the SessionStart manifest. The
@@ -267,7 +270,9 @@ function changedFiles(
  * pyproject.toml with a permissive table would otherwise waive the layers.
  * A file under a config that was already invalid is skipped, since that
  * config governs nothing, and so is one under a config that is invalid now
- * (the config comparison reports that).
+ * (the config comparison reports that). A config set to `stop-gate =
+ * "project"` at session start gets a whole-project check instead, changed
+ * files or not.
  *
  * @param project - the real project root.
  * @param files - absolute changed files.
@@ -284,7 +289,8 @@ async function checkChanged(
   { start, now }: { start: SessionState["start"]; now: Record<string, InwardsConfig> },
   baseline: boolean,
 ): Promise<{ report: Report; strangers: [string, string][]; governing: string[] }> {
-  const byConfig = new Map<string, string[]>();
+  // Targets by config path; undefined checks the whole project.
+  const byConfig = new Map<string, string[] | undefined>();
   const strangers: [string, string][] = [];
   for (const file of files) {
     const config = findConfig(dirname(file), project);
@@ -299,6 +305,11 @@ async function checkChanged(
       strangers.push([projectPath(project, file), rel]);
     } else if (now[rel] !== undefined) {
       byConfig.set(config, [...(byConfig.get(config) ?? []), file]);
+    }
+  }
+  for (const [rel, config] of Object.entries(start.configs)) {
+    if (config.stopGate === "project" && now[rel] !== undefined) {
+      byConfig.set(join(project, rel), undefined);
     }
   }
   const reports = await Promise.all(

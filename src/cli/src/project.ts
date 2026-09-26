@@ -24,7 +24,7 @@ import {
   rootPathOf,
   type SourceFile,
 } from "@inwards/core";
-import { applyBaseline } from "./baseline.ts";
+import { applyBaseline, readBaseline } from "./baseline.ts";
 import { collectPythonFiles } from "./files.ts";
 import { loadGrammars } from "./grammars.ts";
 import { isInside, posix, realpath } from "./paths.ts";
@@ -162,7 +162,9 @@ export async function runCheck(
   const started = performance.now();
   const project = await openProject(configPath);
   const files = loadSources(project, targets, base);
-  const diagnostics = project.engine.checkFiles(files, moduleLookup(project.lexicalRoot));
+  // Read first: the engine skips the confirming parse where the baseline accepts everything.
+  const accepted = baseline ? readBaseline(configPath) : undefined;
+  const diagnostics = project.engine.checkFiles(files, moduleLookup(project.lexicalRoot), accepted);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -182,7 +184,7 @@ export async function runCheck(
     filesChecked: files.length,
     durationMs: performance.now() - started,
   };
-  return baseline ? applyBaseline(configPath, report, targets === undefined) : report;
+  return accepted ? applyBaseline(accepted, report, targets === undefined) : report;
 }
 
 /**

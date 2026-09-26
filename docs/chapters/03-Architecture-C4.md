@@ -192,7 +192,7 @@ The prescan may report false positives, such as an import-shaped line inside a d
 
 The skeleton keeps import statements only, so a file whose only outward dependency is `importlib.import_module("shop.infrastructure.db")` would pass it. Before the prescan runs, a text check looks for the names every loading call has to spell (`importlib`, `runpy`, `builtins`, `__import__`, or a bare `exec`, `eval` or `compile`, after NFKC). A file in a layer that matches goes straight to the full parse, which also looks for dynamic imports. `re.compile` does not match. On the CPython 3.14 standard library, 209 of 1,921 files match. See [ADR-015](05-ADR.md#adr-015-check-literal-dynamic-imports-as-inw011).
 
-The cost model has one bad case. On a legacy codebase where most files already violate, nearly every file pays for the skeleton parse and then the full parse, which is a little slower than parsing everything once. The baseline (UC6) keeps those violations from failing, but the engine still confirms each one on every run. Skipping the confirming parse for a violation the baseline already accepts is planned ([#108](https://github.com/SirCypkowskyy/inwards/issues/108)).
+The cost model has one bad case: a legacy codebase where most files already violate. Without a baseline, nearly every file pays for the skeleton parse and then the full parse, which is slower than parsing everything once. With one, the CLI hands the baseline's keys and counts (rule, module, message without the "Allowed direction" sentence) to the engine as data, and a file whose skeleton findings the baseline accepts in full skips the confirming parse. The engine returns those findings unconfirmed and the CLI hides them as it would have hidden the confirmed ones. That is safe because the baseline hides them either way: the skeleton never misses an import, a finding depends only on the import's target, which both parses read alike, so the real findings are among the skeleton's. A false positive the confirming parse would have dropped (an import-shaped line in a docstring) is hidden too. It never reaches the output, but it uses up an accepted copy, so a fixed violation whose import still sits in a string counts as present, not resolved. Copies are used up in file order, as the CLI's baseline does, and a module with more skeleton findings for a key than the baseline has copies left gets the full parse. On the synthetic repo in legacy mode (`bench/generate.py --legacy`: 2,101 files, each of the 2,000 modules with one violation, all baselined), a cold `inwards check` took a median of 2.74 s before this change and 0.47 s after, against 2.2 to 2.4 s for a bare full parse of every file and 0.43 s for the clean repo (Intel Core Ultra 7 155H, one core).
 
 ## C3: Components of the CLI
 
@@ -370,6 +370,7 @@ src/
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
 │   │   ├── reporters.ts   # text / concise / json / sarif
 │   │   ├── engine.ts      # facade
+│   │   ├── baseline.ts    # baseline keys, which findings a baseline accepts
 │   │   ├── project.ts     # module index, importers on demand
 │   │   ├── types.ts       # SourceFile, Diagnostic, Fix, Span
 │   │   ├── index.ts       # the public API adapters import

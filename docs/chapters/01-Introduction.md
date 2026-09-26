@@ -33,6 +33,7 @@ required-version = "0.1.0"  # oldest Inwards allowed; `inwards init` sets it
 ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
 escalate-after = 3  # attempts at one violation before the agent is told to ask you (optional)
 run-log = false  # local log of hook runs, see the Run log chapter (optional)
+stop-gate = "changed"  # "project" makes the Claude Code Stop gate check the whole project (optional)
 layers = [
   { name = "domain",         modules = ["shop.domain"] },
   { name = "application",    modules = ["shop.application"] },
