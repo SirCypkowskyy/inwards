@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, LAYERS, payload, project } from "./run.ts";
 import { agentWrites, LEAK, put, session, stop } from "./stop-helpers.ts";
 
 const BASELINE = "inwards-baseline.json";
+const LAST_BRACKET = /\]\n$/u;
 
 /**
  * Creates a project with one legacy violation and takes its baseline.
@@ -62,6 +63,25 @@ describe("inwards baseline", () => {
     expect(inwards(["check"], { cwd: twice }).code).toBe(1);
   });
 
+  test("adding an unrelated layer keeps the violation accepted", () => {
+    const root = legacy();
+    const api = '  { name = "api", modules = ["shop.api"] },\n]';
+    put(root, "pyproject.toml", LAYERS.replace(LAST_BRACKET, api));
+    put(root, "shop/api/routes.py", "");
+    const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+    expect(code).toBe(0);
+    expect(summary(stdout)).toMatchObject({ violations: 0, baselined: 1, resolved: 0 });
+  });
+
+  test("writing the baseline replaces a planted symlink instead of following it", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
+    writeFileSync(join(root, "victim.txt"), "keep me\n");
+    symlinkSync(join(root, "victim.txt"), join(root, BASELINE));
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    expect(readFileSync(join(root, "victim.txt"), "utf8")).toBe("keep me\n");
+    expect(lstatSync(join(root, BASELINE)).isSymbolicLink()).toBe(false);
+  });
+
   test("a fixed violation is reported as resolved", () => {
     const root = legacy();
     put(root, "shop/domain/order.py", "X = 1\n");
@@ -114,6 +134,24 @@ describe("baseline with the Claude Code hooks", () => {
     const { code, stderr } = stop(root);
     expect(code).toBe(2);
     expect(stderr).toContain("inwards-baseline.json changed");
+    expect(stderr).not.toContain("git checkout");
+  });
+
+  test("a broken baseline still blocks, and new violations are reported", () => {
+    for (const plant of ["{", "dir"]) {
+      const root = baselinedSession();
+      agentWrites(root, "shop/domain/pay.py", LEAK);
+      rmSync(join(root, BASELINE));
+      if (plant === "dir") {
+        mkdirSync(join(root, BASELINE));
+      } else {
+        writeFileSync(join(root, BASELINE), plant);
+      }
+      const { code, stderr } = stop(root);
+      expect(code).toBe(2);
+      expect(stderr).toContain("inwards-baseline.json changed");
+      expect(stderr).toContain("shop.domain.pay");
+    }
   });
 
   test("the guard denies editing the baseline", () => {
@@ -132,6 +170,9 @@ describe("baseline with the Claude Code hooks", () => {
     expect(run("Write", { file_path: join(root, BASELINE), content: "{}" })).toContain("deny");
     expect(run("Bash", { command: `echo '{}' > ${BASELINE}` })).toContain("deny");
     expect(run("Bash", { command: "inwards baseline" })).toContain("deny");
+    expect(run("Bash", { command: "uvx --from inwards inwards baseline" })).toContain("deny");
+    expect(run("Bash", { command: "env FOO=1 inwards hook claude-code" })).toContain("deny");
+    expect(run("Bash", { command: 'git commit -m "docs: explain inwards baseline"' })).toBe("");
     expect(run("Bash", { command: `cat ${BASELINE}` })).toBe("");
   });
 });

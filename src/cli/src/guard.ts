@@ -31,9 +31,12 @@ const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 const STATE_IN_SHELL = /(?:^|[\s"'=:/\\(<>|;&`${},])\.inw/u;
 const BASELINE_IN_SHELL = /inwards-baseline\.json/iu;
 const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
-/** `inwards hook` or `inwards baseline` in command position, quoted or not. */
+/**
+ * `inwards hook` or `inwards baseline` in command position, quoted or not,
+ * also behind a runner or wrapper (`uvx`, `uv run`, `env`, `sudo`, …).
+ */
 const INWARDS_COMMAND =
-  /(?:^|[;&|(\n]|\$\()\s*(?:[^\s;&|]*[\\/])?inwards(?:\.exe)?\s+["']?(?:hook|baseline)\b/u;
+  /(?:^|[;&|(\n]|\$\()\s*(?:[^\s;&|'"]+\s+)*?(?:[^\s;&|]*[\\/])?inwards(?:\.exe)?\s+["']?(?:hook|baseline)\b/u;
 /** A command that only reads: no redirection, chaining, substitution or in-place flag. */
 const READ_ONLY =
   /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;
