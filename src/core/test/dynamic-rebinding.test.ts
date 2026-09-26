@@ -5,14 +5,14 @@ describe("INW011: a user-defined exec or eval is not a builtin with a computed s
   test.each([
     ["def eval", "def eval(model, loader):\n    pass\neval(model, val_loader)\n"],
     ["class exec", "class exec:\n    pass\nexec(job)\n"],
-    [
-      "def eval after the function that calls it",
-      "def main():\n    eval(model)\ndef eval(m):\n    pass\n",
-    ],
     ["from mylib import eval", "from mylib import eval\neval(model, loader)\n"],
     ["eval = make_evaluator()", "eval = make_evaluator()\neval(model)\n"],
     ["a parameter named exec", "def run(exec, job):\n    return exec(job)\n"],
     ["a typed parameter with a default", "def run(eval: Fn = None):\n    return eval(x)\n"],
+    [
+      "a parameter with a non-loader default",
+      "def run(code, eval=default_eval):\n    return eval(code)\n",
+    ],
     ["a lambda parameter", "f = lambda eval: eval(x)\n"],
     ["a for target", "for eval in evaluators:\n    eval(model)\n"],
     ["a tuple target", "eval, other = pick()\neval(model)\n"],
@@ -63,7 +63,51 @@ describe("INW011: rebindings that don't shadow the builtin at the call", () => {
       "compile rebound by a lambda",
       'compile = lambda *a: code\nexec(compile("pass", "<s>", "exec"))\n',
     ],
+    [
+      "A: a loader-valued binding next to a clean def",
+      "import builtins\ndef eval(x):\n    pass\neval = builtins.eval\neval(expr)\n",
+    ],
+    [
+      "A: a loader-valued binding through nonlocal",
+      "import builtins\ndef outer():\n    def eval(x):\n        pass\n    def inner():\n        nonlocal eval\n        eval = builtins.eval\n    inner()\n    return eval(expr)\n",
+    ],
+    [
+      "B: a parameter default that is the builtin",
+      "def run(code, exec=exec):\n    return exec(code)\n",
+    ],
+    ["B: a lambda default that is the builtin", "(lambda exec=exec: exec(code))()\n"],
+    ["C: a call in a parameter default", "def f(y=exec(code)):\n    exec = 1\n"],
+    ["D: a binding under if False", "if False:\n    exec = print\nexec(code)\n"],
+    [
+      "D: an import that may fail",
+      "try:\n    from nonexistent import exec\nexcept ImportError:\n    pass\nexec(code)\n",
+    ],
+    [
+      "D: global with a conditional assignment",
+      "def setup(flag):\n    global eval\n    if flag:\n        eval = print\ndef run():\n    return eval(expr)\n",
+    ],
+    [
+      "E: a module-level binding after the call ran",
+      "def g():\n    return exec(code)\ng()\nexec = print\n",
+    ],
+    [
+      "E: a def after the function that calls it",
+      "def main():\n    eval(model)\ndef eval(m):\n    pass\n",
+    ],
   ])("%s is still reported", (_, src) => {
+    expect(unverifiable(src)).toEqual(["unverifiable"]);
+  });
+});
+
+describe("INW011: accepted false positives of the conservative exemption", () => {
+  test.each([
+    ["a comprehension variable", "[eval(m) for eval in evaluators]\n"],
+    [
+      "a method name used in its class body",
+      "class M:\n    def eval(self, x):\n        pass\n    result = eval(1, 2)\n",
+    ],
+    ["a match capture", "match evaluator:\n    case eval:\n        eval(model)\n"],
+  ])("%s is reported", (_, src) => {
     expect(unverifiable(src)).toEqual(["unverifiable"]);
   });
 });

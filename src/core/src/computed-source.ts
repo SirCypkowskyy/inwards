@@ -6,13 +6,13 @@
  *   takes `exec` or `eval`, which are reported themselves;
  * - the source is `compile(<literal>, ...)` with `compile` not rebound, whose
  *   imports are read at that call;
- * - a bare `exec` or `eval` names something the code binds itself where the
- *   call can see it, such as `def eval(model, loader)` in PyTorch training code.
+ * - a bare `exec` or `eval` names something the code binds itself, such as
+ *   `def eval(model, loader)` in PyTorch training code (see `rebound`).
  *
  * Only the computed case looks at rebinding: a literal source is still read
  * wherever the name comes from (ADR-015), since reading it can add findings
- * but not hide one. A rebinding counts only when it would really shadow the
- * builtin at the call (see `rebound`), so it errs toward a report.
+ * but not hide one. The exemption is conservative: anything that could leave
+ * the builtin in place at the call turns it off, so it errs toward a report.
  */
 import type { Node } from "web-tree-sitter";
 import { type Bindings, importBindings, qualify } from "./callees.ts";
@@ -46,21 +46,27 @@ export function computedSource(call: Node, via: string, bindings: Bindings): Loa
   return compiled === null ? [COMPUTED] : [];
 }
 
-/** Nodes that can bind a name in a module or one of its functions. */
+/** Nodes that bind a name, or declare or delete one. */
 const BINDERS = [
   "function_definition",
   "class_definition",
   "parameters",
   "lambda_parameters",
+  "default_parameter",
+  "typed_default_parameter",
   "assignment",
   "named_expression",
   "for_statement",
+  "as_pattern",
   "import_statement",
   "import_from_statement",
+  "global_statement",
+  "nonlocal_statement",
+  "delete_statement",
 ];
 
-/** Nodes whose body is a scope of its own. */
-const SCOPES = new Set(["function_definition", "lambda", "class_definition"]);
+/** Modules an import of a loader can come from; relative imports count too. */
+const LOADER_MODULES = new Set(["builtins", "importlib", "runpy"]);
 
 /** Patterns whose parts are each assignment (or `del`) targets. */
 const PATTERNS = new Set([
@@ -75,13 +81,19 @@ const PATTERNS = new Set([
 ]);
 
 /**
- * Tells whether a name, at a call, is something the code bound itself rather
- * than the builtin. A binding counts when it sits at module level (before the
- * call, if the call runs at module level too) or in a function or lambda that
- * encloses the call; a `for` target counts only inside its loop. A binding
- * whose value mentions a loader (`exec = builtins.exec`) doesn't count, nor
- * does a relative import, which may re-export the builtin. A `del` of the name
- * where the call can see it turns the exemption off.
+ * Tells whether a name, at a call, is surely something the code bound itself
+ * rather than the builtin. All of these must hold:
+ *
+ * 1. no binding of the name anywhere in the file may be the builtin: an
+ *    assignment, walrus, `for`, `with` / `except` target or parameter default
+ *    whose value mentions a loader, an import from `builtins`, `importlib`,
+ *    `runpy` or a relative module, or a `del`;
+ * 2. no `global` or `nonlocal` declares the name;
+ * 3. some binding is certain to have run: a `def`, `class`, plain assignment
+ *    or import that is a direct statement of the module body or of the body
+ *    of a function enclosing the call; a parameter of a function or lambda
+ *    whose body holds the call; a `for` target whose loop body holds it;
+ * 4. a module-level binding comes before the top-level statement holding the call.
  *
  * @param call - the call that uses the name.
  * @param name - the name, e.g. `eval`.
@@ -89,52 +101,126 @@ const PATTERNS = new Set([
  * @returns true when the name is rebound where the call sees it.
  */
 function rebound(call: Node, name: string, bindings: Bindings): boolean {
-  const nodes = call.tree.rootNode
-    .descendantsOfType([...BINDERS, "delete_statement"])
-    .flatMap((n) => (n && visibleAt(n, call) ? [n] : []));
-  const deleted = nodes.some(
-    (n) => n.type === "delete_statement" && namedChildren(n).flatMap(targetNames).includes(name),
+  const nodes = call.tree.rootNode.descendantsOfType(BINDERS).flatMap((n) => (n ? [n] : []));
+  return (
+    !nodes.some((n) => mayBeBuiltin(n, name, bindings)) &&
+    nodes.some((n) => surelyBinds(n, name, call))
   );
-  return !deleted && nodes.some((n) => boundNames(n, bindings).includes(name));
 }
 
 /**
- * Tells whether what a statement binds is visible at a call.
+ * Tells whether a node could leave the builtin (or an unknown value) under a name.
  *
- * @param binder - a binding or `del` node.
+ * @param node - a node of one of the `BINDERS` types.
+ * @param name - the name.
+ * @param bindings - what names mean in the calling module.
+ * @returns true for a loader-valued binding, a risky import, `global`, `nonlocal` or `del`.
+ */
+function mayBeBuiltin(node: Node, name: string, bindings: Bindings): boolean {
+  switch (node.type) {
+    case "global_statement":
+    case "nonlocal_statement":
+    case "delete_statement":
+      return namedChildren(node).flatMap(targetNames).includes(name);
+    case "assignment":
+    case "for_statement":
+      return (
+        targetNames(node.childForFieldName("left")).includes(name) &&
+        mentionsLoader(node.childForFieldName("right"), bindings)
+      );
+    case "named_expression":
+      return (
+        targetNames(node.childForFieldName("name")).includes(name) &&
+        mentionsLoader(node.childForFieldName("value"), bindings)
+      );
+    case "as_pattern":
+      return (
+        targetNames(node.childForFieldName("alias")?.namedChildren[0] ?? null).includes(name) &&
+        mentionsLoader(namedChildren(node)[0] ?? null, bindings)
+      );
+    case "default_parameter":
+    case "typed_default_parameter":
+      return (
+        targetNames(node.childForFieldName("name")).includes(name) &&
+        mentionsLoader(node.childForFieldName("value"), bindings)
+      );
+    case "import_statement":
+    case "import_from_statement":
+      return importBindings(node).some(
+        ({ local, qualified }) =>
+          local === name &&
+          (qualified === null || LOADER_MODULES.has(qualified.split(".")[0] ?? "")),
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * Tells whether a node binds a name in a way certain to have run before the call.
+ *
+ * @param node - a node of one of the `BINDERS` types.
+ * @param name - the name.
  * @param call - the call.
- * @returns true when the binding's scope encloses the call, as described in `rebound`.
+ * @returns true for a binding that meets conditions 3 and 4 of `rebound`.
  */
-function visibleAt(binder: Node, call: Node): boolean {
-  const definition = binder.type === "function_definition" || binder.type === "class_definition";
-  const scope = enclosingScope(definition ? binder.parent : binder);
-  if (binder.type === "for_statement" && !encloses(binder.childForFieldName("body"), call)) {
-    return false;
+function surelyBinds(node: Node, name: string, call: Node): boolean {
+  switch (node.type) {
+    case "parameters":
+    case "lambda_parameters":
+      return (
+        namedChildren(node).flatMap(parameterName).includes(name) &&
+        encloses(node.parent?.childForFieldName("body") ?? null, call)
+      );
+    case "for_statement":
+      return (
+        targetNames(node.childForFieldName("left")).includes(name) &&
+        encloses(node.childForFieldName("body"), call)
+      );
+    case "function_definition":
+    case "class_definition": {
+      const own = node.childForFieldName("name");
+      const statement = node.parent?.type === "decorated_definition" ? node.parent : node;
+      return own !== null && identifierName(own) === name && direct(statement, call);
+    }
+    case "assignment":
+      return (
+        node.childForFieldName("right") !== null &&
+        targetNames(node.childForFieldName("left")).includes(name) &&
+        node.parent?.type === "expression_statement" &&
+        direct(node.parent, call)
+      );
+    case "import_statement":
+    case "import_from_statement":
+      return importBindings(node).some(({ local }) => local === name) && direct(node, call);
+    default:
+      return false;
   }
-  // A `for` binds its target before the body runs, while other statements bind when they end.
-  const left = binder.type === "for_statement" ? binder.childForFieldName("left") : null;
-  const bindsAt = (left ?? binder).endIndex;
-  if (scope === null) {
-    const runsAtModuleLevel =
-      (enclosingScope(call)?.type ?? "class_definition") === "class_definition";
-    return !runsAtModuleLevel || bindsAt <= call.startIndex;
-  }
-  return scope.type !== "class_definition" && encloses(scope, call);
 }
 
 /**
- * Finds the function, lambda or class whose body holds a node.
+ * Tells whether a statement surely runs before a call: it sits directly in the
+ * module body, before the top-level statement holding the call, or directly in
+ * the body of a function that encloses the call.
  *
- * @param node - any node, or null.
- * @returns the innermost enclosing scope node, or null at module level.
+ * @param statement - a statement node.
+ * @param call - the call.
+ * @returns true when the statement's bindings are in effect at the call.
  */
-function enclosingScope(node: Node | null): Node | null {
-  for (let n = node; n; n = n.parent) {
-    if (SCOPES.has(n.type)) {
-      return n;
+function direct(statement: Node, call: Node): boolean {
+  const { parent } = statement;
+  if (parent?.type === "module") {
+    let top: Node = call;
+    while (top.parent && top.parent.type !== "module") {
+      top = top.parent;
     }
+    return statement.endIndex <= top.startIndex;
   }
-  return null;
+  return (
+    parent?.type === "block" &&
+    parent.parent?.type === "function_definition" &&
+    encloses(parent, call)
+  );
 }
 
 /**
@@ -149,56 +235,22 @@ function encloses(outer: Node | null, inner: Node): boolean {
 }
 
 /**
- * Lists the names one binding node binds, leaving out a value that mentions
- * a loader and imports that may be the builtin.
+ * Tells whether an expression mentions a loader or a module that holds one
+ * (`exec`, `builtins.eval`, `getattr(builtins, "exec")`).
  *
- * @param node - a node of one of the `BINDERS` types.
+ * @param value - the expression, or null.
  * @param bindings - what names mean in the calling module.
- * @returns the bound names.
+ * @returns true when some part of it resolves to a tracked name.
  */
-function boundNames(node: Node, bindings: Bindings): string[] {
-  switch (node.type) {
-    case "function_definition":
-    case "class_definition": {
-      const name = node.childForFieldName("name");
-      return name ? [identifierName(name)] : [];
-    }
-    case "parameters":
-    case "lambda_parameters":
-      return namedChildren(node).flatMap(parameterName);
-    case "assignment":
-    case "for_statement":
-      return valueBinds(node.childForFieldName("right"), node.childForFieldName("left"), bindings);
-    case "named_expression":
-      return valueBinds(node.childForFieldName("value"), node.childForFieldName("name"), bindings);
-    case "delete_statement":
-      return [];
-    default:
-      return importBindings(node).flatMap(({ local, qualified }) =>
-        qualified === null || qualified.startsWith("builtins.") ? [] : [local],
-      );
-  }
-}
-
-/**
- * Lists the names a `target = value` binds, unless the value mentions a
- * loader or a module that holds one (`exec = exec`, `getattr(builtins, "exec")`).
- *
- * @param value - the value or iterable; null for an annotation without one.
- * @param target - the target.
- * @param bindings - what names mean in the calling module.
- * @returns the bound names.
- */
-function valueBinds(value: Node | null, target: Node | null, bindings: Bindings): string[] {
+function mentionsLoader(value: Node | null, bindings: Bindings): boolean {
   if (!value) {
-    return [];
+    return false;
   }
   const parts = [
     value,
     ...value.descendantsOfType(["identifier", "attribute", "call", "subscript"]),
   ];
-  const loader = parts.some((n) => n !== null && qualify(n, bindings).length > 0);
-  return loader ? [] : targetNames(target);
+  return parts.some((n) => n !== null && qualify(n, bindings).length > 0);
 }
 
 /**
