@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { inwards } from "./run.ts";
 import { edit, LOG, statsOf, withLog } from "./stats-helpers.ts";
@@ -57,11 +57,13 @@ describe("inwards stats: edge cases (#112)", () => {
   });
 
   test("outside git, the walk stops below the home directory", () => {
-    const home = withLog(LOG);
+    // realpath: Windows temp dirs can come as 8.3 short names. USERPROFILE is
+    // where homedir() looks on Windows.
+    const home = realpathSync(withLog(LOG));
     mkdirSync(join(home, "proj/pkg"), { recursive: true });
     const run = inwards(["stats", "--format", "json"], {
       cwd: join(home, "proj/pkg"),
-      env: { HOME: home },
+      env: { HOME: home, USERPROFILE: home },
     });
     expect(JSON.parse(run.stdout).hookRuns).toBe(0);
   });
