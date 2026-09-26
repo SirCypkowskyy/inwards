@@ -60,8 +60,13 @@ test.each(Object.entries(SITES))("every registered rule has a page (%s)", (_site
   expect(registered.map((r) => `${r.code}.md`).filter((page) => !have.has(page))).toEqual([]);
 });
 
-test.each(pages(SITES.en))("%s names a registered rule and carries the page contract", (page) => {
-  const meta = frontMatter(join(SITES.en, page));
+// Every page in either language, as [site, file name].
+const allPages = Object.entries(SITES).flatMap(([site, dir]) =>
+  pages(dir).map((page): [string, string] => [site, page]),
+);
+
+test.each(allPages)("%s/%s names a registered rule and carries the page contract", (site, page) => {
+  const meta = frontMatter(join(site === "pl" ? SITES.pl : SITES.en, page));
   const rule = registered.find((r) => `${r.code}.md` === page);
   expect(REQUIRED.filter((key) => !(key in meta))).toEqual([]);
   expect(meta).toMatchObject({
@@ -76,7 +81,14 @@ test.each(pages(SITES.en))("%s names a registered rule and carries the page cont
   expect(existsSync(resolve(DOCS, "..", source)) && source.startsWith("src/core/src/")).toBe(true);
 });
 
-test.each(pages(SITES.pl))("pl/rules/%s names a registered rule", (page) => {
-  const meta = frontMatter(join(SITES.pl, page));
-  expect(registered.some((r) => `${r.code}.md` === page && meta["code"] === r.code)).toBe(true);
+test.each(pages(SITES.pl))("pl/rules/%s carries the English page's metadata", (page) => {
+  // Only the prose (description) is translated; source and source_hash are the translation's own.
+  const { description: _en, ...en } = frontMatter(join(SITES.en, page));
+  const {
+    description: _pl,
+    source: _source,
+    source_hash: _hash,
+    ...pl
+  } = frontMatter(join(SITES.pl, page));
+  expect(pl).toEqual(en);
 });
