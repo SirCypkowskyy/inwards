@@ -12,12 +12,14 @@
 
 [project]
 name = "inwards"
+# release-please stamps the next line; keep a line nobody edits on each side of
+# it, or every promotion to main conflicts (ADR-019).
 version = "0.1.0"
+license = "MIT"
+license-files = ["LICENSE"]
 description = "Architecture linter for Python that keeps AI coding agents inside your layers."
 readme = "README.md"
 requires-python = ">=3.11"  # scripts/check-docs-nav.py uses tomllib
-license = "MIT"
-license-files = ["LICENSE"]
 keywords = ["linter", "architecture", "ddd", "clean-architecture", "ai-agents"]
 classifiers = [
   "Private :: Do Not Upload",
