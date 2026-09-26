@@ -19,13 +19,14 @@
  * Prints a Markdown table (for $GITHUB_STEP_SUMMARY) and writes JSON with the
  * prescan counts, the raw samples and the runner it ran on.
  */
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { arch, cpus, platform } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { Glob } from "bun";
 import { percentile } from "./compare.ts";
+import { CONFIG_FILE, fetchRepo } from "./corpus-fetch.ts";
 import { isRecord, type Repo, readManifest, toml } from "./corpus-manifest.ts";
 
 /** The prescan differential test's counts for one corpus. */
@@ -45,9 +46,10 @@ interface RepoResult {
   prescan: PrescanCounts;
   check: { filesChecked: number; violations: number; warnings: number };
   samples: { full: number[]; file: number[] };
+  /** Why the repo's fetch or a timed run failed; absent when all went well. */
+  error?: string;
 }
 
-const CONFIG_FILE = "inwards-corpus.toml";
 const DEFAULTS = { fullRuns: 5, fileRuns: 20 };
 const P50 = 0.5;
 const P95 = 0.95;
@@ -78,43 +80,6 @@ export function parsePrescan(stdout: string, dir: string): PrescanCounts | undef
     hinted: Number(m["hinted"]),
     missed: Number(m["missed"]),
   };
-}
-
-/**
- * Runs a command and throws unless it exits 0.
- *
- * @param cmd - the command and its arguments.
- * @returns stdout.
- * @throws {Error} with stderr when the command fails.
- */
-function run(cmd: string[]): string {
-  const res = Bun.spawnSync(cmd, { stderr: "pipe" });
-  if (res.exitCode !== 0) {
-    throw new Error(`${cmd.join(" ")} exited ${res.exitCode}: ${res.stderr.toString()}`);
-  }
-  return res.stdout.toString();
-}
-
-/**
- * Checks out a repo at its pinned commit: one shallow fetch of that commit,
- * without blobs outside the sparse paths. Reuses a checkout already there.
- *
- * @param repo - the manifest entry.
- * @param dir - where the checkout goes.
- */
-function fetchRepo(repo: Repo, dir: string): void {
-  const head = Bun.spawnSync(["git", "-C", dir, "rev-parse", "HEAD"], { stderr: "ignore" });
-  if (existsSync(dir) && head.stdout.toString().trim() === repo.sha) {
-    return;
-  }
-  rmSync(dir, { recursive: true, force: true });
-  run(["git", "init", "-q", dir]);
-  run(["git", "-C", dir, "remote", "add", "origin", repo.url]);
-  run(["git", "-C", dir, "fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", repo.sha]);
-  if (repo.paths) {
-    run(["git", "-C", dir, "sparse-checkout", "set", ...repo.paths]);
-  }
-  run(["git", "-C", dir, "checkout", "-q", "--detach", "FETCH_HEAD"]);
 }
 
 /**
@@ -225,10 +190,10 @@ function checkSummary(stdout: string): RepoResult["check"] {
  *
  * @param xs - samples.
  * @param p - the percentile as a fraction.
- * @returns e.g. `412`.
+ * @returns e.g. `412`, or `n/a` when a failed run left no samples.
  */
 function ms(xs: readonly number[], p: number): string {
-  return percentile(xs, p).toFixed(0);
+  return xs.length === 0 ? "n/a" : percentile(xs, p).toFixed(0);
 }
 
 /**
@@ -246,7 +211,53 @@ export function markdown(results: readonly RepoResult[]): string {
     "| Repo | Commit | .py files | Lines | Prescan refused | Prescan missed | Files checked | Full check p50 / max (ms) | One file p50 / p95 (ms) | Violations (our layers) |",
     "|---|---|--:|--:|--:|--:|--:|--:|--:|--:|",
     ...rows,
+    ...results.flatMap((r) =>
+      r.error === undefined ? [] : ["", `**${r.name} failed:** ${r.error.split("\n")[0]}`],
+    ),
   ].join("\n");
+}
+
+/**
+ * Fetches one repo, runs the prescan test on it and times the checks. A
+ * failure is recorded in the result instead of thrown, so the other repos
+ * still run and corpus-result.json is still written.
+ *
+ * @param repo - the manifest entry.
+ * @param dir - where its checkout goes.
+ * @param options - the binary and the run counts.
+ * @returns what was measured, and whether the repo passed.
+ */
+function measure(repo: Repo, dir: string, options: Options): { result: RepoResult; ok: boolean } {
+  const result: RepoResult = {
+    name: repo.name,
+    sha: repo.sha,
+    lines: 0,
+    prescan: { files: 0, refused: 0, extra: 0, hinted: 0, missed: 0 },
+    check: { filesChecked: 0, violations: 0, warnings: 0 },
+    samples: { full: [], file: [] },
+  };
+  try {
+    fetchRepo(repo, dir);
+    writeFileSync(join(dir, CONFIG_FILE), toml(repo.config));
+    const scan = prescan(repo, dir);
+    result.prescan = scan.counts;
+    result.lines = pythonLines(dir);
+    const { bin, fullRuns, fileRuns } = options;
+    const full = sample(bin, ["check", "--config", CONFIG_FILE, "--format", "json"], dir, fullRuns);
+    result.check = checkSummary(full.stdout);
+    result.samples.full = full.samples;
+    result.samples.file = sample(
+      bin,
+      ["check", "--config", CONFIG_FILE, repo.file],
+      dir,
+      fileRuns,
+    ).samples;
+    return { result, ok: scan.ok };
+  } catch (err) {
+    result.error = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`${repo.name}: ${result.error}\n`);
+    return { result, ok: false };
+  }
 }
 
 /** The validated command line. */
@@ -301,21 +312,9 @@ function main(): number {
   const results: RepoResult[] = [];
   let ok = true;
   for (const repo of repos) {
-    const dir = join(options.dir, repo.name);
-    fetchRepo(repo, dir);
-    writeFileSync(join(dir, CONFIG_FILE), toml(repo.config));
-    const scan = prescan(repo, dir);
-    ok &&= scan.ok;
-    const full = sample(bin, ["check", "--config", CONFIG_FILE, "--format", "json"], dir, fullRuns);
-    const file = sample(bin, ["check", "--config", CONFIG_FILE, repo.file], dir, fileRuns);
-    results.push({
-      name: repo.name,
-      sha: repo.sha,
-      lines: pythonLines(dir),
-      prescan: scan.counts,
-      check: checkSummary(full.stdout),
-      samples: { full: full.samples, file: file.samples },
-    });
+    const measured = measure(repo, join(options.dir, repo.name), options);
+    results.push(measured.result);
+    ok &&= measured.ok;
   }
   const runner = {
     os: `${platform()} ${arch()}`,
@@ -323,10 +322,10 @@ function main(): number {
     cores: cpus().length,
     label: process.env["RUNNER_NAME"] ?? "local",
     bun: Bun.version,
-    inwards: run([bin, "--version"]).trim(),
+    inwards: Bun.spawnSync([bin, "--version"]).stdout.toString().trim() || "unknown",
   };
   process.stdout.write(
-    `${markdown(results)}\n\n${ok ? "The prescan missed no import." : "**The prescan test failed; see the log.**"} ${fullRuns} full and ${fileRuns} single-file runs per repo, after one warm-up each.\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}, inwards ${runner.inwards}\n`,
+    `${markdown(results)}\n\n${ok ? "The prescan missed no import and every run finished." : "**The corpus run failed; see above and the log.**"} ${fullRuns} full and ${fileRuns} single-file runs per repo, after one warm-up each.\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}, inwards ${runner.inwards}\n`,
   );
   writeFileSync(options.out, `${JSON.stringify({ runner, results }, null, 2)}\n`);
   return ok ? 0 : 1;

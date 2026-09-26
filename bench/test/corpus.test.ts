@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { markdown, parsePrescan } from "../corpus.ts";
 import { isRepo, readManifest, toml } from "../corpus-manifest.ts";
 
 const MANIFEST = join(import.meta.dir, "../corpus.json");
+/** prescan-diff's summary line, a template literal in its source. */
+const SUMMARY_TEMPLATE = /`(?<line>\$\{corpus\}: files=[^`]*)`/u;
+/** One `${expression}` in that template. */
+const PLACEHOLDER = /\$\{(?<expr>[^}]+)\}/gu;
 
 describe("bench corpus", () => {
   test("every manifest entry is valid and pinned to a full SHA", () => {
@@ -11,6 +16,7 @@ describe("bench corpus", () => {
     expect(repos.length).toBeGreaterThan(0);
     expect(new Set(repos.map((r) => r.name)).size).toBe(repos.length);
     expect(isRepo({ ...repos[0], sha: "main" })).toBe(false);
+    expect(isRepo({ ...repos[0], url: "file:///etc" })).toBe(false);
   });
 
   test("the config is rendered as a [tool.inwards] table", () => {
@@ -52,6 +58,34 @@ describe("bench corpus", () => {
     expect(parsePrescan(out, "/c/polar")).toBeUndefined();
   });
 
+  test("the parser reads the summary line as prescan-diff.ts formats it", () => {
+    // Running prescan-diff takes seconds (its generated corpus always runs),
+    // so fill in its summary template instead: a changed format fails here.
+    const source = readFileSync(
+      join(import.meta.dir, "../../src/core/scripts/prescan-diff.ts"),
+      "utf8",
+    );
+    const template = SUMMARY_TEMPLATE.exec(source)?.groups?.["line"];
+    expect(template).toBeDefined();
+    const values: Record<string, string> = {
+      corpus: "/c/polar",
+      files: "1831",
+      refused: "22",
+      pct: "1.2",
+      extra: "8",
+      hinted: "14",
+      "missed.length": "0",
+    };
+    const line = (template ?? "").replaceAll(PLACEHOLDER, (_, expr: string) => values[expr] ?? "?");
+    expect(parsePrescan(line, "/c/polar")).toEqual({
+      files: 1831,
+      refused: 22,
+      extra: 8,
+      hinted: 14,
+      missed: 0,
+    });
+  });
+
   test("the table flags a prescan miss", () => {
     const row = {
       name: "r",
@@ -62,5 +96,8 @@ describe("bench corpus", () => {
       samples: { full: [10, 20], file: [5, 6] },
     };
     expect(markdown([row])).toContain("| **1** |");
+    expect(markdown([{ ...row, error: "git fetch exited 128\nmore" }])).toContain(
+      "**r failed:** git fetch exited 128",
+    );
   });
 });

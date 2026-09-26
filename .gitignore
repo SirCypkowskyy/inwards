@@ -8,3 +8,6 @@ __pycache__/
 *.vsix
 .DS_Store
 .memsearch/
+# Written by bench/compare.ts and bench/corpus.ts.
+bench-result.json
+corpus-result.json

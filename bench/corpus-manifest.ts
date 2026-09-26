@@ -69,7 +69,8 @@ function isConfig(x: unknown): x is Repo["config"] {
 
 /**
  * Tells whether a manifest entry has every field bench/corpus.ts relies on,
- * with a full 40-character commit SHA.
+ * with a full 40-character commit SHA and an https://github.com/ URL (the
+ * URL goes to `git fetch`, so no local paths, ssh or other hosts).
  *
  * @param x - one element of `repos`.
  * @returns true for a valid entry.
@@ -80,6 +81,8 @@ export function isRepo(x: unknown): x is Repo {
     ["name", "url", "license", "why", "file"].every((k) => typeof x[k] === "string") &&
     typeof x["sha"] === "string" &&
     SHA.exec(x["sha"]) !== null &&
+    typeof x["url"] === "string" &&
+    x["url"].startsWith("https://github.com/") &&
     (x["paths"] === undefined || isStrings(x["paths"])) &&
     Number.isInteger(x["pythonFiles"]) &&
     isConfig(x["config"])
@@ -101,7 +104,7 @@ export function readManifest(path: string): Repo[] {
   }
   return repos.map((entry: unknown, i) => {
     if (!isRepo(entry)) {
-      throw new Error(`${path}: repos[${i}] is missing a field or has a bad SHA`);
+      throw new Error(`${path}: repos[${i}] is missing a field, or has a bad SHA or URL`);
     }
     return entry;
   });
