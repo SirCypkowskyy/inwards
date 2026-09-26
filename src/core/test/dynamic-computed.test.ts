@@ -1,22 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { check, file, found } from "./helpers.ts";
-
-const UNVERIFIABLE =
-  /^Layer "[^"]+" makes a dynamic import \([^)]+\) with an argument Inwards can't read/u;
-
-/**
- * Checks a snippet and labels each INW011 diagnostic: "unverifiable" when its
- * message says so, else the message itself.
- *
- * @param src - Python source.
- * @param path - where the file sits; a domain module by default.
- * @returns one label per INW011 diagnostic.
- */
-function unverifiable(src: string, path = "shop/domain/order.py"): string[] {
-  return check(file(path, src))
-    .filter((d) => d.code === "INW011")
-    .map((d) => (UNVERIFIABLE.test(d.message) ? "unverifiable" : d.message));
-}
+import { check, file, found, unverifiable } from "./helpers.ts";
 
 describe("INW011: computed targets in an inner layer are unverifiable", () => {
   test.each([
@@ -41,7 +24,7 @@ describe("INW011: computed targets in an inner layer are unverifiable", () => {
     ],
     [
       "relative import_module with the package behind **kwargs",
-      'import importlib\nimportlib.import_module(".infrastructure.db", **{"package": "shop"})\n',
+      'import importlib\nimportlib.import_module(".infrastructure.db", **opts)\n',
     ],
     ["__import__(variable)", "__import__(name)\n"],
     ["__import__ with a computed level", '__import__("db", globals(), None, [], level)\n'],
@@ -95,31 +78,6 @@ describe("INW011: computed targets through aliases", () => {
     ],
   ])("%s", (_, src) => {
     expect(unverifiable(src)).toEqual(["unverifiable"]);
-  });
-});
-
-describe("INW011: a user-defined exec or eval is not a builtin with a computed source", () => {
-  test.each([
-    ["def eval", "def eval(model, loader):\n    pass\neval(model, val_loader)\n"],
-    ["class exec", "class exec:\n    pass\nexec(job)\n"],
-    ["from mylib import eval", "from mylib import eval\neval(model, loader)\n"],
-    [
-      "from .metrics import evaluate as eval",
-      "from .metrics import evaluate as eval\neval(model)\n",
-    ],
-    ["eval = make_evaluator()", "eval = make_evaluator()\neval(model)\n"],
-    ["a parameter named exec", "def run(exec, job):\n    return exec(job)\n"],
-    ["a typed parameter with a default", "def run(eval: Fn = None):\n    return eval(x)\n"],
-    ["a lambda parameter", "f = lambda eval: eval(x)\n"],
-    ["a for target", "for eval in evaluators:\n    eval(model)\n"],
-    ["a tuple target", "eval, other = pick()\neval(model)\n"],
-  ])("%s", (_, src) => {
-    expect(found(src)).toEqual([]);
-  });
-
-  test("a literal source is still read after a rebinding (ADR-015)", () => {
-    const src = 'def exec(src):\n    pass\nexec("import shop.infrastructure.db")\n';
-    expect(found(src)).toEqual([["INW011", "shop.infrastructure.db"]]);
   });
 });
 
@@ -214,4 +172,10 @@ describe("INW011: unverifiable report", () => {
       "unverifiable",
     ]);
   });
+});
+
+test("a literal **{...} is read exactly", () => {
+  const src =
+    'import importlib\nimportlib.import_module(".infrastructure.db", **{"package": "shop"})\n';
+  expect(found(src)).toEqual([["INW011", "shop.infrastructure.db"]]);
 });

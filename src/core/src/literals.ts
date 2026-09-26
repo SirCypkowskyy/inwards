@@ -28,6 +28,7 @@ export function identifierName(node: Node): string {
 /**
  * Finds a call argument by position or keyword.
  * A positional argument after `*args` has no known position, so it is not found.
+ * A keyword is also read from a literal `**{"name": value}`.
  *
  * @param call - the `call` node.
  * @param index - the 0-based position.
@@ -48,15 +49,35 @@ export function argumentAt(call: Node, index: number, keyword: string): Node | n
   if (byPosition) {
     return byPosition;
   }
-  const named = args.find(
-    (a) => a.type === "keyword_argument" && keywordOf(a) === keyword && keyword !== "",
+  if (keyword === "") {
+    return null;
+  }
+  const named = args.find((a) => a.type === "keyword_argument" && keywordOf(a) === keyword);
+  const spread = args
+    .flatMap((a) => (a.type === "dictionary_splat" ? (literalKwargs(a) ?? []) : []))
+    .find((pair) => literalString(pair.childForFieldName("key")) === keyword);
+  return (named ?? spread)?.childForFieldName("value") ?? null;
+}
+
+/**
+ * Reads the entries of a `**{...}` whose keys are all string literals.
+ *
+ * @param splat - a `dictionary_splat` node.
+ * @returns the `pair` nodes, or null when the splat isn't such a literal.
+ */
+function literalKwargs(splat: Node): Node[] | null {
+  const [dict, ...more] = namedChildren(splat);
+  const pairs = dict?.type === "dictionary" && more.length === 0 ? namedChildren(dict) : null;
+  const literal = pairs?.every(
+    (p) => p.type === "pair" && literalString(p.childForFieldName("key")) !== null,
   );
-  return named?.childForFieldName("value") ?? null;
+  return literal ? pairs : null;
 }
 
 /**
  * Tells whether a call passes `*args` or `**kwargs`, behind which any
- * argument `argumentAt` doesn't find may hide.
+ * argument `argumentAt` doesn't find may hide. A literal `**{"name": value}`
+ * hides nothing: `argumentAt` reads it.
  *
  * @param call - the `call` node.
  * @returns true when the argument list holds a splat.
@@ -64,7 +85,10 @@ export function argumentAt(call: Node, index: number, keyword: string): Node | n
 export function hasSplat(call: Node): boolean {
   const list = call.childForFieldName("arguments");
   return list?.type === "argument_list"
-    ? namedChildren(list).some((a) => a.type === "list_splat" || a.type === "dictionary_splat")
+    ? namedChildren(list).some(
+        (a) =>
+          a.type === "list_splat" || (a.type === "dictionary_splat" && literalKwargs(a) === null),
+      )
     : false;
 }
 
