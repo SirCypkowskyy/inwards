@@ -11,17 +11,32 @@ export interface GrammarBinaries {
 }
 
 /**
+ * The runtime and grammar, loaded once per process. `Parser.init` sets up a
+ * global WASM module, so two concurrent loads (two configs checked at once by
+ * the Stop gate) race and fail with "Incompatible language version 0".
+ */
+let python: Promise<Language> | undefined;
+
+/**
  * Creates a tree-sitter parser for Python from the adapter's WASM bytes.
- * Initialises the tree-sitter runtime, then loads the Python grammar into a
- * new parser. Async because both steps compile WASM.
+ * The first call initialises the tree-sitter runtime and loads the grammar;
+ * every call, concurrent ones included, then shares that load, so the
+ * first call's bytes win. Async because both steps compile WASM. A failed
+ * load isn't kept, so the next call tries again.
  *
  * @param wasm - the tree-sitter runtime and Python grammar as WASM bytes.
  * @returns a parser ready to parse Python source.
  */
 export async function createPythonParser(wasm: GrammarBinaries): Promise<Parser> {
-  await Parser.init({ wasmBinary: wasm.runtime });
+  python ??= Parser.init({ wasmBinary: wasm.runtime })
+    .then(() => Language.load(wasm.python))
+    .catch((err: unknown) => {
+      python = undefined;
+      throw err;
+    });
+  const language = await python;
   const parser = new Parser();
-  parser.setLanguage(await Language.load(wasm.python));
+  parser.setLanguage(language);
   return parser;
 }
 

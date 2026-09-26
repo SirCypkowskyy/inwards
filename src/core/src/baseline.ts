@@ -1,8 +1,8 @@
 /**
  * Baseline keys: how a diagnostic matches an accepted violation. The CLI owns
  * the baseline file; the engine only receives its keys and counts as data, so
- * it can skip the confirming parse of a file whose skeleton findings the
- * baseline accepts in full (see `Engine.checkFiles`).
+ * it can skip the confirming parse of a module whose skeleton findings the
+ * baseline accepts in full (see `acceptedModules`).
  */
 import type { Diagnostic } from "./types.ts";
 
@@ -32,41 +32,41 @@ export function baselineKey(d: Pick<Diagnostic, "code" | "module" | "message">):
 }
 
 /**
- * Tells whether the baseline would hide every one of a file's findings: each
- * is an error (warnings are never baselined) and each key has enough accepted
- * copies left for all of the file's findings with that key.
+ * Finds the modules whose findings the baseline hides in full, so the engine
+ * can skip their confirming parse. Keys hold the module, so one module's
+ * findings never use up another's copies. A module qualifies when every file
+ * of it went through the skeleton, every finding is an error (warnings are
+ * never baselined), and for each key the findings across all its files
+ * (`order.py` and `order.pyi` are one module) are no more than the accepted
+ * copies. The skeleton never misses an import (ADR-004), and a finding
+ * depends only on the import's target, which both parses read alike, so the
+ * real findings are no more than the skeleton's and the baseline hides them
+ * all, exactly as it would after the full parse.
  *
- * @param found - the findings.
- * @param left - accepted copies not yet used, by key.
- * @returns true when nothing among the findings would be reported.
+ * @param files - each file's module and scan findings, null when it had no skeleton.
+ * @param accepted - accepted copies by baseline key.
+ * @returns the modules whose skeleton findings can go unconfirmed.
  */
-export function allAccepted(
-  found: readonly Diagnostic[],
-  left: ReadonlyMap<string, number>,
-): boolean {
-  const need = new Map<string, number>();
-  for (const d of found) {
-    const key = baselineKey(d);
-    need.set(key, (need.get(key) ?? 0) + 1);
-    if (d.severity !== "error" || (need.get(key) ?? 0) > (left.get(key) ?? 0)) {
-      return false;
+export function acceptedModules(
+  files: readonly { module: string; found: readonly Diagnostic[] | null }[],
+  accepted: ReadonlyMap<string, number>,
+): Set<string> {
+  const blocked = new Set<string>();
+  const hits = new Map<string, { module: string; n: number }>();
+  for (const { module, found } of files) {
+    if (found === null || found.some((d) => d.severity !== "error")) {
+      blocked.add(module);
+      continue;
+    }
+    for (const d of found) {
+      const key = baselineKey(d);
+      hits.set(key, { module, n: (hits.get(key)?.n ?? 0) + 1 });
     }
   }
-  return true;
-}
-
-/**
- * Uses up accepted copies the way the CLI's baseline does, one per matching
- * error in report order, so the engine knows how many are still left.
- *
- * @param found - findings, in report order.
- * @param left - accepted copies not yet used, by key; updated in place.
- */
-export function spendAccepted(found: readonly Diagnostic[], left: Map<string, number>): void {
-  for (const d of found) {
-    const n = d.severity === "error" ? (left.get(baselineKey(d)) ?? 0) : 0;
-    if (n > 0) {
-      left.set(baselineKey(d), n - 1);
+  for (const [key, { module, n }] of hits) {
+    if (n > (accepted.get(key) ?? 0)) {
+      blocked.add(module);
     }
   }
+  return new Set(files.map((f) => f.module).filter((m) => !blocked.has(m)));
 }

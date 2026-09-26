@@ -58,6 +58,13 @@ describe("inwards baseline", () => {
     expect(inwards(["check"], { cwd: root }).code).toBe(0);
   });
 
+  test("a quoted copy in order.py doesn't bring back the baselined import in order.pyi", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.pyi": LEAK });
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    put(root, "shop/domain/order.py", `"""\n${LEAK}"""\n`);
+    expect(inwards(["check"], { cwd: root }).code).toBe(0);
+  });
+
   test("a new violation fails, and so does a second copy of a baselined one", () => {
     const root = legacy();
     put(root, "shop/domain/pay.py", LEAK);

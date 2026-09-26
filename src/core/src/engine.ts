@@ -1,5 +1,5 @@
 import type { Parser } from "web-tree-sitter";
-import { allAccepted, spendAccepted } from "./baseline.ts";
+import { acceptedModules } from "./baseline.ts";
 import type { InwardsConfig } from "./config.ts";
 import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
@@ -16,6 +16,16 @@ import {
 import { checkShape } from "./shape.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 import { checkUnassignedImports, type ModuleLookup, unassignedWarning } from "./unassigned.ts";
+
+/** A file after the prescan, before any full parse. */
+interface Scan {
+  /** The findings so far; null when the prescan was skipped or refused the file. */
+  found: Diagnostic[] | null;
+  /** True when `found` is final and needs no full parse. */
+  exact: boolean;
+  /** True when the full parse must also look for dynamic imports (INW011). */
+  dynamic: boolean;
+}
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
 export class Engine {
@@ -72,68 +82,50 @@ export class Engine {
    * @returns the violations found, empty when the file is clean.
    */
   checkFile(file: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
-    return this.checkOne(file, ownerOf, undefined);
-  }
-
-  /**
-   * Checks one file, see `checkFile`, using up the baseline's accepted copies.
-   *
-   * @param file - the source file as read by the adapter.
-   * @param ownerOf - finds the first-party module an import lands in (INW006).
-   * @param left - accepted copies not yet used, by baseline key; updated in place.
-   * @returns the violations found, the baselined ones included.
-   */
-  private checkOne(
-    file: SourceFile,
-    ownerOf: ModuleLookup,
-    left: Map<string, number> | undefined,
-  ): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    const found = [...checkShape(src, this.config), ...this.layerFindings(src, ownerOf, left)];
-    if (left) {
-      spendAccepted(found, left);
-    }
-    return found;
+    return [
+      ...checkShape(src, this.config),
+      ...this.confirm(src, this.scan(src, ownerOf), ownerOf),
+    ];
   }
 
   /**
-   * Applies the rules that read the file's text, see `checkFile`.
-   *
-   * Skeleton findings that the baseline accepts in full are returned without
-   * the confirming parse. That is safe because they are hidden anyway: the
-   * skeleton never misses an import (ADR-004), and an import's findings
-   * depend only on its target, which both parses read alike, so the real
-   * findings are among the skeleton's and the baseline hides all of them. A
-   * false positive (an import-shaped line in a string) is hidden too, and
-   * uses up an accepted copy.
+   * Applies the text rules that need no full parse, see `checkFile`.
    *
    * @param src - the source file, with normalised text.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
-   * @param left - accepted copies not yet used, by baseline key, if a baseline applies.
-   * @returns the violations found.
+   * @returns the findings so far, and what the full parse would still have to do.
    */
-  private layerFindings(
-    src: SourceFile,
-    ownerOf: ModuleLookup,
-    left: ReadonlyMap<string, number> | undefined,
-  ): Diagnostic[] {
+  private scan(src: SourceFile, ownerOf: ModuleLookup): Scan {
     if (layerIndexOf(src.module, this.config.layers) === -1) {
       const warning = unassignedWarning(src, this.config);
-      return warning ? [warning] : [];
+      return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
     const unreadable = checkEncoding(src);
     if (unreadable) {
-      return [unreadable];
+      return { found: [unreadable], exact: true, dynamic: false };
     }
     const dynamic = mentionsDynamicImport(src.text);
-    if (!dynamic) {
-      const fast = skeletonImports(this.parser, src);
-      const found = fast ? this.importFindings(src, fast, ownerOf) : undefined;
-      if (found && (found.length === 0 || (left !== undefined && allAccepted(found, left)))) {
-        return found;
-      }
+    const fast = dynamic ? null : skeletonImports(this.parser, src);
+    const found = fast ? this.importFindings(src, fast, ownerOf) : null;
+    return { found, exact: found?.length === 0, dynamic };
+  }
+
+  /**
+   * Finishes a scan: exact findings stand, anything else gets the full parse,
+   * unless `skip` says the baseline hides every skeleton finding anyway.
+   *
+   * @param src - the source file, with normalised text.
+   * @param scan - its scan.
+   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param skip - true to return the skeleton's findings unconfirmed.
+   * @returns the violations found.
+   */
+  private confirm(src: SourceFile, scan: Scan, ownerOf: ModuleLookup, skip = false): Diagnostic[] {
+    if (scan.found && (scan.exact || skip)) {
+      return scan.found;
     }
-    return this.fullCheck(src, dynamic, ownerOf);
+    return this.fullCheck(src, scan.dynamic, ownerOf);
   }
 
   /**
@@ -225,12 +217,12 @@ export class Engine {
    * Order follows the input, so a sorted file list gives sorted output. The
    * INW006 warning for an unassigned package is kept once, on its first file.
    *
-   * With `accepted`, the baseline's keys and counts (see `baselineKey`), a
-   * file whose skeleton findings the baseline would all hide skips the
-   * confirming parse. Its findings are still returned, so the adapter's
-   * baseline hides them the same way. Copies are used up in input order, as
-   * the adapter's baseline does, so a module with more findings than accepted
-   * copies gets the full parse.
+   * With `accepted`, the baseline's copies by key (see `baselineKey`), a
+   * module the baseline hides in full skips the confirming parse: every file
+   * of it is scanned first, and if the skeleton's findings, false positives
+   * included, add up to no more than the accepted copies of each key, the
+   * real ones do too, so the adapter's baseline hides them all either way.
+   * Those findings are returned unconfirmed. See `acceptedModules`.
    *
    * @param files - the source files to check.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
@@ -242,11 +234,24 @@ export class Engine {
     ownerOf: ModuleLookup,
     accepted?: ReadonlyMap<string, number>,
   ): Diagnostic[] {
+    const scanned = [...files].map((file) => {
+      const src = { ...file, text: normalizeSource(file.text) };
+      return { src, scan: this.scan(src, ownerOf) };
+    });
+    const hidden = accepted
+      ? acceptedModules(
+          scanned.map(({ src, scan }) => ({ module: src.module, found: scan.found })),
+          accepted,
+        )
+      : new Set<string>();
     const all: Diagnostic[] = [];
     const warned = new Set<string>();
-    const left = accepted && new Map(accepted);
-    for (const file of files) {
-      for (const found of this.checkOne(file, ownerOf, left)) {
+    for (const { src, scan } of scanned) {
+      const skip = hidden.has(src.module);
+      for (const found of [
+        ...checkShape(src, this.config),
+        ...this.confirm(src, scan, ownerOf, skip),
+      ]) {
         const once = found.severity === "warning" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {
           all.push(found);

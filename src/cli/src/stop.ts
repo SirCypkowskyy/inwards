@@ -78,7 +78,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   if (!project) {
     return 0;
   }
-  const { valid: configs } = projectConfigs(project);
+  const { valid: configs, found } = projectConfigs(project);
   const state = isSessionId(id) ? readSession(project, id) : undefined;
   if (!(isSessionId(id) && state)) {
     if (Object.keys(configs).length === 0 || active) {
@@ -99,18 +99,19 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   const problems = trustProblems(project, configs, state, edited);
   const manifest = projectManifest(project, configs);
   const changed = changedFiles(project, state, manifest);
-  // A baseline changed during the session can't be trusted, so none is applied.
+  // A baseline changed during the session can't be trusted, so none is applied,
+  // and project mode falls back to the changed files.
   const { report, strangers, governing } = await checkChanged(
     project,
     changed,
-    { start: state.start, now: configs },
+    { start: state.start, now: configs, found },
     edited.length === 0,
   );
   // Shape findings on files that predate the session are legacy, like old violations.
-  report.diagnostics = [
+  report.diagnostics = onePerSpot([
     ...newLayoutErrors(project, configs, state.start.manifest, manifest),
     ...report.diagnostics.filter((d) => !preexistingShape(d, state.start.manifest)),
-  ];
+  ]);
   noteRun(project, changed, report.diagnostics);
   for (const [file, config] of strangers) {
     problems.push(
@@ -239,6 +240,47 @@ function block(problems: string[], report: Report | undefined): number {
 }
 
 /**
+ * Lists the configs the Stop gate checks in full: `stop-gate = "project"` at
+ * session start, still valid now, at every path each was found at.
+ *
+ * @param start - the configs at session start, by project-relative path.
+ * @param now - the valid configs now.
+ * @param found - where each valid config was found now.
+ * @returns absolute pyproject.toml paths.
+ */
+function wholeProject(
+  start: Record<string, InwardsConfig>,
+  now: Record<string, InwardsConfig>,
+  found: Record<string, string[]>,
+): string[] {
+  return Object.entries(start)
+    .filter(([rel, config]) => config.stopGate === "project" && now[rel] !== undefined)
+    .flatMap(([rel]) => found[rel] ?? []);
+}
+
+/**
+ * Drops repeated findings about a config file: in project mode an emptied
+ * layer comes both from the session comparison and from the whole-project
+ * check, in different words, at the same place. The first one is kept.
+ *
+ * @param diagnostics - the findings, session comparison first.
+ * @returns them with one config finding per rule and place.
+ */
+function onePerSpot(diagnostics: Diagnostic[]): Diagnostic[] {
+  const seen = new Set<string>();
+  return diagnostics.filter((d) => {
+    // Config findings have no module; code findings are never merged.
+    const spot = d.module === "" ? `${d.code}\u0000${d.file}:${d.line}:${d.column}` : undefined;
+    if (spot === undefined) {
+      return true;
+    }
+    const fresh = !seen.has(spot);
+    seen.add(spot);
+    return fresh;
+  });
+}
+
+/**
  * Collects the Python files this session changed: the edits the hook saw and
  * the manifest diff since SessionStart.
  *
@@ -272,13 +314,15 @@ function changedFiles(
  * config governs nothing, and so is one under a config that is invalid now
  * (the config comparison reports that). A config set to `stop-gate =
  * "project"` at session start gets a whole-project check instead, changed
- * files or not.
+ * files or not, from every path it was found at, but only while the
+ * baselines can be trusted: otherwise it would report every legacy violation.
  *
  * @param project - the real project root.
  * @param files - absolute changed files.
  * @param configs - the session start, with its valid and invalid configs, and the valid configs now.
  * @param configs.start - the session start.
  * @param configs.now - the valid configs now.
+ * @param configs.found - where each valid config was found now.
  * @param baseline - false to report violations the baselines accept.
  * @returns the merged report, each file governed by an unknown config with
  *   that config, and the project-relative configs the checked files fall under.
@@ -286,7 +330,15 @@ function changedFiles(
 async function checkChanged(
   project: string,
   files: string[],
-  { start, now }: { start: SessionState["start"]; now: Record<string, InwardsConfig> },
+  {
+    start,
+    now,
+    found,
+  }: {
+    start: SessionState["start"];
+    now: Record<string, InwardsConfig>;
+    found: Record<string, string[]>;
+  },
   baseline: boolean,
 ): Promise<{ report: Report; strangers: [string, string][]; governing: string[] }> {
   // Targets by config path; undefined checks the whole project.
@@ -307,10 +359,8 @@ async function checkChanged(
       byConfig.set(config, [...(byConfig.get(config) ?? []), file]);
     }
   }
-  for (const [rel, config] of Object.entries(start.configs)) {
-    if (config.stopGate === "project" && now[rel] !== undefined) {
-      byConfig.set(join(project, rel), undefined);
-    }
+  for (const path of baseline ? wholeProject(start.configs, now, found) : []) {
+    byConfig.set(path, undefined);
   }
   const reports = await Promise.all(
     [...byConfig].map(([config, group]) => runCheck(config, group, project, { baseline })),
