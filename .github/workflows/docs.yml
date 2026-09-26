@@ -36,7 +36,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
+    runs-on: ubuntu-26.04 # holds a Pages write token and OIDC: GitHub-hosted (ops/runner/README.md)
     permissions:
       pages: write
       id-token: write

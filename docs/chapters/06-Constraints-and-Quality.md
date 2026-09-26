@@ -178,11 +178,15 @@ The screenshots in these docs come from `scripts/screenshots.py`, which runs eac
 
 ## CI runners
 
-Every Linux job in CI (lint and typecheck, the Linux tests, the docs build, the benchmark, the SARIF dogfood, the PR title check, the docs deploy and release-please) runs on self-hosted runners, so pull requests cost no GitHub Actions minutes. They run on `irysek`, the owner's Fedora server (Intel Core i5-4570, 4 cores, 7.5 GB RAM), as three Docker containers built from the official runner on Ubuntu 26.04. Each job gets a fresh container that is deleted when the job ends: the host asks the GitHub API for a just-in-time runner, good for one job, and starts the container with it. Each container is capped at 2 GB of RAM and 2 CPUs, runs unprivileged and has no Docker socket. `ops/runner/` holds the Dockerfile, the host script, the systemd units and a README that rebuilds the setup from scratch.
+Most Linux jobs run on self-hosted runners, so pull requests cost no GitHub Actions minutes: lint and typecheck, the Linux tests, the docs build, the benchmark, the SARIF dogfood, the nightly corpus run and the weekly link check. They run on `irysek`, the owner's Fedora server (Intel Core i5-4570, 4 cores, 7.5 GB RAM), as two Docker containers built from the official runner on Ubuntu 26.04. Each job gets a fresh container that is deleted when the job ends: the host asks the GitHub API for a just-in-time runner, good for one job, and starts the container with it. Each container is capped at 2 GB of RAM with no swap and 2 CPUs, runs unprivileged with no Docker socket, and sits on a network whose firewall rules let it reach the public internet only, not the host, the LAN or other containers. `ops/runner/` holds the Dockerfile, the host script, the firewall rules, the systemd units and a README that rebuilds the setup from scratch.
 
-Still on GitHub-hosted runners: `cd.yml`, so release binaries are built on a clean, documented image rather than on a shared home machine (the musl check also needs Docker, and the verify matrix needs arm64, macOS and Windows), and the macOS, Windows and ubuntu-24.04 rows of the test matrix, which run only when started by hand.
+Still on GitHub-hosted runners:
 
-The benchmark gate compares the base branch and the PR in the same job, so it still measures relative change on the slower CPU. Other jobs on the same host add noise to both sides alike.
+- jobs that need Docker, publish, or hold a write token, OIDC or a secret, so a compromised host can't leak them: `cd.yml` (release builds come from a clean, documented image), `pypi.yml`, `release-please.yml`, the Pages deploy in `docs.yml`, `docs-cloudflare.yml` and `nightly-e2e.yml`;
+- `pr-title.yml`, a required check that runs from the base branch, so a PR can still pass it while the self-hosted runners are down;
+- the macOS, Windows and ubuntu-24.04 rows of the test matrix, which run only when started by hand.
+
+On the first run, jobs took 2 to 3 times as long as on GitHub-hosted runners (lint and typecheck 120 s against 40 s, Linux tests 51 s against 25 s). The benchmark gate compares the base branch and the PR in the same job, so it still measures relative change on the slower CPU. Other jobs on the same host add noise to both sides alike.
 
 ## Risks
 

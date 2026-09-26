@@ -1,0 +1,40 @@
+#!/usr/sbin/nft -f
+# Loaded by inwards-runner-network.service. Job containers sit on the bridge
+# br-inwards (Docker network inwards-ci) and may reach the public internet
+# only: nothing on this host, the LAN, other Docker networks, k3s, the tailnet
+# or link-local addresses. DNS goes through Docker's embedded resolver, which
+# queries from the host; port 53 on private addresses stays open in case it
+# forwards from the container instead.
+#
+# Its own table, so neither firewalld nor Docker rewrites it. The chains run
+# before theirs (priority filter - 10), and a drop in any chain is final.
+
+table inet inwards_ci
+delete table inet inwards_ci
+
+table inet inwards_ci {
+	set blocked4 {
+		type ipv4_addr
+		flags interval
+		elements = {
+			0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8,
+			169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16,
+			224.0.0.0/4, 240.0.0.0/4
+		}
+	}
+
+	# Container to the host itself, on any of its addresses.
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+		iifname "br-inwards" drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter - 10; policy accept;
+		iifname "br-inwards" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 accept
+		iifname "br-inwards" ip daddr @blocked4 drop
+		iifname "br-inwards" meta nfproto ipv6 drop
+		# Nothing outside opens a connection to a job container.
+		oifname "br-inwards" ct state new drop
+	}
+}
