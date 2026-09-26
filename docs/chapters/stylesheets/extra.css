@@ -36,3 +36,63 @@
     stroke-dashoffset: -10;
   }
 }
+
+.homepage-loop-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+#homepage-loop {
+  width: 100%;
+  height: auto;
+  font-family: var(--md-text-font-family, sans-serif);
+  font-size: 13px;
+}
+
+#homepage-loop .hl-node rect {
+  fill: var(--md-primary-fg-color);
+  stroke: var(--md-primary-fg-color--dark);
+  stroke-width: 1.5;
+}
+
+#homepage-loop .hl-node text {
+  fill: var(--md-primary-bg-color);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+#homepage-loop .hl-edge {
+  fill: none;
+  stroke: var(--md-default-fg-color--light);
+  stroke-width: 2;
+}
+
+#homepage-loop .hl-edge-dashed {
+  stroke-dasharray: 5 4;
+}
+
+#homepage-loop .hl-arrowhead {
+  fill: var(--md-default-fg-color--light);
+}
+
+/* Hovering (or focusing, for keyboard users) a node highlights the arrows
+   connected to it. Node IDs are known and stable (hand-written SVG, not
+   Mermaid-generated), so :has() can target them directly. */
+@media (prefers-reduced-motion: no-preference) {
+  #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-to-hook,
+  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-to-hook,
+  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-clean,
+  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-violation,
+  #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-violation {
+    stroke: var(--md-accent-fg-color);
+    stroke-dasharray: 6 4;
+    animation: diagram-edge-flow 0.6s linear infinite;
+  }
+}
+
+/* Touch fallback: tap toggles the same highlighted state via the
+   .is-active class set by homepage-loop.mjs, since touch devices never
+   trigger :hover. */
+#homepage-loop .hl-edge.is-active {
+  stroke: var(--md-accent-fg-color);
+}
