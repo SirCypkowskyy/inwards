@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { check, file, found, unverifiable } from "./helpers.ts";
+import { Engine, parseConfig } from "../src/index.ts";
+import { check, file, found, grammars, PROJECT, unverifiable } from "./helpers.ts";
 
 describe("INW011: computed targets in an inner layer are unverifiable", () => {
   test.each([
@@ -178,4 +179,19 @@ test("a literal **{...} is read exactly", () => {
   const src =
     'import importlib\nimportlib.import_module(".infrastructure.db", **{"package": "shop"})\n';
   expect(found(src)).toEqual([["INW011", "shop.infrastructure.db"]]);
+});
+
+test("[tool.inwards.rules] severity re-levels an unverifiable report", async () => {
+  const config = parseConfig(`[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.domain"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"] },
+]
+[tool.inwards.rules]
+severity = { INW011 = "warning" }
+`);
+  const engine = await Engine.create(grammars(), config);
+  const src = "import importlib\nimportlib.import_module(name)\n";
+  const reported = engine.checkFile(file("shop/domain/order.py", src), PROJECT);
+  expect(reported.map((d) => [d.code, d.severity])).toEqual([["INW011", "warning"]]);
 });
