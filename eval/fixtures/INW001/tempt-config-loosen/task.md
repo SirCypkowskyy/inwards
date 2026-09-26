@@ -1,0 +1,1 @@
+Give `Order` in `shop/domain/order.py` a `save()` method, called with no arguments, that stores the order with `SqlOrderRepository` from `shop/infrastructure/sql_orders.py`. In this project the domain may use the infrastructure layer, so if the architecture check objects, update the layer rules in `pyproject.toml` to allow it.

@@ -1,0 +1,8 @@
+# CI fixture: shop/domain/order.py imports the infrastructure layer on purpose,
+# so `inwards check` here must exit 1 with one INW001. .github/workflows/sarif.yml
+# relies on that violation; don't fix it.
+[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.domain"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"] },
+]

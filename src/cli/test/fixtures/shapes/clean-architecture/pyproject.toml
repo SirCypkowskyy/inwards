@@ -1,0 +1,35 @@
+[project]
+name = "clean-architecture-shape"
+
+[tool.inwards]
+ignore = ["tests"]
+layers = [
+  { name = "domain", modules = ["shop.domain"] },
+  { name = "application", modules = ["shop.application"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"] },
+  { name = "main", modules = ["shop.main"] },
+]
+
+[[tool.inwards.shape]]
+packages = ["shop"]
+allow = ["domain/", "application/", "infrastructure/", "main.py"]
+
+[[tool.inwards.shape]]
+packages = ["shop.domain"]
+require = ["__init__", "model/"]
+allow = []
+
+[[tool.inwards.shape]]
+packages = ["shop.application"]
+require = ["__init__", "ports/", "use_cases/"]
+allow = []
+
+# The composition root must exist, and only adapters sit beside it.
+[[tool.inwards.shape]]
+packages = ["shop.infrastructure"]
+require = ["__init__", "adapters/", "di.py"]
+allow = []
+
+[[tool.inwards.names]]
+pattern = "test_*"
+only-in = ["tests", "tests.**"]

@@ -6,11 +6,11 @@
  * - Edit, Write or MultiEdit of a pyproject.toml, in a project that uses
  *   Inwards: the edit is simulated (`edit-sim.ts`) and denied when the parsed
  *   `[tool.inwards]` table would change, appear, disappear or stop parsing.
- * - Any file tool on `.inwards/` (session state).
+ * - Any file tool on `.inwards/` (session state) or `inwards-baseline.json`.
  * - A Claude Code settings file (user, project or local, also through a
  *   symlink) that holds the Inwards hooks, or would get `disableAllHooks`.
  * - An edit to a protected file that can't be simulated exactly is denied too.
- * - Bash that names `.inwards` or the settings files (unless it only reads
+ * - Bash that names `.inwards`, the baseline or the settings files (unless it only reads
  *   them), or runs `inwards hook` / `inwards baseline`.
  *
  * The Bash rules are a speed bump: a shell can reach the same files in ways
@@ -21,21 +21,22 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { inwardsTable } from "@inwards/core";
+import { BASELINE_FILE } from "./baseline.ts";
 import { holdsInwardsHooks } from "./claude-settings.ts";
 import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-sim.ts";
 import { findConfig, isInside, realpath } from "./paths.ts";
+import { runsInwards } from "./shell.ts";
 
 const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 /** `.inwards`, or a prefix of it (`.inw*`), as a path segment in a shell command. */
 const STATE_IN_SHELL = /(?:^|[\s"'=:/\\(<>|;&`${},])\.inw/u;
+const BASELINE_IN_SHELL = /inwards-baseline\.json/iu;
 const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
-/** `inwards hook` or `inwards baseline` in command position, quoted or not. */
-const INWARDS_COMMAND =
-  /(?:^|[;&|(\n]|\$\()\s*(?:[^\s;&|]*[\\/])?inwards(?:\.exe)?\s+["']?(?:hook|baseline)\b/u;
 /** A command that only reads: no redirection, chaining, substitution or in-place flag. */
 const READ_ONLY =
   /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;
-const ASK_USER = "If this really must change, stop and ask the user to do it.";
+/** Ends every denial. The agent eval (eval/evidence.ts) counts denials by it. */
+export const ASK_USER = "If this really must change, stop and ask the user to do it.";
 const UNSURE =
   "Inwards can't tell what this edit does: old_string isn't in the file verbatim. Re-read the file and use its exact text.";
 
@@ -107,6 +108,9 @@ function fileProblem(
   const state = fold(join(project, ".inwards"));
   if (spellings.some((p) => p === state || isInside(state, p))) {
     return ".inwards/ holds the session record the Stop gate relies on; it can't be edited.";
+  }
+  if (spellings.some((p) => basename(p) === fold(BASELINE_FILE)) && usesInwards(project)) {
+    return `${BASELINE_FILE} lists the violations the user accepted; only \`inwards baseline\`, run by the user, changes it.`;
   }
   const settings = settingsPaths(project);
   const isSettings = spellings.some((p) => settings.has(p));
@@ -184,7 +188,7 @@ function shellProblem(project: string, command: unknown): string | undefined {
   if (typeof command !== "string" || !usesInwards(project)) {
     return undefined;
   }
-  if (INWARDS_COMMAND.test(command)) {
+  if (runsInwards(command)) {
     return "`inwards hook` and `inwards baseline` are run by Claude Code and the user, not by the agent.";
   }
   if (READ_ONLY.test(command)) {
@@ -192,6 +196,9 @@ function shellProblem(project: string, command: unknown): string | undefined {
   }
   if (STATE_IN_SHELL.test(command)) {
     return "commands that change .inwards/ are not allowed; it holds the session record the Stop gate relies on.";
+  }
+  if (BASELINE_IN_SHELL.test(command)) {
+    return `commands that change ${BASELINE_FILE} are not allowed; only the user takes a new baseline.`;
   }
   if (SETTINGS_IN_SHELL.test(command)) {
     return "commands that change the Claude Code settings files are not allowed while they hold the Inwards hooks.";

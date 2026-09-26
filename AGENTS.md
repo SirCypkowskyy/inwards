@@ -29,9 +29,38 @@ snapshot; its sub-issue list is what counts.
 
 Check the board before picking up work, and set Status at every transition:
 
-- **Starting an issue.** Take only an item in Todo with no assignee. Assign
-  yourself, set In progress, and comment the branch and worktree you work in,
-  plus the plan when it isn't obvious from the issue.
+- **Starting an issue: check, then claim.** Every agent uses the owner's
+  account, so the assignee says nothing about *which* agent works on an
+  issue. Before you start, check all three, and pick another issue if any of
+  them says someone has it:
+  1. the board status is Todo;
+  2. `gh issue develop N --list` shows no linked branch;
+  3. the issue's comments have no claim that is still open, i.e. a
+     "Claimed by …" comment with no later "Released" or closing report.
+
+  Then claim it in one go:
+  - `gh issue develop N --name <type>/N-slug --base develop --checkout --worktree ~/Documents/GitHub/worktrees/inwards/N-slug`
+    creates the branch, links it to the issue (the issue's Development panel
+    shows it to every other agent), sets `develop` as the PR base and checks
+    it out in the worktree;
+  - set Status to In progress;
+  - post the claim comment: who you are (harness and model, e.g. "Claude
+    Code, Opus 5.5" or "Codex"), the branch, the worktree and the plan when
+    it isn't obvious from the issue.
+
+  Right after claiming, run `gh issue develop N --list` again: two agents
+  can pass the checks at the same moment. If there are two linked branches,
+  the later claimant releases.
+
+  If your harness can't reach GitHub or write outside its checkout (Codex's
+  default sandbox, for example), ask the coordinator to claim the issue and
+  create the worktree for you.
+
+  If you stop without finishing, release the issue so the next agent sees it
+  free: push anything worth keeping, then post "Released: <why, what's done,
+  and the commit SHA of anything worth keeping>", delete the linked branch
+  (`git push origin --delete <branch>`, `git worktree remove <path>`,
+  `git branch -D <branch>`), and set the status back to Todo.
 - **While working.** Comment on decisions, scope changes and findings someone
   else will need. Tick acceptance checkboxes in the body as they are met.
 - **Stuck.** Set Blocked and comment what blocks it and who or what can
@@ -50,14 +79,17 @@ limit. Read the board once when you pick up work, not in a loop.
 
 ```sh
 R=SirCypkowskyy/inwards
-gh issue edit N --add-assignee @me
-gh issue comment N --body "Claimed. Branch feat/N-slug, worktree ../inwards-N-slug."
+gh issue develop N --list                         # a linked branch means it's taken
+gh issue view N --comments                        # an open "Claimed by" means it's taken
+gh issue develop N --name feat/N-slug --base develop --checkout \
+  --worktree ~/Documents/GitHub/worktrees/inwards/N-slug
+gh issue comment N --body "Claimed by Claude Code (Opus 5.5). Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug. Plan: …"
 gh issue comment N --body "Status: Blocked. Waiting on #M (engine API)."
 gh issue view N --json body -q .body > body.md   # tick boxes, then:
 gh issue edit N --body-file body.md
 
 # Project board: user project 3
-gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo no:assignee"  # free
+gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo"  # free (then check links and comments)
 gh project item-list 3 --owner SirCypkowskyy -L 300 --query "-status:Todo -status:Done" # taken
 gh project item-list 3 --owner SirCypkowskyy --query "assignee:@me -status:Done"       # mine
 gh project item-add 3 --owner SirCypkowskyy --url https://github.com/$R/issues/N
@@ -73,22 +105,42 @@ gh api repos/$R/issues/EPIC/sub_issues -F sub_issue_id=$ID
 gh api repos/$R/issues/N/dependencies/blocked_by -F issue_id=$BLOCKER_ID
 ```
 
+## Branches
+
+`develop` is the default branch and the only target for work
+([ADR-019](docs/chapters/05-ADR.md)). Every PR goes to `develop` and is
+squash-merged. `main` holds released code and moves only at a release: the
+owner opens a promotion PR `develop` → `main` and merges it with a merge
+commit, then merges release-please's release PR. The release commit (versions,
+CHANGELOG) stays on `main` only, so `develop` keeps `0.1.0` in its version
+fields; that is expected, and one more reason never to edit those files.
+Rulesets enforce this: no direct pushes, no force pushes, required checks,
+squash only into `develop`, merge commits only into `main`.
+
+Agents from other harnesses work the same way as the coordinator's subagents:
+claim the issue, use their own worktree, open a PR to `develop`, and leave the
+merge to the coordinator or the owner.
+
 ## Parallel agents and worktrees
 
 Several agents may run at once. Every agent uses the same GitHub account, so
 the claim comment, not the assignee, says which agent owns an issue.
 
 - **One issue, one branch, one worktree.** Branch `<type>/<N>-<slug>`
-  (`feat/42-sarif-output`), worktree `../inwards-<N>-<slug>` next to this
-  checkout, created by hand off the base branch the coordinator names:
-  `git worktree add ../inwards-42-sarif-output -b feat/42-sarif-output main`,
-  then `bun install` inside it.
-- **Claim before the first edit.** Assign yourself, set In progress, post the
-  claim comment. Never pick up an item that is In progress, Blocked, In
-  review or assigned; pick another or ask the coordinator.
+  (`feat/42-sarif-output`). Worktrees live outside the checkout, in
+  `~/Documents/GitHub/worktrees/<repo>/<worktree>`, here
+  `~/Documents/GitHub/worktrees/inwards/<N>-<slug>`. Create both with
+  `gh issue develop` (see "Starting an issue" above) so the branch is linked
+  to the issue, then run `bun install` inside the worktree. Work that has no
+  issue uses `git worktree add <path> -b <branch> origin/develop`.
+- **Claim before the first edit**, as "Starting an issue" says: board, linked
+  branches and comments first, then the linked branch, In progress and the
+  claim comment. Never pick up an item that is In progress, Blocked or In
+  review, that has a linked branch, or that has an open claim; pick another
+  or ask the coordinator.
 - **Stay in your lane.** Never edit files, run git, or install in another
   agent's worktree or on its branch. Never `git stash`, `checkout`, `switch`,
-  `reset` or `rebase` in the shared main checkout: others have uncommitted
+  `reset` or `rebase` in the shared primary checkout (`~/Documents/GitHub/inwards`): others have uncommitted
   work there.
 - **No shared mutable state.** Run `bun install` in each worktree (isolated
   linker, nothing shared). Temp files go in your own `mktemp -d`, never a
@@ -100,20 +152,24 @@ the claim comment, not the assignee, says which agent owns an issue.
   prompt; everyone else leaves them alone and asks. Never merge a lockfile by
   hand: take the base version and rerun `bun install` or `uv lock`.
   Regenerate snapshots after a rebase and review the diff.
-- **Commit on your branch only.** Rebase on the base branch and rerun the
-  checks below before handing back. Don't merge, and don't push to `main` or
-  the base branch; the coordinator merges one branch at a time.
+- **Commit on your branch only.** Rebase on `origin/develop` and rerun the
+  checks below before handing back. Open the PR with `--base develop`. Don't
+  merge, and don't push to `develop` or `main`; the coordinator merges one
+  branch at a time.
 - **Blocked means stop.** Set Blocked, comment the reason on the issue, and
   report it to the coordinator.
 - **Clean up.** Once the branch is merged or dropped, whoever created the
-  worktree runs `git worktree remove ../inwards-<N>-<slug>` and, once
-  `gh pr view --json state` says MERGED, `git branch -D <branch>` (a
-  squash-merged branch is not an ancestor of `main`, so `-d` refuses it).
+  worktree runs `git worktree remove ~/Documents/GitHub/worktrees/inwards/<N>-<slug>`
+  and, once `gh pr view --json state` says MERGED, `git branch -D <branch>`
+  (a squash-merged branch is not an ancestor of `develop`, so `-d` refuses it).
 
-A coordinator claims the item on the board before it spawns a subagent, so
-two agents never race for it. Each subagent prompt names the issue, the base
-branch, the branch, the worktree path, the files or directories it may touch,
-and any high-conflict file it owns.
+A coordinator that spawns a subagent does the whole claim itself (the checks,
+`gh issue develop`, In progress, and a claim comment naming the subagent)
+before the subagent starts, so two agents never race for it; the subagent
+skips the claim. Each subagent prompt names the issue, the base branch, the
+branch, the worktree path, the files or directories it may touch, and any
+high-conflict file it owns. The coordinator removes the worktree after the
+merge.
 
 ## Before every commit
 
@@ -127,7 +183,8 @@ uv run scripts/check-docs-nav.py  # every page in docs/chapters is in the nav
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
-tests against the compiled binary on Linux, macOS and Windows.
+tests against the compiled binary: on Linux for every PR; on macOS, Windows
+and the older Ubuntu only when started by hand, and in `cd.yml` at a release.
 
 ## Before pushing to a PR
 
@@ -149,19 +206,43 @@ act push -W .github/workflows/cd.yml -n                                       # 
 - **What act can't do:** the macOS and Windows matrix rows, OIDC and
   attestations, releases, and Pages deploys. Those run only on GitHub, so CI
   stays the gate.
+- **macOS and Windows never run on PRs or on a schedule** (#126): the
+  owner's Actions budget is small, and those runners bill at 10x (macOS)
+  and 2x (Windows). A PR only proves Linux. Never start the full matrix
+  yourself; the owner (or the coordinator, when asked) runs it once before
+  a release with `gh workflow run ci.yml --ref develop`, and `cd.yml`
+  verifies each binary on its own OS at the tag.
+- **Linux jobs run on self-hosted runners** on the owner's server `irysek`
+  (`runs-on: [self-hosted, linux, x64, inwards]`), so they cost no Actions
+  minutes. They are two Ubuntu 26.04 containers, one fresh container per
+  job, on a network that reaches only the internet; `ops/runner/README.md`
+  says how to recreate them. A new Linux job gets the self-hosted labels,
+  **except** a job that needs Docker, publishes, or holds a write token,
+  OIDC or a secret: it stays on `ubuntu-26.04`, as `cd.yml`, `pypi.yml`,
+  `release-please.yml`, `docs.yml`'s deploy, `docs-cloudflare.yml` and
+  `nightly-e2e.yml` do. `pr-title.yml` stays hosted too (a required check
+  from the base branch), and so do the manual macOS, Windows and
+  ubuntu-24.04 test rows. If PR jobs sit in "Queued" forever, the runners
+  are down: check `gh api repos/SirCypkowskyy/inwards/actions/runners` and
+  tell the owner. Never attach them to a public repository or allow fork PR
+  workflows: they run PR code.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
+- **`setup-bun` fails with "Unable to locate executable file"**: act's local
+  cache server restored a Bun cache saved under another worktree path. Rerun
+  with `--no-cache-server`.
 
 ## Commits, PR titles and releases
 
-PRs are squash-merged ([ADR-017](docs/chapters/05-ADR.md)): the PR title is
-the one commit on `main` and its CHANGELOG line, and the PR description is its
-body. Commits inside a branch can say anything.
+PRs are squash-merged into `develop` ([ADR-017](docs/chapters/05-ADR.md)): the
+PR title is the one commit on `develop`, and later its CHANGELOG line, and the
+PR description is its body. Commits inside a branch can say anything.
 
 - **Title:** `type(scope): summary`, checked by `pr-title.yml`. Types that
   reach the changelog: `feat`, `fix`, `perf`, `deps`, `revert`, `docs`.
   Hidden: `refactor`, `test`, `build`, `ci`, `chore`. The scope is optional
-  (`core`, `cli`, `hook`, `vscode`, `wheels`, `docs`). The summary says in the
+  and free-form; the usual ones are `core`, `cli`, `hook`, `rules`, `vscode`,
+  `wheels`, `bench` and `docs`. The summary says in the
   imperative what a user gets, with no trailing period.
 - **Breaking change** (a config key removed or renamed, an exit code changed,
   a `diagnostics@1` field removed, a CLI flag removed): `feat!:` in the title
@@ -174,6 +255,41 @@ body. Commits inside a branch can say anything.
   Don't start a paragraph with `fix:`, `feat:` or another type, because each
   one becomes an extra changelog entry. `Release-As: 0.N.0` only counts in the
   description's **last paragraph**.
+- **A release happens in one sitting, with `develop` frozen** (owner, or the
+  coordinator when asked). release-please walks `main`'s history by commit
+  date and stops at the last release commit, so a PR squash-merged into
+  `develop` before a release PR merges, but promoted after it, is silently
+  left out of the changelog and the version bump.
+  1. Stop merging into `develop`, then run the full test matrix once
+     (`gh workflow run ci.yml --ref develop`) and fix any red macOS or
+     Windows row first.
+  2. Promote: `gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promotes develop for the next release."`,
+     then `gh pr merge N --merge`. Never squash it: release-please reads the
+     feature commits through the merge. Keep the description free of
+     `feat:` or `fix:` paragraphs.
+  3. Wait for release-please to update its release PR, check the changelog,
+     and merge it (`gh pr merge N --merge --admin`: it gets no CI run).
+  4. Publish the draft release, then resume merging into `develop`.
+
+  Don't promote without releasing, and never merge a release PR that isn't
+  right after a promotion. Before merging anything into `develop`, check that
+  no release is in progress: `gh pr list --base main --label "autorelease: pending"`
+  is empty **and** the tip of `main` isn't a promotion
+  (`git fetch -q origin main && git log -1 --format=%s origin/main`
+  doesn't start with `chore: promote`). The second check covers the seconds
+  before release-please opens its PR, or a failed release-please run.
+- **Dependabot PRs** (weekly, into `develop`, `.github/dependabot.yml`):
+  - The Bun groups come titled `build:`, which keeps toolchain bumps out of
+    the changelog. Retitle a `runtime` group PR (tree-sitter, smol-toml, the
+    LSP libraries) to `deps:` before merging, since users get those.
+  - They touch `bun.lock` or `uv.lock`, so they merge one at a time like any
+    lockfile change; everyone else rebases and reruns `bun install` or
+    `uv lock` afterwards.
+  - Never push to a Dependabot branch. Comment `@dependabot rebase` or
+    `@dependabot recreate` instead.
+  - A `web-tree-sitter` or `tree-sitter-python` bump changes the parser:
+    check the E2E snapshots and the `prescan-diff` job before merging.
+  - `@types/vscode` is bumped by hand, together with `engines.vscode`.
 - A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
   `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with
@@ -188,9 +304,18 @@ done until both match the code.
   describe what the code does now. Drop "planned" from anything that shipped,
   fix numbers that changed (tests, corpus sizes, timings), and write an ADR
   for any decision a later reader would question. Run the strict docs build.
-- **Every issue you touched** gets a closing comment in three parts:
-  - *Done*: what changed, with commits or the PR;
-  - *Verified*: how you know it works (tests, CI run, `act`, a manual check);
+- **Every issue you touched** gets a closing report as a comment. It is the
+  context a later session (yours or another agent's) reads instead of
+  re-deriving the work, so write it for someone who wasn't there:
+  - *Done*: what changed, with the PR and commit, and where it lives (files,
+    modules, config keys, commands);
+  - *Verified*: how you know it works (tests, CI run, `act`, a manual check,
+    review rounds);
+  - *Challenges*: what was harder than expected, dead ends, surprises in the
+    code or the tools, and how you got past them;
+  - *Weaknesses*: the known limits and trade-offs of the solution, edge
+    cases it gets wrong or doesn't cover, and what you would do differently
+    with more time;
   - *Left*: what is still open. Each open item gets its own issue, linked,
     or stays as an unticked acceptance box with a reason.
   Then tick the acceptance boxes that are met and set the board status.

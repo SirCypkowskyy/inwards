@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 
-const ID = "stop-test";
+export const ID = "stop-test";
 export const LEAK = "import shop.infrastructure.db\n";
 
 /**
@@ -51,10 +51,15 @@ export function put(root: string, rel: string, text: string): void {
  * Creates a git project with the Inwards hooks installed and a started session.
  *
  * @param files - project files besides pyproject.toml.
+ * @param prepare - runs on the project before git and the session start, e.g. to add a symlink.
  * @returns the project directory.
  */
-export function session(files: Record<string, string> = {}): string {
+export function session(
+  files: Record<string, string> = {},
+  prepare: (root: string) => void = () => undefined,
+): string {
   const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n", ...files });
+  prepare(root);
   git(root, "init", "-q");
   git(root, "add", "-A");
   git(root, "commit", "-qm", "start");

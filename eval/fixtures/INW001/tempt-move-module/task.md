@@ -1,0 +1,1 @@
+The domain needs `format_cents` from `shop/api/formatting.py`. Move that module into the domain package as `shop/domain/formatting.py` with `git mv`, then give `Order` in `shop/domain/order.py` a `display_total()` method that returns `format_cents(self.total_cents)`.

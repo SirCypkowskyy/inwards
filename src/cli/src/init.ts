@@ -14,10 +14,10 @@ import { print } from "./output.ts";
 import { findConfig } from "./paths.ts";
 
 export const AGENTS = ["claude", "aider", "agents-md"] as const;
-type Agent = (typeof AGENTS)[number];
+export type Agent = (typeof AGENTS)[number];
 
 /** One file init wants to write: its current text (undefined if absent) and the new text. */
-interface Change {
+export interface Change {
   path: string;
   before: string | undefined;
   after: string;
@@ -44,12 +44,16 @@ const CLAUDE_HOOKS: readonly [event: string, matcher: string | undefined][] = [
  * Permission rules init adds, so Claude Code itself refuses edits to the
  * hooks and the session state even if a hook is gone (`/` anchors at the project).
  */
-const DENY_RULES = ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"];
+const DENY_RULES = [
+  "Edit(/.claude/settings*.json)",
+  "Edit(/.inwards/**)",
+  "Edit(/**/inwards-baseline.json)",
+];
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
-const PRERELEASE = /-.*$/u;
+export const PRERELEASE = /-.*$/u;
 /** What `init` puts in `ignore`: tooling that belongs to no layer. */
-const DEFAULT_IGNORE = ["tests", "scripts", "migrations", "conftest"];
+export const DEFAULT_IGNORE = ["tests", "scripts", "migrations", "conftest"];
 const LINE_BREAK = /\r?\n/u;
 const SECTION_BEGIN = "<!-- inwards:begin -->";
 const SECTION_END = "<!-- inwards:end -->";
@@ -78,9 +82,29 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
   if (!configPath) {
     return print("inwards init: no pyproject.toml with [tool.inwards] here or above.", 2);
   }
-  const project = dirname(configPath);
+  const pinned = pinDefaults(configPath);
+  const changes = agentChanges(agent, dirname(configPath));
+  if (typeof changes === "string") {
+    return print(`inwards init: ${changes}`, 2);
+  }
+  return apply(
+    [pinned, ...changes].filter((c) => c.before !== c.after),
+    dryRun,
+  );
+}
+
+/**
+ * Computes what wiring one agent changes in a project, without writing:
+ * the Claude Code settings or the AGENTS.md section, and the .gitignore
+ * entries. For Aider it prints the `lint-cmd` line to add instead.
+ *
+ * @param agent - which agent to wire up.
+ * @param project - the directory of the project's pyproject.toml.
+ * @returns the changes (some may change nothing), or an error when a file can't be edited safely.
+ */
+export function agentChanges(agent: Agent, project: string): Change[] | string {
   const exec = inwardsExec();
-  const changes: Change[] = [pinDefaults(configPath)];
+  const changes: Change[] = [];
   if (agent === "aider") {
     const cmd = [exec.command, ...exec.args].map(shellQuote).join(" ");
     print(
@@ -94,16 +118,13 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
           claudeSettings(join(project, ".claude", "settings.local.json"), exec)
         : agentsSection(join(project, "AGENTS.md"));
     if (typeof change === "string") {
-      return print(`inwards init: ${change}`, 2);
+      return change;
     }
     changes.push(change);
   }
   // Every agent: session state and the run log (`check --log`) both live in .inwards/.
   changes.push(gitignore(join(project, ".gitignore"), agent));
-  return apply(
-    changes.filter((c) => c.before !== c.after),
-    dryRun,
-  );
+  return changes;
 }
 
 /**
@@ -113,7 +134,7 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
  * @param dryRun - print instead of writing.
  * @returns 0.
  */
-function apply(changes: Change[], dryRun: boolean): number {
+export function apply(changes: Change[], dryRun: boolean): number {
   if (changes.length === 0) {
     return print("inwards init: nothing to change.", 0);
   }
@@ -383,6 +404,6 @@ function separator(text: string): string {
  * @param value - any parsed JSON value.
  * @returns true for a non-null, non-array object.
  */
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

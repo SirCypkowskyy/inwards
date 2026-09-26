@@ -77,7 +77,7 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 | import-linter | :white_check_mark: | :white_check_mark: | yes | static text per contract | :x: | :x: | :x: |
 | pytest-archon | :white_check_mark: | :white_check_mark: | yes (code must import) | :x: | :x: | :x: | :x: |
 | Tach | :white_check_mark: | :white_check_mark: | yes (pip package, Rust extension) | :x: | :x: | :x: | ? |
-| **Inwards** (target) | :white_check_mark: | :white_check_mark: | no (single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| **Inwards** (target) | :white_check_mark: | :white_check_mark: | no (binary in a wheel, or a single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 
 `?` means we couldn't verify it. "Repair guidance" is about telling the reader what to change. Autofix, where the tool rewrites the code itself, is a stronger form of it.
 
@@ -93,25 +93,101 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 
 The coordinates are our qualitative reading of the research above, not a measurement. Inwards' dot marks where it's aiming, not where it is today.
 
-```mermaid
-quadrantChart
-    title Where the tools sit
-    x-axis "Generic code rules" --> "Architecture rules"
-    y-axis "Built for humans" --> "Built for agent loops"
-    quadrant-1 "Inwards' target"
-    quadrant-2 "Agent-aware linters"
-    quadrant-3 "Classic linters"
-    quadrant-4 "Architecture tests"
-    Ruff: [0.15, 0.2]
-    ty: [0.2, 0.25]
-    Biome: [0.25, 0.45]
-    React Doctor: [0.3, 0.85]
-    ArchLint: [0.7, 0.7]
-    import-linter: [0.85, 0.3]
-    pytest-archon: [0.8, 0.1]
-    Tach: [0.75, 0.2]
-    Inwards target: [0.9, 0.9]
-```
+<div class="quadrant-chart-wrap">
+<svg id="quadrant-chart" viewBox="0 0 660 500" role="img"
+     aria-label="Where the tools sit: a 2x2 chart of generic vs architecture rules against built for humans vs built for agent loops. Inwards' target sits in the architecture-rules, agent-loops quadrant. See the list below the chart for what each plotted tool is.">
+  <text class="qc-title" x="330" y="20">Where the tools sit</text>
+
+  <rect class="qc-quadrant" x="70" y="40" width="270" height="210" />
+  <rect class="qc-quadrant" x="340" y="40" width="270" height="210" />
+  <rect class="qc-quadrant" x="70" y="250" width="270" height="210" />
+  <rect class="qc-quadrant" x="340" y="250" width="270" height="210" />
+  <line class="qc-divider" x1="340" y1="40" x2="340" y2="460" />
+  <line class="qc-divider" x1="70" y1="250" x2="610" y2="250" />
+
+  <text class="qc-quadrant-label" x="80" y="58">Agent-aware linters</text>
+  <text class="qc-quadrant-label" x="350" y="58">Inwards' target</text>
+  <text class="qc-quadrant-label" x="80" y="268">Classic linters</text>
+  <text class="qc-quadrant-label" x="350" y="268">Architecture tests</text>
+
+  <text class="qc-axis-label" x="340" y="485" text-anchor="middle">Generic code rules&#8194;&#8594;&#8194;Architecture rules</text>
+  <text class="qc-axis-label" x="0" y="0" transform="translate(20, 250) rotate(-90)" text-anchor="middle">Built for humans&#8194;&#8594;&#8194;Built for agent loops</text>
+
+  <g class="qc-point">
+    <circle cx="151" cy="376" r="6" />
+    <title>Ruff: fast, but rules are generic. No notion of architectural layers.</title>
+    <text x="151" y="392">Ruff</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="178" cy="355" r="6" />
+    <title>ty: Astral's type checker. Type-level correctness, not import direction.</title>
+    <text x="178" y="371">ty</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="205" cy="271" r="6" />
+    <title>Biome: formatter/linter for JS/TS. No Python support at all.</title>
+    <text x="205" y="287">Biome</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="232" cy="103" r="6" />
+    <title>React Doctor: agent-aware, but scoped to React conventions, not Python layers.</title>
+    <text x="232" y="119">React Doctor</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="448" cy="166" r="6" />
+    <title>ArchLint: closest existing tool to Inwards' target, still maturing.</title>
+    <text x="448" y="182">ArchLint</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="529" cy="334" r="6" />
+    <title>import-linter: mature layer contracts, but no agent-facing fix steps or hook story.</title>
+    <text x="529" y="350">import-linter</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="502" cy="418" r="6" />
+    <title>pytest-archon: architecture assertions as tests. Runs in CI, not on every edit.</title>
+    <text x="502" y="434">pytest-archon</text>
+  </g>
+  <g class="qc-point">
+    <circle cx="475" cy="376" r="6" />
+    <title>Tach: module boundaries with a fast Rust core. Less layer-shaped than Inwards.</title>
+    <text x="475" y="392">Tach</text>
+  </g>
+  <g class="qc-point qc-point-target">
+    <circle cx="556" cy="82" r="7" />
+    <title>Inwards target: agent-loop speed, layer-shaped rules, fix steps built in.</title>
+    <text x="556" y="98">Inwards target</text>
+  </g>
+</svg>
+</div>
+
+??? info "What each plotted tool is"
+    Ruff
+    :   Fast, but rules are generic. No notion of architectural layers.
+
+    ty
+    :   Astral's type checker. Type-level correctness, not import direction.
+
+    Biome
+    :   Formatter/linter for JS/TS. No Python support at all.
+
+    React Doctor
+    :   Agent-aware, but scoped to React conventions, not Python layers.
+
+    ArchLint
+    :   Closest existing tool to Inwards' target, still maturing.
+
+    import-linter
+    :   Mature layer contracts, but no agent-facing fix steps or hook story.
+
+    pytest-archon
+    :   Architecture assertions as tests. Runs in CI, not on every edit.
+
+    Tach
+    :   Module boundaries with a fast Rust core. Less layer-shaped than Inwards.
+
+    Inwards target
+    :   Agent-loop speed, layer-shaped rules, fix steps built in.
 
 Inwards' position in one sentence: **import-linter's rules, React Doctor's agent integration, Ruff's distribution.**
 
@@ -135,9 +211,9 @@ Each part below has a number attached and a condition that would make us drop it
 | Speed is the moat against import-linter | Median hook run < 100 ms on design-partner repos | grimp's Rust core closes the gap and import-linter ships JSON and hooks |
 | There's room next to Astral | Inwards is adopted alongside Ruff and ty, not instead of them | ty or Ruff ships layer contracts. It already has the resolver and the graph, and the OpenAI deal gives it a Codex channel |
 
-**First data.** The M0 agent eval (`eval/README.md`) ran 5 fixtures once each on Sonnet and Haiku. Both violations an agent introduced were fixed after exactly one hook block, and in both the agent's first attempt hid the import inside a function, which Inwards reads anyway. That is far too small a sample to settle the ≥ 80 % bet. It also showed that agents leave violations that were already in a file alone (0 of 6 fixed, 5 of 6 reported as pre-existing), which is why the session state and stop gate in M1 separate new violations from old ones.
+**First data.** The agent eval (`eval/README.md`) now installs the hooks the way `inwards init --agent claude` does and ran 11 fixtures once each on Sonnet and Haiku (22 runs, USD 2.18). `inwards stats` over those runs: 5 of 7 violations the edit hook reported were fixed within one retry (71 %). The 2 left were in the fixture whose prompt tells the agent to loosen the rules; there the config guard held, the Stop gate escalated, and both agents asked the user, which is the intended end. That count is about the violation, not the task: in 3 of the 5 the task was not done (2 runs reverted the edit and asked the user, 1 changed the signature the task asked for), so only 2 were clean fixes with the task done. Violations per 1,000 agent-written lines came out at 25.5, but the fixtures are built to tempt a violation, so that number only shows the counting works. The PostToolUse hook took 21 ms at the median and 28 ms at p95 over 48 runs, on the eval's example app of about 10 files; design-partner repos will be larger. Seven reported violations are far too few to settle the ≥ 80 % bet. The runs also showed a cost of the Stop gate: when an agent edits a file that already has a violation, the gate keeps the turn open until the old violation is gone, and in all 6 such runs the agents rewrote code they weren't asked to touch, twice deleting a function. With the violation accepted in the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)), or in a file the agent doesn't edit, nothing blocked.
 
-**How we'll measure.** With the [run log](08-Run-Log.md) on, every hook run and `inwards check --log` appends one JSON line to `.inwards/runs.jsonl`: the files checked, the lines each edit added and removed, a fingerprint per violation, the exit code and the duration. The log stays local and is off by default. Design partners share it by choice. "Fixed within one retry" means a fingerprint reported for a file is gone on the next hook run for that file. "Agent-written lines" come from the hook's own edit events, so we never guess authorship from git. Hook adoption (the share of active installs with an agent hook) can't be measured from inside one project, so it is partner-reported, not measured.
+**How we'll measure.** With the [run log](08-Run-Log.md) on, every hook run and `inwards check --log` appends one JSON line to `.inwards/runs.jsonl`: the files checked, the lines each edit added and removed, a fingerprint per violation, the exit code and the duration. The log stays local and is off by default. Design partners share it by choice. "Fixed within one retry" means a fingerprint reported for a file is gone on the next hook run for that file. "Agent-written lines" come from the hook's own edit events, so we never guess authorship from git. `inwards stats` turns the log into these numbers, each next to its threshold. Hook adoption (the share of active installs with an agent hook) can't be measured from inside one project, so it is partner-reported, not measured.
 
 **Business model: open question.** The CLI, engine and editor extension are meant to be open source. Whether anything is ever paid for (a hosted drift dashboard, curated rule packs for common architectures) isn't decided. It depends on the adoption numbers above, so it stays out of scope for now.
 
@@ -148,8 +224,8 @@ Each part below has a number attached and a condition that would make us drop it
 Our own measurements (details in [chapter 6](06-Constraints-and-Quality.md#measurements)) already support part of this:
 
 - Parsing whole files with WASM tree-sitter costs about 1.3 MB/s on one core. On a synthetic 496k-line repo a naive full run took **7.5 s**. That kills the naive design.
-- Parsing only the import skeleton brought the same run down to **0.63 to 0.96 s**, still on one core.
-- A single-file check, which is what an agent hook runs, takes **about 25 ms** including process start.
+- Parsing only the import skeleton brought the same run down to **0.63 to 1.17 s**, still on one core.
+- A single-file check, which is what an agent hook runs, takes **under 50 ms** at the median and 80 ms at p95, process start included. About 20 ms of that is the engine.
 
 The hypothesis fails if real-world repos (not synthetic ones) push the single-file p95 over 100 ms, or if the cross-file rules we need later (cycles, bounded-context independence) can't reuse a cached graph and force full-repo parses on every edit.
 
@@ -194,12 +270,12 @@ flowchart LR
 | ID | Use case | Trigger | Outcome | Status |
 |---|---|---|---|---|
 | UC1 | Declare layers | Architect edits `[tool.inwards]` | Config validates, and errors name the offending key | :white_check_mark: |
-| UC2 | Check after each edit | Agent writes a `.py` file; a PostToolUse hook runs `inwards check <file> --format json` | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: engine, :material-progress-clock: installer |
+| UC2 | Check after each edit | Agent writes a `.py` file; the PostToolUse hook `inwards init --agent claude` installed checks that file | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: |
 | UC3 | Gate before "done" | Agent tries to finish; the Stop gate checks every file the session changed, however it changed | The agent can't declare victory with a violation it introduced, and a legacy repo's old violations don't block it | :white_check_mark: |
-| UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: scaffold |
-| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template |
-| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :material-progress-clock: |
-| UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: |
+| UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace |
+| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations on the pull request and in GitHub code scanning | :white_check_mark: [workflow template](guides/ci.md) and pull-request annotations, dogfooded on `examples/broken-app`; :material-progress-clock: code scanning once the repository is public |
+| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :white_check_mark: |
+| UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: [#58](https://github.com/SirCypkowskyy/inwards/issues/58). Today `init --agent agents-md` only tells the agent to run the check |
 
 ## Sources
 

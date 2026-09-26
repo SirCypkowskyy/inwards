@@ -15,6 +15,14 @@ copyright = "Copyright &copy; 2026 Inwards maintainers"
 docs_dir = "chapters"
 site_dir = "site"
 
+extra_css = [
+  "stylesheets/extra.css",
+]
+
+extra_javascript = [
+  "javascripts/homepage-loop.mjs",
+]
+
 nav = [
   { "Home" = "index.md" },
   { "Getting started" = [
@@ -22,6 +30,9 @@ nav = [
     { "Claude Code" = "guides/claude-code.md" },
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
+    { "GitHub Actions" = "guides/ci.md" },
+    { "Package shape" = "guides/package-shape.md" },
+    { "Design partners" = "guides/design-partners.md" },
   ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },
@@ -39,6 +50,7 @@ features = [
   "content.code.copy",
   "content.code.annotate",
   "content.tabs.link",
+  "content.tooltips",
   "navigation.footer",
   "navigation.instant",
   "navigation.sections",

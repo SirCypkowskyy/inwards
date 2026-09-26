@@ -9,10 +9,15 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha (0.1.0<!-- x-release-please-version -->). Four rules (INW001 layer direction, INW011 literal dynamic imports,
-INW006 code outside every layer, INW000 encodings that could hide imports) work end to end, and
+Status: pre-alpha. Six rules (INW001 layer direction, INW011 literal dynamic imports,
+INW006 code outside every layer, INW007/INW008 package shape, INW000 encodings that could hide
+imports) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
-a config guard and escalation to the user.
+a config guard and escalation to the user (`--agent aider` and `--agent agents-md` cover Aider
+and `AGENTS.md`). On a new project, `inwards init --style hexagonal --scaffold` writes the layers
+(`layered` and `clean` too) and an example package that passes the check. The only release so far is the pre-release v0.1.0-rc.1, with binaries for six
+platforms and platform wheels for `uv add`; see the
+[install guide](https://sircypkowskyy.github.io/inwards/guides/install/).
 
 ## Layout
 
@@ -23,7 +28,12 @@ a config guard and escalation to the user.
 | `src/vscode-extension/` | LSP server + client. Uses the same engine as the CLI. |
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
 | `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
-| `scripts/` | Release tooling. |
+| `examples/broken-app/` | One deliberate INW001 violation; `sarif.yml` expects it and annotates PRs with it. |
+| `eval/` | Agent eval harness: does an agent fix what the hook reports? |
+| `bench/` | The synthetic benchmark repo generator and the PR regression gate (`compare.ts`). |
+| `packaging/` | README for the platform wheels, and the PyPI/npm name placeholders. |
+| `scripts/` | Build binaries and wheels, version and docs-nav checks, screenshots. |
+| `.github/` | CI, release and docs workflows, Dependabot config, issue forms (bug, feature, rule proposal). |
 
 ## Develop
 
@@ -41,5 +51,8 @@ release-please keeps a `chore: release X.Y.Z` PR open with the next version and 
 binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform wheel
 (`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its native
 runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
-`SHA256SUMS`. Publish the draft by hand. A release candidate is a hand-pushed tag with a
+`SHA256SUMS`. Publish the draft by hand; once the owner switches it on, that starts `pypi.yml`,
+which uploads the same wheels to TestPyPI and then PyPI with trusted publishing (ADR-021). A release candidate is a hand-pushed tag with a
 suffix (`v0.2.0-rc.1`) on the release PR's branch, which already holds the new version. Build provenance attestations switch on once the repo is public.
+
+Report security issues privately, not in a public issue; see [SECURITY.md](SECURITY.md).

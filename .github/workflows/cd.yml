@@ -4,7 +4,8 @@ name: CD
 # (ADR-016): it tags vX.Y.Z and dispatches this workflow on the tag. A release
 # candidate is still a hand-pushed tag with a suffix (v0.2.0-rc.1), pushed on
 # the release PR's branch (it already holds the new version): it builds the
-# same version and drafts a pre-release.
+# same version and drafts a pre-release. Publishing the draft by hand starts
+# pypi.yml, which uploads these same wheels to TestPyPI and PyPI (ADR-021).
 on:
   push:
     tags: ["v*"]
@@ -16,6 +17,11 @@ permissions:
 concurrency:
   group: cd-${{ github.ref }}
 
+# Every job here stays on GitHub-hosted runners, unlike CI (ops/runner): the
+# shipped binaries are built on a clean, documented image rather than a home
+# machine that other workloads share, the musl check needs Docker, and the
+# verify matrix needs arm64, macOS and Windows anyway. It runs once per tag.
+#
 # Build provenance needs a public repository (private ones need GitHub
 # Enterprise Cloud), so attestation steps are skipped while the repo is private.
 env:

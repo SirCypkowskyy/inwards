@@ -3,7 +3,16 @@
   // Run by CI (`bun run src/core/scripts/prescan-diff.ts`), not from package.json.
   // eval/run.ts is the agent eval, run by hand with `bun run eval/run.ts`.
   // The placeholder bin.js is the `bin` of the npm name placeholder, run by `node`.
-  "entry": ["src/core/scripts/prescan-diff.ts", "eval/run.ts", "packaging/placeholder/npm/bin.js"],
+  // bench/compare.ts is run by .github/workflows/bench.yml, bench/corpus.ts by corpus.yml,
+  // and scripts/claude-payload-drift.ts by .github/workflows/nightly-e2e.yml.
+  "entry": [
+    "src/core/scripts/prescan-diff.ts",
+    "eval/run.ts",
+    "bench/compare.ts",
+    "bench/corpus.ts",
+    "scripts/claude-payload-drift.ts",
+    "packaging/placeholder/npm/bin.js"
+  ],
   // Loaded by path, never imported: Bun.resolveSync("tree-sitter-python/...wasm")
   // in core's tests and scripts, and the extension's scripts/copy-wasm.ts.
   // eslint-plugin-jsdoc is loaded by oxlint through .oxlintrc.jsonc "jsPlugins".
@@ -26,6 +35,7 @@
       { "name": "vscode", "patterns": ["src/vscode-extension/**"] },
       { "name": "scripts", "patterns": ["scripts/**"] },
       { "name": "eval", "patterns": ["eval/**"] },
+      { "name": "bench", "patterns": ["bench/**"] },
       { "name": "packaging", "patterns": ["packaging/**"] }
     ],
     "rules": [
@@ -38,8 +48,11 @@
       { "from": "cli", "allow": ["core-api"] },
       { "from": "vscode", "allow": ["core-api"] },
       { "from": "scripts", "allow": [] },
-      // The eval harness reads layers the way the CLI does, through the public API.
-      { "from": "eval", "allow": ["core-api"] },
+      // The eval harness reads layers the way the CLI does, through the public API,
+      // and recognises config guard denials by the CLI's own ASK_USER text.
+      { "from": "eval", "allow": ["core-api", "cli"] },
+      // The bench runs binaries as processes and imports nothing of ours.
+      { "from": "bench", "allow": [] },
       // The npm placeholder ships alone and imports nothing.
       { "from": "packaging", "allow": [] }
     ],

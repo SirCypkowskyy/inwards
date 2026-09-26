@@ -26,6 +26,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import type { Diagnostic, InwardsConfig } from "@inwards/core";
+import { baselineHashes } from "./baseline.ts";
 import { git, projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
 import { appendLine, prune, stateDir, statePath } from "./state-files.ts";
 
@@ -47,6 +48,8 @@ interface SessionStart {
   invalid?: string[];
   /** Project-relative path of every Python file in the project, to its SHA-256. */
   manifest: Record<string, string>;
+  /** Each config's inwards-baseline.json SHA-256, by config path (absent in older state files). */
+  baselines?: Record<string, string>;
 }
 
 /** One line of the session log. */
@@ -121,7 +124,15 @@ export function recordStart(project: string, id: string, source: string): void {
   const head = git(project, ["rev-parse", "HEAD"])?.trim() ?? null;
   const dir = stateDir(project);
   prune(dir, id);
-  const start: SessionStart = { at: new Date().toISOString(), head, configs, invalid, manifest };
+  const baselines = baselineHashes(project, Object.keys(configs));
+  const start: SessionStart = {
+    at: new Date().toISOString(),
+    head,
+    configs,
+    invalid,
+    manifest,
+    baselines,
+  };
   const temp = join(dir, `.${id}.${process.pid}.tmp`);
   writeFileSync(temp, JSON.stringify(start), { flag: "wx" });
   renameSync(temp, startFile); // rename replaces a planted symlink, never follows it

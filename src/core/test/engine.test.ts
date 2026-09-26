@@ -64,6 +64,43 @@ describe("reporters", () => {
     expect(sarif.version).toBe("2.1.0");
     expect(sarif.runs[0].results[0].locations[0].physicalLocation.region.startLine).toBe(1);
   });
+
+  test("concise is one line per diagnostic with the first fix step", () => {
+    const [line, summary, ...rest] = render(report, "concise").split("\n");
+    expect(line).toStartWith("shop/domain/order.py:1:8: INW001 ");
+    expect(line).toEndWith(`fix: ${diagnostics[0]?.fix.steps[0]}`);
+    expect(summary).toStartWith("Found 1 violation");
+    expect(rest).toEqual([]);
+  });
+
+  test("concise keeps a wrapped import on one line", () => {
+    const wrapped = check(
+      file("shop/domain/order.py", "from shop.infrastructure import (\n    db,\n)\n"),
+    );
+    const out = render({ ...report, diagnostics: wrapped }, "concise").split("\n");
+    expect(out).toHaveLength(2);
+    expect(out[0]).toContain("fix: Delete `from shop.infrastructure import ( db, )`.");
+  });
+
+  test("sarif is never capped", () => {
+    const sarif = JSON.parse(render(report, "sarif", { maxDiagnostics: 0 }));
+    expect(sarif.runs[0].results).toHaveLength(1);
+  });
+
+  test("maxDiagnostics keeps errors first and still counts what it cut", () => {
+    const [error] = diagnostics;
+    const capped = {
+      ...report,
+      diagnostics: error ? [{ ...error, severity: "warning" as const, line: 9 }, error] : [],
+    };
+    const json = JSON.parse(render(capped, "json", { maxDiagnostics: 1 }));
+    expect(json.summary).toMatchObject({ violations: 1, warnings: 1, omitted: 1 });
+    expect(json.diagnostics.map((d: { line: number }) => d.line)).toEqual([1]);
+    expect(render(capped, "concise", { maxDiagnostics: 1 })).toEndWith("Not shown: 1 warning.");
+    expect(JSON.parse(render(report, "json", { maxDiagnostics: 1 })).summary.omitted).toBe(
+      undefined,
+    );
+  });
 });
 
 describe("import skeleton prescan", () => {

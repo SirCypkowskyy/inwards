@@ -6,8 +6,8 @@ Each record states the decision, the context it was made in, what it costs us, a
 |---|---|---|
 | [001](#adr-001-typescript-for-the-engine) | TypeScript for the engine | :white_check_mark: Accepted |
 | [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), not native bindings | :white_check_mark: Accepted |
-| [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted |
-| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :white_check_mark: Accepted |
+| [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted, built with `--bytecode` since [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
+| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :white_check_mark: Accepted, baselined modules skip the confirming parse since [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :white_check_mark: Accepted |
 | [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :white_check_mark: Accepted |
@@ -15,13 +15,17 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :white_check_mark: Accepted |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Docs built with Zensical, served by Cloudflare Workers | :material-swap-horizontal: Hosting superseded by 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :white_check_mark: Accepted |
-| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted |
+| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted, deployed from `develop` since 019 |
 | [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted |
 | [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :white_check_mark: Accepted |
 | [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted |
-| [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :white_check_mark: Accepted |
-| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted |
+| [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :material-swap-horizontal: Branching model superseded by 019 |
+| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted, squashed into `develop` since 019 |
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
+| [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | A `develop` integration branch; `main` moves only at releases | :white_check_mark: Accepted |
+| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | The `init` picker uses @clack/prompts, loaded from a split chunk | :white_check_mark: Accepted |
+| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
+| [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
 
 ## ADR-001: TypeScript for the engine
 
@@ -384,4 +388,140 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - *Explicit package names only in v1, globs later:* simpler at first, but every new domain would need a config change. The config guard ([#23](https://github.com/SirCypkowskyy/inwards/issues/23)) forbids agents from making that change, so every new domain would have to stop and wait for the user.
 - *Our own workspace syntax:* would duplicate what uv already defines, and drift from it.
+
+## ADR-019: A `develop` integration branch; `main` moves only at releases
+
+**Status:** Accepted · 2026-09-26 · Supersedes the branching bullet of [ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)
+
+**Context.** ADR-016 chose trunk-based development because one maintainer merged one PR at a time. That changed: the owner wants agents from other harnesses (Codex, Cursor and others) to open their own PRs while the coordinating agent works. Several writers need one protected integration branch, and `main` should show only released code. Before this, neither branch had any protection.
+
+**Decision.** The owner chose this model on 2026-09-26:
+
+- **`develop` is the default branch.** Every PR, from any agent or person, targets it and is squash-merged with a Conventional Commit title ([ADR-017](#adr-017-squash-merges-with-conventional-commit-pr-titles)). GitHub has no separate "default base for PRs" setting, so the default branch is what makes a PR from any tool land on `develop` without extra setup.
+- **`main` moves only at a release.** A promotion PR `develop` → `main` is merged with a **merge commit**, never squashed, so release-please on `main` still sees one commit per feature PR through the merge. Then the owner merges release-please's release PR into `main` (`target-branch: main` is set explicitly, because release-please would otherwise target the default branch).
+- **A release happens in one sitting, with `develop` frozen:** promote, let release-please update its PR, merge it, then reopen `develop`. release-please reads `main`'s history in commit-date order and stops at the last release commit. A squash commit's date is its merge time, so a PR merged into `develop` before a release PR merges, but promoted after it, would come after the stop point and never reach a changelog. Promoting only when releasing, and releasing right after promoting, closes that window.
+- **The release commit stays on `main`; nothing is merged back into `develop`.** release-please stamps versions only on lines agents never edit: `CHANGELOG.md`, the manifest, `meta.ts` (a marked line of its own), the `version` fields of the three `package.json` files, `pyproject.toml` and `uv.lock`. At the next promotion git takes those lines from `main` without a conflict. The README and the docs no longer carry a stamped version in their status paragraphs, because agents edit those sentences and every promotion would then conflict. On `develop` the version fields stay at `0.1.0` forever; they agree with each other, so the version check still passes.
+- **Rulesets enforce the flow.**
+  - Both branches: no direct pushes, no force pushes, no deletion, and the CI checks and the PR-title check must pass. Branches don't have to be up to date, because parallel agents would otherwise rebase each other forever. No approvals are required: every agent shares the owner's account and can't approve its own PR.
+  - `develop` accepts squash merges only, and nobody can bypass its ruleset.
+  - `main` accepts merge commits only, for the promotion and the release PR alike: a squashed promotion would hide every feature commit behind one `chore:` commit. The owner may bypass the checks on a PR, because release-please's PR is opened with `GITHUB_TOKEN` and gets no CI run. Every agent acts as the owner, so an agent could use that bypass too; AGENTS.md forbids it outside step 3 of a release.
+- **CI runs on pushes to both branches. The docs site deploys from `develop`**, since the chapters describe the code as it is, and `main` may lag by a whole milestone.
+- **Worktrees live in `~/Documents/GitHub/worktrees/<repo>/<worktree>`**, outside every checkout, so agents from different harnesses find them in one place and none is nested in another repository.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Any number of agents can open PRs at once; the rulesets, not the agents' discipline, keep `develop` green and `main` release-only.
+- :material-plus-circle-outline: `main` shows exactly what users can install. The repository page shows `develop`, the default branch.
+- :material-minus-circle-outline: A release is now three steps (promote, merge the release PR, publish the draft) instead of two.
+- :material-minus-circle-outline: `git log main` has merge commits again. The changelog is unaffected: the promotion's own title is `chore:` and hidden, and its description must not start a paragraph with a commit type.
+- :material-minus-circle-outline: A binary built from `develop` always reports `0.1.0`, whatever the latest release is.
+- :material-minus-circle-outline: A release freezes `develop` for a few minutes, and a release PR can't sit open for weeks as ADR-016 planned: release candidates are tagged in the same sitting, or on a branch cut for them.
+- :material-minus-circle-outline: The docs site can describe features no release has yet. Chapters already mark planned work, and the install guide names the release it applies to.
+
+**Alternatives.**
+
+- *Stay trunk-based and protect `main`:* the simplest option, but then every agent's PR goes straight to the release branch, and the owner wanted a staging branch between agents and releases.
+- *`main` as the default branch, plus a workflow that retargets PRs to `develop`:* the repository page would show released code. But every PR would first open against `main`, its first CI and benchmark run would compare with the wrong base, and it adds a workflow to maintain. The owner chose `develop` as the default.
+- *release-please on `develop`:* releases would be cut from unpromoted code, and `main` would have no role left.
+- *An automatic back-merge of `main` into `develop` after each release:* on a repository owned by a personal account, GitHub Actions can't be a ruleset bypass actor, so the push would need a PAT or a GitHub App secret. Doing it through a PR instead needs an admin bypass on `develop`, because a PR opened with `GITHUB_TOKEN` gets no CI, and that bypass would also let any agent on the owner's account merge a red PR. Since nothing conflicts without it, the owner chose not to back-merge.
+
+## ADR-020: The `init` picker uses @clack/prompts, loaded from a split chunk
+
+**Status:** Accepted · 2026-09-26 · [#92](https://github.com/SirCypkowskyy/inwards/issues/92)
+
+**Context.** `inwards init` on a terminal, with no `--style` or `--agent`, asks for the architecture style, the scaffold and the agent ([#92](https://github.com/SirCypkowskyy/inwards/issues/92)). The prompt library ships inside the one binary ([ADR-003](#adr-003-ship-a-bun-single-file-executable)), but `check` and the hooks start on every agent edit and must not pay for a prompt they never show. The budget in #92 is 3 ms of start-up.
+
+**Decision.**
+
+- **@clack/prompts, pinned to an exact version (1.8.1).** The analysis on #92 measured it at about 61 KB in the compiled binary. Ink plus React adds about 496 KB and 10 to 29 ms of start-up, crashes at start-up under `bun build --compile` unless a plugin stubs `react-devtools-core`, and has recent Windows rendering regressions. @inquirer/prompts has an open Windows select bug.
+- **Loaded with a dynamic `import()`** inside the picker, and only when stdin and stdout are TTYs and `CI` is unset. Without a terminal, init exits 2 at once with the flags; it never waits for input.
+- **`splitting: true` in `scripts/build-binaries.ts`.** Without it, Bun inlines the dynamically imported module into the one bundle: its code runs only when imported, but every start still loads it. Measured on Linux x64 against `develop` built with the same flags, 150 to 300 alternating runs each, median of per-pair differences:
+
+    | Build | `--version` | small `check` | hook run |
+    |---|---|---|---|
+    | Without bytecode, no splitting | +5.2 ms | +5.9 ms | +5.2 ms |
+    | Bytecode ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)), no splitting | +1.7 ms | +1.7 ms | +1.1 ms |
+    | Bytecode and splitting (adopted) | -0.1 ms | +0.0 ms | -0.1 ms |
+
+    With splitting the library is its own chunk inside the binary, read only when the picker runs. The #29 benchmark agrees: hook -0.0%, full check -1.8%.
+
+**Consequences.**
+
+- :material-plus-circle-outline: `check` and the hooks keep their start-up; the picker's cost falls on the one command that shows it.
+- :material-plus-circle-outline: A later lazily loaded feature gets the same treatment for free.
+- :material-minus-circle-outline: The build writes a `chunk-*.js.map` next to each binary in `dist/`. The release upload already takes only `inwards-*` files.
+- :material-minus-circle-outline: The picker can't be tested in CI, which has no TTY. It was driven through a pseudo-terminal on Linux; Windows Terminal, PowerShell and macOS Terminal still need a check by hand (#92).
+
+**Alternatives.**
+
+- *Ink:* richer layouts, but see the numbers above.
+- *Hand-written prompts on raw stdin:* no dependency, but cursor handling, resize and Windows consoles are what the library already gets right.
+- *Bytecode alone:* it cuts the library's cost from about 5 ms to 1 to 2 ms, but a 10 ms start-up still pays it on every hook call for a prompt the hook never shows.
+
+## ADR-021: Publish the release wheels to PyPI from their own workflow, with trusted publishing
+
+**Status:** Accepted · 2026-09-26 · [#32](https://github.com/SirCypkowskyy/inwards/issues/32)
+
+**Context.** Design partners should install with `uv add --dev inwards`. `cd.yml` already builds five platform wheels, runs each binary and installs each wheel on its own runner, and attaches them to a draft GitHub Release ([ADR-016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)). The owner publishes that draft by hand. PyPI never accepts the same file name twice, so a wrong upload can't be undone, and the owner wants no PyPI upload by accident. The repository is private for now, and every agent works under the owner's GitHub account.
+
+**Decision.**
+
+- **Trusted publishing** (OIDC) with `pypa/gh-action-pypi-publish`, pinned by commit SHA. No PyPI token is stored anywhere.
+- **Its own workflow, `pypi.yml`, not a job in `cd.yml`.** It starts when a release is published, never on a draft, or by hand with a tag and an index. `cd.yml` ends at the draft and can't see the owner publish it. PyPI trusts only `pypi.yml`, which runs no build or test code.
+- **It uploads the release's own wheels**, the files the owner just published, after checking them against the release's `SHA256SUMS`, and against the build provenance once the repository is public. It never rebuilds them.
+- **TestPyPI first, then PyPI**, each in its own GitHub environment (`testpypi`, `pypi`) that the publisher on each index is bound to. Only the two upload jobs get `id-token: write`.
+- **A pre-release goes to TestPyPI only**, whether the release is marked as one or its tag has a suffix (`-rc.1`). PyPI has a 0.0.0 final placeholder, so uv would pick it over any pre-release anyway. An rc can still go to PyPI by a manual run from its tag.
+- **The real gate is the owner's pypi.org account.** Every agent works under the owner's GitHub account, so the variable, the environments, tags and manual runs are all within an agent's reach, and PyPI doesn't check a run's ref or commit. The PyPI publisher is therefore registered last, at go-live, and deleting it stops every PyPI upload. On the GitHub side, the repository variable `PYPI_PUBLISH` must be `true` for any PyPI upload, from a release or a manual run; the `pypi` environment deploys only from `v*` tags; and it gets the owner as required reviewer once GitHub offers that (public repository, or Enterprise). These catch mistakes, not an agent.
+- **No PEP 740 attestations while the repository is private.** They are signed through Sigstore's public transparency log with the repository, workflow and commit in them.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A release reaches PyPI with the exact bytes users could already download from GitHub, and that were run on every platform.
+- :material-plus-circle-outline: Trusted publishing works from a private repository: PyPI checks the owner, repository, workflow file and environment, not the visibility.
+- :material-minus-circle-outline: Once the PyPI publisher exists, an agent acting as the owner can set `PYPI_PUBLISH`, push a `v*` tag (no ruleset protects tags) and start an upload; even a required reviewer can be approved through the API as the owner. Only `AGENTS.md` holds agents back then, and the owner can delete the publisher between releases.
+- :material-minus-circle-outline: A draft's wheels and `SHA256SUMS` can be replaced by hand before publishing. While private, the checksum check proves only that they agree with each other.
+- :material-minus-circle-outline: The five wheels of v0.1.0-rc.1 weigh 170 MB together, against PyPI's default limit of 10 GB per project: roughly 60 releases before asking PyPI for more.
+- :material-minus-circle-outline: A release built while private has no provenance. Once the repository is public, `pypi.yml` refuses to upload it.
+
+**Alternatives.**
+
+- *Upload from `cd.yml` right after the verify jobs:* PyPI would get a version before the owner has looked at the draft, and the trusted workflow would also run `bun install` and the build.
+- *Download the build artifact of the `cd.yml` run:* it expires after 90 days, has to be found by run ID, and isn't what the owner published.
+- *A project-scoped API token as an environment secret:* a long-lived credential to rotate, and one that works from any machine it leaks to.
+- *A reusable workflow called from `cd.yml`:* PyPI can't use a reusable workflow as a trusted publisher.
+
+## ADR-022: M2 go or no-go: continue, conditionally, until partner data
+
+**Status:** Accepted, provisional · 2026-09-26 · [#42](https://github.com/SirCypkowskyy/inwards/issues/42) · To be revisited with partner data ([#132](https://github.com/SirCypkowskyy/inwards/issues/132))
+
+**Context.** M2 ends with a checkpoint: do the numbers in the [business hypothesis](02-Business-Context.md#business-hypothesis) hold well enough to spend M3 to M6 on it? The hypothesis was meant to be measured on design partners' repositories, but the owner moved partner recruiting to the end of the roadmap, so no partner data exists. The evidence available on 2026-09-26:
+
+| Bet (chapter 2) | Threshold | Evidence | Reading |
+|---|---|---|---|
+| The fix steps work for models | ≥ 80 % fixed within one retry | The agent eval ([#101](https://github.com/SirCypkowskyy/inwards/issues/101), `eval/README.md`): 11 fixtures, one run each on Sonnet and Haiku, full hook set. `inwards stats`: 5 of 7 (71 %). The 2 unfixed are the "loosen the config" task, where the agent correctly stopped and asked the user. Of the 5 fixed, 3 ended with the task not done (2 reverted and asked the user), so only 2 were clean fixes with the task done | Points the right way (no violation stayed, no evasion), but 7 seeded violations settle nothing |
+| Agents break layering often enough | ≥ 1 violation per 1,000 agent-written lines | 25.5 per 1,000 lines in the eval, but its fixtures are built to tempt a violation | No evidence either way |
+| Speed is the moat | Hook p50 < 100 ms | Eval: p50 21 ms, p95 28 ms, on the 10-file example app. Local hook p50 about 32 ms after bytecode ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). Five real services ([#36](https://github.com/SirCypkowskyy/inwards/issues/36)): 55 to 83 ms per file locally; one 4,500-line file was 280 ms on a GitHub runner before bytecode ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Holds, with one known outlier |
+| Hooks are the channel | ≥ 60 % of installs keep a hook | Partner-reported only; nothing yet | Unknown |
+| Room next to Astral | Adopted alongside Ruff and ty | Nothing new since M0 | Unknown |
+
+The eval also showed what the checks can't: no evasion in any final diff; the config guard, the deny rules and the Stop gate each held when an agent tried to loosen the rules or switch the hooks off. And one weakness: without a baseline, the Stop gate kept agents working until violations that were already in the files they edited were gone, and in all 6 such runs they rewrote code nobody asked them to touch ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)).
+
+**Decision.** The owner chose to continue, conditionally:
+
+- **Continue with M3 as planned**, with [#134](https://github.com/SirCypkowskyy/inwards/issues/134) (the Stop gate blocks only on violations new in each edited file) moved to P0 at the start of M3: an agent rewriting unrelated code is the failure mode most likely to make a team switch the hooks off, which is the channel bet.
+- **The decision is provisional.** It is revisited on partner data as part of [#132](https://github.com/SirCypkowskyy/inwards/issues/132): the same table, filled with `inwards stats` from partner repositories. If "fixed within one retry" stays under 50 %, or hooks are switched off at most installs, the plan for M4 to M6 is reopened.
+- **The eval stays the interim measure.** Before the partner review, it is rerun with 3 runs per case on each model (`bun run eval/run.ts --runs 3`), which #101 left open to keep spend small.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Work continues on the part of the hypothesis the evidence supports (speed, fix steps, resistance to evasion) without waiting months for partners.
+- :material-plus-circle-outline: The criteria that would reopen the plan are written down now, before the data can bias them.
+- :material-minus-circle-outline: Two bets (violation frequency, hook adoption) have no evidence at all; M3 to M6 could be built for a problem partners don't have.
+- :material-minus-circle-outline: The eval's fixtures come from the same people who built the tool, which makes them a weak stand-in for real repositories.
+
+**Alternatives.**
+
+- *Continue without conditions:* cheaper to state, but it would treat numbers from 7 seeded violations as if they settled the hypothesis.
+- *Pause until partner data (move recruiting, #132, to M3):* the most rigorous option. The owner kept recruiting at the end of the roadmap, and the measurable bets point the right way.
+- *Stop or pivot:* nothing measured contradicts a threshold, so there is no case for either.
 

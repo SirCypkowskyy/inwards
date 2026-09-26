@@ -1,5 +1,5 @@
+export { baselineKey, stableMessage } from "./baseline.ts";
 export {
-  ConfigError,
   declaresInwards,
   type InwardsConfig,
   inwardsTable,
@@ -14,5 +14,18 @@ export type { ProjectIndex } from "./project.ts";
 export { extractImports, type GrammarBinaries, moduleNameFor } from "./python.ts";
 export { type Format, type RenderOptions, type Report, render } from "./reporters.ts";
 export { RULES } from "./rules.ts";
+export {
+  checkRequired,
+  checkSelectors,
+  checkShape,
+  type ListDir,
+  type ListMembers,
+  membersFrom,
+  packagesOf,
+  probeMembers,
+  rootPathOf,
+} from "./shape.ts";
+export type { NameRule, ShapeSpec } from "./shape-config.ts";
+export { ConfigError } from "./toml.ts";
 export type { Diagnostic, Fix, ImportRef, Severity, SourceFile, Span } from "./types.ts";
 export { type ModuleLookup, type PathKind, probeLookup } from "./unassigned.ts";

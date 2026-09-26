@@ -1,0 +1,51 @@
+name: Design partner feedback
+description: How Inwards worked on your project with your agents. See docs/chapters/guides/design-partners.md.
+title: "Design partner feedback: "
+labels: [area:product]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Inwards. Nothing here needs your code: describe what happened in your own words, and leave out anything you'd rather not share.
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: Inwards version (`inwards --version`), the agent and model, the OS, and roughly how big the project is.
+      placeholder: "0.2.0, Claude Code with Opus, macOS, about 40k lines of Python"
+    validations:
+      required: true
+  - type: textarea
+    id: stats
+    attributes:
+      label: Numbers
+      description: Paste the output of `inwards stats` (it holds counts and rates, no paths). Or say that you're sending a redacted log separately.
+      render: text
+  - type: textarea
+    id: worked
+    attributes:
+      label: What the agent did with the reports
+      description: Did it fix violations on its own? Did it try to move the import, change the config, or ask you? Any example you remember.
+    validations:
+      required: true
+  - type: textarea
+    id: friction
+    attributes:
+      label: What got in the way
+      description: False positives, slow checks, confusing messages, setup steps that didn't work, rules you missed.
+  - type: dropdown
+    id: hooks
+    attributes:
+      label: Are the agent hooks still on?
+      description: This is the one number the run log can't give us.
+      options:
+        - "Yes, for the whole team"
+        - "Yes, for some of us"
+        - "No, we switched them off"
+        - "We never turned them on"
+    validations:
+      required: true
+  - type: textarea
+    id: why-off
+    attributes:
+      label: If they're off, why?

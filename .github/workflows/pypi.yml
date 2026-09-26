@@ -1,0 +1,162 @@
+name: Publish to PyPI
+
+# Uploads the wheels of a published GitHub Release to TestPyPI, then PyPI, with
+# trusted publishing: PyPI trusts this file in the `testpypi` and `pypi`
+# environments, and no token is stored anywhere (ADR-021). It builds nothing:
+# the wheels are the ones cd.yml built, ran on every platform and attached to
+# the release, checked here against the release's SHA256SUMS.
+#
+# - Publishing a release (never a draft) starts it once the repository variable
+#   PYPI_PUBLISH is `true`. A pre-release (the release's checkbox, or a tag with
+#   a suffix) goes to TestPyPI only; a full release goes to TestPyPI, then PyPI.
+# - A manual run takes a tag and an index: `testpypi` uploads there only, `pypi`
+#   uploads to TestPyPI, then PyPI, and only while PYPI_PUBLISH is `true`.
+# - Pull requests never start it.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release whose wheels to upload (v0.1.1, v0.2.0-rc.1)
+        required: true
+        type: string
+      index:
+        description: testpypi uploads to TestPyPI only; pypi uploads to TestPyPI, then PyPI
+        required: true
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+permissions: {}
+
+concurrency:
+  group: pypi-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  # PEP 740 attestations go to Sigstore's public log with the repository,
+  # workflow and commit in them, so they wait for the repository to go public,
+  # like the build provenance in cd.yml.
+  ATTEST: ${{ github.event.repository.visibility == 'public' }}
+
+jobs:
+  wheels:
+    name: Fetch the release wheels
+    if: github.event_name == 'workflow_dispatch' || vars.PYPI_PUBLISH == 'true'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read # a private repository's release assets
+      attestations: read
+    outputs:
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - id: release
+        name: The tag is a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(a|alpha|b|beta|rc)\.?[0-9]+)?$ ]]; then
+            echo "::error::Tag $TAG is not vX.Y.Z or vX.Y.Z-(a|b|rc).N"
+            exit 1
+          fi
+          read -r draft pre < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease -q '"\(.isDraft) \(.isPrerelease)"') || true
+          if [ "$draft" != "false" ]; then
+            echo "::error::$TAG is a draft or has no release; publish it first"
+            exit 1
+          fi
+          # A suffixed tag (v0.2.0-rc.1) is a pre-release even if the checkbox was missed.
+          [[ "$TAG" == *-* ]] && pre=true
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
+      - name: Download the wheels and SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
+            --pattern '*.whl' --pattern SHA256SUMS
+      - name: Five wheels of this version, each matching SHA256SUMS
+        working-directory: dist
+        run: |
+          # The tag in PEP 440 form, as scripts/build-wheels.py names the wheels: v0.2.0-rc.1 -> 0.2.0rc1.
+          version="$(sed -E 's/^v//; s/-(alpha|a)\.?/a/; s/-(beta|b)\.?/b/; s/-rc\.?/rc/' <<<"$TAG")"
+          grep '\.whl$' SHA256SUMS > wheels.sha256
+          sha256sum --check --strict wheels.sha256
+          # One wheel per binary in scripts/build-wheels.py; every file checked, none extra.
+          listed="$(wc -l < wheels.sha256)"; present="$(find . -name '*.whl' | wc -l)"
+          if [ "$listed" != 5 ] || [ "$present" != 5 ]; then
+            echo "::error::Expected 5 wheels; SHA256SUMS lists $listed and the release has $present"
+            exit 1
+          fi
+          for wheel in *.whl; do
+            if [[ "$wheel" != "inwards-$version-py3-none-"* ]]; then
+              echo "::error::$wheel is not version $version"
+              exit 1
+            fi
+          done
+          rm SHA256SUMS wheels.sha256 # the upload takes every file in dist/
+          ls -l
+      - name: Provenance verifies
+        if: env.ATTEST == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wheel in dist/*.whl; do
+            gh attestation verify "$wheel" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/cd.yml" --source-ref "refs/tags/$TAG"
+          done
+      # Pinned too: what it uploads is what the OIDC jobs publish.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pypi-wheels
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # The upload jobs hold the OIDC token, so they run nothing but two
+  # SHA-pinned actions (Dependabot keeps them current). skip-existing lets a
+  # re-run finish a partial upload, and lets a PyPI run follow a TestPyPI one.
+  testpypi:
+    name: Upload to TestPyPI
+    needs: wheels
+    runs-on: ubuntu-26.04
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/inwards/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pypi-wheels
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          attestations: ${{ env.ATTEST }}
+
+  pypi:
+    name: Upload to PyPI
+    needs: [wheels, testpypi]
+    # PYPI_PUBLISH gates manual runs too. Implicitly also requires both jobs to
+    # have succeeded.
+    if: >-
+      vars.PYPI_PUBLISH == 'true' && (
+        (github.event_name == 'release' && needs.wheels.outputs.prerelease == 'false')
+        || (github.event_name == 'workflow_dispatch' && inputs.index == 'pypi'))
+    runs-on: ubuntu-26.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/inwards/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pypi-wheels
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          skip-existing: true
+          attestations: ${{ env.ATTEST }}

@@ -1,13 +1,13 @@
 # Install Inwards
 
 !!! info "Verified 2026-09-25"
-    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary on every push; a by-hand check there is still open. The release download steps can't be tried until v0.1.0 is published.
+    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works.
 
 Inwards is one executable with no runtime to install. The latest release is the pre-release v0.1.0-rc.1; the first full release comes with a later milestone. You can also build from source.
 
 ## From a release
 
-Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform and `SHA256SUMS`. Build attestations are added once the repository is public.
+Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (`.vsix`) and `SHA256SUMS`. Build attestations are added once the repository is public.
 
 | Platform | File |
 |---|---|
@@ -30,6 +30,12 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 
     If `inwards` isn't found, add `~/.local/bin` to `PATH` in your shell profile (`export PATH="$HOME/.local/bin:$PATH"`).
 
+    While the repository is private, GitHub answers these URLs with 404. Download with the GitHub CLI instead, then continue from the `sha256sum` line:
+
+    ```sh
+    gh release download "$VERSION" --repo SirCypkowskyy/inwards --pattern "$FILE" --pattern SHA256SUMS
+    ```
+
 === "Windows (PowerShell)"
 
     ```powershell
@@ -46,7 +52,23 @@ Once attestations are published, `gh attestation verify <file> --repo SirCypkows
 
 ## As a uv dev dependency
 
-Each release also has one wheel per platform with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the binary). uv installs it like any other package, and `inwards` lands in the project's virtual environment:
+Each release also has one wheel per platform with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the binary). uv installs it like any other package, and `inwards` lands in the project's virtual environment.
+
+### From PyPI (from the first PyPI release)
+
+No release is on PyPI yet. Once one is, installing takes one line, and uv picks the wheel for each platform:
+
+```sh
+uv add --dev inwards
+uv run inwards check
+uvx inwards --version   # one-off, no project
+```
+
+Until then, `inwards` on PyPI is a 0.0.0 name placeholder: `--version` says the linter isn't released yet and every other command exits 2. Use the wheels from a GitHub release below. Releases reach PyPI through [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); the first one comes with a later milestone, not with v0.1.0-rc.1.
+
+`uv add --dev inwards` takes the newest full release and skips pre-releases. To try a pre-release that is on PyPI, ask for it: `uv add --dev "inwards>=0.2.0rc1"`.
+
+### From a GitHub release
 
 ```sh
 TAG=v0.1.0-rc.1; VER=0.1.0rc1   # the release, and its Python version
@@ -93,8 +115,6 @@ No marker tells glibc from musl, so on Alpine `uv sync` stops with "incompatible
 
 `inwards --version` prints the release it was built from without the pre-release suffix (`0.1.0` for `0.1.0rc1`).
 
-Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), this becomes `uv add --dev inwards`.
-
 ## From source
 
 You need [Bun](https://bun.sh) 1.4.2 (the version in `.bun-version`) and access to the repository.
@@ -109,7 +129,59 @@ inwards --version
 
 ## Configure the layers
 
+### A new project: start from a preset
+
+`inwards init --style` writes `[tool.inwards]` for a known architecture, and `--scaffold` adds a small example package that passes the check. uv creates the project; Inwards only adds the layers:
+
+```sh
+uv init --package app && cd app
+inwards init --style hexagonal --scaffold
+```
+
+```text
+inwards init: wrote the hexagonal preset to pyproject.toml and 14 example files.
+
+src/app/  (hexagonal)
+├── adapters/
+│   ├── inbound/   inbound: may import domain, application, outbound
+│   └── outbound/  outbound: may import domain, application
+├── application/   application: may import domain
+├── bootstrap.py   bootstrap: may import every other layer
+└── domain/        domain: imports no other layer
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m app.bootstrap book 2
+Wire an agent: inwards init --agent claude|aider|agents-md
+```
+
+Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
+
+Three presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
+
+| Style | Layers | What it can't forbid |
+|---|---|---|
+| `layered` | domain, persistence, services, presentation, bootstrap | presentation calling persistence directly (open layers) |
+| `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importing infrastructure |
+| `hexagonal` | domain, application, outbound (`adapters.outbound`), inbound (`adapters.inbound`), bootstrap | inbound adapters importing outbound ones |
+
+Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer.
+
+What `--style` writes and when it stops:
+
+- **The table:** the layers, `root` (`src` for a src layout, else `.`), `required-version`, the default `ignore` list and a comment naming the preset and the Inwards version. The package comes from `[project].name`, normalised the way uv does it (`my-app` becomes `my_app`), or from `--package`; a Python keyword can't be one. Run below the project, init uses the nearest `pyproject.toml` above and says which. Before the package exists, `root` is `src` when the build backend is uv_build or `src/` already holds Python code.
+- **It never rewrites layers.** If `[tool.inwards]` already exists, init exits 2 and writes nothing. Without a `pyproject.toml` it exits 2 and suggests `uv init --package`.
+- **`--scaffold`** writes an entity, a port (`typing.Protocol`), a use case, an adapter that implements the port, a command-line driving adapter, the composition root and one test in `tests/`. It never replaces anything: if a file or symlink is in the way, or a directory leads outside the project through a symlink, init exits 2, lists the paths and writes nothing. An existing `__init__.py`, such as the one uv creates, is left as it is. The files go first and `pyproject.toml` last; if a write fails, init removes what it created, so the same command can run again.
+- **`--dry-run`** prints every change as a diff and writes nothing. **`--agent`** combines with `--style`: `inwards init --style clean --agent claude` writes the layers and the Claude Code hooks in one run.
+- After writing, init runs the check in process and prints the tree above. Without `--scaffold`, each layer package is marked `(missing)` and fails the check until it has a module.
+
+On a terminal, `inwards init` with neither `--style` nor `--agent` asks instead: the style (the highlighted one shows its layers), whether to scaffold, and which agent to wire. It ends by printing the same command with flags. Without a terminal (stdin or stdout isn't a TTY, or `CI` is set), it never waits for input: it exits 2 at once and lists the flags and the styles. Agents run init this way.
+
+### Any project: write the table by hand
+
 Add `[tool.inwards]` to the `pyproject.toml` of the project you want to check, innermost layer first:
+
+<!-- e2e -->
 
 ```toml title="pyproject.toml"
 [tool.inwards]
@@ -122,8 +194,27 @@ layers = [
 
 Then check the whole project:
 
+<!-- e2e -->
+
 ```sh
 inwards check
 ```
 
-`All clear` with exit code 0 means every import points inward. Exit code 1 lists each violation with numbered fix steps, and exit code 2 is a usage or config error. Next, wire Inwards into your agent: [Claude Code](claude-code.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md).
+`All clear` with exit code 0 means every import points inward. Exit code 1 lists each violation with numbered fix steps, and exit code 2 is a usage or config error.
+
+### On an existing codebase
+
+A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:
+
+<!-- e2e -->
+
+```sh
+inwards baseline
+git add inwards-baseline.json
+```
+
+`inwards baseline` checks the whole project under one config and writes every violation to `inwards-baseline.json` next to its `pyproject.toml`. Commit it: `inwards check`, the agent hooks and CI all read it. In a monorepo, run it once per package that has its own `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), since each file is checked against the baseline next to its own config. An accepted import can move to another line and still pass, because entries match by rule, module and message, without the message's "Allowed direction" sentence, so adding a layer doesn't bring them back. A second copy of it in the same module fails. When a whole-project check finds that accepted violations are gone, it says so. Run `inwards baseline` again to drop them. With `--format json` and a baseline present, the summary counts both: `baselined` on every run, `resolved` on a whole-project one. Agents can't edit the file or run the command: the Claude Code hooks deny both, and the Stop gate fails a session that changed it and checks that session's files with no baseline at all.
+
+Once a project has a baseline, `stop-gate = "project"` in `[tool.inwards]` makes the Claude Code Stop gate check the whole project against it instead of only the files the session changed, so a violation anywhere blocks the turn ([chapter 4](../04-AI-Integration.md)). A check skips the confirming parse where the baseline accepts everything the prescan found, so a fully baselined check costs about as much as a clean one.
+
+Next, wire Inwards into your agent: [Claude Code](claude-code.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md). To fail pull requests that break a layer, add the [GitHub Actions](ci.md) workflow.

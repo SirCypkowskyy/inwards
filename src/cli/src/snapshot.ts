@@ -18,6 +18,11 @@ export interface ProjectConfigs {
   valid: Record<string, InwardsConfig>;
   /** Tables that don't parse. They govern nothing: any check under them stops with a config error. */
   invalid: string[];
+  /**
+   * Where each valid config was found, by its real path's key. A symlinked
+   * pyproject.toml governs the tree it sits in, not its target's.
+   */
+  found: Record<string, string[]>;
 }
 
 /**
@@ -54,13 +59,14 @@ function isPyproject(name: string): boolean {
  * @returns the valid configs and the paths of invalid ones, sorted.
  */
 function readConfigs(project: string, paths: string[]): ProjectConfigs {
-  const found: ProjectConfigs = { valid: {}, invalid: [] };
+  const found: ProjectConfigs = { valid: {}, invalid: [], found: {} };
   for (const path of paths.sort()) {
     const text = readFileSync(path, "utf8");
     const rel = projectPath(project, path);
     try {
       if (declaresInwards(text)) {
         found.valid[rel] = parseConfig(text);
+        found.found[rel] = [...(found.found[rel] ?? []), path];
       }
     } catch (err) {
       if (!(err instanceof ConfigError)) {

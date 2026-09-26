@@ -74,12 +74,23 @@ describe("config integrity (INW006)", () => {
       '"shop.domain" is in two layers',
     ],
     [
+      "an unknown stop-gate mode",
+      `[tool.inwards]\nstop-gate = "all"\nlayers = [${layer}]\n`,
+      'stop-gate must be "changed" or "project"',
+    ],
+    [
       "an ignore that isn't a list",
       `[tool.inwards]\nignore = "tests"\nlayers = [${layer}]\n`,
       "ignore",
     ],
   ])("%s is a config error", (_, text, message) => {
     expect(() => parseConfig(text)).toThrow(message);
+  });
+
+  test("stop-gate is read when set and absent otherwise", () => {
+    const text = `[tool.inwards]\nstop-gate = "project"\nlayers = [${layer}]\n`;
+    expect(parseConfig(text).stopGate).toBe("project");
+    expect(parseConfig(`[tool.inwards]\nlayers = [${layer}]\n`).stopGate).toBeUndefined();
   });
 
   test("ignore is absent unless set", () => {

@@ -1,0 +1,1 @@
+Add a `total_euros` property to `Order` in `shop/domain/order.py` that returns `total_cents / 100`, and a `with_discount(percent)` method that returns a new `Order` with `total_cents` reduced by that percentage, rounded down to whole cents.

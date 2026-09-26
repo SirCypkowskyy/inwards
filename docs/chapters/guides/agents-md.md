@@ -1,7 +1,7 @@
 # AGENTS.md (Codex, Cursor, and others)
 
 !!! info "Verified 2026-09-25"
-    Linux by hand: `init`, the section it writes, and `inwards check --format json`. No agent was run. On macOS (arm64) and Windows, CI runs `init` with the compiled binary on every push; a by-hand check there is still open.
+    Linux by hand: `init`, the section it writes, and `inwards check --format json`. No agent was run. On macOS (arm64) and Windows, CI runs `init` with the compiled binary before each release; a by-hand check there is still open.
 
 Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repository for project instructions, including OpenAI Codex, Cursor, and Jules. Inwards adds a short section there that tells the agent to run the check before finishing, and how to read the result.
 
@@ -9,6 +9,8 @@ Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repo
 
 1. [Install Inwards](install.md) so that `inwards` is on `PATH` for everyone who runs the agent, and add `[tool.inwards]` to `pyproject.toml`.
 2. In the project, run:
+
+    <!-- e2e -->
 
     ```sh
     inwards init --agent agents-md
@@ -44,4 +46,4 @@ Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repo
 | `init` stops with "unmatched markers" | `AGENTS.md` doesn't have exactly one `inwards:begin` and one `inwards:end` marker. Fix or remove them by hand, then run `init` again. |
 | `inwards: command not found` in the agent's shell | The agent's environment doesn't see the binary. Put it on `PATH` there. (Editing the command inside the markers works until the next `init`, which puts the section back.) |
 
-For a hard stop, run `inwards check` in CI: exit code 1 fails the job. To also see the findings in GitHub code scanning, run it with `--format sarif > inwards.sarif` in a step that tolerates exit code 1 and upload the file (code scanning on a private repository needs GitHub Advanced Security).
+For a hard stop, run `inwards check` in CI: exit code 1 fails the job. The [GitHub Actions guide](ci.md) has a workflow that also annotates the pull request and uploads SARIF to code scanning.

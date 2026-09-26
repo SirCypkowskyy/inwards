@@ -3,18 +3,24 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { ConfigError, type Format, render, VERSION } from "@inwards/core";
+import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
 import { hookClaudeCode } from "./hook.ts";
-import { AGENTS, initCommand, isAgent } from "./init.ts";
+import { type InitFlags, initMain } from "./init-style.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { logRun, noteRun } from "./runlog.ts";
+import { statsCommand } from "./stats-command.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
 
-Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml] [--log]
-       inwards init --agent claude|aider|agents-md [--dry-run]
+Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
+                     [--config pyproject.toml] [--log]
+       inwards baseline [--config pyproject.toml]    (accept today's violations)
+       inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
+       inwards init --agent claude|aider|agents-md [--dry-run]   (--list-styles: the presets)
+       inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
@@ -40,6 +46,13 @@ async function main(argv: string[]): Promise<number> {
       agent: { type: "string" },
       "dry-run": { type: "boolean" },
       log: { type: "boolean" },
+      "max-diagnostics": { type: "string" },
+      export: { type: "string" },
+      redact: { type: "boolean" },
+      style: { type: "string" },
+      scaffold: { type: "boolean" },
+      package: { type: "string" },
+      "list-styles": { type: "boolean" },
     },
   });
 
@@ -47,33 +60,94 @@ async function main(argv: string[]): Promise<number> {
     return print(VERSION, 0);
   }
   const [command, ...paths] = positionals;
-  if (command === "hook" && !values.help) {
-    return paths[0] === "claude-code" && paths.length === 1
-      ? await hookClaudeCode(USAGE)
-      : print(USAGE, 2);
-  }
-  if (command === "init" && !values.help) {
-    return paths.length === 0 && isAgent(values.agent)
-      ? initCommand(values.agent, values["dry-run"] === true)
-      : print(`${USAGE}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
+  if (!values.help && isSetupCommand(command)) {
+    return await setupCommand(command, paths, values);
   }
   if (values.help || command !== "check") {
     return print(USAGE, command ? 2 : 0);
   }
-  return await checkCommand(paths, values.format, values.config, values.log === true);
+  return await checkCommand(paths, values, values.log === true);
 }
 
-const FORMATS: readonly Format[] = ["text", "json", "sarif"];
+/** The commands besides `check`. */
+type SetupCommand = "hook" | "init" | "baseline" | "stats";
+const SETUP_COMMANDS: readonly string[] = ["hook", "init", "baseline", "stats"];
+
+/**
+ * Tells whether a positional names one of the commands besides `check`.
+ *
+ * @param command - the first positional.
+ * @returns true for hook, init, baseline or stats.
+ */
+function isSetupCommand(command: string | undefined): command is SetupCommand {
+  return command !== undefined && SETUP_COMMANDS.includes(command);
+}
+
+/**
+ * Runs the commands besides `check`: the hook, `init`, `baseline` and `stats`.
+ *
+ * @param command - which one.
+ * @param paths - the positionals after it.
+ * @param values - the parsed options.
+ * @param values.agent - `--agent`, for init (so are the other InitFlags).
+ * @param values."dry-run" - `--dry-run`, for init.
+ * @param values.config - `--config`, for baseline (stats refuses it).
+ * @param values.format - `--format`, for stats.
+ * @param values.export - `--export FILE`, for stats.
+ * @param values.redact - `--redact`, for stats.
+ * @returns the exit code; 2 for unexpected arguments.
+ */
+async function setupCommand(
+  command: SetupCommand,
+  paths: string[],
+  values: InitFlags & {
+    config?: string | undefined;
+    format?: string | undefined;
+    export?: string | undefined;
+    redact?: boolean | undefined;
+  },
+): Promise<number> {
+  if (command === "stats") {
+    if (values.config !== undefined) {
+      return print(
+        "inwards stats reads every run log in a project: pass the project directory, not --config.",
+        2,
+      );
+    }
+    return paths.length <= 1
+      ? statsCommand(values.format ?? "text", paths[0], values)
+      : print(USAGE, 2);
+  }
+  if (command === "hook") {
+    return paths[0] === "claude-code" && paths.length === 1
+      ? await hookClaudeCode(USAGE)
+      : print(USAGE, 2);
+  }
+  if (command === "init") {
+    return await initMain(paths, values, USAGE);
+  }
+  return paths.length === 0 ? await baselineCommand(values.config) : print(USAGE, 2);
+}
+
+const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif"];
 
 /**
  * Tells whether a `--format` value is one the reporters support.
  *
  * @param value - the raw option value.
- * @returns true for `text`, `json` or `sarif`.
+ * @returns true for `text`, `concise`, `json` or `sarif`.
  */
 function isFormat(value: string): value is Format {
   return FORMATS.some((format) => format === value);
 }
+
+/** The options `inwards check` reads. */
+interface CheckOptions {
+  format?: string | undefined;
+  config?: string | undefined;
+  "max-diagnostics"?: string | undefined;
+}
+const WHOLE_NUMBER = /^\d+$/u;
 
 /**
  * Runs `inwards check` and writes the report to stdout.
@@ -84,19 +158,27 @@ function isFormat(value: string): value is Format {
  * Colour follows FORCE_COLOR first, then NO_COLOR, then the TTY check.
  *
  * @param paths - files or directories to check; empty means the config root.
- * @param format - the `--format` value, validated here.
- * @param config - the `--config` path, if given.
+ * @param options - the parsed options.
+ * @param options.format - the `--format` value, validated here.
+ * @param options.config - the `--config` path, if given.
+ * @param options."max-diagnostics" - `--max-diagnostics`: a whole number, and not with SARIF,
+ *   whose readers (code scanning) should see every finding.
  * @param log - `--log`: append this run to `.inwards/runs.jsonl` even when the run log is off.
- * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad format or no config.
+ * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad option or no config.
  */
 async function checkCommand(
   paths: string[],
-  format: string,
-  config: string | undefined,
+  { format = "text", config, "max-diagnostics": max }: CheckOptions,
   log: boolean,
 ): Promise<number> {
   if (!isFormat(format)) {
     return print(`Unknown --format ${format}`, 2);
+  }
+  if (max !== undefined && format === "sarif") {
+    return print("--max-diagnostics does not apply to sarif: code scanning gets every finding.", 2);
+  }
+  if (max !== undefined && !WHOLE_NUMBER.test(max)) {
+    return print("--max-diagnostics takes a whole number, e.g. 20.", 2);
   }
 
   const configPath = config ? resolve(config) : findConfig(process.cwd());
@@ -110,7 +192,8 @@ async function checkCommand(
   // Agents and hooks read a pipe, and indentation there is wasted tokens.
   const pretty = process.stdout.isTTY === true;
   const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
-  process.stdout.write(`${render(report, format, { pretty, color })}\n`);
+  const maxDiagnostics = max === undefined ? undefined : Number(max);
+  process.stdout.write(`${render(report, format, { pretty, color, maxDiagnostics })}\n`);
   const exit = report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
   const project = realpath(dirname(configPath));
   if (project) {
@@ -118,6 +201,28 @@ async function checkCommand(
     logRun(project, { event: "check", exit, force: log });
   }
   return exit;
+}
+
+/**
+ * Runs `inwards baseline`: checks the whole project without the baseline and
+ * writes every error to inwards-baseline.json next to the config, replacing
+ * the old one. Later checks, hooks and the Stop gate then fail only on new
+ * violations.
+ *
+ * @param config - the `--config` path, if given.
+ * @returns 0 once written, 2 without a config.
+ */
+async function baselineCommand(config: string | undefined): Promise<number> {
+  const configPath = config ? resolve(config) : findConfig(process.cwd());
+  if (!configPath) {
+    return print("No pyproject.toml with [tool.inwards] found.", 2);
+  }
+  const report = await runCheck(configPath, undefined, process.cwd(), { baseline: false });
+  const accepted = writeBaseline(configPath, report.diagnostics);
+  return print(
+    `Wrote ${BASELINE_FILE} with ${accepted} violation${accepted === 1 ? "" : "s"}. Commit it; new violations still fail.`,
+    0,
+  );
 }
 
 /**

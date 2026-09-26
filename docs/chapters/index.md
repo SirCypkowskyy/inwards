@@ -29,16 +29,52 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
     Found 1 violation in 1 file (16.8 ms).
     ```
 
-```mermaid
-flowchart LR
-    agent["🤖 Agent edits a file"] --> hook["⚡ Hook runs<br/>inwards check"]
-    hook -- "violation + fix steps" --> agent
-    hook -- "clean" --> cont["✅ Agent continues"]
-```
+<div class="homepage-loop-wrap">
+<svg id="homepage-loop" viewBox="0 0 820 160" role="img"
+     aria-label="Agent edits a file, then the hook runs inwards check. On a violation, the agent gets fix steps and loops back. When clean, the agent continues.">
+  <defs>
+    <marker id="hl-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="hl-arrowhead" />
+    </marker>
+  </defs>
+
+  <path id="hl-edge-to-hook" class="hl-edge" marker-end="url(#hl-arrow)"
+        d="M170,50 H330" />
+  <path id="hl-edge-violation" class="hl-edge hl-edge-dashed" marker-end="url(#hl-arrow)"
+        d="M400,70 C400,110 250,110 170,70" />
+  <text class="hl-edge-label" x="285" y="122">violation + fix steps</text>
+  <path id="hl-edge-clean" class="hl-edge" marker-end="url(#hl-arrow)"
+        d="M480,50 H610" />
+  <text class="hl-edge-label" x="545" y="40">clean</text>
+
+  <g id="hl-agent" class="hl-node" tabindex="0">
+    <rect x="20" y="20" width="150" height="60" rx="10" />
+    <text x="95" y="55">🤖 Agent edits a file</text>
+  </g>
+
+  <g id="hl-hook" class="hl-node" tabindex="0">
+    <rect x="340" y="20" width="140" height="60" rx="10" />
+    <text x="410" y="45">⚡ Hook runs</text>
+    <text x="410" y="62">inwards check</text>
+  </g>
+
+  <g id="hl-outcomes" class="hl-node">
+    <rect x="620" y="20" width="180" height="60" rx="10" />
+    <text x="710" y="55">✅ Agent continues</text>
+  </g>
+</svg>
+</div>
 
 ## Start here
 
 <div class="grid cards" markdown>
+
+-   :material-rocket-launch-outline:{ .lg .middle } __[Getting started](guides/install.md)__
+
+    ---
+
+    Install the binary or the wheel, then wire Inwards into Claude Code, Aider or any agent that reads `AGENTS.md`.
 
 -   :material-book-open-page-variant:{ .lg .middle } __[Introduction](01-Introduction.md)__
 
@@ -68,7 +104,7 @@ flowchart LR
 
     ---
 
-    Twelve decisions, from "why TypeScript" to "why check imports inside functions".
+    Eighteen decisions, among them "why TypeScript", "how a release is cut" and "how packages are selected".
 
 -   :material-speedometer:{ .lg .middle } __[Constraints and quality](06-Constraints-and-Quality.md)__
 
@@ -81,4 +117,8 @@ flowchart LR
 The [glossary](07-Glossary.md) defines every term from "port" to "import skeleton".
 
 !!! info "Project status"
-    Pre-alpha (0.1.0<!-- x-release-please-version -->). Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports). `inwards hook claude-code` wires them into Claude Code, with a Stop gate that checks what the session changed, and each `v*` tag drafts a GitHub Release with binaries for six platforms. CI runs on Linux, macOS and Windows. Items marked :material-progress-clock: are planned.
+    Pre-alpha.
+    Six rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
+    `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal` writes the layers, and `--scaffold` adds an example package that passes the check.
+    Each release is a GitHub Release with binaries for six platforms, five platform wheels for `uv add` and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
+    CI tests every pull request on Linux, and macOS and Windows before each release. Items marked :material-progress-clock: are planned.

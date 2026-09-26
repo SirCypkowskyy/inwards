@@ -1,7 +1,7 @@
 # Claude Code
 
 !!! info "Verified 2026-09-25"
-    Linux by hand: `init` and its output, and a headless `claude -p` session in Claude Code 2.1.282, where the config edit was refused, the violation was reported, and the Stop gate escalated to the user. The interactive `/hooks` step wasn't run. On macOS (arm64) and Windows, CI runs `init` and the hook with the compiled binary on every push; a by-hand check there is still open.
+    Linux by hand: `init` and its output, and a headless `claude -p` session in Claude Code 2.1.282, where the config edit was refused, the violation was reported, and the Stop gate escalated to the user. The interactive `/hooks` step wasn't run. On macOS (arm64) and Windows, CI runs `init` and the hook with the compiled binary before each release; a by-hand check there is still open.
 
 With the hooks installed, Inwards checks every Python file Claude writes. It won't let the turn end while the session's changes break a layer, and it refuses edits to the rules themselves. [Chapter 4](../04-AI-Integration.md) explains the design.
 
@@ -9,6 +9,8 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 
 1. [Install Inwards](install.md) and add `[tool.inwards]` to `pyproject.toml`.
 2. In the project, run:
+
+    <!-- e2e -->
 
     ```sh
     inwards init --agent claude --dry-run   # shows what will change

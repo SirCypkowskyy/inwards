@@ -1,0 +1,128 @@
+{
+  "$comment": "Real-repo corpus for bench/corpus.ts. Each repo is pinned by commit and fetched shallow (sparse when `paths` is set). `pythonFiles` is the number of .py files in that checkout, so a broken fetch fails the prescan test instead of shrinking it. `config` becomes the [tool.inwards] table the timings run with: our layering, not the project's, so its violation count says nothing about the project. `file` is the single-file check's target.",
+  "repos": [
+    {
+      "name": "full-stack-fastapi-template",
+      "url": "https://github.com/fastapi/full-stack-fastapi-template",
+      "sha": "cb740b656d7a0a6c5e12c7bf8e50343ec94ee9c7",
+      "license": "MIT",
+      "why": "FastAPI's official app template: routes, CRUD, models and core, the layout most small FastAPI services start from",
+      "paths": ["backend"],
+      "pythonFiles": 40,
+      "file": "backend/app/api/routes/items.py",
+      "config": {
+        "root": "backend",
+        "ignore": ["tests", "alembic", "scripts"],
+        "layers": [
+          { "name": "core", "modules": ["app.core", "app.models"] },
+          { "name": "services", "modules": ["app.crud", "app.utils"] },
+          { "name": "api", "modules": ["app.api", "app.main"] }
+        ]
+      }
+    },
+    {
+      "name": "fastapi-clean-example",
+      "url": "https://github.com/ivan-borovets/fastapi-clean-example",
+      "sha": "927172311ec272ee3894619d91008a1b3403bc75",
+      "license": "MIT",
+      "why": "Clean architecture on FastAPI: core, outbound and inbound adapters, composition root",
+      "pythonFiles": 209,
+      "file": "src/app/core/commands/create_user.py",
+      "config": {
+        "root": "src",
+        "layers": [
+          { "name": "core", "modules": ["app.core"] },
+          { "name": "outbound", "modules": ["app.outbound"] },
+          { "name": "inbound", "modules": ["app.inbound"] },
+          { "name": "main", "modules": ["app.main"] }
+        ]
+      }
+    },
+    {
+      "name": "python-ddd",
+      "url": "https://github.com/pgorecki/python-ddd",
+      "sha": "429cd4b1ffed571ccd845e64f05b484f4f8c52ac",
+      "license": "MIT",
+      "why": "DDD modular monolith: three bounded contexts, each split into domain, application and infrastructure",
+      "pythonFiles": 139,
+      "file": "src/modules/bidding/domain/entities.py",
+      "config": {
+        "root": "src",
+        "ignore": ["tests", "alembic"],
+        "layers": [
+          {
+            "name": "domain",
+            "modules": [
+              "seedwork.domain",
+              "modules.catalog.domain",
+              "modules.bidding.domain",
+              "modules.iam.domain"
+            ]
+          },
+          {
+            "name": "application",
+            "modules": [
+              "seedwork.application",
+              "modules.catalog.application",
+              "modules.bidding.application",
+              "modules.iam.application"
+            ]
+          },
+          {
+            "name": "infrastructure",
+            "modules": [
+              "seedwork.infrastructure",
+              "modules.catalog.infrastructure",
+              "modules.bidding.infrastructure",
+              "modules.iam.infrastructure",
+              "config"
+            ]
+          },
+          { "name": "interface", "modules": ["api", "cli"] }
+        ]
+      }
+    },
+    {
+      "name": "polar",
+      "url": "https://github.com/polarsource/polar",
+      "sha": "cfae1ba0edffbe1c1482094426a3a500403d35ea",
+      "license": "Apache-2.0",
+      "why": "A large FastAPI service in production: about 70 feature packages over a shared kit and models",
+      "paths": ["server"],
+      "pythonFiles": 1831,
+      "file": "server/polar/subscription/service.py",
+      "config": {
+        "root": "server",
+        "ignore": ["tests", "migrations"],
+        "layers": [
+          { "name": "kit", "modules": ["polar.kit"] },
+          { "name": "models", "modules": ["polar.models"] },
+          { "name": "features", "modules": ["polar"] },
+          {
+            "name": "entrypoints",
+            "modules": ["polar.api", "polar.app", "polar.worker", "polar.backoffice"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "saleor",
+      "url": "https://github.com/saleor/saleor",
+      "sha": "5ff56489737c78a9a5631d528f699303c953696a",
+      "license": "BSD-3-Clause",
+      "why": "A large Django service: about 30 Django apps under a GraphQL API, bigger than the synthetic repo",
+      "paths": ["saleor"],
+      "pythonFiles": 4324,
+      "file": "saleor/order/actions.py",
+      "config": {
+        "root": ".",
+        "ignore": ["tests", "migrations"],
+        "layers": [
+          { "name": "core", "modules": ["saleor.core", "saleor.permission"] },
+          { "name": "apps", "modules": ["saleor"] },
+          { "name": "api", "modules": ["saleor.graphql", "saleor.urls", "saleor.asgi"] }
+        ]
+      }
+    }
+  ]
+}
