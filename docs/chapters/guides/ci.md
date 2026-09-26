@@ -69,7 +69,7 @@ Keep one of the two annotation steps once code scanning works, or each violation
 
 ## Code scanning availability
 
-Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with HTTP 403. Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does until it goes public. The token of a pull request from a fork can't write security events either, so the upload fails there too.
+Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does until it goes public. The token of a pull request from a fork can't write security events either, so the upload fails there too.
 
 ## While Inwards is private
 
