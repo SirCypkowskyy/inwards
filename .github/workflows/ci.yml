@@ -4,6 +4,11 @@ on:
   push:
     branches: [develop, main]
   pull_request:
+  # macOS, Windows and the older Ubuntu run nightly and on demand only, while
+  # Actions minutes are limited (#126); PRs and pushes test on ubuntu-26.04.
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -55,12 +60,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Both Ubuntu images until ubuntu-latest moves to 26.04 (2026-10-19).
-          - { os: ubuntu-24.04, target: bun-linux-x64, bin: inwards-linux-x64 }
-          - { os: ubuntu-26.04, target: bun-linux-x64, bin: inwards-linux-x64 }
-          - { os: macos-latest, target: bun-darwin-arm64, bin: inwards-darwin-arm64 }
-          - { os: windows-latest, target: bun-windows-x64, bin: inwards-windows-x64.exe }
+        # Nightly and manual runs: both Ubuntu images (until ubuntu-latest moves
+        # to 26.04 on 2026-10-19), macOS and Windows. PRs and pushes: ubuntu-26.04
+        # only, to save Actions minutes (#126); revert this to test all four on PRs.
+        include: >-
+          ${{ fromJSON(
+            (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+            && '[{"os":"ubuntu-24.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"ubuntu-26.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"macos-latest","target":"bun-darwin-arm64","bin":"inwards-darwin-arm64"},{"os":"windows-latest","target":"bun-windows-x64","bin":"inwards-windows-x64.exe"}]'
+            || '[{"os":"ubuntu-26.04","target":"bun-linux-x64","bin":"inwards-linux-x64"}]'
+          ) }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:

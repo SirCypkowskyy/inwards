@@ -205,6 +205,12 @@ act push -W .github/workflows/cd.yml -n                                       # 
 - **What act can't do:** the macOS and Windows matrix rows, OIDC and
   attestations, releases, and Pages deploys. Those run only on GitHub, so CI
   stays the gate.
+- **macOS and Windows run nightly, not on PRs** (#126, while Actions
+  minutes are limited). A PR only proves Linux. After merging anything
+  path-, shell- or filesystem-sensitive, check the next nightly CI run
+  (`gh run list --workflow ci.yml --event schedule`), or start one with
+  `gh workflow run ci.yml --ref develop`, and fix a red row before the next
+  release.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
 - **`setup-bun` fails with "Unable to locate executable file"**: act's local
