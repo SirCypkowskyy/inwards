@@ -29,9 +29,38 @@ snapshot; its sub-issue list is what counts.
 
 Check the board before picking up work, and set Status at every transition:
 
-- **Starting an issue.** Take only an item in Todo with no assignee. Assign
-  yourself, set In progress, and comment the branch and worktree you work in,
-  plus the plan when it isn't obvious from the issue.
+- **Starting an issue: check, then claim.** Every agent uses the owner's
+  account, so the assignee says nothing about *which* agent works on an
+  issue. Before you start, check all three, and pick another issue if any of
+  them says someone has it:
+  1. the board status is Todo;
+  2. `gh issue develop N --list` shows no linked branch;
+  3. the issue's comments have no claim that is still open, i.e. a
+     "Claimed by …" comment with no later "Released" or closing report.
+
+  Then claim it in one go:
+  - `gh issue develop N --name <type>/N-slug --base develop --checkout --worktree ~/Documents/GitHub/worktrees/inwards/N-slug`
+    creates the branch, links it to the issue (the issue's Development panel
+    shows it to every other agent), sets `develop` as the PR base and checks
+    it out in the worktree;
+  - set Status to In progress;
+  - post the claim comment: who you are (harness and model, e.g. "Claude
+    Code, Opus 5.5" or "Codex"), the branch, the worktree and the plan when
+    it isn't obvious from the issue.
+
+  Right after claiming, run `gh issue develop N --list` again: two agents
+  can pass the checks at the same moment. If there are two linked branches,
+  the later claimant releases.
+
+  If your harness can't reach GitHub or write outside its checkout (Codex's
+  default sandbox, for example), ask the coordinator to claim the issue and
+  create the worktree for you.
+
+  If you stop without finishing, release the issue so the next agent sees it
+  free: push anything worth keeping, then post "Released: <why, what's done,
+  and the commit SHA of anything worth keeping>", delete the linked branch
+  (`git push origin --delete <branch>`, `git worktree remove <path>`,
+  `git branch -D <branch>`), and set the status back to Todo.
 - **While working.** Comment on decisions, scope changes and findings someone
   else will need. Tick acceptance checkboxes in the body as they are met.
 - **Stuck.** Set Blocked and comment what blocks it and who or what can
@@ -50,14 +79,17 @@ limit. Read the board once when you pick up work, not in a loop.
 
 ```sh
 R=SirCypkowskyy/inwards
-gh issue edit N --add-assignee @me
-gh issue comment N --body "Claimed. Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug."
+gh issue develop N --list                         # a linked branch means it's taken
+gh issue view N --comments                        # an open "Claimed by" means it's taken
+gh issue develop N --name feat/N-slug --base develop --checkout \
+  --worktree ~/Documents/GitHub/worktrees/inwards/N-slug
+gh issue comment N --body "Claimed by Claude Code (Opus 5.5). Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug. Plan: …"
 gh issue comment N --body "Status: Blocked. Waiting on #M (engine API)."
 gh issue view N --json body -q .body > body.md   # tick boxes, then:
 gh issue edit N --body-file body.md
 
 # Project board: user project 3
-gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo no:assignee"  # free
+gh project item-list 3 --owner SirCypkowskyy -L 300 --query "status:Todo"  # free (then check links and comments)
 gh project item-list 3 --owner SirCypkowskyy -L 300 --query "-status:Todo -status:Done" # taken
 gh project item-list 3 --owner SirCypkowskyy --query "assignee:@me -status:Done"       # mine
 gh project item-add 3 --owner SirCypkowskyy --url https://github.com/$R/issues/N
@@ -97,13 +129,15 @@ the claim comment, not the assignee, says which agent owns an issue.
 - **One issue, one branch, one worktree.** Branch `<type>/<N>-<slug>`
   (`feat/42-sarif-output`). Worktrees live outside the checkout, in
   `~/Documents/GitHub/worktrees/<repo>/<worktree>`, here
-  `~/Documents/GitHub/worktrees/inwards/<N>-<slug>`. Create one by hand off
-  `origin/develop` (or the base branch the coordinator names), then run
-  `bun install` inside it:
-  `git worktree add ~/Documents/GitHub/worktrees/inwards/42-sarif-output -b feat/42-sarif-output origin/develop`.
-- **Claim before the first edit.** Assign yourself, set In progress, post the
-  claim comment. Never pick up an item that is In progress, Blocked, In
-  review or assigned; pick another or ask the coordinator.
+  `~/Documents/GitHub/worktrees/inwards/<N>-<slug>`. Create both with
+  `gh issue develop` (see "Starting an issue" above) so the branch is linked
+  to the issue, then run `bun install` inside the worktree. Work that has no
+  issue uses `git worktree add <path> -b <branch> origin/develop`.
+- **Claim before the first edit**, as "Starting an issue" says: board, linked
+  branches and comments first, then the linked branch, In progress and the
+  claim comment. Never pick up an item that is In progress, Blocked or In
+  review, that has a linked branch, or that has an open claim; pick another
+  or ask the coordinator.
 - **Stay in your lane.** Never edit files, run git, or install in another
   agent's worktree or on its branch. Never `git stash`, `checkout`, `switch`,
   `reset` or `rebase` in the shared primary checkout (`~/Documents/GitHub/inwards`): others have uncommitted
@@ -129,10 +163,13 @@ the claim comment, not the assignee, says which agent owns an issue.
   and, once `gh pr view --json state` says MERGED, `git branch -D <branch>`
   (a squash-merged branch is not an ancestor of `develop`, so `-d` refuses it).
 
-A coordinator claims the item on the board before it spawns a subagent, so
-two agents never race for it. Each subagent prompt names the issue, the base
-branch, the branch, the worktree path, the files or directories it may touch,
-and any high-conflict file it owns.
+A coordinator that spawns a subagent does the whole claim itself (the checks,
+`gh issue develop`, In progress, and a claim comment naming the subagent)
+before the subagent starts, so two agents never race for it; the subagent
+skips the claim. Each subagent prompt names the issue, the base branch, the
+branch, the worktree path, the files or directories it may touch, and any
+high-conflict file it owns. The coordinator removes the worktree after the
+merge.
 
 ## Before every commit
 
@@ -183,7 +220,8 @@ PR description is its body. Commits inside a branch can say anything.
 - **Title:** `type(scope): summary`, checked by `pr-title.yml`. Types that
   reach the changelog: `feat`, `fix`, `perf`, `deps`, `revert`, `docs`.
   Hidden: `refactor`, `test`, `build`, `ci`, `chore`. The scope is optional
-  (`core`, `cli`, `hook`, `vscode`, `wheels`, `docs`). The summary says in the
+  and free-form; the usual ones are `core`, `cli`, `hook`, `rules`, `vscode`,
+  `wheels`, `bench` and `docs`. The summary says in the
   imperative what a user gets, with no trailing period.
 - **Breaking change** (a config key removed or renamed, an exit code changed,
   a `diagnostics@1` field removed, a CLI flag removed): `feat!:` in the title
@@ -217,6 +255,18 @@ PR description is its body. Commits inside a branch can say anything.
   (`git fetch -q origin main && git log -1 --format=%s origin/main`
   doesn't start with `chore: promote`). The second check covers the seconds
   before release-please opens its PR, or a failed release-please run.
+- **Dependabot PRs** (weekly, into `develop`, `.github/dependabot.yml`):
+  - The Bun groups come titled `build:`, which keeps toolchain bumps out of
+    the changelog. Retitle a `runtime` group PR (tree-sitter, smol-toml, the
+    LSP libraries) to `deps:` before merging, since users get those.
+  - They touch `bun.lock` or `uv.lock`, so they merge one at a time like any
+    lockfile change; everyone else rebases and reruns `bun install` or
+    `uv lock` afterwards.
+  - Never push to a Dependabot branch. Comment `@dependabot rebase` or
+    `@dependabot recreate` instead.
+  - A `web-tree-sitter` or `tree-sitter-python` bump changes the parser:
+    check the E2E snapshots and the `prescan-diff` job before merging.
+  - `@types/vscode` is bumped by hand, together with `engines.vscode`.
 - A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
   `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with
@@ -231,9 +281,18 @@ done until both match the code.
   describe what the code does now. Drop "planned" from anything that shipped,
   fix numbers that changed (tests, corpus sizes, timings), and write an ADR
   for any decision a later reader would question. Run the strict docs build.
-- **Every issue you touched** gets a closing comment in three parts:
-  - *Done*: what changed, with commits or the PR;
-  - *Verified*: how you know it works (tests, CI run, `act`, a manual check);
+- **Every issue you touched** gets a closing report as a comment. It is the
+  context a later session (yours or another agent's) reads instead of
+  re-deriving the work, so write it for someone who wasn't there:
+  - *Done*: what changed, with the PR and commit, and where it lives (files,
+    modules, config keys, commands);
+  - *Verified*: how you know it works (tests, CI run, `act`, a manual check,
+    review rounds);
+  - *Challenges*: what was harder than expected, dead ends, surprises in the
+    code or the tools, and how you got past them;
+  - *Weaknesses*: the known limits and trade-offs of the solution, edge
+    cases it gets wrong or doesn't cover, and what you would do differently
+    with more time;
   - *Left*: what is still open. Each open item gets its own issue, linked,
     or stays as an unticked acceptance box with a reason.
   Then tick the acceptance boxes that are met and set the board status.
