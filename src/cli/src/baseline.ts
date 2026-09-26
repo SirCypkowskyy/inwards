@@ -68,13 +68,24 @@ function byCodePoint(a: string, b: string): number {
 /**
  * Writes the baseline from a whole-project check: its errors, grouped and sorted
  * so that the file diffs well. Warnings don't fail a check, so they stay out.
+ * The old file's dormant entries (rules `[tool.inwards.rules]` turns off or
+ * down to a warning, which the check can't see) are kept, so that turning the
+ * rule back on doesn't bring back violations the user had accepted.
  *
  * @param configPath - the pyproject.toml.
  * @param diagnostics - the whole-project check's diagnostics.
- * @returns how many violations the baseline now accepts.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
+ * @returns how many violations the baseline now accepts, dormant ones included.
  */
-export function writeBaseline(configPath: string, diagnostics: readonly Diagnostic[]): number {
+export function writeBaseline(
+  configPath: string,
+  diagnostics: readonly Diagnostic[],
+  rules: RuleSettings | undefined,
+): number {
   const entries = new Map<string, Entry>();
+  for (const e of dormantEntries(configPath, rules)) {
+    entries.set(baselineKey(e), e);
+  }
   for (const d of diagnostics.filter((x) => x.severity === "error")) {
     const entry = entries.get(baselineKey(d)) ?? {
       code: d.code,
@@ -104,6 +115,25 @@ export function writeBaseline(configPath: string, diagnostics: readonly Diagnost
     throw new ConfigError(`can't write ${path}; is it a directory?`, { cause: err });
   }
   return violations.reduce((sum, v) => sum + v.count, 0);
+}
+
+/**
+ * Reads the entries of the current baseline that `[tool.inwards.rules]` makes
+ * dormant. A baseline this version can't read has none: it is being replaced.
+ *
+ * @param configPath - the pyproject.toml.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
+ * @returns the dormant entries.
+ */
+function dormantEntries(configPath: string, rules: RuleSettings | undefined): Entry[] {
+  if (rules === undefined) {
+    return [];
+  }
+  try {
+    return (readEntries(baselinePath(configPath)) ?? []).filter((e) => dormant(e.code, rules));
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -169,7 +199,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * for `applyBaseline`. Entries of a rule that `[tool.inwards.rules]` turns
  * off or down to a warning are left out: that rule reports no errors to
  * accept, and its entries must not count as fixed. They apply again once the
- * rule is back, unless `inwards baseline` has rewritten the file since.
+ * rule is back; `inwards baseline` keeps them (see `writeBaseline`).
  *
  * @param configPath - the pyproject.toml.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
@@ -178,7 +208,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function readBaseline(
   configPath: string,
-  rules?: RuleSettings,
+  rules: RuleSettings | undefined,
 ): Map<string, number> | undefined {
   const entries = readEntries(baselinePath(configPath));
   if (entries === undefined) {

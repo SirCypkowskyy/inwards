@@ -53,6 +53,19 @@ describe("config guard: pyproject.toml", () => {
       { old_string: "[tool.inwards]\n", new_string: '[tool.inwards]\nrules.select = ["INW005"]\n' },
     ],
     [
+      "a MultiEdit that adds [tool.inwards.rules] next to a harmless edit",
+      "MultiEdit",
+      {
+        edits: [
+          { old_string: "attrs==23.1", new_string: "attrs==24.2" },
+          {
+            old_string: "[tool.inwards]\n",
+            new_string: '[tool.inwards]\nrules = { ignore = ["INW006"] }\n',
+          },
+        ],
+      },
+    ],
+    [
       "a Write that downgrades a rule",
       "Write",
       { content: `${PYPROJECT}\n[tool.inwards.rules.severity]\nINW001 = "warning"\n` },

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   ConfigError,
+  checkMoves,
   checkPrefixes,
   checkRequired,
   checkShape,
@@ -186,5 +187,16 @@ require = ["order.py"]
     const config = parseConfig(`${shaped}\n[tool.inwards.rules]\nignore = ["INW006"]\n`);
     expect(checkPrefixes(parseConfig(shaped), new Set(["shop.domain"]), pyproject)).toHaveLength(1);
     expect(checkPrefixes(config, new Set(["shop.domain"]), pyproject)).toEqual([]);
+  });
+
+  test("the session layout checks ignore the table, like INW000", () => {
+    const config = parseConfig(`${LAYERS}\n[tool.inwards.rules]\nignore = ["INW006"]\n`);
+    const toml = { path: "pyproject.toml", text: LAYERS };
+    const start = new Set(["shop.domain.order", "shop.infrastructure.db"]);
+    const emptied = checkPrefixes(config, new Set(["shop.infrastructure.db"]), toml, start);
+    expect(emptied.map((d) => `${d.code}:${d.severity}`)).toEqual(["INW006:error"]);
+    const was = new Map([["shop.domain.order", "a"]]);
+    const moved = checkMoves(config, was, new Map([["shop.core.order", "a"]]), toml);
+    expect(moved.map((d) => d.code)).toEqual(["INW006"]);
   });
 });

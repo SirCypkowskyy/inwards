@@ -8,7 +8,8 @@
  *
  * Every core function that returns diagnostics to an adapter applies these
  * settings (`applyRules`), so the CLI, the hooks, the Stop gate and the
- * language server agree.
+ * language server agree. The exception is the session layout comparison in
+ * `layout.ts`: it stops a layer being moved away, so it ignores the table.
  */
 import { RULES } from "./rules.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";

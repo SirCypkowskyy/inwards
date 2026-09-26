@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: fa5e9c8cfa54ce2e4fe62a6ff1dbb71ef0956b1286dc07046065c4f03eb94de9
+source_hash: cab28c893a19fe65ed1d8119eaca7f40706becbe8c5f4e331a7f5a3450360406
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -327,7 +327,7 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 ## Znane ograniczenia { #known-limitations }
 
 - Jeden `root` na konfigurację. Monorepo z kilkoma pakietami Pythona potrzebuje osobnego `pyproject.toml` i osobnego uruchomienia dla każdego; hook i Stop gate wybierają najbliższą konfigurację dla każdego pliku. Obsługa workspace'ów uv to [#57](https://github.com/SirCypkowskyy/inwards/issues/57) ([ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
-- Serwer języka czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu obszaru roboczego i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu.
+- Serwer języka czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu obszaru roboczego i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu. Konfigurację czyta raz, przy starcie: po zmianie `[tool.inwards]`, także `[tool.inwards.rules]`, uruchom go ponownie (VS Code: "Developer: Restart Extension Host"). Błąd konfiguracji trafia tylko do jego kanału wyjściowego. Obie sprawy to [#163](https://github.com/SirCypkowskyy/inwards/issues/163).
 - Niejawne pakiety przestrzeni nazw (bez `__init__.py`) działają przy nazywaniu, ale importy względne wewnątrz nich są rozwiązywane tak, jakby katalog był zwykłym pakietem.
 - Przynależność do warstwy wynika tylko z prefiksu modułu. Wzorce glob (`shop.*.domain`) dla pionowych wycinków przyjdą ze schematem konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51), [ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
 - Dowiązania symboliczne: katalog-dowiązanie wewnątrz warstwy, który wskazuje poza projekt, nie jest sprawdzany ([#83](https://github.com/SirCypkowskyy/inwards/issues/83)), a dowiązanie-alias wewnątrz jednej warstwy, które wskazuje do innej, może ukryć import na zewnątrz ([#84](https://github.com/SirCypkowskyy/inwards/issues/84)).

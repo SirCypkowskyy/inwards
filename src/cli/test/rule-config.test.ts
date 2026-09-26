@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, LAYERS, payload, project } from "./run.ts";
-import { ID, LEAK, put, session, stop } from "./stop-helpers.ts";
+import { agentWrites, ID, LEAK, put, session, stop } from "./stop-helpers.ts";
 
 /**
  * The test layers with a `[tool.inwards.rules]` table.
@@ -107,6 +108,29 @@ describe("[tool.inwards.rules] and the baseline", () => {
       found: ["INW006:warning"],
     });
   });
+
+  test("inwards baseline keeps the entries of a rule that is at warning or off", () => {
+    const root = project({
+      "pyproject.toml": LAYERS,
+      "shop/infrastructure/db.py": "",
+      "shop/domain/order.py": `${LEAK}import sqlalchemy\n`,
+      "shop/domain/pay.py": LEAK,
+    });
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    for (const rules of ['severity = { INW001 = "warning" }', 'ignore = ["INW001"]']) {
+      put(root, "pyproject.toml", configWith(rules));
+      const { stdout } = inwards(["baseline"], { cwd: root });
+      expect(stdout).toContain("3 violations");
+      const file = JSON.parse(readFileSync(join(root, "inwards-baseline.json"), "utf8"));
+      expect(file.violations.map((v: { code: string }) => v.code).sort()).toEqual([
+        "INW001",
+        "INW001",
+        "INW005",
+      ]);
+    }
+    put(root, "pyproject.toml", LAYERS);
+    expect(checkJson(root)).toMatchObject({ code: 0, summary: { baselined: 3, resolved: 0 } });
+  });
 });
 
 describe("[tool.inwards.rules] in the Claude Code hooks", () => {
@@ -124,6 +148,21 @@ describe("[tool.inwards.rules] in the Claude Code hooks", () => {
     expect(edit.stdout).toContain("INW001");
     expect(stop(root).code).toBe(0);
   });
+
+  test.each(['ignore = ["INW006"]', 'severity = { INW006 = "warning" }', 'select = ["INW001"]'])(
+    "with %s, moving a layer away still fails the Stop gate",
+    (rules) => {
+      const root = session({
+        "pyproject.toml": configWith(rules),
+        "shop/infrastructure/db.py": "",
+      });
+      agentWrites(root, "shop/domain/order.py", LEAK);
+      renameSync(join(root, "shop/domain"), join(root, "shop/core"));
+      const { code, stderr } = stop(root);
+      expect(code).toBe(2);
+      expect(stderr).toContain("moved out of layer");
+    },
+  );
 
   test("an agent that turns a rule off through Bash fails the Stop gate", () => {
     const root = session();
