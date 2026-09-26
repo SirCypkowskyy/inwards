@@ -314,7 +314,9 @@ export class Engine {
       );
       suppressed.push(...own.suppressed);
       for (const found of own.kept) {
-        const once = found.severity === "warning" ? found.message : undefined;
+        // An unused-suppression warning (INW009) names no place: each comment is its own.
+        const once =
+          found.severity === "warning" && found.code !== "INW009" ? found.message : undefined;
         if (once === undefined || !warned.has(once)) {
           all.push(found);
         }

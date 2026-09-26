@@ -138,6 +138,20 @@ describe("an unused suppression", () => {
     expect(inw009(text)).toContain("suppression of INW005 matches no finding");
   });
 
+  test("is reported once per comment, in every file", () => {
+    const text = `import os  # inwards: ignore[INW001] ${REASON}\nimport re  # inwards: ignore[INW001] ${REASON}\n`;
+    const found = engine.checkFiles(
+      [file("shop/domain/order.py", text), file("shop/domain/cart.py", text)],
+      PROJECT,
+    );
+    expect(found.map((d) => `${d.module}:${d.line}:${d.code}`)).toEqual([
+      "shop.domain.order:1:INW009",
+      "shop.domain.order:2:INW009",
+      "shop.domain.cart:1:INW009",
+      "shop.domain.cart:2:INW009",
+    ]);
+  });
+
   test("isn't reported for a rule that is off, and a rule that is off has nothing suppressed", async () => {
     const off = await Engine.create(
       grammars(),
