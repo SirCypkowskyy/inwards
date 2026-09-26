@@ -34,7 +34,13 @@ function wireHomepageLoop() {
   }
 }
 
-wireHomepageLoop();
+// `document$` (Material/Zensical's instant-navigation observable) is a
+// ReplaySubject: it already fires once for the very first page load, so
+// calling wireHomepageLoop() both immediately AND from this subscription
+// would bind every click listener twice, canceling each tap's toggle.
+// Only fall back to an immediate call when `document$` isn't there at all.
 if (globalThis.document$ && typeof globalThis.document$.subscribe === "function") {
   globalThis.document$.subscribe(wireHomepageLoop);
+} else {
+  wireHomepageLoop();
 }

@@ -2,39 +2,6 @@
 /* Loaded via docs/zensical.toml's extra_css, a TOML config fallow's JS
    import graph can't trace. */
 @layer inwards-diagrams {
-  /* Diagram color tokens, consumed by classDef in docs/chapters/*.md Mermaid
-     sources via var(). Light values match the colors already hardcoded in
-     the diagrams before this change; dark values are new. */
-  [data-md-color-scheme="default"] {
-    --diagram-ext-bg: rgb(236 239 241);
-    --diagram-ext-fg: rgb(38 50 56);
-    --diagram-ext-border: rgb(144 164 174);
-
-    --diagram-planned-bg: rgb(237 231 246);
-    --diagram-planned-fg: rgb(69 39 160);
-    --diagram-planned-border: rgb(126 87 194);
-  }
-
-  [data-md-color-scheme="slate"] {
-    --diagram-ext-bg: rgb(55 71 79);
-    --diagram-ext-fg: rgb(236 239 241);
-    --diagram-ext-border: rgb(96 125 139);
-
-    --diagram-planned-bg: rgb(42 31 77);
-    --diagram-planned-fg: rgb(179 157 219);
-    --diagram-planned-border: rgb(126 87 194);
-  }
-
-  /* Hover a diagram's arrow to see it "flow" toward its target. Zero markup
-     needed: targets Mermaid's own generated .edgePath class. Respects
-     prefers-reduced-motion. */
-  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-    .mermaid .edgePath:hover path {
-      stroke-dasharray: 6 4;
-      animation: diagram-edge-flow 0.6s linear infinite;
-    }
-  }
-
   @keyframes diagram-edge-flow {
     to {
       stroke-dashoffset: -10;
@@ -79,25 +46,28 @@
     fill: var(--md-default-fg-color--light);
   }
 
+  #homepage-loop .hl-edge-label {
+    fill: var(--md-default-fg-color--light);
+    font-size: 11px;
+    text-anchor: middle;
+  }
+
   /* Hovering (or focusing, for keyboard users) a node highlights the arrows
      connected to it. Node IDs are known and stable (hand-written SVG, not
-     Mermaid-generated), so :has() can target them directly. */
-  @media (prefers-reduced-motion: no-preference) {
-    #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-to-hook,
-    #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-to-hook,
-    #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-clean,
-    #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-violation,
-    #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-violation {
-      stroke: var(--md-accent-fg-color);
+     Mermaid-generated), so :has() can target them directly. The color
+     change applies regardless of motion preference; only the flowing
+     dash animation is gated, so reduced-motion users still get feedback. */
+  #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-to-hook,
+  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-to-hook,
+  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-clean,
+  #homepage-loop:has(#hl-hook:hover, #hl-hook:focus-visible) #hl-edge-violation,
+  #homepage-loop:has(#hl-agent:hover, #hl-agent:focus-visible) #hl-edge-violation,
+  #homepage-loop .hl-edge.is-active {
+    stroke: var(--md-accent-fg-color);
+
+    @media (prefers-reduced-motion: no-preference) {
       stroke-dasharray: 6 4;
       animation: diagram-edge-flow 0.6s linear infinite;
     }
-  }
-
-  /* Touch fallback: tap toggles the same highlighted state via the
-     .is-active class set by homepage-loop.mjs, since touch devices never
-     trigger :hover. */
-  #homepage-loop .hl-edge.is-active {
-    stroke: var(--md-accent-fg-color);
   }
 }

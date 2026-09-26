@@ -33,7 +33,7 @@ flowchart TB
 
     classDef person fill:#5e35b1,color:#fff,stroke:#311b92
     classDef system fill:#7e57c2,color:#fff,stroke:#4527a0
-    classDef ext fill:var(--diagram-ext-bg),color:var(--diagram-ext-fg),stroke:var(--diagram-ext-border)
+    classDef ext fill:#78909c,color:#fff,stroke:#37474f
     class architect,dev,agent person
     class inwards system
     class repo,editor,ci,scanning ext
@@ -81,8 +81,8 @@ flowchart TB
 
     classDef person fill:#5e35b1,color:#fff,stroke:#311b92
     classDef container fill:#7e57c2,color:#fff,stroke:#4527a0
-    classDef planned fill:var(--diagram-planned-bg),color:var(--diagram-planned-fg),stroke:var(--diagram-planned-border),stroke-dasharray:5 5
-    classDef ext fill:var(--diagram-ext-bg),color:var(--diagram-ext-fg),stroke:var(--diagram-ext-border)
+    classDef planned fill:#9575cd,color:#fff,stroke:#673ab7,stroke-dasharray:5 5
+    classDef ext fill:#78909c,color:#fff,stroke:#37474f
     class agent,dev person
     class cli,lsp,ext,core container
     class hooks,state container
@@ -141,8 +141,8 @@ flowchart LR
     engine --> report
 
     classDef comp fill:#7e57c2,color:#fff,stroke:#4527a0
-    classDef planned fill:var(--diagram-planned-bg),color:var(--diagram-planned-fg),stroke:var(--diagram-planned-border),stroke-dasharray:5 5
-    classDef port fill:var(--diagram-ext-bg),color:var(--diagram-ext-fg),stroke:var(--diagram-ext-border)
+    classDef planned fill:#9575cd,color:#fff,stroke:#673ab7,stroke-dasharray:5 5
+    classDef port fill:#78909c,color:#fff,stroke:#37474f
     class config,pre,parser,extract,rules,fix,report,engine,modgraph comp
     class files,cfgtext,wasm port
 ```
@@ -227,7 +227,7 @@ flowchart LR
     pool["Worker pool"]:::planned -.-> eng
     cache["Content-hash cache"]:::planned -.-> eng
 
-    classDef planned fill:var(--diagram-planned-bg),color:var(--diagram-planned-fg),stroke:var(--diagram-planned-border),stroke-dasharray:5 5
+    classDef planned fill:#9575cd,color:#fff,stroke:#673ab7,stroke-dasharray:5 5
 ```
 
 Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usage or config error. Agents and CI scripts can branch on that without parsing output. In the JSON report, `summary.violations` counts errors and `summary.warnings` counts warnings. A whole-project run (no path arguments) also checks every layer prefix against the modules it found (INW006).
@@ -251,7 +251,7 @@ flowchart LR
     pypi -.-> dev["uv add --dev inwards"]
     art -.-> market["VS Code Marketplace"]
 
-    classDef planned fill:var(--diagram-planned-bg),color:var(--diagram-planned-fg),stroke:var(--diagram-planned-border),stroke-dasharray:5 5
+    classDef planned fill:#9575cd,color:#fff,stroke:#673ab7,stroke-dasharray:5 5
     class pypi,dev,market planned
 ```
 

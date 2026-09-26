@@ -20,7 +20,6 @@ extra_css = [
 ]
 
 extra_javascript = [
-  "javascripts/mermaid.mjs",
   "javascripts/homepage-loop.mjs",
 ]
 

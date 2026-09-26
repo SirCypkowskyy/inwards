@@ -94,6 +94,26 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 The coordinates are our qualitative reading of the research above, not a measurement. Inwards' dot marks where it's aiming, not where it is today.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    quadrant1Fill: "#37474f"
+    quadrant2Fill: "#37474f"
+    quadrant3Fill: "#37474f"
+    quadrant4Fill: "#37474f"
+    quadrant1TextFill: "#eceff1"
+    quadrant2TextFill: "#eceff1"
+    quadrant3TextFill: "#eceff1"
+    quadrant4TextFill: "#eceff1"
+    quadrantPointFill: "#7e57c2"
+    quadrantPointTextFill: "#78909c"
+    quadrantXAxisTextFill: "#78909c"
+    quadrantYAxisTextFill: "#78909c"
+    quadrantInternalBorderStrokeFill: "#78909c"
+    quadrantExternalBorderStrokeFill: "#78909c"
+    quadrantTitleFill: "#78909c"
+---
 quadrantChart
     title Where the tools sit
     x-axis "Generic code rules" --> "Architecture rules"
@@ -113,17 +133,33 @@ quadrantChart
     Inwards target: [0.9, 0.9]
 ```
 
-<dl id="quadrant-descriptions" hidden>
-  <dt>Ruff</dt><dd>Fast, but rules are generic — no notion of architectural layers.</dd>
-  <dt>ty</dt><dd>Astral's type checker; type-level correctness, not import direction.</dd>
-  <dt>Biome</dt><dd>Formatter/linter for JS/TS; no Python support at all.</dd>
-  <dt>React Doctor</dt><dd>Agent-aware, but scoped to React conventions, not Python layers.</dd>
-  <dt>ArchLint</dt><dd>Closest existing tool to Inwards' target, still maturing.</dd>
-  <dt>import-linter</dt><dd>Mature layer contracts, but no agent-facing fix steps or hook story.</dd>
-  <dt>pytest-archon</dt><dd>Architecture assertions as tests; runs in CI, not on every edit.</dd>
-  <dt>Tach</dt><dd>Module boundaries with a fast Rust core; less layer-shaped than Inwards.</dd>
-  <dt>Inwards target</dt><dd>Agent-loop speed, layer-shaped rules, fix steps built in.</dd>
-</dl>
+??? info "What each plotted tool is"
+    Ruff
+    :   Fast, but rules are generic. No notion of architectural layers.
+
+    ty
+    :   Astral's type checker. Type-level correctness, not import direction.
+
+    Biome
+    :   Formatter/linter for JS/TS. No Python support at all.
+
+    React Doctor
+    :   Agent-aware, but scoped to React conventions, not Python layers.
+
+    ArchLint
+    :   Closest existing tool to Inwards' target, still maturing.
+
+    import-linter
+    :   Mature layer contracts, but no agent-facing fix steps or hook story.
+
+    pytest-archon
+    :   Architecture assertions as tests. Runs in CI, not on every edit.
+
+    Tach
+    :   Module boundaries with a fast Rust core. Less layer-shaped than Inwards.
+
+    Inwards target
+    :   Agent-loop speed, layer-shaped rules, fix steps built in.
 
 Inwards' position in one sentence: **import-linter's rules, React Doctor's agent integration, Ruff's distribution.**
 

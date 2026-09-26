@@ -30,8 +30,8 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
     ```
 
 <div class="homepage-loop-wrap">
-<svg id="homepage-loop" viewBox="0 0 720 160" role="img"
-     aria-label="Agent edits a file, the hook runs inwards check, then either the agent fixes a violation and loops back, or the agent continues.">
+<svg id="homepage-loop" viewBox="0 0 820 160" role="img"
+     aria-label="Agent edits a file, then the hook runs inwards check. On a violation, the agent gets fix steps and loops back. When clean, the agent continues.">
   <defs>
     <marker id="hl-arrow" viewBox="0 0 10 10" refX="9" refY="5"
             markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -43,8 +43,10 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
         d="M170,50 H330" />
   <path id="hl-edge-violation" class="hl-edge hl-edge-dashed" marker-end="url(#hl-arrow)"
         d="M400,70 C400,110 250,110 170,70" />
+  <text class="hl-edge-label" x="285" y="122">violation + fix steps</text>
   <path id="hl-edge-clean" class="hl-edge" marker-end="url(#hl-arrow)"
-        d="M480,50 H620" />
+        d="M480,50 H610" />
+  <text class="hl-edge-label" x="545" y="40">clean</text>
 
   <g id="hl-agent" class="hl-node" tabindex="0">
     <rect x="20" y="20" width="150" height="60" rx="10" />
@@ -57,9 +59,9 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
     <text x="410" y="62">inwards check</text>
   </g>
 
-  <g id="hl-outcomes" class="hl-node" tabindex="0">
-    <rect x="630" y="20" width="80" height="60" rx="10" />
-    <text x="670" y="55">✅</text>
+  <g id="hl-outcomes" class="hl-node">
+    <rect x="620" y="20" width="180" height="60" rx="10" />
+    <text x="710" y="55">✅ Agent continues</text>
   </g>
 </svg>
 </div>
