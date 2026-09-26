@@ -176,18 +176,6 @@ Two checks keep the agent-facing tests honest. A code fence in `docs/chapters/gu
 
 The screenshots in these docs come from `scripts/screenshots.py`, which runs each command for real and renders the terminal output with Rich.
 
-## CI runners
-
-Most Linux jobs run on self-hosted runners, so pull requests cost no GitHub Actions minutes: lint and typecheck, the Linux tests, the docs build, the benchmark, the SARIF dogfood, the nightly corpus run and the weekly link check. They run on `irysek`, the owner's Fedora server (Intel Core i5-4570, 4 cores, 7.5 GB RAM), as two Docker containers built from the official runner on Ubuntu 26.04. Each job gets a fresh container that is deleted when the job ends: the host asks the GitHub API for a just-in-time runner, good for one job, and starts the container with it. Each container is capped at 2 GB of RAM with no swap and 2 CPUs, runs unprivileged with no Docker socket, and sits on a network whose firewall rules let it reach the public internet only, not the host, the LAN or other containers. `ops/runner/` holds the Dockerfile, the host script, the firewall rules, the systemd units and a README that rebuilds the setup from scratch.
-
-Still on GitHub-hosted runners:
-
-- jobs that need Docker, publish, or hold a write token, OIDC or a secret, so a compromised host can't leak them: `cd.yml` (release builds come from a clean, documented image), `pypi.yml`, `release-please.yml`, the Pages deploy in `docs.yml`, `docs-cloudflare.yml` and `nightly-e2e.yml`;
-- `pr-title.yml`, a required check that runs from the base branch, so a PR can still pass it while the self-hosted runners are down;
-- the macOS, Windows and ubuntu-24.04 rows of the test matrix, which run only when started by hand.
-
-On the first run, jobs took 2 to 3 times as long as on GitHub-hosted runners (lint and typecheck 120 s against 40 s, Linux tests 51 s against 25 s). The benchmark gate compares the base branch and the PR in the same job, so it still measures relative change on the slower CPU. Other jobs on the same host add noise to both sides alike.
-
 ## Risks
 
 | Risk | Likelihood | Impact | Mitigation |
@@ -199,7 +187,7 @@ On the first run, jobs took 2 to 3 times as long as on GitHub-hosted runners (li
 | Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard and the session record ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
 | A binary silently ignores its bytecode (Bun falls back to parsing the source) and start-up doubles | Low | Low | Tests still pass in that case; the PR benchmark catches it on Linux only. Bytecode is tied to the Bun version that built it, and every binary embeds that same version |
-| Something else on `irysek` takes over the host (another project's privileged runners and `traefik` and `watchtower` hold the Docker socket; a second user is in the `docker` group) and with it the CI runners and their token | Low | High | Accepted by the owner (#136). Jobs with write tokens, OIDC or secrets stay GitHub-hosted; job containers are unprivileged, deleted after each job and cut off from the host and the LAN; the token covers only this repository |
+| Something else on `irysek` takes over the host (another project's privileged runners and `traefik` and `watchtower` hold the Docker socket; a second user is in the `docker` group) and with it the CI runners and their token | Low | High | Accepted by the owner (#136; setup in `ops/runner/README.md`). Jobs with write tokens, OIDC or secrets stay GitHub-hosted; job containers are unprivileged, deleted after each job and cut off from the host and the LAN; the token covers only this repository |
 | The self-hosted runners go down (host offline, token expired) and PR jobs queue forever | Medium | Medium | Runners restart with the host (systemd) and the image rebuilds weekly; point `runs-on` back at `ubuntu-26.04` to fall back to GitHub-hosted runners |
 | Zensical (0.0.x) changes its config format | Medium | Low | Docs build runs in CI on every PR; the config is small |
 | Fix steps are wrong for unusual layouts (no obvious place for a port) | Medium | Medium | Measure fix-within-one-retry per rule; let the config name the ports module |
