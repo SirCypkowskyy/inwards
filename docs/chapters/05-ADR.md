@@ -24,6 +24,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
 | [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | A `develop` integration branch; `main` moves only at releases | :white_check_mark: Accepted |
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
+| [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
 
 ## ADR-001: TypeScript for the engine
 
@@ -454,3 +455,39 @@ Each record states the decision, the context it was made in, what it costs us, a
 - *Download the build artifact of the `cd.yml` run:* it expires after 90 days, has to be found by run ID, and isn't what the owner published.
 - *A project-scoped API token as an environment secret:* a long-lived credential to rotate, and one that works from any machine it leaks to.
 - *A reusable workflow called from `cd.yml`:* PyPI can't use a reusable workflow as a trusted publisher.
+
+## ADR-022: M2 go or no-go: continue, conditionally, until partner data
+
+**Status:** Accepted, provisional · 2026-09-26 · [#42](https://github.com/SirCypkowskyy/inwards/issues/42) · To be revisited with partner data ([#132](https://github.com/SirCypkowskyy/inwards/issues/132))
+
+**Context.** M2 ends with a checkpoint: do the numbers in the [business hypothesis](02-Business-Context.md#business-hypothesis) hold well enough to spend M3 to M6 on it? The hypothesis was meant to be measured on design partners' repositories, but the owner moved partner recruiting to the end of the roadmap, so no partner data exists. The evidence available on 2026-09-26:
+
+| Bet (chapter 2) | Threshold | Evidence | Reading |
+|---|---|---|---|
+| The fix steps work for models | ≥ 80 % fixed within one retry | The agent eval ([#101](https://github.com/SirCypkowskyy/inwards/issues/101), `eval/README.md`): 11 fixtures, one run each on Sonnet and Haiku, full hook set. `inwards stats`: 5 of 7 (71 %). The 2 unfixed are the "loosen the config" task, where the agent correctly stopped and asked the user. Of the 5 fixed, 3 ended with the task not done (2 reverted and asked the user), so only 2 were clean fixes with the task done | Points the right way (no violation stayed, no evasion), but 7 seeded violations settle nothing |
+| Agents break layering often enough | ≥ 1 violation per 1,000 agent-written lines | 25.5 per 1,000 lines in the eval, but its fixtures are built to tempt a violation | No evidence either way |
+| Speed is the moat | Hook p50 < 100 ms | Eval: p50 21 ms, p95 28 ms, on the 10-file example app. Local hook p50 about 32 ms after bytecode ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). Five real services ([#36](https://github.com/SirCypkowskyy/inwards/issues/36)): 55 to 83 ms per file locally; one 4,500-line file was 280 ms on a GitHub runner before bytecode ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Holds, with one known outlier |
+| Hooks are the channel | ≥ 60 % of installs keep a hook | Partner-reported only; nothing yet | Unknown |
+| Room next to Astral | Adopted alongside Ruff and ty | Nothing new since M0 | Unknown |
+
+The eval also showed what the checks can't: no evasion in any final diff; the config guard, the deny rules and the Stop gate each held when an agent tried to loosen the rules or switch the hooks off. And one weakness: without a baseline, the Stop gate kept agents working until violations that were already in the files they edited were gone, and in all 6 such runs they rewrote code nobody asked them to touch ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)).
+
+**Decision.** The owner chose to continue, conditionally:
+
+- **Continue with M3 as planned**, with [#134](https://github.com/SirCypkowskyy/inwards/issues/134) (the Stop gate blocks only on violations new in each edited file) moved to P0 at the start of M3: an agent rewriting unrelated code is the failure mode most likely to make a team switch the hooks off, which is the channel bet.
+- **The decision is provisional.** It is revisited on partner data as part of [#132](https://github.com/SirCypkowskyy/inwards/issues/132): the same table, filled with `inwards stats` from partner repositories. If "fixed within one retry" stays under 50 %, or hooks are switched off at most installs, the plan for M4 to M6 is reopened.
+- **The eval stays the interim measure.** Before the partner review, it is rerun with 3 runs per case on each model (`bun run eval/run.ts --runs 3`), which #101 left open to keep spend small.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Work continues on the part of the hypothesis the evidence supports (speed, fix steps, resistance to evasion) without waiting months for partners.
+- :material-plus-circle-outline: The criteria that would reopen the plan are written down now, before the data can bias them.
+- :material-minus-circle-outline: Two bets (violation frequency, hook adoption) have no evidence at all; M3 to M6 could be built for a problem partners don't have.
+- :material-minus-circle-outline: The eval's fixtures come from the same people who built the tool, which makes them a weak stand-in for real repositories.
+
+**Alternatives.**
+
+- *Continue without conditions:* cheaper to state, but it would treat numbers from 7 seeded violations as if they settled the hypothesis.
+- *Pause until partner data (move recruiting, #132, to M3):* the most rigorous option. The owner kept recruiting at the end of the roadmap, and the measurable bets point the right way.
+- *Stop or pivot:* nothing measured contradicts a threshold, so there is no case for either.
+
