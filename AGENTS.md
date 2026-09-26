@@ -29,9 +29,28 @@ snapshot; its sub-issue list is what counts.
 
 Check the board before picking up work, and set Status at every transition:
 
-- **Starting an issue.** Take only an item in Todo with no assignee. Assign
-  yourself, set In progress, and comment the branch and worktree you work in,
-  plus the plan when it isn't obvious from the issue.
+- **Starting an issue: check, then claim.** Every agent uses the owner's
+  account, so the assignee says nothing about *which* agent works on an
+  issue. Before you start, check all three, and pick another issue if any of
+  them says someone has it:
+  1. the board status is Todo;
+  2. `gh issue develop N --list` shows no linked branch;
+  3. the issue's comments have no claim that is still open, i.e. a
+     "Claimed by …" comment with no later "Released" or closing report.
+
+  Then claim it in one go:
+  - `gh issue develop N --name <type>/N-slug --base develop --checkout --worktree ~/Documents/GitHub/worktrees/inwards/N-slug`
+    creates the branch, links it to the issue (the issue's Development panel
+    shows it to every other agent), sets `develop` as the PR base and checks
+    it out in the worktree;
+  - set Status to In progress;
+  - post the claim comment: who you are (harness and model, e.g. "Claude
+    Code, Opus 5.5" or "Codex"), the branch, the worktree and the plan when
+    it isn't obvious from the issue.
+
+  If you stop without finishing, post "Released: <why, and what's done>",
+  delete the linked branch if nothing on it is worth keeping, and set the
+  status back to Todo.
 - **While working.** Comment on decisions, scope changes and findings someone
   else will need. Tick acceptance checkboxes in the body as they are met.
 - **Stuck.** Set Blocked and comment what blocks it and who or what can
@@ -50,8 +69,12 @@ limit. Read the board once when you pick up work, not in a loop.
 
 ```sh
 R=SirCypkowskyy/inwards
+gh issue develop N --list                         # a linked branch means it's taken
+gh issue view N --comments                        # an open "Claimed by" means it's taken
+gh issue develop N --name feat/N-slug --base develop --checkout \
+  --worktree ~/Documents/GitHub/worktrees/inwards/N-slug
 gh issue edit N --add-assignee @me
-gh issue comment N --body "Claimed. Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug."
+gh issue comment N --body "Claimed by Claude Code (Opus 5.5). Branch feat/N-slug, worktree ~/Documents/GitHub/worktrees/inwards/N-slug. Plan: …"
 gh issue comment N --body "Status: Blocked. Waiting on #M (engine API)."
 gh issue view N --json body -q .body > body.md   # tick boxes, then:
 gh issue edit N --body-file body.md
@@ -97,13 +120,15 @@ the claim comment, not the assignee, says which agent owns an issue.
 - **One issue, one branch, one worktree.** Branch `<type>/<N>-<slug>`
   (`feat/42-sarif-output`). Worktrees live outside the checkout, in
   `~/Documents/GitHub/worktrees/<repo>/<worktree>`, here
-  `~/Documents/GitHub/worktrees/inwards/<N>-<slug>`. Create one by hand off
-  `origin/develop` (or the base branch the coordinator names), then run
-  `bun install` inside it:
-  `git worktree add ~/Documents/GitHub/worktrees/inwards/42-sarif-output -b feat/42-sarif-output origin/develop`.
-- **Claim before the first edit.** Assign yourself, set In progress, post the
-  claim comment. Never pick up an item that is In progress, Blocked, In
-  review or assigned; pick another or ask the coordinator.
+  `~/Documents/GitHub/worktrees/inwards/<N>-<slug>`. Create both with
+  `gh issue develop` (see "Starting an issue" above) so the branch is linked
+  to the issue, then run `bun install` inside the worktree. Work that has no
+  issue uses `git worktree add <path> -b <branch> origin/develop`.
+- **Claim before the first edit**, as "Starting an issue" says: board, linked
+  branches and comments first, then the linked branch, In progress and the
+  claim comment. Never pick up an item that is In progress, Blocked or In
+  review, that has a linked branch, or that has an open claim; pick another
+  or ask the coordinator.
 - **Stay in your lane.** Never edit files, run git, or install in another
   agent's worktree or on its branch. Never `git stash`, `checkout`, `switch`,
   `reset` or `rebase` in the shared primary checkout (`~/Documents/GitHub/inwards`): others have uncommitted
@@ -231,9 +256,18 @@ done until both match the code.
   describe what the code does now. Drop "planned" from anything that shipped,
   fix numbers that changed (tests, corpus sizes, timings), and write an ADR
   for any decision a later reader would question. Run the strict docs build.
-- **Every issue you touched** gets a closing comment in three parts:
-  - *Done*: what changed, with commits or the PR;
-  - *Verified*: how you know it works (tests, CI run, `act`, a manual check);
+- **Every issue you touched** gets a closing report as a comment. It is the
+  context a later session (yours or another agent's) reads instead of
+  re-deriving the work, so write it for someone who wasn't there:
+  - *Done*: what changed, with the PR and commit, and where it lives (files,
+    modules, config keys, commands);
+  - *Verified*: how you know it works (tests, CI run, `act`, a manual check,
+    review rounds);
+  - *Challenges*: what was harder than expected, dead ends, surprises in the
+    code or the tools, and how you got past them;
+  - *Weaknesses*: the known limits and trade-offs of the solution, edge
+    cases it gets wrong or doesn't cover, and what you would do differently
+    with more time;
   - *Left*: what is still open. Each open item gets its own issue, linked,
     or stays as an unticked acceptance box with a reason.
   Then tick the acceptance boxes that are met and set the board status.
