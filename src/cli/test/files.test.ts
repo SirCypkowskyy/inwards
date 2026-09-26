@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { collectPythonFiles } from "../src/files.ts";
+import { tempDir } from "./temp.ts";
 
 test("walks build/dist/site inside packages, skips venvs and hidden dirs", () => {
-  const root = mkdtempSync(join(tmpdir(), "inwards-files-"));
+  const root = tempDir("inwards-files-");
   /**
    * Creates an empty file, and its parent directories, under the temp root.
    *
@@ -27,7 +27,7 @@ test("walks build/dist/site inside packages, skips venvs and hidden dirs", () =>
 });
 
 test("lists a file under every name Python could import it by, and survives a cycle", () => {
-  const root = mkdtempSync(join(tmpdir(), "inwards-files-"));
+  const root = tempDir("inwards-files-");
   mkdirSync(join(root, "real/pkg"), { recursive: true });
   writeFileSync(join(root, "real/pkg/mod.py"), "");
   mkdirSync(join(root, "shop"));
@@ -38,9 +38,9 @@ test("lists a file under every name Python could import it by, and survives a cy
 });
 
 test("never follows a link out of the directory it was asked to walk", () => {
-  const outside = mkdtempSync(join(tmpdir(), "inwards-outside-"));
+  const outside = tempDir("inwards-outside-");
   writeFileSync(join(outside, "secret.py"), "");
-  const root = mkdtempSync(join(tmpdir(), "inwards-files-"));
+  const root = tempDir("inwards-files-");
   symlinkSync(outside, join(root, "home"));
   symlinkSync(join(outside, "secret.py"), join(root, "linked.py"));
   expect(collectPythonFiles([root])).toEqual([]);
