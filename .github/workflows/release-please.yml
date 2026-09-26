@@ -1,8 +1,8 @@
 name: Release PR
 
-# Keeps a "chore: release X.Y.Z" PR open with the next version and the new
-# CHANGELOG section (ADR-016). Merging it tags vX.Y.Z, drafts the GitHub Release
-# and starts cd.yml.
+# Keeps a "chore: release X.Y.Z" PR open against main with the next version and
+# the new CHANGELOG section (ADR-016). Merging it tags vX.Y.Z, drafts the GitHub
+# Release and starts cd.yml. The release commit stays on main (ADR-019).
 on:
   push:
     branches: [main]
@@ -24,6 +24,8 @@ jobs:
     steps:
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          target-branch: main # the default would be the repo's default branch, develop
       # A tag pushed with GITHUB_TOKEN starts no workflow; workflow_dispatch is
       # the documented exception, so start cd.yml on the new tag explicitly.
       - name: Build the release
