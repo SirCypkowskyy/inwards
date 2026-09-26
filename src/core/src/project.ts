@@ -1,6 +1,6 @@
 /**
  * The project-wide view the per-file rules can't give: every first-party
- * module, and who imports each one. Nothing in the CLI uses it yet: the Stop
+ * module, and who imports each one. No command, hook or adapter uses it yet: the Stop
  * gate checks only the changed files (an import's verdict depends only on
  * module names), and INW006 probes the file system (`probeLookup`). Only the
  * tests call it today; #44 makes it an engine input for every adapter, and
