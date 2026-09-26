@@ -23,6 +23,7 @@ nav = [
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
     { "GitHub Actions" = "guides/ci.md" },
+    { "Package shape" = "guides/package-shape.md" },
   ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },

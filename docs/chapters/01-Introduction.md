@@ -117,7 +117,7 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 !!! info "Status"
     Pre-alpha.
-    Four rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes) and INW000 (a declared source encoding that could hide imports).
+    Six rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
     `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section.
     Each release is a GitHub Release with binaries for six platforms, five platform wheels and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
     Everything marked :material-progress-clock: in these docs is planned, not built.

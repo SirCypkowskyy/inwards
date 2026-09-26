@@ -9,8 +9,9 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha. Four rules (INW001 layer direction, INW011 literal dynamic imports,
-INW006 code outside every layer, INW000 encodings that could hide imports) work end to end, and
+Status: pre-alpha. Six rules (INW001 layer direction, INW011 literal dynamic imports,
+INW006 code outside every layer, INW007/INW008 package shape, INW000 encodings that could hide
+imports) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
 a config guard and escalation to the user (`--agent aider` and `--agent agents-md` cover Aider
 and `AGENTS.md`). The only release so far is the pre-release v0.1.0-rc.1, with binaries for six

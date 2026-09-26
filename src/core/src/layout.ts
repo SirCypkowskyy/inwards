@@ -202,7 +202,7 @@ function prefixFix(prefix: string, vanished: boolean): Diagnostic["fix"] {
  * @param prefix - the prefix to find.
  * @returns the span of the string, or line 1 column 1 when it isn't spelled plainly.
  */
-function spanOf(text: string, prefix: string): Span {
+export function spanOf(text: string, prefix: string): Span {
   const from = TABLE_HEADER.exec(text)?.index ?? 0;
   const [at] = [`"${prefix}"`, `'${prefix}'`]
     .map((quoted) => text.indexOf(quoted, from))

@@ -1,0 +1,27 @@
+[project]
+name = "fastapi-shape"
+
+[tool.inwards]
+ignore = ["tests"]
+layers = [{ name = "app", modules = ["app"] }]
+
+# An integration package: a client, no routes. Exact entries come before the
+# glob that would also match them.
+[[tool.inwards.shape]]
+packages = ["app.aws"]
+allow = ["client", "schemas", "config", "constants", "exceptions", "utils"]
+require = ["__init__", "client"]
+
+# Every domain package, including the ones added later.
+[[tool.inwards.shape]]
+packages = ["app.*"]
+allow = [
+  "router", "schemas", "models", "service", "dependencies",
+  "config", "constants", "exceptions", "utils",
+]
+require = ["__init__", "router", "service"]
+
+# Tests live under tests/, never next to the code.
+[[tool.inwards.names]]
+pattern = "test_*"
+only-in = ["tests", "tests.**"]

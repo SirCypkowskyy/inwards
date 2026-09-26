@@ -1,5 +1,7 @@
 import { parse } from "smol-toml";
 import { VERSION } from "./meta.ts";
+import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape-config.ts";
+import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 export interface LayerSpec {
   name: string;
@@ -32,16 +34,16 @@ export interface InwardsConfig {
   escalateAfter?: number;
   /** Write the opt-in run log `.inwards/runs.jsonl` (`run-log`, default off). */
   runLog?: boolean;
+  /** Package shapes, `[[tool.inwards.shape]]`, first match wins (INW007, INW008). */
+  shape?: ShapeSpec[];
+  /** Where member names may appear, `[[tool.inwards.names]]` (INW007). */
+  names?: NameRule[];
 }
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
 const PRERELEASE = /-.*$/u;
 /** A plain release version, `MAJOR.MINOR.PATCH`. */
 const RELEASE = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/u;
-
-export class ConfigError extends Error {
-  override name = "ConfigError";
-}
 
 /** Keys `[tool.inwards]` understands; anything else is a typo or a newer feature. */
 const TABLE_KEYS: ReadonlySet<string> = new Set([
@@ -51,6 +53,8 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "ignore",
   "escalate-after",
   "run-log",
+  "shape",
+  "names",
 ]);
 const LAYER_KEYS: ReadonlySet<string> = new Set(["name", "modules"]);
 
@@ -138,6 +142,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     root: root.replaceAll("\\", "/"),
     layers: parsed,
     ...optionalKeys(raw),
+    ...parseShapeKeys(raw),
   };
   return config;
 }
@@ -171,17 +176,6 @@ function optionalKeys(
     ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
     ...(runLog === undefined ? {} : { runLog }),
   };
-}
-
-/**
- * Tells whether a parsed value is a table (or array) whose keys can be read.
- * Used to walk untrusted TOML without casts.
- *
- * @param value - any value from the parsed document.
- * @returns true when the value is a non-null object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 /**
@@ -227,25 +221,6 @@ function rejectOverlaps(layers: readonly LayerSpec[]): void {
       }
       owners.set(prefix, name);
     }
-  }
-}
-
-/**
- * Throws on the first key a table isn't allowed to have.
- *
- * @param table - a parsed TOML table.
- * @param known - the keys it may have.
- * @param where - the table's dotted path, for the message.
- * @throws {ConfigError} naming the unknown key and the known ones.
- */
-function rejectUnknownKeys(
-  table: Record<string, unknown>,
-  known: ReadonlySet<string>,
-  where: string,
-): void {
-  const unknown = Object.keys(table).find((key) => !known.has(key));
-  if (unknown !== undefined) {
-    throw new ConfigError(`Unknown key ${where}.${unknown}. Known keys: ${[...known].join(", ")}.`);
   }
 }
 

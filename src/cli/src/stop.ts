@@ -26,7 +26,7 @@ import { settingsProblem } from "./claude-settings.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { print } from "./output.ts";
 import { findConfig, realpath } from "./paths.ts";
-import { newPrefixErrors } from "./prefixes.ts";
+import { newLayoutErrors, preexistingShape } from "./prefixes.ts";
 import { runCheck } from "./project.ts";
 import { noteRun } from "./runlog.ts";
 import {
@@ -103,7 +103,11 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     { start: state.start, now: configs },
     edited.length === 0,
   );
-  report.diagnostics.unshift(...newPrefixErrors(project, configs, state.start.manifest, manifest));
+  // Shape findings on files that predate the session are legacy, like old violations.
+  report.diagnostics = [
+    ...newLayoutErrors(project, configs, state.start.manifest, manifest),
+    ...report.diagnostics.filter((d) => !preexistingShape(d, state.start.manifest)),
+  ];
   noteRun(project, changed, report.diagnostics);
   for (const [file, config] of strangers) {
     problems.push(

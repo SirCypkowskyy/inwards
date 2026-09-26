@@ -92,9 +92,9 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW006, INW011 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW006, INW007, INW008, INW011 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init`, `hook claude-code` |
-| **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server.ts` | :white_check_mark: every per-file rule, on each change to an open file |
+| **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server.ts` | :white_check_mark: every per-file rule, on each change to an open file; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` for `claude`, `aider` and `agents-md` |
 | **Session state and run log** | JSON and JSON Lines files, local only | `.inwards/state/`, `.inwards/runs.jsonl` | :white_check_mark: (run log opt-in, [chapter 8](08-Run-Log.md)) |
@@ -122,7 +122,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>encoding.ts: INW000</small>"]
+        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>shape.ts: INW007 + INW008<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>reporters.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
@@ -153,10 +153,10 @@ flowchart LR
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
-| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, INW006 for code outside every layer, INW011 for dynamic imports with literal targets, and INW000 for files whose encoding could hide imports. Planned rules are listed below |
+| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, INW006 for code outside every layer, INW007/INW008 for package shape, INW011 for dynamic imports with literal targets, and INW000 for files whose encoding could hide imports. Planned rules are listed below |
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
-| Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. A file outside every layer isn't parsed (it gets at most an INW006 warning). A layered file whose text names a module loader skips the prescan (see below) |
+| Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. The package shape (INW007) is checked first, from the path alone. A file outside every layer isn't parsed (it gets at most an INW006 warning). A layered file whose text names a module loader skips the prescan (see below) |
 | Module index | `Engine.index(files)` returns every first-party module and answers "who imports module X" on demand, parsing only files whose text mentions X's last name segment | Not used by a rule or a command yet (INW006 probes the file system for first-party modules instead); INW010 and cycle detection will use it ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)) |
 
 ### How one check flows
@@ -230,7 +230,7 @@ flowchart LR
     classDef planned fill:#ede7f6,color:#4527a0,stroke:#7e57c2,stroke-dasharray:5 5
 ```
 
-Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usage or config error. Agents and CI scripts can branch on that without parsing output. In the JSON report, `summary.violations` counts errors and `summary.warnings` counts warnings. A whole-project run (no path arguments) also checks every layer prefix against the modules it found (INW006).
+Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usage or config error. Agents and CI scripts can branch on that without parsing output. In the JSON report, `summary.violations` counts errors and `summary.warnings` counts warnings. A whole-project run (no path arguments) also checks every layer prefix and shape selector against the modules it found (INW006, INW007) and the required members of every shaped package (INW008).
 
 The other two commands reuse the same pieces:
 
@@ -284,8 +284,8 @@ Cross-compiling from one Linux runner is possible because the grammars are WASM,
 | INW004 | `no-cycles` | Import cycles between modules or contexts | :material-progress-clock: needs the graph, [#54](https://github.com/SirCypkowskyy/inwards/issues/54) |
 | INW005 | `pure-domain` | The domain layer importing frameworks or I/O libraries (`sqlalchemy`, `fastapi`, `requests`...) | :material-progress-clock: [#47](https://github.com/SirCypkowskyy/inwards/issues/47) |
 | INW006 | `unassigned-module` | An import from a layer into first-party code that belongs to no layer, including the package above the layers (`from shop import x` runs `shop/__init__.py`, which no layer owns), static or dynamic (error); layer code moved out of every layer during a session (error); a package outside every layer and `ignore` (warning); a layer prefix matching no module (warning), a layer with no live prefix, or a prefix emptied during the session (error). Unknown keys and overlapping prefixes are config errors | :white_check_mark: |
-| INW007 | `package-shape` | A package member the configured shape doesn't allow or forbids, such as a new `helpers.py` next to `service.py` | :material-progress-clock: [#95](https://github.com/SirCypkowskyy/inwards/issues/95) |
-| INW008 | `missing-member` | A member the configured shape requires is missing | :material-progress-clock: [#95](https://github.com/SirCypkowskyy/inwards/issues/95) |
+| INW007 | `package-shape` | A package member its `[[tool.inwards.shape]]` doesn't allow (error, or a warning with `extra = "warning"`) or forbids, such as a new `helpers.py` next to `service.py`; a member name outside its `[[tool.inwards.names]]` `only-in` packages, such as `test_x.py` in the app (error); a shape selector that matches no package (warning, in pyproject.toml). The message never lists the allowed members; the fix names the likely target. See [Package shape](guides/package-shape.md) | :white_check_mark: |
+| INW008 | `missing-member` | A member the package's shape requires is missing, reported on its `__init__.py`. Whole-project runs report every one; the Stop gate blocks only those new since the session started | :white_check_mark: |
 | INW010 | `unknown-first-party` | Importing a first-party module that doesn't exist, the typical agent hallucination | :material-progress-clock: needs the module index, [#45](https://github.com/SirCypkowskyy/inwards/issues/45) |
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. A common way to dodge INW001. Known gaps are listed above | :white_check_mark: literal targets |
 
@@ -296,6 +296,7 @@ src/
 ├── core/                  # engine, no I/O
 │   ├── src/
 │   │   ├── config.ts      # [tool.inwards] parsing and validation
+│   │   ├── toml.ts        # ConfigError and the checks shared by the config parsers
 │   │   ├── prescan.ts     # import skeleton fast path
 │   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
 │   │   ├── rules.ts       # rule registry: code, name, severity, docs
@@ -303,6 +304,9 @@ src/
 │   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
 │   │   ├── unassigned.ts  # INW006: code outside every layer, first-party probe
 │   │   ├── layout.ts      # INW006: dead prefixes, layer code moved out of every layer
+│   │   ├── shape.ts       # INW007 + INW008: package shape, ListMembers port
+│   │   ├── shape-config.ts  # [[tool.inwards.shape]] / [[tool.inwards.names]], selectors, patterns
+│   │   ├── shape-fix.ts   # INW007/INW008 wording, likely target
 │   │   ├── callees.ts     # which calls are loaders, through aliases
 │   │   ├── literals.ts    # string literals and call arguments, as Python reads them
 │   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
@@ -328,7 +332,7 @@ src/
 │   │   ├── shell.ts       # reads Bash commands for `inwards hook` / `inwards baseline`
 │   │   ├── edit-sim.ts    # applies an Edit/Write/MultiEdit in memory for the guard
 │   │   ├── stop.ts        # Stop gate
-│   │   ├── prefixes.ts    # INW006 layout checks against the session start
+│   │   ├── prefixes.ts    # INW006 and INW008 layout checks against the session start
 │   │   ├── escalation.ts  # escalate-after, unresolved records
 │   │   ├── session.ts     # session state: start record, edits, fingerprints
 │   │   ├── snapshot.ts    # configs, content hashes and HEAD of the project now
@@ -341,7 +345,7 @@ src/
 │   │   ├── claude-settings.ts  # finds the Inwards hooks in Claude Code settings
 │   │   └── diff.ts        # line diff for init --dry-run
 │   └── test/              # CLI, hook, Stop gate and E2E tests, snapshots
-└── vscode-extension/src/  # extension.ts (client), server.ts (LSP)
+└── vscode-extension/src/  # extension.ts (client), server.ts (LSP), workspace.ts (INW007/INW008 pass)
 ```
 
 Outside `src/`: `scripts/` builds binaries and wheels and checks versions and the docs nav, `packaging/` holds the wheel README and the name placeholders, `eval/` is the agent eval harness, `bench/` generates the synthetic benchmark repo and compares two builds on it for the PR regression gate, and `examples/clean-app` is the app CI checks.

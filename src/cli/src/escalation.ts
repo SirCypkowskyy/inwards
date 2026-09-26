@@ -32,7 +32,7 @@ const UNRESOLVED = /\.unresolved\.json$/u;
  * @returns the instruction for the model, without the `inwards:` prefix.
  */
 export function askUser(attempts: number): string {
-  return `These violations survived ${attempts} attempt${attempts === 1 ? "" : "s"}. Stop editing to work around them. Summarise each one for the user (file, import, why it breaks the layer rule) and ask how to proceed; the fix may need a decision you shouldn't make alone.`;
+  return `These violations survived ${attempts} attempt${attempts === 1 ? "" : "s"}. Stop editing to work around them. Summarise each one for the user (file, rule, what it reports and why) and ask how to proceed; the fix may need a decision you shouldn't make alone.`;
 }
 
 /**

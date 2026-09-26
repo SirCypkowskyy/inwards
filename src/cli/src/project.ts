@@ -3,18 +3,25 @@
  * and a check run over them. The engine does no I/O (ADR-006), so all file
  * reading happens here.
  */
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
   checkPrefixes,
+  checkRequired,
+  checkSelectors,
+  type Diagnostic,
   Engine,
   type InwardsConfig,
   type ModuleLookup,
+  membersFrom,
   moduleNameFor,
   type ProjectIndex,
+  packagesOf,
   parseConfig,
   probeLookup,
+  probeMembers,
   type Report,
+  rootPathOf,
   type SourceFile,
 } from "@inwards/core";
 import { applyBaseline } from "./baseline.ts";
@@ -131,15 +138,18 @@ function moduleLookup(root: string): ModuleLookup {
 
 /**
  * Loads the config and engine, then checks the Python files under the targets.
- * A whole-project run (no targets) also checks the layer prefixes against the
- * modules found (INW006). Errors the config's baseline accepts are left out,
- * unless `baseline` is false. The duration covers config, grammar loading,
- * reading and checking.
+ * A whole-project run (no targets) also checks the layer prefixes and shape
+ * selectors against the modules found (INW006, INW007) and every shaped
+ * package's required members (INW008). With `required`, a partial run checks
+ * the required members of each target's package, listing its directory once.
+ * Errors the config's baseline accepts are left out, unless `baseline` is
+ * false. The duration covers config, grammar loading, reading and checking.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param targets - absolute files or directories; undefined means the config root.
  * @param base - directory that report paths are made relative to.
- * @param options - `baseline: false` reports every violation (for `inwards baseline`).
+ * @param options - `baseline: false` reports every violation (for `inwards baseline`),
+ *   `required: true` adds INW008 for the targets' packages (for the hook).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -147,16 +157,25 @@ export async function runCheck(
   configPath: string,
   targets: string[] | undefined,
   base: string,
-  { baseline = true }: { baseline?: boolean } = {},
+  { baseline = true, required = false }: { baseline?: boolean; required?: boolean } = {},
 ): Promise<Report> {
   const started = performance.now();
   const project = await openProject(configPath);
   const files = loadSources(project, targets, base);
   const diagnostics = project.engine.checkFiles(files, moduleLookup(project.lexicalRoot));
+  const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
     const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
-    diagnostics.unshift(...checkPrefixes(project.config, modules, pyproject));
+    const paths = files.map(rootPathOf);
+    const packages = packagesOf(paths);
+    diagnostics.unshift(
+      ...checkPrefixes(project.config, modules, pyproject),
+      ...checkSelectors(project.config, packages, pyproject),
+    );
+    diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
+  } else if (required) {
+    diagnostics.push(...requiredAround(project, files, shownRoot));
   }
   const report = {
     diagnostics,
@@ -164,6 +183,30 @@ export async function runCheck(
     durationMs: performance.now() - started,
   };
   return baseline ? applyBaseline(configPath, report, targets === undefined) : report;
+}
+
+/**
+ * Checks the required members of the packages that hold some files (INW008),
+ * reading each package's directory listing at most once.
+ *
+ * @param project - the loaded project.
+ * @param files - the checked files.
+ * @param shownRoot - the config root as report paths show it.
+ * @returns the missing-member errors.
+ */
+function requiredAround(project: Project, files: SourceFile[], shownRoot: string): Diagnostic[] {
+  const parents = new Set(files.map((f) => rootPathOf(f).split("/").slice(0, -1).join(".")));
+  const members = probeMembers((dir) => {
+    const path = join(project.lexicalRoot, dir);
+    if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+      return;
+    }
+    return readdirSync(path, { withFileTypes: true }).map((entry) => ({
+      name: entry.name,
+      dir: entry.isDirectory(),
+    }));
+  });
+  return checkRequired(project.config, parents, members, shownRoot);
 }
 
 /**

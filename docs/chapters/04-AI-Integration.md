@@ -81,6 +81,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     - **Violation:** compact JSON diagnostics on stderr, exit code 2.
     - **Warnings only** (INW006: the file belongs to no layer): exit 0, and the same JSON goes back to the model as `additionalContext`, so the edit stands but the agent hears about it.
+    - **Package shape** ([guide](guides/package-shape.md)): INW007 blocks when the file is new this session, and is context only for a file that existed at session start. INW008 for the edited file's package (a required member still missing) is always context; the Stop gate enforces it.
     - **Clean file, non-Python file, or any other hook event:** exit 0, no output.
     - **Broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it. With no `[tool.inwards]` at all the hook stays silent, because it may be installed for every project; the config guard stops an agent from deleting the table.
     - **Unreadable payload or an internal error:** exit 1. Claude Code shows that to the user, not the model.
@@ -195,6 +196,7 @@ A model under pressure to finish will try the cheapest thing that turns the chec
 | Use a relative import | `from ..infrastructure import db` | Resolved against the file's package | :white_check_mark: |
 | Put new code outside every layer | Create `shop/persistence/` and import it from the domain | INW006: the import is an error; the new package gets a warning | :white_check_mark: |
 | Move a layer away | `git mv shop/domain shop/core`, so the prefix matches nothing | INW006: a prefix that matched modules at session start and matches none now fails the Stop gate | :white_check_mark: |
+| Put code where it doesn't belong | A new `helpers.py` next to `service.py`, a `services/` package, `test_x.py` in the app, or `rm service.py` through Bash | INW007 blocks the edit that creates the file; INW008 new since session start fails the Stop gate ([Package shape](guides/package-shape.md)) | :white_check_mark: |
 | Import dynamically | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 reports a literal target that reaches an outer layer, through aliases such as `from importlib import import_module as im`. A computed target is not read yet ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)) | :white_check_mark: literal targets |
 | Suppress it | `# inwards: ignore` | Suppressions will need a code and a reason, show up in the summary, and can be rejected in hooks | :material-progress-clock: [#50](https://github.com/SirCypkowskyy/inwards/issues/50) |
 | Loosen the config | Move `shop.infrastructure` into the domain layer | The `PreToolUse` config guard denies the edit; a `sed -i` through Bash fails the Stop gate; CODEOWNERS covers humans | :white_check_mark: |

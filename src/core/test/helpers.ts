@@ -27,7 +27,7 @@ function load(spec: string): Uint8Array {
  *
  * @returns the tree-sitter runtime and Python grammar.
  */
-function grammars(): GrammarBinaries {
+export function grammars(): GrammarBinaries {
   return {
     runtime: load("web-tree-sitter/web-tree-sitter.wasm"),
     python: load("tree-sitter-python/tree-sitter-python.wasm"),
