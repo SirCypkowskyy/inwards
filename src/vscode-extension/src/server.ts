@@ -1,16 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   ConfigError,
   type Diagnostic as CoreDiagnostic,
-  declaresInwards,
   Engine,
   type InwardsConfig,
   moduleNameFor,
   type ProjectIndex,
-  parseConfig,
 } from "@inwards/core";
 import {
   createConnection,
@@ -27,6 +25,7 @@ import {
   WatchKind,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+import { type ConfigProblem, configDiagnostics, problemOf, readConfig } from "./config-file.ts";
 import { mayHoldModule, projectFiles, workspaceDiagnostics } from "./workspace.ts";
 
 /** A valid config and what the server built from it. */
@@ -36,11 +35,9 @@ interface State {
   root: string;
   index: ProjectIndex;
 }
-/** A config error, shown on pyproject.toml at a 0-based line. */
-interface ConfigProblem {
-  message: string;
-  line: number;
-}
+
+/** The documents the engine checks, as the CLI does: Python sources and stubs. */
+const PYTHON = /\.pyi?$/u;
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -97,14 +94,14 @@ documents.onDidChangeContent(({ document }) => check(document));
  * Without file events the shared index could keep a probe from before a
  * module was created, so each check then builds a fresh one (building is
  * free; only the probes the check makes cost anything). Without a valid
- * config it clears the document's findings instead, and the config itself,
- * if the client has it open, is never checked as Python.
+ * config it clears the document's findings instead. Only Python files are
+ * checked: the client also syncs pyproject.toml, for its saves.
  *
  * @param document - the open document.
  */
 function check(document: TextDocument): void {
   const path = fileURLToPath(document.uri);
-  if (path === configPath) {
+  if (!PYTHON.test(path)) {
     return;
   }
   if (!state) {
@@ -125,10 +122,13 @@ function check(document: TextDocument): void {
   publish(path);
 }
 
+// Closing drops the full check and leaves the workspace pass's findings. A
+// document that was never checked (pyproject.toml, say) had nothing to drop.
 documents.onDidClose(({ document }) => {
   const path = fileURLToPath(document.uri);
-  opened.delete(path);
-  publish(path);
+  if (opened.delete(path)) {
+    publish(path);
+  }
 });
 
 // A client that can't watch files still tells the server when it saves the
@@ -215,7 +215,7 @@ async function reload(): Promise<void> {
     if (!(err instanceof ConfigError)) {
       connection.console.warn(`Inwards disabled: ${String(err)}`);
     }
-    found = err instanceof ConfigError ? { message: err.message, line: lineOf(err) } : undefined;
+    found = err instanceof ConfigError ? problemOf(err) : undefined;
   }
   const shown = problem?.message;
   problem = found;
@@ -238,35 +238,19 @@ async function reload(): Promise<void> {
  * Builds the engine for the config on disk.
  *
  * @returns the new state, or undefined when there is no Inwards config.
- * @throws {ConfigError} when the config is broken.
+ * @throws {ConfigError} when the config is broken or can't be read.
  */
 async function load(): Promise<State | undefined> {
-  const text = configPath && existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
-  if (configPath === undefined || !declaresInwards(text)) {
+  const config = configPath === undefined ? undefined : readConfig(configPath);
+  if (configPath === undefined || config === undefined) {
     return undefined;
   }
-  const config = parseConfig(text);
   const engine = await Engine.create(
     { runtime: wasm("web-tree-sitter.wasm"), python: wasm("tree-sitter-python.wasm") },
     config,
   );
   const root = resolve(dirname(configPath), config.root);
   return { engine, config, root, index: engine.index(projectFiles(root)) };
-}
-
-/**
- * Finds the line a config error points at: the TOML parser's, when the
- * file isn't valid TOML. The config's own checks name a key, not a line.
- *
- * @param err - the config error.
- * @returns the 0-based line, or 0 when the error has none.
- */
-function lineOf(err: ConfigError): number {
-  const cause: unknown = err.cause;
-  if (typeof cause === "object" && cause !== null && "line" in cause) {
-    return typeof cause.line === "number" ? cause.line - 1 : 0;
-  }
-  return 0;
 }
 
 /**
@@ -301,7 +285,7 @@ function refresh(): void {
  */
 function publish(path: string): void {
   if (path === configPath) {
-    const diagnostics = problem ? [configDiagnostic(problem)] : [];
+    const diagnostics = configDiagnostics(path, problem);
     connection.sendDiagnostics({ uri: pathToFileURL(path).href, diagnostics });
     return;
   }
@@ -345,21 +329,6 @@ function toLsp(d: CoreDiagnostic): Diagnostic {
     codeDescription: { href: d.docs },
     source: "inwards",
     message: `${d.message}\n${d.fix.summary}`,
-  };
-}
-
-/**
- * Converts a config error to an LSP diagnostic on its whole line.
- *
- * @param problem - the error and its line.
- * @returns the diagnostic for pyproject.toml.
- */
-function configDiagnostic({ message, line }: ConfigProblem): Diagnostic {
-  return {
-    range: { start: { line, character: 0 }, end: { line: line + 1, character: 0 } },
-    severity: DiagnosticSeverity.Error,
-    source: "inwards",
-    message,
   };
 }
 

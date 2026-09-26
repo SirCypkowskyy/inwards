@@ -1,7 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { DOCUMENT_SELECTOR } from "../src/selector.ts";
 import {
   lspHarness,
   PYPROJECT,
@@ -170,6 +172,94 @@ test("a pyproject.toml without [tool.inwards] is not an error", async () => {
     expect(popups().slice(from)).toEqual([]);
     expect(published.has(pathToFileURL(config).href)).toBe(false);
     expect(published.has(pathToFileURL(router).href)).toBe(false);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("a config that can't be read is an error too, not a missing config", async () => {
+  const from = popups().length;
+  const { server, config, router, edit } = await openProject("unreadable", 7, PYPROJECT, WATCHING);
+  const uri = pathToFileURL(config).href;
+  /**
+   * Reports the config changed without writing it.
+   */
+  function touched(): void {
+    const changes = [{ uri, type: 2 }];
+    server.send({ method: "workspace/didChangeWatchedFiles", params: { changes } });
+  }
+  try {
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+
+    // A directory in its place: the popup, no diagnostic, checking off.
+    rmSync(config);
+    mkdirSync(config);
+    touched();
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+    await until(() => popups().length > from);
+    expect(popups().slice(from)).toHaveLength(1);
+    expect(popups().at(from)).toContain("pyproject.toml can't be read");
+    expect(published.get(uri) ?? []).toEqual([]);
+    rmSync(config, { recursive: true });
+    edit(PYPROJECT);
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("a config without read permission gets the popup and the diagnostic", async () => {
+  if (process.platform === "win32" || process.getuid?.() === 0) {
+    return; // Windows has no unreadable files this way, and root ignores the bit
+  }
+  const { server, config, router } = await openProject("denied", 9, PYPROJECT, WATCHING);
+  const changes = [{ uri: pathToFileURL(config).href, type: 2 }];
+  try {
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+    chmodSync(config, 0);
+    server.send({ method: "workspace/didChangeWatchedFiles", params: { changes } });
+    const denied = await diagnosticsOnce(config, (found) => found.length === 1);
+    expect(denied[0]?.message).toContain("pyproject.toml can't be read");
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+    chmodSync(config, 0o644);
+    server.send({ method: "workspace/didChangeWatchedFiles", params: { changes } });
+    expect(await diagnosticsOnce(config, (found) => found.length === 0)).toEqual([]);
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("the client syncs pyproject.toml, and the server never checks it as Python", async () => {
+  // The language client drops a save outside its selector, so the didSave
+  // fallback needs pyproject.toml in it.
+  const patterns = DOCUMENT_SELECTOR.flatMap((filter) => filter.pattern ?? []);
+  expect(DOCUMENT_SELECTOR).toContainEqual({ scheme: "file", language: "python" });
+  expect(patterns.some((glob) => new Bun.Glob(glob).match("/work/shop/pyproject.toml"))).toBe(true);
+  expect(patterns.some((glob) => new Bun.Glob(glob).match("/work/shop/app/router.py"))).toBe(false);
+
+  const { server, config } = await openProject("synced", 8, PYPROJECT, WATCHING);
+  const nested = join(TMP, "synced/tools/pyproject.toml");
+  write(TMP, { "synced/tools/pyproject.toml": PYPROJECT });
+  try {
+    // Text that would be INW010 if it were checked as Python.
+    for (const path of [config, nested]) {
+      const uri = pathToFileURL(path).href;
+      const text = "import app.pricing\n";
+      server.send({
+        method: "textDocument/didOpen",
+        params: { textDocument: { uri, languageId: "toml", version: 1, text } },
+      });
+      server.send({
+        method: "textDocument/didChange",
+        params: { textDocument: { uri, version: 2 }, contentChanges: [{ text }] },
+      });
+      server.send({ method: "textDocument/didSave", params: { textDocument: { uri } } });
+      server.send({ method: "textDocument/didClose", params: { textDocument: { uri } } });
+    }
+    await Bun.sleep(QUIET_MS);
+    expect(published.has(pathToFileURL(config).href)).toBe(false);
+    expect(published.has(pathToFileURL(nested).href)).toBe(false);
   } finally {
     server.kill();
   }

@@ -6,11 +6,12 @@ import {
   type ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node";
+import { DOCUMENT_SELECTOR } from "./selector.ts";
 
 let client: LanguageClient | undefined;
 
 /**
- * Starts the Inwards language server for Python files.
+ * Starts the Inwards language server for Python files and pyproject.toml.
  * Thin client. All the thinking happens in server.ts, which wraps @inwards/core.
  * The server runs over IPC; debug mode opens the inspector on port 6010.
  *
@@ -23,7 +24,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
     debug: { module, transport: TransportKind.ipc, options: { execArgv: ["--inspect=6010"] } },
   };
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "python" }],
+    documentSelector: DOCUMENT_SELECTOR,
   };
   client = new LanguageClient("inwards", "Inwards", serverOptions, clientOptions);
   await client.start();
