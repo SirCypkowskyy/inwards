@@ -19,6 +19,10 @@ extra_css = [
   "stylesheets/extra.css",
 ]
 
+extra_javascript = [
+  "javascripts/mermaid.mjs",
+]
+
 nav = [
   { "Home" = "index.md" },
   { "Getting started" = [
