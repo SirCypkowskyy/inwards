@@ -25,16 +25,15 @@ import { BASELINE_FILE } from "./baseline.ts";
 import { holdsInwardsHooks } from "./claude-settings.ts";
 import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-sim.ts";
 import { findConfig, isInside, realpath } from "./paths.ts";
-import { runsInwards } from "./shell.ts";
+import { readsOnly, runsInwards } from "./shell.ts";
 
 const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 /** `.inwards`, or a prefix of it (`.inw*`), as a path segment in a shell command. */
 const STATE_IN_SHELL = /(?:^|[\s"'=:/\\(<>|;&`${},])\.inw/u;
 const BASELINE_IN_SHELL = /inwards-baseline\.json/iu;
-const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
-/** A command that only reads: no redirection, chaining, substitution or in-place flag. */
-const READ_ONLY =
-  /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;
+/** `.claude`, then a settings file somewhere after it: two searches, not one backtracking regex. */
+const CLAUDE_DIR = /\.claude\b/u;
+const SETTINGS_NAME = /\bsettings(?:\.local)?\.json/gu;
 /** Ends every denial. The agent eval (eval/evidence.ts) counts denials by it. */
 export const ASK_USER = "If this really must change, stop and ask the user to do it.";
 const UNSURE =
@@ -191,19 +190,45 @@ function shellProblem(project: string, command: unknown): string | undefined {
   if (runsInwards(command)) {
     return "`inwards hook` and `inwards baseline` are run by Claude Code and the user, not by the agent.";
   }
-  if (READ_ONLY.test(command)) {
-    return undefined;
-  }
+  const reason = protectedIn(command);
+  return reason !== undefined && !readsOnly(command) ? reason : undefined;
+}
+
+/**
+ * Tells which protected file a shell command names, if any.
+ *
+ * @param command - the Bash tool's `command`.
+ * @returns why changing it is denied, or undefined when the command names none.
+ */
+function protectedIn(command: string): string | undefined {
   if (STATE_IN_SHELL.test(command)) {
     return "commands that change .inwards/ are not allowed; it holds the session record the Stop gate relies on.";
   }
   if (BASELINE_IN_SHELL.test(command)) {
     return `commands that change ${BASELINE_FILE} are not allowed; only the user takes a new baseline.`;
   }
-  if (SETTINGS_IN_SHELL.test(command)) {
+  if (namesSettings(command)) {
     return "commands that change the Claude Code settings files are not allowed while they hold the Inwards hooks.";
   }
   return undefined;
+}
+
+/**
+ * Tells whether a shell command names a Claude Code settings file: `.claude`,
+ * then `settings.json` or `settings.local.json` anywhere after it. The first
+ * `.claude` is enough, since any later one leaves less text to search, so the
+ * time stays linear where `\.claude\b[\s\S]*\bsettings…` was quadratic.
+ *
+ * @param command - the Bash tool's `command`.
+ * @returns true when it names one.
+ */
+function namesSettings(command: string): boolean {
+  const dir = CLAUDE_DIR.exec(command);
+  if (dir === null) {
+    return false;
+  }
+  SETTINGS_NAME.lastIndex = dir.index + dir[0].length;
+  return SETTINGS_NAME.test(command);
 }
 
 /**
