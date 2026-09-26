@@ -125,12 +125,12 @@ export async function agentSuppressions(
   }
   const now = suppressed.map((s) => s.diagnostic);
   const ids = now.flatMap((d): [string, string][] => {
-    const rel = identityOf(project, check, d);
+    const rel = identityOf(project, check, d.file);
     return rel === undefined ? [] : [[rel, resolve(check.base, d.file)]];
   });
   const same = start ? unchangedFiles(start, ids) : new Set<string>();
   const touched = now.filter((d) => {
-    const rel = identityOf(project, check, d);
+    const rel = identityOf(project, check, d.file);
     return rel === undefined || !same.has(rel);
   });
   const before =
@@ -272,20 +272,47 @@ function realDir(dir: string): string | undefined {
 const realDirs = new Map<string, string | undefined>();
 
 /**
- * The start identity of a finding's file (`startPath`), or none when the
+ * The start identity of a checked file (`startPath`), or none when the
  * path the agent wrote for it (`Check.written`) names another identity: a
  * `..` through a symlinked directory the hook had to resolve to find the file.
  *
  * @param project - the real project root.
  * @param check - the report's base and the written paths.
- * @param d - the finding.
+ * @param file - the file as reported: absolute, or relative to `check.base`.
  * @returns the project-relative identity, or undefined.
  */
-function identityOf(project: string, check: Check, d: Diagnostic): string | undefined {
-  const abs = resolve(check.base, d.file);
+function identityOf(
+  project: string,
+  check: Pick<Check, "base" | "written">,
+  file: string,
+): string | undefined {
+  const abs = resolve(check.base, file);
   const rel = startPath(project, abs);
   const written = check.written?.get(abs);
   return written === undefined || startPath(project, written) === rel ? rel : undefined;
+}
+
+/**
+ * Tells whether a file existed at session start as itself: it has a start
+ * identity (`identityOf`) and the start manifest lists that path. The INW007
+ * excuse for legacy layout rests on this in both hooks, so a symlink alias
+ * the agent creates, a cwd or `..` through one, or a start file swapped for
+ * a link doesn't inherit it (#169).
+ *
+ * @param project - the real project root.
+ * @param start - the session's start record, if there is one.
+ * @param check - the base `file` is relative to, and the paths as written.
+ * @param file - the file as reported: absolute, or relative to `check.base`.
+ * @returns true when the file's start identity is in the start manifest.
+ */
+export function existedAtStart(
+  project: string,
+  start: Pick<Start, "manifest"> | undefined,
+  check: Pick<Check, "base" | "written">,
+  file: string,
+): boolean {
+  const rel = identityOf(project, check, file);
+  return rel !== undefined && start?.manifest[rel] !== undefined;
 }
 
 /**
@@ -322,7 +349,7 @@ async function atStart(
 ): Promise<Report | undefined> {
   const texts = new Map<string, string>();
   for (const d of found) {
-    const rel = identityOf(project, check, d);
+    const rel = identityOf(project, check, d.file);
     const text = rel === undefined ? undefined : startText(project, start, rel);
     if (text !== undefined) {
       texts.set(resolve(check.base, d.file), text);

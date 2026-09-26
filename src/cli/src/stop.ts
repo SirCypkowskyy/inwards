@@ -116,7 +116,7 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   const layout = newLayoutErrors(project, configs, state.start.manifest, manifest);
   report.diagnostics = [
     ...layout,
-    ...notIn(layout, report.diagnostics).filter((d) => !preexistingShape(d, state.start.manifest)),
+    ...notIn(layout, report.diagnostics).filter((d) => !preexistingShape(d, project, state.start)),
   ];
   noteRun(project, changed, report.diagnostics); // old errors aren't the session's
   noteSuppressions(report, rejected);

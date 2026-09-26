@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
+import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
-import { inwards, payload, project, type RunResult } from "./run.ts";
+import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 import { ID, put, session, stop } from "./stop-helpers.ts";
 
 const SHAPES = join(import.meta.dir, "fixtures/shapes");
@@ -161,3 +162,78 @@ describe("package shape: hooks", () => {
     expect(JSON.parse(stdout).hookSpecificOutput.permissionDecision).toBe("deny");
   });
 });
+
+/** LAYERS, with `legacy` disallowed in the domain and in its subpackages. */
+const SHAPED = `${LAYERS}
+[[tool.inwards.shape]]
+packages = ["shop.domain", "shop.domain.*"]
+allow = ["order", "saved"]
+`;
+
+describe.skipIf(process.platform === "win32")(
+  "package shape: the pre-existing excuse needs the file's start identity (#169)",
+  () => {
+    const Original = "shop/domain/original/legacy.py";
+
+    /**
+     * Starts a session on SHAPED with a legacy file that breaks the shape.
+     *
+     * @param rel - the legacy file, relative to the project.
+     * @returns the project directory.
+     */
+    function legacy(rel: string): string {
+      return session({
+        "pyproject.toml": SHAPED,
+        "shop/infrastructure/db.py": "",
+        [rel]: "X = 1\n",
+      });
+    }
+
+    /**
+     * Sends PostToolUse with the payload's own cwd and file_path.
+     *
+     * @param root - the project directory, where the hook runs.
+     * @param cwd - the payload's cwd.
+     * @param file - the payload's file_path, as written.
+     * @returns the hook's exit code and output.
+     */
+    function postedFrom(root: string, cwd: string, file: string): RunResult {
+      const stdin = payload("post-edit-order", root, {
+        session_id: ID,
+        cwd,
+        tool_input: { file_path: file },
+      });
+      return inwards(["hook", "claude-code"], { cwd: root, stdin });
+    }
+
+    test("PostToolUse through a symlinked directory the agent created blocks", () => {
+      for (const file of ["../alias/legacy.py", "legacy.py"]) {
+        const root = legacy(Original);
+        symlinkSync("original", join(root, "shop/domain/alias"));
+        const edit = postedFrom(root, join(root, "shop/domain/alias"), file);
+        expect(edit.code).toBe(2);
+        expect(edit.stderr).toContain('"code":"INW007"');
+      }
+    });
+
+    test("Stop: a start file swapped for a symlink to a renamed copy blocks", () => {
+      const root = legacy("shop/domain/legacy.py");
+      renameSync(join(root, "shop/domain/legacy.py"), join(root, "shop/domain/saved.py"));
+      symlinkSync("saved.py", join(root, "shop/domain/legacy.py")); // through Bash: no PostToolUse
+      const gate = stop(root);
+      expect(gate.code).toBe(2);
+      expect(gate.stderr).toContain('"code":"INW007"');
+      expect(gate.stderr).toContain('"file":"shop/domain/legacy.py"');
+    });
+
+    test("a genuinely pre-existing file is still excused, at PostToolUse and Stop", () => {
+      const root = legacy(Original);
+      put(root, Original, "X = 2\n");
+      const edit = postedFrom(root, join(root, "shop/domain/original"), "legacy.py");
+      expect(edit.code).toBe(0);
+      expect(edit.stdout).toContain("INW007");
+      expect(postedFrom(root, root, join(root, Original)).code).toBe(0);
+      expect(stop(root).code).toBe(0);
+    });
+  },
+);

@@ -24,6 +24,7 @@ import {
   moduleNameFor,
   packagesOf,
 } from "@inwards/core";
+import { existedAtStart } from "./legacy.ts";
 import { isInside, posix } from "./paths.ts";
 
 /**
@@ -70,17 +71,20 @@ export function newLayoutErrors(
 
 /**
  * Tells whether a diagnostic is an INW007 finding on a file that existed at
- * session start: legacy layout, reported but never blocking.
+ * session start as itself (`existedAtStart`): legacy layout, reported but
+ * never blocking. A start path that is now a symlink doesn't count.
  *
  * @param d - a diagnostic whose path is project-relative.
- * @param manifest - the session-start manifest.
+ * @param project - the real project root.
+ * @param start - the session's start record.
  * @returns true for such a finding.
  */
 export function preexistingShape(
   d: Diagnostic,
-  manifest: Readonly<Record<string, string>>,
+  project: string,
+  start: { manifest: Readonly<Record<string, string>> },
 ): boolean {
-  return d.code === "INW007" && manifest[d.file] !== undefined;
+  return d.code === "INW007" && existedAtStart(project, start, { base: project }, d.file);
 }
 
 /**
