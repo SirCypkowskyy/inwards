@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { inwards, LAYERS, payload, project, type RunResult } from "./run.ts";
 
-const ID = "stop-test";
+export const ID = "stop-test";
 export const LEAK = "import shop.infrastructure.db\n";
 
 /**

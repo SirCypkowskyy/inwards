@@ -136,31 +136,32 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
   // The nearest config above the file, so each package in a monorepo uses its own,
   // and only one that really lives inside the project. No config at all means this
   // project doesn't use Inwards (the hook may be user-wide).
-  const configPath = sessionConfig(dirname(target.file), target.project, input["session_id"]);
+  const id = input["session_id"];
+  const start = isSessionId(id) ? readSessionStart(target.project, id) : undefined;
+  const configPath = sessionConfig(dirname(target.file), target.project, start);
   if (!configPath) {
     return 0;
   }
   try {
-    const report = await runCheck(configPath, [target.file], target.cwd);
+    const report = await runCheck(configPath, [target.file], target.cwd, { required: true });
     noteRun(target.project, [target.file], report.diagnostics);
-    const escalation = escalationOf(
-      target.project,
-      input["session_id"],
-      configPath,
-      report.diagnostics,
+    // A shape finding on a file that predates the session, and a missing member, are context.
+    const existed = start?.manifest[projectPath(target.project, target.file)] !== undefined;
+    const blocking = report.diagnostics.filter(
+      (d) => d.severity === "error" && d.code !== "INW008" && !(existed && d.code === "INW007"),
     );
-    rememberEdit(target.project, input["session_id"], target.file, report.diagnostics);
+    const escalation = escalationOf(target.project, id, configPath, blocking);
+    rememberEdit(target.project, id, target.file, report.diagnostics);
     if (report.diagnostics.length === 0) {
       return 0;
     }
     const json = render(report, "json", { pretty: false });
     const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
-    const errors = report.diagnostics.some((d) => d.severity === "error");
-    if (errors && escalation?.every !== true) {
+    if (blocking.length > 0 && escalation?.every !== true) {
       process.stderr.write(`${ask}${json}\n`); // a new violation still blocks
       return 2;
     }
-    // Warnings only, or every error has just reached the limit: the report is context.
+    // Warnings or context only, or every error has just reached the limit: the report is context.
     const hookSpecificOutput = { hookEventName: "PostToolUse", additionalContext: `${ask}${json}` };
     process.stdout.write(`${JSON.stringify({ hookSpecificOutput })}\n`);
     return 0;
@@ -182,7 +183,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
  * @param project - the real project root.
  * @param id - the payload's `session_id`.
  * @param configPath - the config the file was checked with.
- * @param diagnostics - this run's findings.
+ * @param diagnostics - this run's blocking errors.
  * @returns the limit, and whether every error in the run reached it; undefined when none did.
  */
 function escalationOf(
@@ -210,11 +211,15 @@ function escalationOf(
  *
  * @param dir - the edited file's directory.
  * @param project - the real project root.
- * @param id - the payload's `session_id`.
+ * @param start - the session's start record, if it has one.
  * @returns the config path, or undefined without one.
  */
-function sessionConfig(dir: string, project: string, id: unknown): string | undefined {
-  const known = isSessionId(id) ? readSessionStart(project, id)?.configs : undefined;
+function sessionConfig(
+  dir: string,
+  project: string,
+  start: { configs: Record<string, unknown> } | undefined,
+): string | undefined {
+  const known = start?.configs;
   if (known === undefined) {
     return findConfig(dir, project);
   }
