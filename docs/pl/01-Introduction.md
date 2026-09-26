@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: d98d6aba9a2e58c3f7e4a9e5d9c15dbe9d56cda8ec7b0f5abddc07ff13fe4a74
+source_hash: 8a4c27eaf0be31df823585511d706b6d886ce3313e6fed248ca8584237cc5069
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -83,7 +83,7 @@ severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block
 # select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
 ```
 
-Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją przy starcie, więc po zmianie uruchom je ponownie. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
+Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją ponownie przy każdej zmianie `pyproject.toml` i pokazuje błąd konfiguracji (na przykład nieznany kod) na `pyproject.toml`. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
 
 <div class="grid cards" markdown>
 
