@@ -79,6 +79,11 @@ describe("config guard: pyproject.toml", () => {
           '{ name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["os"] }',
       },
     ],
+    [
+      "an Edit that marks modules as generated (INW010)",
+      "Edit",
+      { old_string: "[tool.inwards]\n", new_string: '[tool.inwards]\ngenerated = ["*_pb2"]\n' },
+    ],
     ["a Write that removes the table", "Write", { content: '[project]\nname = "shop"\n' }],
     [
       "an edit that breaks the TOML",

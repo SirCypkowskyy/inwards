@@ -31,6 +31,7 @@ Inwards turns those wiki rules into a check that runs in milliseconds and talks 
 root = "src"
 required-version = "0.1.0"  # oldest Inwards allowed; `inwards init` sets it
 ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
+generated = ["*_pb2", "*_pb2_grpc", "_version"]  # modules a build step writes; this list is the default (optional)
 escalate-after = 3  # attempts at one violation before the agent is told to ask you (optional)
 run-log = false  # local log of hook runs, see the Run log chapter (optional)
 stop-gate = "changed"  # "project" makes the Claude Code Stop gate check the whole project (optional)
@@ -79,6 +80,8 @@ severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block
 ```
 
 Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select`. INW000 always reports as an error, because a file whose declared encoding can hide imports isn't checked at all, and the Stop gate's check that no layer was moved away during the session ignores the table too. `inwards check`, the hooks, the Stop gate and the VS Code extension all apply the table; the extension reads it again whenever `pyproject.toml` changes, and shows a config error (an unknown code, say) on `pyproject.toml`. It is part of `[tool.inwards]`, so the config guard stops an agent from changing it. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) covers the baseline and SARIF.
+
+`generated` lists modules that a build step writes, such as protoc's `orders_pb2` or the `_version` module setuptools-scm writes. A developer's checkout has them and a fresh CI checkout doesn't, so INW010 doesn't report an import of one that isn't on disk. Patterns match whole name segments anywhere, as `ignore` does, and a segment may use `*` and `?`: `*_pb2` covers `shop.api.orders_pb2`, and `shop.gen` covers everything under `shop/gen/`. Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`; setting it replaces that list, and `generated = []` turns it off. A bracket set or a pattern made only of wildcards is a config error. [GitHub Actions](guides/ci.md#generated-modules) and [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) have the details.
 
 To accept one import for good, put a suppression on its line, with the rule's code and a reason:
 

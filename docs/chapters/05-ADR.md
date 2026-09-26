@@ -28,10 +28,11 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted, `extend-deny-libraries` adds to the default since [#155](guides/libraries.md#configure-it) |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
-| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted, generated modules pass when missing since [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
 | [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Report unreadable dynamic-import targets in inner layers | :white_check_mark: Accepted |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
+| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -701,3 +702,39 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-minus-circle-outline: Under `stop-gate = "project"` the Stop gate checks every suppression in the project against its start content, one more check per file that has one.
 
 **Alternatives.** *`# noqa: INW001` or `# type: ignore`-style blanket comments:* other tools read those, and a bare form would hide everything on the line. *A next-line or file-level directive:* hides findings no one looked at. *Suppressions in `pyproject.toml` by path:* one more place to keep in sync with the code, and the config guard would have to judge each entry; per path is left to #160 and the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)). *Honour agent suppressions and only count them:* a count doesn't keep a violation out of the code. *Reject every suppression in a changed file:* the owner's existing ones would block any edit of that file.
+
+## ADR-029: Generated modules pass INW010, protoc and version modules by default
+
+**Status:** Accepted · 2026-09-26 · [#160](https://github.com/SirCypkowskyy/inwards/issues/160)
+
+**Context.** INW010 decides on disk whether a module exists ([ADR-025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). Some modules only exist after a build step: `*_pb2.py` and `*_pb2_grpc.py` from protoc, `_version.py` from setuptools-scm or hatch-vcs. A developer's checkout has them and a fresh CI checkout doesn't, so the same commit passes locally and fails in CI. The ways out were a baseline, which is meant to shrink and is the wrong tool for a module that exists at run time; an inline suppression ([ADR-028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) on every import of it; or INW010 turned off in `[tool.inwards.rules]`.
+
+**Decision.**
+
+- **A `generated` key** in `[tool.inwards]`: module patterns that INW010 treats as existing when the probe finds them missing.
+- **Patterns are dotted names with `*` and `?` per segment.** No bracket sets: a set can hold any character, so `[!/]*` would pass a character check and still cover every segment. A pattern matches whole segments anywhere in the module name, as the top-level `ignore` does, and a wildcard never crosses a dot: `*_pb2` covers `shop.api.orders_pb2`, `_version` covers `shop._version`, `shop.api.gen` covers everything under `shop/api/gen/`. It is matched against the resolved module part of the import, so `from .orders_pb2 import Order` in `shop.api` is `shop.api.orders_pb2`.
+- **Validated.** An empty segment, a character that can't be in a module name (`[` and `]` included), or a pattern made only of wildcards and dots (`*`, `*.*`) is a config error. The last would turn INW010 off, which is `[tool.inwards.rules]`'s job.
+- **On by default.** Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`. Tools write these names and people rarely do, so a missing one is almost always a build step that hasn't run. Setting the key replaces the default, as `deny-libraries` replaces its default ([ADR-023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer)), and `generated = []` turns it off.
+- **Matched without regular expressions.** The module name comes from an import an agent writes, and a regex translation (`.*` per star) backtracks: `*_*_*_*_pb2` against a 240-character segment took over 300 ms in the hook. An iterative two-pointer match that resumes only after the last star costs O(pattern × segment). The shape member patterns share the matcher, and it fixes their bracket sets, where the regex translation turned `?` and `*` into wildcards.
+- **Only INW010 reads it.** The module index still sees the module as missing, so the other rules judge it as they judge any missing module: INW001 goes by name and reports an outward import whatever is on disk, INW005 counts it as first-party through its nearest package that exists, and INW006 names that package.
+- **Guarded** like every key in `[tool.inwards]`: the config guard denies an agent's edit of it, and the Stop gate fails a change made through Bash. A test pins the guard.
+- **No per-file ignore.** An inline suppression is already a per-line escape, and suppressions by path in the config are left to the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), as ADR-028 decided.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A project that imports protoc or version modules gets the same result in CI as locally, with no config. Tests pin both checkouts, for the default and for a configured pattern.
+- :material-plus-circle-outline: Not a breaking change. INW010 has not been released yet (0.2.0 predates it), and the default only removes findings; no exit code, key or `diagnostics@1` field changes.
+- :material-plus-circle-outline: No finding changes on the corpus (5 repositories, 6,543 files), and INW010's four findings in saleor remain.
+- :material-minus-circle-outline: A hallucinated import whose name a pattern covers (`shop.api.payments_pb2` with no `payments.proto`) passes INW010, by default for `*_pb2`, `*_pb2_grpc` and `_version`. It still fails when the code runs. A team that wants those caught sets `generated = []` and runs the generator before the check.
+- :material-minus-circle-outline: INW006 still sees the module as missing. For a generated module directly in the package above the layers (`shop._version` imported from a layer), both checkouts get an INW006 error, but it names "the package above the layers" without the file and the unassigned module with it, so a baseline entry taken in one checkout doesn't match in the other. A generated module inside an unassigned package (`shop.persistence.orders_pb2`) is worded the same in both.
+- :material-minus-circle-outline: A generated top-level package with no committed `__init__.py` isn't first-party to any rule: INW010 never checks it, and INW005 treats it as a library.
+- :material-minus-circle-outline: "Anywhere" is broad: a pattern `api` covers every module with an `api` segment. A longer pattern (`shop.api.gen`) is narrower.
+
+**Alternatives.**
+
+- *No default:* stricter, but every gRPC or setuptools-scm project would meet the CI failure first and find the key from there, for names that almost never come from an agent.
+- *fnmatch over the whole dotted name, with `*` crossing dots:* the issue's example `*._version` would work as written, but `*` would mean something else than in `ignore` and the shape patterns, where it stays inside a segment, and `shop.*` would reach any depth.
+- *Match the whole name only:* `*_pb2` would then need a form for "at any depth", such as the shape selectors' `**`, in every pattern.
+- *Teach the module index that generated modules exist, for every rule:* INW006 would word its finding the same in both checkouts, but INW005, INW006 and the language server would believe in files that aren't there, and the index would need the config.
+- *A per-file INW010 ignore in the config:* one more place to keep in sync with the code, and the per-line suppression already exists.
+- *fnmatch bracket sets, as in the shape member patterns:* a set's contents escape the character check, and `*` and `?` cover every case the issue names.

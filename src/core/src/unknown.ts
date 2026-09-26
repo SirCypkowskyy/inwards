@@ -6,8 +6,11 @@
  * (`ProjectIndex.ownerOf`), never by the module listing, which misses
  * namespace packages and differs between adapters. The package the missing
  * module would live in is read once (`ProjectIndex.listDir`): it holds any
- * compiled extension of that name, and the names the fix suggests.
+ * compiled extension of that name, and the names the fix suggests. A module
+ * a build step writes (`generated`) passes even when it isn't on disk, since
+ * a fresh checkout lacks it.
  */
+import { DEFAULT_GENERATED, isGenerated } from "./generated.ts";
 import type { ProjectIndex } from "./project.ts";
 import { packageOf } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
@@ -36,17 +39,20 @@ interface Unknown {
  * whose top-level package isn't first-party is third-party and passes, and so
  * does one under a package that extends its `__path__`. A relative import
  * that climbs above the top-level package (an empty target, see `ImportRef`)
- * is always flagged: Python raises on it.
+ * is always flagged: Python raises on it. A missing module that a
+ * `generated` pattern covers passes, and so reaches INW006 like one that exists.
  *
  * @param file - the file the imports come from.
  * @param imports - its static imports.
  * @param project - the module index.
+ * @param generated - the `generated` patterns; `DEFAULT_GENERATED` when not set.
  * @returns one error per missing module, and the imports they cover.
  */
 export function checkUnknownImports(
   file: SourceFile,
   imports: readonly ImportRef[],
   project: ProjectIndex,
+  generated: readonly string[] = DEFAULT_GENERATED,
 ): Unknown {
   const found: Diagnostic[] = [];
   const missing = new Set<ImportRef>();
@@ -56,7 +62,12 @@ export function checkUnknownImports(
     let finding: Diagnostic | undefined;
     if (module === "") {
       finding = climbing(file, ref);
-    } else if (owner !== undefined && owner !== module && !project.extendsPath(owner)) {
+    } else if (
+      owner !== undefined &&
+      owner !== module &&
+      !project.extendsPath(owner) &&
+      !isGenerated(module, generated)
+    ) {
       finding = absent(file, ref, owner, project);
     }
     if (finding) {

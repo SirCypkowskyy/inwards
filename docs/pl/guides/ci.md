@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: d66b6f76bab58e5407addb7487894d557fc80ef6519a52e9e98f95963527a416
+source_hash: 6ff568bbee689741f5a67c791d9cfde146593783393e45c82dbaa082780b2851
 ---
 
 # GitHub Actions { #github-actions }
@@ -71,6 +71,21 @@ jobs:
 - **Fail on violations** oblewa zadanie na końcu, gdy wyniki są już opublikowane.
 
 Gdy code scanning zacznie działać, zostaw tylko jeden z dwóch kroków z adnotacjami, bo inaczej każde naruszenie pojawi się dwa razy.
+
+## Moduły generowane { #generated-modules }
+
+Zadanie CI sprawdza świeży checkout, w którym jest tylko to, co zacommitowano. Moduły zapisywane przez krok budowania, takie jak `orders_pb2.py` i `orders_pb2_grpc.py` z protoc albo `_version.py` zapisywany przez setuptools-scm i hatch-vcs, są w checkoucie programisty, ale nie tam. INW010 zgłasza import własnego modułu, którego nie ma na dysku, więc moduły objęte przez `generated` w `[tool.inwards]` traktuje jako istniejące, niezależnie od tego, czy plik jest. Bez tego klucza lista to `["*_pb2", "*_pb2_grpc", "_version"]`, więc moduły z protoc i moduły wersji nie wymagają konfiguracji. Dla innego generatora wypisz wszystkie potrzebne wzorce, bo klucz zastępuje listę domyślną:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
+```
+
+- Wzorzec to nazwa modułu z kropkami, a każdy segment może używać `*` i `?`. Pasuje do całych segmentów w dowolnym miejscu nazwy modułu, tak jak `ignore`: `*_pb2` obejmuje `shop.api.orders_pb2`, `_version` obejmuje `shop._version`, a `shop.api.gen` wszystko w `shop/api/gen/`. `*` nigdy nie przechodzi przez kropkę.
+- Pusty segment, znak, którego nie może być w nazwie modułu (w tym zbiór w nawiasach, taki jak `[a-z]`), albo wzorzec złożony z samych symboli wieloznacznych (`*`, `*.*`) to błąd konfiguracji, a sprawdzenie kończy się kodem 2. Żeby wyłączyć INW010, użyj `ignore = ["INW010"]` w `[tool.inwards.rules]`.
+- `generated = []` wyłącza listę domyślną. Wtedy uruchom generator (`python -m grpc_tools.protoc ...`) przed `inwards check`, bo inaczej INW010 zgłosi każdy import modułu, który ten generator zapisuje.
+- Klucz czyta tylko INW010. Pozostałe reguły widzą moduł generowany, którego nie ma na dysku, jako brakujący: import takiego modułu skierowany na zewnątrz to nadal INW001, a INW006 wskazuje najbliższy istniejący pakiet. [Znane ograniczenia](../03-Architecture-C4.md#known-limitations) w rozdziale o architekturze wymieniają przypadki, w których przez to diagnostyka różni się między dwoma checkoutami.
+- Config guard odrzuca edycję tego klucza przez agenta, tak jak każdego klucza w `[tool.inwards]`.
 
 ## Dostępność code scanning { #code-scanning-availability }
 

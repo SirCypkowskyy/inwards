@@ -8,6 +8,7 @@
  * subpackage, `name/` a subpackage only, `name.py` a module only.
  */
 
+import { globMatches, isGlob } from "./glob.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 import type { Severity } from "./types.ts";
 
@@ -50,8 +51,6 @@ const IDENTIFIER = /^[\p{L}_][\p{L}\p{N}_]*$/u;
 const ANY_SEGMENT = "\u0001";
 /** Up to how many segments `**` is tried with when comparing two selectors. */
 const MAX_DEPTH = 3;
-/** fnmatch characters that mean something in a regular expression but not in a glob. */
-const REGEX_ONLY = /[.+^${}()|\\]/gu;
 
 /**
  * Reads the optional `shape` and `names` arrays of `[tool.inwards]`.
@@ -105,7 +104,7 @@ export function memberMatches(pattern: string, member: string): boolean {
   if ((kind === "/" && !dir) || (kind === ".py" && dir)) {
     return false;
   }
-  return globRegex(want["stem"]).exec(have["stem"]) !== null;
+  return globMatches(want["stem"], have["stem"]);
 }
 
 /**
@@ -137,21 +136,6 @@ function matchSegments(selector: readonly string[], name: readonly string[]): bo
   return (
     name.length > 0 && (head === "*" || head === name[0]) && matchSegments(rest, name.slice(1))
   );
-}
-
-/**
- * Turns an fnmatch glob into an anchored regular expression.
- *
- * @param glob - e.g. `test_*`.
- * @returns the expression.
- */
-function globRegex(glob: string): RegExp {
-  const source = glob
-    .replace(REGEX_ONLY, "\\$&")
-    .replaceAll("*", ".*")
-    .replaceAll("?", ".")
-    .replaceAll("[!", "[^");
-  return new RegExp(`^${source}$`, "u");
 }
 
 /**
@@ -245,28 +229,13 @@ function selectors(value: unknown, where: string): string[] {
  */
 function patterns(value: unknown, where: string): string[] {
   const list = strings(value, where);
-  const bad = list.find((p) => !(PATTERN.test(p) && validGlob(p)));
+  const bad = list.find((p) => !(PATTERN.test(p) && isGlob(p)));
   if (bad !== undefined) {
     throw new ConfigError(
       `${where}: "${bad}" is not a member pattern. Use name (module or subpackage), name/ or name.py.`,
     );
   }
   return list;
-}
-
-/**
- * Tells whether a pattern's glob compiles.
- *
- * @param pattern - a member pattern.
- * @returns false for an unbalanced `[`.
- */
-function validGlob(pattern: string): boolean {
-  try {
-    globRegex(pattern);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

@@ -1,4 +1,5 @@
 import { parse } from "smol-toml";
+import { parseGenerated } from "./generated.ts";
 import { VERSION } from "./meta.ts";
 import { parseRules, type RuleSettings } from "./rule-config.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape-config.ts";
@@ -38,6 +39,14 @@ export interface InwardsConfig {
    * Imports from a layer into them are still checked. Absent when not set.
    */
   ignore?: string[];
+  /**
+   * Modules a build step writes (`generated`), which INW010 treats as existing
+   * when they aren't on disk, such as protoc's `*_pb2` or setuptools-scm's
+   * `_version`. Each entry is a dotted name whose segments may use `*` and
+   * `?`; it matches whole segments anywhere in a module name, like `ignore`. Absent when not set, and then INW010 uses `DEFAULT_GENERATED`;
+   * a list, even an empty one, replaces that default.
+   */
+  generated?: string[];
   /**
    * How many attempts at the same violation before the hooks stop blocking
    * and tell the agent to ask the user (`escalate-after`, default 3).
@@ -87,6 +96,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "layers",
   "required-version",
   "ignore",
+  "generated",
   "escalate-after",
   "run-log",
   "stop-gate",
@@ -190,6 +200,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     root: root.replaceAll("\\", "/"),
     layers: parsed,
     ...optionalKeys(raw),
+    ...parseGenerated(raw["generated"]),
     ...stopGateKey(raw["stop-gate"]),
     ...parseShapeKeys(raw),
     ...parseRules(raw["rules"]),
