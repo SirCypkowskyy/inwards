@@ -4,12 +4,23 @@ Recorded from Claude Code 2.1.282 on 2026-09-25: real stdin of `SessionStart`,
 `PreToolUse`, `PostToolUse` and `Stop` hooks during a headless Haiku session.
 Absolute paths are replaced with `{{ROOT}}`; the transcript path is scrubbed.
 
-To re-record after a Claude Code release, in an empty scratch directory:
+To re-record after a Claude Code release (needs `claude` logged in or
+`ANTHROPIC_API_KEY`; one or two Haiku sessions, each capped at $0.25):
 
-1. Add a `pyproject.toml` with `[tool.inwards]` and a `.claude/settings.json`
-   whose hooks for those four events run
-   `cat > "$CLAUDE_PROJECT_DIR/.rec/$(date +%s%N)-<Event>.json"`.
-2. Run `claude -p "Create shop/domain/order.py containing: import shop.infrastructure.db . Then append X = 1 to it. Then write README.md with the word hi." --model haiku --setting-sources project --permission-mode acceptEdits`.
-3. Replace the scratch directory path with `{{ROOT}}`, keep the file names used
-   here, and run `bun test src/cli --update-snapshots`. Review the snapshot diff:
+1. Run `d=$(mktemp -d); bun run scripts/claude-payload-drift.ts "$d"`. It runs
+   a headless `claude -p` session whose hooks save every payload to
+   `$d/payloads` (a second session in `$d/retry` if the first skipped a call),
+   then reports any field added, removed or retyped against these fixtures.
+   Values are not compared. Payload names start with a nanosecond timestamp
+   (GNU `date`), so they sort in the order the hooks ran.
+2. Copy the payloads you need over these files, keeping the names used here
+   (`hook_event_name`, `tool_name` and `tool_input.file_path` tell which is
+   which), replace the scratch directory path with `{{ROOT}}`, and scrub
+   `transcript_path`.
+3. Run `bun test src/cli --update-snapshots` and review the snapshot diff:
    a change there is a change in what agents see.
+
+`.github/workflows/nightly-e2e.yml` runs step 1 every night and opens an issue
+(or comments on the open one) when the shape drifts. A session that fails, or
+skips a call on both tries, fails the run without an issue. It needs the
+repository secret `ANTHROPIC_API_KEY`; without it the job skips with a notice.

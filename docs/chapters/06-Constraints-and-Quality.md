@@ -157,7 +157,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 ```sh
 bun install
-bun test                                                    # 438 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, bench
+bun test                                                    # 478 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms
@@ -171,6 +171,8 @@ bun run bench/corpus.ts --bin dist/inwards-linux-x64 --dir ~/.cache/inwards-corp
   ![bun test output](assets/screens/bun-test.svg){ loading=lazy }
   <figcaption>The engine's unit tests, including the prescan and colour-output cases.</figcaption>
 </figure>
+
+Two checks keep the agent-facing tests honest. A code fence in `docs/chapters/guides` that follows a `<!-- e2e -->` line and one blank line (without it, the comment breaks a list item) runs as an E2E case in a fresh project, against the compiled binary in CI (`src/cli/test/docs.test.ts`); untagged fences are never run. Every night, `.github/workflows/nightly-e2e.yml` records the Claude Code hook payloads again with a headless `claude -p` session and opens an issue when a field is added, removed or changes type against the recorded fixtures.
 
 The screenshots in these docs come from `scripts/screenshots.py`, which runs each command for real and renders the terminal output with Rich.
 
