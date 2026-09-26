@@ -4,17 +4,17 @@ on:
   push:
     branches: [develop, main]
   pull_request:
-  # macOS, Windows and the older Ubuntu run nightly and on demand only, while
-  # Actions minutes are limited (#126); PRs and pushes test on ubuntu-26.04.
-  schedule:
-    - cron: "17 2 * * *"
+  # macOS, Windows and the older Ubuntu run only on demand, to save Actions
+  # minutes (#126: macOS bills 10x, Windows 2x). Run them before a release:
+  # `gh workflow run ci.yml --ref develop`. cd.yml verifies every binary on
+  # its own OS at each release tag anyway.
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  # By event too: a nightly run on develop is the only macOS/Windows coverage,
+  # By event too: a manual run on develop is the only macOS/Windows coverage,
   # so a push to develop must not cancel it, nor it a push run.
   group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -62,12 +62,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Nightly and manual runs: both Ubuntu images (until ubuntu-latest moves
-        # to 26.04 on 2026-10-19), macOS and Windows. PRs and pushes: ubuntu-26.04
-        # only, to save Actions minutes (#126); revert this to test all four on PRs.
+        # Manual runs: both Ubuntu images (until ubuntu-latest moves to 26.04 on
+        # 2026-10-19), macOS and Windows. PRs and pushes: ubuntu-26.04 only, to
+        # save Actions minutes (#126); revert this to test all four on PRs.
         include: >-
           ${{ fromJSON(
-            (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+            github.event_name == 'workflow_dispatch'
             && '[{"os":"ubuntu-24.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"ubuntu-26.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"macos-latest","target":"bun-darwin-arm64","bin":"inwards-darwin-arm64"},{"os":"windows-latest","target":"bun-windows-x64","bin":"inwards-windows-x64.exe"}]'
             || '[{"os":"ubuntu-26.04","target":"bun-linux-x64","bin":"inwards-linux-x64"}]'
           ) }}

@@ -1,7 +1,7 @@
 # Aider
 
 !!! info "Verified 2026-09-25"
-    Linux by hand: `init`, and the `lint-cmd` run the way Aider runs it (from the git root, once per edited file). Aider itself wasn't run. On macOS (arm64) and Windows, CI runs `init` and `check` with the compiled binary every night; a by-hand check there is still open.
+    Linux by hand: `init`, and the `lint-cmd` run the way Aider runs it (from the git root, once per edited file). Aider itself wasn't run. On macOS (arm64) and Windows, CI runs `init` and `check` with the compiled binary before each release; a by-hand check there is still open.
 
 Aider runs a lint command after each edit and asks the model to fix what it reports. Inwards plugs in as that command for Python files.
 
