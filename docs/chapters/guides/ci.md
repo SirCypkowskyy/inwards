@@ -67,6 +67,21 @@ jobs:
 
 Keep one of the two annotation steps once code scanning works, or each violation shows twice.
 
+## Generated modules
+
+A CI job checks a fresh checkout, which has only what is committed. Modules that a build step writes, such as protoc's `orders_pb2.py` and `orders_pb2_grpc.py` or the `_version.py` that setuptools-scm and hatch-vcs write, exist in a developer's checkout but not there. INW010 reports an import of a first-party module that isn't on disk, so it treats the modules `generated` in `[tool.inwards]` covers as existing, file or no file. Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`, so protoc and version modules need no config. For another generator, list every pattern you need, since the key replaces the default:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
+```
+
+- A pattern is a dotted module name, and each segment may use `*`, `?` and `[seq]`. It matches whole segments anywhere in the module name, as `ignore` does: `*_pb2` covers `shop.api.orders_pb2`, `_version` covers `shop._version`, and `shop.api.gen` covers everything under `shop/api/gen/`. A `*` never crosses a dot.
+- An empty segment, a character that can't be in a module name, or a pattern made only of wildcards (`*`, `*.*`) is a config error, and the check exits 2. To turn INW010 off, use `ignore = ["INW010"]` in `[tool.inwards.rules]`.
+- `generated = []` turns the default off. Then run the generator (`python -m grpc_tools.protoc ...`) before `inwards check`, or INW010 reports every import of a module it writes.
+- Only INW010 reads the key. The other rules see a generated module that isn't on disk as missing: an outward import of one is still INW001, and INW006 names the nearest package that exists. The Architecture chapter's [known limitations](../03-Architecture-C4.md#known-limitations) list the cases where that makes a finding differ between the two checkouts.
+- The config guard denies an agent's edit of the key, as for every key in `[tool.inwards]`.
+
 ## Code scanning availability
 
 Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does while it is private (`continue-on-error: ${{ github.event.repository.private }}`).

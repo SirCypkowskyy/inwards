@@ -196,6 +196,7 @@ export class Engine {
       file,
       imports.filter((ref) => !outward.has(ref)),
       project,
+      this.config.generated,
     );
     const resolved = imports.filter((ref) => ref.target !== "");
     const existing = resolved.filter((ref) => !unknown.missing.has(ref));

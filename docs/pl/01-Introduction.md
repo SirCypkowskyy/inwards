@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: df043dfc1b7a1ad152ef69571706b1752eb45cafa3ad58dc38fb30b71cbaee35
+source_hash: 5997d281b997ccd17f305d7a729462e3c8e9a61731fdefa3df93fb96008b9d87
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -36,6 +36,7 @@ Inwards zamienia reguły z wiki w sprawdzenie, które trwa milisekundy i odpowia
 root = "src"
 required-version = "0.1.0"  # oldest Inwards allowed; `inwards init` sets it
 ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
+generated = ["*_pb2", "*_pb2_grpc", "_version"]  # modules a build step writes; this list is the default (optional)
 escalate-after = 3  # attempts at one violation before the agent is told to ask you (optional)
 run-log = false  # local log of hook runs, see the Run log chapter (optional)
 stop-gate = "changed"  # "project" makes the Claude Code Stop gate check the whole project (optional)
@@ -84,6 +85,8 @@ severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block
 ```
 
 Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją ponownie przy każdej zmianie `pyproject.toml` i pokazuje błąd konfiguracji (na przykład nieznany kod) na `pyproject.toml`. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
+
+`generated` wymienia moduły, które zapisuje krok budowania, na przykład `orders_pb2` z protoc albo moduł `_version` zapisywany przez setuptools-scm. Checkout programisty je ma, a świeży checkout w CI nie, więc INW010 nie zgłasza importu takiego modułu, którego nie ma na dysku. Wzorce pasują do całych segmentów nazwy w dowolnym miejscu, tak jak `ignore`, a segment może używać `*`, `?` i `[seq]`: `*_pb2` obejmuje `shop.api.orders_pb2`, a `shop.gen` wszystko w `shop/gen/`. Bez tego klucza lista to `["*_pb2", "*_pb2_grpc", "_version"]`; ustawienie klucza zastępuje tę listę, a `generated = []` ją wyłącza. Wzorzec złożony z samych symboli wieloznacznych to błąd konfiguracji. Szczegóły są w [GitHub Actions](guides/ci.md#generated-modules) i w [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default).
 
 Żeby na stałe zaakceptować jeden import, dopisz w jego linii wyciszenie z kodem reguły i powodem:
 

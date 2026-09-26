@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 0787c5f0e450676969dc8fcc660ecaac44a2f7d6236f29330823e5637143991c
+source_hash: bd7e5a1770e2a43ae4192ead149f363002f4aac67235f135bd7b2dd51ed019a0
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -214,6 +214,7 @@ Model pod presją zakończenia zadania spróbuje najtańszej rzeczy, która zmie
 | Wyciszenie | `# inwards: ignore[INW001] reason="legacy"` przy imporcie | Wyciszenie wymaga kodu i powodu (inaczej INW009) i jest liczone w każdym raporcie. Przy `agent-suppressions = "deny"`, domyślnym, hooki pomijają wyciszenie, którego nie było w pliku na starcie sesji, więc jego naruszenie nadal blokuje edycję i Stop gate; skopiowanie, przeniesienie albo rozszerzenie istniejącego wyciszenia też liczy się jako nowe ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) | :white_check_mark: |
 | Poluzowanie konfiguracji | Przeniesienie `shop.infrastructure` do warstwy domeny | Config guard w `PreToolUse` odrzuca edycję; `sed -i` przez Bash oblewa Stop gate; ludzi obejmuje CODEOWNERS | :white_check_mark: |
 | Wyłączenie reguły | `ignore = ["INW001"]` albo `severity = { INW001 = "warning" }` w `[tool.inwards.rules]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate. INW000 i sprawdzenie sesji pod kątem przeniesienia warstwy pomijają tabelę, więc nawet `ignore = ["INW006"]` ustawione przez użytkownika nie otwiera tej drogi | :white_check_mark: |
+| Uznanie brakującego modułu za generowany | `generated = ["*"]` albo wzorzec, który obejmuje zmyśloną nazwę, w `[tool.inwards]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate, a wzorzec złożony z samych symboli wieloznacznych to błąd konfiguracji. Domyślna lista (`*_pb2`, `*_pb2_grpc`, `_version`) przepuszcza jednak przez INW010 zmyśloną nazwę tej postaci ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)) | :white_check_mark: |
 | Dopisanie naruszenia do baseline'u | Dodanie własnego naruszenia do `inwards-baseline.json` albo uruchomienie `inwards baseline` | Config guard odrzuca edycje pliku i to polecenie, także za `uvx` albo `env`; baseline zmieniony przez Bash oblewa Stop gate, który wtedy nie stosuje żadnego baseline'u | :white_check_mark: |
 | Wyłączenie Inwards | Usunięcie `.inwards/`, usunięcie hooków, ustawienie `disableAllHooks` | Config guard odrzuca edycje `.inwards/` i plików ustawień, które zawierają hooki albo by je wyłączyły; `permissions.deny` go wspiera | :white_check_mark: |
 | Skopiowanie kodu | Wklejenie klasy SQL do `shop/domain/` | Poza zakresem. Duplikacja to sprawa przeglądu kodu i innych narzędzi | :x: |

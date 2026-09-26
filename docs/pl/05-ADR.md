@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 5bf7b2d418d8c30de1419c7b4b321902566863fb9fee59c571db9a01aa347420
+source_hash: aba9a7f01c7d44affd96201ba59124b9b567d7402a90e06fc3f1019a46f51d6f
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -33,10 +33,11 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy | :white_check_mark: Przyjęty, od [#155](guides/libraries.md#configure-it) `extend-deny-libraries` dopisuje wpisy do listy domyślnej |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
-| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem | :white_check_mark: Przyjęty |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem | :white_check_mark: Przyjęty, moduły generowane przechodzą, gdy ich brakuje, od [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
 | [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Zgłaszaj nieczytelne cele importów dynamicznych w warstwach wewnętrznych | :white_check_mark: Przyjęty |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty, serwer języka czyta tabelę ponownie bez restartu od [#163](03-Architecture-C4.md#known-limitations) |
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :white_check_mark: Przyjęty |
+| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -706,3 +707,37 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: Przy `stop-gate = "project"` Stop gate porównuje każde wyciszenie w projekcie z zawartością ze startu, czyli jedno sprawdzenie więcej na każdy plik, który je ma.
 
 **Alternatywy.** *Ogólne komentarze w stylu `# noqa: INW001` albo `# type: ignore`:* czytają je inne narzędzia, a forma bez kodów ukryłaby wszystko w linii. *Dyrektywa dla następnej linii albo całego pliku:* ukrywa diagnostyki, których nikt nie obejrzał. *Wyciszenia według ścieżki w `pyproject.toml`:* jeszcze jedno miejsce do utrzymywania w zgodzie z kodem, a config guard musiałby oceniać każdy wpis; ścieżki zostają dla #160 i konfiguracji w schemacie v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)). *Uznawać wyciszenia agenta i tylko je liczyć:* licznik nie zatrzyma naruszenia w kodzie. *Odrzucać każde wyciszenie w zmienionym pliku:* istniejące wyciszenia właściciela blokowałyby każdą edycję tego pliku.
+
+## ADR-029: Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji { #adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default }
+
+**Stan:** Przyjęty · 2026-09-26 · [#160](https://github.com/SirCypkowskyy/inwards/issues/160)
+
+**Kontekst.** INW010 ustala na dysku, czy moduł istnieje ([ADR-025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). Niektóre moduły istnieją dopiero po kroku budowania: `*_pb2.py` i `*_pb2_grpc.py` z protoc, `_version.py` z setuptools-scm albo hatch-vcs. Checkout programisty je ma, a świeży checkout w CI nie, więc ten sam commit przechodzi lokalnie i oblewa w CI. Dotąd wyjściem był baseline, który ma się kurczyć i nie nadaje się do modułu istniejącego w czasie działania programu; wyciszenie w linii ([ADR-028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) przy każdym imporcie takiego modułu; albo wyłączenie INW010 w `[tool.inwards.rules]`.
+
+**Decyzja.**
+
+- **Klucz `generated`** w `[tool.inwards]`: wzorce modułów, które INW010 traktuje jako istniejące, gdy sonda ich nie znajduje.
+- **Wzorce to nazwy z kropkami z globami w segmentach**: `*`, `?`, `[seq]` i `[!seq]`, czyli globy fnmatch z wzorców członków w kształcie pakietu. Wzorzec pasuje do całych segmentów w dowolnym miejscu nazwy modułu, tak jak `ignore` na najwyższym poziomie, a glob nigdy nie przechodzi przez kropkę: `*_pb2` obejmuje `shop.api.orders_pb2`, `_version` obejmuje `shop._version`, `shop.api.gen` wszystko w `shop/api/gen/`. Porównywana jest rozwiązana część importu będąca modułem, więc `from .orders_pb2 import Order` w `shop.api` to `shop.api.orders_pb2`.
+- **Walidowane.** Pusty segment, znak, którego nie może być w nazwie modułu, zbiór w nawiasach, który się nie kompiluje (`[z-a]`), albo wzorzec złożony z samych symboli wieloznacznych i kropek (`*`, `*.*`) to błąd konfiguracji. Ten ostatni wyłączyłby INW010, a to zadanie `[tool.inwards.rules]`.
+- **Domyślnie włączone.** Bez tego klucza lista to `["*_pb2", "*_pb2_grpc", "_version"]`. Takie nazwy nadają narzędzia, rzadko ludzie, więc brak takiego modułu prawie zawsze oznacza krok budowania, który się nie wykonał. Ustawienie klucza zastępuje listę domyślną, tak jak `deny-libraries` zastępuje swoją ([ADR-023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer)), a `generated = []` ją wyłącza.
+- **Czyta go tylko INW010.** Indeks modułów nadal widzi moduł jako brakujący, więc pozostałe reguły oceniają go jak każdy brakujący moduł: INW001 patrzy na nazwę i zgłasza import skierowany na zewnątrz niezależnie od tego, co jest na dysku, INW005 uznaje go za własny przez najbliższy istniejący pakiet, a INW006 wskazuje ten pakiet.
+- **Chronione** jak każdy klucz w `[tool.inwards]`: config guard odrzuca jego edycję przez agenta, a Stop gate oblewa zmianę zrobioną przez Bash. Test przypina config guard.
+- **Bez ignorowania INW010 dla pliku.** Wyciszenie w linii już jest wyjściem dla jednej linii, a wyciszenia według ścieżki w konfiguracji zostają dla schematu konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), jak zdecydowało ADR-028.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Projekt, który importuje moduły z protoc albo moduły wersji, dostaje w CI ten sam wynik co lokalnie, bez konfiguracji. Testy przypinają oba checkouty, dla listy domyślnej i dla skonfigurowanego wzorca.
+- :material-plus-circle-outline: To nie jest zmiana łamiąca zgodność. INW010 nie trafiło jeszcze do żadnego wydania (0.2.0 jest starsze), a lista domyślna tylko usuwa diagnostyki; nie zmienia się żaden kod wyjścia, klucz ani pole `diagnostics@1`.
+- :material-plus-circle-outline: Na korpusie (5 repozytoriów, 6543 pliki) nie zmienia się żadna diagnostyka, a cztery diagnostyki INW010 w saleor zostają.
+- :material-minus-circle-outline: Zmyślony import, którego nazwę obejmuje wzorzec (`shop.api.payments_pb2` bez `payments.proto`), przechodzi INW010, domyślnie dla `*_pb2`, `*_pb2_grpc` i `_version`. Nadal zawodzi przy uruchomieniu kodu. Zespół, który chce je wyłapywać, ustawia `generated = []` i uruchamia generator przed sprawdzeniem.
+- :material-minus-circle-outline: INW006 nadal widzi moduł jako brakujący. Moduł generowany leżący bezpośrednio w pakiecie nad warstwami (`shop._version` importowany z warstwy) dostaje błąd INW006 w obu checkoutach, ale bez pliku treść mówi o pakiecie nad warstwami, a z plikiem o module poza warstwami, więc wpis baseline'u zrobiony w jednym checkoucie nie pasuje w drugim. Moduł generowany w pakiecie poza warstwami (`shop.persistence.orders_pb2`) ma w obu tę samą treść.
+- :material-minus-circle-outline: Generowany pakiet najwyższego poziomu bez zacommitowanego `__init__.py` nie jest własny dla żadnej reguły: INW010 go nie sprawdza, a INW005 traktuje go jak bibliotekę.
+- :material-minus-circle-outline: „W dowolnym miejscu” to szeroko: wzorzec `api` obejmuje każdy moduł z segmentem `api`. Dłuższy wzorzec (`shop.api.gen`) jest węższy.
+
+**Alternatywy.**
+
+- *Bez listy domyślnej:* surowiej, ale każdy projekt z gRPC albo setuptools-scm najpierw trafiłby na błąd w CI i dopiero z niego dowiedział się o kluczu, i to dla nazw, które prawie nigdy nie pochodzą od agenta.
+- *fnmatch na całej nazwie z kropkami, z `*` przechodzącym przez kropki:* przykład z issue, `*._version`, działałby tak, jak jest zapisany, ale `*` znaczyłby co innego niż w `ignore` i we wzorcach kształtu, gdzie zostaje w obrębie segmentu, a `shop.*` sięgałby na dowolną głębokość.
+- *Dopasowanie tylko całej nazwy:* `*_pb2` potrzebowałby wtedy w każdym wzorcu formy „na dowolnej głębokości”, takiej jak `**` z selektorów kształtu.
+- *Nauczyć indeks modułów, że moduły generowane istnieją, dla wszystkich reguł:* INW006 miałby tę samą treść w obu checkoutach, ale INW005, INW006 i serwer języka wierzyłyby w pliki, których nie ma, a indeks potrzebowałby konfiguracji.
+- *Ignorowanie INW010 dla pliku w konfiguracji:* jeszcze jedno miejsce do utrzymywania w zgodzie z kodem, a wyciszenie w linii już istnieje.

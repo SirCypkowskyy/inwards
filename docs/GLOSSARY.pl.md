@@ -118,6 +118,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | fix composer | kompozytor poprawek |
 | first-party (code, module) | własny (kod, moduł projektu) |
 | gate (short for Stop gate) | bramka |
+| generated module (`generated`: `*_pb2`, `_version`) | moduł generowany (przy budowaniu) |
 | fix steps | kroki naprawy |
 | guardrail | zabezpieczenie |
 | hallucinated module | zmyślony moduł |

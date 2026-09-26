@@ -140,12 +140,13 @@ function matchSegments(selector: readonly string[], name: readonly string[]): bo
 }
 
 /**
- * Turns an fnmatch glob into an anchored regular expression.
+ * Turns an fnmatch glob into an anchored regular expression. Also used for
+ * the segments of `generated` patterns (INW010).
  *
  * @param glob - e.g. `test_*`.
  * @returns the expression.
  */
-function globRegex(glob: string): RegExp {
+export function globRegex(glob: string): RegExp {
   const source = glob
     .replace(REGEX_ONLY, "\\$&")
     .replaceAll("*", ".*")
