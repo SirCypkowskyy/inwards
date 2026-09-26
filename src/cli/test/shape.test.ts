@@ -82,6 +82,18 @@ describe("package shape: the example configs", () => {
   });
 });
 
+test("a renamed service.old.py is an unexpected member, and service is still missing", () => {
+  const files = Object.entries(fixture("fastapi")).map(([rel, text]): [string, string] => [
+    rel === "app/orders/service.py" ? "app/orders/service.old.py" : rel,
+    text,
+  ]);
+  const { diagnostics } = check(project(Object.fromEntries(files)));
+  expect(diagnostics.map((d) => [d.code, d.file])).toEqual([
+    ["INW007", "app/orders/service.old.py"],
+    ["INW008", "app/orders/__init__.py"],
+  ]);
+});
+
 describe("package shape: hooks", () => {
   test("a Write creating a disallowed file blocks; an Edit of a pre-existing one doesn't", () => {
     const root = session({ ...fixture("fastapi"), "app/orders/helpers.py": "" });
@@ -107,6 +119,18 @@ describe("package shape: hooks", () => {
     const gate = stop(root);
     expect(gate.code).toBe(2);
     expect(gate.stderr).toContain('Package \\"app.payments\\" has no \\"service\\" member');
+  });
+
+  test("context-only findings don't count toward escalation", () => {
+    const root = session(fixture("fastapi"));
+    for (const text of ["", "X = 1\n", "X = 2\n"]) {
+      put(root, "app/payments/router.py", text);
+      expect(posted(root, "write", "app/payments/router.py").code).toBe(0);
+    }
+    const gate = stop(root);
+    expect(gate.code).toBe(2);
+    expect(gate.stderr).toContain('"code":"INW008"');
+    expect(gate.stderr).not.toContain("survived");
   });
 
   test("Stop: deleting a required service.py blocks, a package that already lacked it doesn't", () => {

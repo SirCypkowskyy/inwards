@@ -23,16 +23,16 @@ only-in = ["tests", "tests.**"]
 ```
 
 - **Selectors** (`packages`, `only-in`) match packages, in [import-linter's grammar](../05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces): `a.b` is exact, `a.*` is one segment below `a`, `a.**` is any depth below `a` (not `a` itself). A new domain such as `app/payments/` is covered by `app.*` the moment it exists.
-- **The first matching entry wins.** Put exact entries before the globs that would also match them: an exact entry an earlier glob already matches is a config error, since it could never apply.
+- **The first matching entry wins.** Put exact entries before the globs that would also match them. An entry whose selector an earlier one already covers could never apply, so it is a config error: `app.orders` after `app.*`, a repeated selector, or `app.*` after `app.**`. A glob that only overlaps an earlier one (`app.**` after `app.*`) is fine. Selector segments are Python identifiers, `*` or `**`.
 - **Member patterns** are fnmatch globs (`*`, `?`, `[seq]`). `name` is a module or a subpackage, `name/` a subpackage only, `name.py` a module only (`.pyi` stubs count as modules). `__init__` is always allowed, and so is everything in `require`. Without `allow`, any member is allowed and only `require` and `forbid` apply.
-- **A shape covers a package's direct members.** `app/orders/services/x.py` is member `services/` of `app.orders`; the files inside `services/` answer to a shape for `app.orders.services`, if one exists.
+- **A shape covers a package's direct members.** `app/orders/services/x.py` is member `services/` of `app.orders`; the files inside `services/` answer to a shape for `app.orders.services`, if one exists. Members are named from the file system: `utils.helpers.py` is one module member, not `utils/`, so it matches neither `utils` nor `helpers`. Hidden files and directories are skipped, as every Inwards file walk skips them.
 - **Names rules** apply at every level: a member matching `pattern` anywhere outside the `only-in` packages is an INW007 error.
 
 Unknown keys, malformed selectors or patterns, and shadowed entries are config errors (exit 2). The [config guard](../04-AI-Integration.md) treats `shape` and `names` like the rest of `[tool.inwards]`: an agent's edit to them is denied.
 
 ## What the agent sees
 
-The message names the member and the package, never the allowed list, so a baseline entry survives a change to `allow`. The fix steps list the allowed members and name the one the code most likely belongs in, found through built-in synonyms (`helpers` → `utils`, `services` → `service`, `test_*` → `tests`), a suffix match (`order_service` → `service`) or an edit distance of 2 or less (`rooter` → `router`):
+The message names the member and the package, never the allowed list, so a baseline entry survives a change to `allow`. The fix steps list the allowed members and name the one the code most likely belongs in, found through built-in synonyms (`helpers` → `utils`, `services` → `service`, `test_*` → `tests`), a suffix match (`order_service` → `service`) or a small edit distance (`rooter` → `router`; 2 edits for names of 6 characters or more, 1 for 3 to 5, none below that, so `db.py` isn't sent to `di.py`):
 
 ```text
 app/orders/helpers.py:1:1: INW007 "helpers.py" is not an allowed member of package "app.orders".
@@ -43,7 +43,7 @@ app/orders/helpers.py:1:1: INW007 "helpers.py" is not an allowed member of packa
 
 - **Per edit (PostToolUse).** INW007 blocks (exit 2) when the edited file is new this session. For a file that already existed when the session started, it goes back as context only, so legacy layout never blocks an unrelated edit. INW008 for the edited package is always context: the agent creating `app/payments/router.py` hears that `service.py` is still missing, and can add it next.
 - **Stop gate.** INW008 findings that are new since the session started block the turn, so deleting a required `service.py` through Bash is caught. A package that already lacked it at session start doesn't block. INW007 on files that predate the session doesn't block either.
-- **Editor.** The language server reports INW007 on each open file as you type. A workspace pass over the directory listing (nothing is read or parsed) pushes INW007 to files you haven't opened and INW008 to the package's `__init__.py`, and runs again whenever a Python file is created, changed or deleted.
+- **Editor.** The language server reports INW007 on each open file as you type. A workspace pass over the directory listing (nothing is read or parsed) pushes INW007 to files you haven't opened and INW008 to the package's `__init__.py`. It follows symlinks that stay inside the config root, like `inwards check`, and runs again, once per burst of events, whenever a Python file is created or deleted.
 - **CI.** A whole-project `inwards check` reports INW007 on every file, INW008 for every shaped package, and a warning for a selector that matches no package.
 
 ## Example: fastapi-best-practices

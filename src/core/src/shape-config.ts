@@ -44,6 +44,12 @@ const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
 const MEMBER = /^(?<stem>[^/]+?)(?<kind>\.pyi?|\/)$/u;
 /** A member pattern: a glob stem, optionally ending in `.py` or `/`. */
 const PATTERN = /^(?<stem>[^/.]+)(?<kind>\.py|\/)?$/u;
+/** A Python identifier: one segment of a package name. */
+const IDENTIFIER = /^[\p{L}_][\p{L}\p{N}_]*$/u;
+/** Stands for one package segment no selector names, when comparing two selectors. */
+const ANY_SEGMENT = "\u0001";
+/** Up to how many segments `**` is tried with when comparing two selectors. */
+const MAX_DEPTH = 3;
 /** fnmatch characters that mean something in a regular expression but not in a glob. */
 const REGEX_ONLY = /[.+^${}()|\\]/gu;
 
@@ -111,16 +117,6 @@ export function memberMatches(pattern: string, member: string): boolean {
  */
 export function shapeFor(shapes: readonly ShapeSpec[], pkg: string): ShapeSpec | undefined {
   return shapes.find((shape) => shape.packages.some((selector) => selects(selector, pkg)));
-}
-
-/**
- * Tells whether a selector has a wildcard segment.
- *
- * @param selector - a package selector.
- * @returns true for `*` or `**` anywhere in it.
- */
-function isGlob(selector: string): boolean {
-  return selector.split(".").some((segment) => segment === "*" || segment === "**");
 }
 
 /**
@@ -210,8 +206,12 @@ function parseShape(entry: Record<string, unknown>, i: number): ShapeSpec {
 function parseName(entry: Record<string, unknown>, i: number): NameRule {
   const where = `tool.inwards.names[${i}]`;
   rejectUnknownKeys(entry, NAME_KEYS, where);
-  const [pattern] = patterns([entry["pattern"]], `${where}.pattern`);
-  return { pattern: pattern ?? "", onlyIn: selectors(entry["only-in"], `${where}.only-in`) };
+  const { pattern } = entry;
+  if (typeof pattern !== "string") {
+    throw new ConfigError(`${where}.pattern must be one member pattern, such as "test_*".`);
+  }
+  patterns([pattern], `${where}.pattern`);
+  return { pattern, onlyIn: selectors(entry["only-in"], `${where}.only-in`) };
 }
 
 /**
@@ -225,7 +225,7 @@ function parseName(entry: Record<string, unknown>, i: number): NameRule {
 function selectors(value: unknown, where: string): string[] {
   const list = strings(value, where);
   const bad = list.find((s) =>
-    s.split(".").some((seg) => seg === "" || (seg.includes("*") && seg !== "*" && seg !== "**")),
+    s.split(".").some((seg) => seg !== "*" && seg !== "**" && !IDENTIFIER.test(seg)),
   );
   if (list.length === 0 || bad !== undefined) {
     throw new ConfigError(
@@ -285,23 +285,54 @@ function strings(value: unknown, where: string): string[] {
 }
 
 /**
- * Throws when an exact selector can never apply: an earlier entry's selector
- * already matches it, so the first-match rule would skip its shape.
+ * Throws when a selector can never apply: an earlier entry's selector already
+ * matches every package it matches, so the first-match rule would always pick
+ * the earlier shape. That covers an exact entry after a glob (`app.*` then
+ * `app.orders`), a repeated selector, and a glob inside an earlier one
+ * (`app.**` then `app.*`).
  *
  * @param shapes - the parsed shapes, in order.
- * @throws {ConfigError} naming both selectors.
+ * @throws {ConfigError} naming both entries.
  */
 function rejectShadowed(shapes: readonly ShapeSpec[]): void {
   shapes.forEach((shape, i) => {
-    for (const exact of shape.packages.filter((s) => !isGlob(s))) {
+    for (const selector of shape.packages) {
       const earlier = shapes
         .slice(0, i)
-        .findIndex((s) => s.packages.some((g) => selects(g, exact)));
-      if (earlier !== -1) {
-        throw new ConfigError(
-          `tool.inwards.shape[${i}] selects "${exact}", but shape[${earlier}] already matches it and the first match wins. Move the exact entry first.`,
-        );
+        .findIndex((s) => s.packages.some((g) => covers(g, selector)));
+      if (earlier === -1) {
+        continue;
       }
+      const where = `tool.inwards.shape[${i}]`;
+      throw new ConfigError(
+        shapes[earlier]?.packages.includes(selector)
+          ? `${where} repeats "${selector}" from shape[${earlier}]. The first match wins, so the second can never apply; remove it.`
+          : `${where} selects "${selector}", but shape[${earlier}] already matches every package it does and the first match wins. Put the narrower entry first.`,
+      );
     }
+  });
+}
+
+/**
+ * Tells whether one selector matches every package another matches. Each `*`
+ * of the narrower one is tried as a segment no selector names, and each `**`
+ * as 1, 2 and 3 such segments.
+ *
+ * @param wide - the earlier selector.
+ * @param narrow - the later one.
+ * @returns true when `wide` matches all of `narrow`'s packages.
+ */
+function covers(wide: string, narrow: string): boolean {
+  return Array.from({ length: MAX_DEPTH }, (_, i) => i + 1).every((depth) => {
+    const expanded = narrow
+      .split(".")
+      .flatMap((seg) => {
+        if (seg === "**") {
+          return Array.from({ length: depth }, () => ANY_SEGMENT);
+        }
+        return [seg === "*" ? ANY_SEGMENT : seg];
+      })
+      .join(".");
+    return selects(wide, expanded);
   });
 }

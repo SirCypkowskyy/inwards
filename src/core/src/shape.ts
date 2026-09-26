@@ -38,6 +38,7 @@ interface Problem {
 const FIRST_LINE: Span = { line: 1, column: 1, endLine: 1, endColumn: 1 };
 const PYTHON = /\.pyi?$/u;
 const INIT = /^__init__\.pyi?$/u;
+const SEPARATOR = /[\\/]/u;
 
 /**
  * Applies INW007 to a file: every package on its path that a shape or a names
@@ -46,21 +47,24 @@ const INIT = /^__init__\.pyi?$/u;
  * `app.orders.services`. A names rule is checked first, then `forbid`, then
  * `allow` (`require` and `__init__` are always allowed).
  *
+ * Hidden files and directories are skipped, as every file walk skips them:
+ * Python can't import them under a dotted name either.
+ *
  * @param file - the source file; only its path, module name and kind are read.
  * @param config - the shapes and names rules.
  * @returns one diagnostic per misplaced member, on line 1.
  */
 export function checkShape(file: SourceFile, config: InwardsConfig): Diagnostic[] {
   const { shape = [], names = [] } = config;
-  if ((shape.length === 0 && names.length === 0) || file.module === "") {
+  const parts = rootPathOf(file).split("/");
+  if ((shape.length === 0 && names.length === 0) || !visible(parts)) {
     return [];
   }
-  const parts = file.module.split(".");
-  const ext = file.path.endsWith(".pyi") ? ".pyi" : ".py";
   const found: Diagnostic[] = [];
-  parts.forEach((name, i) => {
+  // The last part is the file itself; `__init__.py` needs no check, it is always allowed.
+  parts.slice(0, file.isPackage ? -1 : undefined).forEach((name, i, all) => {
     const pkg = parts.slice(0, i).join(".");
-    const member = i === parts.length - 1 && !file.isPackage ? `${name}${ext}` : `${name}/`;
+    const member = i === all.length - 1 && !file.isPackage ? name : `${name}/`;
     const problem = memberProblem({ pkg, member }, config);
     if (problem) {
       found.push(diagnostic(RULES.INW007, file, { span: FIRST_LINE, ...problem }));
@@ -172,6 +176,9 @@ export function membersFrom(paths: Iterable<string>): ListMembers {
   const byPackage = new Map<string, Set<string>>();
   for (const path of paths) {
     const parts = path.split("/");
+    if (!visible(parts)) {
+      continue;
+    }
     parts.forEach((name, i) => {
       const pkg = parts.slice(0, i).join(".");
       const member = i === parts.length - 1 ? name : `${name}/`;
@@ -186,6 +193,7 @@ export function membersFrom(paths: Iterable<string>): ListMembers {
 
 /**
  * Names every package that holds one of the files: each directory above one.
+ * Paths through a hidden directory are left out.
  *
  * @param paths - forward-slash paths of Python files relative to the config root.
  * @returns dotted package names.
@@ -194,11 +202,46 @@ export function packagesOf(paths: Iterable<string>): Set<string> {
   const packages = new Set<string>();
   for (const path of paths) {
     const parts = path.split("/").slice(0, -1);
+    if (!visible(parts)) {
+      continue;
+    }
     for (let end = 1; end <= parts.length; end += 1) {
       packages.add(parts.slice(0, end).join("."));
     }
   }
   return packages;
+}
+
+/**
+ * Names a source file by its path under the config root. The file name comes
+ * from the path, so `utils.helpers.py` stays one member and isn't read as
+ * `utils/helpers.py`; the directories are the trailing path segments that
+ * spell the file's package. A path that doesn't end in them (it shouldn't
+ * happen) falls back to the dotted package name.
+ *
+ * @param file - a source file; its path may be relative to any directory above the root.
+ * @returns e.g. `app/orders/__init__.py`.
+ */
+export function rootPathOf(file: SourceFile): string {
+  const parts = file.path.split(SEPARATOR);
+  const base = parts.pop() ?? "";
+  const stem = base.replace(PYTHON, "");
+  const pkg = file.isPackage
+    ? file.module
+    : file.module.slice(0, Math.max(0, file.module.length - stem.length - 1));
+  const size = parts.findIndex((_, i) => parts.slice(i).join(".") === pkg);
+  const dirs = size === -1 ? pkg.split(".").filter(Boolean) : parts.slice(size);
+  return [...(pkg === "" ? [] : dirs), base].join("/");
+}
+
+/**
+ * Tells whether a path has no hidden segment.
+ *
+ * @param parts - the path's segments.
+ * @returns false when a file or directory name starts with a dot.
+ */
+function visible(parts: readonly string[]): boolean {
+  return !parts.some((part) => part.startsWith("."));
 }
 
 /**

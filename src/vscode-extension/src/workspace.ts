@@ -4,8 +4,8 @@
  * read or parsed, so the pass reaches files the user hasn't opened, and the
  * `__init__.py` of a package that just lost a required member.
  */
-import { type Dirent, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { type Dirent, readdirSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
   checkRequired,
   checkShape,
@@ -50,14 +50,23 @@ export function workspaceDiagnostics(
 /**
  * Lists the Python files below a directory, skipping hidden entries,
  * node_modules, __pycache__ and virtualenvs (a directory holding pyvenv.cfg).
+ * Symlinks are followed as Python follows them, but only to targets inside
+ * the root, and a directory already on the way down (a cycle) is not entered
+ * again: the same rules as the CLI's file walk.
  *
  * @param root - the config root.
  * @param rel - the directory to list, relative to the root with forward slashes.
+ * @param chain - the real paths of the directories above this one, updated in place.
  * @returns forward-slash paths relative to the root.
  */
-function pythonFiles(root: string, rel: string): string[] {
+function pythonFiles(root: string, rel: string, chain = new Set<string>()): string[] {
+  const top = realOrUndefined(root);
+  const real = realOrUndefined(join(root, rel));
   let entries: Dirent[];
   try {
+    if (top === undefined || !within(top, real) || chain.has(real ?? "")) {
+      return [];
+    }
     entries = readdirSync(join(root, rel), { withFileTypes: true });
   } catch {
     return []; // deleted or unreadable while listing
@@ -65,14 +74,48 @@ function pythonFiles(root: string, rel: string): string[] {
   if (rel !== "" && entries.some((e) => e.name === "pyvenv.cfg")) {
     return [];
   }
-  return entries.flatMap((entry) => {
+  chain.add(real ?? "");
+  const found = entries.flatMap((entry) => {
     const path = rel === "" ? entry.name : `${rel}/${entry.name}`;
     if (entry.name.startsWith(".") || SKIP.has(entry.name)) {
       return [];
     }
-    if (entry.isDirectory()) {
-      return pythonFiles(root, path);
+    const stat = statSync(join(root, path), { throwIfNoEntry: false });
+    if (stat?.isDirectory()) {
+      return pythonFiles(root, path, chain);
     }
-    return entry.isFile() && PYTHON.test(entry.name) ? [path] : [];
+    const inside = !entry.isSymbolicLink() || within(top, realOrUndefined(join(root, path)));
+    return stat?.isFile() && inside && PYTHON.test(entry.name) ? [path] : [];
   });
+  chain.delete(real ?? "");
+  return found;
+}
+
+/**
+ * Tells whether a real path is a directory or inside it.
+ *
+ * @param top - a real directory.
+ * @param real - a real path, or undefined for a dangling one.
+ * @returns true when `real` is `top` or below it.
+ */
+function within(top: string, real: string | undefined): boolean {
+  if (real === undefined) {
+    return false;
+  }
+  const rel = relative(top, real);
+  return rel === "" || (rel.split(sep)[0] !== ".." && !isAbsolute(rel));
+}
+
+/**
+ * Resolves a path to its real location.
+ *
+ * @param path - any path.
+ * @returns the canonical path, or undefined when it doesn't exist.
+ */
+function realOrUndefined(path: string): string | undefined {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
 }

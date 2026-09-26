@@ -10,6 +10,7 @@ import {
   packagesOf,
   parseConfig,
   probeMembers,
+  rootPathOf,
 } from "../src/index.ts";
 import { file, grammars } from "./helpers.ts";
 
@@ -132,6 +133,54 @@ allow = []
   });
 });
 
+describe("INW007 and INW008: file names and targets", () => {
+  test("a dotted file name is one member, not a subpackage", () => {
+    const [d, ...rest] = shape("app/orders/utils.helpers.py");
+    expect(rest).toEqual([]);
+    expect(d?.message).toBe('"utils.helpers.py" is not an allowed member of package "app.orders".');
+  });
+
+  test("a report path above the root still names the members", () => {
+    const src = { ...file("app/orders/service.old.py", ""), path: "src/app/orders/service.old.py" };
+    expect(rootPathOf(src)).toBe("app/orders/service.old.py");
+    expect(checkShape(src, config).map((d) => d.message)).toEqual([
+      '"service.old.py" is not an allowed member of package "app.orders".',
+    ]);
+  });
+
+  test("service.old.py doesn't count as the required service", () => {
+    const paths = ["app/orders/__init__.py", "app/orders/router.py", "app/orders/service.old.py"];
+    const found = checkRequired(config, packagesOf(paths), membersFrom(paths));
+    expect(found.map((d) => d.message)).toEqual([
+      'Package "app.orders" has no "service" member, which its shape requires.',
+    ]);
+  });
+
+  test.each([".scratch.py", "app/.hidden/x.py", "app/orders/.x.py"])(
+    "hidden %s is skipped, as every file walk skips it",
+    (path) => {
+      expect(shape(path)).toEqual([]);
+      const segments = [...packagesOf([path])].flatMap((pkg) => pkg.split("."));
+      expect(segments.filter((segment) => segment === "" || segment.startsWith("."))).toEqual([]);
+    },
+  );
+
+  test.each([
+    ["db.py", ["di", "adapters/"], undefined],
+    ["io.py", ["di", "adapters/"], undefined],
+    ["x.py", ["di", "adapters/"], undefined],
+    ["urls.py", ["router", "utils"], "router.py"],
+    ["rooter.py", ["router", "utils"], "router.py"],
+  ])("%s with allow %j suggests %s", (member, allow, target) => {
+    const text = `[tool.inwards]\nlayers = [{ name = "a", modules = ["a"] }]\n[[tool.inwards.shape]]\npackages = ["a"]\nallow = ${JSON.stringify(allow)}\n`;
+    const [d] = checkShape(file(`a/${member}`, ""), parseConfig(text));
+    const moves = d?.fix.steps.filter((step) => step.startsWith("Move the code into")) ?? [];
+    expect(moves).toEqual(
+      target === undefined ? [] : [`Move the code into a/${target} and delete ${member}.`],
+    );
+  });
+});
+
 describe("INW008 missing-member", () => {
   const paths = [
     "app/__init__.py",
@@ -194,8 +243,23 @@ describe("shape config", () => {
     ],
     [
       "the same exact entry twice",
-      '[[tool.inwards.shape]]\npackages = ["app.x"]\n[[tool.inwards.shape]]\npackages = ["app.x"]\n',
-      "first match wins",
+      '[[tool.inwards.shape]]\npackages = ["lib"]\n[[tool.inwards.shape]]\npackages = ["lib"]\n',
+      'shape[2] repeats "lib" from shape[1]',
+    ],
+    [
+      "a glob wholly inside an earlier glob",
+      '[[tool.inwards.shape]]\npackages = ["lib.**"]\n[[tool.inwards.shape]]\npackages = ["lib.*"]\n',
+      "already matches every package it does",
+    ],
+    [
+      "a selector segment that isn't a Python identifier",
+      '[[tool.inwards.shape]]\npackages = ["app.my-pkg"]\n',
+      '"app.my-pkg"',
+    ],
+    [
+      "a names pattern that isn't a string",
+      '[[tool.inwards.names]]\npattern = ["x"]\nonly-in = ["y"]\n',
+      "tool.inwards.names[1].pattern must be one member pattern",
     ],
     [
       "an unknown shape key",
@@ -222,6 +286,11 @@ describe("shape config", () => {
   ])("%s is a config error", (_, entry, message) => {
     expect(() => parseConfig(`${FASTAPI}\n${entry}`)).toThrow(ConfigError);
     expect(() => parseConfig(`${FASTAPI}\n${entry}`)).toThrow(message);
+  });
+
+  test("a glob that only overlaps an earlier one is fine", () => {
+    const text = `${FASTAPI}\n[[tool.inwards.shape]]\npackages = ["app.**"]\n`;
+    expect(parseConfig(text).shape).toHaveLength(2);
   });
 
   test("an exact entry before a glob that matches it is fine", () => {

@@ -151,7 +151,8 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
       (d) => d.severity === "error" && d.code !== "INW008" && !(existed && d.code === "INW007"),
     );
     const escalation = escalationOf(target.project, id, configPath, blocking);
-    rememberEdit(target.project, id, target.file, report.diagnostics);
+    // Only what blocks counts toward escalation: context isn't an attempt that failed.
+    rememberEdit(target.project, id, target.file, blocking);
     if (report.diagnostics.length === 0) {
       return 0;
     }
@@ -235,7 +236,7 @@ function sessionConfig(
  * @param project - the real project root.
  * @param id - the payload's `session_id`.
  * @param file - the edited file.
- * @param diagnostics - what the check reported for it.
+ * @param diagnostics - the errors the check blocked on (context-only findings are left out).
  */
 function rememberEdit(
   project: string,

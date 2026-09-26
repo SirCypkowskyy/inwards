@@ -21,6 +21,7 @@ import {
   probeLookup,
   probeMembers,
   type Report,
+  rootPathOf,
   type SourceFile,
 } from "@inwards/core";
 import { applyBaseline } from "./baseline.ts";
@@ -166,7 +167,7 @@ export async function runCheck(
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
     const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
-    const paths = files.map(rootPath);
+    const paths = files.map(rootPathOf);
     const packages = packagesOf(paths);
     diagnostics.unshift(
       ...checkPrefixes(project.config, modules, pyproject),
@@ -185,18 +186,6 @@ export async function runCheck(
 }
 
 /**
- * Names a loaded file by its path under the config root, whichever name it was reached by.
- *
- * @param file - a loaded source file.
- * @returns e.g. `app/orders/__init__.py`.
- */
-function rootPath(file: SourceFile): string {
-  const parts = file.module === "" ? [] : file.module.split(".");
-  const ext = file.path.endsWith(".pyi") ? ".pyi" : ".py";
-  return `${[...parts, ...(file.isPackage ? ["__init__"] : [])].join("/")}${ext}`;
-}
-
-/**
  * Checks the required members of the packages that hold some files (INW008),
  * reading each package's directory listing at most once.
  *
@@ -206,9 +195,7 @@ function rootPath(file: SourceFile): string {
  * @returns the missing-member errors.
  */
 function requiredAround(project: Project, files: SourceFile[], shownRoot: string): Diagnostic[] {
-  const parents = new Set(
-    files.map((f) => (f.isPackage ? f.module : f.module.split(".").slice(0, -1).join("."))),
-  );
+  const parents = new Set(files.map((f) => rootPathOf(f).split("/").slice(0, -1).join(".")));
   const members = probeMembers((dir) => {
     const path = join(project.lexicalRoot, dir);
     if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {

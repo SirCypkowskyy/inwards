@@ -22,6 +22,7 @@ export {
   membersFrom,
   packagesOf,
   probeMembers,
+  rootPathOf,
 } from "./shape.ts";
 export type { NameRule, ShapeSpec } from "./shape-config.ts";
 export { ConfigError } from "./toml.ts";

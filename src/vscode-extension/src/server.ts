@@ -16,6 +16,7 @@ import {
   type Diagnostic,
   DiagnosticSeverity,
   DidChangeWatchedFilesNotification,
+  FileChangeType,
   ProposedFeatures,
   TextDocuments,
 } from "vscode-languageserver/node";
@@ -31,6 +32,9 @@ let state:
 let workspace = new Map<string, CoreDiagnostic[]>();
 /** The full check of each open document, by absolute path. */
 const opened = new Map<string, { uri: string; found: CoreDiagnostic[] }>();
+/** How long file events are collected before the workspace pass reruns. */
+const DEBOUNCE_MS = 100;
+let pending: ReturnType<typeof setTimeout> | undefined;
 
 connection.onInitialize(async (params) => {
   const folder = params.workspaceFolders?.[0]?.uri;
@@ -75,9 +79,10 @@ documents.onDidClose(({ document }) => {
   publish(path);
 });
 
-// The workspace pass runs once at start and again whenever a Python file is
-// created, changed or deleted. The server asks the client to watch them, so
-// any LSP client works, not only the VS Code extension.
+// The workspace pass runs once at start and again when a Python file is
+// created or deleted; a content change can't change a shape. Events are
+// batched for a moment, so a branch switch runs one pass. The server asks the
+// client to watch the files, so any LSP client works, not only VS Code.
 connection.onInitialized(() => {
   if (state) {
     connection.client
@@ -88,10 +93,16 @@ connection.onInitialized(() => {
   }
   refresh();
 });
-connection.onDidChangeWatchedFiles(refresh);
+connection.onDidChangeWatchedFiles(({ changes }) => {
+  if (changes.every((change) => change.type === FileChangeType.Changed)) {
+    return;
+  }
+  clearTimeout(pending);
+  pending = setTimeout(refresh, DEBOUNCE_MS);
+});
 
 /**
- * Reruns the workspace pass and republishes every file whose findings may have changed.
+ * Reruns the workspace pass and republishes the files whose findings changed.
  */
 function refresh(): void {
   if (!state) {
@@ -100,7 +111,9 @@ function refresh(): void {
   const before = workspace;
   workspace = workspaceDiagnostics(state.config, state.root);
   for (const path of new Set([...before.keys(), ...workspace.keys()])) {
-    publish(path);
+    if (JSON.stringify(before.get(path)) !== JSON.stringify(workspace.get(path))) {
+      publish(path);
+    }
   }
 }
 

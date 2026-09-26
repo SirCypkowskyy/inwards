@@ -3,7 +3,8 @@
  * only, never the allowed list, so a baseline entry survives a change to
  * `allow`. The fix steps list the allowed members and name the member the
  * code most likely belongs in: a built-in synonym, a suffix match, or the
- * closest name within an edit distance of 2.
+ * closest name within an edit distance of 2 (1 for names of 3 to 5
+ * characters, 0 below that, so `db.py` isn't sent to `di.py`).
  */
 import type { NameRule, ShapeSpec } from "./shape-config.ts";
 import type { Fix } from "./types.ts";
@@ -14,7 +15,18 @@ const SYNONYMS: readonly (readonly string[])[] = [
   ["service", "services", "svc", "logic", "manager", "managers", "business"],
   ["models", "model", "entities", "entity", "orm", "tables"],
   ["schemas", "schema", "dto", "dtos", "serializers", "types", "payloads"],
-  ["router", "routers", "routes", "route", "api", "endpoints", "views", "controllers", "handlers"],
+  [
+    "router",
+    "routers",
+    "routes",
+    "route",
+    "api",
+    "endpoints",
+    "views",
+    "controllers",
+    "handlers",
+    "urls",
+  ],
   ["dependencies", "deps", "dependency"],
   ["config", "settings", "conf", "configuration"],
   ["constants", "const", "consts", "enums"],
@@ -33,8 +45,10 @@ const MEMBER_KIND = /(?:\.pyi?|\/)$/u;
 const PATTERN_KIND = /(?:\.py|\/)$/u;
 /** Glob characters: a pattern with one of them names no single member. */
 const GLOB = /[*?[]/u;
-/** The farthest a misspelt member may be from its target. */
+/** The farthest a misspelt member may be from its target, for long names. */
 const MAX_DISTANCE = 2;
+/** Characters of the shorter name per allowed edit. */
+const CHARS_PER_EDIT = 3;
 const ASK =
   "Don't edit [tool.inwards] yourself. If the package really needs this member, ask the user to change its [[tool.inwards.shape]].";
 
@@ -147,8 +161,13 @@ function likelyTarget(member: string, allowed: readonly string[]): string | unde
   let closest: string | undefined;
   let best = MAX_DISTANCE + 1;
   for (const p of names) {
-    const d = distance(stem, bare(p));
-    if (d < best) {
+    const other = bare(p);
+    const limit = Math.min(
+      MAX_DISTANCE,
+      Math.floor(Math.min(stem.length, other.length) / CHARS_PER_EDIT),
+    );
+    const d = distance(stem, other);
+    if (d <= limit && d < best) {
       [closest, best] = [p, d];
     }
   }
