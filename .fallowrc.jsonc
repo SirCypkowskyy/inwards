@@ -46,8 +46,9 @@
       { "from": "cli", "allow": ["core-api"] },
       { "from": "vscode", "allow": ["core-api"] },
       { "from": "scripts", "allow": [] },
-      // The eval harness reads layers the way the CLI does, through the public API.
-      { "from": "eval", "allow": ["core-api"] },
+      // The eval harness reads layers the way the CLI does, through the public API,
+      // and recognises config guard denials by the CLI's own ASK_USER text.
+      { "from": "eval", "allow": ["core-api", "cli"] },
       // The bench runs binaries as processes and imports nothing of ours.
       { "from": "bench", "allow": [] },
       // The npm placeholder ships alone and imports nothing.

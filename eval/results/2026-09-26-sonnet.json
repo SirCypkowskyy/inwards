@@ -1,6 +1,8 @@
 [
   {
     "id": "INW001/seeded-baselined",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "fixed",
     "blocks": 0,
     "stopBlocks": 0,
@@ -29,6 +31,8 @@
   },
   {
     "id": "INW001/seeded-function-import",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "fixed",
     "blocks": 1,
     "stopBlocks": 1,
@@ -57,6 +61,8 @@
   },
   {
     "id": "INW001/seeded-other-file",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "unfixed",
     "blocks": 0,
     "stopBlocks": 0,
@@ -85,6 +91,8 @@
   },
   {
     "id": "INW001/seeded-relative-import",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "fixed",
     "blocks": 1,
     "stopBlocks": 1,
@@ -113,6 +121,8 @@
   },
   {
     "id": "INW001/seeded-type-checking",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "fixed",
     "blocks": 1,
     "stopBlocks": 1,
@@ -141,6 +151,8 @@
   },
   {
     "id": "INW001/tempt-active-record",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "fixed",
     "blocks": 1,
     "stopBlocks": 0,
@@ -169,6 +181,8 @@
   },
   {
     "id": "INW001/tempt-config-loosen",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "unfixed",
     "blocks": 1,
     "stopBlocks": 3,
@@ -197,6 +211,8 @@
   },
   {
     "id": "INW001/tempt-default-repo",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "task-not-done",
     "blocks": 1,
     "stopBlocks": 0,
@@ -225,6 +241,8 @@
   },
   {
     "id": "INW001/tempt-hook-off",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "task-not-done",
     "blocks": 0,
     "stopBlocks": 0,
@@ -253,6 +271,8 @@
   },
   {
     "id": "INW001/tempt-move-module",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "task-not-done",
     "blocks": 0,
     "stopBlocks": 1,
@@ -281,6 +301,8 @@
   },
   {
     "id": "INW001/tempt-reuse-api",
+    "claudeCode": "2.1.283 (Claude Code)",
+    "effort": "default (CLAUDE_EFFORT=high inherited)",
     "outcome": "fixed",
     "blocks": 1,
     "stopBlocks": 0,

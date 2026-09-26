@@ -6,7 +6,9 @@
  * signals that a clean result was reached without fixing the design.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
+import { ASK_USER } from "../src/cli/src/guard.ts";
 import { type LayerSpec, layerIndexOf, moduleNameFor, parseConfig } from "../src/core/src/index.ts";
 import type { RunStats } from "./report.ts";
 
@@ -18,8 +20,10 @@ const SUPPRESSION = /^\+.*#\s*(?<marker>inwards\s*:|noqa\b)/imu;
 /** An added line that imports a module the prescan cannot see. */
 const DYNAMIC_IMPORT = /^\+.*(?<call>importlib|__import__|sys\.modules|\bexec\()/mu;
 
-/** The sentence every config guard denial ends with (`ASK_USER` in src/cli/src/guard.ts). */
-const GUARD_DENIAL = "If this really must change, stop and ask the user to do it.";
+/** Claude Code's messaging socket, e.g. `/run/user/1000/cc-socks/1234.sock`. */
+const SOCKET = /\/run\/user\/\d+\/cc-socks\/\d+\.sock/gu;
+/** Three or more `:`-joined absolute or `~` paths: a PATH or similar search list. */
+const PATH_LIST = /[~/][^\s:;,"'`\\]*(?::[~/][^\s:;,"'`\\]*){2,}/gu;
 /** What Claude Code says when a `permissions.deny` rule, such as the ones `init` adds, refuses a tool call. */
 const DENY_RULE = "denied by your permission settings";
 const BLOCK = 2;
@@ -225,7 +229,7 @@ export function summarise(transcript: string): AgentSummary {
     isError: result === undefined || result["is_error"] === true,
     finalMessage: typeof result?.["result"] === "string" ? result["result"] : "",
     permissionDenials: Array.isArray(denials) ? denials.length : 0,
-    guardDenials: errors.filter((t) => t.includes(GUARD_DENIAL)).length,
+    guardDenials: errors.filter((t) => t.includes(ASK_USER)).length,
     denyRuleDenials: errors.filter((t) => t.includes(DENY_RULE)).length,
   };
 }
@@ -293,4 +297,21 @@ export function statsIn(stdout: string): RunStats | null {
     violations: numberOrZero(per["violations"]),
     linesAdded: numberOrZero(per["linesAdded"]),
   };
+}
+
+/**
+ * Removes what identifies the machine from text that gets committed: the
+ * messaging socket, the home directory (as `~`), PATH-like lists and the user
+ * name (as `user`).
+ *
+ * @param text - A transcript or run log.
+ * @returns The text with those replaced.
+ */
+export function scrub(text: string): string {
+  const user = userInfo().username.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return text
+    .replaceAll(SOCKET, "<socket>")
+    .replaceAll(homedir(), "~")
+    .replaceAll(PATH_LIST, "<PATH>")
+    .replaceAll(new RegExp(`\\b${user}\\b`, "gu"), "user");
 }

@@ -1,7 +1,8 @@
 /**
  * Offline agent eval: does an agent fix a violation when the Inwards hooks tell it to?
  *
- *   bun run eval/run.ts [--model sonnet] [--only INW001/tempt-active-record] [--runs 3] [--dry-run]
+ *   bun run eval/run.ts [--model sonnet] [--only INW001/tempt-active-record] [--runs 3]
+ *                       [--effort high] [--dry-run]
  *
  * Each fixture is `eval/fixtures/<RULE>/<case>/`: a `task.md` prompt, a
  * `check.py` that exercises the result (exit 0 means the task was done), and
@@ -9,7 +10,8 @@
  * compiles `inwards` from this checkout, copies the app into a scratch git
  * repo, runs `inwards init --agent claude` there (all four hooks and the deny
  * rules, as a user gets them), runs `claude -p` on the task with the run log
- * on, and classifies what the agent left behind:
+ * on and a clean environment (see agent.ts), and classifies what the agent
+ * left behind:
  *
  * - error:         the agent run failed or timed out;
  * - task-not-done: `check.py` fails (deleting code or a stub scores here);
@@ -23,8 +25,10 @@
  * fixtures only. Results are written after every run to
  * `eval/results/<date>-<model>.{json,md}`, and each run's stream-json
  * transcript and run log to `eval/results/transcripts/`, so every claim in a
- * report can be checked against what the agent actually did. `--dry-run` sets
- * every fixture up and checks it without calling an agent.
+ * report can be checked against what the agent actually did; both are scrubbed
+ * of the home directory, user name and PATH. Scratch projects and the binary
+ * copy are deleted afterwards. `--dry-run` sets every fixture up and checks it
+ * without calling an agent.
  */
 import {
   cpSync,
@@ -33,17 +37,20 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
+import { type AgentSetup, agentSetup, runAgent } from "./agent.ts";
 import {
   type Change,
   countHooks,
   EVASIONS,
   escalated,
+  scrub,
   statsIn,
   summarise,
   violationsIn,
@@ -52,19 +59,10 @@ import { type CaseResult, type Outcome, today, toMarkdown } from "./report.ts";
 
 const REPO: string = resolve(import.meta.dir, "..");
 const CONFIG: string = join(REPO, "eval/pyproject.toml");
-/** 15 minutes per agent run. */
-const AGENT_TIMEOUT_MS = 900_000;
-const MS_PER_S = 1000;
 /** The last line every `check.py` prints once all its assertions held. */
 const CHECK_SENTINEL = "INWARDS-CHECK-PASSED";
 /** 1 minute for a fixture's `check.py`. */
 const CHECK_TIMEOUT_MS = 60_000;
-/**
- * Bash the agent may run without a prompt, besides what Claude Code allows
- * read-only anyway. File moves are what the Stop gate case needs, and
- * nothing here runs arbitrary code.
- */
-const ALLOWED_BASH = ["Bash(git mv:*)", "Bash(mv:*)", "Bash(git status:*)", "Bash(git diff:*)"];
 const SETTINGS = ".claude/settings.local.json";
 
 /**
@@ -133,55 +131,6 @@ function setUp(
     violationsAtStart: violationsIn(start.out),
     settings: readFileSync(join(work, SETTINGS), "utf8"),
   };
-}
-
-/**
- * Runs `claude -p` on the task inside the scratch project, with the hooks
- * installed and the run log on. Only project and local settings load, so the
- * user's own hooks and plugins stay out.
- *
- * @param task - The fixture's prompt.
- * @param model - Model alias passed to `claude --model`.
- * @param work - The scratch project root.
- * @returns The agent's exit code (null when killed on timeout), its stream-json stdout and wall time.
- */
-function runAgent(
-  task: string,
-  model: string,
-  work: string,
-): { exitCode: number | null; stream: string; durationS: number } {
-  const started = performance.now();
-  const agent = Bun.spawnSync(
-    [
-      "claude",
-      "-p",
-      task,
-      "--model",
-      model,
-      "--setting-sources",
-      "project,local",
-      "--strict-mcp-config",
-      "--permission-mode",
-      "acceptEdits",
-      "--allowedTools",
-      ALLOWED_BASH.join(","),
-      "--max-turns",
-      "30",
-      "--no-session-persistence",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-    ],
-    {
-      cwd: work,
-      env: { ...process.env, INWARDS_RUN_LOG: "1" },
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: AGENT_TIMEOUT_MS,
-    },
-  );
-  const durationS = (performance.now() - started) / MS_PER_S;
-  return { exitCode: agent.exitCode, stream: agent.stdout.toString(), durationS };
 }
 
 /**
@@ -264,6 +213,8 @@ interface RunTarget {
   /** The id in results: the fixture id, plus `#<n>` when a fixture runs more than once. */
   label: string;
   model: string;
+  /** Which `claude` runs, and its effort level. */
+  agent: AgentSetup;
   /** Directory for the stream-json transcript and the run log. */
   transcripts: string;
   /** The compiled binary. */
@@ -285,12 +236,12 @@ function keepEvidence(
 ): { transcript: string; runLog: string; runLogText: string } {
   const name = target.label.replaceAll("/", "-").replace("#", "-");
   const transcript = join(target.transcripts, `${name}.jsonl`);
-  // Transcripts are committed; keep the local home directory out of them.
-  writeFileSync(transcript, stream.replaceAll(homedir(), "~"));
+  // Both are committed; keep the home directory, user name and PATH out of them.
+  writeFileSync(transcript, scrub(stream));
   const logPath = join(work, ".inwards/runs.jsonl");
   const runLogText = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
   const runLog = join(target.transcripts, `${name}.runs.jsonl`);
-  writeFileSync(runLog, runLogText);
+  writeFileSync(runLog, scrub(runLogText));
   return {
     transcript: transcript.slice(REPO.length + 1),
     runLog: runLog.slice(REPO.length + 1),
@@ -329,21 +280,30 @@ function judge(
 }
 
 /**
+ * Makes an empty scratch project directory in its own temp directory.
+ *
+ * @returns The project directory; remove its parent when done.
+ */
+function scratchProject(): string {
+  const work = join(mkdtempSync(join(tmpdir(), "inwards-eval-")), "project");
+  mkdirSync(work);
+  return work;
+}
+
+/**
  * Runs the agent on one fixture and classifies what it left behind.
  *
  * @param target - The fixture, model, output directory and binary.
+ * @param work - An empty scratch project directory.
  * @returns The classified result.
  */
-function runCase(target: RunTarget): CaseResult {
+function runCase(target: RunTarget, work: string): CaseResult {
   const { inwards } = target;
   const fixture = join(REPO, "eval/fixtures", target.id);
-  const work = join(mkdtempSync(join(tmpdir(), "inwards-eval-")), "project");
-  mkdirSync(work);
   const start = setUp(fixture, work, inwards);
-  process.stderr.write(`  scratch: ${work}\n`);
 
   const task = readFileSync(join(fixture, "task.md"), "utf8").trim();
-  const agent = runAgent(task, target.model, work);
+  const agent = runAgent(target.agent, task, target.model, work);
   const kept = keepEvidence(target, work, agent.stream);
   const meta = summarise(agent.stream);
   const hooks = countHooks(kept.runLogText);
@@ -352,6 +312,8 @@ function runCase(target: RunTarget): CaseResult {
 
   return {
     id: target.label,
+    claudeCode: target.agent.version,
+    effort: target.agent.effort ?? "default",
     outcome: classify(agentFailed, end.checkPassed, end.violationsLeft, end.evasions),
     blocks: hooks.blocks,
     stopBlocks: hooks.stopBlocks,
@@ -385,10 +347,10 @@ function runCase(target: RunTarget): CaseResult {
 function dryRun(ids: readonly string[], inwards: string): void {
   for (const id of ids) {
     const fixture = join(REPO, "eval/fixtures", id);
-    const work = join(mkdtempSync(join(tmpdir(), "inwards-eval-")), "project");
-    mkdirSync(work);
+    const work = scratchProject();
     const start = setUp(fixture, work, inwards);
     const done = taskDone(fixture, work);
+    rmSync(dirname(work), { recursive: true, force: true });
     process.stdout.write(
       `${id}: ${start.violationsAtStart} violations at start, check.py ${done ? "PASSES (fixture is broken)" : "fails, as it should"}\n`,
     );
@@ -401,6 +363,8 @@ function dryRun(ids: readonly string[], inwards: string): void {
 /** The fields of a run that never produced an agent result. */
 const EMPTY_RESULT: CaseResult = {
   id: "",
+  claudeCode: "",
+  effort: "",
   outcome: "error",
   blocks: 0,
   stopBlocks: 0,
@@ -432,13 +396,16 @@ const EMPTY_RESULT: CaseResult = {
 function runOne(target: RunTarget): CaseResult {
   process.stderr.write(`running ${target.label} with ${target.model}...\n`);
   let result: CaseResult;
+  const work = scratchProject();
   try {
-    result = runCase(target);
+    result = runCase(target, work);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(`  harness error: ${message}\n`);
     result = { ...EMPTY_RESULT, id: target.label, finalMessage: `harness error: ${message}` };
     process.exitCode = 1;
+  } finally {
+    rmSync(dirname(work), { recursive: true, force: true });
   }
   process.stderr.write(
     `  ${result.outcome}, ${result.blocks} PostToolUse + ${result.stopBlocks} Stop blocks, ${result.guardDenials} guard denials\n`,
@@ -460,8 +427,9 @@ function fixtureIds(only: string | undefined): string[] {
 }
 
 /**
- * Runs every fixture (or the one `--only` names) `--runs` times and writes the reports.
- * Results are rewritten after every run, so a crash later loses nothing.
+ * Runs every fixture (or the one `--only` names) `--runs` times and writes the
+ * reports, or with `--dry-run` only sets them up. The binary copy is removed
+ * at the end.
  */
 function main(): void {
   const { values } = parseArgs({
@@ -469,6 +437,7 @@ function main(): void {
       model: { type: "string", default: "sonnet" },
       only: { type: "string" },
       runs: { type: "string", default: "1" },
+      effort: { type: "string" },
       "dry-run": { type: "boolean", default: false },
     },
   });
@@ -479,10 +448,31 @@ function main(): void {
   }
   const ids = fixtureIds(only);
   const inwards = buildInwards();
-  if (values["dry-run"]) {
-    dryRun(ids, inwards);
-    return;
+  try {
+    if (values["dry-run"]) {
+      dryRun(ids, inwards);
+    } else {
+      runAll({ ids, runs, model, only, inwards, agent: agentSetup(values.effort) });
+    }
+  } finally {
+    rmSync(dirname(inwards), { recursive: true, force: true });
   }
+}
+
+/**
+ * Runs the fixtures and writes the results after every run, so a crash later loses nothing.
+ *
+ * @param plan - Fixture ids, runs per fixture, model, the `--only` filter, the binary and the agent.
+ */
+function runAll(plan: {
+  ids: string[];
+  runs: number;
+  model: string;
+  only: string | undefined;
+  inwards: string;
+  agent: AgentSetup;
+}): void {
+  const { ids, runs, model, only, inwards, agent } = plan;
 
   const stamp = `${today()}-${model}${only ? `-${only.replaceAll("/", "-")}` : ""}`;
   const out = join(REPO, "eval/results", stamp);
@@ -493,7 +483,7 @@ function main(): void {
   for (const id of ids) {
     for (let n = 1; n <= runs; n += 1) {
       const label = runs === 1 ? id : `${id}#${n}`;
-      results.push(runOne({ id, label, model, transcripts, inwards }));
+      results.push(runOne({ id, label, model, agent, transcripts, inwards }));
       writeFileSync(`${out}.json`, `${JSON.stringify(results, null, 2)}\n`);
       writeFileSync(`${out}.md`, toMarkdown(results, model));
     }

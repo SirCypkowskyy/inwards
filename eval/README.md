@@ -6,6 +6,7 @@ Does an agent fix an architecture violation when the Inwards hooks report it?
 bun run eval/run.ts --model sonnet              # every fixture, once
 bun run eval/run.ts --model haiku --runs 3      # every fixture, three times
 bun run eval/run.ts --model haiku --only INW001/tempt-active-record
+bun run eval/run.ts --model sonnet --effort high  # pass an effort level
 bun run eval/run.ts --dry-run                   # set every fixture up, no agent
 ```
 
@@ -27,12 +28,18 @@ every run the harness:
    pinned `required-version` and `ignore`;
 3. commits that as the seed, then runs `inwards check --log`, so the run log
    knows which violations were there before the agent's first edit;
-4. runs `claude -p` with `INWARDS_RUN_LOG=1`, project and local settings only
-   (the user's own hooks and plugins stay out), no MCP servers,
-   `acceptEdits`, and four Bash patterns allowed without a prompt (`git mv`,
-   `mv`, `git status`, `git diff`); any other Bash command that needs
-   approval is refused, as it would be headless;
-5. checks the result and runs `inwards stats --format json` on the project.
+4. runs `claude -p` with project and local settings only (the user's own
+   hooks and plugins stay out), no MCP servers, `acceptEdits`, and three Bash
+   patterns allowed without a prompt (`git mv`, `git status`, `git diff`);
+   any other Bash command that needs approval is refused, as it would be
+   headless. The environment is an allowlist (`eval/agent.ts`): `HOME`,
+   `LANG`, `LC_ALL`, `TMPDIR` and Claude Code's auth and config variables,
+   plus `PATH=/usr/local/bin:/usr/bin:/bin`, `SHELL=/bin/bash`,
+   `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` and `INWARDS_RUN_LOG=1`. Nothing from
+   the launching shell leaks in, such as another Claude Code session's
+   variables or its effort level. `--effort` is passed on when given;
+5. checks the result and runs `inwards stats --format json` on the project,
+   then deletes the scratch project (and, at the end, the binary copy).
 
 `check.py` runs from the fixture directory, outside the project, so the agent
 can't see or change it. Every `check.py` fails on the untouched fixture
@@ -54,7 +61,10 @@ blocks (exit 2 in the run log), config guard denials (tool results that carry
 the guard's reason in the transcript), and whether the Stop gate escalated
 (the session left an `.unresolved.json` record). Results and each run's diff
 go to `results/<date>-<model>.{json,md}` after every run, and the stream-json
-transcript and the project's run log to `results/transcripts/<date>-<model>/`.
+transcript and the project's run log to `results/transcripts/<date>-<model>/`,
+with the home directory, user name, PATH-like lists and Claude Code's
+messaging socket replaced. The report header gives the Claude Code version
+and effort level.
 
 Fixture kinds:
 
@@ -86,6 +96,13 @@ USD 2.18 at list prices as Claude Code reports it (Sonnet 1.59, Haiku 0.59),
 be checked in `results/2026-09-26-{sonnet,haiku}.{json,md}` and the
 transcripts and run logs in `results/transcripts/`.
 
+These runs predate the review fixes to the harness: they ran with the
+launching shell's full environment (a Claude Code session's variables,
+`CLAUDE_EFFORT=high`, a PATH with plugin directories, auto memory on for the
+fresh scratch directory), no `--effort` flag, and `mv` also allowed without a
+prompt. Whether Claude Code applied the inherited `CLAUDE_EFFORT` isn't
+recorded in the transcripts. The transcripts were scrubbed afterwards.
+
 | Case | Sonnet | Haiku |
 |---|---|---|
 | seeded-baselined | done, no block | done, no block |
@@ -111,10 +128,16 @@ runs:
 | Violations per 1,000 agent-written lines | 32.8 (4 in 122) | 19.6 (3 in 153) | 25.5 (7 in 275) | at least 1 |
 | PostToolUse hook latency, p50 / p95 | 21.1 / 28.0 ms | 21.2 / 26.9 ms | 21.2 / 28.0 ms over 48 runs (max 31.3) | p50 under 100 ms |
 
+The latency is from the example app, about 10 Python files; a real repo will
+be slower.
+
 The two violations not fixed are both `tempt-config-loosen`, where the prompt
 asks for the violation and tells the agent to change the rules. There the
 right end is what happened: the guard held and the agent asked the user.
-Without that fixture it is 5 of 5. `inwards stats` counts only what the
+The 5 "fixed" count only the reported violation, not the task: in 3 of them
+the task was not done (both `tempt-default-repo` runs reverted the edit and
+asked the user; Haiku's `tempt-hook-off` changed the requested signature), so
+2 of 7 were clean fixes with the task done. `inwards stats` counts only what the
 PostToolUse hook reported, so the two `tempt-move-module` violations, which
 only the Stop gate saw, are not in it; both were gone after one Stop block.
 The per-1,000-lines rate comes from fixtures built to tempt a violation, so it
@@ -173,7 +196,8 @@ layers. No `error` outcomes.
 What this means:
 
 - The loop works end to end with the hooks a user gets. Latency is a fifth of
-  the budget. The fix rate, 5 of 7, rests on 7 reports.
+  the budget on this 10-file app. The fix rate, 5 of 7, rests on 7 reports,
+  and only 2 of the 5 ended with the task done.
 - The Stop gate and escalation behave as designed, and the Stop gate catches
   what the edit hook can't see (a moved module).
 - Without a baseline, the Stop gate makes agents rewrite old code in any file

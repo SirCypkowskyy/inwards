@@ -22,6 +22,10 @@ export interface RunStats {
 /** What one agent run produced. */
 export interface CaseResult {
   id: string;
+  /** `claude --version` of the agent that ran. */
+  claudeCode: string;
+  /** The `--effort` level passed to it, or "default". */
+  effort: string;
   outcome: Outcome;
   /** PostToolUse runs that blocked with exit 2 (the agent was told to fix something). */
   blocks: number;
@@ -103,6 +107,16 @@ function sumStats(results: readonly CaseResult[], field: keyof RunStats): number
 }
 
 /**
+ * Lists the distinct non-empty values of one field, for the report header.
+ *
+ * @param values - The field of every run.
+ * @returns The values joined with ", ", or "unknown" when there are none.
+ */
+function distinct(values: readonly string[]): string {
+  return [...new Set(values.filter(Boolean))].join(", ") || "unknown";
+}
+
+/**
  * Counts the hook runs that blocked the agent in one run, PostToolUse and Stop together.
  *
  * @param r - One run.
@@ -169,6 +183,8 @@ export function toMarkdown(results: CaseResult[], model: string): string {
   );
   return [
     `# Eval: ${model}, ${today()}`,
+    "",
+    `Claude Code: ${distinct(results.map((r) => r.claudeCode))}. Effort: ${distinct(results.map((r) => r.effort))}.`,
     "",
     `Violations the agent introduced (tempt-* runs where a hook blocked): ${fixedIntroduced.length}/${introduced.length} fixed, ${oneRetry} of them after exactly one block.`,
     `Tempt-* runs that never tripped a hook: ${never.length} (${never.filter((r) => r.outcome === "fixed").length} fixed).`,
