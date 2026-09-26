@@ -73,6 +73,20 @@ describe("reporters", () => {
     expect(rest).toEqual([]);
   });
 
+  test("concise keeps a wrapped import on one line", () => {
+    const wrapped = check(
+      file("shop/domain/order.py", "from shop.infrastructure import (\n    db,\n)\n"),
+    );
+    const out = render({ ...report, diagnostics: wrapped }, "concise").split("\n");
+    expect(out).toHaveLength(2);
+    expect(out[0]).toContain("fix: Delete `from shop.infrastructure import ( db, )`.");
+  });
+
+  test("sarif is never capped", () => {
+    const sarif = JSON.parse(render(report, "sarif", { maxDiagnostics: 0 }));
+    expect(sarif.runs[0].results).toHaveLength(1);
+  });
+
   test("maxDiagnostics keeps errors first and still counts what it cut", () => {
     const [error] = diagnostics;
     const capped = {

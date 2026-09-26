@@ -161,8 +161,11 @@ async function checkCommand(
   if (!isFormat(format)) {
     return print(`Unknown --format ${format}`, 2);
   }
-  if (max !== undefined && (!WHOLE_NUMBER.test(max) || format === "sarif")) {
-    return print("--max-diagnostics takes a whole number and does not apply to sarif.", 2);
+  if (max !== undefined && format === "sarif") {
+    return print("--max-diagnostics does not apply to sarif: code scanning gets every finding.", 2);
+  }
+  if (max !== undefined && !WHOLE_NUMBER.test(max)) {
+    return print("--max-diagnostics takes a whole number, e.g. 20.", 2);
   }
 
   const configPath = config ? resolve(config) : findConfig(process.cwd());

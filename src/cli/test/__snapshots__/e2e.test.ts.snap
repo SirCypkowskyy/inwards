@@ -136,7 +136,7 @@ exports[`check --format sarif --max-diagnostics 1 1`] = `
 {
   "code": 2,
   "stderr": 
-"--max-diagnostics takes a whole number and does not apply to sarif.
+"--max-diagnostics does not apply to sarif: code scanning gets every finding.
 "
 ,
   "stdout": "",
@@ -147,7 +147,7 @@ exports[`check --format text --max-diagnostics some 1`] = `
 {
   "code": 2,
   "stderr": 
-"--max-diagnostics takes a whole number and does not apply to sarif.
+"--max-diagnostics takes a whole number, e.g. 20.
 "
 ,
   "stdout": "",

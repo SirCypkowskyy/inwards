@@ -2,6 +2,9 @@ import { DOCS_BASE, VERSION } from "./meta.ts";
 import { RULES } from "./rules.ts";
 import type { Diagnostic } from "./types.ts";
 
+/** A line break with the spaces around it; Unicode line and paragraph separators count too. */
+const LINE_BREAKS = /\s*[\r\n\u2028\u2029]+\s*/gu;
+
 export interface Report {
   diagnostics: Diagnostic[];
   filesChecked: number;
@@ -49,7 +52,8 @@ export function render(
   format: Format,
   { pretty = true, color = false, maxDiagnostics }: RenderOptions = {},
 ): string {
-  const view = cap(report, maxDiagnostics);
+  // Code scanning should see every finding, so SARIF is never capped.
+  const view = cap(report, format === "sarif" ? undefined : maxDiagnostics);
   const indent = pretty ? 2 : undefined;
   if (format === "json") {
     return renderJson(view, indent);
@@ -138,11 +142,24 @@ function renderText(report: View, c: Paint): string {
  * @returns the concise report.
  */
 function renderConcise(report: View): string {
-  const lines = report.shown.map(
-    (d) =>
+  const lines = report.shown.map((d) =>
+    oneLine(
       `${d.file}:${d.line}:${d.column}: ${codeLabel(d, PLAIN)} ${d.message} fix: ${d.fix.steps[0] ?? d.fix.summary}`,
+    ),
   );
   return [...lines, ...footer(report, PLAIN)].join("\n");
+}
+
+/**
+ * Folds line breaks into single spaces, so a diagnostic stays on one line:
+ * a wrapped `from x import (\n a,\n)` statement is quoted in the fix step,
+ * and a string literal or file name can hold a newline.
+ *
+ * @param text - one diagnostic's line.
+ * @returns the same text with every line break (and the spaces around it) as one space.
+ */
+function oneLine(text: string): string {
+  return text.replace(LINE_BREAKS, " ");
 }
 
 /**

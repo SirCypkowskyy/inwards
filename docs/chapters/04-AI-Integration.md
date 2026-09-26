@@ -145,7 +145,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 | `text` | Humans, Aider | `file:line:col: CODE message`, then numbered fix steps |
 | `json` | Agents, scripts | `inwards/diagnostics@1`: `summary` + `diagnostics[]`, each with `fix.summary` and `fix.steps[]` |
 | `sarif` | GitHub code scanning, IDE viewers | SARIF 2.1.0. Fix steps go in `message.text` and `properties.fix` |
-| `concise` | Agents on a token budget | One line per diagnostic: location, code, the message that names the import, and the first fix step. Then the summary line. Never coloured |
+| `concise` | Agents on a token budget | One line per diagnostic: location, code, the message (it names the import, where the rule has one), and the first fix step. Line breaks, such as a wrapped `from x import (…)` quoted in the fix, are folded into spaces. Then the summary line. Never coloured |
 
 <figure markdown="span">
   ![JSON output with summary and fix steps](assets/screens/json-for-agents.svg){ loading=lazy }
@@ -164,7 +164,7 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 4. The output is stable. The same input gives the same diagnostics in the same order, and JSON fields are only ever added, so agents and scripts can rely on it.
 5. The output is short. When stdout isn't a terminal, the CLI prints compact JSON, because indentation is wasted tokens for a model. `--format concise` and `--max-diagnostics` keep a legacy repo with hundreds of findings from flooding the agent's context. The table below gives the tokens per diagnostic for each format.
 
-    | Format | INW001 | Mean of 6 (3 INW001, 1 INW011, 2 INW006) |
+    | Format | INW001 | Mean of 6 on a sample project (3 INW001, 1 INW011, 2 INW006) |
     |---|---|---|
     | `json` (compact) | 1,026 chars, 227 tokens | 944 chars, 218 tokens |
     | `text` | 859 chars, 197 tokens | 780 chars, 187 tokens |
