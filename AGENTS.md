@@ -179,7 +179,8 @@ bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
 bun run typecheck       # tsgo, strictest flags (tsconfig.base.json)
 bun run fallow          # dead code, unused deps, boundaries, duplication
 bun test                # unit + CLI + E2E snapshots
-uv run scripts/check-docs-nav.py  # every page in docs/chapters is in the nav
+uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
+uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
@@ -295,12 +296,36 @@ PR description is its body. Commits inside a branch can say anything.
 - To fix a changelog line after a merge, edit the merged PR's description with
   a `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block.
 
+## Polish docs
+
+`docs/pl/` is the Polish translation of `docs/chapters/`, page for page at
+the same paths, built by `docs/zensical.pl.toml` into `/pl/` (issue #149).
+English stays the source of truth; the changelog isn't translated.
+
+- **A PR that changes an English page updates its Polish page in the same
+  PR.** Re-translate the changed parts (not the whole page), then record the
+  new English hash: `uv run scripts/check-docs-translation.py --fix-hashes docs/pl/<page>`.
+  A new English page gets a Polish page with `source` and `source_hash` front
+  matter and an entry in `docs/zensical.pl.toml`'s nav; a deleted one loses
+  its Polish page.
+- **Terminology comes from `docs/GLOSSARY.pl.md`**: what stays in English
+  (hook, Stop gate, baseline, CLI flags, rule codes...), the fixed Polish
+  terms, and the conventions (headings keep the English anchor with
+  `{ #id }`, code blocks and CLI output stay verbatim, images come from
+  `../assets/`). Add a missing term there in the same PR.
+- **The reviewer checks the Polish diff** for meaning against the English
+  change and for terminology against the glossary.
+- **CI** fails on a missing Polish page and warns on a stale one; the deploy
+  puts a "Tłumaczenie może być nieaktualne" banner on stale pages. Preview
+  both sites with the two builds in `docs/zensical.pl.toml`'s header and a
+  static server on `docs/site/`.
+
 ## Finishing a piece of work
 
 Before you hand back or merge, update the docs and the issues. Work is not
 done until both match the code.
 
-- **Docs** (`docs/chapters/`, `README.md`, `eval/README.md`, `AGENTS.md`):
+- **Docs** (`docs/chapters/` and its Polish mirror `docs/pl/`, `README.md`, `eval/README.md`, `AGENTS.md`):
   describe what the code does now. Drop "planned" from anything that shipped,
   fix numbers that changed (tests, corpus sizes, timings), and write an ADR
   for any decision a later reader would question. Run the strict docs build.
@@ -355,5 +380,5 @@ done until both match the code.
 
 ## Writing
 
-Docs, commit messages and PR text in English, plain and specific (the
+Docs (except `docs/pl/`), commit messages and PR text in English, plain and specific (the
 `humanizer` skill's rules): no filler, no em dashes, numbers over adjectives.

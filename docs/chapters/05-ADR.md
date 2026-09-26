@@ -27,6 +27,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted |
+| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -547,3 +548,28 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-minus-circle-outline: Import names are matched, not distribution names (`PyYAML` is `yaml`), and a stdlib module newer than the bundled list counts as third-party.
 
 **Alternatives.** *Read installed distributions from the virtualenv*: exact, but breaks C4 and fails in CI images without the dependencies. *Default deny for every layer but the outermost*: guesses too much about what an application layer may use. *Name the configured list in the message*: a changed list would bring back every baselined violation.
+
+## ADR-024: A Polish translation as a second build, translated in the same PR
+
+**Status:** Accepted · 2026-09-26 · [#149](https://github.com/SirCypkowskyy/inwards/issues/149)
+
+**Context.** The owner wants the docs in Polish too, with a language switcher. Zensical 0.0.65 builds one language per project: internationalization is on its roadmap, and today a header selector (`extra.alternate`) links to other builds. Its built-in switcher maps pages through the other build's sitemap and assumes sibling roots (`/en/`, `/pl/`), but the English site already lives at `/inwards/`, and the CLI's `docs:` links point there. Zensical can't exclude a Markdown file inside `docs_dir`, and it doesn't follow symlinked directories.
+
+**Decision.**
+
+- **Two builds.** `docs/chapters/` stays English at `/inwards/`. `docs/pl/` mirrors every page in the English nav at the same path, and `docs/zensical.pl.toml` builds it into `docs/site/pl/`, so one Pages artifact holds both. The Polish pages take images, CSS and scripts from the English site through `../` paths instead of copies.
+- **The switcher keeps the page.** A theme override (`docs/overrides/partials/alternate.html`) links each language to the same page in the other build, and `language-switch.mjs` recomputes that on click (the header survives instant navigation), falling back to the language root when the page doesn't exist. Polish headings keep the English anchors (`{ #id }`), so the switch keeps the `#anchor` too.
+- **The agent translates, in the same PR as the English change** (the owner chose this over machine translation in CI, a machine draft plus review, or community translation). `docs/GLOSSARY.pl.md` fixes the terms and sits outside both `docs_dir`s, so it isn't published. A subagent reviews terminology and meaning like any other PR.
+- **Staleness is tracked by hash.** Each Polish page records `source` and the SHA-256 of the English file it was translated from. `scripts/check-docs-translation.py` fails CI on a missing or orphaned page and warns on a stale one; the deploy adds a "may be out of date" banner to stale pages in its checkout.
+- **Everything is translated except** code blocks, CLI output, config keys, diagnostic messages, identifiers and the changelog. ADR bodies are translated in full.
+
+**Consequences.**
+
+- :material-plus-circle-outline: English URLs and anchors don't change, and a reader switching language lands on the same section.
+- :material-plus-circle-outline: A missing translation can't merge, and a stale one is visible to readers instead of silently wrong.
+- :material-minus-circle-outline: Every docs PR also touches `docs/pl/`, and the translation is only as good as the review.
+- :material-minus-circle-outline: The Polish build is only complete inside the English one: `zensical serve -f docs/zensical.pl.toml` shows no screenshots or custom styles.
+- :material-minus-circle-outline: A hash changes on any edit, a typo fix included, so some "stale" warnings need only `--fix-hashes`.
+
+**Alternatives.** *English under `/en/` next to `/pl/`:* the built-in switcher would work, but every existing link and the CLI's `docs:` URLs would move. *Machine translation on each merge:* always in sync, but it needs a secret and a budget, terminology drifts between runs, and nobody reviews it. *Copies of the assets in `docs/pl/`:* self-contained, but two copies of every screenshot to keep equal.
+
