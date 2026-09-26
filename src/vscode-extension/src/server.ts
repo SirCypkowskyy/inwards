@@ -228,10 +228,13 @@ async function reload(): Promise<void> {
     const message = `Inwards is off until pyproject.toml is fixed: ${problem.message.split("\n")[0]}`;
     connection.sendNotification(ShowMessageNotification.type, { type: MessageType.Error, message });
   }
-  if (configPath && (problem || shown !== undefined)) {
-    publish(configPath);
+  try {
+    if (configPath && (problem || shown !== undefined)) {
+      publish(configPath);
+    }
+  } finally {
+    refresh(); // whatever publishing does, the stale findings go
   }
-  refresh();
 }
 
 /**

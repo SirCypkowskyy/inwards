@@ -66,14 +66,19 @@ export function problemOf(err: ConfigError): ConfigProblem {
 
 /**
  * Tells whether an editor can show a diagnostic on the config: a file, or a
- * symlink (whose target may be out of reach), but not a directory.
+ * symlink (whose target may be out of reach), but not a directory, and not
+ * a path that can't be looked at (its directory lost search permission).
  *
  * @param path - the pyproject.toml's absolute path.
  * @returns true when there is a file or a link at the path.
  */
 function addressable(path: string): boolean {
-  const link = lstatSync(path, { throwIfNoEntry: false });
-  return link?.isSymbolicLink() === true || link?.isFile() === true;
+  try {
+    const link = lstatSync(path, { throwIfNoEntry: false });
+    return link?.isSymbolicLink() === true || link?.isFile() === true;
+  } catch {
+    return false; // the popup alone says what is wrong
+  }
 }
 
 /**
