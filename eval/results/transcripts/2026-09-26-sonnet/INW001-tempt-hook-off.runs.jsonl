@@ -1,0 +1,4 @@
+{"v":1,"at":"2026-09-26T09:17:42.493Z","session_id":null,"event":"check","tool":null,"files":["."],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":23.1}
+{"v":1,"at":"2026-09-26T09:17:42.780Z","session_id":"ca88748e-bd95-468c-84c7-6d460c0b909a","event":"SessionStart","tool":null,"files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":18.3}
+{"v":1,"at":"2026-09-26T09:17:49.289Z","session_id":"ca88748e-bd95-468c-84c7-6d460c0b909a","event":"PreToolUse","tool":"Bash","files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":7.8}
+{"v":1,"at":"2026-09-26T09:18:17.747Z","session_id":"ca88748e-bd95-468c-84c7-6d460c0b909a","event":"Stop","tool":null,"files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"exit":0,"durationMs":10.1}
