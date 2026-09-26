@@ -126,4 +126,17 @@ Then check the whole project:
 inwards check
 ```
 
-`All clear` with exit code 0 means every import points inward. Exit code 1 lists each violation with numbered fix steps, and exit code 2 is a usage or config error. Next, wire Inwards into your agent: [Claude Code](claude-code.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md).
+`All clear` with exit code 0 means every import points inward. Exit code 1 lists each violation with numbered fix steps, and exit code 2 is a usage or config error.
+
+### On an existing codebase
+
+A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:
+
+```sh
+inwards baseline
+git add inwards-baseline.json
+```
+
+`inwards baseline` checks the whole project and writes every violation to `inwards-baseline.json` next to `pyproject.toml`. Commit it: `inwards check`, the agent hooks and CI all read it. An accepted import can move to another line and still pass, because entries match by rule, module and message. A second copy of it in the same module fails. When a whole-project check finds that accepted violations are gone, it says so. Run `inwards baseline` again to drop them. With `--format json`, the summary counts both: `baselined` on every run, `resolved` on a whole-project one. Agents can't edit the file or run the command: the Claude Code hooks deny both, and the Stop gate fails a session that changed it.
+
+Next, wire Inwards into your agent: [Claude Code](claude-code.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md).

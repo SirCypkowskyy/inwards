@@ -198,7 +198,7 @@ flowchart LR
 | UC3 | Gate before "done" | Agent tries to finish; the Stop gate checks every file the session changed, however it changed | The agent can't declare victory with a violation it introduced, and a legacy repo's old violations don't block it | :white_check_mark: |
 | UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: scaffold |
 | UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations in GitHub code scanning | :white_check_mark: output, :material-progress-clock: workflow template |
-| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :material-progress-clock: |
+| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :white_check_mark: |
 | UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: |
 
 ## Sources

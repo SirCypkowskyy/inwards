@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { ConfigError, type Format, render, VERSION } from "@inwards/core";
+import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
 import { hookClaudeCode } from "./hook.ts";
 import { AGENTS, initCommand, isAgent } from "./init.ts";
 import { print } from "./output.ts";
@@ -14,6 +15,7 @@ import { logRun, noteRun } from "./runlog.ts";
 const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml] [--log]
+       inwards baseline [--config pyproject.toml]    (accept today's violations)
        inwards init --agent claude|aider|agents-md [--dry-run]
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -47,20 +49,46 @@ async function main(argv: string[]): Promise<number> {
     return print(VERSION, 0);
   }
   const [command, ...paths] = positionals;
-  if (command === "hook" && !values.help) {
-    return paths[0] === "claude-code" && paths.length === 1
-      ? await hookClaudeCode(USAGE)
-      : print(USAGE, 2);
-  }
-  if (command === "init" && !values.help) {
-    return paths.length === 0 && isAgent(values.agent)
-      ? initCommand(values.agent, values["dry-run"] === true)
-      : print(`${USAGE}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
+  if (!values.help && (command === "hook" || command === "init" || command === "baseline")) {
+    return await setupCommand(command, paths, values);
   }
   if (values.help || command !== "check") {
     return print(USAGE, command ? 2 : 0);
   }
   return await checkCommand(paths, values.format, values.config, values.log === true);
+}
+
+/**
+ * Runs the commands besides `check`: the hook, `init` and `baseline`.
+ *
+ * @param command - which one.
+ * @param paths - the positionals after it.
+ * @param values - the parsed options.
+ * @param values.agent - `--agent`, for init.
+ * @param values."dry-run" - `--dry-run`, for init.
+ * @param values.config - `--config`, for baseline.
+ * @returns the exit code; 2 for unexpected arguments.
+ */
+async function setupCommand(
+  command: "hook" | "init" | "baseline",
+  paths: string[],
+  values: {
+    agent?: string | undefined;
+    "dry-run"?: boolean | undefined;
+    config?: string | undefined;
+  },
+): Promise<number> {
+  if (command === "hook") {
+    return paths[0] === "claude-code" && paths.length === 1
+      ? await hookClaudeCode(USAGE)
+      : print(USAGE, 2);
+  }
+  if (command === "init") {
+    return paths.length === 0 && isAgent(values.agent)
+      ? initCommand(values.agent, values["dry-run"] === true)
+      : print(`${USAGE}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
+  }
+  return paths.length === 0 ? await baselineCommand(values.config) : print(USAGE, 2);
 }
 
 const FORMATS: readonly Format[] = ["text", "json", "sarif"];
@@ -118,6 +146,28 @@ async function checkCommand(
     logRun(project, { event: "check", exit, force: log });
   }
   return exit;
+}
+
+/**
+ * Runs `inwards baseline`: checks the whole project without the baseline and
+ * writes every error to inwards-baseline.json next to the config, replacing
+ * the old one. Later checks, hooks and the Stop gate then fail only on new
+ * violations.
+ *
+ * @param config - the `--config` path, if given.
+ * @returns 0 once written, 2 without a config.
+ */
+async function baselineCommand(config: string | undefined): Promise<number> {
+  const configPath = config ? resolve(config) : findConfig(process.cwd());
+  if (!configPath) {
+    return print("No pyproject.toml with [tool.inwards] found.", 2);
+  }
+  const report = await runCheck(configPath, undefined, process.cwd(), { baseline: false });
+  const accepted = writeBaseline(configPath, report.diagnostics);
+  return print(
+    `Wrote ${BASELINE_FILE} with ${accepted} violation${accepted === 1 ? "" : "s"}. Commit it; new violations still fail.`,
+    0,
+  );
 }
 
 /**

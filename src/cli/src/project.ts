@@ -17,6 +17,7 @@ import {
   type Report,
   type SourceFile,
 } from "@inwards/core";
+import { applyBaseline } from "./baseline.ts";
 import { collectPythonFiles } from "./files.ts";
 import { loadGrammars } from "./grammars.ts";
 import { isInside, posix, realpath } from "./paths.ts";
@@ -131,19 +132,22 @@ function moduleLookup(root: string): ModuleLookup {
 /**
  * Loads the config and engine, then checks the Python files under the targets.
  * A whole-project run (no targets) also checks the layer prefixes against the
- * modules found (INW006). The duration covers config, grammar loading,
+ * modules found (INW006). Errors the config's baseline accepts are left out,
+ * unless `baseline` is false. The duration covers config, grammar loading,
  * reading and checking.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param targets - absolute files or directories; undefined means the config root.
  * @param base - directory that report paths are made relative to.
+ * @param options - `baseline: false` reports every violation (for `inwards baseline`).
  * @returns the report, with forward-slash paths on every OS.
- * @throws {ConfigError} when the config is invalid.
+ * @throws {ConfigError} when the config or the baseline is invalid.
  */
 export async function runCheck(
   configPath: string,
   targets: string[] | undefined,
   base: string,
+  { baseline = true }: { baseline?: boolean } = {},
 ): Promise<Report> {
   const started = performance.now();
   const project = await openProject(configPath);
@@ -154,7 +158,12 @@ export async function runCheck(
     const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
     diagnostics.unshift(...checkPrefixes(project.config, modules, pyproject));
   }
-  return { diagnostics, filesChecked: files.length, durationMs: performance.now() - started };
+  const report = {
+    diagnostics,
+    filesChecked: files.length,
+    durationMs: performance.now() - started,
+  };
+  return baseline ? applyBaseline(configPath, report, targets === undefined) : report;
 }
 
 /**

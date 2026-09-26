@@ -21,6 +21,7 @@ import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
+import { baselineHashes } from "./baseline.ts";
 import { settingsProblem } from "./claude-settings.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { print } from "./output.ts";
@@ -173,7 +174,8 @@ function errorsOf(report: Report): Diagnostic[] {
 
 /**
  * Lists what makes the session untrustworthy regardless of the code: a
- * changed `[tool.inwards]`, or Claude Code settings without the Inwards hooks.
+ * changed `[tool.inwards]` or baseline, or Claude Code settings without the
+ * Inwards hooks.
  *
  * @param project - the real project root.
  * @param configs - the valid configs now.
@@ -189,6 +191,16 @@ function trustProblems(
   if (JSON.stringify(configs) !== JSON.stringify(state.start.configs)) {
     problems.push(
       "[tool.inwards] changed during this session. Put it back as it was; if the layers really must change, ask the user to do it.",
+    );
+  }
+  const { baselines } = state.start;
+  if (
+    baselines !== undefined &&
+    JSON.stringify(baselineHashes(project, Object.keys(state.start.configs))) !==
+      JSON.stringify(baselines)
+  ) {
+    problems.push(
+      "inwards-baseline.json changed during this session. Put it back as it was (`git checkout -- inwards-baseline.json`); only the user takes a new baseline.",
     );
   }
   const hooks = settingsProblem(project);

@@ -44,7 +44,11 @@ const CLAUDE_HOOKS: readonly [event: string, matcher: string | undefined][] = [
  * Permission rules init adds, so Claude Code itself refuses edits to the
  * hooks and the session state even if a hook is gone (`/` anchors at the project).
  */
-const DENY_RULES = ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"];
+const DENY_RULES = [
+  "Edit(/.claude/settings*.json)",
+  "Edit(/.inwards/**)",
+  "Edit(/**/inwards-baseline.json)",
+];
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
 const PRERELEASE = /-.*$/u;

@@ -203,7 +203,7 @@ The prescan may report false positives, such as an import-shaped line inside a d
 
 The skeleton keeps import statements only, so a file whose only outward dependency is `importlib.import_module("shop.infrastructure.db")` would pass it. Before the prescan runs, a text check looks for the names every loading call has to spell (`importlib`, `runpy`, `builtins`, `__import__`, or a bare `exec`, `eval` or `compile`, after NFKC). A file in a layer that matches goes straight to the full parse, which also looks for dynamic imports. `re.compile` does not match. On the CPython 3.14 standard library, 209 of 1,921 files match. See [ADR-015](05-ADR.md#adr-015-check-literal-dynamic-imports-as-inw011).
 
-The cost model has one bad case. On a legacy codebase where most files already violate, nearly every file pays for the skeleton parse and then the full parse, which is a little slower than parsing everything once. The planned baseline (UC6) fixes this: once a violation is recorded in the baseline, the engine doesn't need to confirm it on every run.
+The cost model has one bad case. On a legacy codebase where most files already violate, nearly every file pays for the skeleton parse and then the full parse, which is a little slower than parsing everything once. The baseline (UC6) keeps those violations from failing, but the engine still confirms each one on every run. Skipping the confirming parse for a violation the baseline already accepts is planned.
 
 ## C3: Components of the CLI
 
