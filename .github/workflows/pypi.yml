@@ -7,10 +7,10 @@ name: Publish to PyPI
 # the release, checked here against the release's SHA256SUMS.
 #
 # - Publishing a release (never a draft) starts it once the repository variable
-#   PYPI_PUBLISH is `true`. A pre-release goes to TestPyPI only; a full release
-#   goes to TestPyPI, then PyPI.
+#   PYPI_PUBLISH is `true`. A pre-release (the release's checkbox, or a tag with
+#   a suffix) goes to TestPyPI only; a full release goes to TestPyPI, then PyPI.
 # - A manual run takes a tag and an index: `testpypi` uploads there only, `pypi`
-#   uploads to TestPyPI, then PyPI.
+#   uploads to TestPyPI, then PyPI, and only while PYPI_PUBLISH is `true`.
 # - Pull requests never start it.
 on:
   release:
@@ -67,6 +67,8 @@ jobs:
             echo "::error::$TAG is a draft or has no release; publish it first"
             exit 1
           fi
+          # A suffixed tag (v0.2.0-rc.1) is a pre-release even if the checkbox was missed.
+          [[ "$TAG" == *-* ]] && pre=true
           echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
       - name: Download the wheels and SHA256SUMS
         env:
@@ -137,10 +139,12 @@ jobs:
   pypi:
     name: Upload to PyPI
     needs: [wheels, testpypi]
-    # Implicitly also requires both jobs to have succeeded.
+    # PYPI_PUBLISH gates manual runs too. Implicitly also requires both jobs to
+    # have succeeded.
     if: >-
-      (github.event_name == 'release' && needs.wheels.outputs.prerelease == 'false')
-      || (github.event_name == 'workflow_dispatch' && inputs.index == 'pypi')
+      vars.PYPI_PUBLISH == 'true' && (
+        (github.event_name == 'release' && needs.wheels.outputs.prerelease == 'false')
+        || (github.event_name == 'workflow_dispatch' && inputs.index == 'pypi'))
     runs-on: ubuntu-26.04
     environment:
       name: pypi

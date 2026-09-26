@@ -258,24 +258,28 @@ flowchart LR
 
 Releases follow [ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr): release-please keeps a release PR open, merging it tags the version and starts `cd.yml`, and the owner publishes the draft by hand. Publishing the draft starts `pypi.yml` once it is switched on (below). The Marketplace is [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
 
+Cross-compiling from one Linux runner is possible because the grammars are WASM, with no native addon to build per platform (see [ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)). The verify matrix then runs each binary on its real OS, since cross-compiled output that was never executed hasn't been tested.
+
 ### Publishing to PyPI
 
 `.github/workflows/pypi.yml` uploads a published release's wheels with trusted publishing ([ADR-021](05-ADR.md#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing)). It builds nothing: it downloads the five wheels that `cd.yml` built, ran on every platform and attached to the release, checks them against the release's `SHA256SUMS` (and their build provenance, once the repository is public), and uploads them. PyPI trusts that one workflow file in one GitHub environment per index, so no token is stored anywhere, and only the two upload jobs can mint an OIDC token.
 
 | Started by | TestPyPI | PyPI |
 |---|---|---|
-| Publishing a pre-release, with `PYPI_PUBLISH` set | yes | no |
+| Publishing a pre-release (its checkbox, or a tag with a suffix such as `-rc.1`), with `PYPI_PUBLISH` set | yes | no |
 | Publishing a full release, with `PYPI_PUBLISH` set | yes | yes, after it |
 | Manual run, `index: testpypi` | yes | no |
-| Manual run, `index: pypi` | yes | yes, after it |
+| Manual run from the release tag (`--ref vX.Y.Z`, which the `pypi` environment requires), `index: pypi`, with `PYPI_PUBLISH` set | yes | yes, after it |
 
-A draft never starts it, a manual run refuses a draft, and pull requests never start it. Until the repository variable `PYPI_PUBLISH` is `true`, publishing a release uploads nothing. Nothing is on either index yet.
+A draft never starts it, a manual run refuses a draft, and pull requests never start it. Nothing is on either index yet.
+
+**What actually stops an upload.** Every agent works under the owner's GitHub account, so anything on the GitHub side is within an agent's reach: the `PYPI_PUBLISH` variable, the environments, tags (no ruleset protects them) and manual runs. PyPI checks the repository, workflow file and environment of a run, not its ref or commit. The one gate an agent can't reach is the owner's pypi.org account, so the PyPI publisher is registered last, at go-live, and deleting it there stops every PyPI upload at once. `PYPI_PUBLISH` and the `pypi` environment's `v*` tag rule guard against mistakes, not against an agent.
 
 **One-time setup, by the owner,** in this order, so no environment exists without its rules when a run first names it:
 
 1. **Create the two environments** (Settings → Environments → New environment):
     - `testpypi`: under "Deployment branches and tags", choose "Selected branches and tags", then add the branch `develop` (for manual runs) and the tag pattern `v*` (for releases).
-    - `pypi`: the tag pattern `v*` only, so it deploys only from a release tag. Add yourself under "Required reviewers" and leave "Prevent self-review" off, since you both publish and approve. GitHub offers required reviewers on a private repository only with GitHub Enterprise; if the option is missing, add it the day the repository goes public. Until then the tag rule and `PYPI_PUBLISH` are the gates.
+    - `pypi`: the tag pattern `v*` only, so it deploys only from a release tag. Add yourself under "Required reviewers" and leave "Prevent self-review" off, since you both publish and approve. GitHub offers required reviewers on a private repository only with GitHub Enterprise; if the option is missing, add it the day the repository goes public.
 
     The same with the GitHub CLI (drop `reviewers` and `prevent_self_review` if GitHub refuses them while the repository is private):
 
@@ -303,9 +307,8 @@ A draft never starts it, a manual run refuses a draft, and pull requests never s
     | Workflow name | `pypi.yml` |
     | Environment name | `testpypi` |
 
-    A pending publisher doesn't reserve the name; the first upload creates the project. Run step 4 soon after.
-3. **Add a publisher to the existing PyPI project.** `inwards` already exists on pypi.org (the 0.0.0 placeholder), so this is not a pending publisher: open [Manage `inwards` → Publishing](https://pypi.org/manage/project/inwards/settings/publishing/) and add a GitHub publisher with owner `SirCypkowskyy`, repository `inwards`, workflow `pypi.yml` and environment `pypi`.
-4. **Dry run on TestPyPI** with the published pre-release v0.1.0-rc.1, once `pypi.yml` is on `develop`. That tag predates the workflow, so the run starts from `develop`, which only the `testpypi` environment accepts:
+    A pending publisher doesn't reserve the name; the first upload creates the project. Run step 3 soon after.
+3. **Dry run on TestPyPI** with the published pre-release v0.1.0-rc.1, once `pypi.yml` is on `develop`. That tag predates the workflow, so the run starts from `develop`, which only the `testpypi` environment accepts:
 
     ```sh
     gh workflow run pypi.yml --repo SirCypkowskyy/inwards --ref develop -f tag=v0.1.0-rc.1 -f index=testpypi
@@ -322,13 +325,15 @@ A draft never starts it, a manual run refuses a draft, and pull requests never s
     ```
 
     This spends the file names of 0.1.0rc1 on TestPyPI only; PyPI is untouched.
-5. **Switch on publishing from releases** when the first release meant for PyPI is near: `gh variable set PYPI_PUBLISH --body true --repo SirCypkowskyy/inwards`. `gh variable delete PYPI_PUBLISH` switches it off again.
+4. **Go live,** when the first release meant for PyPI is near:
+    - Add a publisher to the existing PyPI project. `inwards` already exists on pypi.org (the 0.0.0 placeholder), so this is not a pending publisher: open [Manage `inwards` → Publishing](https://pypi.org/manage/project/inwards/settings/publishing/) and add a GitHub publisher with owner `SirCypkowskyy`, repository `inwards`, workflow `pypi.yml` and environment `pypi`.
+    - Switch on publishing: `gh variable set PYPI_PUBLISH --body true --repo SirCypkowskyy/inwards`. `gh variable delete PYPI_PUBLISH` switches it off again.
 
-**At each release,** publishing the draft (step 4 of the release in `AGENTS.md`) starts `pypi.yml`. A full release goes to TestPyPI, then waits for your approval under the run's "Review deployments" before PyPI (when the `pypi` environment has a reviewer). Afterwards, `uv add --dev inwards` in a fresh project should install it. After the first release on PyPI, yank the 0.0.0 placeholder there (Manage → Releases → 0.0.0 → Options → Yank).
+Optional hardening: turn on immutable releases (Settings → General → Releases → "Enable release immutability"; the API reports the setting available and off for this repository). A published release's assets and tag can then no longer change, so a later run uploads the bytes that were published. It applies only to releases published after it is turned on, and doesn't protect a draft.
+
+**At each release,** wait until `cd.yml`'s "Draft the GitHub Release" job has succeeded and the draft lists five `.whl` files and `SHA256SUMS`. Only then publish the draft (step 4 of the release in `AGENTS.md`). `cd.yml` refuses to attach files to a published release, so publishing early spends the version. Publishing starts `pypi.yml`: a full release goes to TestPyPI, then waits for your approval under the run's "Review deployments" before PyPI (when the `pypi` environment has a reviewer). Afterwards, `uv add --dev inwards` in a fresh project should install it. After the first release on PyPI, yank the 0.0.0 placeholder there (Manage → Releases → 0.0.0 → Options → Yank).
 
 To put a pre-release on PyPI as well, run the workflow from its tag, which the `pypi` environment requires: `gh workflow run pypi.yml --repo SirCypkowskyy/inwards --ref v0.2.0-rc.1 -f tag=v0.2.0-rc.1 -f index=pypi`. PyPI never takes the same file name twice, so a version uploaded there is final; a re-run only fills in files a failed run missed.
-
-Cross-compiling from one Linux runner is possible because the grammars are WASM, with no native addon to build per platform (see [ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)). The verify matrix then runs each binary on its real OS, since cross-compiled output that was never executed hasn't been tested.
 
 ## Known limitations
 
