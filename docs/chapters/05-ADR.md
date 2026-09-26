@@ -9,7 +9,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted, built with `--bytecode` since [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
 | [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :white_check_mark: Accepted, baselined modules skip the confirming parse since [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :white_check_mark: Accepted |
-| [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted |
+| [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted, the adapter supplies the module index through a ProjectFiles port since [#44](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :white_check_mark: Accepted |
 | [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-progress-clock: Accepted, revisit in M6 (v0.6) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :white_check_mark: Accepted |
@@ -133,7 +133,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - :material-plus-circle-outline: The editor checks the unsaved buffer, and the CLI checks the file on disk, with the same function.
 - :material-plus-circle-outline: Tests need no temp directories. They pass strings.
-- :material-minus-circle-outline: Cross-file rules (cycles, unknown modules) need the adapter to supply the module index. Since [#44](https://github.com/SirCypkowskyy/inwards/issues/44) that input is a port, `ProjectFiles` (probe a path, list the Python files, read one), which `Engine.index` wraps and `checkFile` takes; the engine calls it only when a rule asks.
+- :material-minus-circle-outline: Cross-file rules (cycles, unknown modules) need the adapter to supply the module index. The engine's API grows a "project" input when those rules arrive.
 
 **Alternatives.** *Engine reads files itself*: simpler at first, but it would lock the engine to one runtime's file API and make the editor case awkward.
 

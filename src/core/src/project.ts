@@ -42,8 +42,11 @@ export interface ProjectFiles {
  * A project's first-party modules, answered on demand.
  *
  * - `ownerOf` probes the file system for each query (see `probeLookup`), so
- *   it is never stale and never walks the tree. It follows Python: a module
- *   in a directory the listing skips still has an owner.
+ *   it is never stale and never walks the tree. It follows Python, not the
+ *   listing, and so does `importersOf`, which resolves owners through it: it
+ *   can return a name missing from `modules`, such as a namespace package (a
+ *   directory without `__init__.py`), a module under a virtualenv or
+ *   node_modules the listing skips, or one behind a symlink that leaves the root.
  * - `modules` lists the tree once, on first use; nothing is read or parsed.
  * - `importersOf` reads and parses only candidate files: those whose
  *   NFKC-normalised text mentions the module's last name segment (an

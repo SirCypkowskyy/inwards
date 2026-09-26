@@ -10,6 +10,7 @@ import {
   type SourceFile,
 } from "../src/index.ts";
 import { createPythonParser } from "../src/python.ts";
+import type { ModuleLookup } from "../src/unassigned.ts";
 
 /**
  * Reads a WASM file from an installed package.
@@ -75,11 +76,14 @@ const ON_DISK: ReadonlyMap<string, "file" | "dir"> = new Map([
 ]);
 
 /** The test project's module index, over `ON_DISK`; its files are empty. */
-export const OWNERS: ProjectIndex = engine.index({
+export const PROJECT: ProjectIndex = engine.index({
   kind: (rel: string): "file" | "dir" | undefined => ON_DISK.get(rel),
   list: (): string[] => [...ON_DISK].flatMap(([rel, kind]) => (kind === "file" ? [rel] : [])),
   read: (): string => "",
 });
+
+/** Finds first-party modules among `ON_DISK`. */
+export const OWNERS: ModuleLookup = PROJECT.ownerOf;
 
 /**
  * Checks one file with the test engine and the test project's modules.
@@ -88,7 +92,7 @@ export const OWNERS: ProjectIndex = engine.index({
  * @returns the diagnostics.
  */
 export function check(source: SourceFile): Diagnostic[] {
-  return engine.checkFile(source, OWNERS);
+  return engine.checkFile(source, PROJECT);
 }
 
 /** A bare parser, for tests of the prescan and extractors below the engine. */

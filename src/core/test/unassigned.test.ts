@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseConfig } from "../src/index.ts";
 import { checkPrefixes } from "../src/layout.ts";
-import { check, engine, file, OWNERS } from "./helpers.ts";
+import { check, engine, file, OWNERS, PROJECT } from "./helpers.ts";
 
 describe("INW006 unassigned-module", () => {
   test("a layer importing first-party code outside every layer is an error", () => {
@@ -55,7 +55,14 @@ describe("INW006 unassigned-module", () => {
 
   test("checkFiles warns once per package", () => {
     const files = [file("shop/persistence/a.py", ""), file("shop/persistence/b.py", "")];
-    expect(engine.checkFiles(files, OWNERS)).toHaveLength(1);
+    expect(engine.checkFiles(files, PROJECT)).toHaveLength(1);
+  });
+
+  test("the index owns a namespace package it doesn't list", () => {
+    // shop/application is a directory without __init__.py or any module file:
+    // Python imports it, so the probe finds it, but the listing has no file for it.
+    expect(OWNERS("shop.application.Service")).toBe("shop.application");
+    expect(PROJECT.modules.has("shop.application")).toBe(false);
   });
 });
 

@@ -21,8 +21,8 @@
   "duplicates": { "threshold": 3 },
   // checkFiles and index: called by the CLI on the Engine that Engine.create()
   // returns; fallow does not follow the type of an awaited factory result.
-  // importersOf: only tests call it until the Stop gate (#20) lands; drop it
-  // from this list in that PR.
+  // importersOf: only tests call it; the Stop gate checks the whole project
+  // instead (#139). Drop it once a rule or command uses it.
   // modules: only tests read it until INW010 (#45) lands; drop it in that PR.
   "usedClassMembers": ["checkFiles", "index", "importersOf", "modules"],
   "boundaries": {

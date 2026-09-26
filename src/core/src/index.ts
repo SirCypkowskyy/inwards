@@ -28,4 +28,4 @@ export {
 export type { NameRule, ShapeSpec } from "./shape-config.ts";
 export { ConfigError } from "./toml.ts";
 export type { Diagnostic, Fix, ImportRef, Severity, SourceFile, Span } from "./types.ts";
-export type { ModuleLookup, PathKind } from "./unassigned.ts";
+export type { PathKind } from "./unassigned.ts";

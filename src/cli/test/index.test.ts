@@ -63,3 +63,16 @@ test("relative imports of a package are found without its name in the text", asy
     "shop.domain.sub.up",
   ]);
 });
+
+test("importers of a namespace package are found, though the listing has no file for it", async () => {
+  const root = project({
+    "pyproject.toml": LAYERS,
+    "shop/__init__.py": "",
+    "shop/domain/order.py": "X = 1\n",
+    "shop/infrastructure/db.py": "import shop.domain\n",
+  });
+  const index = await indexProject(join(root, "pyproject.toml"));
+  expect(index.modules.has("shop.domain")).toBe(false);
+  expect(index.ownerOf("shop.domain")).toBe("shop.domain");
+  expect([...index.importersOf("shop.domain")]).toEqual(["shop.infrastructure.db"]);
+});
