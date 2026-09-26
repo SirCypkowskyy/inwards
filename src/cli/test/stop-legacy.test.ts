@@ -5,7 +5,7 @@
  * files, committed, then the edit the task asks for.
  */
 import { describe, expect, test } from "bun:test";
-import { appendFileSync, cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inwards, payload, type RunResult } from "./run.ts";
 import { git, ID, put, session, stop } from "./stop-helpers.ts";
@@ -207,6 +207,34 @@ describe("violations a file had at session start", () => {
     expect(stop(root).code).toBe(0);
     expect(existsSync(marker)).toBe(false);
   });
+
+  for (const remote of ["ext", "ssh"]) {
+    test(`a partial clone with an agent-chosen ${remote} fetch never fetches the start blob`, () => {
+      const root = seeded("seeded-function-import");
+      const marker = join(root, "MARKER");
+      const blob = Bun.spawnSync(["git", "rev-parse", `HEAD:${ORDER}`], { cwd: root });
+      const id = blob.stdout.toString().trim();
+      rmSync(join(root, ".git/objects", id.slice(0, 2), id.slice(2)));
+      const url =
+        remote === "ext" ? `ext::sh -c touch% ${marker};sleep% 10` : "ssh://example.invalid/x";
+      for (const [key, value] of [
+        ["core.repositoryformatversion", "1"],
+        ["extensions.partialClone", "origin"],
+        ["remote.origin.promisor", "true"],
+        ["remote.origin.url", url],
+        ["protocol.allow", "always"],
+        ["core.sshCommand", `touch ${marker}; sleep 10; false`],
+      ]) {
+        git(root, "config", key ?? "", value ?? "");
+      }
+      const started = performance.now();
+      // No start content is provable any more, so the old violation blocks, as for an uncommitted file.
+      expect(agentEdits(root, ORDER, EUROS).code).toBe(2);
+      expect(stop(root).code).toBe(2);
+      expect(performance.now() - started).toBeLessThan(8000);
+      expect(existsSync(marker)).toBe(false);
+    }, 30_000);
+  }
 
   test("a CRLF working tree over an LF commit (core.autocrlf) still proves the start content", () => {
     const root = seeded("seeded-function-import");

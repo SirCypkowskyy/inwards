@@ -9,7 +9,8 @@
  * `core.autocrlf` checks out), whichever matches the start manifest's
  * SHA-256. Never `cat-file --filters` or `git show --textconv`: they run
  * filter drivers from .gitattributes and .git/config, which the agent can
- * write, so they would run the agent's commands outside its permissions. That costs nothing at
+ * write, so they would run the agent's commands outside its permissions.
+ * For the same reason the read never fetches a missing object (`--no-lazy-fetch`). That costs nothing at
  * SessionStart, and a git call plus one more check only for a file that has
  * errors now. A file that was uncommitted, untracked or outside git at
  * session start has no known start content, so all its errors count as new,
@@ -112,7 +113,10 @@ function startText(project: string, start: Start, file: string): string | undefi
     return undefined;
   }
   // `./` makes the path relative to the project, which may sit below the repo root.
-  const raw = git(project, ["cat-file", "blob", `${start.head}:./${rel}`]);
+  // --no-lazy-fetch: a partial clone the agent set up would otherwise fetch a
+  // missing blob through its remote, i.e. run its ext:: URL or sshCommand. Git
+  // before 2.44 rejects the flag; the file then has no start content, which is safe.
+  const raw = git(project, ["--no-lazy-fetch", "cat-file", "blob", `${start.head}:./${rel}`]);
   const crlf = raw?.replace(/\r?\n/gu, "\r\n");
   return [raw, crlf].find(
     (text) => text !== undefined && createHash("sha256").update(text).digest("hex") === hash,
