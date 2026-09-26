@@ -67,7 +67,8 @@ Job containers run on their own Docker network, `inwards-ci` (bridge
 host itself and to private, CGNAT (tailnet), link-local and multicast
 addresses, and all IPv6. Jobs can reach the public internet (GitHub, npm,
 PyPI, the corpus repositories) and resolve names through Docker's embedded
-DNS; port 53 on private addresses stays open for it.
+DNS, which queries from the host, so no private resolver (the router, k3s
+CoreDNS) is reachable from a job.
 
 The table is separate from firewalld's and Docker's, and its chains run
 before theirs, so a firewalld reload or a Docker restart doesn't remove it,
