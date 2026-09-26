@@ -1,0 +1,53 @@
+name: SARIF
+
+# Dogfoods the CI template from docs/chapters/guides/ci.md on
+# examples/broken-app, whose one INW001 violation is there on purpose. The only
+# differences from the template: inwards runs from source, and exit code 1 is
+# the expected result, so the job fails when the violation goes missing.
+#
+# Code scanning on a private repository needs GitHub Code Security, which a
+# personal account can't buy, so the upload fails here with 403 until the
+# repository is public. continue-on-error keeps that from failing the job; the
+# workflow-command annotations cover the PR in the meantime.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sarif-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sarif:
+    name: SARIF on examples/broken-app
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      actions: read # upload-sarif, private repositories only
+      security-events: write # upload-sarif
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Check the broken app (exit code 1 expected)
+        run: |
+          status=0
+          bun run src/cli/src/main.ts check --config examples/broken-app/pyproject.toml --format sarif > inwards.sarif || status=$?
+          test "$status" -eq 1
+          jq -e '[.runs[].results[] | select(.ruleId == "INW001")] | length == 1' inwards.sarif
+      - name: Annotate the pull request
+        run: |
+          jq -r '.runs[].results[] | .locations[0].physicalLocation as $l
+            | "::\(if .level == "error" then "error" else "warning" end) file=\($l.artifactLocation.uri),line=\($l.region.startLine),col=\($l.region.startColumn),title=\(.ruleId)::\(.message.text | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A"))"' inwards.sarif
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: ${{ github.event.repository.private }}
+        with:
+          sarif_file: inwards.sarif
+          category: inwards

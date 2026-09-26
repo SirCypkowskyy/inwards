@@ -144,7 +144,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 |---|---|---|
 | `text` | Humans, Aider | `file:line:col: CODE message`, then numbered fix steps |
 | `json` | Agents, scripts | `inwards/diagnostics@1`: `summary` + `diagnostics[]`, each with `fix.summary` and `fix.steps[]` |
-| `sarif` | GitHub code scanning, IDE viewers | SARIF 2.1.0. Fix steps go in `message.text` and `properties.fix` |
+| `sarif` | GitHub code scanning ([workflow](guides/ci.md)), IDE viewers | SARIF 2.1.0. Fix steps go in `message.text` and `properties.fix` |
 | `concise` | Agents on a token budget | One line per diagnostic: location, code, the message (it names the import, where the rule has one), and the first fix step. Line breaks, such as a wrapped `from x import (…)` quoted in the fix, are folded into spaces. Then the summary line. Never coloured |
 
 <figure markdown="span">

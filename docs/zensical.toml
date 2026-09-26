@@ -22,6 +22,7 @@ nav = [
     { "Claude Code" = "guides/claude-code.md" },
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
+    { "GitHub Actions" = "guides/ci.md" },
   ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },
