@@ -2,8 +2,9 @@
  * Compares two `inwards` binaries on the synthetic repo (bench/generate.py):
  * the base branch's build and the PR's build, run in the same job so runner
  * noise hits both alike. Runs alternate (base, head, base, head, …) for the
- * same reason. The job fails when the head's median is more than the
- * threshold slower than the base's on any metric.
+ * same reason. The job fails when, on any metric, the median of the per-pair
+ * ratios (head run / the base run next to it) is more than the threshold
+ * above 1, or when either binary fails a run.
  *
  *   bun run bench/compare.ts --base /tmp/base/inwards --head dist/inwards-linux-x64 --repo /tmp/inwards-bench
  *
@@ -12,10 +13,12 @@
  *   the quality goal's "a hook checks one edited file" (p95 < 100 ms);
  * - full: a cold `inwards check` of the whole repo.
  *
+ * With 12 full runs, the "p95" column is the slowest run.
+ *
  * Prints a Markdown table (for $GITHUB_STEP_SUMMARY) and writes JSON with the
  * raw samples and the runner it ran on.
  */
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { arch, cpus, platform } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
@@ -133,13 +136,15 @@ export function markdown(verdicts: readonly Verdict[], threshold: number): strin
 }
 
 /**
- * Times one run of a command, wall clock, process start included.
+ * Times one run of a command, wall clock, process start included. The
+ * synthetic repo is clean, so every run must exit 0: a binary that crashes or
+ * fails early would otherwise look fast.
  *
  * @param cmd - the command and its arguments.
  * @param cwd - the working directory.
  * @param stdin - text for stdin, if any.
  * @returns the elapsed milliseconds.
- * @throws {Error} when the command exits 2 or more (a usage or config error).
+ * @throws {Error} when the command exits non-zero or is killed by a signal.
  */
 function timeRun(cmd: string[], cwd: string, stdin?: string): number {
   const started = performance.now();
@@ -149,8 +154,9 @@ function timeRun(cmd: string[], cwd: string, stdin?: string): number {
     env: { ...process.env, CLAUDE_PROJECT_DIR: cwd },
   });
   const elapsed = performance.now() - started;
-  if (run.exitCode >= 2 && !stdin) {
-    throw new Error(`${cmd.join(" ")} exited ${run.exitCode}: ${run.stderr.toString()}`);
+  if (run.exitCode !== 0 || run.signalCode) {
+    const how = run.signalCode ? `was killed by ${run.signalCode}` : `exited ${run.exitCode}`;
+    throw new Error(`${cmd.join(" ")} ${how}: ${run.stderr.toString()}`);
   }
   return elapsed;
 }
@@ -181,12 +187,23 @@ function alternate(
   return samples;
 }
 
+/** The validated command line. */
+interface Options {
+  base: string;
+  head: string;
+  repo: string;
+  out: string;
+  threshold: number;
+  hookRuns: number;
+  fullRuns: number;
+}
+
 /**
- * Reads the options, measures, prints the table and writes the JSON result.
+ * Reads and checks the command line.
  *
- * @returns 0 when every metric passes, 1 otherwise.
+ * @returns the options, or the message to print for a usage error.
  */
-function main(): number {
+function readOptions(): Options | string {
   const { values } = parseArgs({
     options: {
       base: { type: "string" },
@@ -198,12 +215,34 @@ function main(): number {
       "full-runs": { type: "string", default: String(DEFAULTS.fullRuns) },
     },
   });
-  const { base, head, repo } = values;
+  const { base, head, repo, out } = values;
   if (!(base && head && repo)) {
-    process.stderr.write("usage: compare.ts --base <bin> --head <bin> --repo <synthetic repo>\n");
-    return 2;
+    return "usage: compare.ts --base <bin> --head <bin> --repo <synthetic repo>";
   }
   const threshold = Number(values.threshold);
+  const hookRuns = Number(values["hook-runs"]);
+  const fullRuns = Number(values["full-runs"]);
+  if (!(threshold > 0 && threshold < 1)) {
+    return "--threshold must be a fraction between 0 and 1 (0.2 is 20%)";
+  }
+  if (![hookRuns, fullRuns].every((n) => Number.isInteger(n) && n > 0)) {
+    return "--hook-runs and --full-runs must be positive integers";
+  }
+  return { base, head, repo, out, threshold, hookRuns, fullRuns };
+}
+
+/**
+ * Reads the options, measures, prints the table and writes the JSON result.
+ *
+ * @returns 0 when every metric passes, 1 otherwise, 2 for a usage error.
+ */
+function main(): number {
+  const options = readOptions();
+  if (typeof options === "string") {
+    process.stderr.write(`${options}\n`);
+    return 2;
+  }
+  const { base, head, repo, threshold, hookRuns, fullRuns } = options;
   const file = join(repo, "src/shop/domain/p0/m0.py");
   const payload = JSON.stringify({
     session_id: "bench",
@@ -213,15 +252,17 @@ function main(): number {
     tool_input: { file_path: file },
   });
   const binaries = { base: resolve(base), head: resolve(head) };
+  // Every hook run appends to the "bench" session's log; start from none.
+  rmSync(join(repo, ".inwards"), { recursive: true, force: true });
   const hook = alternate(
     binaries,
     { argv: ["hook", "claude-code"], cwd: repo, stdin: payload },
-    { measured: Number(values["hook-runs"]), warmup: DEFAULTS.warmup },
+    { measured: hookRuns, warmup: DEFAULTS.warmup },
   );
   const full = alternate(
     binaries,
     { argv: ["check"], cwd: repo },
-    { measured: Number(values["full-runs"]), warmup: 1 },
+    { measured: fullRuns, warmup: 1 },
   );
   const verdicts = [
     judge("hook (one file)", hook, threshold),
@@ -238,7 +279,7 @@ function main(): number {
     `${markdown(verdicts, threshold)}\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}\n`,
   );
   writeFileSync(
-    values.out,
+    options.out,
     `${JSON.stringify({ runner, threshold, verdicts, samples: { hook, full } }, null, 2)}\n`,
   );
   return verdicts.every((v) => v.pass) ? 0 : 1;

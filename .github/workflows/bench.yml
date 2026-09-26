@@ -22,6 +22,21 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # Each side is built with its own Bun, so a PR that bumps .bun-version is
+      # measured against the old runtime.
+      - name: Check out the base branch
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add "$RUNNER_TEMP/base" "$BASE"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ${{ runner.temp }}/base/.bun-version
+      - name: Build the base branch's binary
+        working-directory: ${{ runner.temp }}/base
+        run: |
+          bun install --frozen-lockfile
+          bun run scripts/build-binaries.ts bun-linux-x64
+          cp dist/inwards-linux-x64 "$RUNNER_TEMP/base-inwards"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
@@ -30,15 +45,6 @@ jobs:
           bun install --frozen-lockfile
           bun run scripts/build-binaries.ts bun-linux-x64
           cp dist/inwards-linux-x64 "$RUNNER_TEMP/head-inwards"
-      - name: Build the base branch's binary
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git worktree add "$RUNNER_TEMP/base" "$BASE"
-          cd "$RUNNER_TEMP/base"
-          bun install --frozen-lockfile
-          bun run scripts/build-binaries.ts bun-linux-x64
-          cp dist/inwards-linux-x64 "$RUNNER_TEMP/base-inwards"
       - name: Synthetic repo (2,100 files)
         run: python3 bench/generate.py "$RUNNER_TEMP/inwards-bench"
       - name: Compare
