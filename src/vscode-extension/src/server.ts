@@ -1,9 +1,11 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import process from "node:process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   type Diagnostic as CoreDiagnostic,
   Engine,
+  type InwardsConfig,
   type ModuleLookup,
   moduleNameFor,
   parseConfig,
@@ -13,14 +15,22 @@ import {
   createConnection,
   type Diagnostic,
   DiagnosticSeverity,
+  DidChangeWatchedFilesNotification,
   ProposedFeatures,
   TextDocuments,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+import { workspaceDiagnostics } from "./workspace.ts";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
-let state: { engine: Engine; root: string; ownerOf: ModuleLookup } | undefined;
+let state:
+  | { engine: Engine; config: InwardsConfig; root: string; ownerOf: ModuleLookup }
+  | undefined;
+/** The last workspace pass (INW007 and INW008 from the listing), by absolute path. */
+let workspace = new Map<string, CoreDiagnostic[]>();
+/** The full check of each open document, by absolute path. */
+const opened = new Map<string, { uri: string; found: CoreDiagnostic[] }>();
 
 connection.onInitialize(async (params) => {
   const folder = params.workspaceFolders?.[0]?.uri;
@@ -33,7 +43,7 @@ connection.onInitialize(async (params) => {
         config,
       );
       const root = resolve(dirname(configPath), config.root);
-      state = { engine, root, ownerOf: probeLookup((rel) => pathKind(root, rel)) };
+      state = { engine, config, root, ownerOf: probeLookup((rel) => pathKind(root, rel)) };
     } catch (err) {
       connection.console.warn(`Inwards disabled: ${String(err)}`);
     }
@@ -55,8 +65,59 @@ documents.onDidChangeContent(({ document }) => {
     },
     state.ownerOf,
   );
-  connection.sendDiagnostics({ uri: document.uri, diagnostics: found.map(toLsp) });
+  opened.set(path, { uri: document.uri, found });
+  publish(path);
 });
+
+documents.onDidClose(({ document }) => {
+  const path = fileURLToPath(document.uri);
+  opened.delete(path);
+  publish(path);
+});
+
+// The workspace pass runs once at start and again whenever a Python file is
+// created, changed or deleted. The server asks the client to watch them, so
+// any LSP client works, not only the VS Code extension.
+connection.onInitialized(() => {
+  if (state) {
+    connection.client
+      .register(DidChangeWatchedFilesNotification.type, { watchers: [{ globPattern: "**/*.py" }] })
+      .catch((err: unknown) =>
+        connection.console.warn(`Inwards can't watch files: ${String(err)}`),
+      );
+  }
+  refresh();
+});
+connection.onDidChangeWatchedFiles(refresh);
+
+/**
+ * Reruns the workspace pass and republishes every file whose findings may have changed.
+ */
+function refresh(): void {
+  if (!state) {
+    return;
+  }
+  const before = workspace;
+  workspace = workspaceDiagnostics(state.config, state.root);
+  for (const path of new Set([...before.keys(), ...workspace.keys()])) {
+    publish(path);
+  }
+}
+
+/**
+ * Sends a file's diagnostics: an open document's full check plus the
+ * workspace pass's INW008 for it, or the workspace pass alone for a file
+ * that isn't open.
+ *
+ * @param path - the file's absolute path.
+ */
+function publish(path: string): void {
+  const listed = workspace.get(path) ?? [];
+  const open = opened.get(path);
+  const found = open ? [...open.found, ...listed.filter((d) => d.code === "INW008")] : listed;
+  const uri = open?.uri ?? pathToFileURL(path).href;
+  connection.sendDiagnostics({ uri, diagnostics: found.map(toLsp) });
+}
 
 /**
  * Tells what is at a path under the config root, for the INW006 module probe.
@@ -76,14 +137,15 @@ function pathKind(root: string, rel: string): "file" | "dir" | undefined {
 /**
  * Reads one grammar file shipped next to dist/server.js.
  * The build copies both grammars there (see scripts/copy-wasm.ts), because
- * the extension runs on Node and cannot use Bun's embedded files.
+ * the extension runs on Node and cannot use Bun's embedded files. The
+ * directory comes from the running script: Bun's bundler writes the source
+ * directory into `__dirname` at build time, which exists only on the build machine.
  *
  * @param name - the file name, e.g. `tree-sitter-python.wasm`.
  * @returns the file's bytes.
  */
 function wasm(name: string): Uint8Array {
-  // biome-ignore lint/correctness/noGlobalDirnameFilename: the build emits CommonJS (see package.json), where __dirname is dist/.
-  return new Uint8Array(readFileSync(join(__dirname, name)));
+  return new Uint8Array(readFileSync(join(dirname(process.argv[1] ?? "."), name)));
 }
 
 /**
