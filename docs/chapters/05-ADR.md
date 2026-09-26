@@ -434,7 +434,15 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - **@clack/prompts, pinned to an exact version (1.8.1).** The analysis on #92 measured it at about 61 KB in the compiled binary. Ink plus React adds about 496 KB and 10 to 29 ms of start-up, crashes at start-up under `bun build --compile` unless a plugin stubs `react-devtools-core`, and has recent Windows rendering regressions. @inquirer/prompts has an open Windows select bug.
 - **Loaded with a dynamic `import()`** inside the picker, and only when stdin and stdout are TTYs and `CI` is unset. Without a terminal, init exits 2 at once with the flags; it never waits for input.
-- **`splitting: true` in `scripts/build-binaries.ts`.** Without it, Bun inlines the dynamically imported module into the one bundle: its code runs only when imported, but every start still parses it. Measured on Linux x64, alternating 150 to 200 runs of each binary against a `develop` build, median of per-pair differences: +5.2 ms on `--version`, +5.9 ms on a small `check`, +5.2 ms on a hook run. With splitting, the library is its own chunk inside the binary, read only when the picker runs, and the difference is within noise: -0.01 ms, -0.26 ms and -0.29 ms over 300 runs each, and -1.5% (hook) and -1.2% (full check) on the #29 benchmark.
+- **`splitting: true` in `scripts/build-binaries.ts`.** Without it, Bun inlines the dynamically imported module into the one bundle: its code runs only when imported, but every start still loads it. Measured on Linux x64 against `develop` built with the same flags, 150 to 300 alternating runs each, median of per-pair differences:
+
+    | Build | `--version` | small `check` | hook run |
+    |---|---|---|---|
+    | Without bytecode, no splitting | +5.2 ms | +5.9 ms | +5.2 ms |
+    | Bytecode ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)), no splitting | +1.7 ms | +1.7 ms | +1.1 ms |
+    | Bytecode and splitting (adopted) | -0.1 ms | +0.0 ms | -0.1 ms |
+
+    With splitting the library is its own chunk inside the binary, read only when the picker runs. The #29 benchmark agrees: hook -0.0%, full check -1.8%.
 
 **Consequences.**
 
@@ -447,7 +455,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 - *Ink:* richer layouts, but see the numbers above.
 - *Hand-written prompts on raw stdin:* no dependency, but cursor handling, resize and Windows consoles are what the library already gets right.
-- *`--bytecode` instead of splitting:* the #92 analysis measured about 2 ms for clack with bytecode. It changes how the whole binary loads, which is a bigger decision than this feature, and splitting alone already moves the cost off the start-up path.
+- *Bytecode alone:* it cuts the library's cost from about 5 ms to 1 to 2 ms, but a 10 ms start-up still pays it on every hook call for a prompt the hook never shows.
 
 ## ADR-021: Publish the release wheels to PyPI from their own workflow, with trusted publishing
 
