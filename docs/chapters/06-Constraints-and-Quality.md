@@ -157,7 +157,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 ```sh
 bun install
-bun test                                                    # 606 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
+bun test                                                    # 607 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms

@@ -108,10 +108,11 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
     edited.length === 0,
   );
   // Shape findings on files that predate the session are legacy, like old violations.
-  report.diagnostics = onePerSpot([
-    ...newLayoutErrors(project, configs, state.start.manifest, manifest),
-    ...report.diagnostics.filter((d) => !preexistingShape(d, state.start.manifest)),
-  ]);
+  const layout = newLayoutErrors(project, configs, state.start.manifest, manifest);
+  report.diagnostics = [
+    ...layout,
+    ...notIn(layout, report.diagnostics).filter((d) => !preexistingShape(d, state.start.manifest)),
+  ];
   noteRun(project, changed, report.diagnostics);
   for (const [file, config] of strangers) {
     problems.push(
@@ -259,25 +260,28 @@ function wholeProject(
 }
 
 /**
- * Drops repeated findings about a config file: in project mode an emptied
- * layer comes both from the session comparison and from the whole-project
- * check, in different words, at the same place. The first one is kept.
+ * Drops the check's findings that the session comparison already reports: in
+ * project mode an emptied layer comes from both, in different words, at the
+ * same place in pyproject.toml. Findings of one source are never merged, so
+ * an emptied prefix and a module moved out of it both stay.
  *
- * @param diagnostics - the findings, session comparison first.
- * @returns them with one config finding per rule and place.
+ * @param layout - the session comparison's findings, from `newLayoutErrors`.
+ * @param found - the check's findings.
+ * @returns `found` without a finding whose rule and place `layout` already has.
  */
-function onePerSpot(diagnostics: Diagnostic[]): Diagnostic[] {
-  const seen = new Set<string>();
-  return diagnostics.filter((d) => {
-    // Config findings have no module; code findings are never merged.
-    const spot = d.module === "" ? `${d.code}\u0000${d.file}:${d.line}:${d.column}` : undefined;
-    if (spot === undefined) {
-      return true;
-    }
-    const fresh = !seen.has(spot);
-    seen.add(spot);
-    return fresh;
-  });
+function notIn(layout: readonly Diagnostic[], found: Diagnostic[]): Diagnostic[] {
+  const spots = new Set(layout.map(spotOf));
+  return found.filter((d) => !spots.has(spotOf(d)));
+}
+
+/**
+ * Names a finding's rule and place.
+ *
+ * @param d - a finding.
+ * @returns the code, file, line and column joined.
+ */
+function spotOf(d: Diagnostic): string {
+  return `${d.code}\u0000${d.file}:${d.line}:${d.column}`;
 }
 
 /**

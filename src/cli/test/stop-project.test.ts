@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { Diagnostic } from "@inwards/core";
 import { LAYERS } from "./run.ts";
@@ -70,6 +70,23 @@ describe('stop-gate = "project"', () => {
     const json = stderr.split("\n").find((line) => line.startsWith("{")) ?? "{}";
     const { diagnostics }: { diagnostics: Diagnostic[] } = JSON.parse(json);
     expect(diagnostics.filter((d) => d.file === "pyproject.toml")).toHaveLength(1);
+  });
+
+  test("a layer's only module moved out is reported as emptied and as moved", () => {
+    for (const gate of ["project", "changed"]) {
+      const root = started(gate);
+      mkdirSync(join(root, "shop/tools"));
+      renameSync(join(root, "shop/infrastructure/db.py"), join(root, "shop/tools/db.py"));
+      const { code, stderr } = stop(root);
+      expect(code).toBe(2);
+      const json = stderr.split("\n").find((line) => line.startsWith("{")) ?? "{}";
+      const { diagnostics }: { diagnostics: Diagnostic[] } = JSON.parse(json);
+      const messages = diagnostics.filter((d) => d.file === "pyproject.toml").map((d) => d.message);
+      expect(messages).toEqual([
+        expect.stringContaining("matched modules when the session started"),
+        expect.stringContaining("moved out of layer"),
+      ]);
+    }
   });
 
   test("a symlinked pyproject.toml governs the tree it sits in", () => {
