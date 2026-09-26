@@ -21,6 +21,7 @@ import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
+import { changedBaselines } from "./baseline.ts";
 import { settingsProblem } from "./claude-settings.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { print } from "./output.ts";
@@ -87,14 +88,20 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
       undefined,
     );
   }
-  const problems = trustProblems(project, configs, state);
+  const { baselines } = state.start;
+  const edited =
+    baselines === undefined
+      ? []
+      : changedBaselines(project, Object.keys(state.start.configs), baselines);
+  const problems = trustProblems(project, configs, state, edited);
   const manifest = projectManifest(project, configs);
   const changed = changedFiles(project, state, manifest);
+  // A baseline changed during the session can't be trusted, so none is applied.
   const { report, strangers, governing } = await checkChanged(
     project,
     changed,
-    state.start,
-    configs,
+    { start: state.start, now: configs },
+    edited.length === 0,
   );
   report.diagnostics.unshift(...newPrefixErrors(project, configs, state.start.manifest, manifest));
   noteRun(project, changed, report.diagnostics);
@@ -173,22 +180,30 @@ function errorsOf(report: Report): Diagnostic[] {
 
 /**
  * Lists what makes the session untrustworthy regardless of the code: a
- * changed `[tool.inwards]`, or Claude Code settings without the Inwards hooks.
+ * changed `[tool.inwards]` or baseline, or Claude Code settings without the
+ * Inwards hooks.
  *
  * @param project - the real project root.
  * @param configs - the valid configs now.
  * @param state - the session state.
+ * @param edited - baselines that changed during the session.
  * @returns the problems, one sentence each.
  */
 function trustProblems(
   project: string,
   configs: Record<string, InwardsConfig>,
   state: SessionState,
+  edited: readonly string[],
 ): string[] {
   const problems: string[] = [];
   if (JSON.stringify(configs) !== JSON.stringify(state.start.configs)) {
     problems.push(
       "[tool.inwards] changed during this session. Put it back as it was; if the layers really must change, ask the user to do it.",
+    );
+  }
+  if (edited.length > 0) {
+    problems.push(
+      `${edited.join(", ")} changed during this session, so no baseline was applied. Tell the user; only they can restore it or take a new baseline.`,
     );
   }
   const hooks = settingsProblem(project);
@@ -252,16 +267,18 @@ function changedFiles(
  *
  * @param project - the real project root.
  * @param files - absolute changed files.
- * @param start - the session start, with its valid and invalid configs.
- * @param now - the valid configs now.
+ * @param configs - the session start, with its valid and invalid configs, and the valid configs now.
+ * @param configs.start - the session start.
+ * @param configs.now - the valid configs now.
+ * @param baseline - false to report violations the baselines accept.
  * @returns the merged report, each file governed by an unknown config with
  *   that config, and the project-relative configs the checked files fall under.
  */
 async function checkChanged(
   project: string,
   files: string[],
-  start: SessionState["start"],
-  now: Record<string, InwardsConfig>,
+  { start, now }: { start: SessionState["start"]; now: Record<string, InwardsConfig> },
+  baseline: boolean,
 ): Promise<{ report: Report; strangers: [string, string][]; governing: string[] }> {
   const byConfig = new Map<string, string[]>();
   const strangers: [string, string][] = [];
@@ -281,7 +298,7 @@ async function checkChanged(
     }
   }
   const reports = await Promise.all(
-    [...byConfig].map(([config, group]) => runCheck(config, group, project)),
+    [...byConfig].map(([config, group]) => runCheck(config, group, project, { baseline })),
   );
   return {
     report: {

@@ -6,6 +6,10 @@ export interface Report {
   diagnostics: Diagnostic[];
   filesChecked: number;
   durationMs: number;
+  /** Violations left out because the project's baseline accepts them. */
+  baselined?: number;
+  /** Baseline entries a whole-project run no longer found: fixed since the baseline. */
+  resolved?: number;
 }
 
 export type Format = "text" | "json" | "sarif";
@@ -78,7 +82,8 @@ const PLAIN: Paint = { bold: String, dim: String, red: String, green: String, cy
  * @param c - the palette: ANSI styles, or identity functions for plain text.
  * @returns the text report.
  */
-function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint): string {
+function renderText(report: Report, c: Paint): string {
+  const { diagnostics, filesChecked, durationMs } = report;
   const lines = diagnostics.map((d) =>
     [
       `${c.bold(`${d.file}:${d.line}:${d.column}:`)} ${codeLabel(d, c)} ${d.message}`,
@@ -95,7 +100,23 @@ function renderText({ diagnostics, filesChecked, durationMs }: Report, c: Paint)
     errors === 0
       ? `${c.green(c.bold("All clear:"))} ${files}, 0 violations${warned} ${ms}.`
       : `${c.red(c.bold("Found"))} ${plural(errors, "violation")}${warned} in ${files} ${ms}.`;
-  return [...lines, tail].join("\n\n");
+  return [...lines, tail, ...baselineNote(report)].join("\n\n");
+}
+
+/**
+ * Says what the baseline accepted and what has been fixed since it was taken.
+ *
+ * @param report - the check's report.
+ * @returns zero or one line.
+ */
+function baselineNote({ baselined = 0, resolved = 0 }: Report): string[] {
+  const parts = [
+    baselined === 0 ? "" : `${plural(baselined, "violation")} accepted by the baseline.`,
+    resolved === 0
+      ? ""
+      : `${plural(resolved, "baselined violation")} fixed since: run \`inwards baseline\` to drop ${resolved === 1 ? "it" : "them"}.`,
+  ].filter((part) => part !== "");
+  return parts.length === 0 ? [] : [parts.join(" ")];
 }
 
 /**
@@ -141,7 +162,8 @@ function plural(n: number, word: string): string {
  * @param indent - spaces per level, or undefined for one line.
  * @returns the JSON document.
  */
-function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: number): string {
+function renderJson(report: Report, indent?: number): string {
+  const { diagnostics, filesChecked, durationMs, baselined, resolved } = report;
   return JSON.stringify(
     {
       schema: "inwards/diagnostics@1",
@@ -149,6 +171,8 @@ function renderJson({ diagnostics, filesChecked, durationMs }: Report, indent?: 
         filesChecked,
         violations: counts(diagnostics).errors,
         warnings: counts(diagnostics).warnings,
+        ...(baselined === undefined ? {} : { baselined }),
+        ...(resolved === undefined ? {} : { resolved }),
         durationMs: Math.round(durationMs * 10) / 10,
       },
       diagnostics,

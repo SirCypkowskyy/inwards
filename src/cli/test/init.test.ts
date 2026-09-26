@@ -67,7 +67,11 @@ describe("inwards init --agent claude", () => {
       "Stop",
     ]);
     expect(settings.permissions).toEqual({
-      deny: ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"],
+      deny: [
+        "Edit(/.claude/settings*.json)",
+        "Edit(/.inwards/**)",
+        "Edit(/**/inwards-baseline.json)",
+      ],
     });
     const entry = ourEntry(root);
     expect(entry.args?.slice(-2)).toEqual(["hook", "claude-code"]);
@@ -94,7 +98,11 @@ describe("inwards init --agent claude", () => {
     const settings: Settings = JSON.parse(read(root, SETTINGS));
     expect(settings.permissions).toEqual({
       allow: ["Bash(ls)"],
-      deny: ["Edit(/.claude/settings*.json)", "Edit(/.inwards/**)"],
+      deny: [
+        "Edit(/.claude/settings*.json)",
+        "Edit(/.inwards/**)",
+        "Edit(/**/inwards-baseline.json)",
+      ],
     });
     expect(settings.hooks["PostToolUse"]?.[0]).toEqual({ matcher: "Edit", hooks: [own] });
     expect(settings.hooks["PostToolUse"]).toHaveLength(2);

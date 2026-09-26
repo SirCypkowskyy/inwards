@@ -67,8 +67,8 @@ Vertical slice
 Agent hook
 :   A command that an AI coding tool runs automatically around its own actions, for example Claude Code's `PostToolUse` and `Stop` hooks. Inwards' main integration point. See [chapter 4](04-AI-Integration.md).
 
-Baseline :material-progress-clock:
-:   A recorded list of existing violations that don't fail the check, so a legacy codebase can adopt Inwards and still block new violations (UC6).
+Baseline
+:   The violations a project already had when it adopted Inwards, recorded by `inwards baseline` in `inwards-baseline.json` next to `pyproject.toml`. They don't fail the check; new ones do (UC6). Entries match by rule, module and message, not by line.
 
 Confirming parse
 :   The full tree-sitter parse the engine runs when the import skeleton reports a violation, so that only real imports are ever reported. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse).
