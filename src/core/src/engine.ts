@@ -12,6 +12,7 @@ import {
   normalizeSource,
   parsePython,
 } from "./python.ts";
+import { checkShape } from "./shape.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 import { checkUnassignedImports, type ModuleLookup, unassignedWarning } from "./unassigned.ts";
 
@@ -46,9 +47,10 @@ export class Engine {
   }
 
   /**
-   * Checks one file against every layer rule.
-   * Parses only the import skeleton first. Violations are rare, so the full
-   * parse runs only to confirm one (or when the prescan declines the file).
+   * Checks one file against every rule.
+   * The package shape (INW007) comes first and reads only the path. Then only
+   * the import skeleton is parsed. Violations are rare, so the full parse runs
+   * only to confirm one (or when the prescan declines the file).
    *
    * The text is normalised first (BOM dropped, lone \r turned into \n), so
    * reported lines and columns match what an editor shows. A file in a layer
@@ -60,8 +62,8 @@ export class Engine {
    * whose text names a loader (`mentionsDynamicImport`) skips the skeleton and
    * gets the full parse, which also looks for dynamic imports (INW011).
    *
-   * A file outside every layer isn't parsed: it gets at most an INW006 warning
-   * naming its package.
+   * A file outside every layer isn't parsed: besides its shape, it gets at
+   * most an INW006 warning naming its package.
    *
    * @param file - the source file as read by the adapter.
    * @param ownerOf - finds the first-party module an import lands in (INW006).
@@ -69,6 +71,17 @@ export class Engine {
    */
   checkFile(file: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
+    return [...checkShape(src, this.config), ...this.layerFindings(src, ownerOf)];
+  }
+
+  /**
+   * Applies the rules that read the file's text, see `checkFile`.
+   *
+   * @param src - the source file, with normalised text.
+   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @returns the violations found.
+   */
+  private layerFindings(src: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
     if (layerIndexOf(src.module, this.config.layers) === -1) {
       const warning = unassignedWarning(src, this.config);
       return warning ? [warning] : [];
