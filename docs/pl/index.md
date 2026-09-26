@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: 4f68ed93770e53d96068a412ec4420c5897629df6a49459e4f31da7326fdb05c
+source_hash: 05b6c7133a704d360f379ab9da6952f92259a38a7e113d332eb3f878807d318b
 hide:
   - navigation
 ---
@@ -106,7 +106,7 @@ Deklarujesz swoje warstwy w `pyproject.toml`. `inwards check` zgłasza błąd, g
 
     ---
 
-    Osiemnaście decyzji, między innymi „dlaczego TypeScript”, „jak powstaje wydanie” i „jak wybiera się pakiety”.
+    Wszystkie decyzje architektoniczne, między innymi „dlaczego TypeScript”, „jak powstaje wydanie” i „jak wybiera się pakiety”.
 
 -   :material-speedometer:{ .lg .middle } __[Ograniczenia i jakość](06-Constraints-and-Quality.md)__
 
