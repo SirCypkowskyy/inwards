@@ -25,114 +25,13 @@ import { BASELINE_FILE } from "./baseline.ts";
 import { holdsInwardsHooks } from "./claude-settings.ts";
 import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-sim.ts";
 import { findConfig, isInside, realpath } from "./paths.ts";
+import { runsInwards } from "./shell.ts";
 
 const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 /** `.inwards`, or a prefix of it (`.inw*`), as a path segment in a shell command. */
 const STATE_IN_SHELL = /(?:^|[\s"'=:/\\(<>|;&`${},])\.inw/u;
 const BASELINE_IN_SHELL = /inwards-baseline\.json/iu;
 const SETTINGS_IN_SHELL = /\.claude\b[\s\S]*\bsettings(?:\.local)?\.json/u;
-/** Where a new command can start in a shell line: separators, subshells, substitutions. */
-const COMMAND_BREAK = /[;&|\n`(]|\$\(/u;
-const WHITESPACE = /\s+/u;
-const QUOTES = /^["']+|["']+$/gu;
-/** A version or extra after a package name: `inwards@latest`, `inwards==0.2`. */
-const PACKAGE_SUFFIX = /(?:@|==|\[).*$/u;
-const ASSIGNMENT = /^\w+=/u;
-const PATH_SEPARATOR = /[\\/]/u;
-/** `-u` or `--from`; a lone `-` (a Markdown bullet in a heredoc) isn't one. */
-const OPTION = /^--?[A-Za-z]/u;
-const PYTHON = /^(?:python[\d.]*|py)$/u;
-/** Words that run the next word as a command, and the second word of `uv run` and the like. */
-const RUNNERS: ReadonlySet<string> = new Set([
-  "uvx",
-  "bunx",
-  "npx",
-  "env",
-  "sudo",
-  "command",
-  "exec",
-  "nice",
-  "time",
-  "nohup",
-  "uv",
-  "bun",
-  "pipx",
-  "poetry",
-  "pdm",
-  "hatch",
-  "bash",
-  "sh",
-  "zsh",
-  "run",
-  "x",
-  "tool",
-  "-m",
-  "-c",
-]);
-
-/**
- * Tells whether a shell command runs `inwards hook` or `inwards baseline`,
- * directly or behind a runner (`uvx --from inwards inwards baseline`,
- * `env X=1 inwards hook`, `python -m inwards baseline`). Each command in the
- * line is read word by word, so a commit message or a grep that mentions the
- * words isn't caught, and the time stays linear in the command's length.
- *
- * @param command - the Bash tool's `command`.
- * @returns true when some command in it runs one of the two.
- */
-function runsInwards(command: string): boolean {
-  return command.split(COMMAND_BREAK).some((segment) => {
-    const words = segment
-      .trim()
-      .split(WHITESPACE)
-      .map((w) => w.replace(QUOTES, ""));
-    for (let i = 0; i < words.length; i += 1) {
-      if (callsInwards(words, i)) {
-        return true;
-      }
-      if (!mayPrecede(words, i)) {
-        return false;
-      }
-    }
-    return false;
-  });
-}
-
-/**
- * Tells whether the words at `i` are `inwards hook` or `inwards baseline`.
- *
- * @param words - one command's words, unquoted.
- * @param i - the position to look at.
- * @returns true for the executable (any path, `.exe`, `@version`) followed by one of the two.
- */
-function callsInwards(words: readonly string[], i: number): boolean {
-  const name = (words[i]?.split(PATH_SEPARATOR).at(-1) ?? "").replace(PACKAGE_SUFFIX, "");
-  return (
-    (name === "inwards" || name === "inwards.exe") &&
-    ["hook", "baseline"].includes(words[i + 1] ?? "")
-  );
-}
-
-/**
- * Tells whether a word can come before the command a runner starts: a runner,
- * an option or its value, or a `VAR=value` assignment.
- *
- * @param words - one command's words, unquoted.
- * @param i - the position of the word.
- * @returns true when reading may go on to the next word.
- */
-function mayPrecede(words: readonly string[], i: number): boolean {
-  const word = words[i] ?? "";
-  const optionValue = i > 0 && OPTION.test(words[i - 1] ?? "");
-  return (
-    RUNNERS.has(word) ||
-    PYTHON.test(word) ||
-    OPTION.test(word) ||
-    ASSIGNMENT.test(word) ||
-    optionValue
-  );
-}
-
 /** A command that only reads: no redirection, chaining, substitution or in-place flag. */
 const READ_ONLY =
   /^\s*(?:cat|less|head|tail|grep|rg|wc|ls|stat|file|diff|git\s+(?:status|diff|log|show))\b(?![^\n]*(?:[;&|<>`]|\$\(|\s-i\b|--in-place))/u;

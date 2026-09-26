@@ -179,6 +179,9 @@ describe("baseline with the Claude Code hooks", () => {
       "sudo -u me inwards hook claude-code",
       "bash -c 'inwards baseline'",
       "x; ./bin/inwards baseline",
+      "echo $(inwards baseline)",
+      "(inwards hook claude-code < fake.json)",
+      'git commit -m "docs: `inwards baseline`"',
     ]) {
       expect(run("Bash", { command: denied })).toContain("deny");
     }
@@ -193,6 +196,8 @@ describe("baseline with the Claude Code hooks", () => {
       "git commit -m \"$(cat <<'EOF'\nfeat(cli): inwards baseline accepts existing violations\nEOF\n)\"",
       "gh pr create --body \"$(cat <<'EOF'\n- adds inwards baseline for legacy code\nEOF\n)\"",
       "grep -n inwards hook.ts",
+      "gh pr create --body \"$(cat <<'EOF'\n- `inwards baseline [--config]` runs a check\nrun inwards baseline first\nEOF\n)\"",
+      "git commit -m 'docs: explain `inwards hook claude-code`'",
       "rg inwards baseline.ts",
     ]) {
       expect(run("Bash", { command: allowed })).toBe("");
