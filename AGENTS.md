@@ -80,9 +80,10 @@ gh api repos/$R/issues/N/dependencies/blocked_by -F issue_id=$BLOCKER_ID
 squash-merged. `main` holds released code and moves only at a release: the
 owner opens a promotion PR `develop` → `main` and merges it with a merge
 commit, then merges release-please's release PR. The release commit (versions,
-CHANGELOG) stays on `main` only, which is one more reason never to edit those
-files. Rulesets enforce this: no direct pushes, no force pushes, required
-checks, squash only into `develop`.
+CHANGELOG) stays on `main` only, so `develop` keeps `0.1.0` in its version
+fields; that is expected, and one more reason never to edit those files.
+Rulesets enforce this: no direct pushes, no force pushes, required checks,
+squash only into `develop`, merge commits only into `main`.
 
 Agents from other harnesses work the same way as the coordinator's subagents:
 claim the issue, use their own worktree, open a PR to `develop`, and leave the
@@ -192,11 +193,23 @@ PR description is its body. Commits inside a branch can say anything.
   Don't start a paragraph with `fix:`, `feat:` or another type, because each
   one becomes an extra changelog entry. `Release-As: 0.N.0` only counts in the
   description's **last paragraph**.
-- **Promotion** (owner or coordinator, at a release):
-  `gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promotes develop for the next release."`,
-  then `gh pr merge N --merge`. Never squash it: release-please reads the
-  feature commits through the merge. Keep the description free of `feat:`
-  or `fix:` paragraphs.
+- **A release happens in one sitting, with `develop` frozen** (owner, or the
+  coordinator when asked). release-please walks `main`'s history by commit
+  date and stops at the last release commit, so a PR squash-merged into
+  `develop` before a release PR merges, but promoted after it, is silently
+  left out of the changelog and the version bump.
+  1. Stop merging into `develop`.
+  2. Promote: `gh pr create --base main --head develop --title "chore: promote develop to main" --body "Promotes develop for the next release."`,
+     then `gh pr merge N --merge`. Never squash it: release-please reads the
+     feature commits through the merge. Keep the description free of
+     `feat:` or `fix:` paragraphs.
+  3. Wait for release-please to update its release PR, check the changelog,
+     and merge it (`gh pr merge N --merge --admin`: it gets no CI run).
+  4. Publish the draft release, then resume merging into `develop`.
+
+  Don't promote without releasing, and never merge a release PR that isn't
+  right after a promotion. Before merging anything into `develop`, check that
+  `gh pr list --base main --label "autorelease: pending"` is empty.
 - A GitHub "Revert" button titles the PR `Revert "…"`. Rename it
   `revert: …` so the title check passes.
 - To fix a changelog line after a merge, edit the merged PR's description with

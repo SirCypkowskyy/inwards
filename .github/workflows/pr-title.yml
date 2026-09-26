@@ -1,6 +1,6 @@
 name: PR title
 
-# The PR title becomes the squash commit on main and its CHANGELOG line (ADR-017).
+# The PR title becomes the squash commit on develop and, after a release, its CHANGELOG line (ADR-017, ADR-019).
 on:
   pull_request_target: # reads the title only; never checks out PR code
     types: [opened, edited, reopened, synchronize]

@@ -88,10 +88,7 @@
           "type": "toml",
           "path": "uv.lock",
           "jsonpath": "$.package[?(@.source.virtual)].version"
-        },
-        "README.md",
-        "docs/chapters/index.md",
-        "docs/chapters/01-Introduction.md"
+        }
       ]
     }
   }
