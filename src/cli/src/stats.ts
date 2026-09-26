@@ -53,7 +53,10 @@ const SEP = "\u0000";
 
 /** Where one session stands on one file while the log is read. */
 interface FileState {
+  /** Counted already, or there before the session's first edit. */
   seen: Set<string>;
+  /** Another session's, still in the file: not this session's until the file loses it. */
+  foreign: Set<string>;
   /** Fingerprints first reported at the previous run for this file, waiting for the next. */
   pending: string[];
   /** When the pending fingerprints were reported. */
@@ -83,7 +86,7 @@ interface Pass {
  *   reports it counts as not fixed; otherwise it is listed as without a retry.
  * - Violations that were there before the agent's first edit are left out:
  *   those a `check` run reported before it, and those the file's last hook
- *   run in an earlier session still had.
+ *   run in another session had, until a run on the file no longer has them.
  * - Latency and run counts cover hook runs that checked a file.
  *
  * @param lines - the log, in time order.
@@ -131,13 +134,22 @@ function observe(pass: Pass, run: RunLine, file: string): void {
   for (const print of state.pending) {
     pass.settled.push({ print, fixed: !run.fingerprints.includes(print) });
   }
-  // A violation another session's run on this file already had is that session's.
+  // A violation another session's run left in this file is that session's,
+  // until a run on the file no longer has it.
   const last = pass.lastRun.get(file);
+  for (const print of state.foreign) {
+    if (!last?.prints.includes(print)) {
+      state.foreign.delete(print);
+    }
+  }
   const others = last && last.session !== session ? last.prints : [];
-  const fresh = errorsOf(run).filter((print) => !state.seen.has(print));
+  const fresh = errorsOf(run).filter((p) => !(state.seen.has(p) || state.foreign.has(p)));
+  for (const print of fresh.filter((p) => others.includes(p))) {
+    state.foreign.add(print);
+  }
   state.pending = fresh.filter((print) => !others.includes(print));
   state.pendingAt = Date.parse(run.at);
-  for (const print of fresh) {
+  for (const print of state.pending) {
     state.seen.add(print);
   }
   for (const print of state.pending) {
@@ -162,8 +174,12 @@ function fileState(pass: Pass, session: string, file: string): FileState {
   if (state === undefined) {
     const last = pass.lastRun.get(file);
     const inherited = last && last.session !== session ? last.prints : [];
-    const seen = new Set([...(pass.old.get(session) ?? []), ...inherited]);
-    state = { seen, pending: [], pendingAt: 0 };
+    state = {
+      seen: new Set(pass.old.get(session) ?? []),
+      foreign: new Set(inherited),
+      pending: [],
+      pendingAt: 0,
+    };
     pass.states.set(key, state);
   }
   return state;

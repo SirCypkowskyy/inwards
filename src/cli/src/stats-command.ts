@@ -3,6 +3,7 @@
  * prints the hypothesis numbers, each next to its chapter-2 threshold.
  */
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { print } from "./output.ts";
@@ -15,7 +16,7 @@ const PERCENT = 100;
 
 /**
  * Runs `inwards stats`. The project is DIR, else `CLAUDE_PROJECT_DIR`, else
- * the git work tree around the working directory, else the working directory:
+ * the git work tree around the working directory, else the folder `projectRoot` finds:
  * the hooks log at that root and `check` next to each config below it.
  *
  * @param format - `text` or `json`.
@@ -31,7 +32,7 @@ export function statsCommand(format: string, dir: string | undefined): number {
     dir ??
     (process.env["CLAUDE_PROJECT_DIR"] ||
       git(cwd, ["rev-parse", "--show-toplevel"])?.trim() ||
-      outermostLog(cwd));
+      projectRoot(cwd));
   const project = realpath(root);
   if (!project) {
     return print(`No such directory: ${root}`, 2);
@@ -71,23 +72,26 @@ function renderStatsText(stats: Stats): string {
   ].join("\n");
 }
 /**
- * Finds the outermost directory at or above `start` that holds a run log,
- * for a project outside git: the hooks log at the project root, above the
- * packages.
+ * Finds the project a working directory belongs to, for a project outside
+ * git: the nearest folder with `.inwards/state` (the hooks keep it at the
+ * project root), else the outermost folder with a run log. The walk stops
+ * below the home directory, so a stray `~/.inwards` is never taken.
  *
  * @param start - the working directory.
- * @returns that directory, or `start` when none above it has a log.
+ * @returns that folder, or `start` when none qualifies.
  */
-function outermostLog(start: string): string {
-  let found = start;
-  for (let dir = start; ; dir = dirname(dir)) {
-    if (["runs.jsonl", "runs.1.jsonl"].some((name) => existsSync(join(dir, ".inwards", name)))) {
-      found = dir;
+function projectRoot(start: string): string {
+  const home = homedir();
+  let outermost: string | undefined;
+  for (let dir = start; dir !== home && dirname(dir) !== dir; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".inwards", "state"))) {
+      return dir;
     }
-    if (dirname(dir) === dir) {
-      return found;
+    if (["runs.jsonl", "runs.1.jsonl"].some((name) => existsSync(join(dir, ".inwards", name)))) {
+      outermost = dir;
     }
   }
+  return outermost ?? start;
 }
 
 /**

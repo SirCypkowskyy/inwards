@@ -4,79 +4,7 @@ import { join } from "node:path";
 import { readRunLogs } from "../src/runs.ts";
 import { computeStats, type Stats } from "../src/stats.ts";
 import { inwards, LAYERS, project } from "./run.ts";
-
-/**
- * Builds one run-log line.
- *
- * @param at - minutes after the start, for the `at` field.
- * @param fields - the fields that differ from a plain PostToolUse line.
- * @returns the line as JSON text.
- */
-function line(at: number, fields: Record<string, unknown>): string {
-  return JSON.stringify({
-    v: 1,
-    at: new Date(Date.UTC(2026, 8, 26, 12, at)).toISOString(),
-    session_id: "s1",
-    event: "PostToolUse",
-    tool: "Edit",
-    files: [],
-    lines: [],
-    fingerprints: [],
-    exit: 0,
-    durationMs: 0,
-    ...fields,
-  });
-}
-
-/**
- * A PostToolUse line for one file.
- *
- * @param at - minutes after the start.
- * @param session - the session id.
- * @param file - the edited file.
- * @param rest - lines added, fingerprints, codes (optional) and duration.
- * @returns the line as JSON text.
- */
-function edit(
-  at: number,
-  session: string,
-  file: string,
-  rest: { added: number; prints: string[]; codes?: string[]; ms: number },
-): string {
-  return line(at, {
-    session_id: session,
-    files: [file],
-    lines: [{ file, added: rest.added, removed: 0 }],
-    fingerprints: rest.prints,
-    ...(rest.codes ? { codes: rest.codes } : {}),
-    durationMs: rest.ms,
-  });
-}
-
-// Worked by hand:
-// - pOld was reported by `check --log` before both sessions, so it never counts.
-// - s1: p1 (INW001) in a.py is gone at the next a.py run: fixed. p2 (INW011) in
-//   b.py is still there: not fixed. p3 in c.py has no later run, and its line
-//   predates `codes`: no retry, rule unknown.
-// - Retry rate 1 of 2. Violations 3 (p1, p2, p3) in 10+2+20+1+7+10 = 50 lines:
-//   60 per 1,000. Latency [30,40,50,60,200,20]: p50 40, p95 200.
-const LOG = [
-  line(0, {
-    session_id: null,
-    event: "check",
-    files: ["."],
-    fingerprints: ["pOld"],
-    codes: ["INW001"],
-  }),
-  line(1, { event: "SessionStart", tool: null }),
-  edit(2, "s1", "a.py", { added: 10, prints: ["pOld", "p1"], codes: ["INW001", "INW001"], ms: 30 }),
-  edit(3, "s1", "a.py", { added: 2, prints: ["pOld"], codes: ["INW001"], ms: 40 }),
-  edit(4, "s1", "b.py", { added: 20, prints: ["p2"], codes: ["INW011"], ms: 50 }),
-  edit(5, "s1", "b.py", { added: 1, prints: ["p2"], codes: ["INW011"], ms: 60 }),
-  edit(6, "s1", "c.py", { added: 7, prints: ["p3"], ms: 200 }),
-  edit(7, "s2", "a.py", { added: 10, prints: ["pOld"], codes: ["INW001"], ms: 20 }),
-  "not json",
-];
+import { edit, LOG, line, statsOf, withLog } from "./stats-helpers.ts";
 
 const EXPECTED: Stats = {
   schema: "inwards/stats@1",
@@ -99,19 +27,6 @@ const EXPECTED: Stats = {
   violationsPer1000Lines: { violations: 3, linesAdded: 50, rate: 60, target: 1, met: true },
   hookLatencyMs: { runs: 6, p50: 40, p95: 200, target: 100, met: true },
 };
-
-/**
- * Creates a project whose run log holds the given lines.
- *
- * @param lines - the log lines.
- * @returns the project directory.
- */
-function withLog(lines: string[]): string {
-  const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "" });
-  mkdirSync(join(root, ".inwards"), { recursive: true });
-  writeFileSync(join(root, ".inwards/runs.jsonl"), `${lines.join("\n")}\n`);
-  return root;
-}
 
 describe("inwards stats", () => {
   test("the numbers match the hand-computed log", () => {
@@ -152,17 +67,6 @@ describe("inwards stats", () => {
     expect(inwards(["stats", "--config", "pyproject.toml"], { cwd: root }).code).toBe(2);
   });
 });
-
-/**
- * Computes stats for a handful of lines.
- *
- * @param lines - log lines as JSON text.
- * @returns the numbers.
- */
-function statsOf(lines: string[]): Stats {
-  const { lines: parsed, skipped } = readRunLogs([withLog(lines)]);
-  return computeStats(parsed, skipped);
-}
 
 describe("inwards stats: review cases", () => {
   test("a check run after SessionStart but before the first edit still marks old violations", () => {
@@ -252,54 +156,5 @@ describe("inwards stats: review cases", () => {
     const run = inwards(["stats", "--format", "json"], { cwd: join(root, "pkg"), env });
     expect(run.code).toBe(0);
     expect(JSON.parse(run.stdout).fixedWithinOneRetry).toMatchObject({ reported: 1, fixed: 1 });
-  });
-});
-
-describe("inwards stats: edge cases (#112)", () => {
-  test("two sessions on one file at once: a violation belongs to the session that made it", () => {
-    const stats = statsOf([
-      edit(0, "A", "a.py", { added: 1, prints: [], ms: 1 }),
-      edit(1, "B", "a.py", { added: 1, prints: ["p"], ms: 1 }),
-      edit(2, "A", "a.py", { added: 1, prints: ["p"], ms: 1 }),
-      edit(3, "B", "a.py", { added: 1, prints: [], ms: 1 }),
-    ]);
-    expect(stats.fixedWithinOneRetry).toMatchObject({ reported: 1, fixed: 1 });
-    expect(stats.violationsPer1000Lines.violations).toBe(1);
-  });
-
-  test("a .py and its .pyi count the same way in both rates", () => {
-    const stats = statsOf([
-      edit(0, "s1", "m.py", { added: 1, prints: ["p"], ms: 1 }),
-      edit(1, "s1", "m.pyi", { added: 1, prints: ["p"], ms: 1 }),
-      edit(2, "s1", "m.py", { added: 1, prints: [], ms: 1 }),
-      edit(3, "s1", "m.pyi", { added: 1, prints: [], ms: 1 }),
-    ]);
-    expect(stats.fixedWithinOneRetry.reported).toBe(2);
-    expect(stats.violationsPer1000Lines.violations).toBe(2);
-  });
-
-  test("outside git, a package's stats read the log above it", () => {
-    const root = withLog(LOG);
-    mkdirSync(join(root, "pkg"), { recursive: true });
-    const run = inwards(["stats", "--format", "json"], { cwd: join(root, "pkg") });
-    expect(JSON.parse(run.stdout).hookRuns).toBe(6);
-  });
-
-  test("--config gets a one-line reason", () => {
-    const root = withLog(LOG);
-    const run = inwards(["stats", "--config", "pyproject.toml"], { cwd: root });
-    expect(run.code).toBe(2);
-    expect(run.stderr.trim().split("\n")).toHaveLength(1);
-  });
-
-  test("79.95% isn't shown as 80% next to a missed target", () => {
-    const runs: string[] = [];
-    for (let i = 0; i < 2000; i += 1) {
-      const kept = i < 401 ? [`p${i}`] : [];
-      runs.push(edit(0, "s1", `f${i}.py`, { added: 0, prints: [`p${i}`], ms: 1 }));
-      runs.push(edit(1, "s1", `f${i}.py`, { added: 0, prints: kept, ms: 1 }));
-    }
-    const text = inwards(["stats", withLog(runs)], { cwd: withLog([]) });
-    expect(text.stdout).toContain("1599 of 2000 (79.9%). Target: at least 80%. Not met.");
   });
 });
