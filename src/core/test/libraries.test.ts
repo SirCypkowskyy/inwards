@@ -165,9 +165,9 @@ layers = [{ name = "d", modules = ["shop.domain"] }, { name = "i", modules = ["s
     expect(withKeys(keys, "os.path")).toHaveLength(1);
     expect(withKeys(keys, "requests")).toHaveLength(1);
     expect(withKeys(keys, "sqlalchemy")).toEqual([]);
-    expect(withKeys('deny-libraries = [], extend-deny-libraries = ["os"]', "sqlalchemy")).toEqual(
-      [],
-    );
+    const emptied = 'deny-libraries = [], extend-deny-libraries = ["os"]';
+    expect(withKeys(emptied, "sqlalchemy")).toEqual([]);
+    expect(withKeys(emptied, "os")).toHaveLength(1);
   });
 
   test("allow-libraries still wins over extend-deny-libraries", () => {

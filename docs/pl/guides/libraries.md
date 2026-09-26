@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/libraries.md
-source_hash: 7446c2c2489051c518559ef9af6c20657482b8191718a4026daaa8c41a73396d
+source_hash: ccb7a52abacd045300972f0ac6b344d95ce80347c367624c96292426ce530d7e
 ---
 
 # Biblioteki w warstwach { #libraries-per-layer }
@@ -22,7 +22,7 @@ Import jest sprawdzany, gdziekolwiek się znajduje: na najwyższym poziomie, wew
 Trzy opcjonalne klucze warstwy, każdy z listą nazw importu: identyfikatorów Pythona z kropkami, takich jak `sqlalchemy` albo `http.client`. Wpis obejmuje moduł i wszystko pod nim: `sqlalchemy` obejmuje `sqlalchemy.orm.Session`, a `http.client` obejmuje `http.client.HTTPConnection`, ale nie `http.HTTPStatus`. Globy (`sqlalchemy.*`) i nazwy dystrybucji (`python-dateutil`, importowany jako `dateutil`) to błędy konfiguracji, bo do niczego by nie pasowały.
 
 - `allow-libraries`: gdy jest ustawione, warstwa może importować tylko te biblioteki zewnętrzne. Biblioteka standardowa pozostaje dozwolona.
-- `deny-libraries`: warstwa nie może importować tych modułów, łącznie z biblioteką standardową. W najbardziej wewnętrznej warstwie zastępuje domyślną listę zakazów.
+- `deny-libraries`: warstwa nie może importować tych modułów, łącznie z biblioteką standardową. W najbardziej wewnętrznej z dwóch lub więcej warstw zastępuje domyślną listę zakazów.
 - `extend-deny-libraries`: dopisuje te moduły do listy zakazów warstwy, łącznie z biblioteką standardową. Lista, do której dopisuje, to `deny-libraries`, gdy warstwa je ustawia, w przeciwnym razie domyślna lista zakazów w najbardziej wewnętrznej z dwóch lub więcej warstw, a w przeciwnym razie pusta lista, więc w każdej innej warstwie działa jak `deny-libraries`. Powtórzone wpisy i wpisy, które już są na liście, niczego nie psują.
 
 Gdy lista dozwolonych i lista zakazów wymieniają ten sam moduł, wygrywa dłuższy wpis (`deny-libraries = ["os"]` z `allow-libraries = ["os.path"]` pozwala tylko na `os.path`), a przy remisie wygrywa `allow`. Dlatego `allow-libraries = ["http"]` nie znosi dłuższego wpisu `http.client` z listy domyślnej; znosi go `allow-libraries = ["http.client"]`. Bez żadnego z tych trzech kluczy warstwa może importować dowolną bibliotekę, z wyjątkiem najbardziej wewnętrznej warstwy w konfiguracji z dwiema lub więcej warstwami, która dostaje opisaną niżej domyślną listę zakazów.

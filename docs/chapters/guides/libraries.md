@@ -17,7 +17,7 @@ The import is checked wherever it is: top level, inside a function, behind `if T
 Three optional keys on a layer, each a list of import names: dotted Python identifiers such as `sqlalchemy` or `http.client`. An entry covers the module and everything below it: `sqlalchemy` covers `sqlalchemy.orm.Session`, `http.client` covers `http.client.HTTPConnection` but not `http.HTTPStatus`. Globs (`sqlalchemy.*`) and distribution names (`python-dateutil`, which imports as `dateutil`) are config errors, since they would match nothing.
 
 - `allow-libraries`: once set, the layer may import only these third-party libraries. The standard library stays allowed.
-- `deny-libraries`: the layer may not import these, standard library included. On the innermost layer it replaces the default deny list.
+- `deny-libraries`: the layer may not import these, standard library included. On the innermost of two or more layers it replaces the default deny list.
 - `extend-deny-libraries`: adds these to the layer's deny list, standard library included. The list it adds to is `deny-libraries` when the layer sets it, else the default deny list on the innermost of two or more layers, else nothing, so on any other layer it works like `deny-libraries`. Repeated entries and entries already in the list are harmless.
 
 When the allow and deny lists both name a module, the longer entry wins (`deny-libraries = ["os"]` with `allow-libraries = ["os.path"]` allows `os.path` only), and `allow` wins a tie. So `allow-libraries = ["http"]` does not undo the default's longer `http.client`; `allow-libraries = ["http.client"]` does. Without any of the three keys a layer may import any library, except the innermost layer of a config with two or more layers, which gets the default deny list below.

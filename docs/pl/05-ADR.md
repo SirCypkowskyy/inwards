@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 61fb07e12590ca0d86887444fe32049d04f6e67190cae1b3aacccfaa43fd2dc3
+source_hash: f794901c271805171a45b325316394fccd01ed02ba04b8f3a2d6d57368f388be
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }

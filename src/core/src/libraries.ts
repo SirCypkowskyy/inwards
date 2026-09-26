@@ -10,7 +10,8 @@
  * tie; with no match, a third-party import passes only when the layer sets
  * no `allow-libraries`, and stdlib always passes. The innermost of two or
  * more layers denies `DEFAULT_DENY` unless it sets `deny-libraries`, and
- * `extend-deny-libraries` adds to whichever of the two applies (#155).
+ * `extend-deny-libraries` adds to whichever of the two applies (#155). On
+ * any other layer without `deny-libraries` it adds to an empty list.
  */
 import type { LayerSpec } from "./config.ts";
 import { layerIndexOf } from "./layers.ts";

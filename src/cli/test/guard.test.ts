@@ -91,6 +91,22 @@ describe("config guard: pyproject.toml", () => {
     expect(reason).toContain("ask the user");
   });
 
+  test.each([
+    ["removing", '{ name = "domain", modules = ["shop.domain"] }'],
+    ["shrinking", '{ name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["os"] }'],
+  ])("%s extend-deny-libraries is denied", (_, newString) => {
+    const extended =
+      '{ name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["os", "pydantic"] }';
+    const withKey = project({
+      "pyproject.toml": PYPROJECT.replace(
+        '{ name = "domain", modules = ["shop.domain"] }',
+        extended,
+      ),
+    });
+    const edit = { file_path: "pyproject.toml", old_string: extended, new_string: newString };
+    expect(denied(pre(withKey, "Edit", edit))).toContain("[tool.inwards]");
+  });
+
   test("a CRLF file edited with LF strings is still compared", () => {
     const crlf = project({ "pyproject.toml": PYPROJECT.replaceAll("\n", "\r\n") });
     const edit = {
