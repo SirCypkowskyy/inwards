@@ -14,8 +14,8 @@ import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 /**
- * Finds the first-party module an import target lives in, the port INW006
- * needs from the adapter (see `probeLookup`).
+ * Finds the first-party module an import target lives in, what INW006 asks
+ * the module index (`ProjectIndex.ownerOf`, built by `probeLookup`).
  *
  * @param target - a resolved dotted import target.
  * @returns the owning first-party module, or undefined for third-party code.

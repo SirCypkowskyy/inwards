@@ -5,7 +5,7 @@ import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } fro
 import { checkEncoding } from "./encoding.ts";
 import { checkLayers, layerIndexOf } from "./layers.ts";
 import { skeletonImports } from "./prescan.ts";
-import { ProjectIndex } from "./project.ts";
+import { type ProjectFiles, ProjectIndex } from "./project.ts";
 import {
   createPythonParser,
   extractImports,
@@ -78,11 +78,12 @@ export class Engine {
    * most an INW006 warning naming its package.
    *
    * @param file - the source file as read by the adapter.
-   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param project - the project's module index (see `index`).
    * @returns the violations found, empty when the file is clean.
    */
-  checkFile(file: SourceFile, ownerOf: ModuleLookup): Diagnostic[] {
+  checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
+    const { ownerOf } = project;
     return [
       ...checkShape(src, this.config),
       ...this.confirm(src, this.scan(src, ownerOf), ownerOf),
@@ -198,14 +199,15 @@ export class Engine {
   }
 
   /**
-   * Builds the project-wide index over every source file of a project.
-   * Cheap: only the module set is computed now. The reverse-import map is
-   * built on first use, reading imports skeleton-first like `checkFile`.
+   * Builds the project's module index, the input `checkFile` and `checkFiles`
+   * take. Free: nothing is listed or read until a rule asks (see
+   * `ProjectIndex`). The reverse-import map reads imports skeleton-first,
+   * like `checkFile`.
    *
-   * @param files - every source file under the config root, as the adapter read them.
-   * @returns the index; `importersOf` reads imports lazily.
+   * @param files - the adapter's view of the files under the config root.
+   * @returns the index.
    */
-  index(files: readonly SourceFile[]): ProjectIndex {
+  index(files: ProjectFiles): ProjectIndex {
     return new ProjectIndex(files, (file) => {
       const src = { ...file, text: normalizeSource(file.text) };
       return skeletonImports(this.parser, src) ?? this.imports(src);
@@ -225,15 +227,16 @@ export class Engine {
    * Those findings are returned unconfirmed. See `acceptedModules`.
    *
    * @param files - the source files to check.
-   * @param ownerOf - finds the first-party module an import lands in (INW006).
+   * @param project - the project's module index (see `index`).
    * @param accepted - accepted copies by baseline key, when a baseline applies.
    * @returns every violation across all files, baselined ones included.
    */
   checkFiles(
     files: Iterable<SourceFile>,
-    ownerOf: ModuleLookup,
+    project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
   ): Diagnostic[] {
+    const { ownerOf } = project;
     const scanned = [...files].map((file) => {
       const src = { ...file, text: normalizeSource(file.text) };
       return { src, scan: this.scan(src, ownerOf) };

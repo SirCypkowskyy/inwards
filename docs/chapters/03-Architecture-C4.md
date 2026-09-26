@@ -100,6 +100,7 @@ The engine is a hexagon in miniature. It gets bytes and text in and returns plai
 flowchart LR
     subgraph driving["Driving side (adapters call in)"]
         files["SourceFile[]<br/><small>path, module, text</small>"]
+        pfiles["ProjectFiles<br/><small>probe, listing, reader</small>"]
         cfgtext["pyproject.toml text"]
         wasm["GrammarBinaries<br/><small>runtime + python .wasm</small>"]
     end
@@ -123,6 +124,7 @@ flowchart LR
     rules --> fix
     rules --> engine
     engine -. "confirm with full parse" .-> parser
+    pfiles --> modgraph
     engine --> modgraph
     modgraph -. "imports of candidate files" .-> extract
     engine --> report
@@ -138,7 +140,7 @@ flowchart LR
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. The package shape (INW007) is checked first, from the path alone. A file outside every layer isn't parsed (it gets at most an INW006 warning). A layered file whose text names a module loader skips the prescan (see below) |
-| Module index | `Engine.index(files)` returns every first-party module and answers "who imports module X" on demand, parsing only files whose text mentions X's last name segment | Not used by a rule or a command yet (INW006 probes the file system for first-party modules instead); INW010 and cycle detection will use it ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)) |
+| Module index | `Engine.index(files)` wraps the adapter's `ProjectFiles` port: `ownerOf` finds the first-party module an import lands in, probing one path at a time; `modules` lists every first-party module; `importersOf` answers "who imports module X", parsing only files whose text mentions X's last name segment | The engine's project input ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)): every adapter builds one and passes it to `checkFile` and `checkFiles`. Building it touches nothing; each question does only its own I/O, so the hook pays nothing for questions no rule asks. INW006 asks `ownerOf`; INW010 and cycle detection will use the rest. A long-lived adapter rebuilds it when a Python file is created, deleted or renamed |
 
 ### How one check flows
 
@@ -151,7 +153,7 @@ sequenceDiagram
     participant T as tree-sitter (WASM)
     participant R as Rules
 
-    A->>E: checkFile({path, module, text})
+    A->>E: checkFile({path, module, text}, index)
     alt file outside every layer
         E-->>A: INW006 warning for its package, or [] (no parse)
     else declared encoding Inwards can't read
@@ -371,7 +373,7 @@ src/
 │   │   ├── reporters.ts   # text / concise / json / sarif
 │   │   ├── engine.ts      # facade
 │   │   ├── baseline.ts    # baseline keys, which findings a baseline accepts
-│   │   ├── project.ts     # module index, importers on demand
+│   │   ├── project.ts     # module index (the engine's project input), importers on demand
 │   │   ├── types.ts       # SourceFile, Diagnostic, Fix, Span
 │   │   ├── index.ts       # the public API adapters import
 │   │   └── meta.ts        # VERSION, DOCS_BASE

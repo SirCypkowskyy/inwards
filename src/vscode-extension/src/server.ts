@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -6,10 +6,9 @@ import {
   type Diagnostic as CoreDiagnostic,
   Engine,
   type InwardsConfig,
-  type ModuleLookup,
   moduleNameFor,
+  type ProjectIndex,
   parseConfig,
-  probeLookup,
 } from "@inwards/core";
 import {
   createConnection,
@@ -21,13 +20,11 @@ import {
   TextDocuments,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { workspaceDiagnostics } from "./workspace.ts";
+import { projectFiles, workspaceDiagnostics } from "./workspace.ts";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
-let state:
-  | { engine: Engine; config: InwardsConfig; root: string; ownerOf: ModuleLookup }
-  | undefined;
+let state: { engine: Engine; config: InwardsConfig; root: string; index: ProjectIndex } | undefined;
 /** The last workspace pass (INW007 and INW008 from the listing), by absolute path. */
 let workspace = new Map<string, CoreDiagnostic[]>();
 /** The full check of each open document, by absolute path. */
@@ -47,7 +44,7 @@ connection.onInitialize(async (params) => {
         config,
       );
       const root = resolve(dirname(configPath), config.root);
-      state = { engine, config, root, ownerOf: probeLookup((rel) => pathKind(root, rel)) };
+      state = { engine, config, root, index: engine.index(projectFiles(root)) };
     } catch (err) {
       connection.console.warn(`Inwards disabled: ${String(err)}`);
     }
@@ -67,7 +64,7 @@ documents.onDidChangeContent(({ document }) => {
       text: document.getText(),
       ...moduleNameFor(relative(state.root, path)),
     },
-    state.ownerOf,
+    state.index,
   );
   opened.set(path, { uri: document.uri, found });
   publish(path);
@@ -80,7 +77,8 @@ documents.onDidClose(({ document }) => {
 });
 
 // The workspace pass runs once at start and again when a Python file is
-// created or deleted; a content change can't change a shape. Events are
+// created or deleted; a content change can't change a shape. The module index
+// is rebuilt then too (free until a rule asks), as its contract says. Events are
 // batched for a moment, so a branch switch runs one pass. The server asks the
 // client to watch the files, so any LSP client works, not only VS Code.
 connection.onInitialized(() => {
@@ -109,6 +107,7 @@ function refresh(): void {
     return;
   }
   const before = workspace;
+  state.index = state.engine.index(projectFiles(state.root));
   workspace = workspaceDiagnostics(state.config, state.root);
   for (const path of new Set([...before.keys(), ...workspace.keys()])) {
     if (JSON.stringify(before.get(path)) !== JSON.stringify(workspace.get(path))) {
@@ -130,21 +129,6 @@ function publish(path: string): void {
   const found = open ? [...open.found, ...listed.filter((d) => d.code === "INW008")] : listed;
   const uri = open?.uri ?? pathToFileURL(path).href;
   connection.sendDiagnostics({ uri, diagnostics: found.map(toLsp) });
-}
-
-/**
- * Tells what is at a path under the config root, for the INW006 module probe.
- *
- * @param root - the config root.
- * @param rel - a forward-slash path relative to it.
- * @returns "file", "dir", or undefined when nothing is there.
- */
-function pathKind(root: string, rel: string): "file" | "dir" | undefined {
-  const stat = statSync(join(root, rel), { throwIfNoEntry: false });
-  if (stat?.isDirectory()) {
-    return "dir";
-  }
-  return stat?.isFile() ? "file" : undefined;
 }
 
 /**

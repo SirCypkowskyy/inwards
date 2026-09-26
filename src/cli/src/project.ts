@@ -12,13 +12,13 @@ import {
   type Diagnostic,
   Engine,
   type InwardsConfig,
-  type ModuleLookup,
   membersFrom,
   moduleNameFor,
+  type PathKind,
+  type ProjectFiles,
   type ProjectIndex,
   packagesOf,
   parseConfig,
-  probeLookup,
   probeMembers,
   type Report,
   rootPathOf,
@@ -121,19 +121,27 @@ function loadSources(project: Project, targets: string[] | undefined, base: stri
 }
 
 /**
- * Finds first-party modules on disk under the config root, for INW006.
+ * Gives the engine the project's files under the config root, for its module
+ * index. Nothing is touched until the engine asks; the listing uses the same
+ * walk as `inwards check`.
  *
- * @param root - the config root.
- * @returns a lookup over the files and directories under it.
+ * @param project - the loaded project.
+ * @returns the probe, listing and reader, with root-relative forward-slash paths.
  */
-function moduleLookup(root: string): ModuleLookup {
-  return probeLookup((rel) => {
-    const stat = statSync(join(root, rel), { throwIfNoEntry: false });
-    if (stat?.isDirectory()) {
-      return "dir";
-    }
-    return stat?.isFile() ? "file" : undefined;
-  });
+function projectFiles(project: Project): ProjectFiles {
+  const root = project.lexicalRoot;
+  return {
+    kind: (rel: string): ReturnType<PathKind> => {
+      const stat = statSync(join(root, rel), { throwIfNoEntry: false });
+      if (stat?.isDirectory()) {
+        return "dir";
+      }
+      return stat?.isFile() ? "file" : undefined;
+    },
+    list: (): string[] =>
+      collectPythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
+    read: (rel: string): string => readFileSync(join(root, rel), "utf8"),
+  };
 }
 
 /**
@@ -164,7 +172,8 @@ export async function runCheck(
   const files = loadSources(project, targets, base);
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(configPath) : undefined;
-  const diagnostics = project.engine.checkFiles(files, moduleLookup(project.lexicalRoot), accepted);
+  const index = project.engine.index(projectFiles(project));
+  const diagnostics = project.engine.checkFiles(files, index, accepted);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -212,18 +221,17 @@ function requiredAround(project: Project, files: SourceFile[], shownRoot: string
 }
 
 /**
- * Indexes every module under the config root. Only the tests use it today;
- * #44 (the index as an engine input) and INW010 (#45) will.
- * Reads every file now; the reverse-import map is built on first use.
+ * Builds the module index `runCheck` gives the engine, for a caller that
+ * wants the index itself (the tests, and the language server parity test).
+ * Nothing is listed or read until the index is asked.
  *
  * @param configPath - absolute path of the pyproject.toml to use.
- * @param base - directory that source paths are made relative to.
  * @returns the project index.
  * @throws {ConfigError} when the config is invalid.
  */
-export async function indexProject(configPath: string, base: string): Promise<ProjectIndex> {
+export async function indexProject(configPath: string): Promise<ProjectIndex> {
   const project = await openProject(configPath);
-  return project.engine.index(loadSources(project, undefined, base));
+  return project.engine.index(projectFiles(project));
 }
 
 /**

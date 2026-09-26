@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { baselineKey, type Diagnostic } from "../src/index.ts";
-import { check, engine, file, OWNERS } from "./helpers.ts";
+import { check, engine, file, PROJECT } from "./helpers.ts";
 
 const PATH = "shop/domain/order.py";
 const STUB = "shop/domain/order.pyi";
@@ -48,25 +48,25 @@ describe("baselined violations skip the confirming parse", () => {
   test("a skeleton hit the baseline accepts is returned unconfirmed, to be hidden", () => {
     // The full parse would drop the docstring's import, so getting it back
     // shows the confirming parse was skipped.
-    expect(engine.checkFiles([file(PATH, QUOTED)], OWNERS)).toEqual([]);
-    const skipped = engine.checkFiles([file(PATH, QUOTED)], OWNERS, accepting(1));
+    expect(engine.checkFiles([file(PATH, QUOTED)], PROJECT)).toEqual([]);
+    const skipped = engine.checkFiles([file(PATH, QUOTED)], PROJECT, accepting(1));
     expect(skipped.map((d) => d.code)).toEqual(["INW001"]);
   });
 
   test("more hits than accepted copies get the full parse, which keeps only the real one", () => {
     const both = file(PATH, `${QUOTED}${LEAK}`);
-    const found = engine.checkFiles([both], OWNERS, accepting(1));
+    const found = engine.checkFiles([both], PROJECT, accepting(1));
     expect(found.map((d) => d.line)).toEqual([4]);
   });
 
   test("hits are totalled across a module's files before anything is skipped", () => {
-    const found = engine.checkFiles([file(PATH, QUOTED), file(STUB, LEAK)], OWNERS, accepting(1));
+    const found = engine.checkFiles([file(PATH, QUOTED), file(STUB, LEAK)], PROJECT, accepting(1));
     expect(found.map((d) => d.file)).toEqual([STUB]);
   });
 
   test("a hit the baseline doesn't accept is still confirmed", () => {
     const other = new Map([["INW001\u0000shop.domain.other\u0000x", 1]]);
-    expect(engine.checkFiles([file(PATH, QUOTED)], OWNERS, other)).toEqual([]);
+    expect(engine.checkFiles([file(PATH, QUOTED)], PROJECT, other)).toEqual([]);
   });
 
   // Every pair of spellings in order.py and order.pyi, with 0 to 2 accepted
@@ -78,7 +78,7 @@ describe("baselined violations skip the confirming parse", () => {
   )("order.py %j, order.pyi %j, %i accepted: shows what the full parse shows", (py, pyi, n) => {
     const files = [file(PATH, py), file(STUB, pyi)];
     const accepted = accepting(n);
-    const plain = shown(engine.checkFiles(files, OWNERS), accepted);
-    expect(shown(engine.checkFiles(files, OWNERS, accepted), accepted)).toEqual(plain);
+    const plain = shown(engine.checkFiles(files, PROJECT), accepted);
+    expect(shown(engine.checkFiles(files, PROJECT, accepted), accepted)).toEqual(plain);
   });
 });

@@ -1,67 +1,100 @@
 /**
- * The project-wide view the per-file rules can't give: every first-party
- * module, and who imports each one. No command, hook or adapter uses it yet: the Stop
- * gate checks only the changed files (an import's verdict depends only on
- * module names), and INW006 probes the file system (`probeLookup`). Only the
- * tests call it today; #44 makes it an engine input for every adapter, and
- * INW010 (imports of first-party modules that don't exist, #45) needs it.
+ * The project-wide view the per-file rules can't give: which first-party
+ * module an import lands in, every first-party module, and who imports a
+ * given module. It is the engine's project input (ADR-006): every adapter
+ * (the CLI's check, hook and Stop gate, the language server) builds one with
+ * `Engine.index` over its own file system and passes it to `checkFile` or
+ * `checkFiles`. INW006 asks it for the owner of an import; INW010 (#45) will
+ * ask it whether a first-party module exists and which real ones are close.
+ *
+ * Building one reads nothing, so the hook pays only for what a rule asks.
  */
+import { moduleNameFor } from "./python.ts";
 import type { ImportRef, SourceFile } from "./types.ts";
+import { type ModuleLookup, type PathKind, probeLookup } from "./unassigned.ts";
 
 const NON_ASCII = /[^ -~\t\n\r\f]/u;
 
 /** Reads the imports of one file; the engine supplies it, so this module needs no parser. */
 type ImportReader = (file: SourceFile) => readonly ImportRef[];
 
+/** A listed Python file, before its text is read. */
+type Listed = Omit<SourceFile, "text">;
+
 /**
- * Every module of a project, and who imports a given module, answered on demand.
- * Reading every file's imports costs about as much as a full check, so
- * `importersOf` only parses candidate files:
+ * What an adapter supplies to index a project: the port (ADR-006). Paths are
+ * relative to the config root, with forward slashes. The CLI and the language
+ * server list with the same walk rules (hidden entries, node_modules,
+ * __pycache__ and virtualenvs skipped; symlinks followed inside the root),
+ * except that the CLI skips nothing but hidden entries inside a layer's
+ * top-level package. `ownerOf` probes, so it agrees in both.
+ */
+export interface ProjectFiles {
+  /** Tells what is at a path; `ownerOf` probes through it, one path at a time. */
+  kind: PathKind;
+  /** Lists every Python file under the config root. Called at most once, on first use of `modules` or `importersOf`. */
+  list: () => readonly string[];
+  /** Reads a listed file's text. Called only by `importersOf`, at most once per file. */
+  read: (path: string) => string;
+}
+
+/**
+ * A project's first-party modules, answered on demand.
  *
- * - files whose NFKC-normalised text mentions the module's last name segment
- *   (an absolute import spells it; identifiers can't be split across lines);
- * - files inside the module's package, because a relative import such as
+ * - `ownerOf` probes the file system for each query (see `probeLookup`), so
+ *   it is never stale and never walks the tree. It follows Python, not the
+ *   listing, and so does `importersOf`, which resolves owners through it: it
+ *   can return a name missing from `modules`, such as a namespace package (a
+ *   directory without `__init__.py`), a module under a virtualenv or
+ *   node_modules the listing skips, or one behind a symlink that leaves the root.
+ * - `modules` lists the tree once, on first use; nothing is read or parsed.
+ * - `importersOf` reads and parses only candidate files: those whose
+ *   NFKC-normalised text mentions the module's last name segment (an
+ *   absolute import spells it; identifiers can't be split across lines), and
+ *   those inside the module's package, because a relative import such as
  *   `from . import *` or `from .. import helper` reaches a package without
  *   spelling its name.
+ *
+ * Incremental updates: the index caches the listing and the texts it has
+ * read, and never sees later changes. A long-lived adapter (the language
+ * server) builds a new one when a Python file is created, deleted or
+ * renamed; building is free until a rule asks. Editing a file changes
+ * neither `ownerOf` nor `modules`, only `importersOf`, so an adapter that
+ * relies on `importersOf` rebuilds on saves too.
  */
 export class ProjectIndex {
-  /** Dotted names of every first-party module, e.g. `shop.domain.order`. */
-  readonly modules: ReadonlySet<string>;
-  private readonly files: readonly SourceFile[];
+  /** Finds the first-party module an import target lives in, e.g. `shop.domain.order` for `shop.domain.order.Order`. */
+  readonly ownerOf: ModuleLookup;
+  private readonly source: ProjectFiles;
   private readonly readImports: ImportReader;
-  private readonly imports = new Map<SourceFile, readonly ImportRef[]>();
-  private readonly normalised = new Map<SourceFile, string>();
+  private listed: readonly Listed[] | undefined;
+  private names: ReadonlySet<string> | undefined;
+  private readonly imports = new Map<string, readonly ImportRef[]>();
+  private readonly normalised = new Map<string, string>();
+  private readonly texts = new Map<string, string>();
   private readonly importers = new Map<string, ReadonlySet<string>>();
 
   /**
-   * Indexes the modules of the given files. No file is parsed yet.
+   * Wraps an adapter's file system. Nothing is listed or read yet.
    *
-   * @param files - every source file of the project, under each of its module names.
+   * @param source - the adapter's listing, probe and reader, rooted at the config root.
    * @param readImports - reads one file's imports (skeleton first, full parse as fallback).
    */
-  constructor(files: readonly SourceFile[], readImports: ImportReader) {
-    this.files = files;
+  constructor(source: ProjectFiles, readImports: ImportReader) {
+    this.source = source;
     this.readImports = readImports;
-    this.modules = new Set(files.map((file) => file.module));
+    this.ownerOf = probeLookup(source.kind);
   }
 
   /**
-   * Finds the first-party module an import target lives in.
-   * `from shop.domain.order import Order` targets `shop.domain.order.Order`,
-   * which lives in `shop.domain.order`: the longest prefix that is a module.
+   * Dotted names of every first-party module file, e.g. `shop.domain.order`
+   * (`shop` for `shop/__init__.py`). Lists the tree on first use.
    *
-   * @param target - a resolved dotted import target.
-   * @returns the owning module, or undefined for a third-party or missing one.
+   * @returns the module names.
    */
-  ownerOf(target: string): string | undefined {
-    const parts = target.split(".");
-    for (let end = parts.length; end > 0; end -= 1) {
-      const candidate = parts.slice(0, end).join(".");
-      if (this.modules.has(candidate)) {
-        return candidate;
-      }
-    }
-    return undefined;
+  get modules(): ReadonlySet<string> {
+    this.names ??= new Set(this.files().map((file) => file.module));
+    return this.names;
   }
 
   /**
@@ -85,7 +118,7 @@ export class ProjectIndex {
     }
     const segment = module.split(".").at(-1) ?? module;
     const found = new Set<string>();
-    for (const file of this.files) {
+    for (const file of this.files()) {
       const candidate = file.module.startsWith(`${module}.`) || this.mentions(file, segment);
       if (file.module !== module && candidate && this.fileImports(file, module)) {
         found.add(file.module);
@@ -96,18 +129,44 @@ export class ProjectIndex {
   }
 
   /**
+   * Lists the project's Python files under their module names, once.
+   *
+   * @returns every listed file, text not yet read.
+   */
+  private files(): readonly Listed[] {
+    this.listed ??= this.source.list().map((path) => ({ path, ...moduleNameFor(path) }));
+    return this.listed;
+  }
+
+  /**
+   * Reads a listed file's text through the adapter, once.
+   *
+   * @param file - a listed file.
+   * @returns its text.
+   */
+  private text(file: Listed): string {
+    let text = this.texts.get(file.path);
+    if (text === undefined) {
+      text = this.source.read(file.path);
+      this.texts.set(file.path, text);
+    }
+    return text;
+  }
+
+  /**
    * Tells whether a file's NFKC-normalised text contains a word.
    *
-   * @param file - a source file.
+   * @param file - a listed file.
    * @param word - the text to look for.
    * @returns true when the word appears anywhere in the file.
    */
-  private mentions(file: SourceFile, word: string): boolean {
-    let text = this.normalised.get(file);
+  private mentions(file: Listed, word: string): boolean {
+    let text = this.normalised.get(file.path);
     if (text === undefined) {
+      const raw = this.text(file);
       // NFKC only changes non-ASCII text; most files skip the (slow) call.
-      text = NON_ASCII.test(file.text) ? file.text.normalize("NFKC") : file.text;
-      this.normalised.set(file, text);
+      text = NON_ASCII.test(raw) ? raw.normalize("NFKC") : raw;
+      this.normalised.set(file.path, text);
     }
     return text.includes(word);
   }
@@ -115,16 +174,21 @@ export class ProjectIndex {
   /**
    * Tells whether a file imports a module, reading its imports once.
    *
-   * @param file - a source file.
+   * @param file - a listed file.
    * @param module - a dotted module name.
    * @returns true when one of the file's imports resolves to that module.
    */
-  private fileImports(file: SourceFile, module: string): boolean {
-    let refs = this.imports.get(file);
+  private fileImports(file: Listed, module: string): boolean {
+    let refs = this.imports.get(file.path);
     if (refs === undefined) {
-      refs = this.readImports(file);
-      this.imports.set(file, refs);
+      refs = this.readImports({ ...file, text: this.text(file) });
+      this.imports.set(file.path, refs);
     }
-    return refs.some((ref) => this.ownerOf(ref.target) === module);
+    // The owner is a prefix of the target, so the string test spares most probes.
+    return refs.some(
+      (ref) =>
+        (ref.target === module || ref.target.startsWith(`${module}.`)) &&
+        this.ownerOf(ref.target) === module,
+    );
   }
 }
