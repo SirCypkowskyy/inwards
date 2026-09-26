@@ -4,6 +4,7 @@ import type { InwardsConfig } from "./config.ts";
 import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
 import { checkLayers, layerIndexOf } from "./layers.ts";
+import { checkLibraries } from "./libraries.ts";
 import { skeletonImports } from "./prescan.ts";
 import { type ProjectFiles, ProjectIndex } from "./project.ts";
 import {
@@ -130,7 +131,7 @@ export class Engine {
   }
 
   /**
-   * Applies the rules that look at import statements: INW001 and INW006.
+   * Applies the rules that look at import statements: INW001, INW005 and INW006.
    *
    * @param file - the source file.
    * @param imports - its imports.
@@ -145,6 +146,7 @@ export class Engine {
     const { layers } = this.config;
     return [
       ...checkLayers(file, imports, layers),
+      ...checkLibraries(file, imports, layers, ownerOf),
       ...checkUnassignedImports(file, imports, layers, ownerOf),
     ];
   }
@@ -165,14 +167,11 @@ export class Engine {
       const found = this.importFindings(file, extractImports(tree, file), ownerOf);
       if (dynamic) {
         const refs = extractDynamicImports(this.parser, tree, file);
+        const readable = refs.filter((ref) => ref.unreadable === null);
         found.push(
           ...checkDynamicImports(file, refs, layers),
-          ...checkUnassignedImports(
-            file,
-            refs.filter((ref) => ref.unreadable === null),
-            layers,
-            ownerOf,
-          ),
+          ...checkLibraries(file, readable, layers, ownerOf),
+          ...checkUnassignedImports(file, readable, layers, ownerOf),
         );
       }
       return found.sort((a, b) => a.line - b.line || a.column - b.column);

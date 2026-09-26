@@ -26,6 +26,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | The `init` picker uses @clack/prompts, loaded from a split chunk | :white_check_mark: Accepted |
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
+| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -525,3 +526,23 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *Pause until partner data (move recruiting, #132, to M3):* the most rigorous option. The owner kept recruiting at the end of the roadmap, and the measurable bets point the right way.
 - *Stop or pivot:* nothing measured contradicts a threshold, so there is no case for either.
 
+## ADR-023: Libraries per layer, with a default deny list for the innermost layer
+
+**Status:** Accepted · 2026-09-26 · [#47](https://github.com/SirCypkowskyy/inwards/issues/47)
+
+**Context.** INW001 only sees first-party layers, so `from sqlalchemy.orm import Session` in the domain passes it, and it is the most common leak in layered Python code. Telling a library apart from first-party code must not need a virtualenv (C4): Inwards never imports user code, so it can't ask Python where a module comes from.
+
+**Decision.**
+
+- INW005 `pure-domain` checks every import of a file in a layer that is neither first-party (a layer or the INW006 file-system probe owns it) nor allowed by the layer's `allow-libraries` / `deny-libraries`. Entries are module names that cover their submodules; the longest matching entry decides, `allow` on a tie.
+- `allow-libraries` makes the layer an allowlist for third-party code only. The standard library stays allowed, told apart by a bundled list: the union of `sys.stdlib_module_names` on CPython 3.11 to 3.14, plus the modules older versions had.
+- The innermost layer of a config with two or more layers denies a fixed list of frameworks, database and network clients and stdlib I/O unless it sets `deny-libraries`. A one-layer config gets no default: its only layer is the whole app, not a domain.
+- The message names the library's top-level package, never the configured lists, so a baseline entry survives a change to them. The fix names the first outer layer the config lets use the library, and the port to introduce there.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Existing configs with two or more layers catch SQLAlchemy, FastAPI or Requests in the domain with no config change.
+- :material-minus-circle-outline: That is also a new source of errors on upgrade for projects whose domain uses such a library on purpose. `deny-libraries = []` or an `allow-libraries` entry turns it off, and `inwards baseline` accepts what is there.
+- :material-minus-circle-outline: Import names are matched, not distribution names (`PyYAML` is `yaml`), and a stdlib module newer than the bundled list counts as third-party.
+
+**Alternatives.** *Read installed distributions from the virtualenv*: exact, but breaks C4 and fails in CI images without the dependencies. *Default deny for every layer but the outermost*: guesses too much about what an application layer may use. *Name the configured list in the message*: a changed list would bring back every baselined violation.

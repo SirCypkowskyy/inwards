@@ -7,6 +7,10 @@ export interface LayerSpec {
   name: string;
   /** Module prefixes that belong to the layer. `shop.domain` matches `shop.domain.order`. */
   modules: string[];
+  /** Libraries the layer may import (`allow-libraries`); set, any other third-party one is denied (INW005). */
+  allowLibraries?: string[];
+  /** Libraries the layer may not import (`deny-libraries`), stdlib included (INW005). */
+  denyLibraries?: string[];
 }
 
 export interface InwardsConfig {
@@ -68,7 +72,12 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "shape",
   "names",
 ]);
-const LAYER_KEYS: ReadonlySet<string> = new Set(["name", "modules"]);
+const LAYER_KEYS: ReadonlySet<string> = new Set([
+  "name",
+  "modules",
+  "allow-libraries",
+  "deny-libraries",
+]);
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
 const INWARDS_WORD = /\binwards\b/u;
@@ -225,7 +234,7 @@ function isStopGate(value: unknown): value is StopGate {
  * @param i - its index, for messages.
  * @param seen - layer names so far, updated in place.
  * @returns the layer.
- * @throws {ConfigError} for unknown keys, a missing or repeated name, or bad modules.
+ * @throws {ConfigError} for unknown keys, a missing or repeated name, or bad modules or libraries.
  */
 function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
   if (isRecord(layer)) {
@@ -242,7 +251,31 @@ function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
   if (!isModuleList(modules)) {
     throw new ConfigError(`tool.inwards.layers[${i}].modules must be a list of module names.`);
   }
-  return { name, modules };
+  const allow = libraryList(layer, i, "allow-libraries");
+  const deny = libraryList(layer, i, "deny-libraries");
+  return {
+    name,
+    modules,
+    ...(allow === undefined ? {} : { allowLibraries: allow }),
+    ...(deny === undefined ? {} : { denyLibraries: deny }),
+  };
+}
+
+/**
+ * Validates a layer's `allow-libraries` or `deny-libraries` (INW005).
+ *
+ * @param layer - the raw layer entry.
+ * @param i - its index, for messages.
+ * @param key - which of the two keys to read.
+ * @returns the module names, or undefined when the key is absent.
+ * @throws {ConfigError} when the value isn't a list of module names.
+ */
+function libraryList(layer: unknown, i: number, key: string): string[] | undefined {
+  const value = isRecord(layer) ? layer[key] : undefined;
+  if (value !== undefined && !isModuleList(value)) {
+    throw new ConfigError(`tool.inwards.layers[${i}].${key} must be a list of module names.`);
+  }
+  return value;
 }
 
 /**
