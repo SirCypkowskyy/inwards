@@ -29,6 +29,8 @@ export interface Published {
   severity: number;
   message: string;
   range: { start: { line: number } };
+  /** The rule's docs page, which the editor links from the code. */
+  codeDescription?: { href: string };
 }
 /** A file watcher the server asks the client to register. */
 interface Watcher {

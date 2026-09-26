@@ -345,6 +345,8 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 
 ## Katalog reguł { #rule-catalogue }
 
+Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md), z przykładami, poprawkami i konfiguracją; diagnostyki linkują do niej.
+
 | Kod | Nazwa | Co wyłapuje | Stan |
 |---|---|---|---|
 | INW000 | `unsupported-encoding` | Plik w warstwie deklaruje kodowanie (PEP 263), takie jak `unicode_escape` albo `utf-7`, przy którym tekst, który Inwards czyta jako komentarz, może być dla CPythona prawdziwym importem. Plik jest zgłaszany, a nie pomijany | :white_check_mark: |

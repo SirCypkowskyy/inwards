@@ -174,8 +174,8 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 
     | Format | INW001 | Mean of 6 on a sample project (3 INW001, 1 INW011, 2 INW006) |
     |---|---|---|
-    | `json` (compact) | 1,026 chars, 227 tokens | 944 chars, 218 tokens |
-    | `text` | 859 chars, 197 tokens | 780 chars, 187 tokens |
+    | `json` (compact) | 1,005 chars, 223 tokens | 923 chars, 214 tokens |
+    | `text` | 838 chars, 192 tokens | 759 chars, 182 tokens |
     | `concise` | 304 chars, 66 tokens | 301 chars, 69 tokens |
 
     Counted with the `o200k_base` tokenizer from `js-tiktoken` 1.0.21. `cl100k_base` stays within 5 tokens of it per diagnostic, and characters divided by 4 comes out 4 to 9% high on the means. Claude's tokenizer isn't public, so its counts will differ somewhat. Each count covers one diagnostic: a JSON object in `diagnostics[]`, a text block, or a concise line, without the summary. `concise` costs under a third of JSON because it drops the docs link, `fix.summary` and fix steps 2 to 4. The hooks still send full JSON: they check one file per edit, so there are only a few diagnostics, and steps 2 to 4 are the part that tells the agent how to fix the import rather than hide it (rule 2).

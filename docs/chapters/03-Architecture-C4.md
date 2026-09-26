@@ -340,6 +340,8 @@ To put a pre-release on PyPI as well, run the workflow from its tag, which the `
 
 ## Rule catalogue
 
+Each shipped rule has its own page under [Rules](rules/index.md), with examples, fixes and configuration; diagnostics link to it.
+
 | Code | Name | What it catches | Status |
 |---|---|---|---|
 | INW000 | `unsupported-encoding` | A file in a layer declares an encoding (PEP 263) such as `unicode_escape` or `utf-7`, under which text Inwards reads as a comment can be a real import to CPython. The file is reported, not skipped | :white_check_mark: |

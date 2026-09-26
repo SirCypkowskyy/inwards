@@ -179,8 +179,8 @@ Każda diagnostyka przestrzega tych samych pięciu zasad. To założenia projekt
 
     | Format | INW001 | Średnia z 6 w przykładowym projekcie (3 × INW001, 1 × INW011, 2 × INW006) |
     |---|---|---|
-    | `json` (zwięzły) | 1026 znaków, 227 tokenów | 944 znaki, 218 tokenów |
-    | `text` | 859 znaków, 197 tokenów | 780 znaków, 187 tokenów |
+    | `json` (zwięzły) | 1005 znaków, 223 tokeny | 923 znaki, 214 tokenów |
+    | `text` | 838 znaków, 192 tokeny | 759 znaków, 182 tokeny |
     | `concise` | 304 znaki, 66 tokenów | 301 znaków, 69 tokenów |
 
     Policzone tokenizerem `o200k_base` z `js-tiktoken` 1.0.21. `cl100k_base` mieści się w granicach 5 tokenów od niego na diagnostykę, a liczba znaków podzielona przez 4 daje średnie zawyżone o 4 do 9%. Tokenizer Claude'a nie jest publiczny, więc jego liczby będą się nieco różnić. Każda liczba dotyczy jednej diagnostyki: obiektu JSON w `diagnostics[]`, bloku tekstu albo linii w formacie concise, bez podsumowania. `concise` kosztuje mniej niż jedną trzecią JSON-a, bo pomija link do dokumentacji, `fix.summary` i kroki naprawy od 2 do 4. Hooki wciąż wysyłają pełny JSON: sprawdzają jeden plik na edycję, więc diagnostyk jest tylko kilka, a kroki od 2 do 4 to ta część, która mówi agentowi, jak naprawić import, zamiast go ukryć (zasada 2).

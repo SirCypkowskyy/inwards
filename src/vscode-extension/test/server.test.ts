@@ -2,9 +2,18 @@ import { afterAll, expect, test } from "bun:test";
 import { renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { DOCS_BASE } from "@inwards/core";
 import { lspHarness, PYPROJECT, QUIET_MS, WATCHING, write } from "./lsp-harness.ts";
 
-const { tmp: TMP, publishes, startServer, watched, codesOnceIncluding, cleanup } = lspHarness();
+const {
+  tmp: TMP,
+  publishes,
+  startServer,
+  watched,
+  codesOnceIncluding,
+  diagnosticsOnce,
+  cleanup,
+} = lspHarness();
 afterAll(cleanup);
 
 test("the server shows INW007 on an unopened file, and INW008 once a member is deleted", async () => {
@@ -23,6 +32,9 @@ test("the server shows INW007 on an unopened file, and INW008 once a member is d
     expect(await codesOnceIncluding(join(root, "app/orders/helpers.py"), "INW007")).toEqual([
       "INW007",
     ]);
+    // The code links to the rule's own docs page (#49).
+    const [shape] = await diagnosticsOnce(join(root, "app/orders/helpers.py"), (f) => f.length > 0);
+    expect(shape?.codeDescription?.href).toBe(`${DOCS_BASE}/rules/INW007/`);
 
     rmSync(join(root, "app/orders/service.py"));
     const changes = [{ uri: pathToFileURL(join(root, "app/orders/service.py")).href, type: 3 }];

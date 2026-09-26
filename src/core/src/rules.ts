@@ -16,10 +16,9 @@ export interface RuleMeta {
   severity: Severity;
   /** One sentence for SARIF `shortDescription` and rule listings. */
   summary: string;
+  /** The rule's own docs page, `docs/chapters/rules/<code>.md` on the site. */
   docs: string;
 }
-
-const CATALOGUE = `${DOCS_BASE}/03-Architecture-C4/#rule-catalogue`;
 
 /** Codes of every registered rule. */
 type RuleCode =
@@ -33,6 +32,17 @@ type RuleCode =
   | "INW010"
   | "INW011";
 
+/**
+ * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
+ * LSP `codeDescription`) link straight to it; a test checks the page exists.
+ *
+ * @param code - the rule's code.
+ * @returns the page's URL, with the trailing slash the site's directory URLs use.
+ */
+function page(code: RuleCode): string {
+  return `${DOCS_BASE}/rules/${code}/`;
+}
+
 /** Each entry's `code` must equal its key, so the registry can't drift. */
 export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: Code } } = {
   INW000: {
@@ -40,28 +50,28 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     name: "unsupported-encoding",
     severity: "error",
     summary: "The file's declared encoding can hide imports.",
-    docs: CATALOGUE,
+    docs: page("INW000"),
   },
   INW001: {
     code: "INW001",
     name: "layer-dependency",
     severity: "error",
     summary: "Dependencies must point toward inner layers.",
-    docs: CATALOGUE,
+    docs: page("INW001"),
   },
   INW005: {
     code: "INW005",
     name: "pure-domain",
     severity: "error",
     summary: "A layer imports only the third-party and standard-library modules its config allows.",
-    docs: CATALOGUE,
+    docs: page("INW005"),
   },
   INW006: {
     code: "INW006",
     name: "unassigned-module",
     severity: "error",
     summary: "First-party code must belong to a layer, and every layer prefix must match modules.",
-    docs: CATALOGUE,
+    docs: page("INW006"),
   },
   INW007: {
     code: "INW007",
@@ -69,14 +79,14 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     severity: "error",
     summary:
       "A package holds only the members its configured shape allows, and names stay where they belong.",
-    docs: CATALOGUE,
+    docs: page("INW007"),
   },
   INW008: {
     code: "INW008",
     name: "missing-member",
     severity: "error",
     summary: "A package holds every member its configured shape requires.",
-    docs: CATALOGUE,
+    docs: page("INW008"),
   },
   INW009: {
     code: "INW009",
@@ -84,14 +94,14 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     severity: "error",
     summary:
       "An inline suppression names rules that can be suppressed, gives a reason, and hides a finding.",
-    docs: CATALOGUE,
+    docs: page("INW009"),
   },
   INW010: {
     code: "INW010",
     name: "unknown-first-party",
     severity: "error",
     summary: "An imported first-party module must exist.",
-    docs: CATALOGUE,
+    docs: page("INW010"),
   },
   INW011: {
     code: "INW011",
@@ -99,7 +109,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     severity: "error",
     summary:
       "Dynamic imports (importlib, __import__, runpy, exec) must point toward inner layers too.",
-    docs: CATALOGUE,
+    docs: page("INW011"),
   },
 };
 
