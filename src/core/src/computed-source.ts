@@ -18,6 +18,7 @@ import type { Node } from "web-tree-sitter";
 import { type Bindings, importBindings, qualify } from "./callees.ts";
 import { argumentAt, identifierName, literalSource, namedChildren } from "./literals.ts";
 import { COMPUTED, type Loaded } from "./loader-targets.ts";
+import type { ModuleLookup } from "./unassigned.ts";
 
 /**
  * Lists what a source-running call with a non-literal source loads.
@@ -25,14 +26,24 @@ import { COMPUTED, type Loaded } from "./loader-targets.ts";
  * @param call - the `exec`, `eval` or `compile` call.
  * @param via - the loader's name: `exec`, `eval` or `compile`.
  * @param bindings - what names mean in the calling module.
+ * @param ownerOf - finds first-party modules, whose imports may re-export the builtin.
  * @returns `COMPUTED`, or nothing when the call is not an unverifiable load.
  */
-export function computedSource(call: Node, via: string, bindings: Bindings): Loaded[] {
+export function computedSource(
+  call: Node,
+  via: string,
+  bindings: Bindings,
+  ownerOf: ModuleLookup,
+): Loaded[] {
   if (via === "compile") {
     return [];
   }
   const fn = call.childForFieldName("function");
-  if (fn?.type === "identifier" && identifierName(fn) === via && rebound(call, via, bindings)) {
+  if (
+    fn?.type === "identifier" &&
+    identifierName(fn) === via &&
+    rebound(call, via, bindings, ownerOf)
+  ) {
     return [];
   }
   const source = argumentAt(call, 0, "source");
@@ -41,7 +52,9 @@ export function computedSource(call: Node, via: string, bindings: Bindings): Loa
     source &&
     compiler &&
     qualify(compiler, bindings).includes("builtins.compile") &&
-    !(compiler.type === "identifier" && rebound(source, identifierName(compiler), bindings));
+    !(
+      compiler.type === "identifier" && rebound(source, identifierName(compiler), bindings, ownerOf)
+    );
   const compiled = trusted ? literalSource(argumentAt(source, 0, "source")) : null;
   return compiled === null ? [COMPUTED] : [];
 }
@@ -64,6 +77,21 @@ const BINDERS = [
   "nonlocal_statement",
   "delete_statement",
 ];
+
+/**
+ * Names through which code can rewrite a module's namespace behind a binding's
+ * back: `globals()["exec"] = ...`, `setattr(module, "exec", ...)`,
+ * `sys.modules[__name__].__dict__`...
+ */
+const NAMESPACE_WRITERS = new Set([
+  "globals",
+  "vars",
+  "locals",
+  "setattr",
+  "delattr",
+  "__dict__",
+  "__builtins__",
+]);
 
 /** Modules an import of a loader can come from; relative imports count too. */
 const LOADER_MODULES = new Set(["builtins", "importlib", "runpy"]);
@@ -93,19 +121,48 @@ const PATTERNS = new Set([
  *    or import that is a direct statement of the module body or of the body
  *    of a function enclosing the call; a parameter of a function or lambda
  *    whose body holds the call; a `for` target whose loop body holds it;
- * 4. a module-level binding comes before the top-level statement holding the call.
+ * 4. a module-level binding comes before the top-level statement holding the call;
+ * 5. the file never rewrites a namespace (`globals`, `vars`, `locals`,
+ *    `setattr`, `delattr`, `__dict__`, `__builtins__`, `sys.modules`) and has
+ *    no wildcard import, either of which can put the builtin back.
  *
  * @param call - the call that uses the name.
  * @param name - the name, e.g. `eval`.
  * @param bindings - what names mean in the calling module.
+ * @param ownerOf - finds first-party modules, whose imports may re-export the builtin.
  * @returns true when the name is rebound where the call sees it.
  */
-function rebound(call: Node, name: string, bindings: Bindings): boolean {
-  const nodes = call.tree.rootNode.descendantsOfType(BINDERS).flatMap((n) => (n ? [n] : []));
+function rebound(call: Node, name: string, bindings: Bindings, ownerOf: ModuleLookup): boolean {
+  const root = call.tree.rootNode;
+  const nodes = root.descendantsOfType(BINDERS).flatMap((n) => (n ? [n] : []));
   return (
-    !nodes.some((n) => mayBeBuiltin(n, name, bindings)) &&
+    !(rewritesNamespace(root) || nodes.some((n) => mayBeBuiltin(n, name, bindings, ownerOf))) &&
     nodes.some((n) => surelyBinds(n, name, call))
   );
+}
+
+/**
+ * Tells whether a file can rewrite a namespace or pulls in names it can't see.
+ *
+ * @param root - the module node.
+ * @returns true for a namespace writer (see `NAMESPACE_WRITERS`), `sys.modules` or a wildcard import.
+ */
+function rewritesNamespace(root: Node): boolean {
+  return root
+    .descendantsOfType(["identifier", "wildcard_import"])
+    .some((n) => n !== null && (n.type === "wildcard_import" || writesNamespace(n)));
+}
+
+/**
+ * Tells whether an identifier names a namespace writer or `sys.modules`.
+ *
+ * @param id - an `identifier` node.
+ * @returns true for a name in `NAMESPACE_WRITERS`, or `modules` read from `sys`.
+ */
+function writesNamespace(id: Node): boolean {
+  const name = identifierName(id);
+  const sysModules = name === "modules" && id.parent?.childForFieldName("object")?.text === "sys";
+  return NAMESPACE_WRITERS.has(name) || sysModules;
 }
 
 /**
@@ -114,9 +171,15 @@ function rebound(call: Node, name: string, bindings: Bindings): boolean {
  * @param node - a node of one of the `BINDERS` types.
  * @param name - the name.
  * @param bindings - what names mean in the calling module.
+ * @param ownerOf - finds first-party modules, whose imports may re-export the builtin.
  * @returns true for a loader-valued binding, a risky import, `global`, `nonlocal` or `del`.
  */
-function mayBeBuiltin(node: Node, name: string, bindings: Bindings): boolean {
+function mayBeBuiltin(
+  node: Node,
+  name: string,
+  bindings: Bindings,
+  ownerOf: ModuleLookup,
+): boolean {
   switch (node.type) {
     case "global_statement":
     case "nonlocal_statement":
@@ -149,11 +212,45 @@ function mayBeBuiltin(node: Node, name: string, bindings: Bindings): boolean {
       return importBindings(node).some(
         ({ local, qualified }) =>
           local === name &&
-          (qualified === null || LOADER_MODULES.has(qualified.split(".")[0] ?? "")),
+          (qualified === null ||
+            LOADER_MODULES.has(qualified.split(".")[0] ?? "") ||
+            ownerOf(qualified) !== undefined),
       );
+    case "function_definition":
+    case "class_definition":
+      return definedName(node) === name && wrappedByLoader(node, bindings);
     default:
       return false;
   }
+}
+
+/**
+ * Reads the name a `def` or `class` binds.
+ *
+ * @param node - a `function_definition` or `class_definition` node.
+ * @returns the name, or null when the node has none.
+ */
+function definedName(node: Node): string | null {
+  const own = node.childForFieldName("name");
+  return own ? identifierName(own) : null;
+}
+
+/**
+ * Tells whether a decorator or a class argument (base, `metaclass=`, keyword)
+ * of a definition mentions a loader, which can make the name the builtin again.
+ *
+ * @param node - a `function_definition` or `class_definition` node.
+ * @param bindings - what names mean in the calling module.
+ * @returns true when one of them mentions a loader.
+ */
+function wrappedByLoader(node: Node, bindings: Bindings): boolean {
+  const decorators =
+    node.parent?.type === "decorated_definition"
+      ? namedChildren(node.parent).filter((c) => c.type === "decorator")
+      : [];
+  return [...decorators, node.childForFieldName("superclasses")].some((n) =>
+    mentionsLoader(n, bindings),
+  );
 }
 
 /**
@@ -179,9 +276,8 @@ function surelyBinds(node: Node, name: string, call: Node): boolean {
       );
     case "function_definition":
     case "class_definition": {
-      const own = node.childForFieldName("name");
       const statement = node.parent?.type === "decorated_definition" ? node.parent : node;
-      return own !== null && identifierName(own) === name && direct(statement, call);
+      return definedName(node) === name && direct(statement, call);
     }
     case "assignment":
       return (

@@ -184,7 +184,7 @@ export class Engine {
     try {
       const found = this.importFindings(file, extractImports(tree, file), project);
       if (dynamic) {
-        const refs = extractDynamicImports(this.parser, tree, file);
+        const refs = extractDynamicImports(this.parser, tree, file, ownerOf);
         const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
         found.push(
           ...checkDynamicImports(file, refs, layers),

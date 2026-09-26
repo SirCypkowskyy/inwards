@@ -14,6 +14,10 @@ describe("INW011: a user-defined exec or eval is not a builtin with a computed s
       "def run(code, eval=default_eval):\n    return eval(code)\n",
     ],
     ["a lambda parameter", "f = lambda eval: eval(x)\n"],
+    [
+      "a decorated def",
+      "import functools\n@functools.cache\ndef eval(m):\n    pass\neval(model)\n",
+    ],
     ["a for target", "for eval in evaluators:\n    eval(model)\n"],
     ["a tuple target", "eval, other = pick()\neval(model)\n"],
     ["a local in the calling function", "def f():\n    eval = pick()\n    return eval(model)\n"],
@@ -28,6 +32,11 @@ describe("INW011: a user-defined exec or eval is not a builtin with a computed s
 
   test("known gap: the builtin passed in as an argument", () => {
     expect(found("def run(exec, c):\n    return exec(c)\nrun(exec, code)\n")).toEqual([]);
+  });
+
+  test("known gap (#79): the builtin reached through an object", () => {
+    const src = 'import operator\nexec = operator.attrgetter("exec")(print.__self__)\nexec(code)\n';
+    expect(found(src)).toEqual([]);
   });
 });
 
@@ -93,6 +102,40 @@ describe("INW011: rebindings that don't shadow the builtin at the call", () => {
     [
       "E: a def after the function that calls it",
       "def main():\n    eval(model)\ndef eval(m):\n    pass\n",
+    ],
+    ["F1: del globals()[...]", 'def exec(c):\n    pass\ndel globals()["exec"]\nexec(code)\n'],
+    ["F2: globals().pop", 'def exec(c):\n    pass\nglobals().pop("exec")\nexec(code)\n'],
+    [
+      "F3: globals()[...] = builtins.exec",
+      'import builtins\ndef exec(c):\n    pass\nglobals()["exec"] = builtins.exec\nexec(code)\n',
+    ],
+    [
+      "F4: sys.modules[__name__].exec",
+      "import builtins, sys\ndef exec(c):\n    pass\nsys.modules[__name__].exec = builtins.exec\nexec(code)\n",
+    ],
+    [
+      "F5: globals().update",
+      "import builtins\ndef exec(c):\n    pass\nglobals().update(exec=builtins.exec)\nexec(code)\n",
+    ],
+    [
+      "F6: a wildcard import after the def",
+      "def exec(c):\n    pass\nfrom shop.domain.compat2 import *\nexec(code)\n",
+    ],
+    [
+      "F7: a decorator that returns the builtin",
+      "@lambda f: exec\ndef exec(c):\n    pass\nexec(code)\n",
+    ],
+    [
+      "F8: a metaclass that returns the builtin",
+      "class exec(metaclass=lambda *a: exec):\n    pass\nexec(code)\n",
+    ],
+    [
+      "the builtin through an object's __dict__",
+      'exec = print.__self__.__dict__["exec"]\nexec(code)\n',
+    ],
+    [
+      "F10: an absolute first-party import, which may re-export the builtin",
+      "from shop.domain.compat import exec\nexec(code)\n",
     ],
   ])("%s is still reported", (_, src) => {
     expect(unverifiable(src)).toEqual(["unverifiable"]);

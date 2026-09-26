@@ -43,6 +43,25 @@ import { type Loaded, moduleTargets, type Unreadable } from "./loader-targets.ts
 import { extractImports, normalizeSource, parsePython } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
+import type { ModuleLookup } from "./unassigned.ts";
+
+/** What the loader search needs besides the tree. */
+interface Reader {
+  /** Parser with the Python grammar loaded, for literal `exec` sources. */
+  parser: Parser;
+  /** Finds the first-party module an import lands in (see `computedSource`). */
+  ownerOf: ModuleLookup;
+}
+
+/**
+ * Treats every module as first-party: the safe default when no project index is at hand.
+ *
+ * @param target - a dotted module name.
+ * @returns the name itself.
+ */
+function everyModule(target: string): string {
+  return target;
+}
 
 /** An import made by a call rather than an import statement. */
 export interface DynamicImportRef extends ImportRef {
@@ -86,16 +105,19 @@ export function mentionsDynamicImport(text: string): boolean {
  * @param parser - parser with the Python grammar loaded, for literal `exec` sources.
  * @param tree - the parsed file.
  * @param file - the file the tree came from; its package resolves relative targets.
+ * @param ownerOf - finds first-party modules; without it every module counts as first-party.
  * @returns one entry per loaded module, in source order.
  */
 export function extractDynamicImports(
   parser: Parser,
   tree: Tree,
   file: SourceFile,
+  ownerOf: ModuleLookup = everyModule,
 ): DynamicImportRef[] {
   const base = builtinBindings();
   const refs: DynamicImportRef[] = [];
-  for (const { call, loads } of loadingCalls(parser, tree.rootNode, file, base)) {
+  const reader: Reader = { parser, ownerOf };
+  for (const { call, loads } of loadingCalls(reader, tree.rootNode, file, base)) {
     const statement = shorten(call.text);
     for (const { target, via, unreadable } of loads) {
       refs.push({
@@ -235,14 +257,14 @@ interface Load extends Loaded {
  * Recurses into literal `exec` sources, whose loads are reported at the
  * outer call and named after it.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param reader - the parser and the first-party lookup.
  * @param root - the module node to search.
  * @param file - the file being checked.
  * @param outer - names bound before this code runs (the builtins, or the caller of `exec`).
  * @returns each call that loads something, with its loads.
  */
 function loadingCalls(
-  parser: Parser,
+  reader: Reader,
   root: Node,
   file: SourceFile,
   outer: Bindings,
@@ -251,7 +273,7 @@ function loadingCalls(
   const bindings = collectBindings(syntax, outer);
   const found: { call: Node; loads: Load[] }[] = [];
   for (const call of syntax) {
-    const loads = call.type === "call" ? loadsOf(parser, call, file, bindings) : [];
+    const loads = call.type === "call" ? loadsOf(reader, call, file, bindings) : [];
     if (loads.length > 0) {
       found.push({ call, loads });
     }
@@ -262,13 +284,13 @@ function loadingCalls(
 /**
  * Lists what one call loads, if its callee is a loader.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param reader - the parser and the first-party lookup.
  * @param call - a `call` node.
  * @param file - the file being checked.
  * @param bindings - what names mean in the calling module.
  * @returns the loaded modules, each with the loader's name; empty for any other call.
  */
-function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Bindings): Load[] {
+function loadsOf(reader: Reader, call: Node, file: SourceFile, bindings: Bindings): Load[] {
   const fn = call.childForFieldName("function");
   const loads: Load[] = [];
   for (const qualified of new Set(fn ? qualify(fn, bindings) : [])) {
@@ -277,7 +299,8 @@ function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Binding
       const via = qualified.replace(BUILTINS_PREFIX, "");
       const loaded =
         kind === "source"
-          ? (sourceTargets(parser, call, file, bindings) ?? computedSource(call, via, bindings))
+          ? (sourceTargets(reader, call, file, bindings) ??
+            computedSource(call, via, bindings, reader.ownerOf))
           : moduleTargets(kind, call, file);
       loads.push(...loaded.map((load) => ({ ...load, via })));
     }
@@ -299,14 +322,14 @@ function loadsOf(parser: Parser, call: Node, file: SourceFile, bindings: Binding
  * decoded as CPython does: a PEP 263 declaration counts, and a codec Inwards
  * can't read makes the whole source unreadable.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param reader - the parser and the first-party lookup.
  * @param call - the `call` node.
  * @param file - the calling file.
  * @param bindings - names bound in the calling file.
  * @returns the modules the source imports, or null when the source isn't a literal.
  */
 function sourceTargets(
-  parser: Parser,
+  reader: Reader,
   call: Node,
   file: SourceFile,
   bindings: Bindings,
@@ -320,9 +343,9 @@ function sourceTargets(
   if (encoding !== null) {
     return [{ target: "", unreadable: { kind: "encoding", encoding } }];
   }
-  const tree = parsePython(parser, text);
+  const tree = parsePython(reader.parser, text);
   try {
-    const nested = loadingCalls(parser, tree.rootNode, file, bindings);
+    const nested = loadingCalls(reader, tree.rootNode, file, bindings);
     return [
       ...extractImports(tree, file).map((ref) => ({ target: ref.target, unreadable: null })),
       ...nested.flatMap(({ loads }) =>
