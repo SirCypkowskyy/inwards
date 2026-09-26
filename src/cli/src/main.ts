@@ -15,7 +15,8 @@ import { statsCommand } from "./stats-command.ts";
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
 
-Usage: inwards check [PATHS...] [--format text|json|sarif] [--config pyproject.toml] [--log]
+Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
+                     [--config pyproject.toml] [--log]
        inwards baseline [--config pyproject.toml]    (accept today's violations)
        inwards init --agent claude|aider|agents-md [--dry-run]
        inwards stats [DIR] [--format text|json]   (hypothesis numbers from the run logs)
@@ -44,6 +45,7 @@ async function main(argv: string[]): Promise<number> {
       agent: { type: "string" },
       "dry-run": { type: "boolean" },
       log: { type: "boolean" },
+      "max-diagnostics": { type: "string" },
     },
   });
 
@@ -57,7 +59,7 @@ async function main(argv: string[]): Promise<number> {
   if (values.help || command !== "check") {
     return print(USAGE, command ? 2 : 0);
   }
-  return await checkCommand(paths, values.format, values.config, values.log === true);
+  return await checkCommand(paths, values, values.log === true);
 }
 
 /** The commands besides `check`. */
@@ -114,17 +116,25 @@ async function setupCommand(
   return paths.length === 0 ? await baselineCommand(values.config) : print(USAGE, 2);
 }
 
-const FORMATS: readonly Format[] = ["text", "json", "sarif"];
+const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif"];
 
 /**
  * Tells whether a `--format` value is one the reporters support.
  *
  * @param value - the raw option value.
- * @returns true for `text`, `json` or `sarif`.
+ * @returns true for `text`, `concise`, `json` or `sarif`.
  */
 function isFormat(value: string): value is Format {
   return FORMATS.some((format) => format === value);
 }
+
+/** The options `inwards check` reads. */
+interface CheckOptions {
+  format?: string | undefined;
+  config?: string | undefined;
+  "max-diagnostics"?: string | undefined;
+}
+const WHOLE_NUMBER = /^\d+$/u;
 
 /**
  * Runs `inwards check` and writes the report to stdout.
@@ -135,19 +145,27 @@ function isFormat(value: string): value is Format {
  * Colour follows FORCE_COLOR first, then NO_COLOR, then the TTY check.
  *
  * @param paths - files or directories to check; empty means the config root.
- * @param format - the `--format` value, validated here.
- * @param config - the `--config` path, if given.
+ * @param options - the parsed options.
+ * @param options.format - the `--format` value, validated here.
+ * @param options.config - the `--config` path, if given.
+ * @param options."max-diagnostics" - `--max-diagnostics`: a whole number, and not with SARIF,
+ *   whose readers (code scanning) should see every finding.
  * @param log - `--log`: append this run to `.inwards/runs.jsonl` even when the run log is off.
- * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad format or no config.
+ * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad option or no config.
  */
 async function checkCommand(
   paths: string[],
-  format: string,
-  config: string | undefined,
+  { format = "text", config, "max-diagnostics": max }: CheckOptions,
   log: boolean,
 ): Promise<number> {
   if (!isFormat(format)) {
     return print(`Unknown --format ${format}`, 2);
+  }
+  if (max !== undefined && format === "sarif") {
+    return print("--max-diagnostics does not apply to sarif: code scanning gets every finding.", 2);
+  }
+  if (max !== undefined && !WHOLE_NUMBER.test(max)) {
+    return print("--max-diagnostics takes a whole number, e.g. 20.", 2);
   }
 
   const configPath = config ? resolve(config) : findConfig(process.cwd());
@@ -161,7 +179,8 @@ async function checkCommand(
   // Agents and hooks read a pipe, and indentation there is wasted tokens.
   const pretty = process.stdout.isTTY === true;
   const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
-  process.stdout.write(`${render(report, format, { pretty, color })}\n`);
+  const maxDiagnostics = max === undefined ? undefined : Number(max);
+  process.stdout.write(`${render(report, format, { pretty, color, maxDiagnostics })}\n`);
   const exit = report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
   const project = realpath(dirname(configPath));
   if (project) {

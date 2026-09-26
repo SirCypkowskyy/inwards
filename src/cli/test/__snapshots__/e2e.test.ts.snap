@@ -97,6 +97,63 @@ exports[`check --format sarif 1`] = `
 }
 `;
 
+exports[`check --format concise 1`] = `
+{
+  "code": 1,
+  "stderr": "",
+  "stdout": 
+"shop/domain/order.py:1:8: INW001 Layer "domain" imports "shop.infrastructure.db" from outer layer "infrastructure". Allowed direction: domain <- infrastructure. fix: Delete \`import shop.infrastructure.db\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.
+Found 1 violation in 2 files (0 ms).
+"
+,
+}
+`;
+
+exports[`check --format json --max-diagnostics 0 1`] = `
+{
+  "code": 1,
+  "stderr": "",
+  "stdout": 
+"{"schema":"inwards/diagnostics@1","summary":{"filesChecked":2,"violations":1,"warnings":0,"omitted":1,"durationMs":0},"diagnostics":[]}
+"
+,
+}
+`;
+
+exports[`check --format concise --max-diagnostics 0 1`] = `
+{
+  "code": 1,
+  "stderr": "",
+  "stdout": 
+"Found 1 violation in 2 files (0 ms).
+Not shown: 1 violation.
+"
+,
+}
+`;
+
+exports[`check --format sarif --max-diagnostics 1 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"--max-diagnostics does not apply to sarif: code scanning gets every finding.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`check --format text --max-diagnostics some 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"--max-diagnostics takes a whole number, e.g. 20.
+"
+,
+  "stdout": "",
+}
+`;
+
 exports[`hook with a broken config: empty layers 1`] = `
 {
   "code": 2,

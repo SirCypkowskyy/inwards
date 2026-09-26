@@ -2,6 +2,9 @@ import { DOCS_BASE, VERSION } from "./meta.ts";
 import { RULES } from "./rules.ts";
 import type { Diagnostic } from "./types.ts";
 
+/** A line break with the spaces around it; Unicode line and paragraph separators count too. */
+const LINE_BREAKS = /\s*[\r\n\u2028\u2029]+\s*/gu;
+
 export interface Report {
   diagnostics: Diagnostic[];
   filesChecked: number;
@@ -12,39 +15,74 @@ export interface Report {
   resolved?: number;
 }
 
-export type Format = "text" | "json" | "sarif";
+export type Format = "text" | "concise" | "json" | "sarif";
 
 export interface RenderOptions {
   /** Indent JSON and SARIF. Adapters turn this off when a program, not a person, reads stdout. */
   pretty?: boolean;
-  /** ANSI colours in text output. The adapter decides (TTY, NO_COLOR, FORCE_COLOR). */
+  /**
+   * ANSI colours in `text` output; `concise` stays plain. The adapter decides
+   * (TTY, NO_COLOR, FORCE_COLOR).
+   */
   color?: boolean;
+  /** Render at most this many diagnostics, errors first. The summary still counts all of them. */
+  maxDiagnostics?: number | undefined;
+}
+
+/** A report plus the diagnostics to print and the ones `maxDiagnostics` cut. */
+interface View extends Report {
+  shown: Diagnostic[];
+  cut: Diagnostic[];
 }
 
 /**
- * Formats a report as text, JSON or SARIF.
+ * Formats a report as text, concise text, JSON or SARIF.
  * The engine only builds strings; the adapter decides where they go and
  * whether to indent or colour them.
  *
  * @param report - the diagnostics plus file count and timing.
- * @param format - `text` for people, `json` (`inwards/diagnostics@1`) or `sarif` for tools.
+ * @param format - `text` for people, `concise` (one line each) for agents on
+ *   a token budget, `json` (`inwards/diagnostics@1`) or `sarif` for tools.
  * @param options - `pretty` indents JSON and SARIF (default true); `color`
- *   adds ANSI codes to text (default false).
+ *   adds ANSI codes to text (default false); `maxDiagnostics` caps the list.
  * @returns the rendered report, without a trailing newline.
  */
 export function render(
   report: Report,
   format: Format,
-  { pretty = true, color = false }: RenderOptions = {},
+  { pretty = true, color = false, maxDiagnostics }: RenderOptions = {},
 ): string {
+  // Code scanning should see every finding, so SARIF is never capped.
+  const view = cap(report, format === "sarif" ? undefined : maxDiagnostics);
   const indent = pretty ? 2 : undefined;
   if (format === "json") {
-    return renderJson(report, indent);
+    return renderJson(view, indent);
   }
   if (format === "sarif") {
-    return renderSarif(report, indent);
+    return renderSarif(view, indent);
   }
-  return renderText(report, color ? ANSI : PLAIN);
+  return format === "concise" ? renderConcise(view) : renderText(view, color ? ANSI : PLAIN);
+}
+
+/**
+ * Splits the diagnostics into the ones to print and the ones over the cap.
+ * Errors go first when there is a cap to fill, so warnings never push an
+ * error out; without a cut the report order stays as it is.
+ *
+ * @param report - the full report.
+ * @param max - the cap, or undefined for none.
+ * @returns the report with `shown` and `cut`.
+ */
+function cap(report: Report, max: number | undefined): View {
+  const all = report.diagnostics;
+  if (max === undefined || all.length <= max) {
+    return { ...report, shown: all, cut: [] };
+  }
+  const ordered = [
+    ...all.filter((d) => d.severity === "error"),
+    ...all.filter((d) => d.severity !== "error"),
+  ];
+  return { ...report, shown: ordered.slice(0, max), cut: ordered.slice(max) };
 }
 
 type Style = "bold" | "dim" | "red" | "green" | "cyan";
@@ -78,13 +116,12 @@ const PLAIN: Paint = { bold: String, dim: String, red: String, green: String, cy
  * One block per diagnostic (location, code, message, numbered fix steps,
  * docs link), blank lines between blocks, then a one-line summary.
  *
- * @param report - the diagnostics plus file count and timing.
+ * @param report - the report and the diagnostics to print.
  * @param c - the palette: ANSI styles, or identity functions for plain text.
  * @returns the text report.
  */
-function renderText(report: Report, c: Paint): string {
-  const { diagnostics, filesChecked, durationMs } = report;
-  const lines = diagnostics.map((d) =>
+function renderText(report: View, c: Paint): string {
+  const lines = report.shown.map((d) =>
     [
       `${c.bold(`${d.file}:${d.line}:${d.column}:`)} ${codeLabel(d, c)} ${d.message}`,
       `  ${c.green("fix:")} ${d.fix.summary}`,
@@ -92,6 +129,49 @@ function renderText(report: Report, c: Paint): string {
       `  ${c.dim(`docs: ${d.docs}`)}`,
     ].join("\n"),
   );
+  return [...lines, ...footer(report, c)].join("\n\n");
+}
+
+/**
+ * Renders one line per diagnostic: location, code, message (which names the
+ * import target) and the first fix step, then the summary. Under a third of
+ * the tokens of one JSON diagnostic; `docs` and the later steps are left out.
+ * Never coloured: agents read it, and hosts often set FORCE_COLOR.
+ *
+ * @param report - the report and the diagnostics to print.
+ * @returns the concise report.
+ */
+function renderConcise(report: View): string {
+  const lines = report.shown.map((d) =>
+    oneLine(
+      `${d.file}:${d.line}:${d.column}: ${codeLabel(d, PLAIN)} ${d.message} fix: ${d.fix.steps[0] ?? d.fix.summary}`,
+    ),
+  );
+  return [...lines, ...footer(report, PLAIN)].join("\n");
+}
+
+/**
+ * Folds line breaks into single spaces, so a diagnostic stays on one line:
+ * a wrapped `from x import (\n a,\n)` statement is quoted in the fix step,
+ * and a string literal or file name can hold a newline.
+ *
+ * @param text - one diagnostic's line.
+ * @returns the same text with every line break (and the spaces around it) as one space.
+ */
+function oneLine(text: string): string {
+  return text.replace(LINE_BREAKS, " ");
+}
+
+/**
+ * Builds the lines under the diagnostics: the totals, what the cap left out,
+ * and the baseline note.
+ *
+ * @param report - the report and the diagnostics cut from it.
+ * @param c - the palette.
+ * @returns one to three lines.
+ */
+function footer(report: View, c: Paint): string[] {
+  const { diagnostics, filesChecked, durationMs, cut } = report;
   const ms = c.dim(`(${durationMs.toFixed(1)} ms)`);
   const files = plural(filesChecked, "file");
   const { errors, warnings } = counts(diagnostics);
@@ -100,7 +180,13 @@ function renderText(report: Report, c: Paint): string {
     errors === 0
       ? `${c.green(c.bold("All clear:"))} ${files}, 0 violations${warned} ${ms}.`
       : `${c.red(c.bold("Found"))} ${plural(errors, "violation")}${warned} in ${files} ${ms}.`;
-  return [...lines, tail, ...baselineNote(report)].join("\n\n");
+  const hidden = counts(cut);
+  const omitted = [
+    hidden.errors === 0 ? "" : plural(hidden.errors, "violation"),
+    hidden.warnings === 0 ? "" : plural(hidden.warnings, "warning"),
+  ].filter((part) => part !== "");
+  const note = omitted.length === 0 ? [] : [`Not shown: ${omitted.join(", ")}.`];
+  return [tail, ...note, ...baselineNote(report)];
 }
 
 /**
@@ -156,14 +242,15 @@ function plural(n: number, word: string): string {
 /**
  * Renders the `inwards/diagnostics@1` JSON report.
  * Stable, versioned shape. Agents parse this, so fields are only ever added.
- * The duration is rounded to 0.1 ms.
+ * The duration is rounded to 0.1 ms. `summary` counts every diagnostic;
+ * `omitted` appears only when a cap cut some.
  *
- * @param report - the diagnostics plus file count and timing.
+ * @param report - the report and the diagnostics to print.
  * @param indent - spaces per level, or undefined for one line.
  * @returns the JSON document.
  */
-function renderJson(report: Report, indent?: number): string {
-  const { diagnostics, filesChecked, durationMs, baselined, resolved } = report;
+function renderJson(report: View, indent?: number): string {
+  const { diagnostics, filesChecked, durationMs, baselined, resolved, shown, cut } = report;
   return JSON.stringify(
     {
       schema: "inwards/diagnostics@1",
@@ -173,9 +260,10 @@ function renderJson(report: Report, indent?: number): string {
         warnings: counts(diagnostics).warnings,
         ...(baselined === undefined ? {} : { baselined }),
         ...(resolved === undefined ? {} : { resolved }),
+        ...(cut.length === 0 ? {} : { omitted: cut.length }),
         durationMs: Math.round(durationMs * 10) / 10,
       },
-      diagnostics,
+      diagnostics: shown,
     },
     null,
     indent,
@@ -200,11 +288,11 @@ function toUriPath(path: string): string {
  * the fix as text and as a `fix` property; file URIs are relative to
  * `%SRCROOT%`.
  *
- * @param report - the diagnostics; the counts are not part of SARIF.
+ * @param report - the diagnostics to print; the counts and the cut are not part of SARIF.
  * @param indent - spaces per level, or undefined for one line.
  * @returns the SARIF log.
  */
-function renderSarif({ diagnostics }: Report, indent?: number): string {
+function renderSarif({ shown }: View, indent?: number): string {
   return JSON.stringify(
     {
       // biome-ignore lint/style/useNamingConvention: SARIF names this key "$schema".
@@ -226,7 +314,7 @@ function renderSarif({ diagnostics }: Report, indent?: number): string {
               })),
             },
           },
-          results: diagnostics.map((d) => ({
+          results: shown.map((d) => ({
             ruleId: d.code,
             level: d.severity,
             message: {

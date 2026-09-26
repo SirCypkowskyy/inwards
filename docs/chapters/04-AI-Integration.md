@@ -145,12 +145,14 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 | `text` | Humans, Aider | `file:line:col: CODE message`, then numbered fix steps |
 | `json` | Agents, scripts | `inwards/diagnostics@1`: `summary` + `diagnostics[]`, each with `fix.summary` and `fix.steps[]` |
 | `sarif` | GitHub code scanning, IDE viewers | SARIF 2.1.0. Fix steps go in `message.text` and `properties.fix` |
-| `concise` :material-progress-clock: [#37](https://github.com/SirCypkowskyy/inwards/issues/37) | Agents on a token budget | One line per violation, like Biome's agent reporter |
+| `concise` | Agents on a token budget | One line per diagnostic: location, code, the message (it names the import, where the rule has one), and the first fix step. Line breaks, such as a wrapped `from x import (…)` quoted in the fix, are folded into spaces. Then the summary line. Never coloured |
 
 <figure markdown="span">
   ![JSON output with summary and fix steps](assets/screens/json-for-agents.svg){ loading=lazy }
   <figcaption>The JSON an agent receives: a versioned summary and ordered fix steps. Piped output is compact; <code>jq</code> only pretty-prints it here.</figcaption>
 </figure>
+
+`--max-diagnostics N` prints at most N diagnostics, errors before warnings, and says what it left out. Text and `concise` add a line such as `Not shown: 3 violations, 1 warning.`; JSON adds `summary.omitted`. The summary counts and the exit code still cover every diagnostic. SARIF refuses the flag, because code scanning should see every finding.
 
 ### Writing diagnostics for a model
 
@@ -160,7 +162,15 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 2. It gives steps in order: delete the import, declare a Protocol, type against it, wire it in the composition root. When an agent gets only a principle, the easiest move is whatever makes the error disappear.
 3. It closes the escape hatches up front. Step 1 of INW001 says *don't move the import into a function or behind `TYPE_CHECKING`; Inwards checks those too*, because moving the import is the cheapest way to quiet a naive import checker.
 4. The output is stable. The same input gives the same diagnostics in the same order, and JSON fields are only ever added, so agents and scripts can rely on it.
-5. The output is short. One INW001 diagnostic is about 1,100 characters of JSON, roughly 280 tokens at the usual 4 characters per token. When stdout isn't a terminal, the CLI prints compact JSON, because indentation is wasted tokens for a model. A planned `--max-diagnostics` cap with a summary line ([#37](https://github.com/SirCypkowskyy/inwards/issues/37)) will stop a legacy repo from flooding the agent's context with hundreds of findings.
+5. The output is short. When stdout isn't a terminal, the CLI prints compact JSON, because indentation is wasted tokens for a model. `--format concise` and `--max-diagnostics` keep a legacy repo with hundreds of findings from flooding the agent's context. The table below gives the tokens per diagnostic for each format.
+
+    | Format | INW001 | Mean of 6 on a sample project (3 INW001, 1 INW011, 2 INW006) |
+    |---|---|---|
+    | `json` (compact) | 1,026 chars, 227 tokens | 944 chars, 218 tokens |
+    | `text` | 859 chars, 197 tokens | 780 chars, 187 tokens |
+    | `concise` | 304 chars, 66 tokens | 301 chars, 69 tokens |
+
+    Counted with the `o200k_base` tokenizer from `js-tiktoken` 1.0.21. `cl100k_base` stays within 5 tokens of it per diagnostic, and characters divided by 4 comes out 4 to 9% high on the means. Claude's tokenizer isn't public, so its counts will differ somewhat. Each count covers one diagnostic: a JSON object in `diagnostics[]`, a text block, or a concise line, without the summary. `concise` costs under a third of JSON because it drops the docs link, `fix.summary` and fix steps 2 to 4. The hooks still send full JSON: they check one file per edit, so there are only a few diagnostics, and steps 2 to 4 are the part that tells the agent how to fix the import rather than hide it (rule 2).
 
 ### Exit codes
 
