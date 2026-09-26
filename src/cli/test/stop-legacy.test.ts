@@ -16,6 +16,13 @@ const ORDER = "shop/domain/order.py";
 const PLACE = "shop/application/place_order.py";
 
 /**
+ * Whether this git has `--no-lazy-fetch` (2.44+). Without it the hooks can't
+ * read a file's start content safely, so every old violation blocks: tests
+ * that expect one excused are skipped (`test.skipIf`) where it is missing.
+ */
+const NO_LAZY_FETCH = Bun.spawnSync(["git", "--no-lazy-fetch", "version"]).exitCode === 0;
+
+/**
  * Starts a session on the example app with one eval fixture's files committed.
  *
  * @param fixture - the fixture's directory name under eval/fixtures/INW001.
@@ -128,7 +135,7 @@ const SECOND_COPY: [string, string] = [
   "from shop.infrastructure.sql_orders import SqlOrderRepository\nfrom dataclasses",
 ];
 
-describe("violations a file had at session start", () => {
+describe.skipIf(!NO_LAZY_FETCH)("violations a file had at session start are excused", () => {
   for (const [fixture, file, task] of TASKS) {
     test(`${fixture}: the task's edit and the Stop pass, the old violation is context`, () => {
       const root = seeded(fixture);
@@ -152,17 +159,6 @@ describe("violations a file had at session start", () => {
     expect(stderr).toContain('"violations":1,');
   });
 
-  test("a different violation in the same file blocks", () => {
-    const root = seeded("seeded-relative-import");
-    agentEdits(root, PLACE, [
-      "from ..domain.order",
-      "from shop.api.http import post_order\nfrom ..domain.order",
-    ]);
-    const { code, stderr } = stop(root);
-    expect(code).toBe(2);
-    expect(stderr).toContain("shop.api.http");
-  });
-
   test("a change through Bash, which PostToolUse never sees, is judged the same way", () => {
     const root = seeded("seeded-type-checking");
     put(root, ORDER, `${readFileSync(join(root, ORDER), "utf8")}\nX = 1\n`);
@@ -174,6 +170,40 @@ describe("violations a file had at session start", () => {
     agentEdits(root, ORDER, EUROS);
     git(root, "commit", "-qam", "agent");
     expect(stop(root).code).toBe(0);
+  });
+
+  test("a CRLF working tree over an LF commit (core.autocrlf) still proves the start content", () => {
+    const root = seeded("seeded-function-import");
+    put(root, ORDER, readFileSync(join(root, ORDER), "utf8").replaceAll("\n", "\r\n"));
+    send(root, "session-start", "crlf");
+    const edit = agentEdits(root, ORDER, ["    id: str\r\n", "    id: str\r\n    note: str\r\n"], {
+      id: "crlf",
+    });
+    expect(edit.code).toBe(0);
+    expect(send(root, "stop", "crlf").code).toBe(0);
+  });
+
+  test("excused violations stay out of the run log; a new one is logged", () => {
+    const root = seeded("seeded-function-import");
+    const env = { INWARDS_RUN_LOG: "1" };
+    agentEdits(root, ORDER, EUROS, { env });
+    send(root, "stop", ID, env);
+    expect(loggedPrints(root)).toEqual([[], []]);
+    agentEdits(root, ORDER, SECOND_COPY, { env });
+    expect(loggedPrints(root).at(-1)).toHaveLength(1);
+  });
+});
+
+describe("violations the hooks still block, and what they never run", () => {
+  test("a different violation in the same file blocks", () => {
+    const root = seeded("seeded-relative-import");
+    agentEdits(root, PLACE, [
+      "from ..domain.order",
+      "from shop.api.http import post_order\nfrom ..domain.order",
+    ]);
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain("shop.api.http");
   });
 
   test("a file uncommitted at session start has no known start content, so it blocks as before", () => {
@@ -201,10 +231,10 @@ describe("violations a file had at session start", () => {
       join(root, ".git/config"),
       `[filter "pwn"]\n\tsmudge = ${run}\n\tprocess = ${run}\n[core]\n\tfsmonitor = ${run}\n`,
     );
-    const edit = agentEdits(root, ORDER, EUROS);
-    expect(edit.code).toBe(0);
-    expect(contextOf(edit)).toContain("already in the file when the session started");
-    expect(stop(root).code).toBe(0);
+    // Excused where the start blob can be read safely, blocked (the fallback) where it can't.
+    const code = NO_LAZY_FETCH ? 0 : 2;
+    expect(agentEdits(root, ORDER, EUROS).code).toBe(code);
+    expect(stop(root).code).toBe(code);
     expect(existsSync(marker)).toBe(false);
   });
 
@@ -235,25 +265,12 @@ describe("violations a file had at session start", () => {
       expect(existsSync(marker)).toBe(false);
     }, 30_000);
   }
+});
 
-  test("a CRLF working tree over an LF commit (core.autocrlf) still proves the start content", () => {
+describe.if(!NO_LAZY_FETCH)("git before 2.44, without --no-lazy-fetch", () => {
+  test("on git before 2.44 an old violation blocks, the safe fallback", () => {
     const root = seeded("seeded-function-import");
-    put(root, ORDER, readFileSync(join(root, ORDER), "utf8").replaceAll("\n", "\r\n"));
-    send(root, "session-start", "crlf");
-    const edit = agentEdits(root, ORDER, ["    id: str\r\n", "    id: str\r\n    note: str\r\n"], {
-      id: "crlf",
-    });
-    expect(edit.code).toBe(0);
-    expect(send(root, "stop", "crlf").code).toBe(0);
-  });
-
-  test("excused violations stay out of the run log; a new one is logged", () => {
-    const root = seeded("seeded-function-import");
-    const env = { INWARDS_RUN_LOG: "1" };
-    agentEdits(root, ORDER, EUROS, { env });
-    send(root, "stop", ID, env);
-    expect(loggedPrints(root)).toEqual([[], []]);
-    agentEdits(root, ORDER, SECOND_COPY, { env });
-    expect(loggedPrints(root).at(-1)).toHaveLength(1);
+    expect(agentEdits(root, ORDER, EUROS).code).toBe(2);
+    expect(stop(root).code).toBe(2);
   });
 });
