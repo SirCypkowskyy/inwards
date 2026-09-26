@@ -69,7 +69,7 @@ interface Pass {
   lastRun: Map<string, { session: string; prints: string[] }>;
   /** Each first report, and whether it was fixed (undefined: nothing settled it). */
   settled: { print: string; fixed: boolean | undefined }[];
-  /** Distinct `session\0fingerprint` of new violations. */
+  /** Distinct `session\0file\0fingerprint` of new violations, keyed like the retry count. */
   introduced: Set<string>;
 }
 
@@ -131,11 +131,17 @@ function observe(pass: Pass, run: RunLine, file: string): void {
   for (const print of state.pending) {
     pass.settled.push({ print, fixed: !run.fingerprints.includes(print) });
   }
-  state.pending = errorsOf(run).filter((print) => !state.seen.has(print));
+  // A violation another session's run on this file already had is that session's.
+  const last = pass.lastRun.get(file);
+  const others = last && last.session !== session ? last.prints : [];
+  const fresh = errorsOf(run).filter((print) => !state.seen.has(print));
+  state.pending = fresh.filter((print) => !others.includes(print));
   state.pendingAt = Date.parse(run.at);
-  for (const print of state.pending) {
+  for (const print of fresh) {
     state.seen.add(print);
-    pass.introduced.add(`${session}${SEP}${print}`);
+  }
+  for (const print of state.pending) {
+    pass.introduced.add(`${session}${SEP}${file}${SEP}${print}`);
   }
   pass.lastRun.set(file, { session, prints: run.fingerprints });
 }

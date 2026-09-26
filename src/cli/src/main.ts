@@ -99,9 +99,13 @@ async function setupCommand(
   },
 ): Promise<number> {
   if (command === "stats") {
-    return paths.length <= 1 && values.config === undefined
-      ? statsCommand(values.format ?? "text", paths[0])
-      : print(USAGE, 2);
+    if (values.config !== undefined) {
+      return print(
+        "inwards stats reads every run log in a project: pass the project directory, not --config.",
+        2,
+      );
+    }
+    return paths.length <= 1 ? statsCommand(values.format ?? "text", paths[0]) : print(USAGE, 2);
   }
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1

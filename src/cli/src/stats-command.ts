@@ -2,6 +2,8 @@
  * The `inwards stats` command: finds the project, reads its run logs, and
  * prints the hypothesis numbers, each next to its chapter-2 threshold.
  */
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import process from "node:process";
 import { print } from "./output.ts";
 import { realpath } from "./paths.ts";
@@ -29,7 +31,7 @@ export function statsCommand(format: string, dir: string | undefined): number {
     dir ??
     (process.env["CLAUDE_PROJECT_DIR"] ||
       git(cwd, ["rev-parse", "--show-toplevel"])?.trim() ||
-      cwd);
+      outermostLog(cwd));
   const project = realpath(root);
   if (!project) {
     return print(`No such directory: ${root}`, 2);
@@ -54,12 +56,12 @@ function renderStatsText(stats: Stats): string {
   const skipped = stats.skippedLines;
   const rules = Object.entries(retry.byRule).map(
     ([rule, c]) =>
-      `    ${rule}  ${c.fixed} of ${c.reported}${share(c.rate)}${c.noRetry ? `, ${c.noRetry} without a retry` : ""}`,
+      `    ${rule}  ${c.fixed} of ${c.reported}${share(c)}${c.noRetry ? `, ${c.noRetry} without a retry` : ""}`,
   );
   return [
     `Run log: ${stats.sessions} sessions, ${stats.hookRuns} hook runs${skipped ? `, ${skipped} unreadable line${skipped === 1 ? "" : "s"} skipped` : ""}.`,
     "",
-    `Fixed within one retry: ${retry.fixed} of ${retry.reported}${share(retry.rate)}. Target: at least ${retry.target * PERCENT}%. ${verdict(retry.met)}`,
+    `Fixed within one retry: ${retry.fixed} of ${retry.reported}${share(retry, retry.target)}. Target: at least ${retry.target * PERCENT}%. ${verdict(retry.met)}`,
     ...rules,
     ...(retry.noRetry
       ? [`    ${retry.noRetry} more had no later run for their file and weren't reported at Stop.`]
@@ -69,13 +71,44 @@ function renderStatsText(stats: Stats): string {
   ].join("\n");
 }
 /**
- * Formats a rate as a percentage in parentheses.
+ * Finds the outermost directory at or above `start` that holds a run log,
+ * for a project outside git: the hooks log at the project root, above the
+ * packages.
  *
- * @param rate - a fraction, or null.
- * @returns e.g. ` (83%)`, or empty for null.
+ * @param start - the working directory.
+ * @returns that directory, or `start` when none above it has a log.
  */
-function share(rate: number | null): string {
-  return rate === null ? "" : ` (${Math.round(rate * PERCENT)}%)`;
+function outermostLog(start: string): string {
+  let found = start;
+  for (let dir = start; ; dir = dirname(dir)) {
+    if (["runs.jsonl", "runs.1.jsonl"].some((name) => existsSync(join(dir, ".inwards", name)))) {
+      found = dir;
+    }
+    if (dirname(dir) === dir) {
+      return found;
+    }
+  }
+}
+
+/**
+ * Formats a share as a percentage in parentheses. When whole percent would
+ * read as the target while the target isn't met (79.95% as "80%"), one
+ * decimal is shown, rounded down.
+ *
+ * @param count - fixed and reported.
+ * @param count.fixed - how many were fixed.
+ * @param count.reported - how many were reported.
+ * @param target - the target share, if the line shows one.
+ * @returns e.g. ` (83%)` or ` (79.9%)`, or empty when nothing was reported.
+ */
+function share(count: { fixed: number; reported: number }, target?: number): string {
+  if (count.reported === 0) {
+    return "";
+  }
+  const exact = (count.fixed / count.reported) * PERCENT;
+  const whole = Math.round(exact);
+  const misleading = target !== undefined && whole === target * PERCENT && exact < whole;
+  return ` (${misleading ? Math.floor(exact * 10) / 10 : whole}%)`;
 }
 /**
  * Words a target verdict.
