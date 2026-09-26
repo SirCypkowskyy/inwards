@@ -42,7 +42,7 @@ Each line is one JSON object:
 
 ## Reading it
 
-`inwards stats [DIR]` reads every `.inwards/runs.1.jsonl` and `.inwards/runs.jsonl` in the project: the one at the root, where the hooks write, and the one next to each config, where `inwards check --log` writes. It merges them in time order and prints the three numbers, each next to its [chapter 2 threshold](02-Business-Context.md#business-hypothesis). The project is DIR, else `CLAUDE_PROJECT_DIR`, else the git work tree you are in. `--format json` prints the same numbers as `inwards/stats@1`, with a `met` verdict for each. Nothing leaves the machine.
+`inwards stats [DIR]` reads every `.inwards/runs.1.jsonl` and `.inwards/runs.jsonl` in the project: the one at the root, where the hooks write, and the one next to each config, where `inwards check --log` writes. It merges them in time order and prints the three numbers, each next to its [chapter 2 threshold](02-Business-Context.md#business-hypothesis). The project is DIR, else `CLAUDE_PROJECT_DIR`, else the git work tree you are in, else the nearest folder above you with the hooks' `.inwards/state`, else the outermost one with a run log, stopping below your home directory. `--config` doesn't apply: `stats` always reads the whole project. `--format json` prints the same numbers as `inwards/stats@1`, with a `met` verdict for each. Nothing leaves the machine.
 
 ```text title="inwards stats"
 Run log: 2 sessions, 6 hook runs, 1 unreadable line skipped.
@@ -59,13 +59,13 @@ Hook latency: p50 40 ms, p95 200 ms over 6 runs. Target: p50 under 100 ms. Met.
 What it counts:
 
 - **Fixed within one retry:** a violation counts once per session and file, at the first `PostToolUse` line that reports it, and only if it is an error: warnings don't block the agent. It is fixed when the next `PostToolUse` line for that file no longer has its fingerprint, so every copy of it has to be gone. With no later run for the file, a later `Stop` line of the same session that still reports it counts as not fixed, so an agent that gives up doesn't drop out of the rate. Anything else is listed as without a retry. The per-rule split uses `codes`; a fingerprint never logged with a code counts under `unknown`.
-- **Violations per 1,000 agent-written lines:** distinct error fingerprints first reported in a session's `PostToolUse` lines, over the sum of `added` in those lines.
+- **Violations per 1,000 agent-written lines:** error fingerprints first reported in a session's `PostToolUse` lines, once per session and file as in the retry rate, over the sum of `added` in those lines. A `.py` and its `.pyi` share a module, so a violation mirrored in a stub counts twice, once per file.
 - **Hook latency:** p50 and p95 of `durationMs` over `PostToolUse` lines that checked a file, by the nearest-rank method. Edits to other files (Markdown, files outside the project) run the hook too, but check nothing, so they're left out.
 - **Verdicts** compare the exact ratios with the thresholds, not the rounded percentages.
 
 A hook checks the whole file, so its fingerprints include violations that were there before the agent touched it. Two kinds are left out of both rates:
 
 - violations a `check` line reported before the session's first edit. Run `inwards check --format json --log` before you ask the agent for its first change; without it, violations already in a file count as the agent's the first time it edits that file;
-- violations the file's last hook run in an earlier session still had, so a violation left over from yesterday's session, or from before `/clear`, isn't counted again.
+- violations the file's last hook run in another session had, so a violation left over from yesterday's session, from before `/clear`, or from another agent working on the same file at the same time isn't counted as this session's, until a run on the file no longer has it. If it comes back after that, it is this session's.
 
 Hook adoption, the share of installs with an agent hook, isn't in the log: one project can't see the others. Partners report it.
