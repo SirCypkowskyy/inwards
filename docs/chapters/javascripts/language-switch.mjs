@@ -50,8 +50,9 @@ function counterpart(link) {
 async function onClick(event) {
   const target = event.target instanceof Element ? event.target : null;
   const link = target?.closest("a[data-inwards-alternate]");
-  if (!(link instanceof HTMLAnchorElement) || event.metaKey || event.ctrlKey) {
-    return;
+  const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+  if (!(link instanceof HTMLAnchorElement) || modified) {
+    return; // a new tab or window uses the href, which syncLinks() keeps current
   }
   event.preventDefault();
   event.stopPropagation();
@@ -67,4 +68,26 @@ async function onClick(event) {
   globalThis.location.assign(destination);
 }
 
+/**
+ * Points every language link's href at the current page's counterpart.
+ *
+ * Instant navigation swaps the content but not the header, so the href the
+ * server rendered still names the first page loaded. Ctrl-click, middle-click
+ * and "copy link" read the href, so it is refreshed after every navigation.
+ */
+function syncLinks() {
+  for (const link of document.querySelectorAll("a[data-inwards-alternate]")) {
+    if (link instanceof HTMLAnchorElement) {
+      link.href = counterpart(link).page.href;
+    }
+  }
+}
+
 document.addEventListener("click", onClick, true);
+// `document$` (the theme's instant-navigation observable) replays the first
+// page load, so subscribing covers it; without the theme's script, run once.
+if (globalThis.document$ && typeof globalThis.document$.subscribe === "function") {
+  globalThis.document$.subscribe(syncLinks);
+} else {
+  syncLinks();
+}

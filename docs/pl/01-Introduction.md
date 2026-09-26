@@ -3,9 +3,9 @@ source: docs/chapters/01-Introduction.md
 source_hash: db058e1677cbfed196f66d9aedd09872b9783ca720d05b550cb7044a50d3a0b1
 ---
 
-# :material-layers-triple: Wprowadzenie
+# :material-layers-triple: Wprowadzenie { #introduction }
 
-Inwards to linter architektury dla Pythona. Zapisujesz, jak podzielony jest na warstwy twój kod, a `inwards check` zgłasza błąd w chwili, gdy import przekracza granicę, której nie powinien. Powstał z myślą o pętli edycji agentów kodujących AI, takich jak Claude Code, Aider i Copilot, bo agent potrafi w jedno popołudnie napisać tyle importów, ile człowiek w tydzień, a nikt nie czyta ich wszystkich.
+Inwards to linter architektury dla Pythona. Zapisujesz, jak podzielony jest na warstwy twój kod, a `inwards check` zgłasza błąd w chwili, gdy import przekracza granicę, której nie powinien. Powstał z myślą o pętli edycji agentów kodujących AI, takich jak Claude Code, Aider i Copilot, bo agent potrafi w jedno popołudnie napisać tyle importów, ile zwykle powstaje przez tydzień, a nikt nie czyta ich wszystkich.
 
 Ten rozdział opisuje problem, to, co Inwards z nim robi, i to, jak zorganizowana jest reszta dokumentacji.
 
@@ -18,9 +18,9 @@ Poproś agenta, żeby „dodał rabat do zamówień”, a zrobi to. Może przy o
 - Testy sprawdzają zachowanie. Zachowanie jest poprawne.
 - Przegląd kodu przez człowieka by to wyłapał, ale agent wyprodukował 40 plików w dziesięć minut, a recenzent tylko je przegląda po łebkach.
 
-Efekt to kod, którego diagramy mówią „architektura heksagonalna”, a importy mówią „wielka kula błota”, jeden mały skrót naraz.
+Efekt to kod, którego diagramy mówią „architektura heksagonalna”, a importy mówią „wielka kula błota”, skrót po skrócie.
 
-Agenci dokładają dwa własne sposoby, w jakie coś idzie nie tak. Zmyślają: `from shop.domain.pricing import DiscountPolicy` wygląda wiarygodnie, nawet gdy `pricing` nie istnieje. A gdy sprawdzenie zgłasza problem, obchodzą je, przenosząc import do ciała funkcji albo za `if TYPE_CHECKING:`. Zabezpieczenie dla agentów musi wyłapać jedno i drugie.
+Agenci dokładają dwa własne rodzaje błędów. Zmyślają: `from shop.domain.pricing import DiscountPolicy` wygląda wiarygodnie, nawet gdy `pricing` nie istnieje. A gdy sprawdzenie zgłasza problem, obchodzą je, przenosząc import do ciała funkcji albo pod `if TYPE_CHECKING:`. Zabezpieczenie dla agentów musi wyłapać jedno i drugie.
 
 !!! abstract "Zakład, na którym stoi Inwards"
     Agenci spełniają ograniczenia, które widzą i mogą uruchomić, a ignorują te, które żyją tylko na stronie w wiki. Reguły architektury zwykle żyją w wiki. Rozdział 2 zamienia to w hipotezę, którą da się przetestować.
@@ -80,7 +80,7 @@ Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomio
 
     ---
 
-    Jeden plik sprawdza się w medianie poniżej 50 ms, łącznie ze startem procesu ([pomiary](06-Constraints-and-Quality.md#measurements)), więc sprawdzenie może się uruchamiać po każdej edycji agenta.
+    Sprawdzenie jednego pliku trwa w medianie poniżej 50 ms, łącznie ze startem procesu ([pomiary](06-Constraints-and-Quality.md#measurements)), więc sprawdzenie może się uruchamiać po każdej edycji agenta.
 
 -   :material-robot-outline:{ .lg .middle } __Pisany dla agentów__
 
@@ -104,7 +104,7 @@ Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomio
 
 ## Czym Inwards nie jest { #what-inwards-is-not }
 
-To nie jest linter ogólnego przeznaczenia, narzędzie do sprawdzania typów ani formatter. Zostaw sobie Ruffa i ty. Inwards zajmuje się wyłącznie strukturą zależności między twoimi własnymi modułami i zakłada, że wiesz już, jakiej architektury chcesz. Nie wymyśli jej za ciebie.
+To nie jest linter ogólnego przeznaczenia, narzędzie do sprawdzania typów ani formatter. Nadal używaj Ruffa i ty. Inwards zajmuje się wyłącznie strukturą zależności między twoimi własnymi modułami i zakłada, że wiesz już, jakiej architektury chcesz. Nie wymyśli jej za ciebie.
 
 ## Jak zorganizowana jest ta dokumentacja { #how-these-docs-are-organised }
 

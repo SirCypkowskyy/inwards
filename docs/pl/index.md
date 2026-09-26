@@ -5,7 +5,7 @@ hide:
   - navigation
 ---
 
-# :material-layers-triple: Inwards
+# :material-layers-triple: Inwards { #inwards }
 
 **Reguły architektury dla Pythona, na tyle szybkie, że można je uruchamiać po każdej edycji agenta AI.**
 
@@ -123,4 +123,4 @@ Deklarujesz swoje warstwy w `pyproject.toml`. `inwards check` zgłasza błąd, g
     Sześć reguł działa od początku do końca w CLI, w silniku i w serwerze VS Code: INW001 (kierunek warstw), INW011 (dosłowne importy dynamiczne), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Każde wydanie to GitHub Release z plikami binarnymi dla sześciu platform, pięcioma wheelami platformowymi dla `uv add` i plikiem `.vsix`. Jak dotąd jedynym wydaniem jest wersja przedpremierowa v0.1.0-rc.1.
-    CI testuje każdy pull request na Linuksie, a macOS i Windows przed każdym wydaniem. Elementy oznaczone :material-progress-clock: są zaplanowane.
+    CI testuje każdy pull request na Linuksie, a na macOS i Windows – przed każdym wydaniem. Elementy oznaczone :material-progress-clock: są zaplanowane.

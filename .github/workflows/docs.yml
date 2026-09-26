@@ -32,6 +32,7 @@ jobs:
       - run: uv run zensical build -f docs/zensical.toml --clean --strict
       # Stale Polish pages get a "may be out of date" banner in this checkout only.
       # ci.yml already fails a PR on a missing translation; don't block the deploy.
+      # (This also hides a crash of the script: the Polish site then ships without banners.)
       - run: uv run scripts/check-docs-translation.py --mark-stale
         continue-on-error: true
       - run: uv run zensical build -f docs/zensical.pl.toml --clean --strict

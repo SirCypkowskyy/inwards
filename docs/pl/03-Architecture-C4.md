@@ -3,7 +3,7 @@ source: docs/chapters/03-Architecture-C4.md
 source_hash: 006671f0ceae2db97dd3f45c87fb11e6f646c4e8f7c141bca01ff7120beb1dd7
 ---
 
-# :material-sitemap-outline: Architektura (C4)
+# :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
 
 Ten rozdział opisuje Inwards za pomocą [modelu C4](https://c4model.com): kontekst systemu (C1), kontenery (C2) i komponenty (C3). Diagramy to schematy blokowe Mermaid w notacji C4, bo natywna składnia C4 w Mermaid jest wciąż eksperymentalna i słabo się renderuje.
 
@@ -86,7 +86,7 @@ flowchart TB
 |---|---|---|---|
 | **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW006, INW007, INW008, INW011 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
-| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku; INW007 i INW008 dla całego workspace na podstawie listy katalogów |
+| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` dla `claude`, `aider` i `agents-md` |
 | **Stan sesji i run log** | Pliki JSON i JSON Lines, tylko lokalnie | `.inwards/state/`, `.inwards/runs.jsonl` | :white_check_mark: (run log opcjonalny, [rozdział 8](08-Run-Log.md)) |
@@ -118,7 +118,7 @@ flowchart LR
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>reporters.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
-        modgraph["<b>Indeks modułów</b><br/><small>project.ts: własne moduły,<br/>importerzy na żądanie</small>"]
+        modgraph["<b>Indeks modułów</b><br/><small>project.ts: własne moduły,<br/>moduły importujące na żądanie</small>"]
     end
 
     cfgtext --> config --> engine
@@ -143,7 +143,7 @@ flowchart LR
 | Kompozytor poprawek | Buduje ponumerowane kroki naprawy z faktycznych nazw importu i warstw | Kroki podają prawdziwe moduły, a nie symbole zastępcze |
 | Reportery | Tekst dla ludzi, JSON `inwards/diagnostics@1` dla agentów, SARIF 2.1.0 dla GitHuba | Pola JSON można dodawać, ale nigdy nie usuwać ani nie zmieniać ich nazw |
 | Fasada silnika | Koordynuje prescan, reguły i potwierdzające pełne parsowanie | Jedyne, co wywołują adaptery. Kształt pakietu (INW007) jest sprawdzany najpierw, na podstawie samej ścieżki. Plik poza wszystkimi warstwami nie jest parsowany (dostaje najwyżej ostrzeżenie INW006). Plik w warstwie, którego tekst wymienia loader modułów, pomija prescan (zobacz niżej) |
-| Indeks modułów | `Engine.index(files)` zwraca każdy własny moduł i na żądanie odpowiada na pytanie „kto importuje moduł X”, parsując tylko pliki, których tekst wspomina ostatni segment nazwy X | Jeszcze nie używa go żadna reguła ani polecenie (INW006 zamiast tego sonduje system plików w poszukiwaniu własnych modułów); użyją go INW010 i wykrywanie cykli ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)) |
+| Indeks modułów | `Engine.index(files)` zwraca każdy własny moduł i na żądanie odpowiada na pytanie „kto importuje moduł X”, parsując tylko pliki, których tekst zawiera ostatni segment nazwy X | Jeszcze nie używa go żadna reguła ani polecenie (INW006 zamiast tego sonduje system plików w poszukiwaniu własnych modułów); użyją go INW010 i wykrywanie cykli ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)) |
 
 ### Przebieg jednego sprawdzenia { #how-one-check-flows }
 
@@ -193,7 +193,7 @@ sequenceDiagram
     end
 ```
 
-Prescan może zgłaszać fałszywe alarmy, na przykład linię wyglądającą jak import wewnątrz docstringa, ale nigdy nie ukryje prawdziwego importu, bo odmawia każdego pliku, którego nie umie w pełni wyjaśnić. Źródłem prawdy jest pełne parsowanie, a uruchamia się ono tylko wtedy, gdy naruszenie wymaga potwierdzenia.
+Prescan może zgłaszać fałszywe alarmy, na przykład linię wyglądającą jak import wewnątrz docstringa, ale nigdy nie ukryje prawdziwego importu, bo odmawia przetworzenia każdego pliku, którego nie umie w pełni wyjaśnić. Źródłem prawdy jest pełne parsowanie, a uruchamia się ono tylko wtedy, gdy naruszenie wymaga potwierdzenia.
 
 Szkielet zachowuje wyłącznie instrukcje importu, więc plik, którego jedyną zależnością na zewnątrz jest `importlib.import_module("shop.infrastructure.db")`, by go przeszedł. Zanim uruchomi się prescan, sprawdzenie tekstu szuka nazw, które każde wywołanie ładujące musi zapisać (`importlib`, `runpy`, `builtins`, `__import__` albo samo `exec`, `eval` lub `compile`, po normalizacji NFKC). Plik w warstwie, który pasuje, trafia prosto do pełnego parsowania, które szuka też importów dynamicznych. `re.compile` nie pasuje. W bibliotece standardowej CPythona 3.14 pasuje 209 z 1921 plików. Zobacz [ADR-015](05-ADR.md#adr-015-check-literal-dynamic-imports-as-inw011).
 
@@ -218,11 +218,11 @@ flowchart LR
 
 Kody wyjścia są takie jak w Ruffie: `0` czysto (ostrzeżenia dozwolone), `1` znaleziono błędy, `2` błąd użycia albo konfiguracji. Agenci i skrypty CI mogą rozgałęziać się na tej podstawie bez parsowania wyjścia. W raporcie JSON `summary.violations` liczy błędy, a `summary.warnings` ostrzeżenia. Uruchomienie dla całego projektu (bez argumentów ścieżek) sprawdza też każdy prefiks warstwy i selektor kształtu względem znalezionych modułów (INW006, INW007) oraz wymagane elementy każdego pakietu z kształtem (INW008).
 
-Pozostałe polecenia korzystają z tych samych elementów:
+Pozostałe dwa polecenia korzystają z tych samych elementów:
 
 - `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
 - `inwards init --agent claude|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
-- `inwards init --style layered|clean|hexagonal [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta selektor zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
+- `inwards init --style layered|clean|hexagonal [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
 ## Wdrożenie i dystrybucja { #deployment-and-distribution }
 
@@ -303,7 +303,7 @@ Szkic nigdy go nie uruchamia, ręczne uruchomienie odrzuca szkic, a pull request
       "$(gh run list --repo SirCypkowskyy/inwards --workflow pypi.yml -L 1 --json databaseId -q '.[0].databaseId')"
     ```
 
-    [test.pypi.org/project/inwards/0.1.0rc1](https://test.pypi.org/project/inwards/0.1.0rc1/) powinno wtedy pokazywać pięć wheeli i wyrenderowane README. Zainstaluj je w świeżym projekcie, na tylu platformach, na ilu możesz:
+    [test.pypi.org/project/inwards/0.1.0rc1](https://test.pypi.org/project/inwards/0.1.0rc1/) powinno wtedy pokazywać pięć wheeli i wyrenderowane README. Zainstaluj pakiet w świeżym projekcie, na tylu platformach, na ilu możesz:
 
     ```sh
     cd "$(mktemp -d)" && uv init --bare --name testpypi-check
@@ -325,7 +325,7 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 ## Znane ograniczenia { #known-limitations }
 
 - Jeden `root` na konfigurację. Monorepo z kilkoma pakietami Pythona potrzebuje osobnego `pyproject.toml` i osobnego uruchomienia dla każdego; hook i Stop gate wybierają najbliższą konfigurację dla każdego pliku. Obsługa workspace'ów uv to [#57](https://github.com/SirCypkowskyy/inwards/issues/57) ([ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
-- Serwer języka czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu workspace i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu.
+- Serwer języka czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu obszaru roboczego i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu.
 - Niejawne pakiety przestrzeni nazw (bez `__init__.py`) działają przy nazywaniu, ale importy względne wewnątrz nich są rozwiązywane tak, jakby katalog był zwykłym pakietem.
 - Przynależność do warstwy wynika tylko z prefiksu modułu. Wzorce glob (`shop.*.domain`) dla pionowych wycinków przyjdą ze schematem konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51), [ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
 - Dowiązania symboliczne: katalog-dowiązanie wewnątrz warstwy, który wskazuje poza projekt, nie jest sprawdzany ([#83](https://github.com/SirCypkowskyy/inwards/issues/83)), a dowiązanie-alias wewnątrz jednej warstwy, które wskazuje do innej, może ukryć import na zewnątrz ([#84](https://github.com/SirCypkowskyy/inwards/issues/84)).
@@ -342,11 +342,11 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 |---|---|---|---|
 | INW000 | `unsupported-encoding` | Plik w warstwie deklaruje kodowanie (PEP 263), takie jak `unicode_escape` albo `utf-7`, przy którym tekst, który Inwards czyta jako komentarz, może być dla CPythona prawdziwym importem. Plik jest zgłaszany, a nie pomijany | :white_check_mark: |
 | INW001 | `layer-dependency` | Warstwa wewnętrzna importująca zewnętrzną | :white_check_mark: |
-| INW002 | `context-independence` | Jeden kontekst ograniczony albo pionowy wycinek importujący wnętrzności innego | :material-progress-clock: [#52](https://github.com/SirCypkowskyy/inwards/issues/52) |
+| INW002 | `context-independence` | Jeden kontekst ograniczony albo pionowy wycinek importujący wewnętrzne moduły innego | :material-progress-clock: [#52](https://github.com/SirCypkowskyy/inwards/issues/52) |
 | INW003 | `public-api-only` | Import z pominięciem publicznego modułu kontekstu (`__init__` albo `api.py`) | :material-progress-clock: [#53](https://github.com/SirCypkowskyy/inwards/issues/53) |
 | INW004 | `no-cycles` | Cykle importów między modułami albo kontekstami | :material-progress-clock: wymaga grafu, [#54](https://github.com/SirCypkowskyy/inwards/issues/54) |
 | INW005 | `pure-domain` | Warstwa domeny importująca frameworki albo biblioteki wejścia-wyjścia (`sqlalchemy`, `fastapi`, `requests`...) | :material-progress-clock: [#47](https://github.com/SirCypkowskyy/inwards/issues/47) |
-| INW006 | `unassigned-module` | Import z warstwy do własnego kodu, który nie należy do żadnej warstwy, w tym do pakietu nad warstwami (`from shop import x` uruchamia `shop/__init__.py`, którego nie ma żadna warstwa), statyczny albo dynamiczny (błąd); kod warstwy przeniesiony w trakcie sesji poza wszystkie warstwy (błąd); pakiet poza wszystkimi warstwami i poza `ignore` (ostrzeżenie); prefiks warstwy, który nie pasuje do żadnego modułu (ostrzeżenie), warstwa bez żywego prefiksu albo prefiks opróżniony w trakcie sesji (błąd). Nieznane klucze i nakładające się prefiksy to błędy konfiguracji | :white_check_mark: |
+| INW006 | `unassigned-module` | Import z warstwy do własnego kodu, który nie należy do żadnej warstwy, w tym do pakietu nad warstwami (`from shop import x` uruchamia `shop/__init__.py`, który nie należy do żadnej warstwy), statyczny albo dynamiczny (błąd); kod warstwy przeniesiony w trakcie sesji poza wszystkie warstwy (błąd); pakiet poza wszystkimi warstwami i poza `ignore` (ostrzeżenie); prefiks warstwy, który nie pasuje do żadnego modułu (ostrzeżenie), warstwa bez żywego prefiksu albo prefiks opróżniony w trakcie sesji (błąd). Nieznane klucze i nakładające się prefiksy to błędy konfiguracji | :white_check_mark: |
 | INW007 | `package-shape` | Element pakietu, na który `[[tool.inwards.shape]]` nie pozwala (błąd albo ostrzeżenie przy `extra = "warning"`) albo którego zabrania, taki jak nowy `helpers.py` obok `service.py`; nazwa elementu poza jej pakietami `only-in` z `[[tool.inwards.names]]`, taka jak `test_x.py` w aplikacji (błąd); selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie, w pyproject.toml). Komunikat nigdy nie wypisuje dozwolonych elementów; poprawka podaje prawdopodobny cel. Zobacz [Kształt pakietu](guides/package-shape.md) | :white_check_mark: |
 | INW008 | `missing-member` | Brakuje elementu, którego wymaga kształt pakietu; zgłaszane w jego `__init__.py`. Uruchomienia dla całego projektu zgłaszają każdy taki brak; Stop gate blokuje tylko te, które pojawiły się od początku sesji | :white_check_mark: |
 | INW010 | `unknown-first-party` | Import własnego modułu, który nie istnieje, typowa halucynacja agenta | :material-progress-clock: wymaga indeksu modułów, [#45](https://github.com/SirCypkowskyy/inwards/issues/45) |

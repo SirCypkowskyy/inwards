@@ -3,13 +3,13 @@ source: docs/chapters/guides/design-partners.md
 source_hash: eeaad8cbbdb484bf075e92554b0a82d9bc1133c8c2e55aea3cd046077fe0058e
 ---
 
-# Design partnerzy
+# Design partnerzy { #design-partners }
 
-Design partnerzy uruchamiają Inwards w prawdziwych projektach ze swoimi agentami AI i mówią nam, czy to działa: czy agenci naprawiają to, co zgłasza, czy wyłapuje prawdziwe naruszenia i czy nie wchodzi w drogę. Ta strona opisuje całą ścieżkę, od instalacji po udostępnienie liczb. Nic nie opuszcza twojej maszyny, chyba że sam to wyślesz.
+Design partnerzy uruchamiają Inwards w prawdziwych projektach ze swoimi agentami AI i mówią nam, czy to działa: czy agenci naprawiają to, co zgłasza Inwards, czy wyłapuje prawdziwe naruszenia i czy nie wchodzi w drogę. Ta strona opisuje całą ścieżkę, od instalacji po udostępnienie liczb. Nic nie opuszcza twojej maszyny, chyba że sam to wyślesz.
 
 ## O co prosimy i co dostajesz { #what-we-ask-and-what-you-get }
 
-- **Prosimy o** kilka tygodni zwykłej pracy z agentem, z włączonymi hookami i run logiem, a potem o wynik `inwards stats` albo zanonimizowany log oraz krótkie zgłoszenie z opinią.
+- **Prosimy o** kilka tygodni zwykłej pracy z agentem, z włączonymi hookami i run logiem, a potem o wynik `inwards stats` albo spseudonimizowany log oraz krótkie zgłoszenie z opinią.
 - **Dostajesz** sprawdzenie architektury, z którym twoi agenci nie mogą dyskutować, wpływ na to, które reguły powstaną jako następne, i bezpośredni kontakt z opiekunem projektu.
 
 ## Lista kroków na start { #onboarding-checklist }
@@ -34,14 +34,14 @@ Jedna linia JSON na każde uruchomienie hooka albo zapisane sprawdzenie, w `.inw
 | Hash każdego naruszenia, jego kod reguły i poziom | Twojego nazwiska, maszyny ani zdalnego repozytorium git |
 | Kod wyjścia i czas trwania | |
 
-Dwa pola mówią coś o twoim kodzie: ścieżki i fingerprinty. Fingerprint to zwykły hash reguły, modułu i komunikatu, więc każdy, kto zgadnie prawdopodobne nazwy modułów, może go odwrócić. `--redact` (niżej) zastępuje jedno i drugie hashami z kluczem, który zostaje na twojej maszynie. `check` z podaną ścieżką spoza projektu zapisuje ją tak, jak ją napisano (`../…`); anonimizacja hashuje również ją.
+Dwa pola mówią coś o twoim kodzie: ścieżki i fingerprinty. Fingerprint to zwykły hash reguły, modułu i komunikatu, więc każdy, kto zgadnie prawdopodobne nazwy modułów, może go odwrócić. `--redact` (niżej) zastępuje jedno i drugie hashami z kluczem, który zostaje na twojej maszynie. `check` z podaną ścieżką spoza projektu zapisuje ją tak, jak ją napisano (`../…`); `--redact` hashuje również ją.
 
 ## Udostępnianie { #sharing }
 
 Wybierz jedną opcję; każda wystarczy.
 
 - **Same liczby:** `inwards stats --format json > inwards-stats.json`. Plik zawiera liczniki, wskaźniki i opóźnienia, bez ścieżek i hashy.
-- **Zanonimizowany log**, do głębszej analizy: `inwards stats --export inwards-log.jsonl --redact`. Zapisuje każdą linię logu projektu w kolejności czasowej, z każdą ścieżką i każdym fingerprintem zastąpionym hashem z kluczem, i tylko z polami wymienionymi wyżej. Klucz powstaje raz na projekt w `.inwards/export-key` i nigdy nie opuszcza twojej maszyny, więc możemy odróżnić pliki od siebie, ale nie możemy zgadnąć ich nazw. Przeczytaj plik, zanim go wyślesz.
+- **Spseudonimizowany log**, do głębszej analizy: `inwards stats --export inwards-log.jsonl --redact`. Zapisuje każdą linię logu projektu w kolejności czasowej, z każdą ścieżką i każdym fingerprintem zastąpionym hashem z kluczem, i tylko z polami wymienionymi wyżej. Klucz powstaje raz na projekt w `.inwards/export-key` i nigdy nie opuszcza twojej maszyny, więc możemy odróżnić pliki od siebie, ale nie możemy zgadnąć ich nazw. Przeczytaj plik, zanim go wyślesz.
 
 Wyślij plik opiekunowi projektu kanałem, na który się umówiliście. Usuń `.inwards/` (w katalogu głównym projektu i obok `pyproject.toml` każdego pakietu w monorepo) i każdy wyeksportowany plik w dowolnej chwili, żeby zacząć od nowa; nic innego nie przechowuje kopii.
 

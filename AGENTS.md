@@ -315,8 +315,11 @@ English stays the source of truth; the changelog isn't translated.
   `../assets/`). Add a missing term there in the same PR.
 - **The reviewer checks the Polish diff** for meaning against the English
   change and for terminology against the glossary.
-- **CI** fails on a missing Polish page and warns on a stale one; the deploy
-  puts a "Tłumaczenie może być nieaktualne" banner on stale pages. Preview
+- **CI** fails on a missing or orphaned Polish page, a committed stale
+  banner, and theme, extension or asset drift between the two configs; it
+  warns on a stale page, and the deploy puts a "Tłumaczenie może być
+  nieaktualne" banner on it. `--fix-hashes` takes paths relative to the
+  current directory. Preview
   both sites with the two builds in `docs/zensical.pl.toml`'s header and a
   static server on `docs/site/`.
 

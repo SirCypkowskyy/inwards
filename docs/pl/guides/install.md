@@ -3,7 +3,7 @@ source: docs/chapters/guides/install.md
 source_hash: 19fe4d06caa26dca8dc0684b0f818cf645edf94125466a8fa008b4185fa181c2
 ---
 
-# Instalacja Inwards
+# Instalacja Inwards { #install-inwards }
 
 !!! info "Zweryfikowano 2026-09-25"
     Budowanie ze źródeł i każde następne polecenie, ręcznie na Linuksie x64. Na macOS (arm64) i Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia. Kroków z `curl` i `Invoke-WebRequest` nie da się wypróbować, dopóki repozytorium jest prywatne; `gh release download` działa.
@@ -170,7 +170,7 @@ Istnieją trzy presety, każdy z warstwami wymienionymi od najbardziej wewnętrz
 | `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importującej infrastructure |
 | `hexagonal` | domain, application, outbound (`adapters.outbound`), inbound (`adapters.inbound`), bootstrap | adapterów inbound importujących adaptery outbound |
 
-Każda warstwa może importować samą siebie i warstwy przed nią, więc konfiguracja złożona z samych warstw nie wyrazi luk z ostatniej kolumny; komentarz w tabeli nazywa tę lukę. `bootstrap.py` to korzeń kompozycji (composition root), jedyny moduł, który widzi każdą warstwę.
+Każda warstwa może importować samą siebie i warstwy przed nią, więc konfiguracja złożona z samych warstw nie wyrazi luk z ostatniej kolumny; komentarz w tabeli `[tool.inwards]` nazywa tę lukę. `bootstrap.py` to korzeń kompozycji (composition root), jedyny moduł, który widzi każdą warstwę.
 
 Co zapisuje `--style` i kiedy się zatrzymuje:
 
@@ -205,7 +205,7 @@ Następnie sprawdź cały projekt:
 inwards check
 ```
 
-`All clear` z kodem wyjścia 0 oznacza, że każdy import wskazuje do środka. Kod wyjścia 1 wypisuje każde naruszenie z ponumerowanymi krokami naprawy, a kod wyjścia 2 to błąd użycia albo konfiguracji.
+`All clear` z kodem wyjścia 0 oznacza, że każdy import wskazuje do środka. Przy kodzie wyjścia 1 polecenie wypisuje każde naruszenie z ponumerowanymi krokami naprawy, a kod wyjścia 2 to błąd użycia albo konfiguracji.
 
 ### Istniejący kod { #on-an-existing-codebase }
 
@@ -218,7 +218,7 @@ inwards baseline
 git add inwards-baseline.json
 ```
 
-`inwards baseline` sprawdza cały projekt w ramach jednej konfiguracji i zapisuje każde naruszenie do `inwards-baseline.json` obok jego `pyproject.toml`. Zacommituj ten plik: czytają go `inwards check`, hooki agentów i CI. W monorepo uruchom polecenie raz dla każdego pakietu, który ma własne `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), bo każdy plik jest sprawdzany względem baseline'u leżącego obok jego konfiguracji. Zaakceptowany import może przenieść się do innej linii i nadal przechodzić, bo wpisy są dopasowywane po regule, module i komunikacie, bez zdania „Allowed direction” z komunikatu, więc dodanie warstwy nie przywraca ich z powrotem. Druga kopia tego samego importu w tym samym module nie przechodzi. Gdy sprawdzenie całego projektu stwierdzi, że zaakceptowanych naruszeń już nie ma, mówi o tym. Uruchom wtedy ponownie `inwards baseline`, żeby je usunąć. Z `--format json` i istniejącym baseline'em podsumowanie liczy jedno i drugie: `baselined` przy każdym uruchomieniu, `resolved` przy sprawdzeniu całego projektu. Agenci nie mogą edytować tego pliku ani uruchamiać tego polecenia: hooki Claude Code odrzucają jedno i drugie, a Stop gate oblewa sesję, która go zmieniła, i sprawdza pliki tej sesji zupełnie bez baseline'u.
+`inwards baseline` sprawdza cały projekt w ramach jednej konfiguracji i zapisuje każde naruszenie do `inwards-baseline.json` obok jego `pyproject.toml`. Zacommituj ten plik: czytają go `inwards check`, hooki agentów i CI. W monorepo uruchom polecenie raz dla każdego pakietu, który ma własne `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), bo każdy plik jest sprawdzany względem baseline'u leżącego obok jego konfiguracji. Zaakceptowany import może przenieść się do innej linii i nadal przechodzić, bo wpisy są dopasowywane po regule, module i komunikacie, bez zdania „Allowed direction” z komunikatu, więc dodanie warstwy nie sprawia, że wracają. Druga kopia tego samego importu w tym samym module nie przechodzi. Gdy sprawdzenie całego projektu stwierdzi, że zaakceptowanych naruszeń już nie ma, mówi o tym. Uruchom wtedy ponownie `inwards baseline`, żeby je usunąć. Z `--format json` i istniejącym baseline'em podsumowanie liczy jedno i drugie: `baselined` przy każdym uruchomieniu, `resolved` przy sprawdzeniu całego projektu. Agenci nie mogą edytować tego pliku ani uruchamiać tego polecenia: hooki Claude Code odrzucają jedno i drugie, a Stop gate oblewa sesję, która go zmieniła, i sprawdza pliki tej sesji zupełnie bez baseline'u.
 
 Gdy projekt ma baseline, `stop-gate = "project"` w `[tool.inwards]` sprawia, że Stop gate w Claude Code sprawdza cały projekt względem baseline'u, a nie tylko pliki zmienione w sesji, więc naruszenie w dowolnym miejscu blokuje turę ([rozdział 4](../04-AI-Integration.md)). Sprawdzenie pomija parsowanie potwierdzające tam, gdzie baseline akceptuje wszystko, co znalazł prescan, więc w pełni pokryte baseline'em sprawdzenie kosztuje mniej więcej tyle, co czyste.
 

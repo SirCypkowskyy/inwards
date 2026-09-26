@@ -3,7 +3,7 @@ source: docs/chapters/guides/agents-md.md
 source_hash: 245ffdf68f4c29ef2fb1943200d527489f5ca9045507d72abaad4e4c67dd54ab
 ---
 
-# AGENTS.md (Codex, Cursor i inni)
+# AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
 
 !!! info "Zweryfikowano 2026-09-25"
     Ręcznie na Linuksie: `init`, sekcja, którą zapisuje, i `inwards check --format json`. Żadnego agenta nie uruchomiono. Na macOS (arm64) i Windows CI uruchamia `init` ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia.

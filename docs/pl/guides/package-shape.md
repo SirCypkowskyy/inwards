@@ -3,7 +3,7 @@ source: docs/chapters/guides/package-shape.md
 source_hash: a009eefcf7667de87e28dd881021ead14fe4bcb58441e912dcbb7796aeaaa28a
 ---
 
-# Kształt pakietu
+# Kształt pakietu { #package-shape }
 
 Reguły warstw (INW001) patrzą na importy. Nie widzą, gdzie kod *leży*: nowy `helpers.py` obok `service.py`, pakiet `services/` obok `service.py` albo `test_orders.py` wewnątrz aplikacji przechodzą je bez problemu. Kształt pakietu zamyka tę lukę. Mówisz, jakie elementy pakiet może, musi i nie może zawierać, a Inwards sprawdza to przy każdej edycji (hook), w edytorze (serwer języka) i w CI (`inwards check`).
 
@@ -48,7 +48,7 @@ app/orders/helpers.py:1:1: INW007 "helpers.py" is not an allowed member of packa
 
 - **Przy każdej edycji (PostToolUse).** INW007 blokuje (kod wyjścia 2), gdy edytowany plik jest nowy w tej sesji. Dla pliku, który istniał już na początku sesji, wraca tylko jako kontekst, więc stary układ nigdy nie blokuje niezwiązanej edycji. INW008 dla edytowanego pakietu jest zawsze kontekstem: agent, który tworzy `app/payments/router.py`, słyszy, że wciąż brakuje `service.py`, i może go dodać w następnym kroku.
 - **Stop gate.** Wyniki INW008, które są nowe od początku sesji, blokują turę, więc usunięcie wymaganego `service.py` przez Bash zostaje wyłapane. Pakiet, któremu tego pliku brakowało już na początku sesji, nie blokuje. INW007 w plikach starszych niż sesja też nie blokuje.
-- **Edytor.** Serwer języka zgłasza INW007 w każdym otwartym pliku na bieżąco, podczas pisania. Przebieg po całym workspace na podstawie listy katalogów (nic nie jest czytane ani parsowane) wysyła INW007 do plików, których nie otwierasz, i INW008 do `__init__.py` pakietu. Podąża za dowiązaniami symbolicznymi, które nie wychodzą poza katalog główny konfiguracji, tak jak `inwards check`, i uruchamia się ponownie, raz na serię zdarzeń, gdy powstaje albo znika plik Pythona.
+- **Edytor.** Serwer języka zgłasza INW007 w każdym otwartym pliku na bieżąco, podczas pisania. Przebieg po całym obszarze roboczym na podstawie listy katalogów (nic nie jest czytane ani parsowane) wysyła INW007 do plików, których nie otworzyłeś, i INW008 do `__init__.py` pakietu. Podąża za dowiązaniami symbolicznymi, które nie wychodzą poza katalog główny konfiguracji, tak jak `inwards check`, i uruchamia się ponownie, raz na serię zdarzeń, gdy powstaje albo znika plik Pythona.
 - **CI.** Sprawdzenie całego projektu przez `inwards check` zgłasza INW007 w każdym pliku, INW008 dla każdego pakietu z kształtem i ostrzeżenie dla selektora, który nie pasuje do żadnego pakietu.
 
 ## Przykład: fastapi-best-practices { #example-fastapi-best-practices }
@@ -121,8 +121,8 @@ pattern = "test_*"
 only-in = ["tests", "tests.**"]
 ```
 
-Obie konfiguracje są fixture'ami testów (`src/cli/test/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z powyższą poprawką.
+Obie konfiguracje są fixture'ami testów (`src/cli/test/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z krokami naprawy pokazanymi wyżej.
 
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 
-Nazwanych szablonów, warstw ról i `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), odrzucania zapisu (Write), zanim plik powstanie ([#96](https://github.com/SirCypkowskyy/inwards/issues/96)), plików innych niż Python oraz tego, co plik zawiera.
+Kształt pakietu nie obejmuje jeszcze nazwanych szablonów, warstw ról i `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), odrzucania zapisu (Write), zanim plik powstanie ([#96](https://github.com/SirCypkowskyy/inwards/issues/96)), plików innych niż Python oraz tego, co plik zawiera.

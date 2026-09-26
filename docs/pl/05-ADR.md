@@ -1,9 +1,9 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 6b53d05ed06c5d1ee9862882de740f786e9f4e70d4e7064ca2fdb42b165c9fcb
+source_hash: 469085b67313d53cd9e5d4faac0745e9ce8769d5c9214a53e316f9bbf9f2e0b2
 ---
 
-# :material-scale-balance: Decyzje architektoniczne (ADR)
+# :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
 
 Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosztuje, i to, co odrzuciliśmy. Zapisów nigdy nie edytuje się po przyjęciu. Zmiana zdania oznacza nowy ADR, który zastępuje stary.
 
@@ -28,7 +28,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Scalanie przez squash z tytułami PR w formacie Conventional Commits | :white_check_mark: Przyjęty, squash do `develop` od 019 |
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Selektory pakietów przyjmują globy od początku; monorepo podąża za workspace'ami uv | :white_check_mark: Przyjęty |
 | [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | Gałąź integracyjna `develop`; `main` przesuwa się tylko przy wydaniach | :white_check_mark: Przyjęty |
-| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | Selektor w `init` używa @clack/prompts, ładowanego z osobnego fragmentu | :white_check_mark: Przyjęty |
+| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | Kreator w `init` używa @clack/prompts, ładowanego z osobnego fragmentu | :white_check_mark: Przyjęty |
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publikuj wheele wydań na PyPI z osobnego workflow, przez trusted publishing | :white_check_mark: Przyjęty, włączany przez właściciela |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
 | [023](#adr-023-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
@@ -104,7 +104,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 </figure>
 
 - :material-alert-outline: Przegląd znalazł prawdziwą lukę, której korpus nigdy nie pokazał: `from shop.infrastructure \` z `import sql_orders` w następnej linii było odczytywane jako `import sql_orders`, a naruszenie nie było zgłaszane. Prescan odmawia teraz każdego pliku, w którym linia wspominająca `import` następuje po kontynuacji ukośnikiem wstecznym. Biblioteka standardowa nie ma takich zapisów, więc `prescan-diff` generuje teraz także własny korpus: 58 zapisów importów (kontynuacje, średniki, jednolinijkowe `if`/`try`, napisy i komentarze wokół importów, spacje w nazwach z kropkami, tabulatory, CRLF, BOM), łączonych w pary oraz w trójki z kontekstem napisów: 52 338 plików w mniej niż 1 s. Jego pierwsze uruchomienie znalazło drugą lukę: napis zawierający `from a import (` doklejał następujący po nim prawdziwy kod do fałszywego importu. Silnik odrzuca teraz każdy szkielet, który nie parsuje się czysto, i wraca do pełnego parsowania. Kolejny przegląd znalazł tę samą sztuczkę z czystym parsowaniem: `import a; t = '''` wewnątrz jednego napisu otwiera w szkielecie nowy napis, który połyka prawdziwy import pod nim. Dlatego szkielet jest też odrzucany, jeśli zawiera cokolwiek poza instrukcjami importu i komentarzami. Oba zapisy są teraz w generatorze (972 przeoczenia bez drugiego zabezpieczenia, zero z nim), a odsetek odmów na bibliotece standardowej się nie zmienił.
-- :material-alert-outline: Samotne `\r` kończy linię w Pythonie, ale nie w tree-sitterze, więc `# note\rimport x` ukrywało prawdziwy import wewnątrz komentarza nawet przed pełnym parsowaniem. Silnik zamienia samotne `\r` na `\n` przed parsowaniem. Test różnicowy nie widzi tej klasy błędów, bo obie strony dzielą parser, więc przypina to test jednostkowy.
+- :material-alert-outline: Samotne `\r` kończy linię w Pythonie, ale nie w tree-sitterze, więc `# note\rimport x` ukrywało prawdziwy import wewnątrz komentarza nawet przed pełnym parsowaniem. Silnik zamienia samotne `\r` na `\n` przed parsowaniem. Test różnicowy nie widzi tej klasy błędów, bo obie strony dzielą parser, więc pilnuje tego test jednostkowy.
 - :material-minus-circle-outline: Pliki z naruszeniami płacą za dwa parsowania. W starszym repozytorium z wieloma naruszeniami zbliża się to do kosztu naiwnego podejścia, dopóki baseline (UC6) nie pozwoli silnikowi pomijać ponownego potwierdzania znanych naruszeń.
 - :material-minus-circle-outline: Przyszłe reguły, które potrzebują czegoś więcej niż importów (na przykład „żadnych dekoratorów frameworków w domenie”), nie mogą używać szkieletu i będą potrzebowały własnej szybkiej ścieżki albo pełnego parsowania.
 
@@ -114,7 +114,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 **Stan:** Przyjęty · 2026-09-25
 
-**Kontekst.** Narzędzia pythonowe zbiegły się na `[tool.<name>]` w `pyproject.toml` (Ruff, pytest, mypy, uv). import-linter używa też `.importlinter` albo `setup.cfg`.
+**Kontekst.** Narzędzia pythonowe ujednoliciły się wokół `[tool.<name>]` w `pyproject.toml` (Ruff, pytest, mypy, uv). import-linter używa też `.importlinter` albo `setup.cfg`.
 
 **Decyzja.** Czytać `[tool.inwards]` z najbliższego `pyproject.toml`, idąc w górę od katalogu roboczego, albo z `--config`. Warstwy to uporządkowana lista, od najbardziej wewnętrznej. Moduł może importować własną warstwę i każdą warstwę wymienioną przed nią.
 
@@ -122,7 +122,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 - :material-plus-circle-outline: Żadnego nowego pliku i jedno oczywiste miejsce, w którym trzeba szukać.
 - :material-plus-circle-outline: Uporządkowane warstwy sprawiają, że typowy przypadek (ścisła cebula) to konfiguracja na cztery linie.
-- :material-minus-circle-outline: Konfiguracja siedzi w pliku, który agenci często edytują ze względu na zależności. Jej ochrona wymaga hooka albo CODEOWNERS zamiast osobnego pliku z osobnymi uprawnieniami. Zabezpieczenie opisuje [rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
+- :material-minus-circle-outline: Konfiguracja siedzi w pliku, który agenci często edytują ze względu na zależności. Jej ochrona wymaga hooka albo CODEOWNERS zamiast osobnego pliku z osobnymi uprawnieniami. Config guard opisuje [rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
 - :material-minus-circle-outline: Reguły nieliniowe (wycinki, które nie mogą się nawzajem widzieć, „tylko przez `api.py`”) będą później wymagały więcej składni. Będą to osobne tabele, więc prosty przypadek pozostanie prosty.
 
 **Alternatywy.** *`inwards.toml`*: łatwiej go zablokować, ale to jeszcze jeden plik. Możemy go jeszcze obsłużyć jako opcję. *Konfiguracja w Pythonie (jak w pytest-archon)*: wymagałaby wykonywania kodu użytkownika, co kłóci się z ADR-006.
@@ -170,7 +170,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 **Konsekwencje.**
 
 - :material-plus-circle-outline: Działa już dziś, bez pobierania pliku binarnego przez rozszerzenie.
-- :material-minus-circle-outline: Silnik jest pakowany na dwa sposoby. Uczciwość obu pilnują zabezpieczenie środowiska uruchomieniowego (ADR-006) i build rozszerzenia w CI.
+- :material-minus-circle-outline: Silnik jest pakowany na dwa sposoby. Zgodność obu wariantów pilnują zabezpieczenie środowiska uruchomieniowego (ADR-006) i build rozszerzenia w CI.
 - :material-minus-circle-outline: Inne edytory czekają na `inwards server`.
 
 **Alternatywy.** *`inwards server` już teraz*: lepszy stan docelowy, ale wymaga obsługi LSP przez stdio w pliku binarnym i kroku pobierania w rozszerzeniu. To więcej, niż powinien dźwigać scaffold.
@@ -210,7 +210,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 **Stan:** Przyjęty · 2026-09-25
 
-**Kontekst.** Robocza nazwa „Stratum” była zajęta na PyPI, npm i crates.io. Gorzej, w świecie Pythona nazywa protokół pul wydobywczych Bitcoina: pakiet `stratum` na PyPI to serwer wydobywczy oparty na Twisted, a najpopularniejsze repozytoria pythonowe na GitHubie o nazwie „stratum” to serwery i proxy wydobywcze. Programista szukający lintera trafiłby na oprogramowanie do kopania kryptowalut. 2026-09-25 sprawdziliśmy kilkanaście alternatyw na PyPI i npm.
+**Kontekst.** Robocza nazwa „Stratum” była zajęta na PyPI, npm i crates.io. Gorzej, w świecie Pythona nazywa protokół pul wydobywczych Bitcoina: pakiet `stratum` na PyPI to serwer wydobywczy oparty na Twisted, a najpopularniejsze repozytoria pythonowe na GitHubie o nazwie „stratum” to serwery i proxy wydobywcze. Programista szukający lintera trafiłby na oprogramowanie do kopania kryptowalut. Dnia 2026-09-25 sprawdziliśmy około tuzina alternatyw na PyPI i npm.
 
 **Decyzja.** Projekt, polecenie i tabela konfiguracji nazywają się **Inwards**: `inwards check`, `[tool.inwards]`, pakiet `inwards` na PyPI i npm (oba wolne tego dnia) oraz kody reguł od `INW001` w górę. Nazwa wyraża regułę, której narzędzie pilnuje: zależności wskazują do środka (inwards).
 
@@ -280,7 +280,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 **Stan:** Przyjęty · 2026-09-25
 
-**Kontekst.** Skoro INW001 wyłapuje importy w funkcjach i za `TYPE_CHECKING` ([ADR-009](#adr-009-check-imports-wherever-they-appear)), następnym najtańszym obejściem jest wywołanie: `importlib.import_module("shop.infrastructure.db")`, `__import__(...)`, `runpy.run_module(...)` albo `exec("from shop.infrastructure import db")`. Inwards nigdy nie uruchamia kodu użytkownika (C4), więc może czytać tylko cele, które są zapisane wprost. Szkielet importów ([ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse)) zachowuje wyłącznie instrukcje importu: plik, którego jedyną zależnością na zewnątrz jest wywołanie, przeszedłby szybką ścieżkę bez żadnych importów.
+**Kontekst.** Skoro INW001 wyłapuje importy w funkcjach i pod `TYPE_CHECKING` ([ADR-009](#adr-009-check-imports-wherever-they-appear)), następnym najtańszym obejściem jest wywołanie: `importlib.import_module("shop.infrastructure.db")`, `__import__(...)`, `runpy.run_module(...)` albo `exec("from shop.infrastructure import db")`. Inwards nigdy nie uruchamia kodu użytkownika (C4), więc może czytać tylko cele, które są zapisane wprost. Szkielet importów ([ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse)) zachowuje wyłącznie instrukcje importu: plik, którego jedyną zależnością na zewnątrz jest wywołanie, przeszedłby szybką ścieżkę bez żadnych importów.
 
 **Decyzja.**
 
@@ -296,11 +296,11 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 **Konsekwencje.**
 
 - :material-plus-circle-outline: Typowe dynamiczne obejścia są zgłaszane z poprawką wymierzoną właśnie w nie. Testy obejmują każdą formę wywołania i każdy alias.
-- :material-minus-circle-outline: INW011 nie jest kompletne. Niewymienione wiązania i API ładujące wymienione wyżej oraz wyliczane cele pozostają fałszywie negatywnymi wynikami, dopóki nie wejdą [#79](https://github.com/SirCypkowskyy/inwards/issues/79) i [#46](https://github.com/SirCypkowskyy/inwards/issues/46).
+- :material-minus-circle-outline: INW011 nie jest kompletne. Nieśledzone wiązania i API ładujące wymienione wyżej oraz wyliczane cele pozostają fałszywie negatywnymi wynikami, dopóki nie wejdą [#79](https://github.com/SirCypkowskyy/inwards/issues/79) i [#46](https://github.com/SirCypkowskyy/inwards/issues/46).
 - :material-plus-circle-outline: Wskazówka wysyła do pełnego parsowania 209 z 1921 plików biblioteki standardowej CPythona 3.14, a płacą za to tylko pliki w warstwie. `re.compile` jej nie wyzwala.
 - :material-minus-circle-outline: Wyliczane cele (`import_module(name)`, f-stringi z polami), względne `import_module` bez czytelnego pakietu i literały z sekwencją `\N{...}` nie są czytane. Wyliczane cele wymagają osobnej decyzji: oznaczania każdego niedosłownego wywołania loadera w warstwie wewnętrznej ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)).
 - :material-minus-circle-outline: `prescan-diff` parsuje teraz każdy plik, którego nie może wykluczyć, więc wygenerowany korpus (65 262 pliki) zajmuje około 4 s zamiast 1 s.
-- :material-minus-circle-outline: Indeks modułów (`importersOf`) wciąż czyta tylko importy statyczne, więc moduł importujący inny dynamicznie nie jest wymieniany jako jego importer.
+- :material-minus-circle-outline: Indeks modułów (`importersOf`) wciąż czyta tylko importy statyczne, więc moduł, który importuje inny dynamicznie, nie jest wymieniany wśród modułów, które go importują.
 
 **Alternatywy.** *Zgłaszać jako INW001*: agent przeczytałby „usuń import” i szukałby instrukcji importu, której nie ma. *Skanować nazwy wywołań w szkielecie*: szkielet musiałby zachowywać dowolne linie z wyrażeniami, co jest pełnym parsowaniem pod inną nazwą. *Oznaczać każde wywołanie loadera w warstwie wewnętrznej*: wyłapuje też wyliczane cele, ale zgłasza `importlib.import_module("json")`; zostawione na późniejsze zgłoszenie.
 
@@ -331,13 +331,13 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 - :material-plus-circle-outline: Wydanie to jedno scalenie, a release PR pokazuje dokładnie, co zostanie dostarczone, zanim to nastąpi.
 - :material-plus-circle-outline: Numery wersji pozostają znaczące dla użytkowników i dla `required-version`.
 - :material-minus-circle-outline: Changelog jest tak dobry, jak tytuły PR ([ADR-017](#adr-017-squash-merges-with-conventional-commit-pr-titles)).
-- :material-minus-circle-outline: Dopóki repozytorium jest prywatne i używa domyślnego `GITHUB_TOKEN`, release PR nie dostaje własnego uruchomienia CI. Jego diff to tylko wpisane wersje i changelog, a `cd.yml` ponownie uruchamia testy na tagu. Token aplikacji GitHub App naprawi to, gdy repozytorium stanie się publiczne.
+- :material-minus-circle-outline: Dopóki repozytorium jest prywatne i używa domyślnego `GITHUB_TOKEN`, release PR nie dostaje własnego uruchomienia CI. Jego diff to tylko wpisane wersje i changelog, a `cd.yml` ponownie uruchamia testy na tagu. Token GitHub App naprawi to, gdy repozytorium stanie się publiczne.
 - :material-minus-circle-outline: Wydanie z release-please uruchamia `cd.yml` przez `workflow_dispatch`, bo tag wypchnięty z `GITHUB_TOKEN` nie uruchamia żadnego workflow. Przejście później na token aplikacji oznacza usunięcie tego kroku, inaczej każde wydanie będzie budowane dwa razy.
 - :material-minus-circle-outline: Pierwszym wydaniem będzie v0.1.1 albo późniejsze (wybiera je `Release-As`), nigdy v0.1.0. Link porównawczy w jego changelogu wskazuje tag v0.1.0, który nie istnieje.
 
 **Alternatywy.**
 
-- *Podbijanie według gałęzi: minor przy każdym scaleniu do `main`, major przy każdym wydaniu i gałąź `develop` publikująca buildy `dev+sha`.* To był pierwszy pomysł właściciela, a jego cel (brak ręcznego tagowania) został zachowany. Minor przy każdym scaleniu doszedłby do 0.40 w ciągu kilku tygodni, spalałby numer wersji na każdy PR, którego nikt nie instaluje, i psułby `required-version`: kolega z zespołu jedno scalenie w tyle ciągle dostawałby „requires Inwards X or newer”. Major przy każdym wydaniu łamie SemVer, bo major oznacza niekompatybilność. Gałąź `develop` dokłada scalenia wsteczne i podwójne CI dla jednego opiekuna, który scala jeden PR naraz.
+- *Podbijanie według gałęzi: minor przy każdym scaleniu do `main`, major przy każdym wydaniu i gałąź `develop` publikująca buildy `dev+sha`.* To był pierwszy pomysł właściciela, a jego cel (brak ręcznego tagowania) został zachowany. Minor przy każdym scaleniu doszedłby do 0.40 w ciągu kilku tygodni, spalałby na każdy PR numer wersji, którego nikt nie instaluje, i psułby `required-version`: kolega z zespołu jedno scalenie w tyle ciągle dostawałby „requires Inwards X or newer”. Major przy każdym wydaniu łamie SemVer, bo major oznacza niekompatybilność. Gałąź `develop` dokłada scalenia wsteczne i podwójne CI dla jednego opiekuna, który scala jeden PR naraz.
 - *semantic-release:* wydaje przy każdym pushu, bez kroku przeglądu, i nie obsługuje wersji 0.x.
 - *python-semantic-release:* commituje i taguje prosto na `main` przy każdym pushu i oddaje narzędziu w Pythonie kontrolę nad repozytorium opartym na Bunie.
 - *git-cliff plus własne zadanie tagujące:* najlepszy generator changelogów, ale podbijanie, wpisywanie wersji i tagowanie byłyby w całości własnej roboty.
@@ -386,7 +386,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 **Konsekwencje.**
 
-- :material-plus-circle-outline: Nową domenę (`src/payments/`) `src.*` obejmuje w chwili, gdy powstaje. Agent nie może obejść kształtu, dodając pakiet, którego konfiguracja jeszcze nie wymienia.
+- :material-plus-circle-outline: Selektor `src.*` obejmuje nową domenę (`src/payments/`) w chwili, gdy powstaje. Agent nie może obejść kształtu, dodając pakiet, którego konfiguracja jeszcze nie wymienia.
 - :material-plus-circle-outline: Użytkownicy monorepo opisują swoje projekty raz, w miejscu, które uv już czyta.
 - :material-minus-circle-outline: Pierwszeństwo globów trzeba wyjaśnić i przetestować. Glob może pasować do pakietów, o które użytkownikowi nie chodziło, więc selektor, który do niczego nie pasuje, jest zgłaszany, podobnie jak selektor przesłonięty przez wcześniejszy wpis.
 
@@ -431,16 +431,16 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 - *release-please na `develop`:* wydania powstawałyby z niewypromowanego kodu, a `main` straciłby jakąkolwiek rolę.
 - *Automatyczne scalanie wsteczne `main` do `develop` po każdym wydaniu:* w repozytorium należącym do konta osobistego GitHub Actions nie może być aktorem omijającym ruleset, więc push wymagałby sekretu z PAT albo GitHub App. Zrobienie tego przez PR wymaga z kolei obejścia administratora na `develop`, bo PR otwarty z `GITHUB_TOKEN` nie dostaje CI, a to obejście pozwoliłoby też dowolnemu agentowi na koncie właściciela scalić czerwony PR. Skoro bez tego nic nie jest w konflikcie, właściciel zdecydował, że nie będzie scalania wstecznego.
 
-## ADR-020: Selektor w `init` używa @clack/prompts, ładowanego z osobnego fragmentu { #adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk }
+## ADR-020: Kreator w `init` używa @clack/prompts, ładowanego z osobnego fragmentu { #adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk }
 
 **Stan:** Przyjęty · 2026-09-26 · [#92](https://github.com/SirCypkowskyy/inwards/issues/92)
 
-**Kontekst.** `inwards init` w terminalu, bez `--style` i `--agent`, pyta o styl architektury, scaffold i agenta ([#92](https://github.com/SirCypkowskyy/inwards/issues/92)). Biblioteka do zadawania pytań jest dostarczana wewnątrz jednego pliku binarnego ([ADR-003](#adr-003-ship-a-bun-single-file-executable)), ale `check` i hooki startują przy każdej edycji agenta i nie mogą płacić za pytania, których nigdy nie pokazują. Budżet w #92 to 3 ms startu.
+**Kontekst.** `inwards init` w terminalu, bez `--style` i `--agent`, pyta o styl architektury, przykładowy pakiet i agenta ([#92](https://github.com/SirCypkowskyy/inwards/issues/92)). Biblioteka do zadawania pytań jest dostarczana wewnątrz jednego pliku binarnego ([ADR-003](#adr-003-ship-a-bun-single-file-executable)), ale `check` i hooki startują przy każdej edycji agenta i nie mogą płacić za pytania, których nigdy nie pokazują. Budżet w #92 to 3 ms startu.
 
 **Decyzja.**
 
 - **@clack/prompts, przypięte do dokładnej wersji (1.8.1).** Analiza w #92 zmierzyła je na około 61 KB w skompilowanym pliku binarnym. Ink z Reactem dodaje około 496 KB i od 10 do 29 ms startu, wysypuje się przy starcie pod `bun build --compile`, chyba że wtyczka zaślepi `react-devtools-core`, i ma świeże regresje renderowania na Windows. @inquirer/prompts ma otwarty błąd z wyborem na Windows.
-- **Ładowane dynamicznym `import()`** wewnątrz selektora i tylko wtedy, gdy stdin i stdout są TTY, a `CI` nie jest ustawione. Bez terminala init od razu kończy się kodem 2 z flagami; nigdy nie czeka na dane.
+- **Ładowane dynamicznym `import()`** wewnątrz kreatora i tylko wtedy, gdy stdin i stdout są TTY, a `CI` nie jest ustawione. Bez terminala init od razu kończy się kodem 2 z flagami; nigdy nie czeka na dane.
 - **`splitting: true` w `scripts/build-binaries.ts`.** Bez tego Bun wkleja dynamicznie importowany moduł do jednej paczki: jego kod wykonuje się dopiero przy imporcie, ale każdy start i tak go wczytuje. Zmierzone na Linuksie x64 względem `develop` zbudowanego z tymi samymi flagami, od 150 do 300 naprzemiennych uruchomień każde, mediana różnic w parach:
 
     | Build | `--version` | mały `check` | uruchomienie hooka |
@@ -449,14 +449,14 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
     | Bajtkod ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)), bez podziału | +1,7 ms | +1,7 ms | +1,1 ms |
     | Bajtkod i podział (przyjęte) | -0,1 ms | +0,0 ms | -0,1 ms |
 
-    Z podziałem biblioteka jest osobnym fragmentem wewnątrz pliku binarnego, czytanym tylko wtedy, gdy uruchamia się selektor. Benchmark z #29 się zgadza: hook -0,0%, pełne sprawdzenie -1,8%.
+    Z podziałem biblioteka jest osobnym fragmentem wewnątrz pliku binarnego, czytanym tylko wtedy, gdy uruchamia się kreator. Benchmark z #29 się zgadza: hook -0,0%, pełne sprawdzenie -1,8%.
 
 **Konsekwencje.**
 
-- :material-plus-circle-outline: `check` i hooki zachowują swój czas startu; koszt selektora spada na jedyne polecenie, które go pokazuje.
+- :material-plus-circle-outline: `check` i hooki zachowują swój czas startu; koszt kreatora spada na jedyne polecenie, które go pokazuje.
 - :material-plus-circle-outline: Późniejsza leniwie ładowana funkcja dostaje to samo za darmo.
 - :material-minus-circle-outline: Build zapisuje `chunk-*.js.map` obok każdego pliku binarnego w `dist/`. Wysyłka wydania i tak bierze tylko pliki `inwards-*`.
-- :material-minus-circle-outline: Selektora nie da się przetestować w CI, które nie ma TTY. Sterowano nim przez pseudoterminal na Linuksie; Windows Terminal, PowerShell i Terminal w macOS wciąż wymagają ręcznego sprawdzenia (#92).
+- :material-minus-circle-outline: Kreatora nie da się przetestować w CI, które nie ma TTY. Sterowano nim przez pseudoterminal na Linuksie; Windows Terminal, PowerShell i Terminal w macOS wciąż wymagają ręcznego sprawdzenia (#92).
 
 **Alternatywy.**
 
@@ -476,7 +476,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 - **Osobny workflow, `pypi.yml`, a nie zadanie w `cd.yml`.** Uruchamia się, gdy wydanie zostaje opublikowane, nigdy na szkicu, albo ręcznie z tagiem i indeksem. `cd.yml` kończy się na szkicu i nie widzi, kiedy właściciel go publikuje. PyPI ufa tylko `pypi.yml`, który nie uruchamia żadnego kodu budującego ani testowego.
 - **Wysyła własne wheele wydania**, czyli pliki, które właściciel właśnie opublikował, po sprawdzeniu ich względem `SHA256SUMS` wydania, a gdy repozytorium będzie publiczne, także względem pochodzenia buildu. Nigdy ich nie przebudowuje.
 - **Najpierw TestPyPI, potem PyPI**, każde we własnym środowisku GitHuba (`testpypi`, `pypi`), z którym związany jest publisher na danym indeksie. Tylko dwa zadania wysyłające dostają `id-token: write`.
-- **Wersja przedpremierowa trafia tylko na TestPyPI**, niezależnie od tego, czy wydanie jest tak oznaczone, czy jego tag ma przyrostek (`-rc.1`). PyPI ma rezerwację 0.0.0 w wersji ostatecznej, więc uv i tak wybrałby ją zamiast każdej wersji przedpremierowej. Kandydat do wydania może wciąż trafić na PyPI przez ręczne uruchomienie z jego tagu.
+- **Wersja przedpremierowa trafia tylko na TestPyPI**, niezależnie od tego, czy wydanie jest tak oznaczone, czy jego tag ma przyrostek (`-rc.1`). Na PyPI jest już finalna wersja-zaślepka 0.0.0, więc uv i tak wybrałby ją zamiast każdej wersji przedpremierowej. Kandydat do wydania może wciąż trafić na PyPI przez ręczne uruchomienie z jego tagu.
 - **Prawdziwą bramką jest konto właściciela na pypi.org.** Każdy agent pracuje na koncie GitHub właściciela, więc zmienna, środowiska, tagi i ręczne uruchomienia są w zasięgu agenta, a PyPI nie sprawdza refu ani commitu uruchomienia. Publisher PyPI jest więc rejestrowany na końcu, przy uruchomieniu produkcyjnym, a jego usunięcie zatrzymuje każdą wysyłkę na PyPI. Po stronie GitHuba zmienna repozytorium `PYPI_PUBLISH` musi mieć wartość `true` dla każdej wysyłki na PyPI, z wydania albo z ręcznego uruchomienia; środowisko `pypi` wdraża tylko z tagów `v*`; a gdy GitHub na to pozwoli (publiczne repozytorium albo Enterprise), dostaje właściciela jako wymaganego recenzenta. To chroni przed pomyłkami, a nie przed agentem.
 - **Żadnych atestacji PEP 740, dopóki repozytorium jest prywatne.** Są podpisywane przez publiczny rejestr przejrzystości Sigstore i zawierają repozytorium, workflow i commit.
 
@@ -504,7 +504,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 | Zakład (rozdział 2) | Próg | Dowody | Odczyt |
 |---|---|---|---|
-| Kroki naprawy działają na modele | ≥ 80 % naprawionych w ramach jednej ponownej próby | Ewaluacja agentów ([#101](https://github.com/SirCypkowskyy/inwards/issues/101), `eval/README.md`): 11 fixture'ów, po jednym uruchomieniu na Sonnecie i Haiku, pełny zestaw hooków. `inwards stats`: 5 z 7 (71 %). 2 nienaprawione to zadanie „poluzuj konfigurację”, w którym agent słusznie się zatrzymał i zapytał użytkownika. Z 5 naprawionych 3 zakończyły się niewykonanym zadaniem (2 wycofały zmianę i zapytały użytkownika), więc tylko 2 były czystymi poprawkami z wykonanym zadaniem | Wskazuje we właściwą stronę (żadne naruszenie nie zostało, żadnych obejść), ale 7 podłożonych naruszeń niczego nie rozstrzyga |
+| Kroki naprawy sprawdzają się u modeli | ≥ 80 % naprawionych w ramach jednej ponownej próby | Ewaluacja agentów ([#101](https://github.com/SirCypkowskyy/inwards/issues/101), `eval/README.md`): 11 fixture'ów, po jednym uruchomieniu na Sonnecie i Haiku, pełny zestaw hooków. `inwards stats`: 5 z 7 (71 %). 2 nienaprawione to zadanie „poluzuj konfigurację”, w którym agent słusznie się zatrzymał i zapytał użytkownika. Z 5 naprawionych 3 zakończyły się niewykonanym zadaniem (2 wycofały zmianę i zapytały użytkownika), więc tylko 2 były czystymi poprawkami z wykonanym zadaniem | Wskazuje we właściwą stronę (żadne naruszenie nie zostało, żadnych obejść), ale 7 podłożonych naruszeń niczego nie rozstrzyga |
 | Agenci łamią podział na warstwy na tyle często | ≥ 1 naruszenie na 1000 linii napisanych przez agenta | 25,5 na 1000 linii w ewaluacji, ale jej fixture'y są zbudowane tak, żeby kusiły do naruszenia | Brak dowodów w żadną stronę |
 | Szybkość to fosa | p50 hooka < 100 ms | Ewaluacja: p50 21 ms, p95 28 ms, na przykładowej aplikacji z 10 plikami. Lokalnie p50 hooka około 32 ms po przejściu na bajtkod ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). Pięć prawdziwych serwisów ([#36](https://github.com/SirCypkowskyy/inwards/issues/36)): od 55 do 83 ms na plik lokalnie; jeden plik z 4500 liniami trwał 280 ms na runnerze GitHuba przed przejściem na bajtkod ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Trzyma się, z jednym znanym odstępstwem |
 | Hooki to kanał | ≥ 60 % instalacji zachowuje hook | Tylko dane od partnerów; na razie brak | Nieznane |
@@ -535,14 +535,14 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 
 **Stan:** Przyjęty · 2026-09-26 · [#149](https://github.com/SirCypkowskyy/inwards/issues/149)
 
-**Kontekst.** Właściciel chce mieć dokumentację także po polsku, z przełącznikiem języka. Zensical 0.0.65 buduje jeden język na projekt: internacjonalizacja jest w jego planie rozwoju, a dziś selektor w nagłówku (`extra.alternate`) linkuje do innych buildów. Jego wbudowany przełącznik mapuje strony przez sitemapę drugiego buildu i zakłada równoległe katalogi główne (`/en/`, `/pl/`), ale angielska strona już żyje pod `/inwards/`, a linki `docs:` z CLI wskazują właśnie tam. Zensical nie potrafi wykluczyć pliku Markdown wewnątrz `docs_dir` i nie podąża za katalogami będącymi dowiązaniami symbolicznymi.
+**Kontekst.** Właściciel chce mieć dokumentację także po polsku, z przełącznikiem języka. Zensical 0.0.65 buduje jeden język na projekt: internacjonalizacja jest w jego planie rozwoju, a dziś menu wyboru języka w nagłówku (`extra.alternate`) linkuje do innych buildów. Jego wbudowany przełącznik mapuje strony przez sitemapę drugiego buildu i zakłada równoległe katalogi główne (`/en/`, `/pl/`), ale angielska strona już żyje pod `/inwards/`, a linki `docs:` z CLI wskazują właśnie tam. Zensical nie potrafi wykluczyć pliku Markdown wewnątrz `docs_dir` i nie podąża za katalogami będącymi dowiązaniami symbolicznymi.
 
 **Decyzja.**
 
 - **Dwa buildy.** `docs/chapters/` zostaje po angielsku pod `/inwards/`. `docs/pl/` odzwierciedla każdą stronę z angielskiej nawigacji pod tą samą ścieżką, a `docs/zensical.pl.toml` buduje go do `docs/site/pl/`, więc jeden artefakt Pages zawiera oba. Polskie strony biorą obrazy, CSS i skrypty z angielskiej strony przez ścieżki `../`, zamiast kopii.
-- **Przełącznik zachowuje stronę.** Nadpisanie motywu (`docs/overrides/partials/alternate.html`) linkuje każdy język do tej samej strony w drugim buildzie, a `language-switch.mjs` przelicza to przy kliknięciu (nagłówek przetrwa nawigację natychmiastową) i wraca do strony głównej języka, gdy strona tam nie istnieje. Polskie nagłówki zachowują angielskie kotwice (`{ #id }`), więc przełączenie zachowuje też `#kotwicę`.
-- **Tłumaczy agent, w tym samym PR co zmianę po angielsku** (właściciel wybrał to zamiast tłumaczenia maszynowego w CI, maszynowego szkicu z przeglądem albo tłumaczenia przez społeczność). `docs/GLOSSARY.pl.md` ustala terminy i leży poza `docs_dir` obu buildów, więc nie jest publikowany. Subagent przegląda terminologię i znaczenie jak w każdym innym PR.
-- **Nieaktualność jest śledzona przez hash.** Każda polska strona zapisuje `source` i SHA-256 angielskiego pliku, z którego ją przetłumaczono. `scripts/check-docs-translation.py` oblewa CI przy brakującej albo osieroconej stronie i ostrzega przy nieaktualnej; wdrożenie dodaje do nieaktualnych stron w swoim checkoucie baner „może być nieaktualne”.
+- **Przełącznik zachowuje stronę.** Nadpisanie motywu (`docs/overrides/partials/alternate.html`) linkuje każdy język do tej samej strony w drugim buildzie, a `language-switch.mjs` utrzymuje te linki aktualne (nawigacja natychmiastowa nie renderuje nagłówka od nowa, więc by się zdezaktualizowały) i przy kliknięciu wraca do strony głównej języka, gdy strona tam nie istnieje. Polskie nagłówki zachowują angielskie kotwice (`{ #id }`), więc przełączenie zachowuje też kotwicę (`#anchor`).
+- **Tłumaczy agent, w tym samym PR co zmiana w wersji angielskiej** (właściciel wybrał to zamiast tłumaczenia maszynowego w CI, maszynowego szkicu z przeglądem albo tłumaczenia przez społeczność). `docs/GLOSSARY.pl.md` ustala terminy i leży poza `docs_dir` obu buildów, więc nie jest publikowany. Subagent przegląda terminologię i znaczenie jak w każdym innym PR.
+- **Nieaktualność jest śledzona przez hash.** Każda polska strona zapisuje `source` i SHA-256 angielskiego pliku, z którego ją przetłumaczono. `scripts/check-docs-translation.py` oblewa CI przy brakującej albo osieroconej stronie, zacommitowanym banerze albo konfiguracjach, których motyw, rozszerzenia albo zasoby się rozjechały, i ostrzega przy nieaktualnej stronie; wdrożenie dodaje do nieaktualnych stron w swoim checkoucie baner „może być nieaktualne”.
 - **Tłumaczone jest wszystko oprócz** bloków kodu, wyjścia CLI, kluczy konfiguracji, komunikatów diagnostyk, identyfikatorów i changelogu. Treść ADR-ów jest tłumaczona w całości.
 
 **Konsekwencje.**
@@ -552,6 +552,7 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: Każdy PR z dokumentacją dotyka też `docs/pl/`, a tłumaczenie jest tak dobre, jak jego przegląd.
 - :material-minus-circle-outline: Polski build jest kompletny tylko wewnątrz angielskiego: `zensical serve -f docs/zensical.pl.toml` nie pokazuje zrzutów ekranu ani własnych stylów.
 - :material-minus-circle-outline: Hash zmienia się przy każdej edycji, także przy poprawce literówki, więc niektóre ostrzeżenia o nieaktualności wymagają tylko `--fix-hashes`.
+- :material-minus-circle-outline: GitHub Pages serwuje tylko główny `404.html`, więc brakująca strona pod `/pl/` pokazuje angielską stronę 404 (przełącznik języka nadal na niej działa).
 
 **Alternatywy.** *Angielski pod `/en/` obok `/pl/`:* wbudowany przełącznik by działał, ale przesunęłyby się wszystkie istniejące linki i adresy `docs:` z CLI. *Tłumaczenie maszynowe przy każdym scaleniu:* zawsze aktualne, ale wymaga sekretu i budżetu, terminologia rozjeżdża się między uruchomieniami i nikt go nie przegląda. *Kopie zasobów w `docs/pl/`:* samowystarczalne, ale każdy zrzut ekranu istniałby w dwóch kopiach, które trzeba utrzymywać identyczne.
 

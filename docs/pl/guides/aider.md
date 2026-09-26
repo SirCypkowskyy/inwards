@@ -3,7 +3,7 @@ source: docs/chapters/guides/aider.md
 source_hash: 75ff3bef545e9915dbeac39b2ecbf86c2a3dabe401a18cd2d013a8676116b1cc
 ---
 
-# Aider
+# Aider { #aider }
 
 !!! info "Zweryfikowano 2026-09-25"
     Ręcznie na Linuksie: `init` oraz `lint-cmd` uruchomione tak, jak uruchamia je Aider (z katalogu głównego repozytorium git, raz na każdy edytowany plik). Samego Aidera nie uruchomiono. Na macOS (arm64) i Windows CI uruchamia `init` i `check` ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia.
@@ -33,7 +33,7 @@ Aider uruchamia polecenie z katalogu głównego repozytorium git, raz na każdy 
 
 ## Sprawdź, czy działa { #check-it-works }
 
-- Uruchom sam `inwards check`. Powinien wypisać `All clear` albo naruszenia, które już są w projekcie.
+- Uruchom sam `inwards check`. Polecenie powinno wypisać `All clear` albo naruszenia, które już są w projekcie.
 - Poproś Aidera: *„Dodaj `import shop.infrastructure.db` do shop/domain/order.py.”* Po edycji Aider pokazuje raport INW001 i proponuje poprawkę.
 
 ## Rozwiązywanie problemów { #troubleshooting }

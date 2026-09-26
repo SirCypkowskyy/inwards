@@ -3,7 +3,7 @@ source: docs/chapters/guides/ci.md
 source_hash: d66b6f76bab58e5407addb7487894d557fc80ef6519a52e9e98f95963527a416
 ---
 
-# GitHub Actions
+# GitHub Actions { #github-actions }
 
 !!! info "Zweryfikowano 2026-09-26"
     Kroki sprawdzenia i adnotacji działają przy każdym pull requeście w tym repozytorium ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), na `examples/broken-app`), z Inwards zbudowanym ze źródeł. Wysyłki do code scanning nie da się wypróbować, dopóki repozytorium jest prywatne (patrz niżej), podobnie jak kroku instalacji przez `curl`.
@@ -65,7 +65,7 @@ jobs:
         run: exit 1
 ```
 
-- **Check** zapisuje SARIF 2.1.0 i zapamiętuje kod wyjścia, zamiast od razu oblewać zadanie, więc kolejne kroki nadal się wykonują. Kod wyjścia 2 (brak konfiguracji, błędna konfiguracja) oblewa zadanie od razu. Sprawdzenie czyta `inwards-baseline.json`, jeśli go zacommitowano, więc w starszym kodzie oblewają tylko nowe naruszenia; `inwards baseline` wymaga wydania nowszego niż v0.1.0-rc.1.
+- **Check** zapisuje SARIF 2.1.0 i zapamiętuje kod wyjścia, zamiast od razu oblewać zadanie, więc kolejne kroki nadal się wykonują. Kod wyjścia 2 (brak konfiguracji, błędna konfiguracja) oblewa zadanie od razu. Sprawdzenie czyta `inwards-baseline.json`, jeśli go zacommitowano, więc w istniejącym kodzie błędem kończą się tylko nowe naruszenia; `inwards baseline` wymaga wydania nowszego niż v0.1.0-rc.1.
 - **Annotate the pull request** zamienia każdy wynik w [polecenie workflow](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands). Naruszenie pojawia się przy swojej linii w zakładce „Files changed” i w podsumowaniu uruchomienia, z krokami naprawy jako treścią. Nie potrzebuje do tego code scanning. GitHub pokazuje najwyżej 10 adnotacji błędów na krok i 50 na zadanie. Ścieżki pochodzą z SARIF-u, gdzie są zakodowane jako URI, więc plik, którego nazwa zawiera spację albo znak spoza ASCII, dostaje adnotację w podsumowaniu uruchomienia, a nie przy swojej linii.
 - **Upload to code scanning** wysyła ten sam plik do [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github). Alerty mają historię, przycisk odrzucenia i link do pomocy reguły. Code scanning pokazuje nowe alerty w pull requeście, porównując go z gałęzią bazową, stąd wyzwalacz `push`.
 - **Fail on violations** oblewa zadanie na końcu, gdy wyniki są już opublikowane.
@@ -74,9 +74,9 @@ Gdy code scanning zacznie działać, zostaw tylko jeden z dwóch kroków z adnot
 
 ## Dostępność code scanning { #code-scanning-availability }
 
-Code scanning jest darmowe w publicznych repozytoriach. W prywatnym repozytorium wymaga GitHub Code Security (części GitHub Advanced Security), które mogą kupić tylko organizacje na planie GitHub Team albo Enterprise. Bez tego krok wysyłki kończy się błędem „Code scanning is not enabled for this repository”. Wtedy albo usuń krok wysyłki i polegaj na kroku z adnotacjami, albo dodaj do niego `continue-on-error: true`, tak jak robi to to repozytorium, dopóki jest prywatne (`continue-on-error: ${{ github.event.repository.private }}`).
+Code scanning jest darmowe w publicznych repozytoriach. W prywatnym repozytorium wymaga GitHub Code Security (części GitHub Advanced Security), które mogą kupić tylko organizacje na planie GitHub Team albo Enterprise. Bez tego krok wysyłki kończy się błędem „Code scanning is not enabled for this repository”. Wtedy albo usuń krok wysyłki i polegaj na kroku z adnotacjami, albo dodaj do niego `continue-on-error: true`, jak robi to repozytorium Inwards, dopóki jest prywatne (`continue-on-error: ${{ github.event.repository.private }}`).
 
-## Dopóki Inwards jest prywatny { #while-inwards-is-private }
+## Dopóki repozytorium Inwards jest prywatne { #while-inwards-is-private }
 
 Adresy wydań zwracają 404, dopóki repozytorium nie jest publiczne (patrz [Instalacja](install.md#from-a-release)). Do tego czasu pobieraj plik binarny przez GitHub CLI z tokenem, który może czytać `SirCypkowskyy/inwards`, zapisanym jako sekret repozytorium:
 

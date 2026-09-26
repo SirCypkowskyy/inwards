@@ -558,9 +558,9 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 **Decision.**
 
 - **Two builds.** `docs/chapters/` stays English at `/inwards/`. `docs/pl/` mirrors every page in the English nav at the same path, and `docs/zensical.pl.toml` builds it into `docs/site/pl/`, so one Pages artifact holds both. The Polish pages take images, CSS and scripts from the English site through `../` paths instead of copies.
-- **The switcher keeps the page.** A theme override (`docs/overrides/partials/alternate.html`) links each language to the same page in the other build, and `language-switch.mjs` recomputes that on click (the header survives instant navigation), falling back to the language root when the page doesn't exist. Polish headings keep the English anchors (`{ #id }`), so the switch keeps the `#anchor` too.
+- **The switcher keeps the page.** A theme override (`docs/overrides/partials/alternate.html`) links each language to the same page in the other build, and `language-switch.mjs` keeps those links current (instant navigation doesn't re-render the header, so they would go stale) and, on click, falls back to the language root when the page doesn't exist. Polish headings keep the English anchors (`{ #id }`), so the switch keeps the `#anchor` too.
 - **The agent translates, in the same PR as the English change** (the owner chose this over machine translation in CI, a machine draft plus review, or community translation). `docs/GLOSSARY.pl.md` fixes the terms and sits outside both `docs_dir`s, so it isn't published. A subagent reviews terminology and meaning like any other PR.
-- **Staleness is tracked by hash.** Each Polish page records `source` and the SHA-256 of the English file it was translated from. `scripts/check-docs-translation.py` fails CI on a missing or orphaned page and warns on a stale one; the deploy adds a "may be out of date" banner to stale pages in its checkout.
+- **Staleness is tracked by hash.** Each Polish page records `source` and the SHA-256 of the English file it was translated from. `scripts/check-docs-translation.py` fails CI on a missing or orphaned page, a committed banner, or configs whose theme, extensions or assets drift apart, and warns on a stale page; the deploy adds a "may be out of date" banner to stale pages in its checkout.
 - **Everything is translated except** code blocks, CLI output, config keys, diagnostic messages, identifiers and the changelog. ADR bodies are translated in full.
 
 **Consequences.**
@@ -570,6 +570,7 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-minus-circle-outline: Every docs PR also touches `docs/pl/`, and the translation is only as good as the review.
 - :material-minus-circle-outline: The Polish build is only complete inside the English one: `zensical serve -f docs/zensical.pl.toml` shows no screenshots or custom styles.
 - :material-minus-circle-outline: A hash changes on any edit, a typo fix included, so some "stale" warnings need only `--fix-hashes`.
+- :material-minus-circle-outline: GitHub Pages serves only the root `404.html`, so a missing page under `/pl/` shows the English 404 page (its language switcher still works).
 
 **Alternatives.** *English under `/en/` next to `/pl/`:* the built-in switcher would work, but every existing link and the CLI's `docs:` URLs would move. *Machine translation on each merge:* always in sync, but it needs a secret and a budget, terminology drifts between runs, and nobody reviews it. *Copies of the assets in `docs/pl/`:* self-contained, but two copies of every screenshot to keep equal.
 

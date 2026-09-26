@@ -3,7 +3,7 @@ source: docs/chapters/07-Glossary.md
 source_hash: 4e07a0163659be1cf0934fdbfec8f6290a7fea2a556acc3359546733cbf5aec3
 ---
 
-# :material-book-alphabet: Słownik
+# :material-book-alphabet: Słownik { #glossary }
 
 Słownictwo używane w tej dokumentacji. Terminy architektoniczne znaczą to, co zwykle znaczą w literaturze o DDD i czystej architekturze. Tam, gdzie Inwards używa słowa w węższym sensie, hasło o tym mówi. Hasła są w kolejności alfabetycznej oryginału angielskiego, a angielski termin podano w nawiasie.
 
@@ -11,14 +11,14 @@ Słownictwo używane w tej dokumentacji. Terminy architektoniczne znaczą to, co
 
 ```mermaid
 flowchart TB
-    subgraph outer["Interfejs / adaptery (najbardziej zewnętrzna)"]
+    subgraph outer["Interfejs / adaptery (warstwa najbardziej zewnętrzna)"]
         root["Korzeń kompozycji<br/><small>łączy adaptery z portami</small>"]
         api["Handlery HTTP, CLI, konsumenci"]
         subgraph infra["Infrastruktura"]
             db["Repozytoria SQL, klienci HTTP"]
             subgraph app["Aplikacja"]
                 uc["Przypadki użycia / komendy"]
-                subgraph dom["Domena (najbardziej wewnętrzna)"]
+                subgraph dom["Domena (warstwa najbardziej wewnętrzna)"]
                     ent["Encje, obiekty wartości"]
                     port["Porty (Protocols)"]
                 end
@@ -37,11 +37,11 @@ Strzałki wskazują kierunek importów. Każda ciągła strzałka wskazuje do ś
 
 ## Terminy architektoniczne { #architecture-terms }
 
-Adapter (adapter)
+Adapter
 :   Kod, który łączy port z prawdziwą technologią: repozytorium SQL, klient HTTP, konsument wiadomości. Adaptery żyją w warstwach zewnętrznych.
 
 Kontekst ograniczony (bounded context)
-:   Część systemu z własnym modelem i własnym językiem (DDD). W kodzie Pythona zwykle pakiet najwyższego poziomu, taki jak `billing` albo `shipping`. INW002 (planowana) nie pozwala kontekstom importować wzajemnie swoich wnętrzności.
+:   Część systemu z własnym modelem i własnym językiem (DDD). W kodzie Pythona zwykle pakiet najwyższego poziomu, taki jak `billing` albo `shipping`. INW002 (planowana) nie pozwala kontekstom importować wzajemnie swoich elementów wewnętrznych.
 
 Czysta architektura (Clean Architecture)
 :   Podział na warstwy według Roberta C. Martina: encje w centrum, potem przypadki użycia, potem adaptery interfejsu, potem frameworki. Jej reguła zależności mówi, że zależności w kodzie źródłowym wskazują tylko do środka.
@@ -61,7 +61,7 @@ Architektura heksagonalna / porty i adaptery (hexagonal architecture / ports and
 Warstwa (layer)
 :   W Inwards nazwany zbiór prefiksów modułów w `[tool.inwards].layers`. Kolejność na liście to kolejność od środka na zewnątrz.
 
-Port (port)
+Port
 :   Interfejs, którego właścicielem jest kod wewnętrzny, a który implementuje kod zewnętrzny. W Pythonie zwykle `typing.Protocol`.
 
 Pionowy wycinek (vertical slice)
@@ -73,7 +73,7 @@ Hook agenta (agent hook)
 :   Polecenie, które narzędzie AI do kodowania uruchamia automatycznie wokół własnych działań, na przykład hooki `PostToolUse` i `Stop` w Claude Code. Główny punkt integracji Inwards. `inwards init --agent claude` instaluje cztery takie hooki. Zobacz [rozdział 4](04-AI-Integration.md).
 
 Baseline
-:   Naruszenia, które projekt już miał, gdy wdrażał Inwards, zapisane przez `inwards baseline` w `inwards-baseline.json` obok `pyproject.toml`. Nie oblewają sprawdzenia; nowe naruszenia oblewają (UC6). Wpisy są dopasowywane po regule, module i komunikacie, a nie po linii.
+:   Naruszenia, które projekt już miał, gdy wdrożył Inwards, zapisane przez `inwards baseline` w `inwards-baseline.json` obok `pyproject.toml`. Nie oblewają sprawdzenia; nowe naruszenia oblewają (UC6). Wpisy są dopasowywane po regule, module i komunikacie, a nie po linii.
 
 Config guard
 :   Hook `PreToolUse`, który z góry odrzuca edycje agenta w `[tool.inwards]`, w `.inwards/`, w `inwards-baseline.json` i w ustawieniach Claude Code zawierających hooki Inwards. Zobacz [rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
@@ -112,7 +112,7 @@ Szkielet importów (import skeleton)
 :   Kopia pliku, w której każda linia niebędąca importem jest pusta, a linie importów mają usunięte wcięcie. Numery linii są zachowane, a parsuje się ją dużo szybciej niż cały plik.
 
 Indeks modułów (module index)
-:   Wszystkie własne moduły projektu, z importerami dowolnego modułu wyliczanymi na żądanie (`Engine.index`). Jest zbudowany, ale żadna reguła jeszcze go nie używa; użyje go INW010.
+:   Wszystkie własne moduły projektu, z modułami importującymi dowolny moduł wyliczanymi na żądanie (`Engine.index`). Jest zbudowany, ale żadna reguła jeszcze go nie używa; użyje go INW010.
 
 Odmowa prescanu (prescan refusal)
 :   Prescan rezygnuje z pliku, bo `import` pojawia się w miejscu, którego nie umie wyjaśnić. Plik dostaje wtedy pełne parsowanie. Odmowę dostaje 8,3 % plików biblioteki standardowej CPythona.
@@ -127,7 +127,7 @@ Run log
 :   `.inwards/runs.jsonl`: przy włączonym logu jedna linia na każde uruchomienie hooka albo `inwards check`; `inwards check --log` dopisuje linię nawet wtedy, gdy log jest wyłączony. Każda linia zawiera czas, zdarzenie, pliki, dodane i usunięte linie, fingerprinty naruszeń, kod wyjścia i czas trwania. Lokalny i domyślnie wyłączony. Zasila metryki design partnerów. Zobacz [rozdział 8](08-Run-Log.md).
 
 Stan sesji (session state)
-:   To, co hooki Claude Code zapisują dla każdej sesji w `.inwards/state/`: migawkę początku (HEAD, każdą tabelę `[tool.inwards]`, hash każdego pliku Pythona) i jedną linię na edycję. Zawsze włączony i lokalny. Czytają go Stop gate i eskalacja.
+:   To, co hooki Claude Code zapisują dla każdej sesji w `.inwards/state/`: migawkę stanu początkowego (HEAD, każdą tabelę `[tool.inwards]`, hash każdego pliku Pythona) i jedną linię na edycję. Zawsze włączony i lokalny. Czytają go Stop gate i eskalacja.
 
 Stop gate
 :   Sprawdzenie uruchamiane z hooka `Stop` agenta. Sprawdza każdy plik Pythona zmieniony w sesji oraz to, czy konfiguracja i hooki są wciąż nienaruszone, i nie pozwala agentowi zakończyć tury, dopóki tak nie jest.

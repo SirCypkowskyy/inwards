@@ -3,7 +3,7 @@ source: docs/chapters/08-Run-Log.md
 source_hash: 3b0f64f331cf4f23024cc09c69938f639c93ad73c048981898fe85f484735a0f
 ---
 
-# Run log
+# Run log { #run-log }
 
 Run log pozwala design partnerom mierzyć [hipotezę biznesową](02-Business-Context.md#business-hypothesis) na ich własnych sesjach. Jest lokalny, domyślnie wyłączony, a Inwards nigdy go nigdzie nie wysyła.
 
@@ -35,7 +35,7 @@ Każda linia to jeden obiekt JSON:
 | `codes` | string[] | Kod reguły każdego fingerprintu, w tej samej kolejności (np. `INW001`). Linie zapisane, zanim to pole powstało, go nie mają |
 | `severities` | string[] | `error` albo `warning` dla każdego fingerprintu, w tej samej kolejności. Linie zapisane, zanim to pole powstało, go nie mają i są czytane jako błędy |
 | `exit` | number | Kod wyjścia zwrócony przez Inwards |
-| `durationMs` | number | Czas od startu procesu, łącznie z uruchomieniem procesu, z dokładnością do 0,1 ms |
+| `durationMs` | number | Czas od startu procesu, łącznie ze startem procesu, z dokładnością do 0,1 ms |
 
 ```json title=".inwards/runs.jsonl (jedna linia, zawinięta)"
 {"v":1,"at":"2026-09-25T20:14:03.512Z","session_id":"7a425a88-...","event":"PostToolUse",
@@ -71,6 +71,6 @@ Co jest liczone:
 Hook sprawdza cały plik, więc jego fingerprinty obejmują naruszenia, które były tam, zanim agent go dotknął. Oba wskaźniki pomijają dwa ich rodzaje:
 
 - naruszenia, które linia `check` zgłosiła przed pierwszą edycją w sesji. Uruchom `inwards check --format json --log`, zanim poprosisz agenta o pierwszą zmianę; bez tego naruszenia, które już są w pliku, liczą się na konto agenta przy pierwszej edycji tego pliku;
-- naruszenia, które miało ostatnie uruchomienie hooka na tym pliku w innej sesji, więc naruszenie pozostałe po wczorajszej sesji, sprzed `/clear` albo od innego agenta pracującego równocześnie nad tym samym plikiem nie jest liczone jako naruszenie tej sesji, dopóki uruchomienie na tym pliku go nie straci. Jeśli potem wróci, należy już do tej sesji.
+- naruszenia, które miało ostatnie uruchomienie hooka na tym pliku w innej sesji, więc naruszenie pozostałe po wczorajszej sesji, sprzed `/clear` albo od innego agenta pracującego równocześnie nad tym samym plikiem nie jest liczone jako naruszenie tej sesji, dopóki któreś uruchomienie na tym pliku nie przestanie go zgłaszać. Jeśli potem wróci, należy już do tej sesji.
 
 Adopcji hooków, czyli odsetka instalacji z hookiem agenta, nie ma w logu: jeden projekt nie widzi pozostałych. Partnerzy podają ją sami.

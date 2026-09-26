@@ -66,6 +66,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | File and config names | `pyproject.toml`, `[tool.inwards]`, `AGENTS.md`, `escalate-after`, ... | |
 | Product names | Claude Code, Aider, Codex, Cursor, Copilot, Ruff, ty, mypy, import-linter, tree-sitter, Bun, Zensical, ... | |
 | Tool terms | LSP, MCP, SARIF, WASM, CI, C4, ADR, JSON | |
+| scaffold (the example code, also the repo's early code) | scaffold (scaffoldu) | the `--scaffold` flag's output is "przykładowy pakiet" |
+| fixture | fixture (fixture'a, fixture'y) | test and eval fixtures |
+| ruleset (GitHub) | ruleset (rulesetu) | |
+| runner, checkout | runner, checkout | CI terms |
+| loader (module loader) | loader (loadera) | |
 
 ## Fixed Polish terms
 
@@ -77,11 +82,14 @@ baseline'u); multi-word names are left uninflected where possible.
 | binary (the executable) | plik binarny |
 | bounded context | kontekst ograniczony (bounded context) |
 | budget (performance) | budżet |
+| bytecode | bajtkod |
 | check (the act of running `inwards check`) | sprawdzenie |
 | whole-project check | sprawdzenie całego projektu |
 | clean (no violations) | czysty (projekt, plik) |
 | code scanning | code scanning (GitHub) |
 | composition root | korzeń kompozycji (composition root) |
+| cold / warm run | zimne / ciepłe uruchomienie |
+| corpus | korpus |
 | config, configuration | konfiguracja |
 | config error | błąd konfiguracji |
 | confirming parse | parsowanie potwierdzające |
@@ -100,37 +108,62 @@ baseline'u); multi-word names are left uninflected where possible.
 | evasion, dodge | obejście, obchodzenie (sprawdzenia) |
 | exit code | kod wyjścia |
 | extension (VS Code) | rozszerzenie |
+| fail (a check, gate, job, PR) | oblewać, nie przechodzić, kończyć się błędem |
+| fix composer | kompozytor poprawek |
 | first-party (code, module) | własny (kod, moduł projektu) |
+| gate (short for Stop gate) | bramka |
 | fix steps | kroki naprawy |
 | guardrail | zabezpieczenie |
 | hallucinated module | zmyślony moduł |
 | hypothesis | hipoteza |
+| importers (of a module) | moduły importujące (dany moduł) |
 | import skeleton | szkielet importów |
 | job (CI) | zadanie |
 | language server | serwer języka |
+| legacy codebase, repo, violation | starszy kod, starsze repozytorium, stare naruszenie |
+| literal (target, dynamic import) | dosłowny (cel, import dynamiczny) |
 | layer | warstwa |
 | inner, outer layer; innermost, outermost | warstwa wewnętrzna, zewnętrzna; najbardziej wewnętrzna, najbardziej zewnętrzna |
 | maintainer | opiekun projektu |
 | member (of a package) | element (pakietu) |
+| miss (prescan) | przeoczenie |
+| owner (the repo's) | właściciel |
+| payload (hook input) | dane wejściowe (hooka) |
+| per-edit hook | hook edycji |
+| picker (`init` on a terminal) | kreator |
 | module index | indeks modułów |
 | package shape | kształt pakietu |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |
+| promotion (PR `develop` → `main`) | promocja |
 | prescan refusal | odmowa prescanu |
 | release | wydanie |
+| redact (`--redact`) | pseudonimizować (not "anonimizować": keyed hashes still tell files apart) |
+| release candidate | kandydat do wydania |
+| release draft | szkic (wydania) |
 | rule | reguła |
 | rule catalogue | katalog reguł |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
 | session | sesja |
 | session state | stan sesji |
+| session baseline (the start snapshot, not the file) | punkt odniesienia, migawka startowa |
 | severity | poziom (błąd, ostrzeżenie) |
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
+| snapshot | migawka |
+| spike | eksperyment |
+| start-up (process) | start (startu) |
+| string (Python) | napis |
+| stub (`.pyi`) | zaślepka (plik `.pyi`) |
+| symlink | dowiązanie symboliczne |
 | turn (of the agent) | tura |
+| upload | wysyłka |
 | use case | przypadek użycia |
 | value object | obiekt wartości |
 | verified (the "Verified" boxes) | zweryfikowano |
 | violation | naruszenie |
+| wall time | czas rzeczywisty |
 | warning | ostrzeżenie |
 | workspace (uv) | workspace (uv) |
+| workspace (editor, VS Code) | obszar roboczy |
