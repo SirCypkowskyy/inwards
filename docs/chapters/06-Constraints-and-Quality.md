@@ -60,7 +60,7 @@ First run, on the laptop described under Setup (load average 3 to 4), `inwards` 
 | polar | 1,831 | 435,688 | 22 (1.2 %) | 0 | 1.16 / 1.37 s | 124 / 142 ms | 358 |
 | saleor | 4,324 | 847,875 | 13 (0.3 %) | 0 | 1.84 / 1.89 s | 59 / 62 ms | 491 |
 
-Two things the synthetic repo didn't show. The single-file check on polar's `subscription/service.py` (4,482 lines, 175 KB, two violations) takes about 125 ms, over the 100 ms budget; a small file in the same repo takes about 55 ms. And a cold full check of saleor's 848,000 lines takes 1.8 s on one core, where the 496,000-line synthetic repo takes 0.4 s.
+Two things the synthetic repo didn't show. The single-file check on polar's `subscription/service.py` (4,482 lines, 175 KB, two violations) takes about 125 ms here and 280 ms on a GitHub runner (AMD EPYC 7763, 2 cores), over the 100 ms budget; a small file in the same repo takes about 55 ms. And a cold full check of saleor's 848,000 lines takes 1.8 s on one core (2.5 s on the GitHub runner), where the 496,000-line synthetic repo takes 0.4 s.
 
 ### Results
 
