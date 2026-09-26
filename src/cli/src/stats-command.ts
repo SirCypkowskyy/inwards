@@ -75,15 +75,16 @@ function renderStatsText(stats: Stats): string {
  * Finds the project a working directory belongs to, for a project outside
  * git: the nearest folder with `.inwards/state` (the hooks keep it at the
  * project root), else the outermost folder with a run log. The walk stops
- * below the home directory, so a stray `~/.inwards` is never taken.
+ * below the home directory (as written or through a symlink), so a stray
+ * `~/.inwards` is never taken from a project below home.
  *
  * @param start - the working directory.
  * @returns that folder, or `start` when none qualifies.
  */
 function projectRoot(start: string): string {
-  const home = homedir();
+  const homes = new Set([homedir(), realpath(homedir())]);
   let outermost: string | undefined;
-  for (let dir = start; dir !== home && dirname(dir) !== dir; dir = dirname(dir)) {
+  for (let dir = start; !homes.has(dir) && dirname(dir) !== dir; dir = dirname(dir)) {
     if (existsSync(join(dir, ".inwards", "state"))) {
       return dir;
     }

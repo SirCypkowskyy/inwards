@@ -56,6 +56,16 @@ describe("inwards stats: edge cases (#112)", () => {
     expect(JSON.parse(run.stdout).hookRuns).toBe(0);
   });
 
+  test("outside git, the walk stops below the home directory", () => {
+    const home = withLog(LOG);
+    mkdirSync(join(home, "proj/pkg"), { recursive: true });
+    const run = inwards(["stats", "--format", "json"], {
+      cwd: join(home, "proj/pkg"),
+      env: { HOME: home },
+    });
+    expect(JSON.parse(run.stdout).hookRuns).toBe(0);
+  });
+
   test("--config gets a one-line reason", () => {
     const root = withLog(LOG);
     const run = inwards(["stats", "--config", "pyproject.toml"], { cwd: root });
