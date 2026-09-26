@@ -170,6 +170,9 @@ act push -W .github/workflows/cd.yml -n                                       # 
   stays the gate.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
+- **`setup-bun` fails with "Unable to locate executable file"**: act's local
+  cache server restored a Bun cache saved under another worktree path. Rerun
+  with `--no-cache-server`.
 
 ## Commits, PR titles and releases
 
