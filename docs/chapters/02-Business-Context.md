@@ -106,13 +106,13 @@ config:
     quadrant2TextFill: "#eceff1"
     quadrant3TextFill: "#eceff1"
     quadrant4TextFill: "#eceff1"
-    quadrantPointFill: "#7e57c2"
-    quadrantPointTextFill: "#78909c"
-    quadrantXAxisTextFill: "#78909c"
-    quadrantYAxisTextFill: "#78909c"
+    quadrantPointFill: "#ffca28"
+    quadrantPointTextFill: "#b0bec5"
+    quadrantXAxisTextFill: "#607d8b"
+    quadrantYAxisTextFill: "#607d8b"
     quadrantInternalBorderStrokeFill: "#78909c"
     quadrantExternalBorderStrokeFill: "#78909c"
-    quadrantTitleFill: "#78909c"
+    quadrantTitleFill: "#607d8b"
 ---
 quadrantChart
     title Where the tools sit

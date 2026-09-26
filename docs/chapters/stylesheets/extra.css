@@ -13,8 +13,13 @@
     overflow-x: auto;
   }
 
+  /* Below this width the SVG keeps its natural size and the wrapper
+     scrolls horizontally instead, so node/edge text never shrinks past
+     legible (width:100% on a viewBox this wide would scale 13px text
+     down to ~5px on a phone otherwise). */
   #homepage-loop {
     width: 100%;
+    min-width: 720px;
     height: auto;
     font-family: var(--md-text-font-family, sans-serif);
     font-size: 13px;

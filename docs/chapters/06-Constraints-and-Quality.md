@@ -96,15 +96,15 @@ config:
   theme: base
   themeVariables:
     pieSectionTextColor: "#ffffff"
-    pieLegendTextColor: "#78909c"
+    pieLegendTextColor: "#607d8b"
     pieStrokeColor: "#ffffff"
     pieOpacity: "1"
-    pie1: "#5e35b1"
-    pie2: "#7e57c2"
-    pie3: "#9575cd"
+    pie1: "#4527a0"
+    pie2: "#673ab7"
+    pie3: "#7e57c2"
     pie4: "#37474f"
-    pie5: "#607d8b"
-    pie6: "#78909c"
+    pie5: "#455a64"
+    pie6: "#546e7a"
 ---
 pie showData
     title One-file check, about 25 ms of work (engine + start-up)
