@@ -1,8 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { readConfig } from "../src/config-file.ts";
 import { DOCUMENT_SELECTOR } from "../src/selector.ts";
 import {
   lspHarness,
@@ -226,6 +227,44 @@ test("a config without read permission gets the popup and the diagnostic", async
     expect(await diagnosticsOnce(config, (found) => found.length === 0)).toEqual([]);
     expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
   } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("a missing file, a dangling symlink and a file for a parent are no config", () => {
+  const dir = join(TMP, "missing");
+  write(dir, { "file.txt": "" });
+  symlinkSync(join(dir, "gone.toml"), join(dir, "pyproject.toml"));
+  expect(readConfig(join(dir, "nothing.toml"))).toBeUndefined();
+  expect(readConfig(join(dir, "pyproject.toml"))).toBeUndefined();
+  expect(readConfig(join(dir, "file.txt", "pyproject.toml"))).toBeUndefined();
+});
+
+test("a config symlinked into a directory the user can't enter is an error, not missing", async () => {
+  if (process.platform === "win32" || process.getuid?.() === 0) {
+    return; // Windows has no unreadable directories this way, and root ignores the bit
+  }
+  const { server, config, router } = await openProject("linked", 10, PYPROJECT, WATCHING);
+  const locked = join(TMP, "linked-locked");
+  write(locked, { "pyproject.toml": PYPROJECT });
+  const changes = [{ uri: pathToFileURL(config).href, type: 2 }];
+  const from = popups().length;
+  try {
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+    rmSync(config);
+    symlinkSync(join(locked, "pyproject.toml"), config);
+    chmodSync(locked, 0);
+    server.send({ method: "workspace/didChangeWatchedFiles", params: { changes } });
+    const denied = await diagnosticsOnce(config, (found) => found.length === 1);
+    expect(denied[0]?.message).toContain("pyproject.toml can't be read");
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+    expect(popups().slice(from)).toHaveLength(1);
+    chmodSync(locked, 0o755);
+    server.send({ method: "workspace/didChangeWatchedFiles", params: { changes } });
+    expect(await diagnosticsOnce(config, (found) => found.length === 0)).toEqual([]);
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+  } finally {
+    chmodSync(locked, 0o755);
     server.kill();
   }
 }, 30_000);
