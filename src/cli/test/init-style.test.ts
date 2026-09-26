@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  symlinkSync,
+} from "node:fs";
 import { join, relative, sep } from "node:path";
 import process from "node:process";
 import { VERSION } from "@inwards/core";
@@ -43,7 +53,8 @@ function init(root: string, ...args: string[]): RunResult {
 }
 
 /**
- * Reads every file of a project, keyed by forward-slash path.
+ * Reads every file of a project, keyed by forward-slash path; a symlink is
+ * recorded by its target, not followed.
  *
  * @param root - the project directory.
  * @returns the file texts, sorted by path.
@@ -58,10 +69,14 @@ function tree(root: string): Record<string, string> {
   function walk(dir: string): void {
     for (const name of readdirSync(dir).sort()) {
       const path = join(dir, name);
-      if (statSync(path).isDirectory()) {
+      const key = relative(root, path).split(sep).join("/");
+      const entry = lstatSync(path);
+      if (entry.isSymbolicLink()) {
+        out[key] = `-> ${readlinkSync(path)}`; // never followed: it may lead outside
+      } else if (entry.isDirectory()) {
         walk(path);
       } else {
-        out[relative(root, path).split(sep).join("/")] = readFileSync(path, "utf8");
+        out[key] = readFileSync(path, "utf8");
       }
     }
   }
@@ -174,6 +189,10 @@ describe("inwards init --style", () => {
     const run = init(root, "--style", "clean");
     expect(run.code).toBe(0);
     expect(run.stdout).toContain("domain/          domain: imports no other layer (missing)");
+    // A missing module is drawn the way the scaffold would create it.
+    expect(run.stdout).toContain(
+      "bootstrap.py     bootstrap: may import every other layer (missing)",
+    );
     expect(Object.keys(tree(root)).sort()).toEqual(Object.keys(UV_PROJECT).sort());
   });
 
@@ -238,11 +257,83 @@ describe("inwards init --style", () => {
     [["--style", "onion"], "--style must be one of"],
     [["--agent", "claude", "--scaffold"], "need --style"],
     [["--style", "clean", "--package", "my-app"], "not a Python package name"],
+    [["--style", "clean", "--package", "class"], "not a Python package name"],
+    [["--style", "clean", "--package", "acme.import"], "not a Python package name"],
   ])("%p exits 2", (args, message) => {
     const root = project(UV_PROJECT);
     const run = init(root, ...args);
     expect(run.code).toBe(2);
     expect(run.stderr).toContain(message);
+  });
+});
+
+describe("inwards init --style: where it writes", () => {
+  test("run below the project, it names the pyproject.toml it is about to change", () => {
+    const root = project({ ...UV_PROJECT, "docs/.keep": "" });
+    const run = inwards(["init", "--style", "clean"], { cwd: join(root, "docs") });
+    expect(run.code).toBe(0);
+    expect(run.stdout).toContain("using ../pyproject.toml, the nearest pyproject.toml above here.");
+    expect(readFileSync(join(root, "pyproject.toml"), "utf8")).toContain("[tool.inwards]");
+  });
+
+  test("an unrelated src/ (no Python, no uv_build) doesn't make it a src layout", () => {
+    const root = project({
+      "pyproject.toml": '[project]\nname = "shop"\n',
+      "src/index.ts": "export {};\n",
+    });
+    expect(init(root, "--style", "hexagonal", "--scaffold").code).toBe(0);
+    expect(readFileSync(join(root, "pyproject.toml"), "utf8")).toContain('root = "."');
+    expect(existsSync(join(root, "shop", "bootstrap.py"))).toBe(true);
+    expect(checkSummary(root).summary).toMatchObject({ violations: 0, warnings: 0 });
+  });
+});
+
+describe("inwards init --scaffold never writes through a symlink or halfway", () => {
+  // Symlinks need privileges on Windows, and root ignores the read-only bit.
+  const posixOnly = process.platform === "win32" ? test.skip : test;
+  const asUser = process.platform === "win32" || process.getuid?.() === 0 ? test.skip : test;
+
+  posixOnly(
+    "a dangling symlink where a file would go is refused, and its target is not created",
+    () => {
+      const outside = project({});
+      const root = project(UV_PROJECT);
+      mkdirSync(join(root, "src/my_app/domain"), { recursive: true });
+      symlinkSync(join(outside, "stolen.py"), join(root, "src/my_app/domain/order.py"));
+      const before = tree(root);
+      const run = init(root, "--style", "clean", "--scaffold");
+      expect(run.code).toBe(2);
+      expect(run.stderr).toContain("\n  src/my_app/domain/order.py\n");
+      expect(existsSync(join(outside, "stolen.py"))).toBe(false);
+      expect(tree(root)).toEqual(before);
+    },
+  );
+
+  posixOnly("a layer directory that is a symlink out of the project is refused", () => {
+    const outside = project({});
+    const root = project(UV_PROJECT);
+    symlinkSync(outside, join(root, "src/my_app/domain"));
+    const run = init(root, "--style", "hexagonal", "--scaffold");
+    expect(run.code).toBe(2);
+    expect(run.stderr).toContain("src/my_app/domain/order.py");
+    expect(readdirSync(outside)).toEqual([]);
+    expect(readFileSync(join(root, "pyproject.toml"), "utf8")).toBe(UV_PROJECT["pyproject.toml"]);
+  });
+
+  asUser("a write that fails removes what this run created and leaves pyproject.toml alone", () => {
+    const root = project(UV_PROJECT);
+    mkdirSync(join(root, "tests"));
+    chmodSync(join(root, "tests"), 0o500); // the test file is written last of the scaffold
+    const before = tree(root);
+    const run = init(root, "--style", "layered", "--scaffold");
+    chmodSync(join(root, "tests"), 0o700);
+    expect(run.code).toBe(2);
+    expect(run.stderr.trim().split("\n")).toHaveLength(1);
+    expect(run.stderr).toContain("could not write");
+    expect(tree(root)).toEqual(before);
+    expect(existsSync(join(root, "src/my_app/domain"))).toBe(false);
+    // Nothing is half-done, so the same command works once the cause is gone.
+    expect(init(root, "--style", "layered", "--scaffold").code).toBe(0);
   });
 });
 

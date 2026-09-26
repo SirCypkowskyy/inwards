@@ -1,14 +1,6 @@
-/**
- * `inwards init` for a project with no `[tool.inwards]` yet: `--style` writes
- * a preset's table, `--scaffold` an example package that passes the check,
- * and without flags on a terminal a picker asks for both. Everything is
- * computed and checked before the first write, so a conflict leaves the
- * project as it was.
- */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname } from "node:path";
 import process from "node:process";
-import { inwardsTable, parseConfig, VERSION } from "@inwards/core";
+import { parseConfig, VERSION } from "@inwards/core";
 import {
   AGENTS,
   type Agent,
@@ -18,12 +10,12 @@ import {
   DEFAULT_IGNORE,
   initCommand,
   isAgent,
-  isRecord,
   PRERELEASE,
 } from "./init.ts";
-import { isDir, report } from "./init-report.ts";
+import { report } from "./init-report.ts";
+import { findTarget, noPackage, shown, sourceRoot, type Target } from "./init-target.ts";
+import { planScaffold, writeAll } from "./init-write.ts";
 import { print } from "./output.ts";
-import { posix } from "./paths.ts";
 import { pick } from "./picker.ts";
 import {
   configTable,
@@ -33,7 +25,6 @@ import {
   STYLES,
   type Style,
   type StyleName,
-  scaffoldFiles,
 } from "./styles.ts";
 
 /** The `init` options main.ts parsed. */
@@ -53,18 +44,6 @@ export interface InitPlan {
   agent: Agent | undefined;
 }
 
-/** A pyproject.toml found from the cwd, and what init needs to know about it. */
-export interface Target {
-  path: string;
-  text: string;
-  /** True when it already has `[tool.inwards]`. */
-  configured: boolean;
-  /** The import package: `--package`, or `[project].name` normalised; undefined when neither is set. */
-  pkg: string | undefined;
-}
-
-const PACKAGE_NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/u;
-const NAME_SEPARATORS = /[-_.]+/gu;
 const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--dry-run]
   inwards init --agent ${AGENTS.join("|")} [--dry-run]    (the project already has [tool.inwards])
   inwards init --list-styles`;
@@ -142,55 +121,6 @@ async function interactive(flags: InitFlags, dryRun: boolean): Promise<number> {
 }
 
 /**
- * Finds the nearest pyproject.toml above the cwd and reads what init needs.
- *
- * @param pkgFlag - `--package`, if given.
- * @returns the target, or an error message.
- */
-function findTarget(pkgFlag: string | undefined): Target | string {
-  let dir = process.cwd();
-  while (!existsSync(join(dir, "pyproject.toml"))) {
-    if (dirname(dir) === dir) {
-      return "no pyproject.toml here or above. Create the project first, e.g. `uv init --package app`.";
-    }
-    dir = dirname(dir);
-  }
-  const path = join(dir, "pyproject.toml");
-  const text = readFileSync(path, "utf8");
-  const table = inwardsTable(text);
-  if (table === null) {
-    return `${path} is not valid TOML; fix it first.`;
-  }
-  if (pkgFlag !== undefined && !PACKAGE_NAME.test(pkgFlag)) {
-    return `--package ${pkgFlag} is not a Python package name.`;
-  }
-  return { path, text, configured: table !== undefined, pkg: pkgFlag ?? projectPackage(text) };
-}
-
-/**
- * Reads `[project].name` and turns it into the import package the way uv
- * does: lowercase, with runs of `-`, `_` and `.` made one `_`.
- *
- * @param text - the pyproject.toml text.
- * @returns the package, or undefined when there is no usable name.
- */
-function projectPackage(text: string): string | undefined {
-  let doc: unknown;
-  try {
-    doc = Bun.TOML.parse(text);
-  } catch {
-    return undefined;
-  }
-  const project = isRecord(doc) ? doc["project"] : undefined;
-  const name = isRecord(project) ? project["name"] : undefined;
-  if (typeof name !== "string") {
-    return undefined;
-  }
-  const pkg = name.toLowerCase().replace(NAME_SEPARATORS, "_");
-  return PACKAGE_NAME.test(pkg) ? pkg : undefined;
-}
-
-/**
  * Writes a preset's `[tool.inwards]`, the example with `--scaffold`, and an
  * agent's wiring with `--agent`, then prints the annotated tree and the
  * result of a check. Refuses (exit 2, nothing written) when the table exists
@@ -222,16 +152,20 @@ async function styleCommand(
   }
   const style = STYLES[plan.style];
   const project = dirname(target.path);
-  const root = sourceRoot(project, target.pkg);
+  if (project !== process.cwd()) {
+    print(`inwards init: using ${shown(target.path)}, the nearest pyproject.toml above here.`, 0);
+  }
+  const root = sourceRoot(project, target.pkg, target.text);
   const config = withTable(target, style, target.pkg, root);
   if (typeof config === "string") {
     return print(`inwards init: ${config}`, 2);
   }
-  const files = plan.scaffold ? newFiles(project, style, target.pkg, root) : [];
-  const conflicts = files.filter((c) => c.before !== undefined).map((c) => shown(c.path));
-  if (conflicts.length > 0) {
+  const { files, refused } = plan.scaffold
+    ? planScaffold(project, style, target.pkg, root)
+    : { files: [], refused: [] };
+  if (refused.length > 0) {
     return print(
-      `inwards init: --scaffold never overwrites a file, and these exist:\n  ${conflicts.join("\n  ")}\nNothing was written.`,
+      `inwards init: --scaffold never replaces an existing file or symlink, or writes outside the project, and these are in the way:\n  ${refused.map(shown).join("\n  ")}\nNothing was written.`,
       2,
     );
   }
@@ -243,51 +177,52 @@ async function styleCommand(
   if (dryRun) {
     return apply([config, ...files, ...agentEdits], true);
   }
-  for (const change of [config, ...files]) {
-    mkdirSync(dirname(change.path), { recursive: true });
-    writeFileSync(change.path, change.after);
+  return await commit({ configPath: target.path, style, pkg: target.pkg, root }, plan, {
+    config,
+    files,
+    agentEdits,
+  });
+}
+
+/**
+ * Writes what `styleCommand` planned: the scaffold's files, then
+ * pyproject.toml (all or nothing), then the agent's wiring, and prints the report.
+ *
+ * @param setup - the pyproject.toml, the preset, the package and the config root.
+ * @param plan - what was chosen, for the messages and the next steps.
+ * @param changes - the config change, the scaffold's files and the agent's edits.
+ * @param changes.config - the pyproject.toml change.
+ * @param changes.files - the scaffold's files.
+ * @param changes.agentEdits - the agent's edits that change something.
+ * @returns 0 once written, 2 when a write failed.
+ */
+async function commit(
+  setup: Parameters<typeof report>[0],
+  plan: InitPlan,
+  changes: { config: Change; files: Change[]; agentEdits: Change[] },
+): Promise<number> {
+  const { config, files, agentEdits } = changes;
+  const failed = writeAll(files, config);
+  if (failed !== undefined) {
+    return print(`inwards init: could not write ${failed}. Nothing was written.`, 2);
   }
   const example = files.length > 0 ? ` and ${files.length} example files` : "";
-  print(`inwards init: wrote the ${style.name} preset to ${shown(target.path)}${example}.`, 0);
+  print(
+    `inwards init: wrote the ${setup.style.name} preset to ${shown(config.path)}${example}.`,
+    0,
+  );
   if (agentEdits.length > 0) {
-    apply(agentEdits, false);
+    try {
+      apply(agentEdits, false);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return print(
+        `inwards init: the layers are written, but wiring ${plan.agent} failed (${reason}); fix that and run \`inwards init --agent ${plan.agent}\`.`,
+        2,
+      );
+    }
   }
-  return await report({ configPath: target.path, style, pkg: target.pkg, root }, plan);
-}
-
-/**
- * Says that init can't tell the import package.
- *
- * @param path - the pyproject.toml.
- * @returns the message.
- */
-function noPackage(path: string): string {
-  return `inwards init: ${shown(path)} has no usable [project].name; name the import package with --package.`;
-}
-
-/**
- * Shows a path relative to the cwd, with forward slashes, as the rest of the output does.
- *
- * @param path - an absolute path.
- * @returns the relative path, e.g. `pyproject.toml` or `../pyproject.toml`.
- */
-function shown(path: string): string {
-  return posix(relative(process.cwd(), path));
-}
-
-/**
- * Picks the config root: `src` for a src layout, `.` otherwise.
- *
- * @param project - the project directory.
- * @param pkg - the import package.
- * @returns `src` when the package (or, before it exists, a `src` directory) is there, else `.`.
- */
-function sourceRoot(project: string, pkg: string): string {
-  const rel = pkg.replaceAll(".", "/");
-  if (isDir(join(project, "src", rel))) {
-    return "src";
-  }
-  return !isDir(join(project, rel)) && isDir(join(project, "src")) ? "src" : ".";
+  return await report(setup, plan);
 }
 
 /**
@@ -333,27 +268,4 @@ function separator(text: string, eol: string): string {
     return "";
   }
   return text.endsWith(eol) ? eol : `${eol}${eol}`;
-}
-
-/**
- * Lists the scaffold's files as changes. An `__init__.py` that already
- * exists is left out, so a package uv created stays as it is; any other
- * existing file is kept as a conflict (its `before` is set).
- *
- * @param project - the project directory.
- * @param style - the preset.
- * @param pkg - the import package.
- * @param root - the config root.
- * @returns one change per file to create, conflicts included.
- */
-function newFiles(project: string, style: Style, pkg: string, root: string): Change[] {
-  return [...scaffoldFiles(style, pkg, root)].flatMap(([rel, after]): Change[] => {
-    const path = join(project, ...rel.split("/"));
-    if (!existsSync(path)) {
-      return [{ path, before: undefined, after }];
-    }
-    return rel.endsWith("/__init__.py")
-      ? []
-      : [{ path, before: readFileSync(path, "utf8"), after }];
-  });
 }

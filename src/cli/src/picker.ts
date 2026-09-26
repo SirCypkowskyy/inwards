@@ -5,7 +5,8 @@
  * The caller has already checked that stdin and stdout are TTYs.
  */
 import { AGENTS, type Agent } from "./init.ts";
-import type { InitFlags, InitPlan, Target } from "./init-style.ts";
+import type { InitFlags, InitPlan } from "./init-style.ts";
+import type { Target } from "./init-target.ts";
 import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "./styles.ts";
 
 const AGENT_HINTS: Readonly<Record<Agent, string>> = {

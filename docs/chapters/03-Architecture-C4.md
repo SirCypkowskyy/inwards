@@ -422,6 +422,8 @@ src/
 │   │   ├── init.ts        # inwards init --agent
 │   │   ├── init-style.ts  # inwards init --style / --scaffold, the entry for every init
 │   │   ├── init-report.ts # the annotated tree and check after init --style
+│   │   ├── init-target.ts # the pyproject.toml, package and src layout init --style uses
+│   │   ├── init-write.ts  # scaffold writes: no symlinks, nothing outside, all or nothing
 │   │   ├── styles.ts      # the presets and the scaffold's Python templates
 │   │   ├── picker.ts      # the interactive init (@clack/prompts, loaded lazily)
 │   │   ├── claude-settings.ts  # finds the Inwards hooks in Claude Code settings

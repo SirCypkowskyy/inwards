@@ -181,7 +181,11 @@ export function drawTree(
     children.forEach(([name, child], i) => {
       const last = i === children.length - 1;
       const what = kind([...parts, name]);
-      const label = `${indent}${last ? "└── " : "├── "}${what === "file" ? `${name}.py` : `${name}/`}`;
+      // A missing module is drawn the way the scaffold would create it.
+      const file =
+        what === "file" ||
+        (what === "missing" && [...parts, name].join(".") === style.example.bootstrap);
+      const label = `${indent}${last ? "└── " : "├── "}${file ? `${name}.py` : `${name}/`}`;
       rows.push([label, layerNote(style, child.layer, what !== "missing")]);
       walk(child, [...parts, name], `${indent}${last ? "    " : "│   "}`);
     });
