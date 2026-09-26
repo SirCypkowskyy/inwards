@@ -27,7 +27,7 @@ platforms and platform wheels for `uv add`; see the
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
 | `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
 | `eval/` | Agent eval harness: does an agent fix what the hook reports? |
-| `bench/` | Generator for the synthetic benchmark repo. |
+| `bench/` | The synthetic benchmark repo generator and the PR regression gate (`compare.ts`). |
 | `packaging/` | README for the platform wheels, and the PyPI/npm name placeholders. |
 | `scripts/` | Build binaries and wheels, version and docs-nav checks, screenshots. |
 

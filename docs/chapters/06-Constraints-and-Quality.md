@@ -61,7 +61,7 @@ All numbers come from the scaffold in this repository. Nothing here is projected
 </figure>
 
 !!! note "Spot check on 0.1.0 (2026-09-26)"
-    Same laptop, a fresh `inwards-linux-x64` build, load average about 2. Single-file check on the example app, 30 runs: p50 44 ms, p95 51 ms wall time, 20 ms engine time. `inwards --version`: about 25 ms, up from about 10 ms. Cold full run on the synthetic repo, 5 runs: 0.71 to 1.22 s, peak RSS about 205 MB, up from about 120 MB. Binary size is unchanged at 82 MB. The start-up breakdown below is from M0 and needs redoing with the start-up spike ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)); the CI benchmark ([#29](https://github.com/SirCypkowskyy/inwards/issues/29)) will track these numbers from now on.
+    Same laptop (Intel Core Ultra 7 155H, 22 threads), a fresh `inwards-linux-x64` build, load average about 1, measured twice independently with the same result. Single-file check on the example app, 30 runs: p50 37 ms, p95 40 ms wall time, 14 ms engine time. `inwards --version`: about 19 ms, up from about 10 ms. Cold full run on the synthetic repo, 5 runs: 0.40 to 0.44 s. Peak RSS about 207 MB, up from about 120 MB. Binary size is unchanged at 82 MB (79 MiB). The start-up breakdown below is from M0 and needs redoing with the start-up spike ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). The CI benchmark ([#29](https://github.com/SirCypkowskyy/inwards/issues/29)) now fails any PR that makes the hook or the full check more than 20% slower; it doesn't track memory, start-up or binary size.
 
 ### Where a single-file check spends its time
 
@@ -95,7 +95,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 ```sh
 bun install
-bun test                                                    # 320 tests: unit, CLI, hook, Stop gate, E2E snapshots
+bun test                                                    # 325 tests: unit, CLI, hook, Stop gate, E2E snapshots, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms

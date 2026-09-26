@@ -86,7 +86,7 @@ Engine
 :   `@inwards/core`. Pure TypeScript that turns source text, config and grammars into diagnostics. It does no I/O ([ADR-006](05-ADR.md#adr-006-the-engine-does-no-io)).
 
 Escalation
-:   What the hooks do once the same violation survives `escalate-after` attempts (default 3): stop blocking, tell the agent to ask the user, and hand what is unresolved to the user and to the next session. See [chapter 4](04-AI-Integration.md#when-the-agent-cant-fix-it).
+:   What the hooks do once the same violation survives `escalate-after` attempts (default 3): the edit that reaches the limit doesn't block, the Stop gate lets the turn end after its last block, the agent is told to ask the user, and what is unresolved goes to the user and to the next session. It isn't sticky: the next edit with the violation blocks again. See [chapter 4](04-AI-Integration.md#when-the-agent-cant-fix-it).
 
 Evasion
 :   An agent changing code so that a check goes quiet without fixing the design, for example moving an import into a function. Chapter 4 lists the evasions Inwards handles.
@@ -119,7 +119,7 @@ Release PR
 :   The pull request release-please keeps open with the next version and its changelog. Merging it cuts the release ([ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)).
 
 Run log
-:   `.inwards/runs.jsonl`, one line per hook run or `inwards check --log`: time, event, files, lines added and removed, violation fingerprints, exit code and duration. Local and off by default. It feeds the design-partner metrics. See [chapter 8](08-Run-Log.md).
+:   `.inwards/runs.jsonl`: with the log on, one line per hook run or `inwards check`; `inwards check --log` adds a line even when it is off. Each line has time, event, files, lines added and removed, violation fingerprints, exit code and duration. Local and off by default. It feeds the design-partner metrics. See [chapter 8](08-Run-Log.md).
 
 Session state
 :   What the Claude Code hooks record per session in `.inwards/state/`: the start snapshot (HEAD, every `[tool.inwards]` table, a hash of every Python file) and one line per edit. Always on and local. The Stop gate and escalation read it.
