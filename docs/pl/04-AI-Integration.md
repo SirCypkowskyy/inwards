@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 2800417d120318ec1bc0071ad216c6c5216589bac9ca712860d4129e4687b931
+source_hash: 0787c5f0e450676969dc8fcc660ecaac44a2f7d6236f29330823e5637143991c
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -89,7 +89,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
     - **Naruszenie:** zwięzłe diagnostyki JSON na stderr, kod wyjścia 2.
     - **Naruszenie, które plik miał już na początku sesji:** kontekst, a nie blokada (kod wyjścia 0, notatka, która wymienia je jako już istniejące i każe agentowi zostawić je w spokoju, chyba że zadanie wymaga tego kodu). Naruszenie dodane przez edycję nadal blokuje, łącznie z drugą kopią starego importu. To, skąd bramka wie, co już było, opisuje niżej część o Stop gate.
     - **Same ostrzeżenia** (INW006: plik nie należy do żadnej warstwy): kod wyjścia 0, a ten sam JSON wraca do modelu jako `additionalContext`, więc edycja zostaje, ale agent się o tym dowiaduje.
-    - **Kształt pakietu** ([przewodnik](guides/package-shape.md)): INW007 blokuje, gdy plik jest nowy w tej sesji, a dla pliku, który istniał na początku sesji, jest tylko kontekstem. INW008 dla pakietu edytowanego pliku (wciąż brakuje wymaganego elementu) jest zawsze kontekstem; egzekwuje go Stop gate.
+    - **Kształt pakietu** ([przewodnik](guides/package-shape.md)): INW007 blokuje, gdy plik jest nowy w tej sesji, a dla pliku, który istniał na początku sesji pod tą samą ścieżką, bez dowiązania symbolicznego na tej ścieżce (tożsamość startowa z [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)), jest tylko kontekstem. Alias utworzony przez agenta albo plik z początku sesji podmieniony na dowiązanie nadal blokuje, tu i w Stop gate. INW008 dla pakietu edytowanego pliku (wciąż brakuje wymaganego elementu) jest zawsze kontekstem; egzekwuje go Stop gate.
     - **Czysty plik, plik spoza Pythona albo każde inne zdarzenie hooka:** kod wyjścia 0, brak wyjścia.
     - **Zepsute `[tool.inwards]`:** komunikat trafia na stderr z kodem wyjścia 2, więc agent, który zepsuł konfigurację, się o tym dowiaduje. Gdy `[tool.inwards]` w ogóle nie ma, hook milczy, bo może być zainstalowany dla każdego projektu; config guard nie pozwala agentowi usunąć tabeli.
     - **Nieczytelne dane wejściowe albo błąd wewnętrzny:** kod wyjścia 1. Claude Code pokazuje to użytkownikowi, a nie modelowi.

@@ -7,7 +7,7 @@ import process from "node:process";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
 import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
 import { configGuard } from "./guard.ts";
-import { agentSuppressions, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
+import { agentSuppressions, existedAtStart, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
 import { print } from "./output.ts";
 import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
 import { runCheck } from "./project.ts";
@@ -153,7 +153,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
       await runCheck(configPath, [target.file], target.cwd, { required: true }),
     );
     // A shape finding on a file that predates the session, and a missing member, are context.
-    const existed = start?.manifest[projectPath(target.project, target.file)] !== undefined;
+    const existed = existedAtStart(target.project, start, check, target.file);
     const errors = report.diagnostics.filter(
       (d) => d.severity === "error" && d.code !== "INW008" && !(existed && d.code === "INW007"),
     );
