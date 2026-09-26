@@ -9,7 +9,7 @@ import { appendFileSync, readFileSync, renameSync, symlinkSync, writeFileSync } 
 import { join } from "node:path";
 import process from "node:process";
 import { startText, unchangedFiles } from "../src/legacy.ts";
-import { inwards, payload, project } from "./run.ts";
+import { inwards, payload, project, type RunResult } from "./run.ts";
 import { git, ID, put, session, stop } from "./stop-helpers.ts";
 import {
   agentWritesOrder,
@@ -249,6 +249,72 @@ describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
       const root = session({ [LEGACY]: SUPPRESSED });
       put(root, LEGACY, `${SUPPRESSED}TOTAL = 1\n`);
       expect(posted(root, LEGACY).code).toBe(0);
+      expect(stop(root).code).toBe(0);
+    });
+  },
+);
+
+/**
+ * Sends PostToolUse the way a payload with its own cwd names a file.
+ *
+ * @param root - the project directory, where the hook runs.
+ * @param cwd - the payload's cwd.
+ * @param file - the payload's file_path, as written.
+ * @returns the hook's exit code and output.
+ */
+function postedFrom(root: string, cwd: string, file: string): RunResult {
+  const input = payload("post-write-order", root, {
+    session_id: ID,
+    cwd,
+    tool_input: { file_path: file },
+  });
+  return inwards(["hook", "claude-code"], { cwd: root, stdin: input });
+}
+
+describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
+  "the start identity is the path as written, below the real project root",
+  () => {
+    const Original = "shop/domain/original/legacy.py";
+
+    test("a cwd in a symlinked directory the agent created gets no allowance", () => {
+      const root = session({ [Original]: SUPPRESSED });
+      symlinkSync("original", join(root, "shop/domain/alias"));
+      const edit = postedFrom(root, join(root, "shop/domain/alias"), "legacy.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("wasn't in the file when the session started");
+    });
+
+    test("nor does it inherit an old violation's excuse (#134)", () => {
+      const root = session({ [Original]: "import shop.infrastructure.db\n" });
+      symlinkSync("original", join(root, "shop/domain/alias"));
+      const edit = postedFrom(root, join(root, "shop/domain/alias"), "legacy.py");
+      expect(edit.code).toBe(2);
+      // The alias's finding blocks; only the real file's own old violation is excused.
+      expect(edit.stderr).toContain('"file":"legacy.py","module":"shop.domain.alias.legacy"');
+      expect(edit.stderr).not.toContain("- legacy.py:1");
+    });
+
+    test("`..` through a symlinked file the agent created gets no allowance", () => {
+      const root = session({ "shop/domain/cart.pyi": SUPPRESSED });
+      symlinkSync("cart.pyi", join(root, "shop/domain/cart.py"));
+      const edit = postedFrom(root, root, "shop/domain/../domain/cart.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("shop/domain/cart.py:1");
+    });
+
+    test("a plain cwd inside the project still matches", () => {
+      const root = session({ [LEGACY]: SUPPRESSED });
+      put(root, LEGACY, `${SUPPRESSED}TOTAL = 1\n`);
+      expect(postedFrom(root, join(root, "shop/domain"), "legacy.py").code).toBe(0);
+      expect(postedFrom(root, root, "shop/domain/../domain/legacy.py").code).toBe(0);
+    });
+
+    test("a project reached through a link to its root still matches (macOS /var)", () => {
+      const root = session({ [LEGACY]: SUPPRESSED });
+      const link = `${root}-link`;
+      symlinkSync(root, link);
+      put(root, LEGACY, `${SUPPRESSED}TOTAL = 1\n`);
+      expect(postedFrom(root, link, join(link, LEGACY)).code).toBe(0);
       expect(stop(root).code).toBe(0);
     });
   },

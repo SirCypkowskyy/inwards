@@ -2,7 +2,7 @@
  * `inwards hook claude-code`: the Claude Code hook entry point.
  */
 import { readFileSync, statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
 import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
@@ -342,10 +342,13 @@ function hookTarget(
     return undefined;
   }
   const real = physicalRealpath(lexicalCwd, file);
-  // With `..` in the path, the name as written is not where the file is.
-  const lexical = PATH_SEPARATORS[Symbol.split](file).includes("..")
-    ? real
-    : resolve(lexicalCwd, file);
+  // With `..` in the path, the directory as written is not where the file is:
+  // resolve it as the OS does, but keep the file's own name, so a symlinked
+  // file (`cart.py -> cart.pyi`) is still checked as itself.
+  const dir = PATH_SEPARATORS[Symbol.split](file).includes("..")
+    ? physicalRealpath(lexicalCwd, dirname(file))
+    : undefined;
+  const lexical = dir === undefined ? resolve(lexicalCwd, file) : join(dir, basename(file));
   if (real && lexical && isInside(project, real) && statSync(real).isFile()) {
     // Report paths against the cwd as written: on macOS /var is a link to
     // /private/var, and mixing the two spellings gives ../../var/... paths.

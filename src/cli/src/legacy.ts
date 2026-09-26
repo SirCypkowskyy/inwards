@@ -16,9 +16,10 @@
  * session start has no known start content, so all its errors count as new,
  * as before: when in doubt, the gate blocks.
  *
- * Start content is looked up by the path the file was checked under, never
- * where a symlink points, so an alias the agent creates has none. Each
- * lookup, failed ones included, happens once per process.
+ * Start content is looked up by the file's path as written, below the real
+ * project root, and never for a path with a symlink below that root
+ * (`startPath`), so an alias the agent creates has none. Each lookup, failed
+ * ones included, happens once per process.
  *
  * The same start content decides which inline suppressions the hooks honour
  * under `agent-suppressions = "deny"` (#50, ADR-028): a finding suppressed now
@@ -26,7 +27,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { join, normalize, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import {
   type AgentSuppressions,
   type Diagnostic,
@@ -116,13 +117,16 @@ export async function agentSuppressions(
     return { report, rejected: [] };
   }
   const now = suppressed.map((s) => s.diagnostic);
-  const same = start
-    ? unchangedFiles(
-        start,
-        now.map((d) => [checkedPath(project, check.base, d.file), resolve(check.base, d.file)]),
-      )
-    : new Set<string>();
-  const touched = now.filter((d) => !same.has(checkedPath(project, check.base, d.file)));
+  const ids = now.flatMap((d): [string, string][] => {
+    const abs = resolve(check.base, d.file);
+    const rel = startPath(project, abs);
+    return rel === undefined ? [] : [[rel, abs]];
+  });
+  const same = start ? unchangedFiles(start, ids) : new Set<string>();
+  const touched = now.filter((d) => {
+    const rel = startPath(project, resolve(check.base, d.file));
+    return rel === undefined || !same.has(rel);
+  });
   const before =
     start && touched.length > 0 ? await atStart(project, start, check, touched) : undefined;
   const kept = carried(touched, before?.suppressed?.map((s) => s.diagnostic) ?? []);
@@ -183,7 +187,7 @@ function modeOf(project: string, start: Start | undefined, configPath: string): 
  * allowance. Each file is read and hashed once, however many findings it has.
  *
  * @param start - the session's start manifest.
- * @param files - each finding's file: its project path as checked (`checkedPath`)
+ * @param files - each finding's file: its start identity (`startPath`)
  *   and its absolute path; repeats allowed.
  * @param read - reads a file's bytes; the tests count the calls.
  * @returns the project paths whose hash now is their start hash.
@@ -209,19 +213,37 @@ export function unchangedFiles(
 }
 
 /**
- * Names a finding's file the way the start manifest does: project-relative,
- * with symlinks in the report path left alone. Only the base the report
- * paths are relative to is resolved, so a cwd spelled through a link
- * (`/var` for `/private/var`) still lands inside the project.
+ * The identity a file is looked up by in the start record: its path as
+ * written (`..` already applied as text), relative to the real project root.
+ * The root is found as the outermost directory on that path whose real path
+ * is the project, so a cwd spelled through a link to the whole project
+ * (`/var` for `/private/var`) still matches. A path with a symlink anywhere
+ * below the root gets no identity, and so no start allowance: the agent can
+ * create a symlinked directory or file (`alias -> original`,
+ * `cart.py -> cart.pyi`) that the start record has no entry for, and a
+ * path through one names another file than it did at start. Memoised, since
+ * one run asks for the same files many times.
  *
  * @param project - the real project root.
- * @param base - the directory the report paths are relative to.
- * @param file - a report path.
- * @returns the project-relative path with forward slashes.
+ * @param file - the file, absolute, as checked.
+ * @returns the project-relative path with forward slashes, or undefined.
  */
-function checkedPath(project: string, base: string, file: string): string {
-  return posix(normalize(join(relative(project, realpath(base) ?? base), file)));
+function startPath(project: string, file: string): string | undefined {
+  if (!startPaths.has(file)) {
+    const ancestors: string[] = [];
+    for (let dir = file; ancestors.at(-1) !== dir; dir = dirname(dir)) {
+      ancestors.push(dir);
+    }
+    const root = ancestors.reverse().find((dir) => realpath(dir) === project);
+    const rel = root === undefined ? undefined : posix(relative(root, file));
+    const direct = rel !== undefined && realpath(file) === join(project, rel);
+    startPaths.set(file, direct ? rel : undefined);
+  }
+  return startPaths.get(file);
 }
+
+/** `startPath` answers, by absolute file. */
+const startPaths = new Map<string, string | undefined>();
 
 /**
  * Checks the files some findings are in again, as they were at session start.
@@ -240,7 +262,8 @@ async function atStart(
 ): Promise<Report | undefined> {
   const texts = new Map<string, string>();
   for (const d of found) {
-    const text = startText(project, start, checkedPath(project, check.base, d.file));
+    const rel = startPath(project, resolve(check.base, d.file));
+    const text = rel === undefined ? undefined : startText(project, start, rel);
     if (text !== undefined) {
       texts.set(resolve(check.base, d.file), text);
     }
@@ -303,7 +326,7 @@ const startTexts = new Map<string, string | null>();
 
 /**
  * Reads a file as it was at session start, if git still has exactly that.
- * The file is looked up by its path as checked (`checkedPath`), never where a
+ * The file is looked up by its start identity (`startPath`), never where a
  * symlink points, so a new alias has no start content. Each path is read
  * from git at most once per process, whether or not that works.
  *
