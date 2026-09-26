@@ -31,6 +31,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted |
 | [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Report unreadable dynamic-import targets in inner layers | :white_check_mark: Accepted |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
+| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -670,3 +671,32 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-minus-circle-outline: No per-file or per-path settings. Those belong with suppressions ([#50](https://github.com/SirCypkowskyy/inwards/issues/50)).
 
 **Alternatives.** *Top-level `select` and `ignore`, as in Ruff:* familiar, but `ignore` is taken, and telling `INW001` from a module named `tests` by its shape is a guess. *One key per rule, `INW001 = "off"`, as in ESLint:* compact, but it can't say "only these rules". *Code prefixes:* see above. *Filtering in each adapter:* four call sites (the check, the Stop gate's layout check, two in the language server) that could drift apart.
+
+## ADR-028: Inline suppressions need a reason, and an agent can't add one by default
+
+**Status:** Accepted · 2026-09-26 · [#50](https://github.com/SirCypkowskyy/inwards/issues/50)
+
+**Context.** A team sometimes has to accept one import for good: a legacy adapter, a vendored module, a generated one. The baseline accepts violations as a set and is meant to shrink, and `[tool.inwards.rules]` works per rule, not per line. Ruff, mypy and ESLint answer this with a comment on the line. For Inwards a comment is also the cheapest way for an agent to turn a check green, and a hook can't tell who wrote a line. The #134 machinery already reads a file as it was at session start, safely, from the git blob the start manifest vouches for.
+
+**Decision.**
+
+- **Syntax.** `# inwards: ignore[INW001] reason="why"` hides the findings of the named rules that point at the comment's line. Several codes go in one comment (`ignore[INW001,INW005]`), and the directive may follow another tool's comment on the same line. For a parenthesised import, the line is the imported name's, the line the diagnostic points at. No blanket form without codes, no file-level form, no next-line form: each would hide more than the finding someone looked at.
+- **Accountable.** The reason is mandatory. A comment that is malformed, has an empty or missing reason, or names a code that is unknown or can't be suppressed hides nothing and is itself an error, INW009 `suppression-comment`. A valid code that matches no finding on its line is an INW009 warning, since it would silently hide a new finding there later; a rule that is off in `[tool.inwards.rules]` isn't reported as unused. INW009 follows the table like any rule.
+- **What can be suppressed.** Every rule that points at a line of Python: INW001, INW005, INW006, INW011 and the rules that come after them. Not INW000 (the file isn't checked at all, so under its declared encoding a "comment" may be code), INW007 and INW008 (they are about the package tree; the shape config is the place to change them) and INW009 itself. A file with INW000 has no suppressions read at all.
+- **Read from the syntax tree.** Comments come from a full parse, so `x = "# inwards: ignore[...]"` doesn't count. That parse runs only for a file whose text mentions `inwards: ignore`; the prescan and its soundness argument ([ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse)) are untouched. A file with a suppression pays one more full parse.
+- **Applied in the core.** `Engine.checkFile` and `Engine.check` apply suppressions per file, before `[tool.inwards.rules]`, so the CLI, the hooks and the language server agree. `Engine.check` also returns the suppressed findings with their reasons; `checkFiles` keeps returning only what is reported.
+- **Visible.** Text and concise output end with "N findings suppressed by inline comments", and the JSON summary has `suppressed` (only when there are some). SARIF lists each suppressed finding as a result with an `inSource` suppression whose `justification` is the reason, so code scanning shows it as suppressed rather than losing it. The run log records `suppressed` and `rejected` per run, and `inwards stats` counts rejected suppressions.
+- **`agent-suppressions = "deny"` by default.** In the Claude Code hooks, a finding stays suppressed only if the file, as it was at session start, had the same finding (rule, module, message) suppressed too, copy for copy. A suppression the agent adds, copies to another import, moves, or widens with another code puts its finding back into the report; the finding then blocks like any other, with a note saying why. Editing only the reason of an existing suppression changes nothing. The mode is read from the session-start config, so a Bash edit of it changes nothing in the hooks and fails the Stop gate; the config guard covers it like every `[tool.inwards]` key. `"allow"` honours every suppression. `inwards check`, CI and the language server always honour suppressions: they have no session to compare with.
+
+**Consequences.**
+
+- :material-plus-circle-outline: One accepted import no longer needs a baseline or a rule turned off, and every such exception carries its reason in the code, next to the import.
+- :material-plus-circle-outline: An agent can't silence a violation with a comment unless the owner opts in, and a rejected attempt shows up in `inwards stats`.
+- :material-plus-circle-outline: Adding the feature changes nothing for existing projects: no file has a suppression yet, and the new key is optional.
+- :material-minus-circle-outline: Under `"deny"`, a suppression in a file that was uncommitted or untracked at session start counts as new, because the hooks can't prove the start content ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). The owner commits a suppression before handing the file to an agent.
+- :material-minus-circle-outline: Moving a suppression between two imports that give the same finding (the same target twice in one module) isn't noticed. It hides nothing new.
+- :material-minus-circle-outline: A reason can't contain `"`, and nothing checks that it says anything useful. Review does.
+- :material-minus-circle-outline: A file with a suppression costs one more full parse per check; one without pays nothing.
+- :material-minus-circle-outline: Under `stop-gate = "project"` the Stop gate checks every suppression in the project against its start content, one more check per file that has one.
+
+**Alternatives.** *`# noqa: INW001` or `# type: ignore`-style blanket comments:* other tools read those, and a bare form would hide everything on the line. *A next-line or file-level directive:* hides findings no one looked at. *Suppressions in `pyproject.toml` by path:* one more place to keep in sync with the code, and the config guard would have to judge each entry; per path is left to #160 and the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)). *Honour agent suppressions and only count them:* a count doesn't keep a violation out of the code. *Reject every suppression in a changed file:* the owner's existing ones would block any edit of that file.

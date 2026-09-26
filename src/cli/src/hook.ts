@@ -167,7 +167,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
       [target.file],
       report.diagnostics.filter((d) => !old.includes(d)),
     );
-    noteSuppressions(report.suppressed?.length ?? 0, rejected);
+    noteSuppressions(report, rejected);
     const escalation = escalationOf(target.project, id, configPath, blocking);
     // Only what blocks counts toward escalation: context isn't an attempt that failed.
     rememberEdit(target.project, id, target.file, blocking);

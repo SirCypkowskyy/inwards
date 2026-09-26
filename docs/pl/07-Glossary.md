@@ -132,6 +132,9 @@ Stan sesji (session state)
 Stop gate
 :   Sprawdzenie uruchamiane z hooka `Stop` agenta. Sprawdza każdy plik Pythona zmieniony w sesji oraz to, czy konfiguracja i hooki są wciąż nienaruszone, i nie pozwala agentowi zakończyć tury, dopóki tak nie jest.
 
+Wyciszenie (suppression)
+:   Komentarz w linii, na którą wskazuje diagnostyka, `# inwards: ignore[INW001] reason="why"`, który ukrywa tę diagnostykę. Powód jest obowiązkowy, każdy raport liczy wyciszenia, a hooki Claude Code domyślnie pomijają wyciszenie dodane przez agenta w trakcie sesji. Zobacz [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default).
+
 ## Terminy narzędziowe { #tooling-terms }
 
 Model C4 (C4 model)

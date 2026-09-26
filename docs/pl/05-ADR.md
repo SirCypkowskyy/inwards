@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: e2fab602d9ad31e93e8b3cebd9af391e8520445845113a4b99c80e86b7d7c39b
+source_hash: 06572d99867c300b6fe41ad2638e14cc4f5ef0d7588c2a7822a79539e7a18837
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -36,6 +36,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem | :white_check_mark: Przyjęty |
 | [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Zgłaszaj nieczytelne cele importów dynamicznych w warstwach wewnętrznych | :white_check_mark: Przyjęty |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty, serwer języka czyta tabelę ponownie bez restartu od [#163](03-Architecture-C4.md#known-limitations) |
+| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -675,3 +676,32 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: Brak ustawień dla pojedynczych plików lub ścieżek. Należą do wyciszeń ([#50](https://github.com/SirCypkowskyy/inwards/issues/50)).
 
 **Alternatywy.** *`select` i `ignore` na najwyższym poziomie, jak w Ruffie:* znajome, ale `ignore` jest zajęte, a odróżnianie `INW001` od modułu o nazwie `tests` po samym kształcie to zgadywanie. *Jeden klucz na regułę, `INW001 = "off"`, jak w ESLint:* zwięzłe, ale nie da się powiedzieć „tylko te reguły”. *Prefiksy kodów:* patrz wyżej. *Filtrowanie w każdym adapterze:* cztery miejsca wywołań (sprawdzenie, sprawdzenie układu w Stop gate, dwa w serwerze języka), które mogłyby się rozjechać.
+
+## ADR-028: Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać { #adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default }
+
+**Stan:** Przyjęty · 2026-09-26 · [#50](https://github.com/SirCypkowskyy/inwards/issues/50)
+
+**Kontekst.** Zespół czasem musi na stałe zaakceptować jeden import: stary adapter, moduł dołączony do repozytorium, moduł generowany. Baseline akceptuje naruszenia jako zbiór i ma się kurczyć, a `[tool.inwards.rules]` działa na całą regułę, nie na linię. Ruff, mypy i ESLint rozwiązują to komentarzem w linii. W Inwards komentarz jest jednak też najtańszym sposobem, żeby agent zazielenił sprawdzenie, a hook nie odróżni, kto napisał daną linię. Mechanizm z #134 już teraz bezpiecznie czyta plik w stanie ze startu sesji, z blobu git, za który ręczy manifest startowy.
+
+**Decyzja.**
+
+- **Składnia.** `# inwards: ignore[INW001] reason="why"` ukrywa diagnostyki wymienionych reguł, które wskazują na linię komentarza. W jednym komentarzu może być kilka kodów (`ignore[INW001,INW005]`), a dyrektywa może stać po komentarzu innego narzędzia w tej samej linii. W imporcie w nawiasach liczy się linia importowanej nazwy, czyli ta, na którą wskazuje diagnostyka. Nie ma formy ogólnej bez kodów, formy dla całego pliku ani formy dla następnej linii: każda ukryłaby więcej niż diagnostykę, którą ktoś obejrzał.
+- **Rozliczalne.** Powód jest obowiązkowy. Komentarz w złej postaci, z pustym albo brakującym powodem albo z kodem nieznanym lub takim, którego nie da się wyciszyć, niczego nie ukrywa i sam jest błędem, INW009 `suppression-comment`. Poprawny kod, który nie pasuje do żadnej diagnostyki w swojej linii, to ostrzeżenie INW009, bo później po cichu ukryłby tam nową diagnostykę; reguła wyłączona w `[tool.inwards.rules]` nie jest zgłaszana jako nieużyta. INW009 podlega tabeli jak każda reguła.
+- **Co można wyciszyć.** Każdą regułę, która wskazuje na linię kodu Pythona: INW001, INW005, INW006, INW011 i reguły dodane po nich. Nie INW000 (plik w ogóle nie jest sprawdzany, więc przy zadeklarowanym kodowaniu „komentarz” może być kodem), INW007 i INW008 (dotyczą drzewa pakietów; zmienia się je w konfiguracji kształtu) ani samej INW009. W pliku z INW000 wyciszenia w ogóle nie są czytane.
+- **Czytane z drzewa składni.** Komentarze pochodzą z pełnego parsowania, więc `x = "# inwards: ignore[...]"` się nie liczy. To parsowanie działa tylko dla pliku, którego tekst zawiera `inwards: ignore`; prescan i argument za jego poprawnością ([ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse)) się nie zmieniają. Plik z wyciszeniem kosztuje jedno pełne parsowanie więcej.
+- **Stosowane w rdzeniu.** `Engine.checkFile` i `Engine.check` stosują wyciszenia dla każdego pliku, przed `[tool.inwards.rules]`, więc CLI, hooki i serwer języka są zgodne. `Engine.check` zwraca też wyciszone diagnostyki z ich powodami; `checkFiles` nadal zwraca tylko to, co jest zgłaszane.
+- **Widoczne.** Wyjście tekstowe i zwięzłe kończy się linią „N findings suppressed by inline comments”, a podsumowanie JSON ma `suppressed` (tylko gdy są jakieś). SARIF wymienia każdą wyciszoną diagnostykę jako wynik z wyciszeniem `inSource`, którego `justification` to powód, więc code scanning pokazuje ją jako wyciszoną, zamiast ją zgubić. Run log zapisuje `suppressed` i `rejected` dla każdego uruchomienia, a `inwards stats` liczy odrzucone wyciszenia.
+- **Domyślnie `agent-suppressions = "deny"`.** W hookach Claude Code diagnostyka pozostaje wyciszona tylko wtedy, gdy plik w stanie ze startu sesji miał tę samą diagnostykę (reguła, moduł, komunikat) też wyciszoną, kopia za kopię. Wyciszenie, które agent dodał, skopiował na inny import, przeniósł albo rozszerzył o inny kod, przywraca swoją diagnostykę do raportu; ta diagnostyka blokuje wtedy jak każda inna, z notą, która mówi dlaczego. Zmiana samego powodu istniejącego wyciszenia niczego nie zmienia. Tryb jest czytany z konfiguracji ze startu sesji, więc edycja przez Bash nie zmienia niczego w hookach i oblewa Stop gate; config guard chroni ten klucz jak każdy klucz `[tool.inwards]`. `"allow"` uznaje każde wyciszenie. `inwards check`, CI i serwer języka zawsze uznają wyciszenia: nie mają sesji, z którą mogłyby porównać.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jeden zaakceptowany import nie wymaga już baseline'u ani wyłączenia reguły, a każdy taki wyjątek ma swój powód w kodzie, obok importu.
+- :material-plus-circle-outline: Agent nie może uciszyć naruszenia komentarzem, dopóki właściciel na to nie pozwoli, a odrzuconą próbę widać w `inwards stats`.
+- :material-plus-circle-outline: Dodanie tej funkcji nie zmienia niczego w istniejących projektach: żaden plik nie ma jeszcze wyciszenia, a nowy klucz jest opcjonalny.
+- :material-minus-circle-outline: Przy `"deny"` wyciszenie w pliku, który na starcie sesji był niezacommitowany albo nieśledzony, liczy się jako nowe, bo hooki nie mogą udowodnić jego zawartości na starcie ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). Właściciel commituje wyciszenie, zanim przekaże plik agentowi.
+- :material-minus-circle-outline: Przeniesienie wyciszenia między dwoma importami, które dają tę samą diagnostykę (ten sam cel dwa razy w jednym module), przechodzi niezauważone. Nie ukrywa niczego nowego.
+- :material-minus-circle-outline: Powód nie może zawierać `"`, a nic nie sprawdza, czy mówi cokolwiek sensownego. To zadanie przeglądu kodu.
+- :material-minus-circle-outline: Plik z wyciszeniem kosztuje jedno pełne parsowanie więcej na sprawdzenie; plik bez wyciszenia nic.
+- :material-minus-circle-outline: Przy `stop-gate = "project"` Stop gate porównuje każde wyciszenie w projekcie z zawartością ze startu, czyli jedno sprawdzenie więcej na każdy plik, który je ma.
+
+**Alternatywy.** *Ogólne komentarze w stylu `# noqa: INW001` albo `# type: ignore`:* czytają je inne narzędzia, a forma bez kodów ukryłaby wszystko w linii. *Dyrektywa dla następnej linii albo całego pliku:* ukrywa diagnostyki, których nikt nie obejrzał. *Wyciszenia według ścieżki w `pyproject.toml`:* jeszcze jedno miejsce do utrzymywania w zgodzie z kodem, a config guard musiałby oceniać każdy wpis; ścieżki zostają dla #160 i konfiguracji w schemacie v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)). *Uznawać wyciszenia agenta i tylko je liczyć:* licznik nie zatrzyma naruszenia w kodzie. *Odrzucać każde wyciszenie w zmienionym pliku:* istniejące wyciszenia właściciela blokowałyby każdą edycję tego pliku.

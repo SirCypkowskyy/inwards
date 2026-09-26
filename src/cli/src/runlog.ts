@@ -14,7 +14,7 @@
 import { readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
-import { type Diagnostic, parseConfig } from "@inwards/core";
+import { type Diagnostic, parseConfig, type Report } from "@inwards/core";
 import { findConfig } from "./paths.ts";
 import { fingerprint } from "./session.ts";
 import { projectPath } from "./snapshot.ts";
@@ -61,11 +61,14 @@ export function noteRun(
 /**
  * Notes what inline suppressions did in this run, for its log line.
  *
- * @param suppressed - how many findings a suppression comment hid.
+ * @param report - the check, whose `suppressed` findings a comment hid.
  * @param rejected - findings whose suppression the hooks didn't honour (`agent-suppressions`).
  */
-export function noteSuppressions(suppressed: number, rejected: readonly Diagnostic[]): void {
-  noted.suppressed += suppressed;
+export function noteSuppressions(
+  report: Pick<Report, "suppressed">,
+  rejected: readonly Diagnostic[],
+): void {
+  noted.suppressed += report.suppressed?.length ?? 0;
   noted.rejected.push(...rejected);
 }
 

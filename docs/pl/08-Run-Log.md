@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/08-Run-Log.md
-source_hash: d50ea709e8a396af008b63ae8662dbdcc1fe1847a290fc602126e3f8d100a3d1
+source_hash: 8246d61db730c240829c9fec54538e2cff05585f6bc79c8f1d83dd9a55d0021b
 ---
 
 # Run log { #run-log }
@@ -34,6 +34,8 @@ Każda linia to jeden obiekt JSON:
 | `fingerprints` | string[] | Po jednym na każde zgłoszone naruszenie (zahashowane: kod reguły, moduł i komunikat), tak samo jak w stanie sesji. Dwa identyczne importy w jednym pliku dają ten sam fingerprint dwa razy |
 | `codes` | string[] | Kod reguły każdego fingerprintu, w tej samej kolejności (np. `INW001`). Linie zapisane, zanim to pole powstało, go nie mają |
 | `severities` | string[] | `error` albo `warning` dla każdego fingerprintu, w tej samej kolejności, tak jak ustawiła je `[tool.inwards.rules]`. Linie zapisane, zanim to pole powstało, go nie mają i są czytane jako błędy |
+| `suppressed` | number | Diagnostyki, które w tym uruchomieniu ukrył komentarz wyciszający i które uruchomienie uznało. Linie zapisane, zanim to pole powstało, go nie mają |
+| `rejected` | string[] | Fingerprinty, których wyciszenia hooki nie uznały, bo dodał je agent (`agent-suppressions = "deny"`); są też w `fingerprints`. Linie zapisane, zanim to pole powstało, go nie mają |
 | `exit` | number | Kod wyjścia zwrócony przez Inwards |
 | `durationMs` | number | Czas od startu procesu, łącznie ze startem procesu, z dokładnością do 0,1 ms |
 
@@ -42,7 +44,7 @@ Każda linia to jeden obiekt JSON:
  "tool":"Edit","files":["shop/domain/order.py"],
  "lines":[{"file":"shop/domain/order.py","added":2,"removed":1}],
  "fingerprints":["4c1f0e9a2b7d3e10"],"codes":["INW001"],"severities":["error"],
- "exit":2,"durationMs":24.8}
+ "suppressed":0,"rejected":[],"exit":2,"durationMs":24.8}
 ```
 
 ## Odczyt { #reading-it }
@@ -67,6 +69,7 @@ Co jest liczone:
 - **Naruszenia na 1000 linii napisanych przez agenta:** fingerprinty błędów po raz pierwszy zgłoszone w liniach `PostToolUse` sesji, raz na sesję i plik, tak jak we wskaźniku ponownych prób, podzielone przez sumę `added` w tych liniach. `.py` i jego `.pyi` dzielą moduł, więc naruszenie powtórzone w pliku zaślepki liczy się dwa razy, raz na plik.
 - **Opóźnienie hooka:** p50 i p95 z `durationMs` w liniach `PostToolUse`, które sprawdziły plik, metodą najbliższej rangi. Edycje innych plików (Markdown, pliki spoza projektu) też uruchamiają hook, ale niczego nie sprawdzają, więc są pomijane.
 - **Werdykty** porównują z progami dokładne proporcje, a nie zaokrąglone procenty.
+- **Odrzucone wyciszenia:** różne naruszenia w każdej sesji, których wyciszenie w linii dodał agent, a hooki odrzuciły, z pola `rejected` w dowolnej linii. Raport tekstowy pokazuje tę linię tylko wtedy, gdy są jakieś; JSON zawsze ma `rejectedSuppressions`. Nie ma progu: liczy, jak często agent próbował najtańszego obejścia ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)).
 
 Hook sprawdza cały plik, więc jego fingerprinty obejmują naruszenia, które były tam, zanim agent go dotknął. Oba wskaźniki pomijają dwa ich rodzaje:
 

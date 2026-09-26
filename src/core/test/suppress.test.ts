@@ -12,7 +12,7 @@ layers = [
   { name = "infrastructure", modules = ["shop.infrastructure"] },
 ]
 `;
-const engine = await Engine.create(grammars(), parseConfig(LAYERS));
+const engine: Engine = await Engine.create(grammars(), parseConfig(LAYERS));
 const REASON = 'reason="legacy, tracked in #12"';
 
 /**
@@ -40,7 +40,9 @@ function inw009(text: string): string {
   const d = engine
     .checkFiles([file("shop/domain/order.py", text)], PROJECT)
     .filter((x) => x.code === "INW009");
-  expect(d).toHaveLength(1);
+  if (d.length !== 1) {
+    throw new Error(`expected one INW009, got ${d.length}`);
+  }
   return d[0]?.message ?? "";
 }
 

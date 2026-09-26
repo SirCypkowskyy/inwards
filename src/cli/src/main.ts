@@ -199,7 +199,7 @@ async function checkCommand(
   const project = realpath(dirname(configPath));
   if (project) {
     noteRun(project, targets ?? [project], report.diagnostics);
-    noteSuppressions(report.suppressed?.length ?? 0, []);
+    noteSuppressions(report, []);
     logRun(project, { event: "check", exit, force: log });
   }
   return exit;

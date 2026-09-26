@@ -29,6 +29,8 @@ Each line is one JSON object:
 | `fingerprints` | string[] | One per violation reported (rule code, module and message, hashed), the same as in the session state. Two identical imports in one file give the same fingerprint twice |
 | `codes` | string[] | The rule code of each fingerprint, in the same order (e.g. `INW001`). Lines written before this field existed lack it |
 | `severities` | string[] | `error` or `warning` for each fingerprint, in the same order, as `[tool.inwards.rules]` set it. Lines written before this field existed lack it and are read as errors |
+| `suppressed` | number | Findings an inline suppression comment hid in this run and the run honoured. Lines written before this field existed lack it |
+| `rejected` | string[] | Fingerprints whose inline suppression the hooks didn't honour, because the agent added it (`agent-suppressions = "deny"`); they are in `fingerprints` too. Lines written before this field existed lack it |
 | `exit` | number | The exit code Inwards returned |
 | `durationMs` | number | Time since the process started, process startup included, to 0.1 ms |
 
@@ -37,7 +39,7 @@ Each line is one JSON object:
  "tool":"Edit","files":["shop/domain/order.py"],
  "lines":[{"file":"shop/domain/order.py","added":2,"removed":1}],
  "fingerprints":["4c1f0e9a2b7d3e10"],"codes":["INW001"],"severities":["error"],
- "exit":2,"durationMs":24.8}
+ "suppressed":0,"rejected":[],"exit":2,"durationMs":24.8}
 ```
 
 ## Reading it
@@ -62,6 +64,7 @@ What it counts:
 - **Violations per 1,000 agent-written lines:** error fingerprints first reported in a session's `PostToolUse` lines, once per session and file as in the retry rate, over the sum of `added` in those lines. A `.py` and its `.pyi` share a module, so a violation mirrored in a stub counts twice, once per file.
 - **Hook latency:** p50 and p95 of `durationMs` over `PostToolUse` lines that checked a file, by the nearest-rank method. Edits to other files (Markdown, files outside the project) run the hook too, but check nothing, so they're left out.
 - **Verdicts** compare the exact ratios with the thresholds, not the rounded percentages.
+- **Rejected suppressions:** distinct violations, per session, whose inline suppression the agent added and the hooks rejected, from `rejected` in any line. The text report shows the line only when there are some; JSON always has `rejectedSuppressions`. It has no threshold: it counts how often the agent tried the cheapest dodge ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)).
 
 A hook checks the whole file, so its fingerprints include violations that were there before the agent touched it. Two kinds are left out of both rates:
 
