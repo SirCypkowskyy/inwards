@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 9dd486749c9ffcf77623a2b99370d32b2be57b589552fc601268aeda58075c10
+source_hash: a779e9c5da85b254a164e28aa9eb879d5344ffeb55eddace088b13bde62de1a4
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -134,7 +134,7 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 
 !!! info "Stan"
     Pre-alpha.
-    Siedem reguł działa od początku do końca w CLI, w silniku i w serwerze VS Code: INW001 (kierunek warstw), INW011 (dosłowne importy dynamiczne), INW005 ([biblioteki w warstwach](guides/libraries.md): domyślnie żadnych frameworków ani operacji wejścia-wyjścia w domenie), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
+    Osiem reguł działa od początku do końca w CLI, w silniku i w serwerze VS Code: INW001 (kierunek warstw), INW011 (dosłowne importy dynamiczne), INW005 ([biblioteki w warstwach](guides/libraries.md): domyślnie żadnych frameworków ani operacji wejścia-wyjścia w domenie), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW010 (importy własnych modułów, które nie istnieją), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Każde wydanie to GitHub Release z plikami binarnymi dla sześciu platform, pięcioma wheelami platformowymi i plikiem `.vsix`. Jak dotąd jedynym wydaniem jest wersja przedpremierowa v0.1.0-rc.1.
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.

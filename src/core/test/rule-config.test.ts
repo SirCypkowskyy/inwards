@@ -161,6 +161,20 @@ describe("[tool.inwards.rules] in the engine", () => {
   });
 });
 
+describe("[tool.inwards.rules] with INW010", () => {
+  const missing = file("shop/domain/order.py", "from shop.domain.pricing import Discount\n");
+
+  test.each([
+    ["no settings", "", ["INW010:error"]],
+    ["severity", 'severity = { INW010 = "warning" }', ["INW010:warning"]],
+    ["ignore", 'ignore = ["INW010"]', []],
+  ])("%s", async (_, rules, expected) => {
+    const engine = await Engine.create(grammars(), withRules(rules));
+    const found = engine.checkFile(missing, PROJECT).map((d) => `${d.code}:${d.severity}`);
+    expect(found).toEqual(expected);
+  });
+});
+
 describe("[tool.inwards.rules] in the checks adapters call directly", () => {
   const shaped = `${LAYERS}
 [[tool.inwards.shape]]

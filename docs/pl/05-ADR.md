@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: a391667161159d0d5b30785843b418968cef988da7e28570d7874b0313aa75a5
+source_hash: dc8e659d3c8a9dbde8ac987ce9d04e8d40faa10e1bf59547316ec1932862950b
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -33,6 +33,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy | :white_check_mark: Przyjęty |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem | :white_check_mark: Przyjęty |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
@@ -579,6 +580,40 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: GitHub Pages serwuje tylko główny `404.html`, więc brakująca strona pod `/pl/` pokazuje angielską stronę 404 (przełącznik języka nadal na niej działa).
 
 **Alternatywy.** *Angielski pod `/en/` obok `/pl/`:* wbudowany przełącznik by działał, ale przesunęłyby się wszystkie istniejące linki i adresy `docs:` z CLI. *Tłumaczenie maszynowe przy każdym scaleniu:* zawsze aktualne, ale wymaga sekretu i budżetu, terminologia rozjeżdża się między uruchomieniami i nikt go nie przegląda. *Kopie zasobów w `docs/pl/`:* samowystarczalne, ale każdy zrzut ekranu istniałby w dwóch kopiach, które trzeba utrzymywać identyczne.
+
+## ADR-025: INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem { #adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import }
+
+**Stan:** Przyjęty · 2026-09-26 · [#45](https://github.com/SirCypkowskyy/inwards/issues/45)
+
+**Kontekst.** INW010 oznacza import własnego modułu, który nie istnieje. Indeks modułów daje dwie odpowiedzi na pytanie „czy istnieje”: swoją listę (`modules`) i sondowanie systemu plików (`ownerOf`). Lista pomija pakiety przestrzeni nazw, moduły za dowiązaniem symbolicznym wychodzącym poza katalog główny i wszystko pod node_modules, `__pycache__` albo w virtualenvie, a CLI i serwer języka inaczej wypisują pakiety warstw. Żadna z odpowiedzi nie zna skompilowanych modułów rozszerzeń (`name.cpython-313-x86_64-linux-gnu.so`), których nazwy sondowanie nie potrafi zgadnąć. Sama instrukcja importu też nie mówi, która jej część jest modułem: `from shop.domain import pricing` importuje podmoduł albo nazwę zdefiniowaną w `shop/domain/__init__.py`. Pakiet może też rozszerzyć swój `__path__` (`pkgutil.extend_path`, `pkg_resources.declare_namespace`), żeby dzielić nazwę najwyższego poziomu z zainstalowaną dystrybucją: polar z korpusu robi tak ze swoim SDK, a 79 jego importów wskazuje moduły, które ma tylko SDK.
+
+**Decyzja.**
+
+- O istnieniu decyduje `ownerOf`, które sonduje dysk tak, jak importuje Python, nigdy lista modułów.
+- Gdy sondowanie nie znajdzie modułu, pakiet, w którym by się znajdował, jest wypisywany raz (`ProjectFiles.listDir`). Skompilowany moduł rozszerzenia (`.so`, `.pyd`, z tagiem ABI albo bez), źródło Cythona (`.pyx`) albo bajtkod (`.pyc`) o tej nazwie liczy się jako ten moduł. Poprawka podpowiada trzy elementy tego pakietu najbliższe brakującej nazwie według odległości edycyjnej, nigdy plik, który importuje, ani jego własny pakiet.
+- Sprawdzana jest tylko część będąca modułem: `X` w `from X import name` oraz cała nazwa w `import X` i `from X import *`. `name` nie jest sprawdzane nigdy.
+- Import jest własny, gdy któryś jego prefiks sonduje się jako własny moduł (pakiet najwyższego poziomu potrzebuje `__init__.py`, jak w INW006). Import pod pakietem, którego `__init__.py` wspomina `__path__` albo `declare_namespace`, przechodzi.
+- Import względny, który wychodzi ponad pakiet najwyższego poziomu, też jest błędem INW010: Python go odrzuca bez względu na to, co jest na dysku.
+- Sprawdzane są tylko importy statyczne w plikach należących do warstwy. Import, który zgłasza INW010, nie dostaje dodatkowo INW006, które by mu przeczyło, a import skierowany na zewnątrz, który zgłasza INW001, nie dostaje INW010: poprawka INW001 usuwa import, a poprawka INW010 kazałaby utworzyć moduł.
+- Podpowiedzi trafiają do kroków naprawy, a nie do komunikatu, więc klucz baseline'u się nie zmienia, gdy przybywa modułów.
+- Indeks sonduje każdą ścieżkę raz. Serwer języka buduje indeks od nowa i ponownie sprawdza otwarte dokumenty, gdy powstaje albo znika ścieżka, która może być modułem (plik `.py`, `.pyi`, moduł rozszerzenia albo bajtkod, albo katalog, poza katalogami ukrytymi, pamięciami podręcznymi, node_modules i site-packages), więc utworzenie brakującego modułu usuwa błąd bez naciskania klawisza. Gdy klient nie potrafi zgłaszać zdarzeń plików, serwer buduje świeży indeks przy każdym sprawdzeniu, więc błąd znika przy następnym naciśnięciu klawisza.
+
+**Konsekwencje.**
+
+- :material-minus-circle-outline: `from shop.domain import pricing` bez żadnego `pricing` przechodzi, gdy `shop/domain` jest pakietem.
+- :material-minus-circle-outline: Moduł generowany przy budowaniu (`_version.py`, `*_pb2.py`) jest zgłaszany, dopóki nie pojawi się w checkoucie ([#160](https://github.com/SirCypkowskyy/inwards/issues/160)), podobnie jak opcjonalny import za `try/except ImportError`. Pakiet przestrzeni nazw współdzielony z zainstalowaną dystrybucją jest zgłaszany jako brakujący ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)).
+- :material-minus-circle-outline: Serwer języka buduje indeks od nowa tylko przy utworzeniu i usunięciu, więc `__init__.py` zmieniony tak, żeby rozszerzał swój `__path__`, zaczyna działać dopiero przy następnym utworzeniu albo usunięciu pliku.
+- :material-minus-circle-outline: Naruszenie znalezione w hooku kosztuje parsowanie potwierdzające, które kosztuje każde naruszenie (ADR-004), i jeden odczyt katalogu: w saleor `webhook/payloads.py` (1301 linii) rośnie z 38,8 ms do 71,6 ms (p50), czyli mniej więcej tyle, ile na develop kosztuje w tym pliku naruszenie INW001 (70,1 ms); `channel/tasks/saleor3_22.py` z 27,4 do 32,7 ms.
+- :material-plus-circle-outline: Żadnego fałszywego alarmu na pięciu repozytoriach z korpusu (6543 pliki) ani na przykładach. Cztery znaleziska, wszystkie w saleor, to naprawdę zepsute importy: import `saleor.translation.models` pod `TYPE_CHECKING`, który nie istnieje (klasa jest w `saleor.core.utils.translations`), import `saleor.models` i dwa importy względne, które wychodzą ponad `saleor`.
+- :material-plus-circle-outline: Edytor i CLI zgadzają się bez względu na to, co każde z nich wypisuje, bo ani decyzja, ani podpowiedź nie czyta listy modułów.
+- :material-plus-circle-outline: Sondowany jest teraz każdy import w pliku z warstwy, a nie tylko te spoza warstw; sondowanie każdej ścieżki raz utrzymuje koszt całego projektu na tym samym poziomie: pełne sprawdzenie saleor trwa 1,96 s wobec 2,15 s na develop (mediana z 8 naprzemiennych lokalnych uruchomień), a na syntetycznym repozytorium hook jest wolniejszy o 2,9 %, a pełne sprawdzenie szybsze o 1,3 % (`bench/compare.ts`, próg 20 %).
+
+**Alternatywy.**
+
+- *Przynależność do `modules`:* fałszywe błędy w edytorze dla pakietów przestrzeni nazw i wszystkiego, co pomija lista (przegląd [#153](https://github.com/SirCypkowskyy/inwards/pull/153)), oraz przeglądanie całego projektu dla podpowiedzi przy każdym znalezisku, co kosztowało hook 50 do 130 ms na saleor.
+- *Czytać `__init__.py`, żeby sprawdzać `from X import name`:* import z gwiazdką albo `__getattr__` na poziomie modułu może zdefiniować dowolną nazwę, więc sprawdzanie tekstu byłoby zgadywaniem.
+- *Pomijać importy wewnątrz `try/except ImportError`:* agent mógłby wtedy uciszyć regułę, owijając import, a tę furtkę zamykają kroki naprawy.
+- *Wyłączyć pamięć podręczną sondowania w serwerze języka:* poprawne, ale otwarty dokument nadal pokazywałby nieaktualny błąd do następnego naciśnięcia klawisza. Tak działa to u klienta bez zdarzeń plików.
 
 ## ADR-027: `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` { #adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table }
 

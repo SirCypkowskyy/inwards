@@ -219,7 +219,7 @@ function selectorPath(selector: string): string {
  * @param b - the other.
  * @returns the fewest single-character edits between them.
  */
-function distance(a: string, b: string): number {
+export function distance(a: string, b: string): number {
   let row = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i += 1) {
     const next = [i];

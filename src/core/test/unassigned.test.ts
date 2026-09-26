@@ -59,7 +59,7 @@ describe("INW006 unassigned-module", () => {
   });
 
   test("the index owns a namespace package it doesn't list", () => {
-    // shop/application is a directory without __init__.py or any module file:
+    // shop/application is a directory without __init__.py:
     // Python imports it, so the probe finds it, but the listing has no file for it.
     expect(OWNERS("shop.application.Service")).toBe("shop.application");
     expect(PROJECT.modules.has("shop.application")).toBe(false);

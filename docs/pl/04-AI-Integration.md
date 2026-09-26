@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: c9f9783c49ce3565cf1e5cb8095244b5864454df12476a2ab76b15098c064f42
+source_hash: 251963ebb3ee802ca314137a8c0419c879b353eb9acefe9d9c8858446c8a7780
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -228,7 +228,7 @@ Odmowa dociera do modelu jako powód odrzucenia wywołania i każe mu zapytać u
 
 ## Wyłapywanie zmyślonych modułów { #catching-hallucinated-modules }
 
-Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing import DiscountPolicy`, gdzie `pricing` nie istnieje. Dziś wychodzi to na jaw jako `ImportError` w czasie testów, o ile jakiś test obejmuje ten plik. Inwards już zna każdy własny moduł, bo przegląda drzewo, żeby je nazwać. Może więc oznaczyć import własnego modułu, który nie istnieje (INW010, zaplanowane w [#45](https://github.com/SirCypkowskyy/inwards/issues/45)), w tym samym uruchomieniu hooka, zanim powstanie jakikolwiek test. Kroki naprawy wypiszą najbliższe nazwą prawdziwe moduły.
+Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing import DiscountPolicy`, gdzie `pricing` nie istnieje. Bez sprawdzenia wychodzi to na jaw jako `ImportError` w czasie testów, o ile jakiś test obejmuje ten plik. INW010 oznacza taki import w tym samym uruchomieniu hooka, zanim powstanie jakikolwiek test: silnik pyta system plików, czy `shop.domain.pricing` istnieje, a kroki naprawy wymieniają trzy najbliższe nazwą moduły z `shop.domain`, więc chybiona nazwa, taka jak `shop.domain.prices`, jest o jedną edycję od poprawnej. `from shop.domain import pricing` przechodzi, bo `pricing` może być nazwą zdefiniowaną w `shop/domain/__init__.py` ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). Na korpusie prawdziwych repozytoriów reguła znalazła w saleor cztery zepsute importy, wśród nich import `saleor.translation.models` pod `TYPE_CHECKING`, który nie istnieje (klasa jest w `saleor.core.utils.translations`), oraz dwa importy względne, które wychodzą ponad pakiet najwyższego poziomu.
 
 ## Instruowanie agenta, zanim zacznie pisać (planowane) { #briefing-the-agent-before-it-writes-planned }
 

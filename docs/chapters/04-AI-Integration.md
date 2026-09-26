@@ -223,7 +223,7 @@ A denial reaches the model as the reason for the refused call and tells it to as
 
 ## Catching hallucinated modules
 
-Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy`, where `pricing` doesn't exist. Today that surfaces as an `ImportError` at test time, if a test covers the file. Inwards already knows every first-party module, because it walks the tree to name them. So it can flag an import of a first-party module that doesn't exist (INW010, planned in [#45](https://github.com/SirCypkowskyy/inwards/issues/45)) within the same hook run, before any test is written. The fix steps will list the closest real modules by name.
+Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy`, where `pricing` doesn't exist. Without a check, that surfaces as an `ImportError` at test time, if a test covers the file. INW010 flags it in the same hook run, before any test is written: the engine asks the file system whether `shop.domain.pricing` exists, and the fix steps list the three closest modules in `shop.domain`, so a near miss such as `shop.domain.prices` is one edit away. `from shop.domain import pricing` passes, because `pricing` could be a name defined in `shop/domain/__init__.py` ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). On the real-repo corpus the rule found four broken imports in saleor, among them a `TYPE_CHECKING` import of `saleor.translation.models`, which doesn't exist (the class lives in `saleor.core.utils.translations`), and two relative imports that climb above the top-level package.
 
 ## Briefing the agent before it writes (planned)
 

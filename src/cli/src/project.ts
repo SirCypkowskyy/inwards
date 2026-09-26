@@ -12,6 +12,7 @@ import {
   type Diagnostic,
   Engine,
   type InwardsConfig,
+  type ListDir,
   membersFrom,
   moduleNameFor,
   type PathKind,
@@ -129,7 +130,7 @@ function loadSources(
 /**
  * Gives the engine the project's files under the config root, for its module
  * index. Nothing is touched until the engine asks; the listing uses the same
- * walk as `inwards check`.
+ * walk as `inwards check`, and `listDir` reads one directory (INW010).
  *
  * @param project - the loaded project.
  * @returns the probe, listing and reader, with root-relative forward-slash paths.
@@ -147,6 +148,7 @@ function projectFiles(project: Project): ProjectFiles {
     list: (): string[] =>
       collectPythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
     read: (rel: string): string => readFileSync(join(root, rel), "utf8"),
+    listDir: (rel: string): ReturnType<ListDir> => listDir(root, rel),
   };
 }
 
@@ -218,17 +220,26 @@ export async function runCheck(
  */
 function requiredAround(project: Project, files: SourceFile[], shownRoot: string): Diagnostic[] {
   const parents = new Set(files.map((f) => rootPathOf(f).split("/").slice(0, -1).join(".")));
-  const members = probeMembers((dir) => {
-    const path = join(project.lexicalRoot, dir);
-    if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
-      return;
-    }
-    return readdirSync(path, { withFileTypes: true }).map((entry) => ({
-      name: entry.name,
-      dir: entry.isDirectory(),
-    }));
-  });
+  const members = probeMembers((dir) => listDir(project.lexicalRoot, dir));
   return checkRequired(project.config, parents, members, shownRoot);
+}
+
+/**
+ * Lists a directory under the config root, the `ListDir` port.
+ *
+ * @param root - the config root.
+ * @param dir - a forward-slash directory relative to it.
+ * @returns its entries, or undefined when it isn't a directory.
+ */
+function listDir(root: string, dir: string): ReturnType<ListDir> {
+  const path = join(root, dir);
+  if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+    return;
+  }
+  return readdirSync(path, { withFileTypes: true }).map((entry) => ({
+    name: entry.name,
+    dir: entry.isDirectory(),
+  }));
 }
 
 /**

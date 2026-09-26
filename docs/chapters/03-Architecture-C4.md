@@ -79,9 +79,9 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW011 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code` |
-| **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server.ts` | :white_check_mark: every per-file rule, on each change to an open file; INW007 and INW008 for the whole workspace from a directory listing |
+| **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server.ts` | :white_check_mark: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` for `claude`, `aider` and `agents-md` |
 | **Session state and run log** | JSON and JSON Lines files, local only | `.inwards/state/`, `.inwards/runs.jsonl` | :white_check_mark: (run log opt-in, [chapter 8](08-Run-Log.md)) |
@@ -110,7 +110,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>libraries.ts: INW005<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>shape.ts: INW007 + INW008<br/>encoding.ts: INW000</small>"]
+        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>libraries.ts: INW005<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>unknown.ts: INW010<br/>shape.ts: INW007 + INW008<br/>encoding.ts: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>reporters.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / index</small>"]
@@ -136,11 +136,11 @@ flowchart LR
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
-| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, INW005 for the libraries a layer may import, INW006 for code outside every layer, INW007/INW008 for package shape, INW011 for dynamic imports with literal targets, and INW000 for files whose encoding could hide imports. Planned rules are listed below |
+| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, INW005 for the libraries a layer may import, INW006 for code outside every layer, INW010 for first-party modules that don't exist, INW007/INW008 for package shape, INW011 for dynamic imports with literal targets, and INW000 for files whose encoding could hide imports. Planned rules are listed below |
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. The package shape (INW007) is checked first, from the path alone. A file outside every layer isn't parsed (it gets at most an INW006 warning). A layered file whose text names a module loader skips the prescan (see below) |
-| Module index | `Engine.index(files)` wraps the adapter's `ProjectFiles` port: `ownerOf` finds the first-party module an import lands in, probing one path at a time; `modules` lists every first-party module; `importersOf` answers "who imports module X", parsing only files whose text mentions X's last name segment | The engine's project input ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)): every adapter builds one and passes it to `checkFile` and `checkFiles`. Building it touches nothing; each question does only its own I/O, so the hook pays nothing for questions no rule asks. INW006 asks `ownerOf`; INW010 and cycle detection will use the rest. A long-lived adapter rebuilds it when a Python file is created, deleted or renamed |
+| Module index | `Engine.index(files)` wraps the adapter's `ProjectFiles` port: `ownerOf` finds the first-party module an import lands in, probing one path at a time, each once; `modules` lists every first-party module; `importersOf` answers "who imports module X", parsing only files whose text mentions X's last name segment | The engine's project input ([#44](https://github.com/SirCypkowskyy/inwards/issues/44)): every adapter builds one and passes it to `checkFile` and `checkFiles`. Building it touches nothing; each question does only its own I/O, so the hook pays nothing for questions no rule asks. INW006 asks `ownerOf`; INW010 asks `ownerOf` whether a module exists and `listDir` what the package it would live in holds (compiled extensions, the closest names); cycle detection will use `importersOf`. A long-lived adapter rebuilds it when a file or directory is created, deleted or renamed |
 
 ### How one check flows
 
@@ -160,7 +160,7 @@ sequenceDiagram
         E-->>A: INW000
     else file names a loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(full text)
-        E->>R: INW001 + INW005 + INW006 + INW011
+        E->>R: INW001 + INW005 + INW006 + INW010 + INW011
         R-->>E: diagnostics
         E-->>A: diagnostics
     else everything else
@@ -169,21 +169,21 @@ sequenceDiagram
             P-->>E: skeleton (imports only)
             E->>T: parse(skeleton)
             T-->>E: tiny tree
-            E->>R: INW001 + INW005 + INW006 (imports)
+            E->>R: INW001 + INW005 + INW006 + INW010 (imports)
             alt no violations (the common case)
                 R-->>E: []
                 E-->>A: []
             else violations found
                 E->>T: parse(full text)
                 T-->>E: full tree
-                E->>R: INW001 + INW005 + INW006 (imports from full tree)
+                E->>R: INW001 + INW005 + INW006 + INW010 (imports from full tree)
                 R-->>E: confirmed diagnostics
                 E-->>A: diagnostics
             end
         else skeleton refused (odd import placement)
             P-->>E: null
             E->>T: parse(full text)
-            E->>R: INW001 + INW005 + INW006
+            E->>R: INW001 + INW005 + INW006 + INW010
             R-->>E: diagnostics
             E-->>A: diagnostics
         end
@@ -331,6 +331,7 @@ To put a pre-release on PyPI as well, run the workflow from its tag, which the `
     - loaders reached through a walrus, tuple assignment, class or instance attributes, `functools.partial`, a name bound inside `exec`, or an object (`print.__self__.exec`): [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
     - other loading APIs: `pkgutil.resolve_name`, `importlib.util.find_spec` with `exec_module`, and `SourceFileLoader(...).load_module()`: [#79](https://github.com/SirCypkowskyy/inwards/issues/79);
     - a false positive, accepted over a miss: `exec`, `eval`, `compile` and `__import__` always count as the builtins, so after `from re import compile`, `compile("from shop.infrastructure import x")` is reported.
+- INW010 checks only the module part of a static import ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` passes when `shop/domain` is a package, since `pricing` could be a name its `__init__.py` defines, and dynamic imports aren't checked. A module generated at build time (`_version.py`, `*_pb2.py`) is reported until it exists in the checkout ([#160](https://github.com/SirCypkowskyy/inwards/issues/160)), and so is an optional import behind `try/except ImportError`. A namespace package shared with an installed distribution is reported as missing ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). The language server doesn't notice an `__init__.py` that starts extending its `__path__` until a file is created or deleted.
 - Modules that belong to no layer are not checked themselves. INW006 makes that visible (a warning per package, an error for an import into one from a layer, and dead prefixes), but the imports inside an unassigned package are still unchecked until the user assigns it. Sourceless modules, `ignore` depth, renamed top-level packages and path-scoped prefix checks are open in [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Rule catalogue
@@ -346,7 +347,7 @@ To put a pre-release on PyPI as well, run the workflow from its tag, which the `
 | INW006 | `unassigned-module` | An import from a layer into first-party code that belongs to no layer, including the package above the layers (`from shop import x` runs `shop/__init__.py`, which no layer owns), static or dynamic (error); layer code moved out of every layer during a session (error); a package outside every layer and `ignore` (warning); a layer prefix matching no module (warning), a layer with no live prefix, or a prefix emptied during the session (error). Unknown keys and overlapping prefixes are config errors | :white_check_mark: |
 | INW007 | `package-shape` | A package member its `[[tool.inwards.shape]]` doesn't allow (error, or a warning with `extra = "warning"`) or forbids, such as a new `helpers.py` next to `service.py`; a member name outside its `[[tool.inwards.names]]` `only-in` packages, such as `test_x.py` in the app (error); a shape selector that matches no package (warning, in pyproject.toml). The message never lists the allowed members; the fix names the likely target. See [Package shape](guides/package-shape.md) | :white_check_mark: |
 | INW008 | `missing-member` | A member the package's shape requires is missing, reported on its `__init__.py`. Whole-project runs report every one; the Stop gate blocks only those new since the session started | :white_check_mark: |
-| INW010 | `unknown-first-party` | Importing a first-party module that doesn't exist, the typical agent hallucination | :material-progress-clock: needs the module index, [#45](https://github.com/SirCypkowskyy/inwards/issues/45) |
+| INW010 | `unknown-first-party` | A static import, in a layer, of a first-party module that doesn't exist, the typical agent hallucination (`from shop.domain.pricing import X` with no `pricing`), and a relative import that climbs above the top-level package, which Python always refuses. The module part is checked: `X` of `from X import name`, the whole name otherwise. Existence is probed on disk, so namespace packages, stubs and compiled extensions (`.so`, `.pyd`, `.pyx`) count; the fix lists the three closest modules in the same package. Such an import gets no INW006 as well, and an outward import INW001 reports gets no INW010. Packages that extend their `__path__` are skipped. See [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :white_check_mark: |
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. A common way to dodge INW001. Known gaps are listed above | :white_check_mark: literal targets |
 
 ## Code map
@@ -366,6 +367,7 @@ src/
 │   │   ├── stdlib.ts      # standard-library module names (INW005)
 │   │   ├── dynamic.ts     # INW011: literal dynamic imports, loader hint for the engine
 │   │   ├── unassigned.ts  # INW006: code outside every layer, first-party probe
+│   │   ├── unknown.ts     # INW010: first-party modules that don't exist, closest names
 │   │   ├── layout.ts      # INW006: dead prefixes, layer code moved out of every layer
 │   │   ├── shape.ts       # INW007 + INW008: package shape, ListMembers port
 │   │   ├── shape-config.ts  # [[tool.inwards.shape]] / [[tool.inwards.names]], selectors, patterns

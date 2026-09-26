@@ -134,6 +134,7 @@ allow = []
         kind: (): undefined => undefined,
         list: (): [] => [],
         read: (): string => "",
+        listDir: (): undefined => undefined,
       }),
     );
     expect(found.map((d) => d.code)).toEqual(["INW007", "INW006"]);

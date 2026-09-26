@@ -6,12 +6,13 @@
  * opened, and the `__init__.py` of a package that just lost a required member.
  */
 import { type Dirent, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { join, sep } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
   checkRequired,
   checkShape,
   type Diagnostic,
   type InwardsConfig,
+  type ListDir,
   membersFrom,
   moduleNameFor,
   type PathKind,
@@ -22,6 +23,30 @@ import {
 const PYTHON = /\.pyi?$/u;
 /** Directories that never hold first-party code. */
 const SKIP = new Set(["node_modules", "__pycache__"]);
+/** Directories a file event can be ignored under: SKIP, and installed packages. */
+const NOT_PROJECT = new Set([...SKIP, "site-packages"]);
+/** Files Python can import a module from. */
+const MODULE_FILE = /\.(?:py|pyi|so|pyd|pyx|pyc)$/u;
+
+/**
+ * Tells whether a created or deleted path can change what a module lookup
+ * finds: a Python, stub or extension file, or a directory (a name without a
+ * dot, since a deleted path can't be looked at), under the root and outside
+ * hidden directories, caches, node_modules and installed packages.
+ *
+ * @param root - the config root, absolute.
+ * @param path - the path the client reported, absolute.
+ * @returns false for events the language server can ignore.
+ */
+export function mayHoldModule(root: string, path: string): boolean {
+  const rel = relative(root, path);
+  const parts = rel.split(sep);
+  if (isAbsolute(rel) || parts.some((p) => p.startsWith(".") || NOT_PROJECT.has(p))) {
+    return false;
+  }
+  const name = parts.at(-1) ?? "";
+  return !name.includes(".") || MODULE_FILE.test(name);
+}
 
 /**
  * Checks the shape of every Python file under the config root.
@@ -53,7 +78,7 @@ export function workspaceDiagnostics(
 /**
  * Gives the engine the files under the config root, for its module index.
  * Nothing is touched until the engine asks; the listing is the workspace
- * pass's, and a file that vanished reads as empty.
+ * pass's, a file that vanished reads as empty, and `listDir` reads one directory.
  *
  * @param root - the config root, absolute.
  * @returns the probe, listing and reader, with root-relative forward-slash paths.
@@ -68,6 +93,18 @@ export function projectFiles(root: string): ProjectFiles {
       } catch {
         return ""; // deleted since the listing
       }
+    },
+    listDir: (rel: string): ReturnType<ListDir> => {
+      let entries: ReturnType<ListDir>;
+      try {
+        entries = readdirSync(join(root, rel), { withFileTypes: true }).map((entry) => ({
+          name: entry.name,
+          dir: entry.isDirectory(),
+        }));
+      } catch {
+        // not a directory, or gone
+      }
+      return entries;
     },
   };
 }

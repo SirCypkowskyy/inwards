@@ -65,9 +65,12 @@ const ON_DISK: ReadonlyMap<string, "file" | "dir"> = new Map([
   ["shop/domain", "dir"],
   ["shop/domain/order.py", "file"],
   ["shop/application", "dir"],
+  ["shop/application/place_order.py", "file"],
   ["shop/infrastructure", "dir"],
   ["shop/infrastructure/db.py", "file"],
+  ["shop/infrastructure/sql_orders.py", "file"],
   ["shop/api", "dir"],
+  ["shop/api/http.py", "file"],
   ["shop/persistence", "dir"],
   ["shop/persistence/repo.py", "file"],
   ["scripts", "dir"],
@@ -75,12 +78,34 @@ const ON_DISK: ReadonlyMap<string, "file" | "dir"> = new Map([
   ["logging", "dir"],
 ]);
 
+/**
+ * Builds a module index over an in-memory file system. Every file is listed.
+ *
+ * @param disk - what is at each root-relative path.
+ * @param texts - file contents by path; a missing file reads as empty.
+ * @returns the index.
+ */
+export function indexOn(
+  disk: ReadonlyMap<string, "file" | "dir">,
+  texts: ReadonlyMap<string, string> = new Map(),
+): ProjectIndex {
+  return engine.index({
+    kind: (rel: string): "file" | "dir" | undefined => disk.get(rel),
+    list: (): string[] => [...disk].flatMap(([rel, kind]) => (kind === "file" ? [rel] : [])),
+    read: (rel: string): string => texts.get(rel) ?? "",
+    listDir: (rel: string): { name: string; dir: boolean }[] | undefined =>
+      disk.get(rel) === "dir"
+        ? [...disk]
+            .filter(
+              ([path]) => path.startsWith(`${rel}/`) && !path.slice(rel.length + 1).includes("/"),
+            )
+            .map(([path, kind]) => ({ name: path.slice(rel.length + 1), dir: kind === "dir" }))
+        : undefined,
+  });
+}
+
 /** The test project's module index, over `ON_DISK`; its files are empty. */
-export const PROJECT: ProjectIndex = engine.index({
-  kind: (rel: string): "file" | "dir" | undefined => ON_DISK.get(rel),
-  list: (): string[] => [...ON_DISK].flatMap(([rel, kind]) => (kind === "file" ? [rel] : [])),
-  read: (): string => "",
-});
+export const PROJECT: ProjectIndex = indexOn(ON_DISK);
 
 /** Finds first-party modules among `ON_DISK`. */
 export const OWNERS: ModuleLookup = PROJECT.ownerOf;

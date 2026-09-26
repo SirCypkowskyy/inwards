@@ -118,7 +118,8 @@ function plainImports(stmt: Node): ImportRef[] {
  * Lists the targets of a `from X import a, b` statement.
  * Each name counts as `X.name`, because `from shop import infrastructure` may
  * import a submodule. `from X import *` counts as `X`. A relative import that
- * climbs above the root yields nothing.
+ * climbs above the top-level package, which Python refuses, yields one entry
+ * with an empty target, for INW010 alone.
  *
  * @param stmt - an `import_from_statement` node.
  * @param file - the importing file, used to resolve relative imports.
@@ -132,7 +133,7 @@ function fromImports(stmt: Node, file: SourceFile): ImportRef[] {
   }
   const base = resolveModule(moduleNode, file);
   if (base === null) {
-    return [];
+    return [refAt(moduleNode, "", stmt.text)];
   }
   const names = stmt.childrenForFieldName("name");
   if (names.length === 0) {
@@ -146,7 +147,8 @@ function fromImports(stmt: Node, file: SourceFile): ImportRef[] {
     }
     // `from shop import infrastructure` must count as importing shop.infrastructure.
     const imported = canonicalName(dotted);
-    refs.push(refAt(name, base ? `${base}.${imported}` : imported, stmt.text));
+    const ref = refAt(name, base ? `${base}.${imported}` : imported, stmt.text);
+    refs.push(base ? { ...ref, from: base } : ref);
   }
   return refs;
 }
@@ -206,7 +208,7 @@ function refAt(node: Node, target: string, statement: string): ImportRef {
  *
  * @param node - the `module_name` node of the statement.
  * @param file - the importing file.
- * @returns the dotted module name, or null if the dots climb above the root.
+ * @returns the dotted module name, or null if the dots climb above the top-level package.
  */
 function resolveModule(node: Node, file: SourceFile): string | null {
   if (node.type !== "relative_import") {
@@ -238,12 +240,14 @@ export function packageOf(file: SourceFile): string[] {
 /**
  * Resolves a relative module name against a package.
  * Level 1 is the package itself, and each extra level climbs one package up,
- * as the dots of `from ..x import y` or the `level` of `__import__` do.
+ * as the dots of `from ..x import y` or the `level` of `__import__` do. Like
+ * Python, it refuses to climb past the top-level package, and refuses any
+ * level in a top-level module, which has no package.
  *
  * @param pkg - the package the name is relative to, split into parts.
  * @param level - the number of leading dots, 1 or more.
  * @param rest - the dotted name after the dots, if any.
- * @returns the dotted module name, or null if the level climbs above the root.
+ * @returns the dotted module name, or null if the level climbs above the top-level package.
  */
 export function resolveRelative(
   pkg: readonly string[],
@@ -251,7 +255,7 @@ export function resolveRelative(
   rest: string | undefined,
 ): string | null {
   const up = level - 1;
-  if (up > pkg.length) {
+  if (up >= pkg.length) {
     return null;
   }
   const parts = pkg.slice(0, pkg.length - up);

@@ -28,6 +28,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted |
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
@@ -574,6 +575,40 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-minus-circle-outline: GitHub Pages serves only the root `404.html`, so a missing page under `/pl/` shows the English 404 page (its language switcher still works).
 
 **Alternatives.** *English under `/en/` next to `/pl/`:* the built-in switcher would work, but every existing link and the CLI's `docs:` URLs would move. *Machine translation on each merge:* always in sync, but it needs a secret and a budget, terminology drifts between runs, and nobody reviews it. *Copies of the assets in `docs/pl/`:* self-contained, but two copies of every screenshot to keep equal.
+
+## ADR-025: INW010 probes the disk for existence and checks only the module part of an import
+
+**Status:** Accepted · 2026-09-26 · [#45](https://github.com/SirCypkowskyy/inwards/issues/45)
+
+**Context.** INW010 flags an import of a first-party module that doesn't exist. The module index offers two answers to "does it exist": its listing (`modules`) and a probe of the file system (`ownerOf`). The listing misses namespace packages, modules behind a symlink that leaves the root, and anything under node_modules, `__pycache__` or a virtualenv, and the CLI and the language server list layer packages differently. Neither answer knows compiled extensions (`name.cpython-313-x86_64-linux-gnu.so`), which the probe can't spell. An import statement doesn't say which of its parts is a module either: `from shop.domain import pricing` imports a submodule or a name defined in `shop/domain/__init__.py`. And a package can extend its `__path__` (`pkgutil.extend_path`, `pkg_resources.declare_namespace`) to share its top-level name with an installed distribution: polar in the corpus does this with its SDK, and 79 of its imports name modules only the SDK has.
+
+**Decision.**
+
+- Existence is decided by `ownerOf`, which probes the disk the way Python imports, never by the listing.
+- When the probe finds a module missing, the package it would live in is listed once (`ProjectFiles.listDir`). A compiled extension (`.so`, `.pyd`, with or without an ABI tag), Cython source (`.pyx`) or bytecode (`.pyc`) of that name counts as the module. The fix suggests the three members of that package closest to the missing name by edit distance, never the importing file or its own package.
+- Only the module part is checked: `X` of `from X import name`, the whole name of `import X` and `from X import *`. The `name` is never checked.
+- An import is first-party when a prefix of it probes as a first-party module (a top-level package needs an `__init__.py`, as for INW006). One under a package whose `__init__.py` mentions `__path__` or `declare_namespace` passes.
+- A relative import that climbs above the top-level package is an INW010 error too: Python refuses it whatever is on disk.
+- Only static imports in files inside a layer are checked. An import INW010 reports gets no INW006 as well, which would contradict it, and an outward import INW001 reports gets no INW010: INW001's fix deletes the import, while INW010's would create the module.
+- The suggestions go in the fix steps, not the message, so a baseline key doesn't change when modules are added.
+- The index probes each path once. The language server rebuilds the index, and checks the open documents again, when a path that could be a module is created or deleted (a `.py`, `.pyi`, extension or bytecode file, or a directory, outside hidden directories, caches, node_modules and site-packages), so creating the missing module clears the error without a keystroke. With a client that can't report file events, it builds a fresh index for each check instead, so the error clears at the next keystroke.
+
+**Consequences.**
+
+- :material-minus-circle-outline: `from shop.domain import pricing` with no `pricing` passes when `shop/domain` is a package.
+- :material-minus-circle-outline: A module generated at build time (`_version.py`, `*_pb2.py`) is reported until it exists in the checkout ([#160](https://github.com/SirCypkowskyy/inwards/issues/160)), and so is an optional import behind `try/except ImportError`. A namespace package shared with an installed distribution is reported as missing ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)).
+- :material-minus-circle-outline: The language server rebuilds only on create and delete, so an `__init__.py` edited to extend its `__path__` takes effect at the next create or delete.
+- :material-minus-circle-outline: A finding in the hook costs the confirming full parse every finding costs (ADR-004) and one directory read: on saleor, `webhook/payloads.py` (1,301 lines) goes from 38.8 ms to 71.6 ms p50, about what an INW001 finding in that file costs on develop (70.1 ms); `channel/tasks/saleor3_22.py` from 27.4 to 32.7 ms.
+- :material-plus-circle-outline: No false positive on the five corpus repositories (6,543 files) or the examples. The four findings, all in saleor, are real broken imports: a `TYPE_CHECKING` import of `saleor.translation.models`, which doesn't exist (the class lives in `saleor.core.utils.translations`), an import of `saleor.models`, and two relative imports that climb above `saleor`.
+- :material-plus-circle-outline: The editor and the CLI agree whatever each lists, since neither decision nor suggestion reads the listing.
+- :material-plus-circle-outline: Every import in a layered file is probed now, not only those outside every layer; probing each path once keeps the whole-project cost level: saleor's full check takes 1.96 s against 2.15 s on develop (median of 8 alternating local runs), and on the synthetic repo the hook is 2.9 % slower and the full check 1.3 % faster (`bench/compare.ts`, threshold 20 %).
+
+**Alternatives.**
+
+- *Membership in `modules`:* false errors in the editor for namespace packages and anything a listing skips (the review of [#153](https://github.com/SirCypkowskyy/inwards/pull/153)), and a walk of the whole project for each finding's suggestions, which cost the hook 50 to 130 ms on saleor.
+- *Read `__init__.py` to check `from X import name`:* a star import or a module-level `__getattr__` can define any name, so a text check would guess.
+- *Skip imports inside `try/except ImportError`:* an agent could then silence the rule by wrapping the import, the escape hatch the fix steps close.
+- *Drop the probe cache in the language server:* stays correct, but an open document would still show a stale error until the next keystroke. That is what a client without file events gets.
 
 ## ADR-027: Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table
 
