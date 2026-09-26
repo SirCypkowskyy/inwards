@@ -104,6 +104,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | domain layer, application layer, infrastructure layer | warstwa domeny, warstwa aplikacji, warstwa infrastruktury |
 | dynamic import | import dynamiczny |
 | edit distance | odległość edycyjna |
+| computed (target, source) | wyliczany (cel, kod) |
+| unverifiable (INW011 target), unreadable | niesprawdzalny, nieczytelny |
 | edit | edycja |
 | engine | silnik |
 | entity | encja |
