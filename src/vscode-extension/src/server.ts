@@ -159,14 +159,15 @@ connection.onInitialized(() => {
 connection.onDidChangeWatchedFiles(({ changes }) => {
   const root = state?.root;
   const paths = changes.map((change) => ({ type: change.type, path: fileURLToPath(change.uri) }));
-  reread = reread || paths.some(({ path }) => path === configPath);
+  const config = paths.some(({ path }) => path === configPath);
   const moved = paths.some(
     ({ type, path }) =>
       type !== FileChangeType.Changed && root !== undefined && mayHoldModule(root, path),
   );
-  if (!(reread || moved)) {
+  if (!(config || moved)) {
     return; // .git, caches, virtualenvs, docs: nothing a module lookup reads
   }
+  reread = reread || config;
   clearTimeout(pending);
   pending = setTimeout(() => {
     enqueue(reread ? reload : refresh);
