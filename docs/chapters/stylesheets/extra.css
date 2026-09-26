@@ -75,4 +75,64 @@
       animation: diagram-edge-flow 0.6s linear infinite;
     }
   }
+
+  /* Quadrant chart (positioning): hand-built SVG, not Mermaid.
+     Mermaid's quadrantChart is one of the diagram types Zensical doesn't
+     auto-theme, and neither per-diagram themeVariables nor a raw CSS
+     var() reference survive Mermaid's own color handling for it (both
+     were tried and both silently fell back to Mermaid's stock grey).
+     Plain CSS custom properties on a hand-authored SVG don't have that
+     problem, the same reasoning that already applies to #homepage-loop. */
+  .quadrant-chart-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  #quadrant-chart {
+    width: 100%;
+    min-width: 600px;
+    height: auto;
+    font-family: var(--md-text-font-family, sans-serif);
+  }
+
+  #quadrant-chart .qc-title {
+    font-size: 16px;
+    text-anchor: middle;
+    fill: var(--md-default-fg-color);
+  }
+
+  #quadrant-chart .qc-quadrant {
+    fill: color-mix(in srgb, var(--md-default-fg-color) 6%, transparent);
+  }
+
+  #quadrant-chart .qc-divider {
+    stroke: var(--md-default-fg-color--lighter);
+    stroke-width: 1;
+  }
+
+  #quadrant-chart .qc-quadrant-label {
+    font-size: 13px;
+    fill: var(--md-default-fg-color--light);
+  }
+
+  #quadrant-chart .qc-axis-label {
+    font-size: 12px;
+    fill: var(--md-default-fg-color--light);
+  }
+
+  #quadrant-chart .qc-point circle {
+    fill: var(--md-accent-fg-color);
+  }
+
+  #quadrant-chart .qc-point-target circle {
+    fill: var(--md-primary-fg-color);
+    stroke: var(--md-accent-fg-color);
+    stroke-width: 2;
+  }
+
+  #quadrant-chart .qc-point text {
+    font-size: 11px;
+    text-anchor: middle;
+    fill: var(--md-default-fg-color);
+  }
 }

@@ -3,7 +3,7 @@
 This chapter describes Inwards with the [C4 model](https://c4model.com): system context (C1), containers (C2) and components (C3). The diagrams use Mermaid flowcharts in C4 notation, because Mermaid's native C4 syntax is still experimental and renders poorly.
 
 !!! tip "Legend used in every diagram"
-    :material-account: rounded nodes are people · purple boxes are parts of Inwards · grey boxes are external systems · dashed boxes are planned.
+    :material-account: rounded nodes are people · cylinders are stored data · dashed boxes are planned.
 
 ## C1: System context
 
@@ -31,12 +31,6 @@ flowchart TB
     ci -- "uploads SARIF" --> scanning
     inwards -. "JSON diagnostics with fix steps" .-> agent
 
-    classDef person fill:#5e35b1,color:#fff,stroke:#311b92
-    classDef system fill:#7e57c2,color:#fff,stroke:#4527a0
-    classDef ext fill:#37474f,color:#fff,stroke:#90a4ae
-    class architect,dev,agent person
-    class inwards system
-    class repo,editor,ci,scanning ext
 ```
 
 A few things this picture commits us to:
@@ -79,15 +73,8 @@ flowchart TB
     cli -- "reads/writes (hook)" --> state
     cli -. "reads/writes" .-> cache
 
-    classDef person fill:#5e35b1,color:#fff,stroke:#311b92
-    classDef container fill:#7e57c2,color:#fff,stroke:#4527a0
-    classDef planned fill:#4527a0,color:#fff,stroke:#7e57c2,stroke-dasharray:5 5
-    classDef ext fill:#37474f,color:#fff,stroke:#90a4ae
-    class agent,dev person
-    class cli,lsp,ext,core container
-    class hooks,state container
+    classDef planned stroke-dasharray:5 5
     class cache planned
-    class config,src,vscode ext
 ```
 
 | Container | Tech | Lives in | Status |
@@ -139,12 +126,6 @@ flowchart LR
     engine --> modgraph
     modgraph -. "imports of candidate files" .-> extract
     engine --> report
-
-    classDef comp fill:#7e57c2,color:#fff,stroke:#4527a0
-    classDef planned fill:#4527a0,color:#fff,stroke:#7e57c2,stroke-dasharray:5 5
-    classDef port fill:#37474f,color:#fff,stroke:#90a4ae
-    class config,pre,parser,extract,rules,fix,report,engine,modgraph comp
-    class files,cfgtext,wasm port
 ```
 
 | Component | Responsibility | Notes |
@@ -227,7 +208,7 @@ flowchart LR
     pool["Worker pool"]:::planned -.-> eng
     cache["Content-hash cache"]:::planned -.-> eng
 
-    classDef planned fill:#4527a0,color:#fff,stroke:#7e57c2,stroke-dasharray:5 5
+    classDef planned stroke-dasharray:5 5
 ```
 
 Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usage or config error. Agents and CI scripts can branch on that without parsing output. In the JSON report, `summary.violations` counts errors and `summary.warnings` counts warnings. A whole-project run (no path arguments) also checks every layer prefix and shape selector against the modules it found (INW006, INW007) and the required members of every shaped package (INW008).
@@ -253,7 +234,7 @@ flowchart LR
     pypi -.-> dev["uv add --dev inwards"]
     art -.-> market["VS Code Marketplace"]
 
-    classDef planned fill:#4527a0,color:#fff,stroke:#7e57c2,stroke-dasharray:5 5
+    classDef planned stroke-dasharray:5 5
     class testpypi,pypi,dev,market planned
 ```
 
