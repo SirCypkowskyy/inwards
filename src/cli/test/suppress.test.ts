@@ -271,14 +271,6 @@ describe("a rejected suppression is treated as if the comment weren't there", ()
     expect(stop(root).code).toBe(0);
   });
 
-  test.skipIf(!NO_LAZY_FETCH)("a violation the file had at session start stays context", () => {
-    const root = session({ [ORDER]: "import shop.infrastructure.db\n" });
-    const edit = agentWrites(root, SUPPRESSED);
-    expect(edit.code).toBe(0);
-    expect(edit.stdout).toContain("already in the file when the session started");
-    expect(stop(root).code).toBe(0);
-  });
-
   test("a second, new copy still blocks", () => {
     const root = session({ [ORDER]: "import shop.infrastructure.db\n" }, (dir) => {
       inwards(["baseline"], { cwd: dir });
@@ -287,5 +279,15 @@ describe("a rejected suppression is treated as if the comment weren't there", ()
     const edit = agentWrites(root, readFileSync(join(root, ORDER), "utf8"));
     expect(edit.code).toBe(2);
     expect(stop(root).code).toBe(2);
+  });
+});
+
+describe.skipIf(!NO_LAZY_FETCH)("a rejected suppression on an old violation", () => {
+  test("leaves it context, as the violation the file had at session start", () => {
+    const root = session({ [ORDER]: "import shop.infrastructure.db\n" });
+    const edit = agentWrites(root, SUPPRESSED);
+    expect(edit.code).toBe(0);
+    expect(edit.stdout).toContain("already in the file when the session started");
+    expect(stop(root).code).toBe(0);
   });
 });
