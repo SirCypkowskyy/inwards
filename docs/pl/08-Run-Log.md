@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/08-Run-Log.md
-source_hash: 3b0f64f331cf4f23024cc09c69938f639c93ad73c048981898fe85f484735a0f
+source_hash: d50ea709e8a396af008b63ae8662dbdcc1fe1847a290fc602126e3f8d100a3d1
 ---
 
 # Run log { #run-log }
@@ -33,7 +33,7 @@ Każda linia to jeden obiekt JSON:
 | `lines` | object[] | Tylko `PostToolUse`, dla pliku sprawdzonego przez hook: `{ "file", "added", "removed" }`, liczone z wywołania narzędzia bez linii, które edycja powtarza bez zmian wokół swojej zmiany. `Write` liczy każdą linię jako dodaną; `replace_all` liczy jedno wystąpienie |
 | `fingerprints` | string[] | Po jednym na każde zgłoszone naruszenie (zahashowane: kod reguły, moduł i komunikat), tak samo jak w stanie sesji. Dwa identyczne importy w jednym pliku dają ten sam fingerprint dwa razy |
 | `codes` | string[] | Kod reguły każdego fingerprintu, w tej samej kolejności (np. `INW001`). Linie zapisane, zanim to pole powstało, go nie mają |
-| `severities` | string[] | `error` albo `warning` dla każdego fingerprintu, w tej samej kolejności. Linie zapisane, zanim to pole powstało, go nie mają i są czytane jako błędy |
+| `severities` | string[] | `error` albo `warning` dla każdego fingerprintu, w tej samej kolejności, tak jak ustawiła je `[tool.inwards.rules]`. Linie zapisane, zanim to pole powstało, go nie mają i są czytane jako błędy |
 | `exit` | number | Kod wyjścia zwrócony przez Inwards |
 | `durationMs` | number | Czas od startu procesu, łącznie ze startem procesu, z dokładnością do 0,1 ms |
 

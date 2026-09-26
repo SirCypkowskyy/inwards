@@ -360,6 +360,7 @@ src/
 │   │   ├── prescan.ts     # import skeleton fast path
 │   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
 │   │   ├── rules.ts       # rule registry: code, name, severity, docs
+│   │   ├── rule-config.ts # [tool.inwards.rules]: select, ignore, severity
 │   │   ├── layers.ts      # INW001 + fix composer
 │   │   ├── libraries.ts   # INW005: libraries per layer, default deny list
 │   │   ├── stdlib.ts      # standard-library module names (INW005)

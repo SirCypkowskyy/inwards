@@ -24,6 +24,8 @@ import {
   ConfigError,
   type Diagnostic,
   type Report,
+  type RuleSettings,
+  ruleLevel,
   stableMessage,
 } from "@inwards/core";
 
@@ -164,22 +166,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Reads the accepted violations of a config's baseline, for the engine and
- * for `applyBaseline`.
+ * for `applyBaseline`. Entries of a rule that `[tool.inwards.rules]` turns
+ * off or down to a warning are left out: that rule reports no errors to
+ * accept, and its entries must not count as fixed. They apply again once the
+ * rule is back, unless `inwards baseline` has rewritten the file since.
  *
  * @param configPath - the pyproject.toml.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns accepted copies by baseline key, or undefined when there is no baseline.
  * @throws {ConfigError} when the file isn't a baseline this version understands.
  */
-export function readBaseline(configPath: string): Map<string, number> | undefined {
+export function readBaseline(
+  configPath: string,
+  rules?: RuleSettings,
+): Map<string, number> | undefined {
   const entries = readEntries(baselinePath(configPath));
   if (entries === undefined) {
     return undefined;
   }
   const accepted = new Map<string, number>();
-  for (const e of entries) {
+  for (const e of entries.filter((entry) => !dormant(entry.code, rules))) {
     accepted.set(baselineKey(e), (accepted.get(baselineKey(e)) ?? 0) + e.count);
   }
   return accepted;
+}
+
+/**
+ * Tells whether a rule's baseline entries are dormant: the rule reports no
+ * errors, being off or turned down to a warning.
+ *
+ * @param code - the entry's rule code.
+ * @param rules - the config's `[tool.inwards.rules]`, if any.
+ * @returns true when the entry can't match anything now.
+ */
+function dormant(code: string, rules: RuleSettings | undefined): boolean {
+  const level = ruleLevel(code, rules);
+  return level === "off" || level === "warning";
 }
 
 /**

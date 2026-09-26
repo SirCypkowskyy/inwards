@@ -4,14 +4,17 @@
  * may appear (`[[tool.inwards.names]]`).
  *
  * - `checkShape` is pure: it reads only the file's path, so the engine runs it
- *   on every file, parsed or not.
+ *   (as `shapeFindings`) on every file, parsed or not.
  * - `checkRequired` asks a `ListMembers` port what a package holds. Adapters
  *   build one from a directory listing (`probeMembers`) or from the files they
  *   already have (`membersFrom`).
  * - `checkSelectors` warns about a shape selector that matches no package.
+ *
+ * The exported checks apply `[tool.inwards.rules]` (`applyRules`).
  */
 import type { InwardsConfig } from "./config.ts";
 import { type ConfigFile, spanOf } from "./layout.ts";
+import { applyRules } from "./rule-config.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import { memberMatches, selects, shapeFor } from "./shape-config.ts";
 import { type Misfit, missingFinding, nameFinding, shapeFinding } from "./shape-fix.ts";
@@ -51,10 +54,22 @@ const SEPARATOR = /[\\/]/u;
  * Python can't import them under a dotted name either.
  *
  * @param file - the source file; only its path, module name and kind are read.
- * @param config - the shapes and names rules.
+ * @param config - the shapes and names rules, and `[tool.inwards.rules]`.
  * @returns one diagnostic per misplaced member, on line 1.
  */
 export function checkShape(file: SourceFile, config: InwardsConfig): Diagnostic[] {
+  return applyRules(shapeFindings(file, config), config.rules);
+}
+
+/**
+ * Applies INW007 to a file as `checkShape` does, before `[tool.inwards.rules]`:
+ * the engine applies those once, to all of a run's findings.
+ *
+ * @param file - the source file; only its path, module name and kind are read.
+ * @param config - the shapes and names rules.
+ * @returns one diagnostic per misplaced member, on line 1.
+ */
+export function shapeFindings(file: SourceFile, config: InwardsConfig): Diagnostic[] {
   const { shape = [], names = [] } = config;
   const parts = rootPathOf(file).split("/");
   if ((shape.length === 0 && names.length === 0) || !visible(parts)) {
@@ -110,7 +125,7 @@ export function checkRequired(
       );
     }
   }
-  return found;
+  return applyRules(found, config.rules);
 }
 
 /**
@@ -130,7 +145,7 @@ export function checkSelectors(
   const dead = (config.shape ?? [])
     .flatMap((shape) => shape.packages)
     .filter((selector) => ![...packages].some((pkg) => selects(selector, pkg)));
-  return [...new Set(dead)].map((selector) =>
+  const found = [...new Set(dead)].map((selector) =>
     diagnostic(RULES.INW007, source, {
       span: spanOf(file.text, selector),
       severity: "warning",
@@ -144,6 +159,7 @@ export function checkSelectors(
       },
     }),
   );
+  return applyRules(found, config.rules);
 }
 
 /**

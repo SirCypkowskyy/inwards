@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: b7d1aed5372b08ac330663149b02d3f424d5714c4631dc5fde9ae3838dd55afe
+source_hash: 4b510b59de4a4df4f3923b5be0430dbcb1b0a14be841e4a1ef4c2daf7286cf3a
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -33,6 +33,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
 | [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy | :white_check_mark: Przyjęty |
 | [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
+| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -579,3 +580,32 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 
 **Alternatywy.** *Angielski pod `/en/` obok `/pl/`:* wbudowany przełącznik by działał, ale przesunęłyby się wszystkie istniejące linki i adresy `docs:` z CLI. *Tłumaczenie maszynowe przy każdym scaleniu:* zawsze aktualne, ale wymaga sekretu i budżetu, terminologia rozjeżdża się między uruchomieniami i nikt go nie przegląda. *Kopie zasobów w `docs/pl/`:* samowystarczalne, ale każdy zrzut ekranu istniałby w dwóch kopiach, które trzeba utrzymywać identyczne.
 
+## ADR-027: `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` { #adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table }
+
+**Stan:** Przyjęty · 2026-09-26 · [#43](https://github.com/SirCypkowskyy/inwards/issues/43)
+
+**Kontekst.** Zespół, który wprowadza Inwards do starszego kodu, chce włączać reguły po jednej albo najpierw widzieć naruszenia danej reguły jako ostrzeżenia, zanim zaczną blokować. Użytkownicy Ruffa oczekują `select` i `ignore`, ale `[tool.inwards]` ma już klucz `ignore`: nazwy modułów pomijanych przez ostrzeżenie INW006 o nieprzypisanym pakiecie, które zapisuje `inwards init`. Diagnostyki pochodzą z silnika i z pięciu sprawdzeń, które adaptery wywołują bezpośrednio (`checkShape`, `checkRequired`, `checkSelectors`, `checkPrefixes`, `checkMoves`), a Stop gate porównuje konfiguracje jako JSON.
+
+**Decyzja.**
+
+- **Podtabela.** `[tool.inwards.rules]` zawiera `select` i `ignore`, listy kodów reguł, oraz `severity`, tabelę z kodu na `"error"` albo `"warning"`. Klucz `ignore` najwyższego poziomu zachowuje swoje znaczenie. Bez `select` zgłasza każda reguła; `ignore` ma pierwszeństwo przed `select`. `severity` ustawia poziom każdej diagnostyki reguły, także tych, które reguła zgłasza na własnym poziomie: przy `INW006 = "error"` ostrzeżenie o pakiecie staje się błędem.
+- **Dokładne kody, sprawdzane.** Kod, którego nie ma w rejestrze, to błąd konfiguracji, tak jak nieznany klucz. Bez prefiksów: kody nie są pogrupowane według kategorii, a prefiks taki jak `INW00` po cichu objąłby reguły dodane później. Pusty `select` też jest błędem, bo do wyłączania reguł służy `ignore`.
+- **INW000 jest stała.** `ignore` ani `severity` nie mogą jej wymienić, a `select` jej nie wyłącza. Plik, którego zadeklarowane kodowanie może ukryć importy, dostaje INW000 zamiast sprawdzenia, więc wyłączenie INW000 albo obniżenie jej poziomu przepuściłoby taki plik niesprawdzony.
+- **Stosowana w rdzeniu, na końcu.** Każda funkcja rdzenia, która zwraca diagnostyki adapterowi, stosuje tabelę, więc `inwards check`, hooki, Stop gate i serwer języka są zgodne. `Engine.checkFiles` stosuje ją po tym, jak zostawi jedno ostrzeżenie INW006 na pakiet, więc skonfigurowany poziom nie zmienia liczby zgłoszonych kopii. Reguły nadal się wykonują; ich diagnostyki są potem odrzucane albo dostają nowy poziom.
+- **Ostrzeżenie to ostrzeżenie.** Reguła ustawiona na `"warning"` pojawia się w każdym formacie, ale jak każde ostrzeżenie nie zmienia kodu wyjścia, nie blokuje ani hooka edycji, ani Stop gate i nie trafia do baseline'u.
+- **Baseline.** `inwards baseline` zapisuje tylko to, co zgłasza sprawdzenie, więc pomija reguły wyłączone albo ustawione na ostrzeżenie. Wpisy takiej reguły, które już są w pliku, są uśpione: nie liczą się jako naprawione (`resolved`) i znów obowiązują, gdy reguła wróci do poziomu błędu, chyba że w międzyczasie baseline został zapisany od nowa.
+- **SARIF.** `rules[]` nadal wymienia każdą zarejestrowaną regułę z domyślnym poziomem z rejestru w `defaultConfiguration.level`. Każdy wynik ma skonfigurowany `level`, który pokazują przeglądarki SARIF. Wyłączona reguła nie ma wyników.
+- **Run log.** `codes` i `severities` zapisują to, co zostało zgłoszone, po zastosowaniu tabeli.
+- **Chroniona jak reszta.** Tabela jest wewnątrz `[tool.inwards]`, więc config guard odrzuca edycję, która ją zmienia, a zmiana przez Bash oblewa Stop gate. Oba przypadki mają testy.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Zespół może wprowadzać reguły stopniowo bez baseline'u i pokazywać regułę jako ostrzeżenia, zanim zacznie blokować.
+- :material-plus-circle-outline: Żadnej osobnej ścieżki w adapterach: serwer języka stosuje tabelę bez własnych zmian.
+- :material-minus-circle-outline: `rules.ignore` i `ignore` najwyższego poziomu mają wspólne słowo, ale nie znaczenie. Zmiana nazwy klucza najwyższego poziomu to zmiana łamiąca zgodność, odłożona do schematu konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)).
+- :material-minus-circle-outline: Wyłączona reguła nadal kosztuje czas sprawdzenia. Pominięcie jej wymagałoby przekazania tabeli do każdej reguły, żeby zaoszczędzić kilka milisekund.
+- :material-minus-circle-outline: Konfiguracja, która wymienia regułę znaną tylko nowszemu Inwards, kończy się kodem wyjścia 2; jaśniejszy komunikat daje `required-version`.
+- :material-minus-circle-outline: Wyłączenie INW006 albo obniżenie jej poziomu wyłącza też blokadę Stop gate na kod warstwy przeniesiony w trakcie sesji poza wszystkie warstwy.
+- :material-minus-circle-outline: Brak ustawień dla pojedynczych plików lub ścieżek. Należą do wyciszeń ([#50](https://github.com/SirCypkowskyy/inwards/issues/50)).
+
+**Alternatywy.** *`select` i `ignore` na najwyższym poziomie, jak w Ruffie:* znajome, ale `ignore` jest zajęte, a odróżnianie `INW001` od modułu o nazwie `tests` po samym kształcie to zgadywanie. *Jeden klucz na regułę, `INW001 = "off"`, jak w ESLint:* zwięzłe, ale nie da się powiedzieć „tylko te reguły”. *Prefiksy kodów:* patrz wyżej. *Filtrowanie w każdym adapterze:* cztery miejsca wywołań (sprawdzenie, sprawdzenie układu w Stop gate, dwa w serwerze języka), które mogłyby się rozjechać.

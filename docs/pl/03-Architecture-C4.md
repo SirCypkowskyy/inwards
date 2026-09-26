@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: fff2739694478cc2b5da5626b40f1121f1e690d71674c8d75c65aa8299025631
+source_hash: fa5e9c8cfa54ce2e4fe62a6ff1dbb71ef0956b1286dc07046065c4f03eb94de9
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -365,6 +365,7 @@ src/
 │   │   ├── prescan.ts     # import skeleton fast path
 │   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
 │   │   ├── rules.ts       # rule registry: code, name, severity, docs
+│   │   ├── rule-config.ts # [tool.inwards.rules]: select, ignore, severity
 │   │   ├── layers.ts      # INW001 + fix composer
 │   │   ├── libraries.ts   # INW005: libraries per layer, default deny list
 │   │   ├── stdlib.ts      # standard-library module names (INW005)

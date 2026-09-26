@@ -13,6 +13,7 @@ export { DOCS_BASE, VERSION } from "./meta.ts";
 export type { ProjectFiles, ProjectIndex } from "./project.ts";
 export { extractImports, type GrammarBinaries, moduleNameFor } from "./python.ts";
 export { type Format, type RenderOptions, type Report, render } from "./reporters.ts";
+export { type RuleSettings, ruleLevel } from "./rule-config.ts";
 export { RULES } from "./rules.ts";
 export {
   checkRequired,

@@ -2,10 +2,11 @@
  * INW006 layout checks against pyproject.toml: layer prefixes that match no
  * module (a warning for one dead prefix, an error when a whole layer matches
  * nothing or a prefix stopped matching during the session), and layer code
- * moved out of every layer during a session.
+ * moved out of every layer during a session. Both apply `[tool.inwards.rules]`.
  */
 import type { InwardsConfig } from "./config.ts";
 import { layerIndexOf } from "./layers.ts";
+import { applyRules } from "./rule-config.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, SourceFile, Span } from "./types.ts";
 import { holdsLayer, unassignedPackage } from "./unassigned.ts";
@@ -58,7 +59,7 @@ export function checkPrefixes(
       );
     }
   }
-  return found;
+  return applyRules(found, config.rules);
 }
 
 /** SHA-256 of an empty file: every empty `__init__.py` has it, so it proves no move. */
@@ -95,7 +96,7 @@ export function checkMoves(
       unassignedPackage(m, layers) !== undefined,
   );
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
-  return layers.flatMap((layer, i) => {
+  const found = layers.flatMap((layer, i) => {
     const lost = [...before].filter(([m]) => !now.has(m) && layerIndexOf(m, layers) === i);
     const moved = appeared.filter(
       ([m, hash]) =>
@@ -120,6 +121,7 @@ export function checkMoves(
       }),
     ];
   });
+  return applyRules(found, config.rules);
 }
 
 /**

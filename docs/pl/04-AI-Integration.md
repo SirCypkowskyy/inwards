@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 43e6a8924ed14690d90b44f4d0535f5aaeb467ffc42658c5c8befc0c6108e661
+source_hash: 7b1c8eab41e0917dd69c16863c0a7e2054419f0ef5942b57968349703790b198
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -213,6 +213,7 @@ Model pod presją zakończenia zadania spróbuje najtańszej rzeczy, która zmie
 | Import dynamiczny | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 zgłasza dosłowny cel, który sięga do warstwy zewnętrznej, także przez aliasy takie jak `from importlib import import_module as im`. Wyliczany cel nie jest jeszcze odczytywany ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)) | :white_check_mark: dosłowne cele |
 | Wyciszenie | `# inwards: ignore` | Wyciszenia będą wymagały kodu i powodu, pojawią się w podsumowaniu i będzie można je odrzucać w hookach | :material-progress-clock: [#50](https://github.com/SirCypkowskyy/inwards/issues/50) |
 | Poluzowanie konfiguracji | Przeniesienie `shop.infrastructure` do warstwy domeny | Config guard w `PreToolUse` odrzuca edycję; `sed -i` przez Bash oblewa Stop gate; ludzi obejmuje CODEOWNERS | :white_check_mark: |
+| Wyłączenie reguły | `ignore = ["INW001"]` albo `severity = { INW001 = "warning" }` w `[tool.inwards.rules]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate. INW000 nie da się wyłączyć ani obniżyć jego poziomu | :white_check_mark: |
 | Dopisanie naruszenia do baseline'u | Dodanie własnego naruszenia do `inwards-baseline.json` albo uruchomienie `inwards baseline` | Config guard odrzuca edycje pliku i to polecenie, także za `uvx` albo `env`; baseline zmieniony przez Bash oblewa Stop gate, który wtedy nie stosuje żadnego baseline'u | :white_check_mark: |
 | Wyłączenie Inwards | Usunięcie `.inwards/`, usunięcie hooków, ustawienie `disableAllHooks` | Config guard odrzuca edycje `.inwards/` i plików ustawień, które zawierają hooki albo by je wyłączyły; `permissions.deny` go wspiera | :white_check_mark: |
 | Skopiowanie kodu | Wklejenie klasy SQL do `shop/domain/` | Poza zakresem. Duplikacja to sprawa przeglądu kodu i innych narzędzi | :x: |

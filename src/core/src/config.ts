@@ -1,5 +1,6 @@
 import { parse } from "smol-toml";
 import { VERSION } from "./meta.ts";
+import { parseRules, type RuleSettings } from "./rule-config.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape-config.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -49,6 +50,8 @@ export interface InwardsConfig {
   shape?: ShapeSpec[];
   /** Where member names may appear, `[[tool.inwards.names]]` (INW007). */
   names?: NameRule[];
+  /** Which rules report and at what severity, `[tool.inwards.rules]`. Absent when not set. */
+  rules?: RuleSettings;
 }
 
 /** What the Stop gate checks, see `InwardsConfig.stopGate`. */
@@ -71,6 +74,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "stop-gate",
   "shape",
   "names",
+  "rules",
 ]);
 const LAYER_KEYS: ReadonlySet<string> = new Set([
   "name",
@@ -168,6 +172,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...optionalKeys(raw),
     ...stopGateKey(raw["stop-gate"]),
     ...parseShapeKeys(raw),
+    ...parseRules(raw["rules"]),
   };
   return config;
 }
