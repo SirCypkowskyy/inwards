@@ -67,6 +67,7 @@ describe("config guard: read-only Bash that names protected files (#135)", () =>
     "git diff --output=inwards-baseline.json",
     "rg --pre rm x .inwards",
     "file -C -m .inwards/magic",
+    "file --comp -m .inwards/magic",
     "cat '.inwards/unclosed",
   ])("%j is denied", (command) => {
     expect(denied(pre(root, "Bash", { command }))).toContain("ask the user");

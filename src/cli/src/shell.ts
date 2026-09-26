@@ -158,7 +158,8 @@ interface Reading {
 /**
  * Programs that only read the files they are given, each with the arguments
  * that would make it write or run a command: `find -delete`/`-exec`/`-fprint`,
- * `rg --pre`, `file -C` (compiles a magic file), `git … --output`. Where there
+ * `rg --pre`, `file -C` or any long option of `file` (GNU accepts abbreviations
+ * such as `--comp` for `--compile`), `git … --output`. Where there
  * are such arguments, a word bash could expand (a glob matching a file named
  * `-delete`, a variable) is refused too.
  */
@@ -173,7 +174,7 @@ const READERS: ReadonlyMap<string, RegExp | undefined> = new Map([
   ["diff", undefined],
   ["find", /^-(?:delete|exec|execdir|ok|okdir|fprint0?|fprintf|fls)$/u],
   ["rg", /^--pre/u],
-  ["file", /^(?:-[^-]*C|--compile)/u],
+  ["file", /^(?:-[^-]*C|--)/u],
   ["git", /^--output/u],
 ]);
 /** The only `git` subcommands read as read-only. */
