@@ -1,0 +1,17 @@
+[Unit]
+Description=GitHub Actions runner slot %i for SirCypkowskyy/inwards (ephemeral, one container per job)
+Documentation=https://github.com/SirCypkowskyy/inwards/tree/develop/ops/runner
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+User=cyprian
+ExecStart=/opt/inwards-runner/runner.sh %i
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

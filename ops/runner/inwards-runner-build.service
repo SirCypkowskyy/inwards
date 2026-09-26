@@ -1,0 +1,13 @@
+[Unit]
+Description=Rebuild the inwards-runner image from the latest official runner and Ubuntu 26.04
+Documentation=https://github.com/SirCypkowskyy/inwards/tree/develop/ops/runner
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=cyprian
+ExecStart=/usr/bin/docker build --pull -t inwards-runner:latest /opt/inwards-runner
+# Drop the previous build; an image a running job still uses is kept.
+ExecStartPost=/usr/bin/docker image prune -f --filter label=org.opencontainers.image.title=inwards-runner

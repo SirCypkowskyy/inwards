@@ -15,7 +15,10 @@ concurrency:
 
 jobs:
   release-please:
-    runs-on: ubuntu-26.04
+    # Self-hosted like CI: it builds nothing and runs no repository code, and its
+    # write token lives only as long as the job's fresh container. The release
+    # build itself (cd.yml) stays GitHub-hosted.
+    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
     permissions:
       contents: write # release branch, tag, draft release
       pull-requests: write # open and label the release PR

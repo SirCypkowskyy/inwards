@@ -24,7 +24,7 @@ concurrency:
 jobs:
   sarif:
     name: SARIF on examples/broken-app
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
     permissions:
       contents: read
       actions: read # upload-sarif, private repositories only

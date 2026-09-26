@@ -212,6 +212,16 @@ act push -W .github/workflows/cd.yml -n                                       # 
   yourself; the owner (or the coordinator, when asked) runs it once before
   a release with `gh workflow run ci.yml --ref develop`, and `cd.yml`
   verifies each binary on its own OS at the tag.
+- **Linux jobs run on self-hosted runners** on the owner's server `irysek`
+  (`runs-on: [self-hosted, linux, x64, inwards]`), so they cost no Actions
+  minutes. They are three Ubuntu 26.04 containers, one fresh container per
+  job; `ops/runner/README.md` says how to recreate them. Still on
+  GitHub-hosted runners: `cd.yml` (release builds) and the manual macOS,
+  Windows and ubuntu-24.04 test rows. A new Linux job gets the self-hosted
+  labels, not `ubuntu-*`. If PR jobs sit in "Queued" forever, the runners
+  are down: check `gh api repos/SirCypkowskyy/inwards/actions/runners` and
+  tell the owner. Never attach them to a public repository or allow fork PR
+  workflows: they run PR code.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
 - **`setup-bun` fails with "Unable to locate executable file"**: act's local

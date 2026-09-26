@@ -22,7 +22,7 @@ concurrency:
 jobs:
   engine:
     name: Lint, typecheck, prescan
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
     steps:
       - uses: actions/checkout@v7
       - name: Every version field matches .release-please-manifest.json
@@ -65,13 +65,17 @@ jobs:
         # Manual runs: both Ubuntu images (until ubuntu-latest moves to 26.04 on
         # 2026-10-19), macOS and Windows. PRs and pushes: ubuntu-26.04 only, to
         # save Actions minutes (#126); revert this to test all four on PRs.
+        # `os` names the check ("Test on ubuntu-26.04" is required by the
+        # rulesets); `runner` is where it runs. ubuntu-26.04 runs on the
+        # self-hosted Ubuntu 26.04 containers on irysek (ops/runner). The other
+        # rows stay GitHub-hosted: ubuntu-24.04 on irysek would really be 26.04.
         include: >-
           ${{ fromJSON(
             github.event_name == 'workflow_dispatch'
-            && '[{"os":"ubuntu-24.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"ubuntu-26.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"macos-latest","target":"bun-darwin-arm64","bin":"inwards-darwin-arm64"},{"os":"windows-latest","target":"bun-windows-x64","bin":"inwards-windows-x64.exe"}]'
-            || '[{"os":"ubuntu-26.04","target":"bun-linux-x64","bin":"inwards-linux-x64"}]'
+            && '[{"os":"ubuntu-24.04","runner":"ubuntu-24.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"ubuntu-26.04","runner":["self-hosted","linux","x64","inwards"],"target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"macos-latest","runner":"macos-latest","target":"bun-darwin-arm64","bin":"inwards-darwin-arm64"},{"os":"windows-latest","runner":"windows-latest","target":"bun-windows-x64","bin":"inwards-windows-x64.exe"}]'
+            || '[{"os":"ubuntu-26.04","runner":["self-hosted","linux","x64","inwards"],"target":"bun-linux-x64","bin":"inwards-linux-x64"}]'
           ) }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: bash
@@ -104,7 +108,7 @@ jobs:
 
   docs:
     name: Docs build
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag

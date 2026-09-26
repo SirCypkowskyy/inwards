@@ -15,7 +15,7 @@ permissions:
 jobs:
   external:
     name: External links
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
