@@ -79,6 +79,9 @@ const LAYER_KEYS: ReadonlySet<string> = new Set([
   "deny-libraries",
 ]);
 
+/** An import name: dotted Python identifiers, e.g. `http.client` (INW005 library lists). */
+const DOTTED_NAME = /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*$/u;
+
 /** Any mention of the tool, used only when the TOML can't be parsed. */
 const INWARDS_WORD = /\binwards\b/u;
 
@@ -268,14 +271,17 @@ function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
  * @param i - its index, for messages.
  * @param key - which of the two keys to read.
  * @returns the module names, or undefined when the key is absent.
- * @throws {ConfigError} when the value isn't a list of module names.
+ * @throws {ConfigError} when the value isn't a list of dotted Python identifiers.
  */
 function libraryList(layer: unknown, i: number, key: string): string[] | undefined {
   const value = isRecord(layer) ? layer[key] : undefined;
-  if (value !== undefined && !isModuleList(value)) {
-    throw new ConfigError(`tool.inwards.layers[${i}].${key} must be a list of module names.`);
+  const valid = isModuleList(value) && value.every((entry) => DOTTED_NAME.test(entry));
+  if (value !== undefined && !valid) {
+    throw new ConfigError(
+      `tool.inwards.layers[${i}].${key} must be a list of import names such as "sqlalchemy" or "http.client": no globs, and no distribution names like "python-dateutil".`,
+    );
   }
-  return value;
+  return valid ? value : undefined;
 }
 
 /**

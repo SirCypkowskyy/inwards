@@ -66,9 +66,19 @@ describe("INW005 pure-domain", () => {
       'Layer "domain" imports "sqlalchemy.orm.Session" from library "sqlalchemy", which "domain" may not use.',
     );
     expect(d?.fix.summary).toBe(
-      'Use "sqlalchemy" in "application" behind a port owned by "domain".',
+      'Use "sqlalchemy" in an outer layer, behind a port owned by "domain".',
     );
     expect(d?.fix.steps[1]).toContain("`shop.domain.ports`");
+    expect(d?.fix.steps[3]).toContain(
+      'in the outer layer that holds adapters (allowed: "application", "infrastructure", "interface")',
+    );
+  });
+
+  test("the fix names the deny entry that matched, the message the top-level package", () => {
+    const [d] = check(file("shop/domain/order.py", "from http.client import HTTPConnection\n"));
+    expect(d?.message).toContain('from library "http"');
+    expect(d?.fix.summary).toContain('Use "http.client"');
+    expect(d?.fix.steps.at(-1)).toContain('add "http.client" to that layer\'s allow-libraries');
   });
 
   test.each([
@@ -84,6 +94,7 @@ describe("INW005 pure-domain", () => {
 
   test.each([
     ["the stdlib", "import dataclasses\nfrom urllib.parse import urlsplit\nimport http\n"],
+    ["__main__", "import __main__\n"],
     ["other third-party code", "import attrs\n"],
     ["first-party code", "from shop.domain import order\nfrom . import order\n"],
   ])("the domain may import %s", (_, src) => {
@@ -117,7 +128,8 @@ layers = [{ name = "d", modules = ["shop.domain"] }, { name = "i", modules = ["s
     const keys = 'allow-libraries = ["attrs"]';
     expect(withKeys(keys, "attrs.define")).toEqual([]);
     expect(withKeys(keys, "collections.abc")).toEqual([]);
-    expect(withKeys(keys, "pydantic")).toHaveLength(1);
+    const [d] = withKeys(keys, "pydantic.fields");
+    expect(d?.fix.summary).toContain('Use "pydantic"');
   });
 
   test("allow-libraries overrides the default list; the longest entry wins", () => {
@@ -125,6 +137,10 @@ layers = [{ name = "d", modules = ["shop.domain"] }, { name = "i", modules = ["s
     const keys = 'deny-libraries = ["os"], allow-libraries = ["os.path"]';
     expect(withKeys(keys, "os.path")).toEqual([]);
     expect(withKeys(keys, "os.environ")).toHaveLength(1);
+  });
+
+  test("unicode identifiers are valid entries", () => {
+    expect(withKeys('deny-libraries = ["café"]', "café.x")).toHaveLength(1);
   });
 
   test("deny-libraries replaces the default list", () => {
@@ -147,8 +163,12 @@ layers = [
   });
 
   test.each([
-    ['allow-libraries = "attrs"', "allow-libraries must be a list of module names"],
-    ['deny-libraries = [""]', "deny-libraries must be a list of module names"],
+    ['allow-libraries = "attrs"', "allow-libraries must be a list of import names"],
+    ['deny-libraries = [""]', "deny-libraries must be a list of import names"],
+    ['deny-libraries = ["sqlalchemy.*"]', "no globs"],
+    ['allow-libraries = ["python-dateutil"]', "no distribution names"],
+    ['deny-libraries = ["http..client"]', "deny-libraries must be"],
+    ['deny-libraries = ["1password"]', "deny-libraries must be"],
   ])("%s is a config error", (keys, message) => {
     const text = `[tool.inwards]\nlayers = [{ name = "d", modules = ["d"], ${keys} }]\n`;
     expect(() => parseConfig(text)).toThrow(ConfigError);

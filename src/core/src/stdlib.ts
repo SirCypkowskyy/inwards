@@ -3,11 +3,12 @@
  * `sys.stdlib_module_names` on CPython 3.11 to 3.14, plus the modules 3.10 and
  * older still had (`binhex`, `formatter`, `parser`, `symbol`, ...), so a
  * project on any supported Python sorts its imports the same way (INW005).
+ * `__main__`, the running script, is added by hand: it is never a library.
  * Regenerate by printing that set on each new CPython and taking the union.
  */
 export const STDLIB: ReadonlySet<string> = new Set(
   `
-_abc abc aifc _aix_support _android_support annotationlib antigravity _apple_support argparse
+__main__ _abc abc aifc _aix_support _android_support annotationlib antigravity _apple_support argparse
 array _ast ast _ast_unparse asynchat _asyncio asyncio asyncore atexit audioop base64 bdb
 binascii binhex _bisect bisect _blake2 _bootsubprocess builtins _bz2 bz2 calendar cgi cgitb
 chunk cmath cmd code _codecs codecs _codecs_cn _codecs_hk _codecs_iso2022 _codecs_jp _codecs_kr

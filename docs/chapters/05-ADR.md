@@ -536,8 +536,9 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 
 - INW005 `pure-domain` checks every import of a file in a layer that is neither first-party (a layer or the INW006 file-system probe owns it) nor allowed by the layer's `allow-libraries` / `deny-libraries`. Entries are module names that cover their submodules; the longest matching entry decides, `allow` on a tie.
 - `allow-libraries` makes the layer an allowlist for third-party code only. The standard library stays allowed, told apart by a bundled list: the union of `sys.stdlib_module_names` on CPython 3.11 to 3.14, plus the modules older versions had.
-- The innermost layer of a config with two or more layers denies a fixed list of frameworks, database and network clients and stdlib I/O unless it sets `deny-libraries`. A one-layer config gets no default: its only layer is the whole app, not a domain.
-- The message names the library's top-level package, never the configured lists, so a baseline entry survives a change to them. The fix names the first outer layer the config lets use the library, and the port to introduce there.
+- Entries must be dotted Python identifiers. A glob or a distribution name would match nothing and, on the innermost layer, silently drop the default.
+- The innermost layer of a config with two or more layers denies a fixed list of frameworks, database and network clients and stdlib I/O unless it sets `deny-libraries`, which replaces the list rather than extending it. A one-layer config gets no default: its only layer is the whole app, not a domain.
+- The message names the library's top-level package, never the configured lists, so a baseline entry survives a change to them. The fix names the deny entry that matched (`http.client`, which `allow-libraries = ["http"]` would not override) and every outer layer the config lets use the library; the agent picks the one that holds adapters, since layer order doesn't say which one that is in a hexagonal layout.
 
 **Consequences.**
 

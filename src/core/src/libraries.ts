@@ -55,17 +55,18 @@ const DEFAULT_DENY: readonly string[] = [
 ];
 
 /**
- * Finds the length of the longest entry that covers a module.
+ * Finds the longest entry that covers a module.
  *
  * @param entries - module names; each covers itself and its submodules.
  * @param target - a dotted import target.
- * @returns the entry's length, or -1 when none covers the target.
+ * @returns the entry, or undefined when none covers the target.
  */
-function longest(entries: readonly string[], target: string): number {
-  let best = -1;
+function longest(entries: readonly string[], target: string): string | undefined {
+  let best: string | undefined;
   for (const entry of entries) {
-    if ((target === entry || target.startsWith(`${entry}.`)) && entry.length > best) {
-      best = entry.length;
+    const covers = target === entry || target.startsWith(`${entry}.`);
+    if (covers && entry.length > (best?.length ?? -1)) {
+      best = entry;
     }
   }
   return best;
@@ -77,17 +78,19 @@ function longest(entries: readonly string[], target: string): number {
  * @param layers - the configured layers, innermost first.
  * @param i - the index of the importing layer.
  * @param target - a dotted import target that is not first-party.
- * @returns true when the import is allowed.
+ * @returns undefined when the import is allowed; else the deny entry that
+ *   matched, or the top-level package when the import is outside `allow-libraries`.
  */
-function allows(layers: readonly LayerSpec[], i: number, target: string): boolean {
+function denial(layers: readonly LayerSpec[], i: number, target: string): string | undefined {
   const layer = layers[i];
   const inner = i === 0 && layers.length > 1;
   const deny = longest(layer?.denyLibraries ?? (inner ? DEFAULT_DENY : []), target);
   const allow = longest(layer?.allowLibraries ?? [], target);
-  if (allow >= 0 || deny >= 0) {
-    return allow >= deny;
+  if (allow !== undefined || deny !== undefined) {
+    return (allow?.length ?? -1) >= (deny?.length ?? -1) ? undefined : deny;
   }
-  return layer?.allowLibraries === undefined || STDLIB.has(topOf(target));
+  const allowed = layer?.allowLibraries === undefined || STDLIB.has(topOf(target));
+  return allowed ? undefined : topOf(target);
 }
 
 /**
@@ -123,19 +126,21 @@ export function checkLibraries(
   }
   const found: Diagnostic[] = [];
   for (const ref of imports) {
-    // allows() first: ownerOf may probe the file system. The other two rule out first-party code.
-    const denied =
-      !allows(layers, from, ref.target) &&
+    // denial() first: ownerOf may probe the file system. The other two rule out first-party code.
+    const entry = denial(layers, from, ref.target);
+    if (
+      entry !== undefined &&
       layerIndexOf(ref.target, layers) === -1 &&
-      ownerOf(ref.target) === undefined;
-    if (denied) {
-      const lib = topOf(ref.target);
-      const owner = layers.find((_, i) => i > from && allows(layers, i, ref.target));
+      ownerOf(ref.target) === undefined
+    ) {
+      const owners = layers.filter(
+        (_, i) => i > from && denial(layers, i, ref.target) === undefined,
+      );
       found.push(
         diagnostic(RULES.INW005, file, {
           span: ref,
-          message: `Layer "${source.name}" imports "${ref.target}" from library "${lib}", which "${source.name}" may not use.`,
-          fix: fixFor(source, owner, ref, lib),
+          message: `Layer "${source.name}" imports "${ref.target}" from library "${topOf(ref.target)}", which "${source.name}" may not use.`,
+          fix: fixFor(source, owners, ref, entry),
         }),
       );
     }
@@ -145,32 +150,39 @@ export function checkLibraries(
 
 /**
  * Writes the repair advice attached to an INW005 diagnostic: move the library
- * behind a port the layer owns, implemented in the first outer layer that may
- * use it.
+ * behind a port the layer owns, implemented in an outer layer that may use it.
+ * Every such layer is listed, and the agent picks the one that holds adapters:
+ * which one that is depends on the architecture, not on the layer order.
  *
  * @param source - the layer that made the import.
- * @param owner - the first outer layer allowed to use the library, if any.
+ * @param owners - the outer layers allowed to use the library.
  * @param ref - the offending import.
- * @param lib - the library's top-level package.
+ * @param entry - the deny entry that matched, or the top-level package outside `allow-libraries`.
  * @returns the summary and numbered steps of the fix.
  */
-function fixFor(source: LayerSpec, owner: LayerSpec | undefined, ref: ImportRef, lib: string): Fix {
+function fixFor(
+  source: LayerSpec,
+  owners: readonly LayerSpec[],
+  ref: ImportRef,
+  entry: string,
+): Fix {
   const remove = `Delete \`${ref.statement}\`. Do not move the import into a function, behind TYPE_CHECKING or into importlib; Inwards checks those too.`;
-  const ask = `If "${source.name}" should be allowed to use "${lib}", ask the user to add it to that layer's allow-libraries in [tool.inwards]. Don't edit [tool.inwards] yourself.`;
-  if (!owner) {
+  const ask = `If "${source.name}" should be allowed to use "${entry}", ask the user to add "${entry}" to that layer's allow-libraries in [tool.inwards]. Don't edit [tool.inwards] yourself.`;
+  if (owners.length === 0) {
     return {
-      summary: `"${source.name}" may not use "${lib}", and no outer layer may either: ask the user where it belongs.`,
+      summary: `"${source.name}" may not use "${entry}", and no outer layer may either: ask the user where it belongs.`,
       steps: [remove, ask],
     };
   }
   const home = source.modules[0] ?? source.name;
+  const allowed = owners.map((layer) => `"${layer.name}"`).join(", ");
   return {
-    summary: `Use "${lib}" in "${owner.name}" behind a port owned by "${source.name}".`,
+    summary: `Use "${entry}" in an outer layer, behind a port owned by "${source.name}".`,
     steps: [
       remove,
-      `Declare a typing.Protocol in \`${home}\` (for example \`${home}.ports\`) that describes only what this module needs from "${lib}".`,
+      `Declare a typing.Protocol in \`${home}\` (for example \`${home}.ports\`) that describes only what this module needs from "${entry}".`,
       "Type this module against that Protocol and receive the implementation through a constructor or function parameter.",
-      `Implement the Protocol with "${lib}" in "${owner.name}", and wire it in the outermost layer (the composition root).`,
+      `Implement the Protocol with "${entry}" in the outer layer that holds adapters (allowed: ${allowed}), and wire it in the outermost layer (the composition root).`,
       ask,
     ],
   };

@@ -14,12 +14,15 @@ The import is checked wherever it is: top level, inside a function, behind `if T
 
 ## Configure it
 
-Two optional keys on a layer, each a list of module names. An entry covers the module and everything below it: `sqlalchemy` covers `sqlalchemy.orm.Session`, `http.client` covers `http.client.HTTPConnection` but not `http.HTTPStatus`.
+Two optional keys on a layer, each a list of import names: dotted Python identifiers such as `sqlalchemy` or `http.client`. An entry covers the module and everything below it: `sqlalchemy` covers `sqlalchemy.orm.Session`, `http.client` covers `http.client.HTTPConnection` but not `http.HTTPStatus`. Globs (`sqlalchemy.*`) and distribution names (`python-dateutil`, which imports as `dateutil`) are config errors, since they would match nothing.
 
 - `allow-libraries`: once set, the layer may import only these third-party libraries. The standard library stays allowed.
 - `deny-libraries`: the layer may not import these, standard library included.
 
-When both lists name a module, the longer entry wins (`deny-libraries = ["os"]` with `allow-libraries = ["os.path"]` allows `os.path` only), and `allow` wins a tie. Without either key a layer may import any library, except the innermost layer of a config with two or more layers, which gets the default deny list below unless it sets `deny-libraries` itself (`deny-libraries = []` turns the default off).
+When both lists name a module, the longer entry wins (`deny-libraries = ["os"]` with `allow-libraries = ["os.path"]` allows `os.path` only), and `allow` wins a tie. So `allow-libraries = ["http"]` does not undo the default's longer `http.client`; `allow-libraries = ["http.client"]` does. Without either key a layer may import any library, except the innermost layer of a config with two or more layers, which gets the default deny list below.
+
+!!! warning "`deny-libraries` on the innermost layer replaces the default"
+    It does not add to it. `deny-libraries = ["pydantic"]` on the domain denies `pydantic` and nothing else: SQLAlchemy, Requests and the rest of the default are allowed again. Copy the default entries you want to keep into the list. `deny-libraries = []` turns the default off. To allow one default entry, add it to `allow-libraries` instead, which keeps the rest.
 
 <!-- e2e -->
 
@@ -44,24 +47,24 @@ Here the domain may use `attrs` and the standard library, minus the default deny
 
 Frameworks and servers: `django`, `fastapi`, `flask`, `litestar`, `starlette`, `celery`, `grpc`. Databases and ORMs: `sqlalchemy`, `sqlmodel`, `alembic`, `peewee`, `psycopg`, `psycopg2`, `asyncpg`, `pymysql`, `pymongo`, `redis`, `sqlite3`. Network clients: `requests`, `httpx`, `aiohttp`, `urllib3`, `boto3`, `botocore`, `pika`. Standard-library I/O: `socket`, `subprocess`, `http.client`, `http.server`, `urllib.request`, `smtplib`, `ftplib`.
 
-Pure standard-library modules stay allowed: `dataclasses`, `typing`, `datetime`, `decimal`, `enum`, `urllib.parse`, `http.HTTPStatus`. So do `os` and `pathlib`; add them to `deny-libraries` if your domain must not touch the file system either (the list replaces the default, so copy the default entries you want to keep).
+Pure standard-library modules stay allowed: `dataclasses`, `typing`, `datetime`, `decimal`, `enum`, `urllib.parse`, `http.HTTPStatus`. So do `os` and `pathlib`; add them to `deny-libraries` if your domain must not touch the file system either, together with the default entries you want to keep.
 
 ## What the agent sees
 
-The message names the layer, the import and the library's top-level package, never the lists, so a [baseline](install.md#on-an-existing-codebase) entry survives a change to them. The fix names the first outer layer allowed to use the library and the port to introduce:
+The message names the layer, the import and the library's top-level package, never the lists, so a [baseline](install.md#on-an-existing-codebase) entry survives a change to them. The fix names the entry that denied the import (`http.client` for `from http.client import HTTPConnection`; the top-level package when the import is outside `allow-libraries`), the port to introduce, and every outer layer allowed to use the library. The agent picks the one that holds adapters: in a hexagonal layout that isn't always the next layer out.
 
 ```text
 shop/domain/order.py:3:28: INW005 Layer "domain" imports "sqlalchemy.orm.Session" from library "sqlalchemy", which "domain" may not use.
-  fix: Use "sqlalchemy" in "infrastructure" behind a port owned by "domain".
+  fix: Use "sqlalchemy" in an outer layer, behind a port owned by "domain".
     1. Delete `from sqlalchemy.orm import Session`. Do not move the import into a function, behind TYPE_CHECKING or into importlib; Inwards checks those too.
     2. Declare a typing.Protocol in `shop.domain` (for example `shop.domain.ports`) that describes only what this module needs from "sqlalchemy".
     3. Type this module against that Protocol and receive the implementation through a constructor or function parameter.
-    4. Implement the Protocol with "sqlalchemy" in "infrastructure", and wire it in the outermost layer (the composition root).
-    5. If "domain" should be allowed to use "sqlalchemy", ask the user to add it to that layer's allow-libraries in [tool.inwards]. Don't edit [tool.inwards] yourself.
+    4. Implement the Protocol with "sqlalchemy" in the outer layer that holds adapters (allowed: "infrastructure"), and wire it in the outermost layer (the composition root).
+    5. If "domain" should be allowed to use "sqlalchemy", ask the user to add "sqlalchemy" to that layer's allow-libraries in [tool.inwards]. Don't edit [tool.inwards] yourself.
 ```
 
 When no outer layer may use the library either, the fix keeps steps 1 and 5 and tells the agent to ask the user where the library belongs.
 
 ## Not covered yet
 
-Distribution names that differ from the import name (`PyYAML` is `yaml`) are not mapped: list the import name. The standard-library list is fixed at build time, so a module added in a later CPython counts as third-party until Inwards updates the list.
+Distribution names that differ from the import name (`PyYAML` is `yaml`) are not mapped: list the import name. There is no key that adds to the default deny list without replacing it. The standard-library list is fixed at build time, so a module added in a later CPython counts as third-party until Inwards updates the list.
