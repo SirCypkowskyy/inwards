@@ -34,7 +34,7 @@ Correctness sits above speed on purpose. A guardrail that sometimes stays silent
 
 All numbers come from the scaffold in this repository. Nothing here is projected. They were measured during M0; the spot check below shows how they have moved since.
 
-**Setup.** A Linux laptop, Bun 1.4.2, `inwards-linux-x64` built by `scripts/build-binaries.ts`. Everything runs on one thread, since the engine has no worker pool yet. The laptop was in normal desktop use (load average around 2 to 3), so these are realistic numbers rather than best-case ones.
+**Setup.** A laptop, Bun 1.4.2, `inwards-linux-x64` built by `scripts/build-binaries.ts`. Everything runs on one thread, since the engine has no worker pool yet. The laptop was in normal desktop use (load average around 2 to 3), so these are realistic numbers rather than best-case ones.
 
 **Synthetic repo.** 2,100 Python files, 496,000 lines, 8.0 MB, four layers with eight first-party imports and forty small functions per module. `bench/generate.py` rebuilds it exactly (fixed random seed). With `--legacy` it adds an outer `legacy` layer that every module imports, so each of the 2,000 modules has one violation: the legacy codebase that [chapter 3](03-Architecture-C4.md)'s cost model times with a full baseline.
 
@@ -93,7 +93,7 @@ Two things the synthetic repo didn't show. `inwards check` on polar's `subscript
 
 [#39](https://github.com/SirCypkowskyy/inwards/issues/39) asked whether `bun build --compile` flags cut start-up or binary size. Since then `scripts/build-binaries.ts` builds with `--bytecode --format=esm` on top of `--minify --sourcemap=linked`.
 
-**Method.** Six variants of `inwards-linux-x64` from one commit, Bun 1.4.2, the same laptop as above. Start-up: 200 rounds of `inwards --version`, every variant once per round in rotating order. Hook and full check: `bench/compare.ts` with the current build as base, 100 hook runs and 20 full checks per side, change as the median of per-pair ratios. Peak RSS: `/usr/bin/time -f %M`, median of 5 runs. MB means 10^6 bytes throughout. Other agents' builds shared the machine (load average 2 to 6 during the runs), so trust the ratios more than the absolute milliseconds; a base-against-base run moved 0.2% (hook) and 0.6% (full).
+**Method.** Six variants of `inwards-linux-x64` from one commit, Bun 1.4.2, the same laptop as above. Start-up: 200 rounds of `inwards --version`, every variant once per round in rotating order. Hook and full check: `bench/compare.ts` with the current build as base, 100 hook runs and 20 full checks per side, change as the median of per-pair ratios. Peak RSS: `/usr/bin/time -f %M`, median of 5 runs. MB means 10^6 bytes throughout. The load average was 2 to 6 during the runs, so trust the ratios more than the absolute milliseconds; a base-against-base run moved 0.2% (hook) and 0.6% (full).
 
 | Variant | Size (Linux x64) | `inwards --version` p50 / p95 | Hook, one file | Full check | Peak RSS, full / hook |
 |---|---|---|---|---|---|
@@ -190,6 +190,6 @@ The screenshots in these docs come from `scripts/screenshots.py`, which runs eac
 | Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard and the session record ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
 | A binary silently ignores its bytecode (Bun falls back to parsing the source) and start-up doubles | Low | Low | Tests still pass in that case; the PR benchmark catches it on Linux only. Bytecode is tied to the Bun version that built it, and every binary embeds that same version |
-| The self-hosted part of CI is unavailable and the PR jobs that run there queue | Medium | Medium | To save GitHub Actions limits and costs, some automated CI jobs run on self-hosted infrastructure; jobs with write tokens, OIDC or secrets always run on GitHub-hosted runners. Point `runs-on` back at `ubuntu-26.04` to fall back to GitHub-hosted runners |
+| The self-hosted part of CI is unavailable and the PR jobs that run there queue | Medium | Medium | To save GitHub Actions limits and costs, some automated CI jobs run on self-hosted infrastructure; when it is unavailable, those jobs can run on GitHub-hosted runners instead |
 | Zensical (0.0.x) changes its config format | Medium | Low | Docs build runs in CI on every PR; the config is small |
 | Fix steps are wrong for unusual layouts (no obvious place for a port) | Medium | Medium | Measure fix-within-one-retry per rule; let the config name the ports module |

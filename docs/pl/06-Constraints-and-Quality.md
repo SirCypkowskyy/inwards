@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: bf27a8726213c9c185607f1b2553cb6b0f35e2df49492e8bda235c1e8a2c6bfd
+source_hash: 8d227f541bd25d99944ed6a89aa0ab33546923c9dcc86cf1473ade30b29ec5a5
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -39,7 +39,7 @@ Poprawność celowo stoi wyżej niż szybkość. Zabezpieczenie, które czasem m
 
 Wszystkie liczby pochodzą ze scaffoldu w tym repozytorium. Nic tu nie jest prognozą. Zmierzono je w M0; wyrywkowe sprawdzenie niżej pokazuje, jak się od tego czasu zmieniły.
 
-**Środowisko.** Laptop z Linuksem, Bun 1.4.2, `inwards-linux-x64` zbudowany przez `scripts/build-binaries.ts`. Wszystko działa w jednym wątku, bo silnik nie ma jeszcze puli workerów. Laptop był w zwykłym użyciu desktopowym (średnie obciążenie około 2–3), więc to liczby realistyczne, a nie najlepszy możliwy przypadek.
+**Środowisko.** Laptop, Bun 1.4.2, `inwards-linux-x64` zbudowany przez `scripts/build-binaries.ts`. Wszystko działa w jednym wątku, bo silnik nie ma jeszcze puli workerów. Laptop był w zwykłym użyciu desktopowym (średnie obciążenie około 2–3), więc to liczby realistyczne, a nie najlepszy możliwy przypadek.
 
 **Syntetyczne repozytorium.** 2100 plików Pythona, 496 000 linii, 8,0 MB, cztery warstwy z ośmioma importami własnego kodu i czterdziestoma małymi funkcjami na moduł. `bench/generate.py` odtwarza je dokładnie (stałe ziarno losowości). Z `--legacy` dodaje zewnętrzną warstwę `legacy`, którą importuje każdy moduł, więc każdy z 2000 modułów ma jedno naruszenie: to starszy kod, dla którego model kosztów z [rozdziału 3](03-Architecture-C4.md) mierzy czas z pełnym baseline'em.
 
@@ -98,7 +98,7 @@ Dwie rzeczy, których syntetyczne repozytorium nie pokazało. `inwards check` na
 
 [#39](https://github.com/SirCypkowskyy/inwards/issues/39) pytało, czy flagi `bun build --compile` skracają start albo zmniejszają plik binarny. Od tego czasu `scripts/build-binaries.ts` buduje z `--bytecode --format=esm` oprócz `--minify --sourcemap=linked`.
 
-**Metoda.** Sześć wariantów `inwards-linux-x64` z jednego commitu, Bun 1.4.2, ten sam laptop co wyżej. Start: 200 rund `inwards --version`, każdy wariant raz na rundę w rotującej kolejności. Hook i pełne sprawdzenie: `bench/compare.ts` z obecnym buildem jako bazą, 100 uruchomień hooka i 20 pełnych sprawdzeń na stronę, zmiana jako mediana stosunków w parach. Szczytowe RSS: `/usr/bin/time -f %M`, mediana z 5 uruchomień. MB oznacza wszędzie 10^6 bajtów. Maszynę współdzieliły buildy innych agentów (średnie obciążenie 2 do 6 w trakcie uruchomień), więc bardziej ufaj stosunkom niż bezwzględnym milisekundom; porównanie bazy z bazą dało różnicę 0,2% (hook) i 0,6% (pełne).
+**Metoda.** Sześć wariantów `inwards-linux-x64` z jednego commitu, Bun 1.4.2, ten sam laptop co wyżej. Start: 200 rund `inwards --version`, każdy wariant raz na rundę w rotującej kolejności. Hook i pełne sprawdzenie: `bench/compare.ts` z obecnym buildem jako bazą, 100 uruchomień hooka i 20 pełnych sprawdzeń na stronę, zmiana jako mediana stosunków w parach. Szczytowe RSS: `/usr/bin/time -f %M`, mediana z 5 uruchomień. MB oznacza wszędzie 10^6 bajtów. Średnie obciążenie wynosiło 2 do 6 w trakcie uruchomień, więc bardziej ufaj stosunkom niż bezwzględnym milisekundom; porównanie bazy z bazą dało różnicę 0,2% (hook) i 0,6% (pełne).
 
 | Wariant | Rozmiar (Linux x64) | `inwards --version` p50 / p95 | Hook, jeden plik | Pełne sprawdzenie | Szczytowe RSS, pełne / hook |
 |---|---|---|---|---|---|
@@ -195,6 +195,6 @@ Zrzuty ekranu w tej dokumentacji pochodzą ze `scripts/screenshots.py`, który n
 | Agenci edytują `[tool.inwards]`, żeby przejść sprawdzenie | Wysokie bez zabezpieczenia | Wysoki | Config guard w PreToolUse, porównanie konfiguracji w Stop gate, reguły `permissions.deny` z `init`, CODEOWNERS ([rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash wciąż może ominąć config guard i zapis sesji ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Regresje albo niekompatybilne zmiany w `--compile` Buna | Niskie | Średni | Wersja przypięta przez `.bun-version`; macierz weryfikacji w CD uruchamia każdy plik binarny |
 | Plik binarny po cichu ignoruje swój bajtkod (Bun wraca do parsowania źródła) i start wydłuża się dwukrotnie | Niskie | Niski | Testy w takim przypadku nadal przechodzą; benchmark w PR wyłapuje to tylko na Linuksie. Bajtkod jest związany z wersją Buna, która go zbudowała, a każdy plik binarny osadza tę samą wersję |
-| Część CI działająca na infrastrukturze self-hosted jest niedostępna, a zadania PR, które tam trafiają, czekają w kolejce | Średnie | Średni | Dla oszczędności limitów i kosztów GitHub Actions część automatycznych zadań CI działa na infrastrukturze self-hosted; zadania z tokenami zapisu, OIDC albo sekretami zawsze działają na runnerach GitHuba. Żeby wrócić do runnerów GitHuba, ustaw `runs-on` z powrotem na `ubuntu-26.04` |
+| Część CI działająca na infrastrukturze self-hosted jest niedostępna, a zadania PR, które tam trafiają, czekają w kolejce | Średnie | Średni | Dla oszczędności limitów i kosztów GitHub Actions część automatycznych zadań CI działa na infrastrukturze self-hosted; gdy jest niedostępna, te zadania mogą działać na runnerach GitHuba |
 | Zensical (0.0.x) zmienia format konfiguracji | Średnie | Niski | Build dokumentacji działa w CI przy każdym PR; konfiguracja jest mała |
 | Kroki naprawy są błędne dla nietypowych układów (brak oczywistego miejsca na port) | Średnie | Średni | Mierzyć naprawę w ramach jednej ponownej próby dla każdej reguły; pozwolić konfiguracji wskazać moduł portów |
