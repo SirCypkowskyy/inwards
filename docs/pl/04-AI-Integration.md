@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: bd7e5a1770e2a43ae4192ead149f363002f4aac67235f135bd7b2dd51ed019a0
+source_hash: bd4c1b957f4c7e19cbc09abadc06b92f2e4e366a44905d03a92304a9253f2eda
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
