@@ -1,0 +1,116 @@
+/**
+ * @file The OpenCode plugin through a session. A bad edit gets its findings
+ * in the tool result, and warnings reach the agent too. The Stop gate sends
+ * the agent back once, as the agent the user picked, with a preface that
+ * says who is speaking. A Stop result from before the user's latest
+ * message, or a second idle while the first is being answered, sends
+ * nothing. Subagents share their top-level session, including one resumed
+ * after a restart, and a plugin file changed during the session is reported.
+ */
+import { expect, test } from "bun:test";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
+import { fire, initProject, load, PLUGIN, say } from "../support/opencode-helpers.ts";
+
+const STOP = "Inwards Stop gate (sent by the Inwards plugin, not the user)";
+const LEAK = "import shop.infrastructure.db\n";
+
+test("a bad edit gets its findings, and the Stop gate sends the agent back once, as the chosen agent", async () => {
+  const root = initProject();
+  const { hooks, sent } = await load(root);
+  const s = "ses_stop";
+  await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.", "reviewer");
+  const order = join(root, "shop/domain/order.py");
+  writeFileSync(order, LEAK);
+  const out = { output: "Edit applied." };
+  await hooks["tool.execute.after"](
+    { tool: "write", sessionID: s, args: { filePath: order } },
+    out,
+  );
+  expect(out.output).toContain("INW001");
+
+  await fire(hooks, "session.idle", s);
+  expect(sent.map((m) => [m.id, m.agent, m.noReply])).toEqual([[s, "reviewer", false]]);
+  expect(sent[0]?.text).toStartWith(STOP);
+  expect(sent[0]?.text).toContain("INW001");
+
+  await fire(hooks, "session.idle", s); // an idle from before the gate's message arrived
+  expect(sent).toHaveLength(1);
+  await say(hooks, s, sent[0]?.text ?? ""); // the gate's message arrives
+  writeFileSync(order, "X = 1\n");
+  await fire(hooks, "session.idle", s);
+  expect(sent).toHaveLength(1);
+});
+
+test("a warning reaches the agent in the tool result", async () => {
+  const root = initProject();
+  const { hooks } = await load(root);
+  const util = join(root, "shop/util.py");
+  writeFileSync(util, "X = 1\n");
+  const out = { output: "" };
+  await hooks["tool.execute.after"](
+    { tool: "write", sessionID: "ses_warn", args: { filePath: util } },
+    out,
+  );
+  expect(out.output).toContain("INW006");
+});
+
+test("a Stop result from before the user's latest message sends nothing", async () => {
+  const root = initProject();
+  const { hooks, sent } = await load(root);
+  const s = "ses_race";
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  const idle = fire(hooks, "session.idle", s);
+  const again = fire(hooks, "session.idle", s);
+  await say(hooks, s, "Never mind, leave it.");
+  await Promise.all([idle, again]);
+  expect(sent).toEqual([]);
+});
+
+test("subagents share their session, also when resumed after a restart", async () => {
+  const root = initProject();
+  const { hooks, sent, parents } = await load(root);
+  const [top, child, resumed] = ["ses_top", "ses_child", "ses_resumed"];
+  await fire(hooks, "session.created", top);
+  await fire(hooks, "session.created", child, top);
+  parents.set(resumed, child); // known to OpenCode, never created in this process
+  const order = join(root, "shop/domain/order.py");
+  writeFileSync(order, LEAK);
+  const out = { output: "" };
+  await hooks["tool.execute.after"](
+    { tool: "write", sessionID: resumed, args: { filePath: order } },
+    out,
+  );
+  expect(out.output).toContain("INW001");
+  await say(hooks, child, "Do the subtask.");
+  await fire(hooks, "session.idle", child);
+  await fire(hooks, "session.idle", resumed);
+  expect(sent).toEqual([]);
+  await fire(hooks, "session.idle", top);
+  expect(sent.map((m) => m.id)).toEqual([top]);
+});
+
+test("the Stop gate reports a plugin removed, or rewritten with the marker kept", async () => {
+  const root = initProject();
+  const path = join(root, PLUGIN);
+  const original = readFileSync(path, "utf8");
+  const { hooks, sent } = await load(root);
+  const s = "ses_gone";
+  await fire(hooks, "session.created", s);
+  writeFileSync(path, `${PLUGIN_MARKER}\nexport const Inwards = async () => ({});\n`);
+  await fire(hooks, "session.idle", s);
+  expect(sent.at(-1)?.text).toContain("changed since OpenCode loaded it");
+
+  await say(hooks, s, "Go on.");
+  rmSync(path);
+  await fire(hooks, "session.idle", s);
+  expect(sent.at(-1)?.text).toContain("--agent opencode");
+
+  await say(hooks, s, "Go on.");
+  writeFileSync(path, original);
+  await fire(hooks, "session.idle", s);
+  expect(sent).toHaveLength(2);
+});

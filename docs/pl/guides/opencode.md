@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/opencode.md
-source_hash: edf5137fb2a244cf62b4cae58779061f969ff8a4bb574c9c81ec565cccf0e7cb
+source_hash: adfbf95b25e78d6d622f980dfcb86e0cc8749df913e391f81909a3f5e99a5f27
 ---
 
 # OpenCode { #opencode }
@@ -22,9 +22,9 @@ Z zainstalowanym pluginem Inwards sprawdza każdy plik Pythona, który agent edy
     inwards init --agent opencode
     ```
 
-    To zapisuje plugin `.opencode/plugins/inwards.js`. Zawiera on ścieżkę do pliku binarnego na tej maszynie, więc `init` dodaje go do `.gitignore`, razem z `.inwards/`. Przypina też `required-version` i domyślną listę `ignore` w `[tool.inwards]`. Ponowne uruchomienie niczego nie zmienia. Jeśli plik o tej nazwie istnieje, a `init` go nie zapisał, `init` zatrzymuje się i zostawia go w spokoju.
+    To zapisuje plugin `.opencode/plugins/inwards.js`. Zawiera on ścieżkę do pliku binarnego na tej maszynie, więc `init` dodaje go do `.gitignore`, razem z `.inwards/`. Przypina też `required-version` i domyślną listę `ignore` w `[tool.inwards]`. Ponowne uruchomienie niczego nie zmienia. Jeśli plik o tej nazwie istnieje, a `init` go nie zapisał, albo pod tą ścieżką jest katalog lub dowiązanie, `init` zatrzymuje się, zanim cokolwiek zmieni.
 
-3. Uruchom OpenCode ponownie w projekcie. OpenCode ładuje pluginy przy starcie.
+3. Uruchom OpenCode ponownie w projekcie albo w dowolnym katalogu pod nim. OpenCode ładuje pluginy przy starcie, a plugin sprawdza względem projektu, do którego go zapisano.
 
 ## Sprawdź, czy działa { #check-it-works }
 
@@ -35,12 +35,12 @@ Z zainstalowanym pluginem Inwards sprawdza każdy plik Pythona, który agent edy
 
 | Gwarancja Claude Code | W OpenCode |
 |---|---|
-| Sprawdzenie po każdej edycji | Obowiązuje dla narzędzi `edit`, `write` i `apply_patch`. Znaleziska są dopisywane do wyniku narzędzia, który agent czyta przed następnym krokiem. |
-| Strażnik konfiguracji odrzuca edycje `[tool.inwards]`, baseline'u i plików Inwards | Obowiązuje dla `edit`, `write` i `bash`: przechodzą przez tego samego strażnika. Strażnik nie przeczyta łatki, więc plugin odmawia każdego `apply_patch`, który dotyka `pyproject.toml`, `.opencode/`, `opencode.json(c)`, `.inwards/` albo `inwards-baseline.json`. Agent nadal może zmienić `pyproject.toml` przez `edit`, który strażnik sprawdza; `edit` i `write` pozostałych plików też są odrzucane, tak jak robi to `permissions.deny` w Claude Code. |
-| Bramka Stop odmawia zakończenia tury, dopóki zmiany z sesji łamią warstwę | OpenCode nie może odmówić zakończenia tury. Gdy sesja przechodzi w bezczynność, plugin uruchamia bramkę; jeśli ta blokuje, plugin wysyła jej powody do sesji jako nową wiadomość, która zaczyna kolejną turę. Wiadomość zaczyna się od „Inwards Stop gate (sent by the Inwards plugin, not the user)”, żeby agent nie wziął jej za twoje słowa. `escalate-after` działa tak jak w Claude Code. |
+| Sprawdzenie po każdej edycji | Obowiązuje dla narzędzi `edit`, `write` i `apply_patch`. Znaleziska, ostrzeżenia i prośba eskalacji, żeby zapytać ciebie, są dopisywane do wyniku narzędzia, który agent czyta przed następnym krokiem. |
+| Strażnik konfiguracji odrzuca edycje `[tool.inwards]`, baseline'u i plików Inwards | Obowiązuje dla `edit`, `write` i `bash`: przechodzą przez tego samego strażnika. Strażnik nie przeczyta łatki, więc plugin odmawia każdego `apply_patch`, który dotyka `pyproject.toml`, `.opencode/`, `opencode.json(c)`, `.inwards/` albo `inwards-baseline.json`. Agent nadal może zmienić `pyproject.toml` przez `edit`, który strażnik sprawdza; `edit` i `write` pozostałych plików też są odrzucane, tak jak robi to `permissions.deny` w Claude Code. Ścieżki są porównywane po rozwiązaniu dowiązań, więc alias nie przejdzie. Jeśli Inwards w ogóle nie może się uruchomić, wywołanie dotykające tych plików jest odrzucane; inne wywołania przechodzą, a wynik edycji mówi, że nic nie sprawdzono. |
+| Bramka Stop odmawia zakończenia tury, dopóki zmiany z sesji łamią warstwę | OpenCode nie może odmówić zakończenia tury. Gdy sesja przechodzi w bezczynność, plugin uruchamia bramkę; jeśli ta blokuje, plugin wysyła jej powody do sesji jako nową wiadomość, która zaczyna kolejną turę. Wiadomość zaczyna się od „Inwards Stop gate (sent by the Inwards plugin, not the user)”, żeby agent nie wziął jej za twoje słowa, i trafia do agenta, którego wybrałeś. Wynik bramki, który przychodzi po twojej wiadomości, jest odrzucany. `escalate-after` działa tak jak w Claude Code; podsumowanie, które Claude Code pokazuje ci, gdy bramka się poddaje, i nierozwiązane problemy, z którymi zaczyna się nowa sesja, przychodzą jako wiadomości od pluginu, które nie zaczynają tury. |
 | Bramka Stop w uruchomieniu nieinteraktywnym | `opencode run` kończy działanie, gdy sesja przechodzi w bezczynność, więc drugiej tury nie ma. Sprawdzenie po edycji nadal dociera do agenta w trakcie uruchomienia; po nim uruchom `inwards check`, jak w [CI](ci.md). Sesja prowadzona przez `opencode serve` dostaje drugą turę. |
-| Subagenty | Sesja subagenta jest przypisana do sesji najwyższego poziomu, tak jak Claude Code daje subagentowi identyfikator sesji rodzica. Jego edycje są sprawdzane; bramka Stop działa, gdy w bezczynność przechodzi sesja najwyższego poziomu, i obejmuje wszystko, co zmieniły ta sesja i jej subagenty. |
-| Brak hooka oblewa bramkę Stop | Bramka sprawdza, czy plik pluginu wciąż jest na miejscu. Jeśli go nie ma, bramka blokuje i prosi o `inwards init --agent opencode`. Gdy OpenCode wystartuje ponownie bez pluginu, nic nie działa, więc nic tego nie zgłosi, tak jak po usunięciu pliku ustawień Claude Code. |
+| Subagenty | Sesja subagenta jest przypisana do sesji najwyższego poziomu, tak jak Claude Code daje subagentowi identyfikator sesji rodzica; subagent wznowiony po restarcie jest wyszukiwany. Jego edycje są sprawdzane; bramka Stop działa, gdy w bezczynność przechodzi sesja najwyższego poziomu, i obejmuje wszystko, co zmieniły ta sesja i jej subagenty. |
+| Brak hooka oblewa bramkę Stop | Bramka sprawdza, czy plik pluginu to wciąż, bajt w bajt, ten, który załadował OpenCode. Jeśli go nie ma albo się zmienił, bramka blokuje i prosi o `inwards init --agent opencode`. Gdy OpenCode wystartuje ponownie bez działającego pluginu, nic nie działa, więc nic tego nie zgłosi, tak jak po usunięciu pliku ustawień Claude Code. |
 | Wiadomości od użytkownika | Plugin nie może zablokować wiadomości, którą wysyłasz. Twoja wiadomość zaczyna nową turę, a licznik `escalate-after` liczy od nowa. |
 
 ## Rozwiązywanie problemów { #troubleshooting }
@@ -50,7 +50,8 @@ Z zainstalowanym pluginem Inwards sprawdza każdy plik Pythona, który agent edy
 | Przy edycjach nic się nie dzieje | OpenCode działał, gdy `init` zapisał plugin. Uruchom go ponownie. Jeśli brakuje `.opencode/plugins/inwards.js`, uruchom ponownie `inwards init --agent opencode`. |
 | „Inwards has no record of how this session started” | Plugin zainstalowano po rozpoczęciu sesji. Zacznij nową sesję. |
 | „The Inwards OpenCode plugin … is missing or isn't the one `inwards init` wrote” | Coś usunęło albo podmieniło `.opencode/plugins/inwards.js`. Uruchom ponownie `inwards init --agent opencode`. |
+| „The Inwards OpenCode plugin … changed since OpenCode loaded it” | Plik zmienił się w trakcie sesji, przez `init` albo przez coś innego. Jeśli ponownie uruchomiłeś `init`, uruchom ponownie OpenCode; w przeciwnym razie uruchom `inwards init --agent opencode`, a potem ponownie OpenCode. |
 | „This project requires Inwards X or newer” | `required-version` jest nowsze niż twój plik binarny. Zainstaluj nowsze wydanie. |
 | Agent mówi, że `apply_patch` został odrzucony | Łatka dotknęła `pyproject.toml` albo jednego z plików Inwards. Agent może wprowadzić zmianę przez `edit`, który sprawdza strażnik konfiguracji; zmiana `[tool.inwards]` należy do ciebie. |
 | Bramka Stop nie odesłała agenta po `opencode run` | Tak ma być: proces kończy działanie, gdy sesja przechodzi w bezczynność. Po uruchomieniu wykonaj `inwards check`. |
-| Windows: plugin nie może uruchomić Inwards | Plugin uruchamia plik binarny pod bezwzględną ścieżką, bez powłoki. Jeśli przeniesiono plik binarny, uruchom `init` ponownie. |
+| „Inwards couldn't check …” | Plugin nie może uruchomić Inwards: plik binarny przeniesiono albo usunięto. Plugin uruchamia go pod bezwzględną ścieżką, bez powłoki. Uruchom `init` ponownie, a potem ponownie OpenCode. |

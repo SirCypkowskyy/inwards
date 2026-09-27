@@ -4,8 +4,11 @@
  * layers (`settings.ts`). OpenCode keeps them in the project plugin
  * `inwards init --agent opencode` writes, which runs this hook with
  * `INWARDS_HOOK_HOST=opencode`; there the plugin file must still be the one
- * init wrote.
+ * init wrote, byte for byte the file OpenCode loaded (the plugin passes its
+ * hash), so a plugin emptied or rewritten during the session is reported
+ * before the next start loads it.
  */
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
 import { settingsProblem } from "./settings.ts";
@@ -25,21 +28,47 @@ export const PLUGIN_MARKER = "// inwards: opencode plugin";
  */
 export function hookProblem(
   io: {
-    read: Pick<FileReader, "text">;
-    probe: Pick<PathProbe, "kind">;
-    runtime: Pick<Runtime, "hookHost" | "claudeConfigDir" | "home">;
+    read: Pick<FileReader, "text" | "bytes">;
+    probe: Pick<PathProbe, "kind" | "isLink">;
+    runtime: Pick<Runtime, "hookHost" | "pluginSha256" | "claudeConfigDir" | "home">;
   },
   project: string,
 ): string | undefined {
   if (io.runtime.hookHost === "opencode") {
-    const path = join(project, ".opencode", "plugins", "inwards.js");
-    const ours = io.probe.kind(path) === "file" && io.read.text(path).startsWith(PLUGIN_MARKER);
-    return ours
-      ? undefined
-      : "The Inwards OpenCode plugin (.opencode/plugins/inwards.js) is missing or isn't the one `inwards init` wrote. Restore it (`inwards init --agent opencode`) or ask the user.";
+    return pluginProblem(io, join(project, ".opencode", "plugins", "inwards.js"));
   }
   const hooks = settingsProblem(io, project);
   return hooks === undefined
     ? undefined
     : `${hooks} Restore them (\`inwards init --agent claude\`) or ask the user.`;
+}
+
+/**
+ * Says what is wrong with the OpenCode plugin file.
+ *
+ * @param io - reads and probes the file, and knows the hash OpenCode loaded.
+ * @param io.read - reads the plugin.
+ * @param io.probe - tells whether it is a regular file.
+ * @param io.runtime - the hash the plugin passed.
+ * @param path - `.opencode/plugins/inwards.js` in the project.
+ * @returns the problem with how to fix it, or undefined when the plugin is the one OpenCode loaded.
+ */
+function pluginProblem(
+  io: {
+    read: Pick<FileReader, "text" | "bytes">;
+    probe: Pick<PathProbe, "kind" | "isLink">;
+    runtime: Pick<Runtime, "pluginSha256">;
+  },
+  path: string,
+): string | undefined {
+  const fix = "Restore it (`inwards init --agent opencode`) or ask the user.";
+  const regular = io.probe.isLink(path) === false && io.probe.kind(path) === "file";
+  if (!(regular && io.read.text(path).startsWith(PLUGIN_MARKER))) {
+    return `The Inwards OpenCode plugin (.opencode/plugins/inwards.js) is missing or isn't the one \`inwards init\` wrote. ${fix}`;
+  }
+  const loaded = io.runtime.pluginSha256;
+  const now = createHash("sha256").update(io.read.bytes(path)).digest("hex");
+  return loaded === undefined || loaded === now
+    ? undefined
+    : `The Inwards OpenCode plugin (.opencode/plugins/inwards.js) changed since OpenCode loaded it, so the next start may run without Inwards. ${fix}`;
 }
