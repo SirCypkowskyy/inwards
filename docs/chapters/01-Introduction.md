@@ -31,6 +31,7 @@ Inwards turns those wiki rules into a check that runs in milliseconds and talks 
 root = "src"
 required-version = "0.1.0"  # oldest Inwards allowed; `inwards init` sets it
 ignore = ["tests", "scripts", "migrations", "conftest"]  # tooling outside the layers; `inwards init` sets it
+generated = ["*_pb2", "*_pb2_grpc", "_version"]  # modules a build step writes; this list is the default (optional)
 escalate-after = 3  # attempts at one violation before the agent is told to ask you (optional)
 run-log = false  # local log of hook runs, see the Run log chapter (optional)
 stop-gate = "changed"  # "project" makes the Claude Code Stop gate check the whole project (optional)
@@ -68,6 +69,35 @@ Layers are listed innermost first. A module may import its own layer and anythin
 ```
 
 The diagnostic comes from the working scaffold in this repository, run on a copy of `examples/clean-app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
+
+To phase rules in, a `[tool.inwards.rules]` table sets which rules report and how loudly:
+
+```toml title="pyproject.toml"
+[tool.inwards.rules]
+ignore = ["INW007", "INW008"]      # these rules never report (optional)
+severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent (optional)
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+```
+
+Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select`. INW000 always reports as an error, because a file whose declared encoding can hide imports isn't checked at all, and the Stop gate's check that no layer was moved away during the session ignores the table too. `inwards check`, the hooks, the Stop gate and the VS Code extension all apply the table; the extension reads it again whenever `pyproject.toml` changes, and shows a config error (an unknown code, say) on `pyproject.toml`. It is part of `[tool.inwards]`, so the config guard stops an agent from changing it. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) covers the baseline and SARIF.
+
+`generated` lists modules that a build step writes, such as protoc's `orders_pb2` or the `_version` module setuptools-scm writes. A developer's checkout has them and a fresh CI checkout doesn't, so INW010 doesn't report an import of one that isn't on disk. Patterns match whole name segments anywhere, as `ignore` does, and a segment may use `*` and `?`: `*_pb2` covers `shop.api.orders_pb2`, and `shop.gen` covers everything under `shop/gen/`. Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`; setting it replaces that list, and `generated = []` turns it off. A bracket set or a pattern made only of wildcards is a config error. [GitHub Actions](guides/ci.md#generated-modules) and [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) have the details.
+
+To accept one import for good, put a suppression on its line, with the rule's code and a reason:
+
+```python title="shop/domain/order.py"
+from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
+```
+
+The comment goes on the line the finding points at: for a parenthesised import, the imported name's line; for a dynamic import spread over several lines, the call's first line:
+
+```python title="shop/domain/plugins.py"
+importlib.import_module(  # inwards: ignore[INW011] reason="plugin loader, reviewed in #230"
+    "shop.infrastructure.plugins",
+)
+```
+
+A suppression with no reason, an unknown code or a malformed comment hides nothing and is reported as INW009, and so, as a warning, is one that matches no finding on its line. Every output format counts suppressed findings, and SARIF lists them as suppressed results. The Claude Code hooks ignore a suppression that wasn't in the file when the session started, so an agent can't silence a violation with a comment; `agent-suppressions = "allow"` in `[tool.inwards]` lets them count. [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) has the details.
 
 <div class="grid cards" markdown>
 
@@ -118,7 +148,7 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 !!! info "Status"
     Pre-alpha.
-    Six rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
+    Eight rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (dynamic imports), INW005 ([libraries per layer](guides/libraries.md): no frameworks or I/O in the domain by default), INW006 (code outside every layer, dead prefixes), INW010 (imports of first-party modules that don't exist), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
     `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal` writes the layers, and `--scaffold` adds an example package that passes the check.
     Each release is a GitHub Release with binaries for six platforms, five platform wheels and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
     Everything marked :material-progress-clock: in these docs is planned, not built.

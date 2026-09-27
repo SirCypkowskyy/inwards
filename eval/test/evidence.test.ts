@@ -1,3 +1,8 @@
+/**
+ * @file The eval's readers on real transcript and run-log lines: guard denials and
+ * deny-rule refusals counted apart, hook timings, and the scrubbing of home
+ * directories, user names and paths. The lines come from committed Haiku runs.
+ */
 import { expect, test } from "bun:test";
 import { homedir, userInfo } from "node:os";
 import { countHooks, scrub, summarise } from "../evidence.ts";

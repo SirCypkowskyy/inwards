@@ -1,5 +1,5 @@
 /**
- * Runs the real-repo corpus (bench/corpus.json): fetches each repo at its
+ * @file Runs the real-repo corpus (bench/corpus.json): fetches each repo at its
  * pinned commit, runs the prescan differential test on its Python files, and
  * times `inwards check` on it, whole and on one file, with a compiled binary.
  * Run nightly by .github/workflows/corpus.yml.

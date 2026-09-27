@@ -1,5 +1,5 @@
 /**
- * Result types of the agent eval and the Markdown summary a report quotes.
+ * @file Result types of the agent eval and the Markdown summary a report quotes.
  * Kept apart from `run.ts`, which drives the agent, so each file stays small.
  */
 
@@ -100,7 +100,7 @@ function pooledLatency(results: readonly CaseResult[]): {
  *
  * @param results - One entry per run.
  * @param field - The field to add up.
- * @returns The sum.
+ * @returns The field's total over the runs that recorded stats.
  */
 function sumStats(results: readonly CaseResult[], field: keyof RunStats): number {
   return results.reduce((n, r) => n + (r.stats ? r.stats[field] : 0), 0);

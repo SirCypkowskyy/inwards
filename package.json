@@ -13,7 +13,9 @@
     "typecheck": "tsc -p . && bun run --filter '*' typecheck",
     "test": "bun test",
     "lint:docs": "oxlint --config .oxlintrc.jsonc --deny-warnings",
-    "fallow": "fallow dead-code && fallow dupes",
+    "fallow": "fallow dead-code && fallow dupes && bun run scripts/check-no-clones.ts",
+    "check:cycles": "bun run scripts/check-import-cycles.ts",
+    "check:overviews": "bun run scripts/check-module-overviews.ts src scripts eval bench docs/test",
     "build:cli": "bun run scripts/build-binaries.ts",
     "check:self": "bun run src/cli/src/main.ts check examples/clean-app"
   },

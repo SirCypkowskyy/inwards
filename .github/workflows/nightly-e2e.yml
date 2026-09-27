@@ -2,12 +2,12 @@ name: Nightly E2E
 
 # Re-records the Claude Code hook payloads with a headless `claude -p` session
 # and compares their shape (field names and JSON types) with the fixtures in
-# src/cli/test/fixtures/claude-code. Drift opens an issue, or comments on the
+# src/cli/test/support/fixtures/claude-code. Drift opens an issue, or comments on the
 # open one. A session that fails or skips a call (twice) fails the run without
 # an issue. Needs the ANTHROPIC_API_KEY secret; without it the job skips with
 # a notice. Each run is one or two Haiku sessions, each capped at $0.25.
 # The doc-snippet E2E cases run on every PR in ci.yml's test job
-# (src/cli/test/docs.test.ts).
+# (src/cli/test/integration/docs.test.ts).
 on:
   schedule:
     - cron: "41 3 * * *" # daily, 03:41 UTC
@@ -84,7 +84,7 @@ jobs:
           {
             printf '%s\n\n' "$REPORT"
             printf 'Run: %s (the recorded payloads are its artifact).\n' "$RUN"
-            printf 'Refresh the fixtures as src/cli/test/fixtures/claude-code/README.md describes, then review the snapshot diff.\n'
+            printf 'Refresh the fixtures as src/cli/test/support/fixtures/claude-code/README.md describes, then review the snapshot diff.\n'
           } > body.md
           n="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number -q '.[0].number')"
           if [ -n "$n" ]; then

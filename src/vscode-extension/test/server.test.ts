@@ -1,131 +1,25 @@
+/**
+ * @file The language server end to end: diagnostics on unopened files, INW008 once
+ * a member is deleted, INW010 clearing when a module appears, and the watcher
+ * fallback. Without watched-file support, every check uses a fresh index.
+ */
 import { afterAll, expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import process from "node:process";
+import { renameSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { DOCS_BASE } from "@inwards/core";
+import { lspHarness, PYPROJECT, QUIET_MS, WATCHING, write } from "./lsp-harness.ts";
 
-// The language server over stdio, bundled the way the extension ships it
-// (CommonJS, grammars next to server.js), talking to a minimal LSP client.
-const TMP = mkdtempSync(join(tmpdir(), "inwards-lsp-"));
-afterAll(() => rmSync(TMP, { recursive: true, force: true }));
-
-const PYPROJECT = `[tool.inwards]
-layers = [{ name = "app", modules = ["app"] }]
-
-[[tool.inwards.shape]]
-packages = ["app.*"]
-allow = ["router", "schemas", "utils"]
-require = ["__init__", "router", "service"]
-`;
-const TIMEOUT_MS = 15_000;
-const HEADER_END = "\r\n\r\n";
-const CONTENT_LENGTH = /Content-Length: (?<n>\d+)/iu;
-
-/** What the test client has received: the latest diagnostics per URI. */
-const published = new Map<string, { code: string }[]>();
-/** Ids of the requests the server has answered. */
-const answered = new Set<number>();
-
-/**
- * Bundles server.ts into a temporary directory next to both grammars.
- *
- * @returns the path of the bundled server.
- */
-async function bundle(): Promise<string> {
-  const out = join(TMP, "dist");
-  const built = await Bun.build({
-    entrypoints: [join(import.meta.dir, "../src/server.ts")],
-    outdir: out,
-    target: "node",
-    format: "cjs",
-  });
-  if (!built.success) {
-    throw new Error(built.logs.join("\n"));
-  }
-  for (const spec of [
-    "web-tree-sitter/web-tree-sitter.wasm",
-    "tree-sitter-python/tree-sitter-python.wasm",
-  ]) {
-    copyFileSync(Bun.resolveSync(spec, import.meta.dir), join(out, spec.split("/").at(-1) ?? ""));
-  }
-  return join(out, "server.js");
-}
-
-/**
- * Writes the test project's files.
- *
- * @param root - the project directory.
- * @param files - contents by relative path.
- */
-function write(root: string, files: Record<string, string>): void {
-  for (const [rel, text] of Object.entries(files)) {
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), text);
-  }
-}
-
-/**
- * Reads framed LSP messages from the server and records its diagnostics.
- *
- * @param stdout - the server's stdout.
- */
-async function listen(stdout: ReadableStream<Uint8Array>): Promise<void> {
-  let buffer = Buffer.alloc(0);
-  for await (const chunk of stdout) {
-    buffer = Buffer.concat([buffer, chunk]);
-    for (;;) {
-      const end = buffer.indexOf(HEADER_END);
-      const length = Number(CONTENT_LENGTH.exec(buffer.subarray(0, end).toString())?.groups?.["n"]);
-      if (end === -1 || buffer.length < end + 4 + length) {
-        break;
-      }
-      const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString());
-      buffer = buffer.subarray(end + 4 + length);
-      if (typeof message.id === "number" && message.method === undefined) {
-        answered.add(message.id);
-      }
-      if (message.method === "textDocument/publishDiagnostics") {
-        published.set(message.params.uri, message.params.diagnostics);
-      }
-    }
-  }
-}
-
-/**
- * Waits until a condition holds, or the deadline passes.
- *
- * @param ready - the condition.
- * @param deadline - when to give up, in `Date.now()` milliseconds.
- */
-async function until(ready: () => boolean, deadline = Date.now() + TIMEOUT_MS): Promise<void> {
-  if (ready() || Date.now() > deadline) {
-    return;
-  }
-  await Bun.sleep(20);
-  await until(ready, deadline);
-}
-
-/**
- * Waits until a file's latest diagnostics include a code.
- *
- * @param path - the file's absolute path.
- * @param code - e.g. `INW007`.
- * @returns the codes published for the file.
- */
-async function codesOnceIncluding(path: string, code: string): Promise<string[]> {
-  const uri = pathToFileURL(path).href;
-  /**
-   * Lists the codes published for the file so far.
-   *
-   * @returns the codes.
-   */
-  function codes(): string[] {
-    return (published.get(uri) ?? []).map((d) => d.code);
-  }
-  await until(() => codes().includes(code));
-  return codes();
-}
+const {
+  tmp: TMP,
+  publishes,
+  startServer,
+  watched,
+  codesOnceIncluding,
+  diagnosticsOnce,
+  cleanup,
+} = lspHarness();
+afterAll(cleanup);
 
 test("the server shows INW007 on an unopened file, and INW008 once a member is deleted", async () => {
   const root = join(TMP, "project");
@@ -137,39 +31,15 @@ test("the server shows INW007 on an unopened file, and INW008 once a member is d
     "app/orders/service.py": "",
     "app/orders/helpers.py": "",
   });
-  const server = Bun.spawn([process.execPath, await bundle(), "--stdio"], {
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "ignore",
-  });
-  /**
-   * Sends one JSON-RPC message to the server.
-   *
-   * @param message - the message without `jsonrpc`.
-   */
-  function send(message: Record<string, unknown>): void {
-    const body = JSON.stringify({ jsonrpc: "2.0", ...message });
-    server.stdin.write(`Content-Length: ${Buffer.byteLength(body)}${HEADER_END}${body}`);
-    server.stdin.flush();
-  }
-  listen(server.stdout).catch(() => undefined);
+  const server = await startServer(root, 1, WATCHING);
+  const { send } = server;
   try {
-    const folder = pathToFileURL(root).href;
-    send({
-      id: 1,
-      method: "initialize",
-      params: {
-        processId: null,
-        rootUri: folder,
-        capabilities: {},
-        workspaceFolders: [{ uri: folder, name: "project" }],
-      },
-    });
-    await until(() => answered.has(1));
-    send({ method: "initialized", params: {} });
     expect(await codesOnceIncluding(join(root, "app/orders/helpers.py"), "INW007")).toEqual([
       "INW007",
     ]);
+    // The code links to the rule's own docs page (#49).
+    const [shape] = await diagnosticsOnce(join(root, "app/orders/helpers.py"), (f) => f.length > 0);
+    expect(shape?.codeDescription?.href).toBe(`${DOCS_BASE}/rules/INW007/`);
 
     rmSync(join(root, "app/orders/service.py"));
     const changes = [{ uri: pathToFileURL(join(root, "app/orders/service.py")).href, type: 3 }];
@@ -177,6 +47,117 @@ test("the server shows INW007 on an unopened file, and INW008 once a member is d
     expect(await codesOnceIncluding(join(root, "app/orders/__init__.py"), "INW008")).toEqual([
       "INW008",
     ]);
+
+    // INW010 on an open document clears once the missing module is created.
+    const router = join(root, "app/orders/router.py");
+    const uri = pathToFileURL(router).href;
+    const textDocument = { uri, languageId: "python", version: 1, text: "import app.pricing\n" };
+    send({ method: "textDocument/didOpen", params: { textDocument } });
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+    write(root, { "app/pricing.py": "" });
+    const created = [{ uri: pathToFileURL(join(root, "app/pricing.py")).href, type: 1 }];
+    send({ method: "workspace/didChangeWatchedFiles", params: { changes: created } });
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+
+    /**
+     * Reports file events the way a client would.
+     *
+     * @param events - paths relative to the root, with 1 for created and 3 for deleted.
+     */
+    function report(events: [string, number][]): void {
+      const reported = events.map(([rel, type]) => ({
+        uri: pathToFileURL(join(root, rel)).href,
+        type,
+      }));
+      send({ method: "workspace/didChangeWatchedFiles", params: { changes: reported } });
+    }
+
+    /**
+     * Replaces the open document's text, then applies a change on disk and
+     * reports it the way a client with the server's watchers would.
+     *
+     * @param text - the document's new text, which imports a missing module.
+     * @param change - the change on disk.
+     * @param events - the created (1) and deleted (3) paths, relative to the root.
+     */
+    async function fixedBy(
+      text: string,
+      change: () => void | Promise<void>,
+      events: [string, number][],
+    ): Promise<void> {
+      const version = Date.now();
+      send({
+        method: "textDocument/didChange",
+        params: { textDocument: { uri, version }, contentChanges: [{ text }] },
+      });
+      expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+      await change();
+      for (const [rel, type] of events) {
+        // The client reports a path only when a registered watcher covers it.
+        expect(watched(rel, type)).toBe(true);
+      }
+      report(events);
+      expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
+    }
+
+    // A stub file, and a directory renamed into place, are modules too.
+    await fixedBy("import app.stubbed\n", () => write(root, { "app/stubbed.pyi": "" }), [
+      ["app/stubbed.pyi", 1],
+    ]);
+    write(root, { "app/payments/invoice.py": "" });
+    await fixedBy(
+      "import app.billing.invoice\n",
+      () => renameSync(join(root, "app/payments"), join(root, "app/billing")),
+      [
+        ["app/payments", 3],
+        ["app/billing", 1],
+      ],
+    );
+
+    // Events for paths that can't be modules don't rebuild the index: the
+    // cached probe still says app.later is missing after it is created.
+    const ignored = [".git/index.lock", "app/__pycache__/later.cpython-313.pyc", "README.md"];
+    ignored.push("node_modules/pkg/x.py", ".venv/lib/site-packages/x.py", "../outside.py");
+    /**
+     * Creates the module, then reports only events the server must ignore.
+     */
+    async function quiet(): Promise<void> {
+      write(root, { "app/later.py": "" });
+      const before = publishes.get(uri);
+      report(ignored.map((rel) => [rel, 1]));
+      await Bun.sleep(QUIET_MS);
+      expect(publishes.get(uri)).toBe(before);
+    }
+    await fixedBy("import app.later\n", quiet, [["app/later.py", 1]]);
+  } finally {
+    server.kill();
+  }
+}, 30_000);
+
+test("without watched-file support, the server checks against a fresh index each time", async () => {
+  const root = join(TMP, "unwatched");
+  write(root, {
+    "pyproject.toml": PYPROJECT,
+    "app/__init__.py": "",
+    "app/orders/__init__.py": "",
+    "app/orders/router.py": "",
+    "app/orders/service.py": "",
+  });
+  const server = await startServer(root, 2, {});
+  try {
+    const router = join(root, "app/orders/router.py");
+    const uri = pathToFileURL(router).href;
+    const textDocument = { uri, languageId: "python", version: 1, text: "import app.pricing\n" };
+    server.send({ method: "textDocument/didOpen", params: { textDocument } });
+    expect(await codesOnceIncluding(router, "INW010")).toEqual(["INW010"]);
+    // No file event will come; the next keystroke must see the new module.
+    write(root, { "app/pricing.py": "" });
+    const change = {
+      textDocument: { uri, version: 2 },
+      contentChanges: [{ text: "import app.pricing\n" }],
+    };
+    server.send({ method: "textDocument/didChange", params: change });
+    expect(await codesOnceIncluding(router, "INW010", false)).toEqual([]);
   } finally {
     server.kill();
   }

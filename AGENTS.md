@@ -4,9 +4,42 @@ Edit this file (`AGENTS.md`). `CLAUDE.md` holds only `@AGENTS.md`, which
 Claude Code expands on load; Codex, Cursor and other agents read this file
 directly. Never add content to `CLAUDE.md`.
 
-Architecture linter for Python, written in TypeScript on Bun. Engine in
-`src/core`, CLI in `src/cli`, VS Code extension in `src/vscode-extension`,
-docs in `docs/` (Zensical). The plan lives in GitHub issues on
+Architecture linter for Python, written in TypeScript on Bun, in three
+packages that depend one way, onto the engine (chapter 3 of the docs has the
+pictures). Each package has its own guide, which adds to this one: read it
+before working there. Its `CLAUDE.md` holds only `@AGENTS.md`, so Claude Code
+loads the package guide when it works in that folder; this root file doesn't
+import them.
+
+- `src/core`: the engine. Pure, no I/O; everything outside comes through
+  ports (`GrammarBinaries`, `ProjectFiles`, `ListDir`), and adapters import
+  `@inwards/core` (its `index.ts`) only. Feature folders, one module or
+  folder per rule under `rules/`. Guide:
+  [`src/core/AGENTS.md`](src/core/AGENTS.md).
+- `src/cli`: the command line and the Claude Code hook adapter. Feature
+  folders with the I/O behind contracts, wired in `main.ts`. Guide:
+  [`src/cli/AGENTS.md`](src/cli/AGENTS.md).
+- `src/vscode-extension`: the editor adapter, a VS Code client and a
+  language server in separate folders. Guide:
+  [`src/vscode-extension/AGENTS.md`](src/vscode-extension/AGENTS.md).
+
+Where to start:
+
+- **A new rule or config key**: `src/core/AGENTS.md`, "Where new code goes";
+  the rule's docs page goes in `docs/chapters/rules/` and `docs/pl/rules/`.
+- **A new hook event or CLI command**: `src/cli/AGENTS.md`, "Where new code
+  goes".
+- **Something the editor shows or a new extension setting**:
+  `src/vscode-extension/AGENTS.md`.
+- **A docs change**: "Polish docs" below; the English page and its Polish
+  translation change in the same PR.
+
+The boundaries are enforced, not just described: fallow zones per folder
+(`.fallowrc.jsonc`, where a file in a new folder fails until it gets a
+zone), Biome's I/O and global rules per folder (`biome.jsonc`),
+`check:cycles`, and each package's architecture tests.
+
+Docs live in `docs/` (Zensical), with the architecture in chapter 3. The plan lives in GitHub issues on
 `SirCypkowskyy/inwards`: epics #1 to #7 are milestones M0 to M6, and every
 other issue is a sub-issue of one of them.
 
@@ -148,7 +181,7 @@ the claim comment, not the assignee, says which agent owns an issue.
 - **High-conflict files have one owner at a time:** `bun.lock`, `uv.lock`,
   `package.json`, `pyproject.toml`, `AGENTS.md`, `.github/workflows/`,
   `release-please-config.json`, `.release-please-manifest.json`,
-  `src/cli/test/__snapshots__/`. The coordinator names the owner in the
+  `src/cli/test/**/__snapshots__/`. The coordinator names the owner in the
   prompt; everyone else leaves them alone and asks. Never merge a lockfile by
   hand: take the base version and rerun `bun install` or `uv lock`.
   Regenerate snapshots after a rebase and review the diff.
@@ -176,10 +209,13 @@ merge.
 ```sh
 bun x biome ci .        # lint + format, every rule group at error
 bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
-bun run typecheck       # tsgo, strictest flags (tsconfig.base.json)
-bun run fallow          # dead code, unused deps, boundaries, duplication
+bun run typecheck       # tsc (TypeScript 7), strictest flags (tsconfig.base.json)
+bun run fallow          # dead code, unused deps, boundaries, zero clone groups
+bun run check:cycles    # no import cycles, type-only imports included (tsgo's own parse)
+bun run check:overviews # every module's @file overview is 2+ sentences
 bun test                # unit + CLI + E2E snapshots
-uv run scripts/check-docs-nav.py  # every page in docs/chapters is in the nav
+uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
+uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
@@ -295,12 +331,39 @@ PR description is its body. Commits inside a branch can say anything.
 - To fix a changelog line after a merge, edit the merged PR's description with
   a `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block.
 
+## Polish docs
+
+`docs/pl/` is the Polish translation of `docs/chapters/`, page for page at
+the same paths, built by `docs/zensical.pl.toml` into `/pl/` (issue #149).
+English stays the source of truth; the changelog isn't translated.
+
+- **A PR that changes an English page updates its Polish page in the same
+  PR.** Re-translate the changed parts (not the whole page), then record the
+  new English hash: `uv run scripts/check-docs-translation.py --fix-hashes docs/pl/<page>`.
+  A new English page gets a Polish page with `source` and `source_hash` front
+  matter and an entry in `docs/zensical.pl.toml`'s nav; a deleted one loses
+  its Polish page.
+- **Terminology comes from `docs/GLOSSARY.pl.md`**: what stays in English
+  (hook, Stop gate, baseline, CLI flags, rule codes...), the fixed Polish
+  terms, and the conventions (headings keep the English anchor with
+  `{ #id }`, code blocks and CLI output stay verbatim, images come from
+  `../assets/`). Add a missing term there in the same PR.
+- **The reviewer checks the Polish diff** for meaning against the English
+  change and for terminology against the glossary.
+- **CI** fails on a missing or orphaned Polish page, a committed stale
+  banner, and theme, extension or asset drift between the two configs; it
+  warns on a stale page, and the deploy puts a "Tłumaczenie może być
+  nieaktualne" banner on it. `--fix-hashes` takes paths relative to the
+  current directory. Preview
+  both sites with the two builds in `docs/zensical.pl.toml`'s header and a
+  static server on `docs/site/`.
+
 ## Finishing a piece of work
 
 Before you hand back or merge, update the docs and the issues. Work is not
 done until both match the code.
 
-- **Docs** (`docs/chapters/`, `README.md`, `eval/README.md`, `AGENTS.md`):
+- **Docs** (`docs/chapters/` and its Polish mirror `docs/pl/`, `README.md`, `eval/README.md`, `AGENTS.md`):
   describe what the code does now. Drop "planned" from anything that shipped,
   fix numbers that changed (tests, corpus sizes, timings), and write an ADR
   for any decision a later reader would question. Run the strict docs build.
@@ -330,14 +393,24 @@ done until both match the code.
   no `as` casts except at a trust boundary right after validation, with a
   `biome-ignore lint/nursery/noUnsafeTypeAssertion: <what was checked>`.
   Prefer `unknown` plus a type guard. Explicit types on every function.
-  Rule exceptions live in `biome.jsonc`, each with its reason.
+  Rule exceptions live in `biome.jsonc` (or the tool's own config), scoped
+  to the files that need them and each with its reason; no blanket `off`.
+- **Every module opens with an overview** (`@file`, two or more sentences):
+  what it is for, what it owns, and what it deliberately doesn't do ("no
+  I/O; the caller supplies file contents"). `lint:docs` requires the tag and
+  `check:overviews` the prose, in every TypeScript file.
 - **Every function is documented** (`lint:docs`) with a TSDoc block,
   including private helpers and arrow functions bound to a name:
   - first line: a title that says what it does;
   - then 1-3 lines of description (what, and why when it isn't obvious);
   - a longer section when the behaviour has edge cases, invariants or a
-    non-obvious reason (see `importSkeleton` in `src/core/src/prescan.ts`);
-  - `@param` for every parameter and `@returns` for every non-void return.
+    non-obvious reason (see `importSkeleton` in `src/core/src/python/prescan.ts`);
+  - `@param` for every parameter and `@returns` for every non-void return,
+    with a description that says more than the name; a destructured or
+    object parameter documents each property (`@param opts.cwd - ...`);
+  - `@throws` for every error a function can let escape on purpose, direct
+    or propagated (the linter only sees direct `throw`s, so check the rest
+    by hand). A function with no error contract needs none.
 - **Ports and adapters where it pays.** The engine (`src/core`) is the
   hexagon: pure, no I/O, no `Bun`/`Deno`/`node:fs`. Anything it needs from outside comes through a port, an
   interface the core owns (`GrammarBinaries`, `SourceFile`), and adapters
@@ -346,6 +419,19 @@ done until both match the code.
   Bun and env access in `src/core/src`). Add a port only when a second
   adapter or a test needs it; one interface with one implementation and no
   test seam is just indirection.
+- **The CLI's policy does no I/O of its own.** Its feature folders get the
+  filesystem, git, the environment, the clock and the streams through
+  `src/cli/src/platform/contracts.ts`; `src/cli/src/adapters/` implements
+  them and only `main.ts` (through `adapters/compose.ts`) wires them in.
+  Biome refuses `node:fs`, `node:child_process`, `node:os`, the network
+  modules, and the `process`, `Bun`, `fetch`, `performance`, `Date` and
+  global-object globals in those folders: the time comes from `Clock`, and
+  `platform/time.ts` parses a recorded timestamp behind the one exception.
+  fallow's zones refuse imports of `adapters/`.
+  Relative paths from the command line resolve against `Runtime.cwd`, never
+  the process's own working directory.
+  Mutable state lives in objects made per invocation (`createStartLookups`,
+  `createRunLog`), never in module globals.
 - Machine output (JSON, SARIF, hook stderr) goes through
   `process.stdout/stderr.write`, never `console.*` (Bun colours
   `console.error` under `FORCE_COLOR`). Biome's noConsole enforces it outside
@@ -355,5 +441,5 @@ done until both match the code.
 
 ## Writing
 
-Docs, commit messages and PR text in English, plain and specific (the
+Docs (except `docs/pl/`), commit messages and PR text in English, plain and specific (the
 `humanizer` skill's rules): no filler, no em dashes, numbers over adjectives.

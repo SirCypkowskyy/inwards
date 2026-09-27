@@ -101,13 +101,13 @@ GrammarBinaries
 :   The port through which adapters hand the engine the tree-sitter runtime and Python grammar as bytes.
 
 Hallucinated module
-:   An import of a first-party module that doesn't exist, such as `shop.domain.pricing` when there is no `pricing`. Agents produce these because the name looks plausible. INW010 (planned) catches them from the module index, before any test runs.
+:   An import of a first-party module that doesn't exist, such as `shop.domain.pricing` when there is no `pricing`. Agents produce these because the name looks plausible. INW010 catches them from the module index, before any test runs.
 
 Import skeleton
 :   A copy of a file where every non-import line is blank and import lines are dedented. Line numbers are preserved, and it parses far faster than the whole file.
 
 Module index
-:   Every first-party module of a project, with the importers of any one module worked out on demand (`Engine.index`). Built, but no rule uses it yet; INW010 will.
+:   The engine's view of a project's first-party modules (`Engine.index`), which every adapter passes to each check: the owner of an import, the list of modules, and the importers of any one module, each worked out on demand. INW006 uses the owner; INW010 uses the owner to tell whether a module exists, and a listing of the package it would live in to suggest the closest real ones.
 
 Prescan refusal
 :   The prescan declining a file because `import` appears somewhere it can't account for. The file then gets a full parse. 8.3 % of CPython's stdlib files are refused.
@@ -126,6 +126,9 @@ Session state
 
 Stop gate
 :   The check run from the agent's `Stop` hook. It checks every Python file the session changed, plus whether the config and the hooks are still intact, and keeps the agent from ending the turn while they aren't.
+
+Suppression
+:   A comment on the line a finding points at, `# inwards: ignore[INW001] reason="why"`, that hides that finding. The reason is mandatory, every report counts suppressions, and by default the Claude Code hooks ignore one the agent added during the session. See [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default).
 
 ## Tooling terms
 

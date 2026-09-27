@@ -110,6 +110,9 @@
     {
       // Tests and scripts hold fixture strings (TOML snippets, adversarial
       // Python) that the entropy check reads as secrets. None are credentials.
+      // Narrowing this to fixture files was measured under #176: 70 findings
+      // in 22 test and script files, inline fixtures all, so it stays scoped
+      // to tests and scripts.
       "includes": ["**/test/**", "**/scripts/**"],
       "linter": { "rules": { "security": { "noSecrets": "off" } } }
     },
@@ -164,12 +167,123 @@
       "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
     },
     {
+      // The CLI's policy folders do no I/O of their own: files, git, the
+      // environment and the streams come in through platform/contracts.ts,
+      // implemented in adapters/ and wired in main.ts (#176). The same goes for
+      // the network and the clock: Date, performance and the global object are
+      // denied outright, since pattern matching on their uses leaked (a clock
+      // read nested in Date.parse, globalThis["Date"]); platform/time.ts parses
+      // recorded timestamps behind the one exception. node:path and node:crypto
+      // stay allowed: path text and hashing are pure.
+      "includes": [
+        "src/cli/src/claude-code/**",
+        "src/cli/src/commands/**",
+        "src/cli/src/init/**",
+        "src/cli/src/json/**",
+        "src/cli/src/paths/**",
+        "src/cli/src/platform/**",
+        "src/cli/src/project/**",
+        "src/cli/src/runlog/**",
+        "src/cli/src/session/**"
+      ],
+      "linter": {
+        "rules": {
+          "nursery": { "noBunModules": "error" },
+          "style": {
+            "noProcessEnv": "error",
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "node:fs": "Read and write through the platform contracts (PathProbe, FileReader, StateFiles, ...), not node:fs.",
+                  "node:fs/promises": "Read and write through the platform contracts, not node:fs/promises.",
+                  "node:child_process": "Run git through the Git contract; nothing else may start a process.",
+                  "node:os": "Take the home directory and platform from the Runtime contract.",
+                  "node:process": "Take the environment, cwd and streams from the Runtime and Streams contracts.",
+                  "fs": "Read and write through the platform contracts, not fs.",
+                  "child_process": "Run git through the Git contract.",
+                  "os": "Take the home directory and platform from the Runtime contract.",
+                  "process": "Take the environment and streams from the Runtime and Streams contracts.",
+                  "node:http": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "http": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:https": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "https": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:http2": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "http2": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:net": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "net": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:tls": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "tls": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:dgram": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "dgram": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:dns": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "dns": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:worker_threads": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "worker_threads": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "node:cluster": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
+                  "cluster": "Policy code talks to nothing outside the process; add a contract and an adapter if it must."
+                },
+                "patterns": [
+                  {
+                    "group": ["node:fs/*", "fs/*"],
+                    "message": "Read and write through the platform contracts, not node:fs."
+                  },
+                  {
+                    "group": [
+                      "node:dns",
+                      "node:dns/*",
+                      "dns",
+                      "dns/*",
+                      "node:inspector",
+                      "node:inspector/*",
+                      "inspector",
+                      "inspector/*"
+                    ],
+                    "message": "Policy code talks to nothing outside the process; add a contract and an adapter if it must."
+                  },
+                  {
+                    "group": ["node:readline", "node:readline/*", "readline", "readline/*"],
+                    "message": "Read the terminal through the Streams contract."
+                  },
+                  {
+                    "group": ["node:perf_hooks", "perf_hooks"],
+                    "message": "Take durations from the Clock contract (elapsed)."
+                  }
+                ]
+              }
+            },
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "Bun": "Bun's APIs belong in src/cli/src/adapters/; take what you need through a contract.",
+                  "process": "Take the environment, cwd and streams from the Runtime and Streams contracts.",
+                  "Deno": "The CLI runs on Bun; take I/O through a contract.",
+                  "fetch": "Policy code makes no network requests; add a contract and an adapter if it must.",
+                  "WebSocket": "Policy code makes no network connections; add a contract and an adapter if it must.",
+                  "XMLHttpRequest": "Policy code makes no network requests; add a contract and an adapter if it must.",
+                  "EventSource": "Policy code makes no network connections; add a contract and an adapter if it must.",
+                  "performance": "Take durations from the Clock contract (elapsed).",
+                  "Date": "Take the time from the Clock contract; parse a recorded timestamp with platform/time.ts.",
+                  "globalThis": "Reach nothing through the global object; take what you need through a contract.",
+                  "global": "Reach nothing through the global object; take what you need through a contract.",
+                  "Function": "No code built from strings."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       // The engine's public API: adapters import `@inwards/core` and nothing deeper.
       "includes": ["src/core/src/index.ts"],
       "linter": { "rules": { "performance": { "noBarrelFile": "off" } } }
     },
     {
-      // The engine is pure: no runtime globals, no Node or Bun modules, no env.
+      // The engine is pure: no runtime globals, no Node or Bun modules, no env,
+      // no network and no clock (Date, performance and the global object are
+      // denied; durations and times come from the adapter).
       "includes": ["src/core/src/**"],
       "linter": {
         "rules": {
@@ -182,7 +296,17 @@
               "options": {
                 "deniedGlobals": {
                   "Bun": "The engine also runs on Node inside VS Code. Take I/O through a port instead (see GrammarBinaries).",
-                  "Deno": "The engine must stay runtime-agnostic."
+                  "Deno": "The engine must stay runtime-agnostic.",
+                  "process": "The engine has no process: take what you need as a parameter or a port.",
+                  "fetch": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "WebSocket": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "XMLHttpRequest": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "EventSource": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "performance": "The engine doesn't time itself; the adapter measures durations.",
+                  "Date": "The engine reads no clock and parses no dates; the adapter does.",
+                  "globalThis": "The engine reaches nothing through the global object.",
+                  "global": "The engine reaches nothing through the global object.",
+                  "Function": "No code built from strings."
                 }
               }
             }

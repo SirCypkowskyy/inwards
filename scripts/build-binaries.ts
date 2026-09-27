@@ -1,10 +1,11 @@
 /**
- * Cross-compiles `inwards` into single-file executables, one per target.
+ * @file Cross-compiles `inwards` into single-file executables, one per target.
  *
  *   bun run scripts/build-binaries.ts                 # every target
  *   bun run scripts/build-binaries.ts bun-linux-x64   # just one
  *
- * Output: dist/inwards-<os>-<arch>[.exe]
+ * Output: dist/inwards-<os>-<arch>[.exe]. Each binary embeds both grammars,
+ * so it runs with nothing else installed.
  */
 import { mkdirSync } from "node:fs";
 import process from "node:process";

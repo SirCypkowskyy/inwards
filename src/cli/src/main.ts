@@ -1,16 +1,24 @@
 #!/usr/bin/env bun
-import { dirname, resolve } from "node:path";
+/**
+ * @file The `inwards` command line: the composition root. It reads the process
+ * environment once, has `adapters/compose.ts` build one invocation's
+ * `AppDeps` from the real adapters, parses argv, and hands off to a command
+ * (`commands/`). Nothing below it imports a concrete adapter; everything
+ * receives what it needs as parameters.
+ */
 import process from "node:process";
 import { parseArgs } from "node:util";
-import { ConfigError, type Format, render, VERSION } from "@inwards/core";
-import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
-import { hookClaudeCode } from "./hook.ts";
-import { type InitFlags, initMain } from "./init-style.ts";
-import { print } from "./output.ts";
-import { findConfig, realpath } from "./paths.ts";
-import { runCheck } from "./project.ts";
-import { logRun, noteRun } from "./runlog.ts";
-import { statsCommand } from "./stats-command.ts";
+import { ConfigError, VERSION } from "@inwards/core";
+import { compose } from "./adapters/compose.ts";
+import { processStreams } from "./adapters/stdio.ts";
+import { baselineCommand } from "./commands/baseline.ts";
+import { checkCommand } from "./commands/check.ts";
+import type { AppDeps } from "./commands/deps.ts";
+import { hookClaudeCode } from "./commands/hook.ts";
+import { statsCommand } from "./commands/stats.ts";
+import type { InitFlags } from "./init/contracts.ts";
+import { initMain } from "./init/style.ts";
+import { print } from "./platform/print.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}
@@ -31,10 +39,12 @@ Checks Python imports against the layers declared in [tool.inwards].`;
  * do the work. Anything else prints usage with exit 2. An unknown option
  * makes parseArgs throw, which the caller at the bottom turns into exit 2.
  *
+ * @param deps - this invocation's dependencies, built by `compose`.
  * @param argv - arguments after the executable and script path.
  * @returns the process exit code: 0 clean or warnings only, 1 errors, 2 usage or config error.
  */
-async function main(argv: string[]): Promise<number> {
+async function main(deps: AppDeps, argv: string[]): Promise<number> {
+  const { streams } = deps.io;
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -57,16 +67,16 @@ async function main(argv: string[]): Promise<number> {
   });
 
   if (values.version) {
-    return print(VERSION, 0);
+    return print(streams, VERSION, 0);
   }
   const [command, ...paths] = positionals;
   if (!values.help && isSetupCommand(command)) {
-    return await setupCommand(command, paths, values);
+    return await setupCommand(deps, command, paths, values);
   }
   if (values.help || command !== "check") {
-    return print(USAGE, command ? 2 : 0);
+    return print(streams, USAGE, command ? 2 : 0);
   }
-  return await checkCommand(paths, values, values.log === true);
+  return await checkCommand(deps, paths, values, values.log === true);
 }
 
 /** The commands besides `check`. */
@@ -86,6 +96,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
 /**
  * Runs the commands besides `check`: the hook, `init`, `baseline` and `stats`.
  *
+ * @param deps - this invocation's dependencies.
  * @param command - which one.
  * @param paths - the positionals after it.
  * @param values - the parsed options.
@@ -98,6 +109,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
+  deps: AppDeps,
   command: SetupCommand,
   paths: string[],
   values: InitFlags & {
@@ -107,122 +119,28 @@ async function setupCommand(
     redact?: boolean | undefined;
   },
 ): Promise<number> {
+  const { streams } = deps.io;
   if (command === "stats") {
     if (values.config !== undefined) {
       return print(
+        streams,
         "inwards stats reads every run log in a project: pass the project directory, not --config.",
         2,
       );
     }
     return paths.length <= 1
-      ? statsCommand(values.format ?? "text", paths[0], values)
-      : print(USAGE, 2);
+      ? statsCommand(deps, values.format ?? "text", paths[0], values)
+      : print(streams, USAGE, 2);
   }
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1
-      ? await hookClaudeCode(USAGE)
-      : print(USAGE, 2);
+      ? await hookClaudeCode(deps, USAGE)
+      : print(streams, USAGE, 2);
   }
   if (command === "init") {
-    return await initMain(paths, values, USAGE);
+    return await initMain(deps, paths, values, USAGE);
   }
-  return paths.length === 0 ? await baselineCommand(values.config) : print(USAGE, 2);
-}
-
-const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif"];
-
-/**
- * Tells whether a `--format` value is one the reporters support.
- *
- * @param value - the raw option value.
- * @returns true for `text`, `concise`, `json` or `sarif`.
- */
-function isFormat(value: string): value is Format {
-  return FORMATS.some((format) => format === value);
-}
-
-/** The options `inwards check` reads. */
-interface CheckOptions {
-  format?: string | undefined;
-  config?: string | undefined;
-  "max-diagnostics"?: string | undefined;
-}
-const WHOLE_NUMBER = /^\d+$/u;
-
-/**
- * Runs `inwards check` and writes the report to stdout.
- * Without `--config`, the nearest pyproject.toml with `[tool.inwards]` above
- * the working directory is used. Without paths, the whole config root is checked.
- *
- * Output is indented only on a TTY, since agents and hooks read a pipe.
- * Colour follows FORCE_COLOR first, then NO_COLOR, then the TTY check.
- *
- * @param paths - files or directories to check; empty means the config root.
- * @param options - the parsed options.
- * @param options.format - the `--format` value, validated here.
- * @param options.config - the `--config` path, if given.
- * @param options."max-diagnostics" - `--max-diagnostics`: a whole number, and not with SARIF,
- *   whose readers (code scanning) should see every finding.
- * @param log - `--log`: append this run to `.inwards/runs.jsonl` even when the run log is off.
- * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad option or no config.
- */
-async function checkCommand(
-  paths: string[],
-  { format = "text", config, "max-diagnostics": max }: CheckOptions,
-  log: boolean,
-): Promise<number> {
-  if (!isFormat(format)) {
-    return print(`Unknown --format ${format}`, 2);
-  }
-  if (max !== undefined && format === "sarif") {
-    return print("--max-diagnostics does not apply to sarif: code scanning gets every finding.", 2);
-  }
-  if (max !== undefined && !WHOLE_NUMBER.test(max)) {
-    return print("--max-diagnostics takes a whole number, e.g. 20.", 2);
-  }
-
-  const configPath = config ? resolve(config) : findConfig(process.cwd());
-  if (!configPath) {
-    return print("No pyproject.toml with [tool.inwards] found.", 2);
-  }
-
-  const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : undefined;
-  const report = await runCheck(configPath, targets, process.cwd());
-
-  // Agents and hooks read a pipe, and indentation there is wasted tokens.
-  const pretty = process.stdout.isTTY === true;
-  const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
-  const maxDiagnostics = max === undefined ? undefined : Number(max);
-  process.stdout.write(`${render(report, format, { pretty, color, maxDiagnostics })}\n`);
-  const exit = report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
-  const project = realpath(dirname(configPath));
-  if (project) {
-    noteRun(project, targets ?? [project], report.diagnostics);
-    logRun(project, { event: "check", exit, force: log });
-  }
-  return exit;
-}
-
-/**
- * Runs `inwards baseline`: checks the whole project without the baseline and
- * writes every error to inwards-baseline.json next to the config, replacing
- * the old one. Later checks, hooks and the Stop gate then fail only on new
- * violations.
- *
- * @param config - the `--config` path, if given.
- * @returns 0 once written, 2 without a config.
- */
-async function baselineCommand(config: string | undefined): Promise<number> {
-  const configPath = config ? resolve(config) : findConfig(process.cwd());
-  if (!configPath) {
-    return print("No pyproject.toml with [tool.inwards] found.", 2);
-  }
-  const report = await runCheck(configPath, undefined, process.cwd(), { baseline: false });
-  const accepted = writeBaseline(configPath, report.diagnostics);
-  return print(
-    `Wrote ${BASELINE_FILE} with ${accepted} violation${accepted === 1 ? "" : "s"}. Commit it; new violations still fail.`,
-    0,
-  );
+  return paths.length === 0 ? await baselineCommand(deps, values.config) : print(streams, USAGE, 2);
 }
 
 /**
@@ -230,6 +148,7 @@ async function baselineCommand(config: string | undefined): Promise<number> {
  * early, and that is no reason for a stack trace. Other stream errors still throw.
  *
  * @param err - the stream's error.
+ * @throws {Error} the same error, when it isn't a closed pipe.
  */
 function ignoreClosedPipe(err: Error & { code?: string }): void {
   if (err.code !== "EPIPE") {
@@ -241,13 +160,14 @@ process.stderr.on("error", ignoreClosedPipe);
 
 // exitCode, not exit(): Node-style exit() may drop writes still queued for a
 // pipe, and a hook's stderr is the whole message to the agent.
-main(process.argv.slice(2)).then(
+main(compose(), process.argv.slice(2)).then(
   (code: number) => {
     process.exitCode = code;
   },
   (err: unknown) => {
     const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
     process.exitCode = print(
+      processStreams,
       err instanceof ConfigError ? `config error: ${err.message}` : detail,
       2,
     );

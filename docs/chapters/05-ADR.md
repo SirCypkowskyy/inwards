@@ -9,7 +9,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted, built with `--bytecode` since [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
 | [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :white_check_mark: Accepted, baselined modules skip the confirming parse since [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :white_check_mark: Accepted |
-| [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted |
+| [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted, the adapter supplies the module index through a ProjectFiles port since [#44](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :white_check_mark: Accepted |
 | [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-progress-clock: Accepted, revisit in M6 (v0.6) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :white_check_mark: Accepted |
@@ -18,7 +18,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted, deployed from `develop` since 019 |
 | [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted |
 | [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :white_check_mark: Accepted |
-| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted |
+| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted, unreadable targets reported since 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :material-swap-horizontal: Branching model superseded by 019 |
 | [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted, squashed into `develop` since 019 |
 | [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
@@ -26,6 +26,13 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | The `init` picker uses @clack/prompts, loaded from a split chunk | :white_check_mark: Accepted |
 | [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
+| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted, `extend-deny-libraries` adds to the default since [#155](guides/libraries.md#configure-it) |
+| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted, generated modules pass when missing since [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
+| [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Report unreadable dynamic-import targets in inner layers | :white_check_mark: Accepted |
+| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
+| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
+| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -525,3 +532,209 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *Pause until partner data (move recruiting, #132, to M3):* the most rigorous option. The owner kept recruiting at the end of the roadmap, and the measurable bets point the right way.
 - *Stop or pivot:* nothing measured contradicts a threshold, so there is no case for either.
 
+## ADR-023: Libraries per layer, with a default deny list for the innermost layer
+
+**Status:** Accepted · 2026-09-26 · [#47](https://github.com/SirCypkowskyy/inwards/issues/47)
+
+**Context.** INW001 only sees first-party layers, so `from sqlalchemy.orm import Session` in the domain passes it, and it is the most common leak in layered Python code. Telling a library apart from first-party code must not need a virtualenv (C4): Inwards never imports user code, so it can't ask Python where a module comes from.
+
+**Decision.**
+
+- INW005 `pure-domain` checks every import of a file in a layer that is neither first-party (a layer or the INW006 file-system probe owns it) nor allowed by the layer's `allow-libraries` / `deny-libraries`. Entries are module names that cover their submodules; the longest matching entry decides, `allow` on a tie.
+- `allow-libraries` makes the layer an allowlist for third-party code only. The standard library stays allowed, told apart by a bundled list: the union of `sys.stdlib_module_names` on CPython 3.11 to 3.14, plus the modules older versions had.
+- Entries must be dotted Python identifiers. A glob or a distribution name would match nothing and, on the innermost layer, silently drop the default.
+- The innermost layer of a config with two or more layers denies a fixed list of frameworks, database and network clients and stdlib I/O unless it sets `deny-libraries`, which replaces the list rather than extending it. A one-layer config gets no default: its only layer is the whole app, not a domain.
+- The message names the library's top-level package, never the configured lists, so a baseline entry survives a change to them. The fix names the deny entry that matched (`http.client`, which `allow-libraries = ["http"]` would not override) and every outer layer the config lets use the library; the agent picks the one that holds adapters, since layer order doesn't say which one that is in a hexagonal layout.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Existing configs with two or more layers catch SQLAlchemy, FastAPI or Requests in the domain with no config change.
+- :material-minus-circle-outline: That is also a new source of errors on upgrade for projects whose domain uses such a library on purpose. `deny-libraries = []` or an `allow-libraries` entry turns it off, and `inwards baseline` accepts what is there.
+- :material-minus-circle-outline: Import names are matched, not distribution names (`PyYAML` is `yaml`), and a stdlib module newer than the bundled list counts as third-party.
+
+**Alternatives.** *Read installed distributions from the virtualenv*: exact, but breaks C4 and fails in CI images without the dependencies. *Default deny for every layer but the outermost*: guesses too much about what an application layer may use. *Name the configured list in the message*: a changed list would bring back every baselined violation.
+
+## ADR-024: A Polish translation as a second build, translated in the same PR
+
+**Status:** Accepted · 2026-09-26 · [#149](https://github.com/SirCypkowskyy/inwards/issues/149)
+
+**Context.** The owner wants the docs in Polish too, with a language switcher. Zensical 0.0.65 builds one language per project: internationalization is on its roadmap, and today a header selector (`extra.alternate`) links to other builds. Its built-in switcher maps pages through the other build's sitemap and assumes sibling roots (`/en/`, `/pl/`), but the English site already lives at `/inwards/`, and the CLI's `docs:` links point there. Zensical can't exclude a Markdown file inside `docs_dir`, and it doesn't follow symlinked directories.
+
+**Decision.**
+
+- **Two builds.** `docs/chapters/` stays English at `/inwards/`. `docs/pl/` mirrors every page in the English nav at the same path, and `docs/zensical.pl.toml` builds it into `docs/site/pl/`, so one Pages artifact holds both. The Polish pages take images, CSS and scripts from the English site through `../` paths instead of copies.
+- **The switcher keeps the page.** A theme override (`docs/overrides/partials/alternate.html`) links each language to the same page in the other build, and `language-switch.mjs` keeps those links current (instant navigation doesn't re-render the header, so they would go stale) and, on click, falls back to the language root when the page doesn't exist. Polish headings keep the English anchors (`{ #id }`), so the switch keeps the `#anchor` too.
+- **The agent translates, in the same PR as the English change** (the owner chose this over machine translation in CI, a machine draft plus review, or community translation). `docs/GLOSSARY.pl.md` fixes the terms and sits outside both `docs_dir`s, so it isn't published. A subagent reviews terminology and meaning like any other PR.
+- **Staleness is tracked by hash.** Each Polish page records `source` and the SHA-256 of the English file it was translated from. `scripts/check-docs-translation.py` fails CI on a missing or orphaned page, a committed banner, or configs whose theme, extensions or assets drift apart, and warns on a stale page; the deploy adds a "may be out of date" banner to stale pages in its checkout.
+- **Everything is translated except** code blocks, CLI output, config keys, diagnostic messages, identifiers and the changelog. ADR bodies are translated in full.
+
+**Consequences.**
+
+- :material-plus-circle-outline: English URLs and anchors don't change, and a reader switching language lands on the same section.
+- :material-plus-circle-outline: A missing translation can't merge, and a stale one is visible to readers instead of silently wrong.
+- :material-minus-circle-outline: Every docs PR also touches `docs/pl/`, and the translation is only as good as the review.
+- :material-minus-circle-outline: The Polish build is only complete inside the English one: `zensical serve -f docs/zensical.pl.toml` shows no screenshots or custom styles.
+- :material-minus-circle-outline: A hash changes on any edit, a typo fix included, so some "stale" warnings need only `--fix-hashes`.
+- :material-minus-circle-outline: GitHub Pages serves only the root `404.html`, so a missing page under `/pl/` shows the English 404 page (its language switcher still works).
+
+**Alternatives.** *English under `/en/` next to `/pl/`:* the built-in switcher would work, but every existing link and the CLI's `docs:` URLs would move. *Machine translation on each merge:* always in sync, but it needs a secret and a budget, terminology drifts between runs, and nobody reviews it. *Copies of the assets in `docs/pl/`:* self-contained, but two copies of every screenshot to keep equal.
+
+## ADR-025: INW010 probes the disk for existence and checks only the module part of an import
+
+**Status:** Accepted · 2026-09-26 · [#45](https://github.com/SirCypkowskyy/inwards/issues/45)
+
+**Context.** INW010 flags an import of a first-party module that doesn't exist. The module index offers two answers to "does it exist": its listing (`modules`) and a probe of the file system (`ownerOf`). The listing misses namespace packages, modules behind a symlink that leaves the root, and anything under node_modules, `__pycache__` or a virtualenv, and the CLI and the language server list layer packages differently. Neither answer knows compiled extensions (`name.cpython-313-x86_64-linux-gnu.so`), which the probe can't spell. An import statement doesn't say which of its parts is a module either: `from shop.domain import pricing` imports a submodule or a name defined in `shop/domain/__init__.py`. And a package can extend its `__path__` (`pkgutil.extend_path`, `pkg_resources.declare_namespace`) to share its top-level name with an installed distribution: polar in the corpus does this with its SDK, and 79 of its imports name modules only the SDK has.
+
+**Decision.**
+
+- Existence is decided by `ownerOf`, which probes the disk the way Python imports, never by the listing.
+- When the probe finds a module missing, the package it would live in is listed once (`ProjectFiles.listDir`). A compiled extension (`.so`, `.pyd`, with or without an ABI tag), Cython source (`.pyx`) or bytecode (`.pyc`) of that name counts as the module. The fix suggests the three members of that package closest to the missing name by edit distance, never the importing file or its own package.
+- Only the module part is checked: `X` of `from X import name`, the whole name of `import X` and `from X import *`. The `name` is never checked.
+- An import is first-party when a prefix of it probes as a first-party module (a top-level package needs an `__init__.py`, as for INW006). One under a package whose `__init__.py` mentions `__path__` or `declare_namespace` passes.
+- A relative import that climbs above the top-level package is an INW010 error too: Python refuses it whatever is on disk.
+- Only static imports in files inside a layer are checked. An import INW010 reports gets no INW006 as well, which would contradict it, and an outward import INW001 reports gets no INW010: INW001's fix deletes the import, while INW010's would create the module.
+- The suggestions go in the fix steps, not the message, so a baseline key doesn't change when modules are added.
+- The index probes each path once. The language server rebuilds the index, and checks the open documents again, when a path that could be a module is created or deleted (a `.py`, `.pyi`, extension or bytecode file, or a directory, outside hidden directories, caches, node_modules and site-packages), so creating the missing module clears the error without a keystroke. With a client that can't report file events, it builds a fresh index for each check instead, so the error clears at the next keystroke.
+
+**Consequences.**
+
+- :material-minus-circle-outline: `from shop.domain import pricing` with no `pricing` passes when `shop/domain` is a package.
+- :material-minus-circle-outline: A module generated at build time (`_version.py`, `*_pb2.py`) is reported until it exists in the checkout ([#160](https://github.com/SirCypkowskyy/inwards/issues/160)), and so is an optional import behind `try/except ImportError`. A namespace package shared with an installed distribution is reported as missing ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)).
+- :material-minus-circle-outline: The language server rebuilds only on create and delete, so an `__init__.py` edited to extend its `__path__` takes effect at the next create or delete.
+- :material-minus-circle-outline: A finding in the hook costs the confirming full parse every finding costs (ADR-004) and one directory read: on saleor, `webhook/payloads.py` (1,301 lines) goes from 38.8 ms to 71.6 ms p50, about what an INW001 finding in that file costs on develop (70.1 ms); `channel/tasks/saleor3_22.py` from 27.4 to 32.7 ms.
+- :material-plus-circle-outline: No false positive on the five corpus repositories (6,543 files) or the examples. The four findings, all in saleor, are real broken imports: a `TYPE_CHECKING` import of `saleor.translation.models`, which doesn't exist (the class lives in `saleor.core.utils.translations`), an import of `saleor.models`, and two relative imports that climb above `saleor`.
+- :material-plus-circle-outline: The editor and the CLI agree whatever each lists, since neither decision nor suggestion reads the listing.
+- :material-plus-circle-outline: Every import in a layered file is probed now, not only those outside every layer; probing each path once keeps the whole-project cost level: saleor's full check takes 1.96 s against 2.15 s on develop (median of 8 alternating local runs), and on the synthetic repo the hook is 2.9 % slower and the full check 1.3 % faster (`bench/compare.ts`, threshold 20 %).
+
+**Alternatives.**
+
+- *Membership in `modules`:* false errors in the editor for namespace packages and anything a listing skips (the review of [#153](https://github.com/SirCypkowskyy/inwards/pull/153)), and a walk of the whole project for each finding's suggestions, which cost the hook 50 to 130 ms on saleor.
+- *Read `__init__.py` to check `from X import name`:* a star import or a module-level `__getattr__` can define any name, so a text check would guess.
+- *Skip imports inside `try/except ImportError`:* an agent could then silence the rule by wrapping the import, the escape hatch the fix steps close.
+- *Drop the probe cache in the language server:* stays correct, but an open document would still show a stale error until the next keystroke. That is what a client without file events gets.
+
+## ADR-026: Report unreadable dynamic-import targets in inner layers
+
+**Status:** Accepted · 2026-09-26 · [#46](https://github.com/SirCypkowskyy/inwards/issues/46)
+
+**Context.** [ADR-015](#adr-015-check-literal-dynamic-imports-as-inw011) checks a dynamic import only when its target is a constant string, and left the rest for a separate decision. Everything else passed silently: `importlib.import_module(name)`, `import_module(f"shop.{layer}.db")`, `exec(code)`, a relative `import_module` whose `package` is a variable, and a literal with a `\N{...}` escape (decoding one needs the Unicode name table, which the engine doesn't ship). For an agent that INW011 has just blocked, putting the module name in a variable is the next dodge, and Inwards can't evaluate it without running user code (C4).
+
+**Decision.**
+
+- A loader call whose target Inwards can't read is reported as INW011, severity error, with a message saying the target can't be verified. That covers `import_module` with a name that isn't a literal, or a relative name whose `package` is given but isn't a literal, `__package__` or `__name__`; `__import__` with a computed name or `level`, or a `fromlist` that isn't `None` or a list or tuple of literals; `run_module` with a computed name; and `exec` or `eval` with a computed source. An argument that isn't found while the call passes `*args`, or a `**kwargs` that isn't a literal dict with string keys, counts as computed, since the splat may hold it; a literal `**{"package": "shop"}` is read exactly. Loaders are recognised through the same aliases as in ADR-015, and a computed call inside a literal `exec` source counts at the outer call.
+- It is reported only in layers that have an outer layer. In the outermost layer every first-party target is allowed by direction, so there is nothing to verify, and that is where plugin loaders and composition roots belong. Files outside every layer stay unchecked.
+- The fix gives two ways out: write the target as a literal (or as an import statement), or move the loader to the outermost layer and pass what it loads in through a parameter typed against a `typing.Protocol` of the inner layer.
+- `compile` with a computed source is not reported. It only builds a code object, and running that takes `exec` or `eval`, which are. This also keeps `from re import compile` followed by `compile(pattern)` quiet, since ADR-015 always reads `compile` as the builtin. `exec(compile("<literal>", ...))` isn't reported either, as long as `compile` isn't rebound by the check below: the literal is read at the `compile` call.
+- A bare `exec` or `eval` with a computed source is skipped only when the code surely rebinds that name at the call. The binding must be a `def`, `class`, plain assignment or import placed directly in the module body, before the top-level statement that holds the call, or directly in the body of a function that encloses the call; or a parameter of a function or lambda whose body holds the call; or a `for` target inside its loop. Bindings under `if`, `try`, `with` or `while` don't count. The exemption is off for the whole file when any binding of the name could be the builtin: an assignment, walrus, `for`, `with` or `except` target, or parameter default whose value mentions a loader or a module that holds one (`exec = exec`, `eval = builtins.eval`, `def run(code, exec=exec)`); a `def` or `class` whose decorators or class arguments (bases, `metaclass=`, keywords) mention one; or an import from `builtins`, `importlib`, `runpy`, a relative module or a first-party module, since first-party code may re-export the builtin (the engine's module index decides what is first-party). A `global`, `nonlocal` or `del` of the name turns it off too, and so does a wildcard import or any mention of `globals`, `vars`, `locals`, `setattr`, `delattr`, `__dict__`, `__builtins__` or `sys.modules`, through which code can put the builtin back. PyTorch training code often defines `eval(model, loader)`, and reporting it as a dynamic import would be noise with a nonsense fix. A literal source is still read whatever the name is bound to, as ADR-015 decided.
+- Calls that fail at runtime stay unreported: a relative `import_module` with no `package`, `package=None` or `package=""`, a relative `run_module`, an empty name.
+- A name bound to several loaders reports each load once.
+- Severity error, like the rest of INW011. Warnings pass the CLI exit code, the hook and the Stop gate, and they are not baselined, so a warning would let the dodge through.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The variable-name dodge is reported, through every alias ADR-015 follows. Tests cover each loader, the aliases, f-strings, variables, `\N{...}` literals, arguments behind `*args` and `**kwargs`, a relative `import_module` with an unknown package, and every rebinding of `exec`, `eval` or `compile` that doesn't shadow the builtin at the call. The loader hint needs no change, and `prescan-diff` still misses nothing.
+- :material-minus-circle-outline: Legitimate runtime loaders in inner layers are reported. On the real-repo corpus (5 repositories, 6,543 files) the change adds 4 findings, each an `import_module(path)` that loads a configured class or plugin: one in python-ddd's `seedwork.application`, three in saleor (`saleor.core.telemetry`, `saleor.plugins`, `saleor.schedulers`). Their teams would move each loader outward or baseline it.
+- :material-minus-circle-outline: Constant targets that aren't literals (a module-level `TARGET = "..."`, `str.format`, `%`, f-string conversions such as `{'shop'!s}`) are now reported as unverifiable instead of passing. Folding them, and so reporting them exactly, is [#79](https://github.com/SirCypkowskyy/inwards/issues/79).
+- :material-minus-circle-outline: The rebinding exemption misses the builtin passed in as an argument: `def run(exec, c): return exec(c)` called as `run(exec, code)` is not reported, since the parameter shadows the builtin inside `run`. It also misses the builtin reached through an object without naming a loader or a namespace writer, such as `exec = operator.attrgetter("exec")(print.__self__)`, one of the routes [#79](https://github.com/SirCypkowskyy/inwards/issues/79) tracks. Being conservative, it reports some calls that are not the builtin: a comprehension variable (`[eval(m) for eval in evaluators]`), a method name used inside its own class body, a `match` capture, any binding under `if` or `try` or made through `global` even when it does run before the call, and every rebinding in a file that touches a namespace writer or has a wildcard import.
+- :material-minus-circle-outline: The report is about direction only. In the outermost layer an unverifiable call can still reach first-party code outside every layer (INW006) without a report, and a `compile` code object run by something other than `exec` or `eval` (`types.FunctionType`) is missed.
+
+**Alternatives.** *Report in every layer, the outermost too*: flags composition roots and plugin registries, where a runtime loader is the right design. *Warning instead of error*: passes the hook and the Stop gate, so the agent's dodge would still land. *Resolve known prefixes* (`f"shop.plugins.{name}"` can only reach `shop.plugins`): fewer reports where the prefix sits in an inner layer, but more code for a case the corpus doesn't have yet; a later issue can add it if real projects need it. *Flag every loader call in an inner layer, literal or not* (an ADR-015 alternative): reports `import_module("json")` too.
+
+## ADR-027: Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table
+
+**Status:** Accepted · 2026-09-26 · [#43](https://github.com/SirCypkowskyy/inwards/issues/43)
+
+**Context.** A team adopting Inwards on a legacy codebase wants to turn rules on one at a time, or see a rule's findings as warnings before they block. Ruff users expect `select` and `ignore`, but `[tool.inwards]` already has an `ignore` key: module names left out of the INW006 unassigned-package warning, which `inwards init` writes. Diagnostics come from the engine and from five checks the adapters call directly (`checkShape`, `checkRequired`, `checkSelectors`, `checkPrefixes`, `checkMoves`), and the Stop gate compares configs as JSON.
+
+**Decision.**
+
+- **A sub-table.** `[tool.inwards.rules]` holds `select` and `ignore`, lists of rule codes, and `severity`, a table from code to `"error"` or `"warning"`. The top-level `ignore` keeps its meaning. Without `select` every rule reports; `ignore` wins over `select`. `severity` sets the level of every finding of a rule, including findings a rule reports at a level of its own: with `INW006 = "error"`, the per-package warning becomes an error.
+- **Exact codes, validated.** A code the registry doesn't have is a config error, like an unknown key. No prefixes: codes aren't grouped by category, and a prefix such as `INW00` would silently take in rules that ship later. An empty `select` is an error too, since turning rules off is `ignore`'s job.
+- **INW000 is fixed.** `ignore` and `severity` can't list it, and `select` doesn't turn it off. A file whose declared encoding can hide imports gets INW000 instead of a check, so turning INW000 off or down would let that file pass unchecked.
+- **The session layout check is fixed too.** The Stop gate's INW006 comparison with the session start (a prefix emptied since then, layer code moved out of every layer) ignores the table. It is the defence against `mv shop/domain shop/core`, a dodge rather than a rule a team phases in, and with `select = ["INW001"]` or `ignore = ["INW006"]` that move would pass.
+- **Applied in the core, last.** Every other core function that returns diagnostics to an adapter applies the table, so `inwards check`, the hooks, the Stop gate and the language server agree. `Engine.checkFiles` applies it after keeping INW006's per-package warning once per package, so a configured severity doesn't change how many copies are reported. The rules still run; their findings are dropped or re-levelled afterwards.
+- **A warning is a warning.** A rule set to `"warning"` shows up in every format but, like any warning, doesn't change the exit code, block the per-edit hook or the Stop gate, or go into the baseline.
+- **Baseline.** `inwards baseline` records only what the check reports, so it leaves out rules that are off or at warning. Entries already in the file for such a rule are dormant: they don't count as fixed (`resolved`), `inwards baseline` keeps them, and they apply again once the rule is back at error. The other way round, an entry taken while a rule was raised to error is used up by the matching warning once the rule is back at its default, so it doesn't count as fixed either.
+- **SARIF.** `rules[]` still lists every registered rule with the registry's default in `defaultConfiguration.level`. Each result carries the configured `level`, which is what viewers show. A rule that is off has no results.
+- **Run log.** `codes` and `severities` record what was reported, after the table.
+- **Guarded like the rest.** The table is inside `[tool.inwards]`, so the config guard denies an edit that changes it and the Stop gate fails a change made through Bash. Tests pin both.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A team can phase rules in without a baseline, and show a rule as warnings before it blocks.
+- :material-plus-circle-outline: No per-adapter code path: the language server picks up the table with no change of its own.
+- :material-minus-circle-outline: `rules.ignore` and the top-level `ignore` share a word but not a meaning. Renaming the top-level key is a breaking change, left for the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)).
+- :material-minus-circle-outline: A rule that is off still costs its check time. Skipping it would mean passing the table into every rule, to save a few milliseconds.
+- :material-minus-circle-outline: A config that names a rule only a newer Inwards knows fails with exit 2; `required-version` gives the clearer message.
+- :material-minus-circle-outline: INW006 can't be fully turned off: the session layout check still blocks a layer moved away.
+- :material-minus-circle-outline: The language server reads the table when it starts, so a change needs a restart, and a config error (an unknown code, say) only reaches its output channel ([#163](https://github.com/SirCypkowskyy/inwards/issues/163)).
+- :material-minus-circle-outline: After a Bash edit of the table, the Stop gate fails on the change but checks with the edited config, so it doesn't list what the edit hides ([#164](https://github.com/SirCypkowskyy/inwards/issues/164)).
+- :material-minus-circle-outline: No per-file or per-path settings. Those belong with suppressions ([#50](https://github.com/SirCypkowskyy/inwards/issues/50)).
+
+**Alternatives.** *Top-level `select` and `ignore`, as in Ruff:* familiar, but `ignore` is taken, and telling `INW001` from a module named `tests` by its shape is a guess. *One key per rule, `INW001 = "off"`, as in ESLint:* compact, but it can't say "only these rules". *Code prefixes:* see above. *Filtering in each adapter:* four call sites (the check, the Stop gate's layout check, two in the language server) that could drift apart.
+
+## ADR-028: Inline suppressions need a reason, and an agent can't add one by default
+
+**Status:** Accepted · 2026-09-26 · [#50](https://github.com/SirCypkowskyy/inwards/issues/50)
+
+**Context.** A team sometimes has to accept one import for good: a legacy adapter, a vendored module, a generated one. The baseline accepts violations as a set and is meant to shrink, and `[tool.inwards.rules]` works per rule, not per line. Ruff, mypy and ESLint answer this with a comment on the line. For Inwards a comment is also the cheapest way for an agent to turn a check green, and a hook can't tell who wrote a line. The #134 machinery already reads a file as it was at session start, safely, from the git blob the start manifest vouches for.
+
+**Decision.**
+
+- **Syntax.** `# inwards: ignore[INW001] reason="why"` hides every finding of the named rules that points at the comment's line, however many there are (`from x import a, b` gives two). Several codes go in one comment (`ignore[INW001,INW005]`), and the directive may follow another tool's comment on the same line; a second directive in the same comment is an INW009 error rather than being read or dropped silently. The line is the one the diagnostic points at: for a parenthesised import, the imported name's line, not the `from` line; for a dynamic import spread over several lines, the call's first line. No blanket form without codes, no file-level form, no next-line form: each would hide more than the finding someone looked at.
+- **Accountable.** The reason is mandatory. A comment that is malformed, has an empty or missing reason, or names a code that is unknown or can't be suppressed hides nothing and is itself an error, INW009 `suppression-comment`. A valid code that matches no finding on its line is an INW009 warning, since it would silently hide a new finding there later; a rule that is off in `[tool.inwards.rules]` isn't reported as unused. INW009 follows the table like any rule.
+- **What can be suppressed.** Every rule that points at a line of Python: INW001, INW005, INW006, INW010, INW011 and rules added later (for INW010, a generated module that a fresh checkout lacks, [#160](https://github.com/SirCypkowskyy/inwards/issues/160)). Not INW000 (the file isn't checked at all, so under its declared encoding a "comment" may be code), INW007 and INW008 (they are about the package tree; the shape config is the place to change them) and INW009 itself. A file with INW000 has no suppressions read at all.
+- **Read from the syntax tree.** Comments come from a full parse, so `x = "# inwards: ignore[...]"` doesn't count. A file whose text mentions `inwards: ignore` skips the import skeleton and goes straight to the full parse, which yields its imports and its comments from one tree, so it costs what a file with a violation costs. Skipping the skeleton only makes the check more exact; the prescan and its soundness argument ([ADR-004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse)) are untouched.
+- **Applied in the core.** `Engine.checkFile` and `Engine.check` apply suppressions per file, before `[tool.inwards.rules]`, so the CLI, the hooks and the language server agree. `Engine.check` also returns the suppressed findings with their reasons; `checkFiles` keeps returning only what is reported.
+- **Visible.** Text and concise output end with "N findings suppressed by inline comments", and the JSON summary has `suppressed` (only when there are some). SARIF lists each suppressed finding as a result with an `inSource` suppression whose `justification` is the reason, so code scanning shows it as suppressed rather than losing it. The run log records `suppressed` and `rejected` per run, and `inwards stats` counts rejected suppressions.
+- **`agent-suppressions = "deny"` by default.** In the Claude Code hooks, a suppression is honoured when its file is byte for byte what it was at session start (the start manifest's SHA-256), since the agent didn't touch it, committed or not; otherwise only if the file, as it was at session start (the #134 git blob), had the same finding (rule, module, message) suppressed too, in the same file, copy for copy. The file matters because `order.py` and `order.pyi` share a module: a suppression moved from one into the other is new. A suppression the agent adds, copies to another import, moves, or widens with another code isn't honoured, and neither is one in a file the agent created, renamed or linked. Both checks, and the #134 one, follow one invariant: a file has a start identity only when its path as written (the cwd as given joined with the file path, `..` applied as text, relative to the real project root) equals its physical path, and the file isn't itself a symlink. So a new symlinked file (`ln -s order.pyi order.py`), a cwd inside a new symlinked directory, `..` through either, or a start file swapped for a link to the same bytes can't borrow a start record. The Stop gate re-checks a start file that lost its identity even when its content hash is unchanged. The finding is then treated exactly as if the comment weren't there: a baseline entry still accepts it, a violation the file had at session start is still context (#134), and anything else blocks like any other violation, with a note saying why. To make that work, a suppressed finding uses up a matching baseline entry, after the reported ones, so the entry doesn't count as fixed either. Editing only the reason of an existing suppression changes nothing. The mode is read from the session-start config, so a Bash edit of it changes nothing in the hooks and fails the Stop gate; the config guard covers it like every `[tool.inwards]` key. `"allow"` honours every suppression. `inwards check`, CI and the language server always honour suppressions: they have no session to compare with.
+
+**Consequences.**
+
+- :material-plus-circle-outline: One accepted import no longer needs a baseline or a rule turned off, and every such exception carries its reason in the code, next to the import.
+- :material-plus-circle-outline: An agent can't silence a violation with a comment unless the owner opts in, and a rejected attempt shows up in `inwards stats`.
+- :material-plus-circle-outline: Adding the feature changes nothing for existing projects: no file has a suppression yet, and the new key is optional.
+- :material-minus-circle-outline: Under `"deny"`, a suppression in a file that was uncommitted or untracked at session start, or in any file of a project outside git, counts as new once the agent edits that file, because the hooks can't prove its start content ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). A file the agent leaves alone keeps its suppressions. The owner commits a suppression before handing the file to an agent.
+- :material-minus-circle-outline: Moving a suppression between two imports that give the same finding (the same target twice in one module) isn't noticed. It hides nothing new.
+- :material-minus-circle-outline: Renaming or moving a file with a suppression makes the suppression new, since the new path has no start content. So does reaching a file through any symlink inside the project, even one that existed at session start.
+- :material-minus-circle-outline: A reason can't contain `"`, and nothing checks that it says anything useful. Review does.
+- :material-minus-circle-outline: A file with a suppression always gets the full parse, which a clean file without one skips.
+- :material-minus-circle-outline: Under `stop-gate = "project"` the Stop gate checks every suppression in the project against its start content, one more check per file that has one.
+
+**Alternatives.** *`# noqa: INW001` or `# type: ignore`-style blanket comments:* other tools read those, and a bare form would hide everything on the line. *A next-line or file-level directive:* hides findings no one looked at. *Suppressions in `pyproject.toml` by path:* one more place to keep in sync with the code, and the config guard would have to judge each entry; per path is left to #160 and the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)). *Honour agent suppressions and only count them:* a count doesn't keep a violation out of the code. *Reject every suppression in a changed file:* the owner's existing ones would block any edit of that file.
+
+## ADR-029: Generated modules pass INW010, protoc and version modules by default
+
+**Status:** Accepted · 2026-09-26 · [#160](https://github.com/SirCypkowskyy/inwards/issues/160)
+
+**Context.** INW010 decides on disk whether a module exists ([ADR-025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). Some modules only exist after a build step: `*_pb2.py` and `*_pb2_grpc.py` from protoc, `_version.py` from setuptools-scm or hatch-vcs. A developer's checkout has them and a fresh CI checkout doesn't, so the same commit passes locally and fails in CI. The ways out were a baseline, which is meant to shrink and is the wrong tool for a module that exists at run time; an inline suppression ([ADR-028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) on every import of it; or INW010 turned off in `[tool.inwards.rules]`.
+
+**Decision.**
+
+- **A `generated` key** in `[tool.inwards]`: module patterns that INW010 treats as existing when the probe finds them missing.
+- **Patterns are dotted names with `*` and `?` per segment.** No bracket sets: a set can hold any character, so `[!/]*` would pass a character check and still cover every segment. A pattern matches whole segments anywhere in the module name, as the top-level `ignore` does, and a wildcard never crosses a dot: `*_pb2` covers `shop.api.orders_pb2`, `_version` covers `shop._version`, `shop.api.gen` covers everything under `shop/api/gen/`. It is matched against the resolved module part of the import, so `from .orders_pb2 import Order` in `shop.api` is `shop.api.orders_pb2`.
+- **Validated.** An empty segment, a character that can't be in a module name (`[` and `]` included), or a pattern made only of wildcards and dots (`*`, `*.*`) is a config error. The last would turn INW010 off, which is `[tool.inwards.rules]`'s job.
+- **On by default.** Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`. Tools write these names and people rarely do, so a missing one is almost always a build step that hasn't run. Setting the key replaces the default, as `deny-libraries` replaces its default ([ADR-023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer)), and `generated = []` turns it off.
+- **Matched without regular expressions.** The module name comes from an import an agent writes, and a regex translation (`.*` per star) backtracks: `*_*_*_*_pb2` against a 240-character segment took over 300 ms in the hook. An iterative two-pointer match that resumes only after the last star costs O(pattern × segment). The shape member patterns share the matcher, and it fixes their bracket sets, where the regex translation turned `?` and `*` into wildcards.
+- **Only INW010 reads it.** The module index still sees the module as missing, so the other rules judge it as they judge any missing module: INW001 goes by name and reports an outward import whatever is on disk, INW005 counts it as first-party through its nearest package that exists, and INW006 names that package.
+- **Guarded** like every key in `[tool.inwards]`: the config guard denies an agent's edit of it, and the Stop gate fails a change made through Bash. A test pins the guard.
+- **No per-file ignore.** An inline suppression is already a per-line escape, and suppressions by path in the config are left to the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), as ADR-028 decided.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A project that imports protoc or version modules gets the same result in CI as locally, with no config. Tests pin both checkouts, for the default and for a configured pattern.
+- :material-plus-circle-outline: Not a breaking change. INW010 has not been released yet (0.2.0 predates it), and the default only removes findings; no exit code, key or `diagnostics@1` field changes.
+- :material-plus-circle-outline: No finding changes on the corpus (5 repositories, 6,543 files), and INW010's four findings in saleor remain.
+- :material-minus-circle-outline: A hallucinated import whose name a pattern covers (`shop.api.payments_pb2` with no `payments.proto`) passes INW010, by default for `*_pb2`, `*_pb2_grpc` and `_version`. It still fails when the code runs. A team that wants those caught sets `generated = []` and runs the generator before the check.
+- :material-minus-circle-outline: INW006 still sees the module as missing. For a generated module directly in the package above the layers (`shop._version` imported from a layer), both checkouts get an INW006 error, but it names "the package above the layers" without the file and the unassigned module with it, so a baseline entry taken in one checkout doesn't match in the other. A generated module inside an unassigned package (`shop.persistence.orders_pb2`) is worded the same in both.
+- :material-minus-circle-outline: A generated top-level package with no committed `__init__.py` isn't first-party to any rule: INW010 never checks it, and INW005 treats it as a library.
+- :material-minus-circle-outline: "Anywhere" is broad: a pattern `api` covers every module with an `api` segment. A longer pattern (`shop.api.gen`) is narrower.
+
+**Alternatives.**
+
+- *No default:* stricter, but every gRPC or setuptools-scm project would meet the CI failure first and find the key from there, for names that almost never come from an agent.
+- *fnmatch over the whole dotted name, with `*` crossing dots:* the issue's example `*._version` would work as written, but `*` would mean something else than in `ignore` and the shape patterns, where it stays inside a segment, and `shop.*` would reach any depth.
+- *Match the whole name only:* `*_pb2` would then need a form for "at any depth", such as the shape selectors' `**`, in every pattern.
+- *Teach the module index that generated modules exist, for every rule:* INW006 would word its finding the same in both checkouts, but INW005, INW006 and the language server would believe in files that aren't there, and the index would need the config.
+- *A per-file INW010 ignore in the config:* one more place to keep in sync with the code, and the per-line suppression already exists.
+- *fnmatch bracket sets, as in the shape member patterns:* a set's contents escape the character check, and `*` and `?` cover every case the issue names.

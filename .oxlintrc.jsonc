@@ -34,5 +34,40 @@
     ],
     "jsdoc-js/require-param": ["error", { "checkDestructured": false, "checkConstructors": true }],
     "jsdoc-js/require-returns": ["error", { "checkGetters": true }]
-  }
+  },
+  // Stricter documentation for every TypeScript file (#176): each module opens
+  // with an @file overview, destructured parameters are documented property
+  // by property, descriptions must say more than the name, and a function
+  // that throws directly says so. The docs site's browser scripts (plain JS)
+  // keep the base rules above.
+  "overrides": [
+    {
+      "files": ["**/*.ts"],
+      "rules": {
+        "jsdoc-js/require-file-overview": [
+          "error",
+          {
+            "tags": {
+              "file": { "initialCommentsOnly": true, "mustExist": true, "preventDuplicates": true }
+            }
+          }
+        ],
+        "jsdoc-js/require-param": [
+          "error",
+          { "checkDestructured": true, "checkConstructors": true }
+        ],
+        "jsdoc-js/check-param-names": ["error", { "checkDestructured": true }],
+        "jsdoc-js/require-param-description": "error",
+        "jsdoc-js/require-returns-description": "error",
+        "jsdoc-js/require-returns-check": "error",
+        "jsdoc-js/check-tag-names": "error",
+        "jsdoc-js/require-throws": "error",
+        "jsdoc-js/require-throws-description": "error",
+        "jsdoc-js/require-yields": "error",
+        "jsdoc-js/require-yields-check": "error",
+        "jsdoc-js/informative-docs": "error",
+        "jsdoc-js/no-blank-block-descriptions": "error"
+      }
+    }
+  ]
 }

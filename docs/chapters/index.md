@@ -24,7 +24,7 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
         2. Declare a typing.Protocol in `shop.domain` (for example `shop.domain.ports`) that describes only what this module needs from `SqlOrderRepository`.
         3. Type this module against that Protocol and receive the implementation through a constructor or function parameter.
         4. Make the class in "infrastructure" satisfy the Protocol, and wire it in the outermost layer (the composition root).
-      docs: https://sircypkowskyy.github.io/inwards/03-Architecture-C4/#rule-catalogue
+      docs: https://sircypkowskyy.github.io/inwards/rules/INW001/
 
     Found 1 violation in 1 file (16.8 ms).
     ```
@@ -104,7 +104,7 @@ You declare your layers in `pyproject.toml`. `inwards check` fails when an impor
 
     ---
 
-    Eighteen decisions, among them "why TypeScript", "how a release is cut" and "how packages are selected".
+    Every architecture decision, among them "why TypeScript", "how a release is cut" and "how packages are selected".
 
 -   :material-speedometer:{ .lg .middle } __[Constraints and quality](06-Constraints-and-Quality.md)__
 
@@ -118,7 +118,7 @@ The [glossary](07-Glossary.md) defines every term from "port" to "import skeleto
 
 !!! info "Project status"
     Pre-alpha.
-    Six rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (literal dynamic imports), INW006 (code outside every layer, dead prefixes), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
+    Nine rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (dynamic imports), INW005 ([libraries per layer](guides/libraries.md): no frameworks or I/O in the domain by default), INW006 (code outside every layer, dead prefixes), INW010 (imports of first-party modules that don't exist), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members), INW000 (a declared source encoding that could hide imports) and INW009 (inline suppressions, `# inwards: ignore[CODE] reason="..."`, that are invalid or unused).
     `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal` writes the layers, and `--scaffold` adds an example package that passes the check.
     Each release is a GitHub Release with binaries for six platforms, five platform wheels for `uv add` and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
     CI tests every pull request on Linux, and macOS and Windows before each release. Items marked :material-progress-clock: are planned.

@@ -3,8 +3,8 @@
 # br-inwards (Docker network inwards-ci) and may reach the public internet
 # only: nothing on this host, the LAN, other Docker networks, k3s, the tailnet
 # or link-local addresses. DNS goes through Docker's embedded resolver, which
-# queries from the host; port 53 on private addresses stays open in case it
-# forwards from the container instead.
+# queries from the host (127.0.0.53), so no private resolver is reachable from
+# a job either.
 #
 # Its own table, so neither firewalld nor Docker rewrites it. The chains run
 # before theirs (priority filter - 10), and a drop in any chain is final.
@@ -31,7 +31,6 @@ table inet inwards_ci {
 
 	chain forward {
 		type filter hook forward priority filter - 10; policy accept;
-		iifname "br-inwards" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 accept
 		iifname "br-inwards" ip daddr @blocked4 drop
 		iifname "br-inwards" meta nfproto ipv6 drop
 		# Nothing outside opens a connection to a job container.

@@ -1,5 +1,5 @@
 /**
- * Readers for what one eval run left behind: the stream-json transcript, the
+ * @file Readers for what one eval run left behind: the stream-json transcript, the
  * project's run log, the session state and the output of `inwards check` and
  * `inwards stats`. Each validates the shape instead of trusting it, because
  * the transcript belongs to Claude Code and may change. EVASIONS lists the
@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
-import { ASK_USER } from "../src/cli/src/guard.ts";
+import { ASK_USER } from "../src/cli/src/claude-code/protocol.ts";
 import { type LayerSpec, layerIndexOf, moduleNameFor, parseConfig } from "../src/core/src/index.ts";
 import type { RunStats } from "./report.ts";
 

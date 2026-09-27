@@ -1,5 +1,5 @@
 /**
- * Compares two `inwards` binaries on the synthetic repo (bench/generate.py):
+ * @file Compares two `inwards` binaries on the synthetic repo (bench/generate.py):
  * the base branch's build and the PR's build, run in the same job so runner
  * noise hits both alike. Runs alternate (base, head, base, head, …) for the
  * same reason. The job fails when, on any metric, the median of the per-pair
@@ -164,9 +164,16 @@ function timeRun(cmd: string[], cwd: string, stdin?: string): number {
 /**
  * Runs both binaries alternately and collects the samples.
  *
- * @param binaries - base and head executables.
- * @param args - the arguments, working directory and stdin for one run.
- * @param runs - measured runs per binary, after `warmup` unmeasured ones.
+ * @param binaries - the two builds to compare.
+ * @param binaries.base - the base branch's executable.
+ * @param binaries.head - the head branch's executable.
+ * @param args - how to run one check.
+ * @param args.argv - the arguments after the executable.
+ * @param args.cwd - the working directory.
+ * @param args.stdin - text for standard input, if any.
+ * @param runs - how many runs.
+ * @param runs.measured - measured runs per binary.
+ * @param runs.warmup - unmeasured runs per binary before those.
  * @returns the samples.
  */
 function alternate(

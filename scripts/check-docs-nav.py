@@ -1,7 +1,9 @@
-"""Fail when a Markdown page in the docs is missing from the zensical.toml nav.
+"""Fail when a Markdown page in the docs is missing from its site's nav.
 
 `zensical build --strict` still builds such a page, but no menu links to it,
-so readers never find it (issue #26). CI runs this before the docs build:
+so readers never find it (issue #26). Checks both sites: English
+(docs/zensical.toml, docs/chapters/) and Polish (docs/zensical.pl.toml,
+docs/pl/). CI runs this before the docs build:
 
     uv run scripts/check-docs-nav.py
 """
@@ -25,18 +27,20 @@ def nav_pages(entry: object) -> set[str]:
     return set()
 
 
-project = tomllib.loads((DOCS / "zensical.toml").read_text())["project"]
-pages_dir = DOCS / project.get("docs_dir", "docs")
-# Zensical doesn't build dotfiles or files in dot-directories, so they need no nav entry.
-pages = {
-    rel.as_posix()
-    for rel in (page.relative_to(pages_dir) for page in pages_dir.rglob("*.md"))
-    if not any(part.startswith(".") for part in rel.parts)
-}
-missing = sorted(pages - nav_pages(project.get("nav", [])))
-for page in missing:
-    print(
-        f"{pages_dir.relative_to(DOCS.parent)}/{page} is not in the nav of docs/zensical.toml",
-        file=sys.stderr,
-    )
+missing = []
+for config in ("zensical.toml", "zensical.pl.toml"):
+    project = tomllib.loads((DOCS / config).read_text())["project"]
+    pages_dir = DOCS / project.get("docs_dir", "docs")
+    # Zensical doesn't build dotfiles or files in dot-directories, so they need no nav entry.
+    pages = {
+        rel.as_posix()
+        for rel in (page.relative_to(pages_dir) for page in pages_dir.rglob("*.md"))
+        if not any(part.startswith(".") for part in rel.parts)
+    }
+    for page in sorted(pages - nav_pages(project.get("nav", []))):
+        missing.append(page)
+        print(
+            f"{pages_dir.relative_to(DOCS.parent)}/{page} is not in the nav of docs/{config}",
+            file=sys.stderr,
+        )
 sys.exit(1 if missing else 0)

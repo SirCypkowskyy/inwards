@@ -1,6 +1,8 @@
-# Zensical site for the Inwards architecture docs.
+# Zensical site for the Inwards architecture docs, in English.
 #   uv run zensical serve -f docs/zensical.toml          # live preview
 #   uv run zensical build -f docs/zensical.toml --clean  # writes docs/site/
+# The Polish translation (docs/zensical.pl.toml) builds into docs/site/pl/
+# afterwards; run the English build first, since --clean empties docs/site/.
 # .github/workflows/docs.yml publishes docs/site/ to GitHub Pages (ADR-012).
 # docs/wrangler.jsonc keeps the Cloudflare Workers option ready (docs-cloudflare.yml).
 
@@ -21,6 +23,7 @@ extra_css = [
 
 extra_javascript = [
   "javascripts/homepage-loop.mjs",
+  "javascripts/language-switch.mjs",
 ]
 
 nav = [
@@ -32,7 +35,20 @@ nav = [
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
     { "GitHub Actions" = "guides/ci.md" },
     { "Package shape" = "guides/package-shape.md" },
+    { "Libraries per layer" = "guides/libraries.md" },
     { "Design partners" = "guides/design-partners.md" },
+  ] },
+  { "Rules" = [
+    { "Overview" = "rules/index.md" },
+    { "INW000 unsupported-encoding" = "rules/INW000.md" },
+    { "INW001 layer-dependency" = "rules/INW001.md" },
+    { "INW005 pure-domain" = "rules/INW005.md" },
+    { "INW006 unassigned-module" = "rules/INW006.md" },
+    { "INW007 package-shape" = "rules/INW007.md" },
+    { "INW008 missing-member" = "rules/INW008.md" },
+    { "INW009 suppression-comment" = "rules/INW009.md" },
+    { "INW010 unknown-first-party" = "rules/INW010.md" },
+    { "INW011 dynamic-import" = "rules/INW011.md" },
   ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },
@@ -44,8 +60,17 @@ nav = [
   { "8. Run log" = "08-Run-Log.md" },
 ]
 
+# The header's language selector. Links are relative to this site's root;
+# docs/overrides/partials/alternate.html keeps the current page.
+[project.extra]
+alternate = [
+  { name = "English", link = "./", lang = "en" },
+  { name = "Polski", link = "pl/", lang = "pl" },
+]
+
 [project.theme]
 language = "en"
+custom_dir = "overrides"
 features = [
   "content.code.copy",
   "content.code.annotate",

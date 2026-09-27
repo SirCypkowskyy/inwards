@@ -24,7 +24,7 @@ only-in = ["tests", "tests.**"]
 
 - **Selectors** (`packages`, `only-in`) match packages, in [import-linter's grammar](../05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces): `a.b` is exact, `a.*` is one segment below `a`, `a.**` is any depth below `a` (not `a` itself). A new domain such as `app/payments/` is covered by `app.*` the moment it exists.
 - **The first matching entry wins.** Put exact entries before the globs that would also match them. An entry whose selector an earlier one already covers could never apply, so it is a config error: `app.orders` after `app.*`, a repeated selector, or `app.*` after `app.**`. A glob that only overlaps an earlier one (`app.**` after `app.*`) is fine. Selector segments are Python identifiers, `*` or `**`.
-- **Member patterns** are fnmatch globs (`*`, `?`, `[seq]`). `name` is a module or a subpackage, `name/` a subpackage only, `name.py` a module only (`.pyi` stubs count as modules). `__init__` is always allowed, and so is everything in `require`. Without `allow`, any member is allowed and only `require` and `forbid` apply.
+- **Member patterns** are fnmatch globs (`*`, `?`, `[seq]`, `[!seq]`), matched as Python's `fnmatch.fnmatchcase` matches them: inside `[...]`, `*` and `?` are literal. A `[` that is never closed, or a reversed range such as `[z-a]`, is a config error. `name` is a module or a subpackage, `name/` a subpackage only, `name.py` a module only (`.pyi` stubs count as modules). `__init__` is always allowed, and so is everything in `require`. Without `allow`, any member is allowed and only `require` and `forbid` apply.
 - **A shape covers a package's direct members.** `app/orders/services/x.py` is member `services/` of `app.orders`; the files inside `services/` answer to a shape for `app.orders.services`, if one exists. Members are named from the file system: `utils.helpers.py` is one module member, not `utils/`, so it matches neither `utils` nor `helpers`. Hidden files and directories are skipped, as every Inwards file walk skips them.
 - **Names rules** apply at every level: a member matching `pattern` anywhere outside the `only-in` packages is an INW007 error.
 
@@ -116,7 +116,7 @@ pattern = "test_*"
 only-in = ["tests", "tests.**"]
 ```
 
-Both configs are test fixtures (`src/cli/test/fixtures/shapes/`): each passes `inwards check` with 0 findings, and the tests plant `helpers.py`, `services/x.py` and `test_x.py` to check that each fails with the fix above.
+Both configs are test fixtures (`src/cli/test/support/fixtures/shapes/`): each passes `inwards check` with 0 findings, and the tests plant `helpers.py`, `services/x.py` and `test_x.py` to check that each fails with the fix above.
 
 ## Not covered yet
 

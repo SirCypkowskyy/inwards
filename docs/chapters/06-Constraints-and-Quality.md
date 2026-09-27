@@ -9,7 +9,7 @@ This chapter covers the rules the design has to live within, the quality goals i
 | C1 | Engine in TypeScript | Shared by CLI, language server and extension ([ADR-001](05-ADR.md#adr-001-typescript-for-the-engine)) | Raw parse speed, binary size |
 | C2 | Python parsed with tree-sitter, WASM build | Portable across Bun, Node and every target ([ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)) | About 12 ms of WASM start-up per process |
 | C3 | Distributed as a Bun single-file executable | No runtime prerequisites; installs as a dev dependency ([ADR-003](05-ADR.md#adr-003-ship-a-bun-single-file-executable)) | 66 to 90 MB per binary depending on the platform (85 MB for Linux x64), almost all of it the Bun runtime |
-| C4 | Never import or execute user code | Deterministic, safe on untrusted repos, no venv needed | Only dynamic imports with a literal target are visible (INW011); computed targets stay invisible |
+| C4 | Never import or execute user code | Deterministic, safe on untrusted repos, no venv needed | Only dynamic imports with a literal target can be checked (INW011); a computed target is reported as unverifiable in inner layers, not resolved |
 | C5 | No network access at check time | Works offline, in sandboxes and in locked-down CI | Rule packs must ship inside the binary or the repo |
 | C6 | Config in `pyproject.toml` under `[tool.inwards]` | Python convention ([ADR-005](05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml)) | Protecting the config needs hooks or CODEOWNERS |
 | C7 | Output contract `inwards/diagnostics@1` is additive only | Agents and scripts depend on it ([ADR-007](05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)) | Renames need a new major schema |
@@ -21,12 +21,12 @@ Ranked. When two goals conflict, the higher one wins.
 
 | Rank | Goal | Scenario | Measure |
 |---|---|---|---|
-| 1 | :material-shield-check: **No false negatives** | An agent hides a forbidden import in a function, behind `TYPE_CHECKING`, via a relative path or a package import | Every form is reported, including `shop . infrastructure` with spaces, a backslash inside the name, NFKC identifiers and symlinked aliases of a layer. Dynamic imports with constant targets (`importlib.import_module`, `__import__`, `exec`) are reported as INW011. Known gaps: computed targets ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)), and loaders reached through walrus, tuple assignment, attributes, `functools.partial` or other loading APIs ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). Unit tests plus the prescan differential test (0 misses on 65,262 generated and 1,921 stdlib files, dynamic imports included, and nightly on 6,543 files from five open-source services) |
+| 1 | :material-shield-check: **No false negatives** | An agent hides a forbidden import in a function, behind `TYPE_CHECKING`, via a relative path or a package import | Every form is reported, including `shop . infrastructure` with spaces, a backslash inside the name, NFKC identifiers and symlinked aliases of a layer. Dynamic imports with constant targets (`importlib.import_module`, `__import__`, `exec`) are reported as INW011, and computed targets in inner layers as unverifiable INW011. Known gaps: loaders reached through walrus, tuple assignment, attributes, `functools.partial` or other loading APIs ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). Unit tests plus the prescan differential test (0 misses on 69,762 generated and 1,921 stdlib files, dynamic imports included, and nightly on 6,543 files from five open-source services) |
 | 2 | :material-lightning-bolt: **Agent-loop latency** | A hook checks one edited file | p95 < 100 ms wall time, process start included |
 | 3 | :material-robot-outline: **Actionable for agents** | An agent gets INW001 | It fixes the violation within one retry in ≥ 80 % of cases (measured with design partners, see [chapter 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministic** | Same repo, same config, two runs | Identical diagnostics in identical order. Only the timing fields in the summary (`durationMs`) change |
 | 5 | :material-timer-sand: **Full-repo throughput** | CI checks a 500k-line repo cold | About 1 s today on one core. Target < 300 ms with workers and cache |
-| 6 | :material-package-variant: **Easy to adopt** | New team, existing codebase | One command wires in the agent (`inwards init`). The Stop gate checks only what a session changed, so old violations in other files don't block; the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) will cover the rest |
+| 6 | :material-package-variant: **Easy to adopt** | New team, existing codebase | One command wires in the agent (`inwards init`). The Stop gate checks only what a session changed, and in a changed file only what is new since the session started, so old violations don't block; the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) will cover the rest |
 
 Correctness sits above speed on purpose. A guardrail that sometimes stays silent teaches the agent that the wrong move is fine, and that's worse than no guardrail.
 
@@ -54,11 +54,13 @@ First run, on the laptop described under Setup (load average 3 to 4), `inwards` 
 
 | Repo | `.py` files | Lines | Prescan refused | Prescan missed | Full check p50 / max | One file p50 / p95 | Violations |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| full-stack-fastapi-template | 40 | 2,685 | 0 | 0 | 59 / 60 ms | 46 / 51 ms | 1 |
+| full-stack-fastapi-template | 40 | 2,685 | 0 | 0 | 59 / 60 ms | 46 / 51 ms | 8 |
 | fastapi-clean-example | 209 | 6,764 | 0 | 0 | 80 / 87 ms | 46 / 49 ms | 2 |
 | python-ddd | 139 | 5,852 | 0 | 0 | 82 / 87 ms | 43 / 45 ms | 10 |
-| polar | 1,831 | 435,688 | 22 (1.2 %) | 0 | 1.16 / 1.37 s | 124 / 142 ms | 358 |
-| saleor | 4,324 | 847,875 | 13 (0.3 %) | 0 | 1.84 / 1.89 s | 59 / 62 ms | 491 |
+| polar | 1,831 | 435,688 | 22 (1.2 %) | 0 | 1.16 / 1.37 s | 124 / 142 ms | 494 |
+| saleor | 4,324 | 847,875 | 13 (0.3 %) | 0 | 1.84 / 1.89 s | 59 / 62 ms | 758 |
+
+The Violations column is from a later run (the INW010 review in [#45](https://github.com/SirCypkowskyy/inwards/issues/45)), after INW005 and INW010 landed; saleor's count includes INW010's four broken imports.
 
 Two things the synthetic repo didn't show. `inwards check` on polar's `subscription/service.py` (4,482 lines, 175 KB, two violations) takes about 125 ms here and 280 ms on a GitHub runner (AMD EPYC 7763, 2 cores), over the 100 ms budget; a small file in the same repo takes about 55 ms. The budget is written for the Claude Code hook, which runs the same one-file check (`runCheck` on the edited file) after reading its payload, so the hook can only be slower. Tracked in [#122](https://github.com/SirCypkowskyy/inwards/issues/122). Rerun locally after bytecode compilation ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)) cut every one-file check by 20 to 40 ms: polar's file now takes 83 / 90 ms (p50 / p95), saleor's 27 / 30 ms. And a cold full check of saleor's 848,000 lines takes 1.8 s on one core (2.5 s on the GitHub runner), where the 496,000-line synthetic repo takes 0.4 s.
 
@@ -71,7 +73,7 @@ Two things the synthetic repo didn't show. `inwards check` on polar's `subscript
 | Single file, wall time incl. process start (30 runs) | p50 48.6 ms, p95 80.4 ms | p95 < 100 ms | :white_check_mark: with little headroom |
 | Single file, engine time reported by the CLI | 16 to 30 ms | n/a | |
 | `inwards --version` (process start only) | about 10 ms | n/a | |
-| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter) | < 1 s | :white_check_mark: |
+| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter). Since #44 the index reads nothing up front: building it takes 17 to 21 ms, listing the 2,100 modules 25 to 32 ms, and the importers read the files they need, 0.53 to 0.71 s in total (0.58 to 0.66 s for the eager index it replaced) | < 1 s | :white_check_mark: |
 | Prescan refusals on the CPython 3.14 stdlib | 8.3 % of 1,921 files | lower is faster | :white_check_mark: |
 | Prescan missed imports on the same corpus | 0 | 0 | :white_check_mark: |
 | Prescan missed imports on the real-repo corpus (6,543 files, five services) | 0 | 0 | :white_check_mark: |
@@ -172,21 +174,9 @@ bun run bench/corpus.ts --bin dist/inwards-linux-x64 --dir ~/.cache/inwards-corp
   <figcaption>The engine's unit tests, including the prescan and colour-output cases.</figcaption>
 </figure>
 
-Two checks keep the agent-facing tests honest. A code fence in `docs/chapters/guides` that follows a `<!-- e2e -->` line and one blank line (without it, the comment breaks a list item) runs as an E2E case in a fresh project, against the compiled binary in CI (`src/cli/test/docs.test.ts`); untagged fences are never run. Every night, `.github/workflows/nightly-e2e.yml` records the Claude Code hook payloads again with a headless `claude -p` session and opens an issue when a field is added, removed or changes type against the recorded fixtures.
+Two checks keep the agent-facing tests honest. A code fence in `docs/chapters/guides` or `docs/chapters/rules` that follows a `<!-- e2e -->` line and one blank line (without it, the comment breaks a list item) runs as an E2E case in a fresh project, against the compiled binary in CI (`src/cli/test/integration/docs.test.ts`); untagged fences are never run. The fences run in the system's bash, which on macOS is bash 3.2, so the harness never puts a heredoc inside `$(...)`: bash 3.2 matches quotes across it, and one apostrophe in a documented message breaks the script. Every night, `.github/workflows/nightly-e2e.yml` records the Claude Code hook payloads again with a headless `claude -p` session and opens an issue when a field is added, removed or changes type against the recorded fixtures.
 
 The screenshots in these docs come from `scripts/screenshots.py`, which runs each command for real and renders the terminal output with Rich.
-
-## CI runners
-
-Most Linux jobs run on self-hosted runners, so pull requests cost no GitHub Actions minutes: lint and typecheck, the Linux tests, the docs build, the benchmark, the SARIF dogfood, the nightly corpus run and the weekly link check. They run on `irysek`, the owner's Fedora server (Intel Core i5-4570, 4 cores, 7.5 GB RAM), as two Docker containers built from the official runner on Ubuntu 26.04. Each job gets a fresh container that is deleted when the job ends: the host asks the GitHub API for a just-in-time runner, good for one job, and starts the container with it. Each container is capped at 2 GB of RAM with no swap and 2 CPUs, runs unprivileged with no Docker socket, and sits on a network whose firewall rules let it reach the public internet only, not the host, the LAN or other containers. `ops/runner/` holds the Dockerfile, the host script, the firewall rules, the systemd units and a README that rebuilds the setup from scratch.
-
-Still on GitHub-hosted runners:
-
-- jobs that need Docker, publish, or hold a write token, OIDC or a secret, so a compromised host can't leak them: `cd.yml` (release builds come from a clean, documented image), `pypi.yml`, `release-please.yml`, the Pages deploy in `docs.yml`, `docs-cloudflare.yml` and `nightly-e2e.yml`;
-- `pr-title.yml`, a required check that runs from the base branch, so a PR can still pass it while the self-hosted runners are down;
-- the macOS, Windows and ubuntu-24.04 rows of the test matrix, which run only when started by hand.
-
-On the first run, jobs took 2 to 3 times as long as on GitHub-hosted runners (lint and typecheck 120 s against 40 s, Linux tests 51 s against 25 s). The benchmark gate compares the base branch and the PR in the same job, so it still measures relative change on the slower CPU. Other jobs on the same host add noise to both sides alike.
 
 ## Risks
 
@@ -199,7 +189,7 @@ On the first run, jobs took 2 to 3 times as long as on GitHub-hosted runners (li
 | Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard and the session record ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
 | A binary silently ignores its bytecode (Bun falls back to parsing the source) and start-up doubles | Low | Low | Tests still pass in that case; the PR benchmark catches it on Linux only. Bytecode is tied to the Bun version that built it, and every binary embeds that same version |
-| Something else on `irysek` takes over the host (another project's privileged runners and `traefik` and `watchtower` hold the Docker socket; a second user is in the `docker` group) and with it the CI runners and their token | Low | High | Accepted by the owner (#136). Jobs with write tokens, OIDC or secrets stay GitHub-hosted; job containers are unprivileged, deleted after each job and cut off from the host and the LAN; the token covers only this repository |
+| Something else on `irysek` takes over the host (another project's privileged runners and `traefik` and `watchtower` hold the Docker socket; a second user is in the `docker` group) and with it the CI runners and their token | Low | High | Accepted by the owner (#136; setup in `ops/runner/README.md`). Jobs with write tokens, OIDC or secrets stay GitHub-hosted; job containers are unprivileged, deleted after each job and cut off from the host and the LAN; the token covers only this repository |
 | The self-hosted runners go down (host offline, token expired) and PR jobs queue forever | Medium | Medium | Runners restart with the host (systemd) and the image rebuilds weekly; point `runs-on` back at `ubuntu-26.04` to fall back to GitHub-hosted runners |
 | Zensical (0.0.x) changes its config format | Medium | Low | Docs build runs in CI on every PR; the config is small |
 | Fix steps are wrong for unusual layouts (no obvious place for a port) | Medium | Medium | Measure fix-within-one-retry per rule; let the config name the ports module |
