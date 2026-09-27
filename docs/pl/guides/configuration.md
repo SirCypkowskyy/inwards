@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: e976c612361fb991e426279cc3be37774ddafec4e11833a3daac73f191f17f38
+source_hash: 41aafa3c28bc92bb05b77a3d2de06dc91439a465be5153c72627179ecff1c959
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -174,3 +174,16 @@ Każdy kontekst ma:
 - `depends-on` (domyślnie `[]`): konteksty, z których ten może importować. Zależność jest bezpośrednia: nie przechodzi dalej i nie działa w drugą stronę. Nazwa może wskazywać kontekst zadeklarowany niżej. Własna nazwa kontekstu, nieznana nazwa i powtórzona nazwa to błędy konfiguracji.
 
 Konteksty i warstwy się sumują: zadeklarowana zależność ani moduł publiczny nigdy nie pozwalają na import, którego zabrania kolejność warstw, a przynależność do kontekstu nic nie mówi o warstwie ani odwrotnie. Kontekst korzysta tylko ze swoich własnych `depends-on` i `public`, także wtedy, gdy jego prefiksy leżą wewnątrz innego kontekstu. Uzasadnienie jest w [ADR-030](../05-ADR.md#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes).
+
+### `cycles` { #cycles }
+
+Typ: lista wartości `"modules"` i `"contexts"`. Domyślnie: `["contexts"]`.
+
+Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu całego projektu: między kontekstami, między modułami, jedne i drugie albo żadne (`[]`). Wartość domyślna ma znaczenie dopiero wtedy, gdy zadeklarowano `contexts`, więc aktualizacja nie psuje projektu, który żyje z cyklami modułów; dodaj `"modules"`, żeby wyłapywać także je.
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+cycles = ["modules", "contexts"]
+```

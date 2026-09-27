@@ -118,6 +118,7 @@ describe("the schema and the parser agree", () => {
       stopGate: props["stop-gate"]?.default,
       agentSuppressions: props["agent-suppressions"]?.default,
       shapeExtra: shape["extra"]?.default,
+      cycles: props["cycles"]?.default,
     }).toEqual({ ...CONFIG_DEFAULTS });
     expect(props["generated"]?.default).toEqual([...DEFAULT_GENERATED]);
     expect(context["public"]?.default).toEqual([]);

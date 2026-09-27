@@ -8,6 +8,7 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 | [INW001](INW001.md) | `layer-dependency` | An import from an inner layer into an outer one | error | yes |
 | [INW002](INW002.md) | `context-independence` | An import from one bounded context into another its `depends-on` doesn't declare | error | yes |
 | [INW003](INW003.md) | `public-api-only` | An import of a context's module that isn't public, from outside the context | error | yes |
+| [INW004](INW004.md) | `import-cycles` | Modules, or bounded contexts, that import each other in a cycle (whole-project runs) | error | no |
 | [INW005](INW005.md) | `pure-domain` | A library import a layer's config doesn't allow, such as SQLAlchemy in the domain | error | yes |
 | [INW006](INW006.md) | `unassigned-module` | First-party code outside every layer, and layer prefixes that match nothing | error, some findings warn | yes |
 | [INW007](INW007.md) | `package-shape` | A package member its shape doesn't allow, or a name outside the packages it belongs in | error, some findings warn | no |
@@ -16,7 +17,7 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | error | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | error | yes |
 
-The code INW004 is reserved for a rule that is planned but not built: import cycles ([#54](https://github.com/SirCypkowskyy/inwards/issues/54)). The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists them with the rest.
+The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.
 
 ## Configure rules
 

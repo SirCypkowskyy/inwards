@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 8d227f541bd25d99944ed6a89aa0ab33546923c9dcc86cf1473ade30b29ec5a5
+source_hash: 2792035d84c5b157dcd63bb8be9c005b517f4ad3eaf5420c45a6b04f95c9f621
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -76,6 +76,7 @@ Dwie rzeczy, których syntetyczne repozytorium nie pokazało. `inwards check` na
 | Zimne pełne uruchomienie, naiwne pełne parsowanie (pierwsze podejście) | 7,5 s | < 1 s | :x: odrzucone, doprowadziło do ADR-004 |
 | Zimne pełne uruchomienie, szkielet importów | 0,63–1,17 s (uruchomienia z dwóch sesji) | < 1 s | :material-alert: na granicy |
 | Ciepłe pełne uruchomienie, pamięć podręczna ekstrakcji ([#56](https://github.com/SirCypkowskyy/inwards/issues/56)) | p50 0,46 s, wobec 1,25 s bez pamięci podręcznej w tym samym przebiegu (3,0 raza szybciej, maszyna pod obciążeniem) | nie dotyczy | |
+| Szukanie cykli importów przy sprawdzaniu całego projektu ([#54](https://github.com/SirCypkowskyy/inwards/issues/54), `cycles = ["modules"]`) | 30 do 60 ms ponad samo sprawdzenie (znalezione cztery cykle, żaden plik nie wymagał potwierdzającego parsowania) | całe uruchomienie < 1 s na zimno | :white_check_mark: |
 | Jeden plik, czas rzeczywisty ze startem procesu (30 uruchomień) | p50 48,6 ms, p95 80,4 ms | p95 < 100 ms | :white_check_mark: z niewielkim zapasem |
 | Jeden plik, czas silnika zgłaszany przez CLI | 16 do 30 ms | nie dotyczy | |
 | `inwards --version` (sam start procesu) | około 10 ms | nie dotyczy | |

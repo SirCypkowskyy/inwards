@@ -8,8 +8,15 @@
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
 import { type ContextSpec, parseContexts } from "./contexts.ts";
+import { type CycleMode, parseCycles } from "./cycles.ts";
 import { CONFIG_DEFAULTS } from "./defaults.ts";
 import { parseGenerated } from "./generated.ts";
+import {
+  type AgentSuppressions,
+  agentSuppressionsKey,
+  type StopGate,
+  stopGateKey,
+} from "./hook-keys.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
@@ -90,15 +97,9 @@ export interface InwardsConfig {
    * depend on (INW002, INW003). Absent when not set or empty.
    */
   contexts?: ContextSpec[];
+  /** Which import cycles INW004 reports (`cycles`, see `cycles.ts`); absent when not set. */
+  cycles?: CycleMode[];
 }
-
-/** What the hooks do with a suppression the agent added, see `InwardsConfig.agentSuppressions`. */
-export type AgentSuppressions = "deny" | "allow";
-const AGENT_SUPPRESSIONS: readonly string[] = ["deny", "allow"] satisfies AgentSuppressions[];
-
-/** What the Stop gate checks, see `InwardsConfig.stopGate`. */
-export type StopGate = "changed" | "project";
-const STOP_GATES: readonly string[] = ["changed", "project"] satisfies StopGate[];
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
 const PRERELEASE = /-.*$/u;
@@ -120,6 +121,7 @@ export const TABLE_KEYS: ReadonlySet<string> = new Set([
   "rules",
   "agent-suppressions",
   "contexts",
+  "cycles",
 ]);
 export const LAYER_KEYS: ReadonlySet<string> = new Set([
   "name",
@@ -219,6 +221,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...parseRules(raw["rules"]),
     ...agentSuppressionsKey(raw["agent-suppressions"]),
     ...parseContexts(raw["contexts"]),
+    ...parseCycles(raw["cycles"]),
   };
   return config;
 }
@@ -252,60 +255,6 @@ function optionalKeys(
     ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
     ...(runLog === undefined ? {} : { runLog }),
   };
-}
-
-/**
- * Validates `stop-gate`.
- *
- * @param value - the raw `stop-gate` value, if any.
- * @returns `{ stopGate }` when it is set, else nothing.
- * @throws {ConfigError} when it is neither "changed" nor "project".
- */
-function stopGateKey(value: unknown): Pick<InwardsConfig, "stopGate"> {
-  if (value === undefined) {
-    return {};
-  }
-  if (!isStopGate(value)) {
-    throw new ConfigError('tool.inwards.stop-gate must be "changed" or "project".');
-  }
-  return { stopGate: value };
-}
-
-/**
- * Validates `agent-suppressions`.
- *
- * @param value - the raw value, if any.
- * @returns `{ agentSuppressions }` when it is set, else nothing.
- * @throws {ConfigError} when it is neither "deny" nor "allow".
- */
-function agentSuppressionsKey(value: unknown): Pick<InwardsConfig, "agentSuppressions"> {
-  if (value === undefined) {
-    return {};
-  }
-  if (!isAgentSuppressions(value)) {
-    throw new ConfigError('tool.inwards.agent-suppressions must be "deny" or "allow".');
-  }
-  return { agentSuppressions: value };
-}
-
-/**
- * Tells whether a raw value is an `agent-suppressions` mode.
- *
- * @param value - the raw value.
- * @returns true for "deny" or "allow".
- */
-function isAgentSuppressions(value: unknown): value is AgentSuppressions {
-  return typeof value === "string" && AGENT_SUPPRESSIONS.includes(value);
-}
-
-/**
- * Tells whether a raw value is a Stop gate mode.
- *
- * @param value - the raw `stop-gate` value.
- * @returns true for "changed" or "project".
- */
-function isStopGate(value: unknown): value is StopGate {
-  return typeof value === "string" && STOP_GATES.includes(value);
 }
 
 /**

@@ -15,7 +15,6 @@ import type {
   ImportRef,
   SourceFile,
   Suppressed,
-  SuppressionComment,
 } from "../contracts/records.ts";
 import { type ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import { topLevelBindings } from "../python/bindings.ts";
@@ -40,30 +39,11 @@ import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
 import { checkUnassignedImports, unassignedWarning } from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { type Collected, projectCycles, skeletonIsExact } from "./cycles.ts";
 import { Extractor } from "./extraction.ts";
+import { type Checked, type Confirmed, keptOnce, ordered, type Scan } from "./stages.ts";
 
-/** A file after the prescan, before any full parse. */
-interface Scan {
-  /** The findings so far; null when the prescan was skipped or refused the file. */
-  found: Diagnostic[] | null;
-  /** True when `found` is final and needs no full parse. */
-  exact: boolean;
-  /** True when the full parse must also look for dynamic imports (INW011). */
-  dynamic: boolean;
-}
-
-/** A file's findings after the full parse, if it ran, and its suppression comments. */
-interface Confirmed {
-  found: Diagnostic[];
-  /** Read from the full parse of a file that mentions `inwards: ignore`; absent otherwise. */
-  comments?: SuppressionComment[];
-}
-
-/** What `check` returns: the findings to report, and the ones inline suppressions hid. */
-export interface Checked {
-  diagnostics: Diagnostic[];
-  suppressed: Suppressed[];
-}
+export type { Checked } from "./stages.ts";
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
 export class Engine {
@@ -170,7 +150,7 @@ export class Engine {
     const found = fast ? this.importFindings(src, fast, project) : null;
     // Outside every layer, the unassigned-package warning needs no confirmation.
     const unsettled = layered ? found : found?.filter((d) => d.code !== "INW006");
-    return { found, exact: unsettled?.length === 0, dynamic };
+    return { found, exact: unsettled?.length === 0, dynamic, ...(fast ? { imports: fast } : {}) };
   }
 
   /**
@@ -297,7 +277,7 @@ export class Engine {
   private fullCheck(file: SourceFile, dynamic: boolean, project: ProjectIndex): Confirmed {
     if (!dynamic) {
       const { imports, comments } = this.extractor.full(file);
-      return ordered(file, this.importFindings(file, imports, project), comments);
+      return { ...ordered(file, this.importFindings(file, imports, project), comments), imports };
     }
     const { layers } = this.config;
     const tree = parsePython(this.parser, file.text);
@@ -319,7 +299,7 @@ export class Engine {
           ...checkUnassignedImports(file, readable, layers, project.ownerOf),
         );
       }
-      return ordered(file, found, comments);
+      return { ...ordered(file, found, comments), imports: [...imports, ...readable] };
     } finally {
       tree.delete(); // WASM memory is not garbage collected
     }
@@ -391,12 +371,16 @@ export class Engine {
    * @param files - the source files to check.
    * @param project - the project's module index (see `index`).
    * @param accepted - accepted copies by baseline key, when a baseline applies.
+   * @param options - `whole: true` when the files are the whole project, which
+   *   adds the import cycles among them (INW004, `engine/cycles.ts`).
+   * @param options.whole - true for a whole-project run.
    * @returns the violations, as `checkFiles` returns them, and the suppressed findings.
    */
   check(
     files: Iterable<SourceFile>,
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
+    { whole = false }: { whole?: boolean } = {},
   ): Checked {
     const { rules } = this.config;
     const scanned = [...files].map((file) => {
@@ -415,21 +399,28 @@ export class Engine {
     const all: Diagnostic[] = [];
     const suppressed: Suppressed[] = [];
     const warned = new Set<string>();
+    const collected: Collected[] = [];
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
-      const own = this.suppressIn(src, this.confirm(src, scan, project, skip));
-      suppressed.push(...own.suppressed);
-      for (const found of own.kept) {
-        // An unused-suppression warning (INW009) names no place: each comment is its own.
-        const once =
-          found.severity === "warning" && found.code !== "INW009" ? found.message : undefined;
-        if (once === undefined || !warned.has(once)) {
-          all.push(found);
-        }
-        if (once !== undefined) {
-          warned.add(once);
-        }
+      const confirmed = this.confirm(src, scan, project, skip);
+      const imports = confirmed.imports ?? scan.imports;
+      if (imports !== undefined) {
+        const exact = confirmed.imports !== undefined || skeletonIsExact(src.text);
+        collected.push({ file: src, imports, exact });
       }
+      const own = this.suppressIn(src, confirmed);
+      suppressed.push(...own.suppressed);
+      all.push(...keptOnce(own.kept, warned));
+    }
+    if (whole) {
+      all.push(
+        ...projectCycles(collected, {
+          modes: this.config.cycles,
+          contexts: this.config.contexts ?? [],
+          fullImports: (file: SourceFile): readonly ImportRef[] =>
+            this.extractor.full(file).imports,
+        }),
+      );
     }
     return {
       diagnostics: applyRules(all, rules),
@@ -438,18 +429,4 @@ export class Engine {
       ),
     };
   }
-}
-
-/**
- * Orders a full parse's findings and attaches the comments when the file may
- * hold a suppression, as suppress() expects.
- *
- * @param file - the source file, with normalised text.
- * @param found - the findings, in any order.
- * @param comments - the file's suppression comments.
- * @returns the findings in source order, with the comments when they matter.
- */
-function ordered(file: SourceFile, found: Diagnostic[], comments: SuppressionComment[]): Confirmed {
-  found.sort((a, b) => a.line - b.line || a.column - b.column);
-  return mentionsSuppression(file.text) ? { found, comments } : { found };
 }

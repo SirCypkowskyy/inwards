@@ -35,6 +35,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
+| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -804,3 +805,35 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *One cache file per project:* fewer files, but every run rewrites all of it and concurrent runs need a lock.
 - *Cache for the hooks too, with an HMAC keyed outside the project:* the key would have to live where the agent can't read it, and the hooks check one file, where parsing isn't the cost ([chapter 6](06-Constraints-and-Quality.md#where-a-single-file-check-spends-its-time)).
 - *Cache whole results:* they depend on the config, the baseline and other files; invalidating them correctly is the hard problem this design avoids.
+
+## ADR-032: Import cycles on whole-project runs, from the imports the check already reads
+
+**Status:** Accepted · 2026-09-27 · [#54](https://github.com/SirCypkowskyy/inwards/issues/54)
+
+**Context.** A cycle between modules, or between bounded contexts, is an architecture smell no single import shows: every step can be allowed on its own. ADR-030 left cycles between contexts to INW004. Finding a cycle needs every module's imports, and the hooks check one file within a 100 ms budget. The issue asked for a cold run on the synthetic repo to stay under 1 s, cycle search included.
+
+**Decision.**
+
+- **Whole-project runs only.** INW004 runs when a check covers the whole project: `inwards check` without paths, `inwards baseline`, the Stop gate with `stop-gate = "project"`. The per-edit hook and the language server never report it.
+- **From the imports the check already reads.** The engine keeps each checked file's imports as it scans and confirms them: the skeleton's, or the full parse's with readable dynamic imports. No file is read twice, and the extraction cache ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) applies. Every import counts, function-level and `TYPE_CHECKING` ones included, as for the other rules.
+- **Nodes are the checked modules.** An import is an edge to the longest checked module its target starts with. Anything else, the standard library or a package outside the check, can't close a cycle and makes no edge; resolving targets needs no filesystem.
+- **One report per strongly connected group.** Tarjan's algorithm, iterative, finds the groups; each gets the shortest cycle through its first module, with the full path, on the import that makes the first step. Nodes and edges are visited in sorted order, so the report is the same on every run.
+- **Every reported step is confirmed.** The skeleton can read an import out of a multi-line string. A file whose text has triple quotes or a backslash line continuation, and whose imports came from the skeleton alone, is parsed in full before a cycle through it is reported, and the search runs again.
+- **`cycles` picks the kinds**, `["contexts"]` by default: cycles between contexts are the architecture question contexts exist for, and module cycles would fail many existing projects on upgrade. `"modules"` adds them; `[]` turns the rule off.
+- **Not suppressible inline.** A one-file check can't tell whether a suppressed cycle still exists, and the comment would sit on one import of many. The baseline accepts the cycles a project already has.
+
+**Consequences.**
+
+- :material-plus-circle-outline: On the synthetic repo (2,100 files), the cycle search adds 30 to 60 ms to a whole-project check: the edges come from a set of module names, and no file needed confirming. It found four cycles the generator makes by importing random modules in each layer.
+- :material-plus-circle-outline: A cycle between contexts is caught even when `depends-on` allows both directions.
+- :material-minus-circle-outline: The editor and the per-edit hook don't show cycles; the Stop gate does only in project mode.
+- :material-minus-circle-outline: Importing a submodule also runs its package's `__init__`; that implicit step is no edge, so a cycle that only closes through an `__init__` is missed.
+- :material-minus-circle-outline: Without contexts, files outside every layer aren't parsed, so cycles through them aren't seen.
+
+**Alternatives.**
+
+- *A separate graph pass that reads every file:* simpler to write, but it doubles the reading and parsing the check already does.
+- *Resolve edges with `ownerOf`:* follows Python exactly, but probes the filesystem for every import, 55 ms of the first measurement, and a module outside the check can't be on a reported cycle anyway.
+- *Report every elementary cycle:* the count explodes with the size of a group; one shortest cycle per group is enough to act on, and the next run shows the next.
+- *Module cycles on by default:* the stricter setting, but an upgrade that fails most codebases teaches people to turn the rule off.
+

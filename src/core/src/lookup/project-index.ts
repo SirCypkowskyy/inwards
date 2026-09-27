@@ -108,12 +108,20 @@ export class ProjectIndex {
     // A long-lived adapter must rebuild the index when a path that could be a module is
     // created or deleted; the language server does, or builds one per check without file events.
     const kinds = new Map<string, ReturnType<PathKind>>();
-    this.ownerOf = probeLookup((rel: string): ReturnType<PathKind> => {
+    const lookup = probeLookup((rel: string): ReturnType<PathKind> => {
       if (!kinds.has(rel)) {
         kinds.set(rel, source.kind(rel));
       }
       return kinds.get(rel);
     });
+    // Several rules, and the import graph, ask about the same targets.
+    const owners = new Map<string, string | undefined>();
+    this.ownerOf = (target: string): string | undefined => {
+      if (!owners.has(target)) {
+        owners.set(target, lookup(target));
+      }
+      return owners.get(target);
+    };
   }
 
   /**

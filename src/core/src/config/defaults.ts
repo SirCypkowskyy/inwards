@@ -14,6 +14,7 @@ export const CONFIG_DEFAULTS: {
   readonly stopGate: "changed";
   readonly agentSuppressions: "deny";
   readonly shapeExtra: "error";
+  readonly cycles: readonly ["contexts"];
 } = {
   root: ".",
   escalateAfter: 3,
@@ -21,4 +22,5 @@ export const CONFIG_DEFAULTS: {
   stopGate: "changed",
   agentSuppressions: "deny",
   shapeExtra: "error",
+  cycles: ["contexts"],
 };

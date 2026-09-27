@@ -27,6 +27,7 @@ type RuleCode =
   | "INW001"
   | "INW002"
   | "INW003"
+  | "INW004"
   | "INW005"
   | "INW006"
   | "INW007"
@@ -75,6 +76,13 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     severity: "error",
     summary: "Code outside a bounded context imports only the context's public modules.",
     docs: page("INW003"),
+  },
+  INW004: {
+    code: "INW004",
+    name: "import-cycles",
+    severity: "error",
+    summary: "Modules, or bounded contexts, don't import each other in a cycle.",
+    docs: page("INW004"),
   },
   INW005: {
     code: "INW005",

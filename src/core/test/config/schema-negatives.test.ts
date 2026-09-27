@@ -55,6 +55,9 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ["a context that isn't a table", withExtra("contexts = [3]\n")],
     // Enums and formats.
     ["an unknown stop-gate", withExtra('stop-gate = "always"\n')],
+    ["cycles that isn't a list", withExtra('cycles = "modules"\n')],
+    ["an unknown cycle mode", withExtra('cycles = ["loops"]\n')],
+    ["a repeated cycle mode", withExtra('cycles = ["modules", "modules"]\n')],
     ["an unknown agent-suppressions", withExtra('agent-suppressions = "maybe"\n')],
     [
       "an unknown shape extra",
