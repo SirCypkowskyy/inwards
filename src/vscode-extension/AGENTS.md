@@ -22,8 +22,10 @@ client that VS Code loads, and a language server (LSP) that wraps
 The client imports `vscode` and `vscode-languageclient` only; the server
 imports `vscode-languageserver` and the engine through `@inwards/core`.
 They share nothing but the protocol. fallow enforces it (`vscode-client`,
-`vscode-server`, `vscode-unzoned` and `vscode-dev` in `.fallowrc.jsonc`), and
-`bun run check:cycles` covers this package too. Both sides are runtime
+`vscode-server` and `vscode-dev` in `.fallowrc.jsonc`; a file in a new `src/`
+folder matches no zone and fails until it gets one), `test/architecture.test.ts`
+checks the zones through `fallow guard`, and `bun run check:cycles` covers
+this package too. Both sides are runtime
 adapters, so `node:*` modules are allowed here.
 
 ## The shipped layout is a contract

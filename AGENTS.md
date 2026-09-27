@@ -35,8 +35,9 @@ Where to start:
   translation change in the same PR.
 
 The boundaries are enforced, not just described: fallow zones per folder
-(`.fallowrc.jsonc`), Biome's I/O rules per folder (`biome.jsonc` and
-`biome-plugins/`), `check:cycles`, and each package's architecture tests.
+(`.fallowrc.jsonc`, where a file in a new folder fails until it gets a
+zone), Biome's I/O and global rules per folder (`biome.jsonc`),
+`check:cycles`, and each package's architecture tests.
 
 Docs live in `docs/` (Zensical), with the architecture in chapter 3. The plan lives in GitHub issues on
 `SirCypkowskyy/inwards`: epics #1 to #7 are milestones M0 to M6, and every
