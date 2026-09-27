@@ -23,6 +23,7 @@ test("each kind of event asks for its pass", () => {
   );
   expect(passFor([{ type: changed, path: "/p/shop/api.py" }], CONTEXT)).toBe("reindex");
   expect(passFor([{ type: changed, path: "/p/README.md" }], CONTEXT)).toBeUndefined();
+  expect(passFor([{ type: changed, path: "/p/.venv/lib/x.py" }], CONTEXT)).toBeUndefined();
 });
 
 test("without contexts, a saved file changes nothing a check reads", () => {

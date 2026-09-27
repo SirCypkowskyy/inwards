@@ -146,11 +146,15 @@ documents.onDidClose(({ document }) => {
   }
 });
 
-// A client that can't watch files still tells the server when it saves the
-// config, if the config is open in it.
+// A client that can't watch files still tells the server when it saves an open
+// file: the config reloads, and with contexts a Python file rechecks the open
+// documents, whose INW003 fix may name what that file exposes.
 documents.onDidSave(({ document }) => {
-  if (!watching && fileURLToPath(document.uri) === configPath) {
+  const path = fileURLToPath(document.uri);
+  if (!watching && path === configPath) {
     enqueue(reload);
+  } else if (!watching && state?.config.contexts !== undefined && PYTHON.test(path)) {
+    enqueue(reindex);
   }
 });
 

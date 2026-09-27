@@ -344,7 +344,7 @@ export class Engine {
       (file) => {
         const tree = parsePython(this.parser, normalizeSource(file.text));
         try {
-          return topLevelBindings(tree);
+          return topLevelBindings(tree, file.path.endsWith(".pyi"));
         } finally {
           tree.delete(); // WASM memory is not garbage collected
         }

@@ -55,7 +55,11 @@ export function passFor(
     return "refresh";
   }
   const edited = events.some(
-    ({ type, path }) => type === FileChangeType.Changed && PYTHON.test(path),
+    ({ type, path }) =>
+      type === FileChangeType.Changed &&
+      PYTHON.test(path) &&
+      root !== undefined &&
+      mayHoldModule(root, path),
   );
   return contexts && edited ? "reindex" : undefined;
 }
