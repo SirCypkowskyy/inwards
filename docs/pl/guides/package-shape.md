@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: 14ebd071bae69b0d8fc6c88f140fa795e9d60ec8e27c45c0026152ae130a5753
+source_hash: fa152c3b7f6f74b52c4414609385035c7b4d2729bae6f6aa27a540ffbc41671f
 ---
 
 # Kształt pakietu { #package-shape }
@@ -121,7 +121,7 @@ pattern = "test_*"
 only-in = ["tests", "tests.**"]
 ```
 
-Obie konfiguracje są fixture'ami testów (`src/cli/test/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z krokami naprawy pokazanymi wyżej.
+Obie konfiguracje są fixture'ami testów (`src/cli/test/support/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z krokami naprawy pokazanymi wyżej.
 
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 

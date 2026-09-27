@@ -27,8 +27,12 @@ jobs:
       - uses: actions/checkout@v7
       - name: Every version field matches .release-please-manifest.json
         run: bash scripts/check-version.sh
-      - name: CLAUDE.md only imports AGENTS.md (edit AGENTS.md instead)
-        run: test "$(cat CLAUDE.md)" = "@AGENTS.md"
+      - name: Every CLAUDE.md only imports the AGENTS.md next to it (edit AGENTS.md instead)
+        run: |
+          for f in $(git ls-files '*CLAUDE.md'); do
+            test "$(cat "$f")" = "@AGENTS.md" || { echo "$f must hold only @AGENTS.md"; exit 1; }
+            test -f "$(dirname "$f")/AGENTS.md" || { echo "$f has no AGENTS.md next to it"; exit 1; }
+          done
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
@@ -41,6 +45,10 @@ jobs:
         run: bun run typecheck
       - name: Fallow (dead code, unused deps, architecture boundaries, duplication)
         run: bun run fallow
+      - name: No import cycles, type imports included (fallow sees runtime ones only)
+        run: bun run check:cycles
+      - name: Every module opens with a real overview (the packages restructured under #176)
+        run: bun run check:overviews
       # A full CPython: Ubuntu 26.04's python3 ships its stdlib tests in a separate
       # package, which shrank the corpus from 2,273 files to 626.
       - uses: actions/setup-python@v7

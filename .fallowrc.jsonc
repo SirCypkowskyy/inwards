@@ -17,8 +17,12 @@
   // in core's tests and scripts, and the extension's scripts/copy-wasm.ts.
   // eslint-plugin-jsdoc is loaded by oxlint through .oxlintrc.jsonc "jsPlugins".
   "ignoreDependencies": ["tree-sitter-python", "eslint-plugin-jsdoc"],
-  // Fail CI when more than 3% of the code is duplicated (it is 0% today).
-  "duplicates": { "threshold": 3 },
+  // The detector's settings, spelled out. The 3% gate is fallow's own; zero
+  // clone groups is enforced by scripts/check-no-clones.ts, since a threshold
+  // of 0 disables the limit in fallow 3.28.0 (#176).
+  "duplicates": { "threshold": 3, "mode": "mild", "minTokens": 50, "minLines": 5 },
+  // Dev and optional dependencies nobody uses fail like the rest (default: warn).
+  "rules": { "unused-dev-dependencies": "error", "unused-optional-dependencies": "error" },
   // checkFiles and index: called by the CLI on the Engine that Engine.create()
   // returns; fallow does not follow the type of an awaited factory result.
   // importersOf: only tests call it; the Stop gate checks the whole project
@@ -32,8 +36,24 @@
       { "name": "core-api", "patterns": ["src/core/src/index.ts"] },
       { "name": "core", "patterns": ["src/core/src/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
-      { "name": "adapter-parity", "patterns": ["src/cli/test/lsp-parity.test.ts"] },
-      { "name": "cli", "patterns": ["src/cli/**"] },
+      { "name": "adapter-parity", "patterns": ["src/cli/test/integration/lsp-parity.test.ts"] },
+      // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
+      { "name": "cli-main", "patterns": ["src/cli/src/main.ts"] },
+      { "name": "cli-adapters", "patterns": ["src/cli/src/adapters/**"] },
+      { "name": "cli-commands", "patterns": ["src/cli/src/commands/**"] },
+      // Before the rest of claude-code/: the eval may import this module alone.
+      { "name": "cli-protocol", "patterns": ["src/cli/src/claude-code/protocol.ts"] },
+      { "name": "cli-claude-code", "patterns": ["src/cli/src/claude-code/**"] },
+      { "name": "cli-session", "patterns": ["src/cli/src/session/**"] },
+      { "name": "cli-project", "patterns": ["src/cli/src/project/**"] },
+      { "name": "cli-runlog", "patterns": ["src/cli/src/runlog/**"] },
+      { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
+      { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
+      { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
+      { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
+      // Anything else under src/ has no zone of its own yet and may import nothing.
+      { "name": "cli-unzoned", "patterns": ["src/cli/src/**"] },
+      { "name": "cli-test", "patterns": ["src/cli/**"] },
       { "name": "vscode", "patterns": ["src/vscode-extension/**"] },
       { "name": "scripts", "patterns": ["scripts/**"] },
       { "name": "eval", "patterns": ["eval/**"] },
@@ -47,15 +67,110 @@
       { "from": "core-api", "allow": ["core"] },
       // Its own tests and the prescan differential test may reach internals.
       { "from": "core-dev", "allow": ["core-api", "core"] },
-      // Adapters use the engine through `@inwards/core` (index.ts) only.
-      { "from": "cli", "allow": ["core-api"] },
+      // The CLI reaches the engine through `@inwards/core` (index.ts) only, and
+      // its folders depend downwards: pure leaves (platform, json, paths), then
+      // project, session, runlog, then claude-code and init, then commands.
+      // Only adapters/ implements the platform contracts, and only main.ts
+      // (through adapters/compose.ts) wires adapters in (#176).
+      { "from": "cli-platform", "allow": [] },
+      { "from": "cli-json", "allow": [] },
+      { "from": "cli-paths", "allow": ["core-api", "cli-platform"] },
+      { "from": "cli-project", "allow": ["core-api", "cli-platform", "cli-json", "cli-paths"] },
+      {
+        "from": "cli-session",
+        "allow": ["core-api", "cli-platform", "cli-json", "cli-paths", "cli-project"]
+      },
+      {
+        "from": "cli-runlog",
+        "allow": ["core-api", "cli-platform", "cli-json", "cli-paths", "cli-project", "cli-session"]
+      },
+      {
+        "from": "cli-protocol",
+        "allow": ["cli-platform", "cli-runlog", "cli-session"]
+      },
+      {
+        "from": "cli-claude-code",
+        "allow": [
+          "core-api",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-session",
+          "cli-runlog",
+          "cli-protocol"
+        ]
+      },
+      {
+        "from": "cli-init",
+        "allow": [
+          "core-api",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-session",
+          "cli-claude-code"
+        ]
+      },
+      {
+        "from": "cli-commands",
+        "allow": [
+          "core-api",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-session",
+          "cli-runlog",
+          "cli-protocol",
+          "cli-claude-code",
+          "cli-init"
+        ]
+      },
+      {
+        "from": "cli-adapters",
+        "allow": [
+          "core-api",
+          "cli-platform",
+          "cli-paths",
+          "cli-project",
+          "cli-session",
+          "cli-runlog",
+          "cli-init",
+          "cli-commands"
+        ]
+      },
+      {
+        "from": "cli-main",
+        "allow": ["core-api", "cli-adapters", "cli-commands", "cli-init", "cli-platform"]
+      },
+      { "from": "cli-unzoned", "allow": [] },
+      {
+        "from": "cli-test",
+        "allow": [
+          "core-api",
+          "cli-main",
+          "cli-adapters",
+          "cli-commands",
+          "cli-protocol",
+          "cli-claude-code",
+          "cli-session",
+          "cli-project",
+          "cli-runlog",
+          "cli-init",
+          "cli-paths",
+          "cli-platform",
+          "cli-json"
+        ]
+      },
       { "from": "vscode", "allow": ["core-api"] },
       // The one test that builds the module index through both adapters (#44).
-      { "from": "adapter-parity", "allow": ["core-api", "cli", "vscode"] },
+      { "from": "adapter-parity", "allow": ["core-api", "cli-adapters", "cli-project", "vscode"] },
       { "from": "scripts", "allow": [] },
       // The eval harness reads layers the way the CLI does, through the public API,
       // and recognises config guard denials by the CLI's own ASK_USER text.
-      { "from": "eval", "allow": ["core-api", "cli"] },
+      { "from": "eval", "allow": ["core-api", "cli-protocol"] },
       // The bench runs binaries as processes and imports nothing of ours.
       { "from": "bench", "allow": [] },
       // The npm placeholder ships alone and imports nothing.

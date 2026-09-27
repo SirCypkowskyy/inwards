@@ -4,9 +4,19 @@ Edit this file (`AGENTS.md`). `CLAUDE.md` holds only `@AGENTS.md`, which
 Claude Code expands on load; Codex, Cursor and other agents read this file
 directly. Never add content to `CLAUDE.md`.
 
-Architecture linter for Python, written in TypeScript on Bun. Engine in
-`src/core`, CLI in `src/cli`, VS Code extension in `src/vscode-extension`,
-docs in `docs/` (Zensical). The plan lives in GitHub issues on
+Architecture linter for Python, written in TypeScript on Bun, in three
+packages that depend one way, onto the engine:
+
+- `src/core`: the engine. Pure, no I/O; everything outside comes through
+  ports (`GrammarBinaries`, `ProjectFiles`, `ListDir`), and adapters import
+  `@inwards/core` (its `index.ts`) only.
+- `src/cli`: the command line and the Claude Code hook adapter, organised
+  in feature folders with the I/O behind contracts (#176). Read
+  [`src/cli/AGENTS.md`](src/cli/AGENTS.md) before working there: it says
+  what each folder owns, who may import whom, and where new code goes.
+- `src/vscode-extension`: the editor adapter (LSP client and server).
+
+Docs live in `docs/` (Zensical), with the architecture in chapter 3. The plan lives in GitHub issues on
 `SirCypkowskyy/inwards`: epics #1 to #7 are milestones M0 to M6, and every
 other issue is a sub-issue of one of them.
 
@@ -148,7 +158,7 @@ the claim comment, not the assignee, says which agent owns an issue.
 - **High-conflict files have one owner at a time:** `bun.lock`, `uv.lock`,
   `package.json`, `pyproject.toml`, `AGENTS.md`, `.github/workflows/`,
   `release-please-config.json`, `.release-please-manifest.json`,
-  `src/cli/test/__snapshots__/`. The coordinator names the owner in the
+  `src/cli/test/**/__snapshots__/`. The coordinator names the owner in the
   prompt; everyone else leaves them alone and asks. Never merge a lockfile by
   hand: take the base version and rerun `bun install` or `uv lock`.
   Regenerate snapshots after a rebase and review the diff.
@@ -176,8 +186,10 @@ merge.
 ```sh
 bun x biome ci .        # lint + format, every rule group at error
 bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
-bun run typecheck       # tsgo, strictest flags (tsconfig.base.json)
-bun run fallow          # dead code, unused deps, boundaries, duplication
+bun run typecheck       # tsc (TypeScript 7), strictest flags (tsconfig.base.json)
+bun run fallow          # dead code, unused deps, boundaries, zero clone groups
+bun run check:cycles    # no import cycles, type-only imports included (tsgo's own parse)
+bun run check:overviews # every module's @file overview is 2+ sentences (src/cli so far)
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
 uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
@@ -358,14 +370,24 @@ done until both match the code.
   no `as` casts except at a trust boundary right after validation, with a
   `biome-ignore lint/nursery/noUnsafeTypeAssertion: <what was checked>`.
   Prefer `unknown` plus a type guard. Explicit types on every function.
-  Rule exceptions live in `biome.jsonc`, each with its reason.
+  Rule exceptions live in `biome.jsonc` (or the tool's own config), scoped
+  to the files that need them and each with its reason; no blanket `off`.
+- **Every module opens with an overview** (`@file`, two or more sentences):
+  what it is for, what it owns, and what it deliberately doesn't do ("no
+  I/O; the caller supplies file contents"). `lint:docs` requires the tag and
+  `check:overviews` the prose, in the packages restructured under #176.
 - **Every function is documented** (`lint:docs`) with a TSDoc block,
   including private helpers and arrow functions bound to a name:
   - first line: a title that says what it does;
   - then 1-3 lines of description (what, and why when it isn't obvious);
   - a longer section when the behaviour has edge cases, invariants or a
     non-obvious reason (see `importSkeleton` in `src/core/src/prescan.ts`);
-  - `@param` for every parameter and `@returns` for every non-void return.
+  - `@param` for every parameter and `@returns` for every non-void return,
+    with a description that says more than the name; a destructured or
+    object parameter documents each property (`@param opts.cwd - ...`);
+  - `@throws` for every error a function can let escape on purpose, direct
+    or propagated (the linter only sees direct `throw`s, so check the rest
+    by hand). A function with no error contract needs none.
 - **Ports and adapters where it pays.** The engine (`src/core`) is the
   hexagon: pure, no I/O, no `Bun`/`Deno`/`node:fs`. Anything it needs from outside comes through a port, an
   interface the core owns (`GrammarBinaries`, `SourceFile`), and adapters
@@ -374,6 +396,18 @@ done until both match the code.
   Bun and env access in `src/core/src`). Add a port only when a second
   adapter or a test needs it; one interface with one implementation and no
   test seam is just indirection.
+- **The CLI's policy does no I/O of its own.** Its feature folders get the
+  filesystem, git, the environment, the clock and the streams through
+  `src/cli/src/platform/contracts.ts`; `src/cli/src/adapters/` implements
+  them and only `main.ts` (through `adapters/compose.ts`) wires them in.
+  Biome refuses `node:fs`, `node:child_process`, `node:os`, the network
+  modules, `process`, `Bun` and `fetch` in those folders, and a GritQL plugin
+  (`biome-plugins/no-direct-clock.grit`) refuses `Date.now()`, `new Date()`
+  and `performance.now()`. fallow's zones refuse imports of `adapters/`.
+  Relative paths from the command line resolve against `Runtime.cwd`, never
+  the process's own working directory.
+  Mutable state lives in objects made per invocation (`createStartLookups`,
+  `createRunLog`), never in module globals.
 - Machine output (JSON, SARIF, hook stderr) goes through
   `process.stdout/stderr.write`, never `console.*` (Bun colours
   `console.error` under `FORCE_COLOR`). Biome's noConsole enforces it outside
