@@ -1,9 +1,9 @@
 /**
  * Loading a project: its config, its Python sources under their module names,
  * and a check run over them. The engine does no I/O (ADR-006), so all file
- * reading happens here.
+ * reading happens here, through the injected `ProjectIo`: paths are probed,
+ * files read and trees walked by whatever the caller wired in.
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
   checkPrefixes,
@@ -25,10 +25,10 @@ import {
   rootPathOf,
   type SourceFile,
 } from "@inwards/core";
-import { collectPythonFiles } from "../adapters/file-walk.ts";
-import { loadGrammars } from "../adapters/grammars.ts";
-import { isInside, posix, realpath } from "../paths/lexical.ts";
+import { isInside, posix } from "../paths/lexical.ts";
+import type { PathProbe } from "../platform/contracts.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
+import type { ProjectIo } from "./contracts.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
@@ -48,22 +48,23 @@ interface Project {
 /**
  * Reads the config and builds an engine for it.
  *
+ * @param io - reads the config and loads the grammars.
  * @param configPath - absolute path of the pyproject.toml to use.
  * @returns the engine and the config root, as written and resolved.
  * @throws {ConfigError} when the config is invalid.
  */
-async function openProject(configPath: string): Promise<Project> {
-  const configText = readFileSync(configPath, "utf8");
+async function openProject(io: ProjectIo, configPath: string): Promise<Project> {
+  const configText = io.read.text(configPath);
   const config = parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
   return {
-    engine: await Engine.create(await loadGrammars(), config),
+    engine: await Engine.create(await io.grammars(), config),
     config,
     configPath,
     configText,
     lexicalRoot,
-    realRoot: realpath(lexicalRoot) ?? lexicalRoot,
-    layerDirs: layerDirs(configPath, config),
+    realRoot: io.probe.realpath(lexicalRoot) ?? lexicalRoot,
+    layerDirs: layerDirs(io.probe, configPath, config),
   };
 }
 
@@ -73,11 +74,16 @@ async function openProject(configPath: string): Promise<Project> {
  * so a virtualenv marker or a node_modules name can't hide layer code, nor
  * code moved out of a layer next to it.
  *
+ * @param probe - resolves real paths.
  * @param configPath - absolute path of the pyproject.toml.
  * @param config - its parsed config.
  * @returns each existing layer package, as written and as its real path.
  */
-export function layerDirs(configPath: string, config: InwardsConfig): string[] {
+export function layerDirs(
+  probe: Pick<PathProbe, "realpath">,
+  configPath: string,
+  config: InwardsConfig,
+): string[] {
   const root = resolve(dirname(configPath), config.root);
   return config.layers
     .flatMap((layer) => layer.modules)
@@ -85,7 +91,7 @@ export function layerDirs(configPath: string, config: InwardsConfig): string[] {
       // The whole top-level package: code moved from shop/domain to a
       // disguised shop/core must still be seen.
       const dir = join(root, prefix.split(".")[0] ?? prefix);
-      const real = realpath(dir);
+      const real = probe.realpath(dir);
       return real === undefined ? [] : [...new Set([dir, real])];
     });
 }
@@ -96,25 +102,34 @@ export function layerDirs(configPath: string, config: InwardsConfig): string[] {
  * project. A file reached through an alias and through its real path gets one
  * entry per distinct (module, real file), so it is never reported twice.
  *
+ * @param io - walks the targets and reads the files.
  * @param project - the loaded project.
- * @param targets - absolute files or directories; undefined means the config root.
- * @param base - directory that report paths are made relative to.
- * @param texts - content to check instead of what is on disk, by absolute path.
+ * @param what - which files, and how to name and read them.
+ * @param what.targets - absolute files or directories; undefined means the config root.
+ * @param what.base - directory that report paths are made relative to.
+ * @param what.texts - content to check instead of what is on disk, by absolute path.
  * @returns the source files, with forward-slash paths on every OS.
  */
 function loadSources(
+  io: ProjectIo,
   project: Project,
-  targets: string[] | undefined,
-  base: string,
-  texts?: ReadonlyMap<string, string>,
+  {
+    targets,
+    base,
+    texts,
+  }: {
+    targets: string[] | undefined;
+    base: string;
+    texts: ReadonlyMap<string, string> | undefined;
+  },
 ): SourceFile[] {
   const { lexicalRoot, realRoot } = project;
   const files: SourceFile[] = [];
   const seen = new Set<string>();
-  for (const abs of collectPythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
-    const text = texts?.get(abs) ?? readFileSync(abs, "utf8");
-    const real = realpath(abs) ?? abs;
-    for (const { rel, shown } of moduleNames(abs, lexicalRoot, realRoot)) {
+  for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
+    const text = texts?.get(abs) ?? io.read.text(abs);
+    const real = io.probe.realpath(abs) ?? abs;
+    for (const { rel, shown } of moduleNames(io.probe, abs, lexicalRoot, realRoot)) {
       const named = moduleNameFor(rel);
       // Keyed on the real file too: order.py and order.pyi are one module, two files.
       const key = `${named.module}\u0000${real}`;
@@ -132,23 +147,18 @@ function loadSources(
  * index. Nothing is touched until the engine asks; the listing uses the same
  * walk as `inwards check`, and `listDir` reads one directory (INW010).
  *
+ * @param io - probes, walks and reads the project.
  * @param project - the loaded project.
  * @returns the probe, listing and reader, with root-relative forward-slash paths.
  */
-function projectFiles(project: Project): ProjectFiles {
+function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
   const root = project.lexicalRoot;
   return {
-    kind: (rel: string): ReturnType<PathKind> => {
-      const stat = statSync(join(root, rel), { throwIfNoEntry: false });
-      if (stat?.isDirectory()) {
-        return "dir";
-      }
-      return stat?.isFile() ? "file" : undefined;
-    },
+    kind: (rel: string): ReturnType<PathKind> => io.probe.kind(join(root, rel)),
     list: (): string[] =>
-      collectPythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
-    read: (rel: string): string => readFileSync(join(root, rel), "utf8"),
-    listDir: (rel: string): ReturnType<ListDir> => listDir(root, rel),
+      io.walk.pythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
+    read: (rel: string): string => io.read.text(join(root, rel)),
+    listDir: (rel: string): ReturnType<ListDir> => io.read.list(join(root, rel)),
   };
 }
 
@@ -162,31 +172,38 @@ function projectFiles(project: Project): ProjectFiles {
  * false; findings inline comments suppress go in `suppressed`. The duration
  * covers config, grammar loading, reading and checking.
  *
+ * @param io - reads, walks and probes the project, loads the grammars, and times the run.
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param targets - absolute files or directories; undefined means the config root.
- * @param base - directory that report paths are made relative to.
- * @param options - `baseline: false` reports every violation (for `inwards baseline`),
+ * @param options - `base`, the directory report paths are made relative to;
+ *   `baseline: false` reports every violation (for `inwards baseline`),
  *   `required: true` adds INW008 for the targets' packages (for the hook), `texts`
  *   checks the given content instead of a file's (a file as it was at session start).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
 export async function runCheck(
+  io: ProjectIo,
   configPath: string,
   targets: string[] | undefined,
-  base: string,
   {
+    base,
     baseline = true,
     required = false,
     texts,
-  }: { baseline?: boolean; required?: boolean; texts?: ReadonlyMap<string, string> } = {},
+  }: {
+    base: string;
+    baseline?: boolean | undefined;
+    required?: boolean | undefined;
+    texts?: ReadonlyMap<string, string> | undefined;
+  },
 ): Promise<Report> {
-  const started = performance.now();
-  const project = await openProject(configPath);
-  const files = loadSources(project, targets, base, texts);
+  const started = io.clock.elapsed();
+  const project = await openProject(io, configPath);
+  const files = loadSources(io, project, { targets, base, texts });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
-  const accepted = baseline ? readBaseline(configPath, project.config.rules) : undefined;
-  const index = project.engine.index(projectFiles(project));
+  const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
+  const index = project.engine.index(projectFiles(io, project));
   const { diagnostics, suppressed } = project.engine.check(files, index, accepted);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
@@ -200,13 +217,13 @@ export async function runCheck(
     );
     diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
   } else if (required) {
-    diagnostics.push(...requiredAround(project, files, shownRoot));
+    diagnostics.push(...requiredAround(io, project, files, shownRoot));
   }
   const report = {
     diagnostics,
     suppressed,
     filesChecked: files.length,
-    durationMs: performance.now() - started,
+    durationMs: io.clock.elapsed() - started,
   };
   return accepted ? applyBaseline(accepted, report, targets === undefined) : report;
 }
@@ -215,33 +232,21 @@ export async function runCheck(
  * Checks the required members of the packages that hold some files (INW008),
  * reading each package's directory listing at most once.
  *
+ * @param io - lists directories.
  * @param project - the loaded project.
  * @param files - the checked files.
  * @param shownRoot - the config root as report paths show it.
  * @returns the missing-member errors.
  */
-function requiredAround(project: Project, files: SourceFile[], shownRoot: string): Diagnostic[] {
+function requiredAround(
+  io: Pick<ProjectIo, "read">,
+  project: Project,
+  files: SourceFile[],
+  shownRoot: string,
+): Diagnostic[] {
   const parents = new Set(files.map((f) => rootPathOf(f).split("/").slice(0, -1).join(".")));
-  const members = probeMembers((dir) => listDir(project.lexicalRoot, dir));
+  const members = probeMembers((dir) => io.read.list(join(project.lexicalRoot, dir)));
   return checkRequired(project.config, parents, members, shownRoot);
-}
-
-/**
- * Lists a directory under the config root, the `ListDir` port.
- *
- * @param root - the config root.
- * @param dir - a forward-slash directory relative to it.
- * @returns its entries, or undefined when it isn't a directory.
- */
-function listDir(root: string, dir: string): ReturnType<ListDir> {
-  const path = join(root, dir);
-  if (!statSync(path, { throwIfNoEntry: false })?.isDirectory()) {
-    return;
-  }
-  return readdirSync(path, { withFileTypes: true }).map((entry) => ({
-    name: entry.name,
-    dir: entry.isDirectory(),
-  }));
 }
 
 /**
@@ -249,13 +254,14 @@ function listDir(root: string, dir: string): ReturnType<ListDir> {
  * wants the index itself (the tests, and the language server parity test).
  * Nothing is listed or read until the index is asked.
  *
+ * @param io - reads, walks and probes the project and loads the grammars.
  * @param configPath - absolute path of the pyproject.toml to use.
  * @returns the project index.
  * @throws {ConfigError} when the config is invalid.
  */
-export async function indexProject(configPath: string): Promise<ProjectIndex> {
-  const project = await openProject(configPath);
-  return project.engine.index(projectFiles(project));
+export async function indexProject(io: ProjectIo, configPath: string): Promise<ProjectIndex> {
+  const project = await openProject(io, configPath);
+  return project.engine.index(projectFiles(io, project));
 }
 
 /**
@@ -265,12 +271,14 @@ export async function indexProject(configPath: string): Promise<ProjectIndex> {
  * real path. Both are checked, so an alias can't hide a file from its layer.
  * Names that fall outside the config root are dropped.
  *
+ * @param probe - resolves real paths.
  * @param abs - the file as found.
  * @param lexicalRoot - the config root as written.
  * @param realRoot - the config root with symlinks resolved.
  * @returns each name as a root-relative path, with the path to show for it.
  */
 function moduleNames(
+  probe: Pick<PathProbe, "realpath">,
   abs: string,
   lexicalRoot: string,
   realRoot: string,
@@ -279,7 +287,7 @@ function moduleNames(
   if (isInside(lexicalRoot, abs)) {
     names.push({ rel: relative(lexicalRoot, abs), shown: abs });
   }
-  const real = realpath(abs);
+  const real = probe.realpath(abs);
   if (real !== undefined && isInside(realRoot, real)) {
     const rel = relative(realRoot, real);
     if (!names.some((n) => n.rel === rel)) {

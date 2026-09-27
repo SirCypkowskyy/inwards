@@ -4,15 +4,13 @@
  * `--dry-run` can print it and a second run finds nothing to do. Anything init
  * can't edit safely stops it with exit 2 instead of being rewritten.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import process from "node:process";
+import { basename, dirname, join } from "node:path";
 import { type InwardsConfig, parseConfig, VERSION } from "@inwards/core";
-import { print } from "../adapters/stdio.ts";
 import { isOurHook } from "../claude-code/settings.ts";
 import { isRecord } from "../json/guards.ts";
-import { findConfig } from "../paths/lexical.ts";
-import type { Agent, Change } from "./contracts.ts";
+import { print } from "../platform/print.ts";
+import { findConfig } from "../project/config-discovery.ts";
+import type { Agent, Change, InitContext } from "./contracts.ts";
 import { lineDiff } from "./diff.ts";
 
 /** How to start this Inwards without a shell: an executable and its leading arguments. */
@@ -55,21 +53,25 @@ const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\][ \t]*(?:#
  * Runs init for one agent in the project whose config is found from the cwd.
  * Files go next to that pyproject.toml, even when init runs in a subdirectory.
  *
+ * @param ctx - the platform and init's writer.
  * @param agent - which agent to wire up.
  * @param dryRun - print the changes instead of writing them.
  * @returns 0 on success, 2 without a config or with a file init can't edit safely.
+ * @throws {ConfigError} when the config is invalid; when a file can't be read or written.
  */
-export function initCommand(agent: Agent, dryRun: boolean): number {
-  const configPath = findConfig(process.cwd());
+export function initCommand(ctx: InitContext, agent: Agent, dryRun: boolean): number {
+  const { streams } = ctx.io;
+  const configPath = findConfig(ctx.io, ctx.io.runtime.cwd);
   if (!configPath) {
-    return print("inwards init: no pyproject.toml with [tool.inwards] here or above.", 2);
+    return print(streams, "inwards init: no pyproject.toml with [tool.inwards] here or above.", 2);
   }
-  const pinned = pinDefaults(configPath);
-  const changes = agentChanges(agent, dirname(configPath));
+  const pinned = pinDefaults(ctx, configPath);
+  const changes = agentChanges(ctx, agent, dirname(configPath));
   if (typeof changes === "string") {
-    return print(`inwards init: ${changes}`, 2);
+    return print(streams, `inwards init: ${changes}`, 2);
   }
   return apply(
+    ctx,
     [pinned, ...changes].filter((c) => c.before !== c.after),
     dryRun,
   );
@@ -80,16 +82,20 @@ export function initCommand(agent: Agent, dryRun: boolean): number {
  * the Claude Code settings or the AGENTS.md section, and the .gitignore
  * entries. For Aider it prints the `lint-cmd` line to add instead.
  *
+ * @param ctx - the platform, for reading the files and printing Aider's line.
  * @param agent - which agent to wire up.
  * @param project - the directory of the project's pyproject.toml.
  * @returns the changes (some may change nothing), or an error when a file can't be edited safely.
+ * @throws when a file exists but can't be read.
  */
-export function agentChanges(agent: Agent, project: string): Change[] | string {
-  const exec = inwardsExec();
+export function agentChanges(ctx: InitContext, agent: Agent, project: string): Change[] | string {
+  const exec = inwardsExec(ctx);
   const changes: Change[] = [];
   if (agent === "aider") {
-    const cmd = [exec.command, ...exec.args].map(shellQuote).join(" ");
+    const quote = shellQuoter(ctx.io.runtime.platform);
+    const cmd = [exec.command, ...exec.args].map(quote).join(" ");
     print(
+      ctx.io.streams,
       `Add to .aider.conf.yml:\n  lint-cmd: ${JSON.stringify(`python: ${cmd} check --format text`)}`,
       0,
     );
@@ -97,37 +103,39 @@ export function agentChanges(agent: Agent, project: string): Change[] | string {
     const change =
       agent === "claude"
         ? // settings.local.json: the hook holds this machine's binary path, so it must not be committed.
-          claudeSettings(join(project, ".claude", "settings.local.json"), exec)
-        : agentsSection(join(project, "AGENTS.md"));
+          claudeSettings(ctx, join(project, ".claude", "settings.local.json"), exec)
+        : agentsSection(ctx, join(project, "AGENTS.md"));
     if (typeof change === "string") {
       return change;
     }
     changes.push(change);
   }
   // Every agent: session state and the run log (`check --log`) both live in .inwards/.
-  changes.push(gitignore(join(project, ".gitignore"), agent));
+  changes.push(gitignore(ctx, join(project, ".gitignore"), agent));
   return changes;
 }
 
 /**
  * Writes the changes, or prints them as a diff.
  *
+ * @param ctx - prints, and writes through init's writer.
  * @param changes - only the files whose text would change.
  * @param dryRun - print instead of writing.
  * @returns 0.
+ * @throws when a file can't be written.
  */
-export function apply(changes: Change[], dryRun: boolean): number {
+export function apply(ctx: InitContext, changes: Change[], dryRun: boolean): number {
+  const { streams } = ctx.io;
   if (changes.length === 0) {
-    return print("inwards init: nothing to change.", 0);
+    return print(streams, "inwards init: nothing to change.", 0);
   }
   for (const change of changes) {
     if (dryRun) {
       const diff = lineDiff(change.before ?? "", change.after);
-      print(`--- ${change.path}\n+++ ${change.path} (after init)\n${diff}`, 0);
+      print(streams, `--- ${change.path}\n+++ ${change.path} (after init)\n${diff}`, 0);
     } else {
-      mkdirSync(dirname(change.path), { recursive: true });
-      writeFileSync(change.path, change.after);
-      print(`inwards init: updated ${change.path}`, 0);
+      ctx.init.files.write(change.path, change.after);
+      print(streams, `inwards init: updated ${change.path}`, 0);
     }
   }
   return 0;
@@ -137,24 +145,24 @@ export function apply(changes: Change[], dryRun: boolean): number {
  * How to start this Inwards with no shell and no PATH lookup: the binary, or
  * Bun plus main.ts when running from source.
  *
+ * @param ctx - the running executable and the CLI's `main.ts`.
  * @returns the executable and leading arguments.
  */
-function inwardsExec(): Exec {
-  const exe = process.execPath;
+function inwardsExec(ctx: InitContext): Exec {
+  const exe = ctx.io.runtime.execPath;
   const fromSource = basename(exe).replace(EXE_SUFFIX, "") === "bun";
-  return fromSource
-    ? { command: exe, args: [resolve(import.meta.dir, "../main.ts")] }
-    : { command: exe, args: [] };
+  return fromSource ? { command: exe, args: [ctx.init.entry] } : { command: exe, args: [] };
 }
 
 /**
- * Quotes one word for a POSIX shell, or for cmd/PowerShell on Windows.
+ * Makes the quoting for one word: a POSIX shell, or cmd/PowerShell on Windows.
  *
- * @param word - a path or argument.
- * @returns the quoted word.
+ * @param platform - `process.platform`.
+ * @returns a function from a path or argument to the quoted word.
  */
-function shellQuote(word: string): string {
-  return process.platform === "win32" ? `"${word}"` : `'${word.replaceAll("'", `'\\''`)}'`;
+function shellQuoter(platform: string): (word: string) => string {
+  return (word: string): string =>
+    platform === "win32" ? `"${word}"` : `'${word.replaceAll("'", `'\\''`)}'`;
 }
 
 /**
@@ -164,11 +172,13 @@ function shellQuote(word: string): string {
  * and kept only if the keys landed in the table and nothing else changed;
  * otherwise init warns and leaves the file alone.
  *
+ * @param ctx - reads the file and prints the warning.
  * @param configPath - the project's pyproject.toml.
  * @returns the change (unchanged text when nothing is missing or it can't be placed safely).
+ * @throws {ConfigError} when the config is invalid.
  */
-function pinDefaults(configPath: string): Change {
-  const before = readFileSync(configPath, "utf8");
+function pinDefaults(ctx: InitContext, configPath: string): Change {
+  const before = ctx.io.read.text(configPath);
   const config = parseConfig(before);
   const unchanged = { path: configPath, before, after: before };
   const want = {
@@ -197,6 +207,7 @@ function pinDefaults(configPath: string): Change {
   if (!landed) {
     const keys = lines.map((line) => line.split(" ")[0]).join(" and ");
     print(
+      ctx.io.streams,
       `inwards init: warning: could not add ${keys} to ${configPath}; add these lines under [tool.inwards] by hand:\n  ${lines.join("\n  ")}`,
       0,
     );
@@ -236,12 +247,13 @@ function safeParse(text: string): ReturnType<typeof parseConfig> | undefined {
  * deny rules are added once. Anything that isn't the documented shape stops
  * init rather than being rewritten.
  *
+ * @param ctx - reads the current file.
  * @param path - `.claude/settings.local.json`.
  * @param exec - how to start Inwards.
  * @returns the change, or an error message.
  */
-function claudeSettings(path: string, exec: Exec): Change | string {
-  const before = existsSync(path) ? readFileSync(path, "utf8") : undefined;
+function claudeSettings(ctx: InitContext, path: string, exec: Exec): Change | string {
+  const before = readIfThere(ctx, path);
   let settings: unknown;
   try {
     settings = before === undefined ? {} : JSON.parse(before);
@@ -308,12 +320,13 @@ function withoutOurHook(group: unknown): unknown {
  * (session state, run log) for every agent, and for Claude Code the
  * machine-specific `.claude/settings.local.json` that holds the hooks.
  *
+ * @param ctx - reads the current file.
  * @param path - the project's .gitignore.
  * @param agent - which agent is being wired up.
  * @returns the change (unchanged when every entry is already there).
  */
-function gitignore(path: string, agent: Agent): Change {
-  const before = existsSync(path) ? readFileSync(path, "utf8") : undefined;
+function gitignore(ctx: InitContext, path: string, agent: Agent): Change {
+  const before = readIfThere(ctx, path);
   const text = before ?? "";
   const lines = new Set(text.split(LINE_BREAK).map((l) => l.trim()));
   const wanted = [
@@ -335,11 +348,12 @@ function gitignore(path: string, agent: Agent): Change {
  * Adds or replaces the marked Inwards section in AGENTS.md. The section names
  * `inwards` without a path, since AGENTS.md is shared with the team.
  *
+ * @param ctx - reads the current file.
  * @param path - the project's AGENTS.md.
  * @returns the change, or an error when the markers don't form one pair.
  */
-function agentsSection(path: string): Change | string {
-  const before = existsSync(path) ? readFileSync(path, "utf8") : undefined;
+function agentsSection(ctx: InitContext, path: string): Change | string {
+  const before = readIfThere(ctx, path);
   const text = before ?? "";
   const section = [
     SECTION_BEGIN,
@@ -378,4 +392,16 @@ function separator(text: string): string {
     return "";
   }
   return text.endsWith("\n") ? "\n" : "\n\n";
+}
+
+/**
+ * Reads a file init may edit, when it is there.
+ *
+ * @param ctx - probes and reads the file.
+ * @param path - the file.
+ * @returns its text, or undefined when nothing is there.
+ * @throws when it exists but can't be read.
+ */
+function readIfThere(ctx: InitContext, path: string): string | undefined {
+  return ctx.io.probe.exists(path) ? ctx.io.read.text(path) : undefined;
 }

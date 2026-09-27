@@ -6,25 +6,31 @@
  */
 import { configGuard } from "./config-guard.ts";
 import { postToolUse } from "./post-tool-use.ts";
+import type { HookDeps } from "./protocol.ts";
 import { sessionStart } from "./session-start.ts";
 import { stopGate } from "./stop-gate.ts";
 
 /**
  * Hands a hook payload to the handler for its event.
  *
+ * @param deps - the platform, this invocation's run log and the check runner.
  * @param event - the payload's `hook_event_name`.
  * @param input - the hook payload.
  * @returns the handler's exit code; 0 for events Inwards doesn't handle.
  */
-export async function dispatch(event: unknown, input: Record<string, unknown>): Promise<number> {
+export async function dispatch(
+  deps: HookDeps,
+  event: unknown,
+  input: Record<string, unknown>,
+): Promise<number> {
   if (event === "SessionStart") {
-    return sessionStart(input);
+    return sessionStart(deps.io, input);
   }
   if (event === "Stop") {
-    return await stopGate(input);
+    return await stopGate(deps, input);
   }
   if (event === "PreToolUse") {
-    return configGuard(input);
+    return configGuard(deps.io, input);
   }
-  return event === "PostToolUse" ? await postToolUse(input) : 0;
+  return event === "PostToolUse" ? await postToolUse(deps, input) : 0;
 }

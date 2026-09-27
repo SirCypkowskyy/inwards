@@ -7,11 +7,17 @@
  * guard doesn't, and denies an edit it can't simulate on a protected file
  * instead, so a looser match can't slip a change past it.
  */
-import { lstatSync, readlinkSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { isRecord } from "../json/guards.ts";
-import { physicalRealpath } from "../paths/lexical.ts";
+import { physicalRealpath } from "../paths/physical.ts";
+import type { PathProbe } from "../platform/contracts.ts";
+
+/** Where a tool's path lands: resolves real paths and symlinks, and knows `~`. */
+export interface Landing {
+  probe: Pick<PathProbe, "realpath" | "readLink">;
+  /** The user's home directory, for `~/`. */
+  home: string;
+}
 
 const BOM = "﻿";
 
@@ -82,14 +88,15 @@ function replaceOnce(text: string, edit: Record<string, unknown>): string | unde
 /**
  * Resolves a tool's `file_path` as written: trimmed, `~/` expanded, made absolute.
  *
+ * @param home - the user's home directory, for `~/`.
  * @param base - the directory a relative path is resolved against.
  * @param file - the path as given.
  * @returns the absolute path, symlinks not resolved.
  */
-export function lexicalPath(base: string, file: string): string {
+export function lexicalPath(home: string, base: string, file: string): string {
   const trimmed = file.trim();
-  const home = trimmed.startsWith("~/") ? join(homedir(), trimmed.slice(2)) : trimmed;
-  return resolve(base, home);
+  const expanded = trimmed.startsWith("~/") ? join(home, trimmed.slice(2)) : trimmed;
+  return resolve(base, expanded);
 }
 
 /**
@@ -97,38 +104,26 @@ export function lexicalPath(base: string, file: string): string {
  * existing ancestor, plus the rest. A symlink can't make `.inwards` look like
  * another directory.
  *
+ * @param landing - resolves real paths and symlinks, and knows `~`.
  * @param base - the directory a relative path is resolved against.
  * @param file - the path as given.
  * @returns the real landing path, or undefined when nothing on the way exists.
  */
-export function landingPath(base: string, file: string): string | undefined {
-  const full = lexicalPath(base, file);
-  const real = physicalRealpath(base, full);
+export function landingPath(landing: Landing, base: string, file: string): string | undefined {
+  const full = lexicalPath(landing.home, base, file);
+  const real = physicalRealpath(landing.probe, base, full);
   if (real !== undefined) {
     return real;
   }
-  const link = danglingTarget(full);
+  // A symlink whose target doesn't exist yet: writing through it creates the target.
+  const link = landing.probe.readLink(full);
   if (link !== undefined) {
-    return landingPath(dirname(full), link); // writing through it creates the target
+    return landingPath(landing, dirname(full), link);
   }
   const parent = dirname(full);
   if (parent === full) {
     return undefined;
   }
-  const landed = landingPath(base, parent);
+  const landed = landingPath(landing, base, parent);
   return landed === undefined ? undefined : join(landed, basename(full));
-}
-
-/**
- * Reads a symlink whose target doesn't exist yet.
- *
- * @param path - any path.
- * @returns the link's target as written, or undefined when it isn't a symlink.
- */
-function danglingTarget(path: string): string | undefined {
-  try {
-    return lstatSync(path).isSymbolicLink() ? readlinkSync(path) : undefined;
-  } catch {
-    return undefined;
-  }
 }

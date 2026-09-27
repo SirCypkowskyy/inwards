@@ -8,17 +8,7 @@
  * must not bring every accepted violation back.
  */
 import { createHash } from "node:crypto";
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
 import { dirname, join } from "node:path";
-import process from "node:process";
 import {
   baselineKey,
   ConfigError,
@@ -29,6 +19,14 @@ import {
   stableMessage,
 } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
+import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import type { BaselineWriter } from "./contracts.ts";
+
+/** What reading a baseline needs. */
+interface BaselineReads {
+  probe: Pick<PathProbe, "exists">;
+  read: Pick<FileReader, "text">;
+}
 
 export const BASELINE_FILE = "inwards-baseline.json";
 const SCHEMA = "inwards/baseline@1";
@@ -73,18 +71,24 @@ function byCodePoint(a: string, b: string): number {
  * down to a warning, which the check can't see) are kept, so that turning the
  * rule back on doesn't bring back violations the user had accepted.
  *
+ * @param io - reads the old baseline and replaces it.
+ * @param io.probe - tells whether the old baseline exists.
+ * @param io.read - reads the old baseline.
+ * @param io.baselines - replaces the file.
  * @param configPath - the pyproject.toml.
  * @param diagnostics - the whole-project check's diagnostics.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns how many violations the baseline now accepts, dormant ones included.
+ * @throws {ConfigError} when the baseline can't be written.
  */
 export function writeBaseline(
+  io: BaselineReads & { baselines: BaselineWriter },
   configPath: string,
   diagnostics: readonly Diagnostic[],
   rules: RuleSettings | undefined,
 ): number {
   const entries = new Map<string, Entry>();
-  for (const e of dormantEntries(configPath, rules)) {
+  for (const e of dormantEntries(io, configPath, rules)) {
     entries.set(baselineKey(e), e);
   }
   for (const d of diagnostics.filter((x) => x.severity === "error")) {
@@ -103,18 +107,10 @@ export function writeBaseline(
       byCodePoint(a.code, b.code) ||
       byCodePoint(a.message, b.message),
   );
-  // A temp file and a rename replace a planted symlink instead of writing through it.
-  const path = baselinePath(configPath);
-  const temp = `${path}.${process.pid}.tmp`;
-  writeFileSync(temp, `${JSON.stringify({ schema: SCHEMA, violations }, null, 2)}\n`, {
-    flag: "wx",
-  });
-  try {
-    renameSync(temp, path);
-  } catch (err) {
-    rmSync(temp, { force: true });
-    throw new ConfigError(`can't write ${path}; is it a directory?`, { cause: err });
-  }
+  io.baselines.replace(
+    baselinePath(configPath),
+    `${JSON.stringify({ schema: SCHEMA, violations }, null, 2)}\n`,
+  );
   return violations.reduce((sum, v) => sum + v.count, 0);
 }
 
@@ -122,16 +118,21 @@ export function writeBaseline(
  * Reads the entries of the current baseline that `[tool.inwards.rules]` makes
  * dormant. A baseline this version can't read has none: it is being replaced.
  *
+ * @param io - reads the baseline.
  * @param configPath - the pyproject.toml.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns the dormant entries.
  */
-function dormantEntries(configPath: string, rules: RuleSettings | undefined): Entry[] {
+function dormantEntries(
+  io: BaselineReads,
+  configPath: string,
+  rules: RuleSettings | undefined,
+): Entry[] {
   if (rules === undefined) {
     return [];
   }
   try {
-    return (readEntries(baselinePath(configPath)) ?? []).filter((e) => dormant(e.code, rules));
+    return (readEntries(io, baselinePath(configPath)) ?? []).filter((e) => dormant(e.code, rules));
   } catch {
     return [];
   }
@@ -140,17 +141,18 @@ function dormantEntries(configPath: string, rules: RuleSettings | undefined): En
 /**
  * Reads a baseline's entries.
  *
+ * @param io - tells whether the file exists and reads it.
  * @param path - the baseline file.
  * @returns the entries, or undefined when there is no baseline.
  * @throws {ConfigError} when the file isn't a baseline this version understands.
  */
-function readEntries(path: string): Entry[] | undefined {
-  if (!existsSync(path)) {
+function readEntries(io: BaselineReads, path: string): Entry[] | undefined {
+  if (!io.probe.exists(path)) {
     return undefined;
   }
   let value: unknown;
   try {
-    value = JSON.parse(readFileSync(path, "utf8"));
+    value = JSON.parse(io.read.text(path));
   } catch (err) {
     throw new ConfigError(`${path} is not valid JSON. ${REGENERATE}`, {
       cause: err,
@@ -192,16 +194,18 @@ function isEntry(value: unknown): value is Entry {
  * accept, and its entries must not count as fixed. They apply again once the
  * rule is back; `inwards baseline` keeps them (see `writeBaseline`).
  *
+ * @param io - tells whether the baseline exists and reads it.
  * @param configPath - the pyproject.toml.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns accepted copies by baseline key, or undefined when there is no baseline.
  * @throws {ConfigError} when the file isn't a baseline this version understands.
  */
 export function readBaseline(
+  io: BaselineReads,
   configPath: string,
   rules: RuleSettings | undefined,
 ): Map<string, number> | undefined {
-  const entries = readEntries(baselinePath(configPath));
+  const entries = readEntries(io, baselinePath(configPath));
   if (entries === undefined) {
     return undefined;
   }
@@ -235,7 +239,7 @@ function dormant(code: string, rules: RuleSettings | undefined): boolean {
  * Findings an inline comment suppressed use up entries too, after the
  * reported ones, so their entries don't count as fixed; an error that does is
  * marked `baselined`, which keeps it hidden if the hooks don't honour its
- * suppression (see `agentSuppressions` in `legacy.ts`).
+ * suppression (see `session/agent-suppressions.ts`).
  *
  * @param accepted - accepted copies by baseline key, from `readBaseline`.
  * @param report - the check's report.
@@ -284,45 +288,74 @@ export function applyBaseline(
  * changed during a session. Never throws: a baseline that can't be read (a
  * directory, a dangling link) gets a marker instead, which differs from any hash.
  *
+ * @param io - looks at and reads the baselines.
+ * @param io.probe - tells what each baseline path is.
+ * @param io.read - reads a baseline's bytes.
  * @param project - the project root.
  * @param configs - project-relative pyproject.toml paths.
  * @returns the SHA-256 or marker of each existing baseline, by the config's path, sorted.
  */
 export function baselineHashes(
+  io: { probe: Pick<PathProbe, "isLink" | "kind" | "exists">; read: Pick<FileReader, "bytes"> },
   project: string,
   configs: readonly string[],
 ): Record<string, string> {
   const hashes: Record<string, string> = {};
   for (const rel of [...configs].sort()) {
     const path = baselinePath(join(project, rel));
-    if (lstatSync(path, { throwIfNoEntry: false }) === undefined) {
-      continue;
+    if (io.probe.isLink(path) === undefined) {
+      continue; // nothing there, not even a dangling link
     }
-    try {
-      hashes[rel] = statSync(path).isFile()
-        ? createHash("sha256").update(readFileSync(path)).digest("hex")
-        : "not a file";
-    } catch {
-      hashes[rel] = "unreadable";
-    }
+    hashes[rel] = baselineMark(io, path);
   }
   return hashes;
 }
 
 /**
+ * Fingerprints one baseline path that exists (possibly as a dangling link).
+ *
+ * @param io - looks at and reads the path.
+ * @param io.probe - tells what the path is.
+ * @param io.read - reads its bytes.
+ * @param path - the baseline path.
+ * @returns its SHA-256, "not a file" for a directory or special file, or
+ *   "unreadable" for a dangling link or a file that can't be read.
+ */
+function baselineMark(
+  io: { probe: Pick<PathProbe, "kind" | "exists">; read: Pick<FileReader, "bytes"> },
+  path: string,
+): string {
+  if (!io.probe.exists(path)) {
+    return "unreadable";
+  }
+  if (io.probe.kind(path) !== "file") {
+    return "not a file";
+  }
+  try {
+    return createHash("sha256").update(io.read.bytes(path)).digest("hex");
+  } catch {
+    return "unreadable";
+  }
+}
+
+/**
  * Lists the baselines that differ from the session start.
  *
+ * @param io - looks at and reads the baselines.
+ * @param io.probe - tells what each baseline path is.
+ * @param io.read - reads a baseline's bytes.
  * @param project - the project root.
  * @param configs - the session-start configs' project-relative paths.
  * @param start - the baseline hashes recorded at session start, by config path.
  * @returns project-relative baseline paths that appeared, changed or went away.
  */
 export function changedBaselines(
+  io: { probe: Pick<PathProbe, "isLink" | "kind" | "exists">; read: Pick<FileReader, "bytes"> },
   project: string,
   configs: readonly string[],
   start: Record<string, string>,
 ): string[] {
-  const now = baselineHashes(project, configs);
+  const now = baselineHashes(io, project, configs);
   return [...new Set([...Object.keys(start), ...Object.keys(now)])]
     .filter((rel) => start[rel] !== now[rel])
     .map((rel) => join(dirname(rel), BASELINE_FILE).replaceAll("\\", "/"));

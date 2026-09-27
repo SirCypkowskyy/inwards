@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
-import { ASK_USER } from "../src/cli/src/claude-code/config-guard.ts";
+import { ASK_USER } from "../src/cli/src/claude-code/protocol.ts";
 import { type LayerSpec, layerIndexOf, moduleNameFor, parseConfig } from "../src/core/src/index.ts";
 import type { RunStats } from "./report.ts";
 

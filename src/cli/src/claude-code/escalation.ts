@@ -15,11 +15,12 @@
  *   the model, unless every file involved has changed since.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
-import { existingStateDir, stateDir } from "../adapters/state-files.ts";
+import type { FileReader, Platform } from "../platform/contracts.ts";
+
+/** What escalation touches: the state directory, file hashes, the clock and stdout. */
+export type EscalationIo = Pick<Platform, "probe" | "read" | "clock" | "state" | "streams">;
 
 /** Attempts before escalating, when the config doesn't say. */
 export const DEFAULT_ESCALATE_AFTER = 3;
@@ -49,12 +50,14 @@ function listViolations(diagnostics: readonly Diagnostic[]): string {
  * Ends the turn after the last block: tells the user what is unresolved and
  * records it for the next session, with a hash of each file involved.
  *
+ * @param io - hashes files, writes the record and prints the message.
  * @param project - the real project root; diagnostic paths are relative to it.
  * @param id - the session id, which names the record.
  * @param found - session problems that aren't diagnostics, and the violations still there.
  * @returns 0; the message goes to stdout as the Stop hook's `systemMessage`.
  */
 export function yieldTurn(
+  io: EscalationIo,
   project: string,
   id: string,
   found: { problems: readonly string[]; diagnostics: readonly Diagnostic[] },
@@ -62,19 +65,16 @@ export function yieldTurn(
   const lines = [...found.problems.map((p) => `- ${p}`), listViolations(found.diagnostics)];
   const summary = `Inwards: the turn ended with unresolved architecture problems:\n${lines.filter(Boolean).join("\n")}`;
   const files = Object.fromEntries(
-    found.diagnostics.map((d) => [d.file, hashOf(join(project, d.file))]),
+    found.diagnostics.map((d) => [d.file, hashOf(io.read, join(project, d.file))]),
   );
   try {
-    const dir = stateDir(project);
-    const temp = join(dir, `.${id}.unresolved.${process.pid}.tmp`);
-    writeFileSync(temp, JSON.stringify({ at: new Date().toISOString(), summary, files }), {
-      flag: "wx",
-    });
-    renameSync(temp, join(dir, `${id}.unresolved.json`));
+    const dir = io.state.stateDir(project);
+    const record = { at: io.clock.now().toISOString(), summary, files };
+    io.state.publish(dir, `${id}.unresolved.json`, JSON.stringify(record));
   } catch {
     // best effort: the user still sees the summary now
   }
-  process.stdout.write(`${JSON.stringify({ systemMessage: summary })}\n`);
+  io.streams.out(`${JSON.stringify({ systemMessage: summary })}\n`);
   return 0;
 }
 
@@ -82,20 +82,23 @@ export function yieldTurn(
  * Takes what earlier sessions left unresolved, once. A record whose files
  * have all changed since is dropped: someone has worked on them.
  *
+ * @param io - lists, reads and deletes the records, and hashes files.
  * @param project - the real project root.
  * @returns the summaries still relevant, or undefined when there are none.
+ * @throws when the state directory can't be listed.
  */
-export function takeUnresolved(project: string): string | undefined {
-  const dir = existingStateDir(project);
+export function takeUnresolved(io: EscalationIo, project: string): string | undefined {
+  const dir = io.state.existingStateDir(project);
   if (dir === undefined) {
     return undefined;
   }
   const summaries: string[] = [];
-  for (const name of readdirSync(dir).filter((n) => UNRESOLVED.test(n))) {
+  const names = (io.read.list(dir) ?? []).map((entry) => entry.name);
+  for (const name of names.filter((n) => UNRESOLVED.test(n))) {
     const path = join(dir, name);
-    const record = readRecord(path);
-    rmSync(path, { force: true });
-    if (record !== undefined && stillRelevant(project, record.files)) {
+    const record = readRecord(io, path);
+    io.state.remove(path);
+    if (record !== undefined && stillRelevant(io.read, project, record.files)) {
       summaries.push(record.summary);
     }
   }
@@ -105,15 +108,19 @@ export function takeUnresolved(project: string): string | undefined {
 /**
  * Reads one unresolved record, refusing anything but a regular file.
  *
+ * @param io - tells what the path is and reads it.
  * @param path - the record's path.
  * @returns the summary and file hashes, or undefined when unreadable.
  */
-function readRecord(path: string): { summary: string; files: Record<string, string> } | undefined {
+function readRecord(
+  io: Pick<EscalationIo, "probe" | "read">,
+  path: string,
+): { summary: string; files: Record<string, string> } | undefined {
   try {
-    if (!lstatSync(path).isFile()) {
+    if (io.probe.isLink(path) !== false || io.probe.kind(path) !== "file") {
       return undefined;
     }
-    const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+    const value: unknown = JSON.parse(io.read.text(path));
     if (typeof value !== "object" || value === null || !("summary" in value)) {
       return undefined;
     }
@@ -133,26 +140,33 @@ function readRecord(path: string): { summary: string; files: Record<string, stri
 /**
  * Tells whether a record still applies: it names no files, or one of them is unchanged.
  *
+ * @param read - reads the files.
  * @param project - the real project root.
  * @param files - project-relative path to content hash, at the time of the record.
  * @returns true when the record should be shown.
  */
-function stillRelevant(project: string, files: Record<string, string>): boolean {
+function stillRelevant(
+  read: Pick<FileReader, "bytes">,
+  project: string,
+  files: Record<string, string>,
+): boolean {
   const entries = Object.entries(files);
   return (
-    entries.length === 0 || entries.some(([file, hash]) => hashOf(join(project, file)) === hash)
+    entries.length === 0 ||
+    entries.some(([file, hash]) => hashOf(read, join(project, file)) === hash)
   );
 }
 
 /**
  * Hashes a file's content.
  *
+ * @param read - reads the file.
  * @param path - a file.
  * @returns its SHA-256, or "" when it can't be read.
  */
-function hashOf(path: string): string {
+function hashOf(read: Pick<FileReader, "bytes">, path: string): string {
   try {
-    return createHash("sha256").update(readFileSync(path)).digest("hex");
+    return createHash("sha256").update(read.bytes(path)).digest("hex");
   } catch {
     return "";
   }

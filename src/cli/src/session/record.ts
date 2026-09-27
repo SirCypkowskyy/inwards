@@ -21,24 +21,24 @@
  * privilege boundary, since such a process could write those files itself.
  * The PreToolUse guard (#23) keeps the agent's own tools away from `.inwards/`.
  */
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import process from "node:process";
 import type { Diagnostic, InwardsConfig } from "@inwards/core";
-import { appendLine, prune, stateDir, statePath } from "../adapters/state-files.ts";
+import { isRecord } from "../json/guards.ts";
+import type { Platform } from "../platform/contracts.ts";
 import { baselineHashes } from "../project/baseline.ts";
-import { git, projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
+import { projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
+import { fingerprint } from "./fingerprint.ts";
+
+/** What recording and reading a session touches. */
+export type SessionIo = Pick<Platform, "probe" | "read" | "walk" | "git" | "clock" | "state">;
 
 /** Session ids come from the agent's payload, so only a safe file name is accepted. */
 const SESSION_ID = /^[\w-]{1,128}$/u;
-/** Hex digits kept from a fingerprint's SHA-256: 64 bits is plenty for one session. */
-const FINGERPRINT_LENGTH = 16;
 /** SessionStart sources that begin a session; `resume` and `compact` continue one. */
 const NEW_SESSION = new Set(["startup", "clear"]);
 
 /** What a session started from. */
-interface SessionStart {
+export interface SessionStart {
   at: string;
   /** `git rev-parse HEAD` at session start, or null outside a git repo. */
   head: string | null;
@@ -81,81 +81,70 @@ export function isSessionId(id: unknown): id is string {
 }
 
 /**
- * Identifies a violation across hook runs: same rule, same module, same message
- * (which names the offending import target).
- *
- * @param d - a diagnostic.
- * @returns a short stable hash.
- */
-export function fingerprint(d: Diagnostic): string {
-  return createHash("sha256")
-    .update(`${d.code}\u0000${d.module}\u0000${d.message}`)
-    .digest("hex")
-    .slice(0, FINGERPRINT_LENGTH);
-}
-
-/**
  * Handles SessionStart. A new session (startup, /clear) records its start and
  * prunes old sessions; a resume or compact only logs that it happened.
  * Projects without any `[tool.inwards]` get no state at all.
  *
+ * @param io - reads the project, runs git, tells the time and writes the state.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @param source - the payload's `source`: startup, resume, clear or compact.
+ * @throws when the state can't be written or the project can't be read.
  */
-export function recordStart(project: string, id: string, source: string): void {
-  const startFile = join(statePath(project), `${id}.start.json`);
+export function recordStart(io: SessionIo, project: string, id: string, source: string): void {
+  const startFile = join(io.state.statePath(project), `${id}.start.json`);
   if (!NEW_SESSION.has(source)) {
     // Only a session that already has state is continued. This never creates
     // .inwards/ in a project without Inwards, nor a start for a lost session.
-    if (existsSync(statePath(project))) {
-      append(project, id, { t: "resume", at: new Date().toISOString(), source });
+    if (io.probe.exists(io.state.statePath(project))) {
+      append(io, project, id, { t: "resume", at: io.clock.now().toISOString(), source });
     }
     return;
   }
-  if (existsSync(startFile)) {
+  if (io.probe.exists(startFile)) {
     return; // a start is written once; a repeated startup can't reset the baseline
   }
-  const { valid: configs, invalid } = projectConfigs(project);
+  const { valid: configs, invalid } = projectConfigs(io, project);
   if (Object.keys(configs).length === 0) {
     return;
   }
-  const manifest = projectManifest(project, configs);
-  const head = git(project, ["rev-parse", "HEAD"])?.trim() ?? null;
-  const dir = stateDir(project);
-  prune(dir, id);
-  const baselines = baselineHashes(project, Object.keys(configs));
+  const manifest = projectManifest(io, project, configs);
+  const head = io.git.run(project, ["rev-parse", "HEAD"])?.trim() ?? null;
+  const dir = io.state.stateDir(project);
+  io.state.prune(dir, id);
+  const baselines = baselineHashes(io, project, Object.keys(configs));
   const start: SessionStart = {
-    at: new Date().toISOString(),
+    at: io.clock.now().toISOString(),
     head,
     configs,
     invalid,
     manifest,
     baselines,
   };
-  const temp = join(dir, `.${id}.${process.pid}.tmp`);
-  writeFileSync(temp, JSON.stringify(start), { flag: "wx" });
-  renameSync(temp, startFile); // rename replaces a planted symlink, never follows it
+  io.state.publish(dir, `${id}.start.json`, JSON.stringify(start));
 }
 
 /**
  * Records one edit and the violations the hook reported for it.
  *
- * @param project - the real project root.
- * @param id - a session id that passed `isSessionId`.
+ * @param io - resolves the file's real path, tells the time and appends to the log.
+ * @param session - the real project root and a session id that passed `isSessionId`.
+ * @param session.project - the real project root.
+ * @param session.id - the session id.
  * @param file - the edited file, absolute.
  * @param diagnostics - what the check of that file reported (empty when clean).
+ * @throws when the log can't be written.
  */
 export function recordEdit(
-  project: string,
-  id: string,
+  io: Pick<SessionIo, "probe" | "clock" | "state">,
+  { project, id }: { project: string; id: string },
   file: string,
   diagnostics: readonly Diagnostic[],
 ): void {
-  append(project, id, {
+  append(io, project, id, {
     t: "edit",
-    at: new Date().toISOString(),
-    file: projectPath(project, file),
+    at: io.clock.now().toISOString(),
+    file: projectPath(io.probe, project, file),
     // Once per edit: the same import twice in a file is one attempt, not two.
     fingerprints: [...new Set(diagnostics.map(fingerprint))],
   });
@@ -164,34 +153,52 @@ export function recordEdit(
 /**
  * Records that the Stop gate blocked the turn.
  *
+ * @param io - tells the time and appends to the log.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @param fresh - true for the turn's first block (`stop_hook_active` was false),
  *   which restarts the count.
+ * @throws when the log can't be written.
  */
-export function recordStop(project: string, id: string, fresh: boolean): void {
-  append(project, id, { t: "stop", at: new Date().toISOString(), fresh });
+export function recordStop(
+  io: Pick<SessionIo, "clock" | "state">,
+  project: string,
+  id: string,
+  fresh: boolean,
+): void {
+  append(io, project, id, { t: "stop", at: io.clock.now().toISOString(), fresh });
 }
 
 /**
  * Records that the Stop gate passed clean, which ends a streak of blocks.
  *
+ * @param io - tells the time and appends to the log.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
+ * @throws when the log can't be written.
  */
-export function recordPass(project: string, id: string): void {
-  append(project, id, { t: "pass", at: new Date().toISOString() });
+export function recordPass(
+  io: Pick<SessionIo, "clock" | "state">,
+  project: string,
+  id: string,
+): void {
+  append(io, project, id, { t: "pass", at: io.clock.now().toISOString() });
 }
 
 /**
  * Reads only a session's start record, which is cheaper than the whole log.
  *
+ * @param io - reads the state.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @returns the start record, or undefined when missing or unreadable.
  */
-export function readSessionStart(project: string, id: string): SessionStart | undefined {
-  return readStart(join(statePath(project), `${id}.start.json`));
+export function readSessionStart(
+  io: Pick<SessionIo, "read" | "state">,
+  project: string,
+  id: string,
+): SessionStart | undefined {
+  return readStart(io, join(io.state.statePath(project), `${id}.start.json`));
 }
 
 /**
@@ -200,18 +207,23 @@ export function readSessionStart(project: string, id: string): SessionStart | un
  * can fail closed: a session whose history is gone can't prove it is clean.
  * Torn or foreign log lines are skipped.
  *
+ * @param io - reads the state.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @returns the session state, or undefined without a recorded start.
  */
-export function readSession(project: string, id: string): SessionState | undefined {
-  const start = readStart(join(statePath(project), `${id}.start.json`));
+export function readSession(
+  io: Pick<SessionIo, "read" | "state">,
+  project: string,
+  id: string,
+): SessionState | undefined {
+  const start = readStart(io, join(io.state.statePath(project), `${id}.start.json`));
   if (start === undefined) {
     return undefined;
   }
   let log = "";
   try {
-    log = readFileSync(join(statePath(project), `${id}.jsonl`), "utf8");
+    log = io.read.text(join(io.state.statePath(project), `${id}.jsonl`));
   } catch {
     // no edits yet
   }
@@ -249,12 +261,13 @@ function tally(state: SessionState, event: SessionEvent): void {
 /**
  * Reads and shape-checks a start file.
  *
+ * @param io - reads the file.
  * @param path - the `<id>.start.json` path.
  * @returns the start record, or undefined when missing or malformed.
  */
-function readStart(path: string): SessionStart | undefined {
+function readStart(io: Pick<SessionIo, "read">, path: string): SessionStart | undefined {
   try {
-    const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+    const value: unknown = JSON.parse(io.read.text(path));
     if (
       isRecord(value) &&
       isRecord(value["configs"]) &&
@@ -305,33 +318,22 @@ function parseEvent(line: string): SessionEvent | undefined {
 }
 
 /**
- * Tells whether a parsed JSON value is a plain object.
- *
- * @param value - any parsed JSON value.
- * @returns true for a non-null, non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/**
  * Appends one event to a session's log as one line.
  *
+ * @param io - writes the state.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @param event - the event to record.
+ * @throws when the log can't be written.
  */
-function append(project: string, id: string, event: SessionEvent): void {
-  appendLine(logFile(project, id), `${JSON.stringify(event)}\n`);
-}
-
-/**
- * Locates one session's event log, creating and checking the directory.
- *
- * @param project - the real project root.
- * @param id - a session id that passed `isSessionId`.
- * @returns `<project>/.inwards/state/<id>.jsonl`.
- */
-function logFile(project: string, id: string): string {
-  return join(stateDir(project), `${id}.jsonl`);
+function append(
+  io: Pick<SessionIo, "state">,
+  project: string,
+  id: string,
+  event: SessionEvent,
+): void {
+  io.state.appendLine(
+    join(io.state.stateDir(project), `${id}.jsonl`),
+    `${JSON.stringify(event)}\n`,
+  );
 }

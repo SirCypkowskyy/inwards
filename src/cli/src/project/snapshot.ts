@@ -1,17 +1,23 @@
 /**
  * What a project looks like right now, as the session start and the Stop gate
- * compare it: every `[tool.inwards]` table, a content hash per Python file,
- * and the git HEAD. Paths are project-relative with forward slashes: real
- * paths for configs, the paths as walked for the manifest.
+ * compare it: every `[tool.inwards]` table, and a content hash per Python
+ * file. Paths are project-relative with forward slashes: real paths for
+ * configs, the paths as walked for the manifest. The filesystem comes in
+ * through the injected probe, reader and walker.
  */
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { ConfigError, declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";
-import { collectFiles, collectPythonFiles } from "../adapters/file-walk.ts";
-import { posix, realpath } from "../paths/lexical.ts";
+import { posix } from "../paths/lexical.ts";
+import type { FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 import { layerDirs } from "./check.ts";
+
+/** What taking a snapshot reads. */
+export interface SnapshotIo {
+  probe: Pick<PathProbe, "realpath">;
+  read: Pick<FileReader, "text" | "bytes">;
+  walk: FileWalker;
+}
 
 /** Every `[tool.inwards]` table in a project, by project-relative pyproject.toml path. */
 export interface ProjectConfigs {
@@ -30,15 +36,20 @@ export interface ProjectConfigs {
  * included. Layer packages are walked again without skips, so a config
  * inside a disguised directory there is found too.
  *
+ * @param io - walks the project and reads the configs.
  * @param project - the real project root.
  * @returns the valid configs and the paths of invalid ones.
+ * @throws when a pyproject.toml can't be read.
  */
-export function projectConfigs(project: string): ProjectConfigs {
-  const first = readConfigs(project, collectFiles([project], isPyproject));
-  const open = openDirs(project, first.valid);
+export function projectConfigs(io: SnapshotIo, project: string): ProjectConfigs {
+  const first = readConfigs(io, project, io.walk.files([project], isPyproject));
+  const open = openDirs(io, project, first.valid);
   // ponytail: a second walk, over layer packages only; one walk if SessionStart gets slow.
-  const paths = [...collectFiles([project], isPyproject), ...collectFiles(open, isPyproject, open)];
-  return readConfigs(project, [...new Set(paths)]);
+  const paths = [
+    ...io.walk.files([project], isPyproject),
+    ...io.walk.files(open, isPyproject, open),
+  ];
+  return readConfigs(io, project, [...new Set(paths)]);
 }
 
 /**
@@ -54,15 +65,17 @@ function isPyproject(name: string): boolean {
 /**
  * Parses the pyproject.toml files that declare `[tool.inwards]`.
  *
+ * @param io - reads the files and resolves their real paths.
  * @param project - the real project root.
  * @param paths - absolute pyproject.toml paths.
  * @returns the valid configs and the paths of invalid ones, sorted.
+ * @throws when a file can't be read, or on an error other than a `ConfigError`.
  */
-function readConfigs(project: string, paths: string[]): ProjectConfigs {
+function readConfigs(io: SnapshotIo, project: string, paths: string[]): ProjectConfigs {
   const found: ProjectConfigs = { valid: {}, invalid: [], found: {} };
   for (const path of paths.sort()) {
-    const text = readFileSync(path, "utf8");
-    const rel = projectPath(project, path);
+    const text = io.read.text(path);
+    const rel = projectPath(io.probe, project, path);
     try {
       if (declaresInwards(text)) {
         found.valid[rel] = parseConfig(text);
@@ -81,54 +94,46 @@ function readConfigs(project: string, paths: string[]): ProjectConfigs {
 /**
  * Lists the layer package directories of every config, walked without skips.
  *
+ * @param io - resolves real paths.
  * @param project - the real project root.
  * @param configs - valid configs by project-relative path.
  * @returns the directories.
  */
-function openDirs(project: string, configs: Record<string, InwardsConfig>): string[] {
+function openDirs(
+  io: Pick<SnapshotIo, "probe">,
+  project: string,
+  configs: Record<string, InwardsConfig>,
+): string[] {
   return Object.entries(configs).flatMap(([path, config]) =>
-    layerDirs(join(project, path), config),
+    layerDirs(io.probe, join(project, path), config),
   );
 }
 
 /**
- * Hashes every Python file in the project, under every name it is reachable by. Layer packages are walked without
- * skips, so a file hidden in a pyvenv.cfg or node_modules directory inside a
- * layer is still seen.
+ * Hashes every Python file in the project, under every name it is reachable
+ * by. Layer packages are walked without skips, so a file hidden in a
+ * pyvenv.cfg or node_modules directory inside a layer is still seen.
  *
+ * @param io - walks the project and reads each file's bytes.
  * @param project - the real project root.
  * @param configs - the project's configs, from `projectConfigs`.
  * @returns SHA-256 hex digests, by project-relative path.
+ * @throws when a file can't be read.
  */
 export function projectManifest(
+  io: SnapshotIo,
   project: string,
   configs: Record<string, InwardsConfig>,
 ): Record<string, string> {
   const manifest: Record<string, string> = {};
-  for (const file of collectPythonFiles([project], openDirs(project, configs))) {
+  for (const file of io.walk.pythonFiles([project], openDirs(io, project, configs))) {
     // Keyed by the path as walked, not the real one: a file reached through a
     // symlink into a layer is that layer's module under that name.
     manifest[posix(relative(project, file))] = createHash("sha256")
-      .update(readFileSync(file))
+      .update(io.read.bytes(file))
       .digest("hex");
   }
   return manifest;
-}
-
-/**
- * Runs git in the project. The hooks call it with an agent-writable
- * .git/config, so only plumbing that runs no filters, hooks or pagers may go
- * through here (`rev-parse`, `cat-file blob`); the overrides switch off the
- * two config commands such plumbing could still reach.
- *
- * @param project - the real project root.
- * @param args - git arguments.
- * @returns stdout, or undefined when git fails or isn't installed.
- */
-export function git(project: string, args: string[]): string | undefined {
-  const safe = ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"];
-  const run = spawnSync("git", [...safe, ...args], { cwd: project, encoding: "utf8" });
-  return run.status === 0 ? run.stdout : undefined;
 }
 
 /**
@@ -136,10 +141,15 @@ export function git(project: string, args: string[]): string | undefined {
  * On macOS the project is /private/var/... while a payload may say /var/...;
  * mixing the two spellings would give ../../var paths.
  *
+ * @param probe - resolves real paths.
  * @param project - the real project root.
  * @param path - an absolute path inside the project.
  * @returns the project-relative path.
  */
-export function projectPath(project: string, path: string): string {
-  return posix(relative(project, realpath(path) ?? path));
+export function projectPath(
+  probe: Pick<PathProbe, "realpath">,
+  project: string,
+  path: string,
+): string {
+  return posix(relative(project, probe.realpath(path) ?? path));
 }

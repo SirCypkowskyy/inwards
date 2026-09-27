@@ -11,27 +11,33 @@
  * module names would reverse them. The key is made once per project and
  * never leaves the machine; the receiver can tell files and violations apart
  * but can't guess what they are.
+ *
+ * Reading the logs and hashing are here; the key and the output file go
+ * through the `ExportFiles` contract.
  */
-import { createHmac, randomBytes } from "node:crypto";
-import { closeSync, constants, lstatSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { ConfigError } from "@inwards/core";
-import { realpath } from "../paths/lexical.ts";
+import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import type { ExportFiles } from "./contracts.ts";
 import { parseLine, type RunLine } from "./runs.ts";
 
 const LINE_BREAK = /\r?\n/u;
-const KEY_BYTES = 32;
-const KEY_FORMAT = /^[0-9a-f]{64}$/u;
 /** Hex digits kept from an HMAC: 64 bits tell a project's files and violations apart. */
 const HASH_LENGTH = 16;
-/** O_NOFOLLOW where the OS has it (not on Windows), so a planted symlink isn't read. */
-const NO_FOLLOW: number = constants.O_NOFOLLOW ?? 0;
-const OWNER_ONLY = 0o600;
+
+/** What an export touches. */
+export interface ExportIo {
+  probe: Pick<PathProbe, "realpath">;
+  read: Pick<FileReader, "text">;
+  exports: ExportFiles;
+}
 
 /**
  * Writes the project's run logs, merged in time order, to one file readable
  * by the owner only.
  *
+ * @param io - reads the logs, resolves paths, and keeps the key and the output.
  * @param dirs - directories that may hold `.inwards/` logs (see `logDirs`).
  * @param out - the file to write.
  * @param redact - with the project root: replace paths and fingerprints with keyed hashes.
@@ -40,6 +46,7 @@ const OWNER_ONLY = 0o600;
  * @throws {ConfigError} when `out` is one of the logs, or the key can't be used safely.
  */
 export function exportRunLogs(
+  io: ExportIo,
   dirs: readonly string[],
   out: string,
   redact?: { project: string },
@@ -47,31 +54,33 @@ export function exportRunLogs(
   const logs = [...new Set(dirs)].flatMap((dir) =>
     ["runs.1.jsonl", "runs.jsonl"].map((name) => join(dir, ".inwards", name)),
   );
-  const target = realpath(resolve(out)) ?? resolve(out);
-  if (target.split(sep).includes(".inwards") || logs.some((log) => realpath(log) === target)) {
+  const target = io.probe.realpath(resolve(out)) ?? resolve(out);
+  if (
+    target.split(sep).includes(".inwards") ||
+    logs.some((log) => io.probe.realpath(log) === target)
+  ) {
     throw new ConfigError(`${out} is inside .inwards/ or is a run log; export to another file.`);
   }
-  const hash = redact ? keyedHash(redact.project) : undefined;
+  const hash = redact ? keyedHash(io.exports.exportKey(redact.project)) : undefined;
   const lines = logs
-    .flatMap(readKnownLines)
+    .flatMap((log) => readKnownLines(io, log))
     .sort((a, b) => Date.parse(String(a["at"])) - Date.parse(String(b["at"])))
     .map((line) => (hash ? redactLine(line, hash) : line));
-  writeFileSync(out, lines.map((line) => `${JSON.stringify(line)}\n`).join(""), {
-    mode: OWNER_ONLY,
-  });
+  io.exports.writeOwnerOnly(out, lines.map((line) => `${JSON.stringify(line)}\n`).join(""));
   return lines.length;
 }
 
 /**
  * Reads a log file's lines that `stats` would read, keeping known fields only.
  *
+ * @param io - reads the file.
  * @param path - the log file.
  * @returns the lines, or none when the file doesn't exist.
  */
-function readKnownLines(path: string): Record<string, unknown>[] {
+function readKnownLines(io: Pick<ExportIo, "read">, path: string): Record<string, unknown>[] {
   let text = "";
   try {
-    text = readFileSync(path, "utf8");
+    text = io.read.text(path);
   } catch {
     return []; // no such file: nothing logged there
   }
@@ -154,66 +163,12 @@ function strings(value: unknown): string[] {
 }
 
 /**
- * Makes the keyed hash from the project's key, creating the key on first use.
+ * Makes the keyed hash from the project's export key.
  *
- * @param project - the project root.
+ * @param key - the project's export key.
  * @returns text to a 16-hex-digit HMAC-SHA256.
- * @throws {ConfigError} when `.inwards` or the key is a symlink, or the key is malformed.
  */
-function keyedHash(project: string): (text: string) => string {
-  const dir = join(project, ".inwards");
-  if (lstatSync(dir, { throwIfNoEntry: false })?.isSymbolicLink()) {
-    throw new ConfigError(`${dir} is a symlink; the export key must stay in the project.`);
-  }
-  const key = readKey(join(dir, "export-key")) ?? createKey(dir);
+function keyedHash(key: string): (text: string) => string {
   return (text: string): string =>
     createHmac("sha256", key).update(text).digest("hex").slice(0, HASH_LENGTH);
-}
-
-/**
- * Reads the key without following a symlink.
- *
- * @param path - the key file.
- * @returns the key, or undefined when there is none yet.
- * @throws {ConfigError} when the file isn't 64 hex digits.
- */
-function readKey(path: string): string | undefined {
-  if (lstatSync(path, { throwIfNoEntry: false }) === undefined) {
-    return undefined;
-  }
-  let fd: number;
-  try {
-    // biome-ignore lint/suspicious/noBitwiseOperators: open(2) flags are a bit set.
-    fd = openSync(path, constants.O_RDONLY | NO_FOLLOW);
-  } catch (err) {
-    throw new ConfigError(`${path} can't be read safely (a symlink?).`, { cause: err });
-  }
-  try {
-    const key = readFileSync(fd, "utf8").trim();
-    if (!KEY_FORMAT.test(key)) {
-      throw new ConfigError(
-        `${path} isn't an export key (64 hex digits). Delete it to make a new one.`,
-      );
-    }
-    return key;
-  } finally {
-    closeSync(fd);
-  }
-}
-
-/**
- * Creates the key, or reads the one a concurrent export just created.
- *
- * @param dir - the project's `.inwards/`.
- * @returns the key.
- */
-function createKey(dir: string): string {
-  const path = join(dir, "export-key");
-  const key = randomBytes(KEY_BYTES).toString("hex");
-  try {
-    writeFileSync(path, `${key}\n`, { mode: OWNER_ONLY, flag: "wx" });
-    return key;
-  } catch {
-    return readKey(path) ?? key; // another export won the race: use its key
-  }
 }

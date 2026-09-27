@@ -8,16 +8,14 @@
  * Claude Code reloads hooks when a settings file changes, so an agent that
  * deletes the Stop hook switches the gate off at once; this check can't see
  * that. It catches the hooks the gate depends on (SessionStart, PreToolUse,
- * PostToolUse) going missing, and the config guard (`guard.ts`) is what stops
+ * PostToolUse) going missing, and the config guard (`config-guard.ts`) is what stops
  * the edit itself.
  * It matches names, not programs: an entry that runs some other `inwards`
  * binary or `main.ts` passes, so it proves the configuration, not what runs.
  */
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import process from "node:process";
 import { isRecord } from "../json/guards.ts";
+import type { FileReader, Runtime } from "../platform/contracts.ts";
 
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
@@ -63,16 +61,21 @@ export function isOurHook(entry: unknown): boolean {
 /**
  * Checks that the hooks Inwards relies on are still on, across every layer.
  *
+ * @param io - reads the settings files and knows where the user's live.
+ * @param io.read - reads a settings file.
+ * @param io.runtime - `CLAUDE_CONFIG_DIR` and the home directory.
  * @param project - the project root.
  * @returns what is wrong, or undefined when the hooks are in place.
  */
-export function settingsProblem(project: string): string | undefined {
-  const userDir = process.env["CLAUDE_CONFIG_DIR"] || join(homedir(), ".claude");
+export function settingsProblem(
+  io: { read: Pick<FileReader, "text">; runtime: Pick<Runtime, "claudeConfigDir" | "home"> },
+  project: string,
+): string | undefined {
   const layers = [
-    join(userDir, "settings.json"),
+    join(userSettingsDir(io.runtime), "settings.json"),
     join(project, ".claude", "settings.json"),
     join(project, ".claude", "settings.local.json"),
-  ].map(readSettings);
+  ].map((path) => readSettings(io.read, path));
   // The highest layer that sets disableAllHooks decides, as in Claude Code.
   const disabled = layers
     .map((s) => s?.["disableAllHooks"])
@@ -188,14 +191,28 @@ function matches(group: unknown, tool: string): boolean {
 /**
  * Reads one settings file.
  *
+ * @param read - reads the file.
  * @param path - a settings.json path.
  * @returns the parsed object, or undefined when missing or not a JSON object.
  */
-function readSettings(path: string): Record<string, unknown> | undefined {
+function readSettings(
+  read: Pick<FileReader, "text">,
+  path: string,
+): Record<string, unknown> | undefined {
   try {
-    const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+    const value: unknown = JSON.parse(read.text(path));
     return isRecord(value) ? value : undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Where the user's Claude Code settings live: `$CLAUDE_CONFIG_DIR`, else `~/.claude`.
+ *
+ * @param runtime - the environment.
+ * @returns the directory.
+ */
+export function userSettingsDir(runtime: Pick<Runtime, "claudeConfigDir" | "home">): string {
+  return runtime.claudeConfigDir ?? join(runtime.home, ".claude");
 }

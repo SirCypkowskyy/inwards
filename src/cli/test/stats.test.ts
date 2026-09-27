@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { nodeFileReader } from "../src/adapters/filesystem.ts";
 import { readRunLogs } from "../src/runlog/runs.ts";
 import { computeStats, type Stats } from "../src/runlog/stats.ts";
 import { inwards, LAYERS, project } from "./run.ts";
@@ -31,14 +32,14 @@ const EXPECTED: Stats = {
 
 describe("inwards stats", () => {
   test("the numbers match the hand-computed log", () => {
-    const { lines, skipped } = readRunLogs([withLog(LOG)]);
+    const { lines, skipped } = readRunLogs(nodeFileReader, [withLog(LOG)]);
     expect(computeStats(lines, skipped)).toEqual(EXPECTED);
   });
 
   test("the rotated file is read first, so order holds across rotation", () => {
     const root = withLog(LOG.slice(4));
     writeFileSync(join(root, ".inwards/runs.1.jsonl"), `${LOG.slice(0, 4).join("\n")}\n`);
-    const { lines, skipped } = readRunLogs([root]);
+    const { lines, skipped } = readRunLogs(nodeFileReader, [root]);
     expect(computeStats(lines, skipped)).toEqual(EXPECTED);
   });
 

@@ -4,6 +4,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { nodeFileReader } from "../src/adapters/filesystem.ts";
 import { readRunLogs } from "../src/runlog/runs.ts";
 import { computeStats, type Stats } from "../src/runlog/stats.ts";
 import { LAYERS, project } from "./run.ts";
@@ -73,7 +74,7 @@ export function withLog(lines: string[]): string {
  * @returns the numbers.
  */
 export function statsOf(lines: string[]): Stats {
-  const { lines: parsed, skipped } = readRunLogs([withLog(lines)]);
+  const { lines: parsed, skipped } = readRunLogs(nodeFileReader, [withLog(lines)]);
   return computeStats(parsed, skipped);
 }
 

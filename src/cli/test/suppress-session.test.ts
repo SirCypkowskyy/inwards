@@ -7,7 +7,8 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { appendFileSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { startText, unchangedFiles } from "../src/session/old-errors.ts";
+import { nodeGit } from "../src/adapters/git.ts";
+import { createStartContent } from "../src/session/start-content.ts";
 import { inwards, payload, project } from "./run.ts";
 import { git, ID, put, session, stop } from "./stop-helpers.ts";
 import {
@@ -174,11 +175,15 @@ describe("the unchanged-file check", () => {
       ["a.py", a],
       ["b.py", b],
     ];
-    const same = unchangedFiles({ manifest }, files, read);
+    const same = createStartContent({ git: nodeGit, read: { bytes: read } }).unchangedFiles(
+      { manifest },
+      files,
+    );
     expect(reads).toEqual([a, b]);
     expect([...same]).toEqual(["a.py"]);
     writeFileSync(a, "changed\n");
-    expect(unchangedFiles({ manifest }, [["a.py", a]], read).size).toBe(0);
+    const again = createStartContent({ git: nodeGit, read: { bytes: read } });
+    expect(again.unchangedFiles({ manifest }, [["a.py", a]]).size).toBe(0);
   });
 
   test("asks git for each start content once, a failed lookup included", () => {
@@ -190,22 +195,23 @@ describe("the unchanged-file check", () => {
     const start = { head: "0123456789abcdef", manifest };
     const specs: string[] = [];
     /**
-     * Stands in for `git cat-file blob` and records each call.
+     * Stands in for `git cat-file blob` and records each blob asked for.
      *
-     * @param _project - the project root (unused).
-     * @param spec - the blob asked for.
+     * @param _dir - the project root (unused).
+     * @param args - the git arguments; the last is the blob spec.
      * @returns the committed content, which the dirty file no longer has.
      */
-    function blob(_project: string, spec: string): string {
-      specs.push(spec);
+    function run(_dir: string, args: string[]): string {
+      specs.push(args.at(-1) ?? "");
       return text;
     }
+    const content = createStartContent({ git: { run }, read: { bytes: readFileSync } });
     for (let i = 0; i < 3; i += 1) {
-      expect(startText("/p", start, "clean.py", blob)).toBe(text);
-      expect(startText("/p", start, "dirty.py", blob)).toBeUndefined();
+      expect(content.startText("/p", start, "clean.py")).toBe(text);
+      expect(content.startText("/p", start, "dirty.py")).toBeUndefined();
     }
     expect(specs).toEqual(["0123456789abcdef:./clean.py", "0123456789abcdef:./dirty.py"]);
-    expect(startText("/p", start, "new.py", blob)).toBeUndefined();
+    expect(content.startText("/p", start, "new.py")).toBeUndefined();
     expect(specs).toHaveLength(2);
   });
 });

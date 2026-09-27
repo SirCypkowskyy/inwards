@@ -3,18 +3,15 @@
  * tree annotated with each layer and what it may import, then the result of
  * a check run in process, then what to try next.
  */
-import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import process from "node:process";
-import { isDir } from "../adapters/filesystem.ts";
-import { print } from "../adapters/stdio.ts";
 import { posix } from "../paths/lexical.ts";
-import { runCheck } from "../project/check.ts";
-import { AGENTS, type InitPlan } from "./contracts.ts";
+import type { PathProbe } from "../platform/contracts.ts";
+import { print } from "../platform/print.ts";
+import { AGENTS, type InitContext, type InitPlan } from "./contracts.ts";
 import { drawTree, MISSING, type Style } from "./styles.ts";
 
 /** A project init has just configured: its pyproject.toml, the preset, the package and the config root. */
-interface Setup {
+export interface Setup {
   configPath: string;
   style: Style;
   pkg: string;
@@ -24,15 +21,18 @@ interface Setup {
 /**
  * Prints what was set up: the annotated tree, the check's result, and what to run next.
  *
+ * @param ctx - prints, looks at the tree, and runs the check.
  * @param setup - the pyproject.toml just written, the preset, the package and the config root.
  * @param plan - what was chosen, for the next steps.
  * @returns 0.
+ * @throws {ConfigError} when the check can't run on the new config.
  */
-export async function report(setup: Setup, plan: InitPlan): Promise<number> {
+export async function report(ctx: InitContext, setup: Setup, plan: InitPlan): Promise<number> {
   const { configPath, style, pkg } = setup;
-  const tree = annotatedTree(setup);
-  print(`\n${tree}`, 0);
-  const result = await runCheck(configPath, undefined, process.cwd(), { baseline: false });
+  const { streams } = ctx.io;
+  const tree = annotatedTree(ctx.io.probe, setup);
+  print(streams, `\n${tree}`, 0);
+  const result = await ctx.check(configPath, undefined, ctx.io.runtime.cwd, { baseline: false });
   const errors = result.diagnostics.filter((d) => d.severity === "error").length;
   const warnings = result.diagnostics.length - errors;
   const missing = tree.includes(MISSING)
@@ -40,6 +40,7 @@ export async function report(setup: Setup, plan: InitPlan): Promise<number> {
     : "";
   const more = errors + warnings > 0 ? ` Run \`inwards check\` to see them.${missing}` : "";
   print(
+    streams,
     `\ninwards check: ${plural(errors, "violation")}, ${plural(warnings, "warning")}.${more}`,
     0,
   );
@@ -49,7 +50,7 @@ export async function report(setup: Setup, plan: InitPlan): Promise<number> {
     plan.agent === undefined ? `Wire an agent: inwards init --agent ${AGENTS.join("|")}` : "",
   ].filter((line) => line !== "");
   if (next.length > 0) {
-    print(`\n${next.join("\n")}`, 0);
+    print(streams, `\n${next.join("\n")}`, 0);
   }
   return 0;
 }
@@ -70,18 +71,19 @@ function plural(n: number, word: string): string {
  * what it may import, e.g. `├── domain/   domain: imports no other layer`.
  * A layer module missing on disk is marked, since its prefix matches nothing.
  *
+ * @param probe - tells what is on disk.
  * @param setup - the pyproject.toml, the preset, the package and the config root.
  * @returns the tree, headed by the package's path relative to the project.
  */
-function annotatedTree(setup: Setup): string {
+function annotatedTree(probe: Pick<PathProbe, "kind" | "exists">, setup: Setup): string {
   const { style, pkg, root } = setup;
   const project = dirname(setup.configPath);
   const base = resolve(project, root, ...pkg.split("."));
   return drawTree(style, `${posix(relative(project, base))}/  (${style.name})`, (parts) => {
     const path = join(base, ...parts);
-    if (isDir(path)) {
+    if (probe.kind(path) === "dir") {
       return "dir";
     }
-    return existsSync(`${path}.py`) ? "file" : "missing";
+    return probe.exists(`${path}.py`) ? "file" : "missing";
   });
 }

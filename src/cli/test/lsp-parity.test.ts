@@ -3,8 +3,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Engine, type ProjectIndex, parseConfig } from "@inwards/core";
 import { projectFiles } from "../../vscode-extension/src/workspace.ts";
+import { nodePlatform, nodeProjectIo } from "../src/adapters/compose.ts";
 import { loadGrammars } from "../src/adapters/grammars.ts";
 import { indexProject } from "../src/project/check.ts";
+
+const IO = nodeProjectIo(nodePlatform());
 
 // #44: the CLI and the language server build the engine's module index from
 // their own file walks; on the examples both must give the same answers.
@@ -27,7 +30,7 @@ for (const configPath of [
   join(REPO, "examples/broken-app/pyproject.toml"),
 ]) {
   test(`the CLI and the language server index ${configPath.slice(REPO.length + 1)} alike`, async () => {
-    const cli = await indexProject(configPath);
+    const cli = await indexProject(IO, configPath);
     const lsp = await lspIndex(configPath);
     const modules = [...cli.modules].sort();
     expect(modules.length).toBeGreaterThan(0);

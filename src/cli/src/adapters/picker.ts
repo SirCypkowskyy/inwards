@@ -9,6 +9,7 @@ import {
   type Agent,
   type InitFlags,
   type InitPlan,
+  type Picker,
   type Target,
 } from "../init/contracts.ts";
 import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "../init/styles.ts";
@@ -27,7 +28,7 @@ const AGENT_HINTS: Readonly<Record<Agent, string>> = {
  * @param flags - the options given with the picker (`--scaffold`, `--package`, `--dry-run`).
  * @returns the plan, or undefined when the user cancelled (after saying so).
  */
-export async function pick(target: Target, flags: InitFlags): Promise<InitPlan | undefined> {
+async function pick(target: Target, flags: InitFlags): Promise<InitPlan | undefined> {
   // Loaded here, never at start-up: only this path pays for the prompt library.
   const clack = await import("@clack/prompts");
   clack.intro("inwards init");
@@ -125,3 +126,6 @@ function equivalentCommand(plan: InitPlan, flags: InitFlags): string {
     .filter((part) => part !== "")
     .join(" ");
 }
+
+/** The picker behind the `Picker` contract. */
+export const terminalPicker: Picker = { pick };

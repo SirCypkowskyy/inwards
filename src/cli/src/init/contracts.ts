@@ -7,6 +7,8 @@
  * parts (planning, target discovery, the picker, the report) depend on this
  * contract instead of on each other. Pure: no I/O.
  */
+import type { Platform } from "../platform/contracts.ts";
+import type { CheckRunner } from "../session/contracts.ts";
 import type { StyleName } from "./styles.ts";
 
 /** The agents `inwards init --agent` can wire Inwards into. */
@@ -57,4 +59,53 @@ export interface Target {
   configured: boolean;
   /** The import package: `--package`, or `[project].name` normalised; undefined when neither is set. */
   pkg: string | undefined;
+}
+
+/** Writing what init planned (see `adapters/init-files.ts`). */
+export interface InitFiles {
+  /**
+   * Writes one file, creating its directory: the agent wiring init edits in place.
+   *
+   * @param path - the file.
+   * @param text - its new content.
+   * @throws when it can't be written.
+   */
+  write: (path: string, text: string) => void;
+  /**
+   * Writes the scaffold's files without replacing anything, pyproject.toml
+   * last, and removes what this run created if any write fails.
+   *
+   * @param files - the files to create.
+   * @param config - the pyproject.toml change, written last.
+   * @returns undefined on success, or which file failed and why.
+   */
+  writeAll: (files: readonly Change[], config: Change) => string | undefined;
+}
+
+/** The interactive style picker (see `adapters/picker.ts`). */
+export interface Picker {
+  /**
+   * Asks for a style, whether to scaffold, and an agent.
+   *
+   * @param target - the project found from the cwd.
+   * @param flags - the options given so far.
+   * @returns the plan, or undefined when the user cancels.
+   */
+  pick: (target: Target, flags: InitFlags) => Promise<InitPlan | undefined>;
+}
+
+/** What `inwards init` needs besides the platform. */
+export interface InitDeps {
+  files: InitFiles;
+  picker: Picker;
+  /** Absolute path of the CLI's `main.ts`, for running Inwards from source under Bun. */
+  entry: string;
+}
+
+/** Everything an init function is given. */
+export interface InitContext {
+  io: Platform;
+  /** Runs a check with its I/O bound, for the report after writing. */
+  check: CheckRunner;
+  init: InitDeps;
 }

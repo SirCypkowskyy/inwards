@@ -2,14 +2,19 @@
  * Finding the project `inwards init --style` works on: the nearest
  * pyproject.toml, its import package, and whether it uses a src layout.
  */
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import process from "node:process";
 import { inwardsTable } from "@inwards/core";
-import { isDir } from "../adapters/filesystem.ts";
 import { isRecord } from "../json/guards.ts";
 import { posix } from "../paths/lexical.ts";
+import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
 import type { Target } from "./contracts.ts";
+
+/** What finding the target reads. */
+interface TargetIo {
+  probe: Pick<PathProbe, "exists" | "kind" | "isLink">;
+  read: Pick<FileReader, "text" | "list">;
+  runtime: Pick<Runtime, "cwd">;
+}
 
 const PACKAGE_NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/u;
 const NAME_SEPARATORS = /[-_.]+/gu;
@@ -22,19 +27,21 @@ const KEYWORDS: ReadonlySet<string> = new Set(
 /**
  * Finds the nearest pyproject.toml above the cwd and reads what init needs.
  *
+ * @param io - probes and reads files, and knows the cwd.
  * @param pkgFlag - `--package`, if given.
  * @returns the target, or an error message.
+ * @throws when the pyproject.toml exists but can't be read.
  */
-export function findTarget(pkgFlag: string | undefined): Target | string {
-  let dir = process.cwd();
-  while (!existsSync(join(dir, "pyproject.toml"))) {
+export function findTarget(io: TargetIo, pkgFlag: string | undefined): Target | string {
+  let dir = io.runtime.cwd;
+  while (!io.probe.exists(join(dir, "pyproject.toml"))) {
     if (dirname(dir) === dir) {
       return "no pyproject.toml here or above. Create the project first, e.g. `uv init --package app`.";
     }
     dir = dirname(dir);
   }
   const path = join(dir, "pyproject.toml");
-  const text = readFileSync(path, "utf8");
+  const text = io.read.text(path);
   const table = inwardsTable(text);
   if (table === null) {
     return `${path} is not valid TOML; fix it first.`;
@@ -90,21 +97,23 @@ function isPackageName(name: string): boolean {
 /**
  * Says that init can't tell the import package.
  *
+ * @param cwd - the working directory.
  * @param path - the pyproject.toml.
  * @returns the message.
  */
-export function noPackage(path: string): string {
-  return `inwards init: ${shown(path)} has no usable [project].name; name the import package with --package.`;
+export function noPackage(cwd: string, path: string): string {
+  return `inwards init: ${shown(cwd, path)} has no usable [project].name; name the import package with --package.`;
 }
 
 /**
  * Shows a path relative to the cwd, with forward slashes, as the rest of the output does.
  *
+ * @param cwd - the working directory.
  * @param path - an absolute path.
  * @returns the relative path, e.g. `pyproject.toml` or `../pyproject.toml`.
  */
-export function shown(path: string): string {
-  return posix(relative(process.cwd(), path));
+export function shown(cwd: string, path: string): string {
+  return posix(relative(cwd, path));
 }
 
 /**
@@ -113,20 +122,27 @@ export function shown(path: string): string {
  * module root is `src`) or `src/` already holds Python code; an unrelated
  * `src/` (a frontend, say) doesn't count.
  *
+ * @param io - looks at the directories.
  * @param project - the project directory.
  * @param pkg - the import package.
  * @param text - the pyproject.toml text, for the build backend.
  * @returns `src` or `.`.
+ * @throws when `src/` is a directory that can't be listed.
  */
-export function sourceRoot(project: string, pkg: string, text: string): string {
+export function sourceRoot(
+  io: Pick<TargetIo, "probe" | "read">,
+  project: string,
+  pkg: string,
+  text: string,
+): string {
   const rel = pkg.replaceAll(".", "/");
-  if (isDir(join(project, "src", rel))) {
+  if (io.probe.kind(join(project, "src", rel)) === "dir") {
     return "src";
   }
-  if (isDir(join(project, rel))) {
+  if (io.probe.kind(join(project, rel)) === "dir") {
     return ".";
   }
-  return usesUvBuild(text) || holdsPython(join(project, "src")) ? "src" : ".";
+  return usesUvBuild(text) || holdsPython(io, join(project, "src")) ? "src" : ".";
 }
 
 /**
@@ -145,17 +161,14 @@ function usesUvBuild(text: string): boolean {
  * Tells whether a directory holds Python code at its top level: a `.py` file
  * or a package (a directory with `__init__.py`).
  *
+ * @param io - lists the directory and looks for `__init__.py`.
  * @param dir - the directory.
  * @returns false when it is missing or holds no Python.
  */
-function holdsPython(dir: string): boolean {
-  if (!isDir(dir)) {
-    return false;
-  }
-  return readdirSync(dir, { withFileTypes: true }).some(
+function holdsPython(io: Pick<TargetIo, "probe" | "read">, dir: string): boolean {
+  return (io.read.list(dir) ?? []).some(
     (entry) =>
-      (entry.isFile() && entry.name.endsWith(".py")) ||
-      (entry.isDirectory() &&
-        lstatSync(join(dir, entry.name, "__init__.py"), { throwIfNoEntry: false }) !== undefined),
+      (entry.file && entry.name.endsWith(".py")) ||
+      (entry.dir && io.probe.isLink(join(dir, entry.name, "__init__.py")) !== undefined),
   );
 }

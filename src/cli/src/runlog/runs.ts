@@ -4,8 +4,8 @@
  * in the project, since the hooks log at the project root and `check` next
  * to its config.
  */
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { FileReader } from "../platform/contracts.ts";
 
 const LINE_BREAK = /\r?\n/u;
 
@@ -30,15 +30,19 @@ export interface RunLine {
  * Reads the run logs of a project and its packages, merged in time order.
  * Each directory's rotated file comes first, so its lines stay in order.
  *
+ * @param read - reads the log files.
  * @param dirs - directories that may hold `.inwards/` (the project root and each config's).
  * @returns the readable lines, and how many weren't.
  */
-export function readRunLogs(dirs: readonly string[]): { lines: RunLine[]; skipped: number } {
+export function readRunLogs(
+  read: Pick<FileReader, "text">,
+  dirs: readonly string[],
+): { lines: RunLine[]; skipped: number } {
   const lines: RunLine[] = [];
   let skipped = 0;
   for (const dir of new Set(dirs)) {
     for (const name of ["runs.1.jsonl", "runs.jsonl"]) {
-      for (const raw of readLines(join(dir, ".inwards", name))) {
+      for (const raw of readLines(read, join(dir, ".inwards", name))) {
         const line = parseLine(raw);
         if (line === undefined) {
           skipped += 1;
@@ -55,12 +59,14 @@ export function readRunLogs(dirs: readonly string[]): { lines: RunLine[]; skippe
 /**
  * Reads a log file's non-empty lines.
  *
+ * @param read - reads the file.
  * @param path - the log file.
  * @returns its lines, or none when it doesn't exist.
  */
-function readLines(path: string): string[] {
+function readLines(read: Pick<FileReader, "text">, path: string): string[] {
   try {
-    return readFileSync(path, "utf8")
+    return read
+      .text(path)
       .split(LINE_BREAK)
       .filter((raw) => raw.trim() !== "");
   } catch {

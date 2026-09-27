@@ -1,13 +1,13 @@
 /**
- * Writing what `inwards init --style` planned without touching anything it
- * shouldn't: a scaffold file never replaces an existing entry (a dangling
- * symlink included) and never lands outside the project through a symlinked
- * directory, and a failed write removes what this run created, so the
- * project is as it was and init can run again.
+ * Planning what `inwards init --style --scaffold` creates without touching
+ * anything it shouldn't: a scaffold file never replaces an existing entry (a
+ * dangling symlink included) and never lands outside the project through a
+ * symlinked directory. Writing the plan, with rollback, is the `InitFiles`
+ * contract's job (`adapters/init-files.ts`).
  */
-import { lstatSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { isInside, realpath } from "../paths/lexical.ts";
+import { isInside } from "../paths/lexical.ts";
+import type { PathProbe } from "../platform/contracts.ts";
 import type { Change } from "./contracts.ts";
 import { type Style, scaffoldFiles } from "./styles.ts";
 
@@ -24,27 +24,28 @@ interface ScaffoldPlan {
  * other existing entry, a symlink even when it dangles, is refused, and so
  * is a file whose nearest existing directory resolves outside the project.
  *
+ * @param probe - looks at what is already there.
  * @param project - the project directory.
- * @param style - the preset.
- * @param pkg - the import package.
- * @param root - the config root.
+ * @param preset - what to scaffold.
+ * @param preset.style - the preset.
+ * @param preset.pkg - the import package.
+ * @param preset.root - the config root.
  * @returns the files to create and the refused paths.
  */
 export function planScaffold(
+  probe: Pick<PathProbe, "realpath" | "isLink" | "kind">,
   project: string,
-  style: Style,
-  pkg: string,
-  root: string,
+  { style, pkg, root }: { style: Style; pkg: string; root: string },
 ): ScaffoldPlan {
-  const realProject = realpath(project) ?? project;
+  const realProject = probe.realpath(project) ?? project;
   const plan: ScaffoldPlan = { files: [], refused: [] };
   for (const [rel, after] of scaffoldFiles(style, pkg, root)) {
     const path = join(project, ...rel.split("/"));
-    const entry = entryAt(path);
+    const entry = entryAt(probe, path);
     if (entry === "keep" && rel.endsWith("/__init__.py")) {
       continue;
     }
-    if (entry !== undefined || !landsInside(realProject, dirname(path))) {
+    if (entry !== undefined || !landsInside(probe, realProject, dirname(path))) {
       plan.refused.push(path);
     } else {
       plan.files.push({ path, before: undefined, after });
@@ -56,19 +57,21 @@ export function planScaffold(
 /**
  * Tells what is at a path without following a symlink there.
  *
+ * @param probe - looks at the path.
  * @param path - the path to look at.
- * @returns undefined when nothing is there, "keep" for a regular file, "other" for anything else.
+ * @returns undefined when nothing can be looked at there (a parent that is a
+ *   file is caught by `landsInside`), "keep" for a regular file, "other" for
+ *   anything else, a symlink included.
  */
-function entryAt(path: string): "keep" | "other" | undefined {
-  try {
-    const entry = lstatSync(path, { throwIfNoEntry: false });
-    if (entry === undefined) {
-      return undefined;
-    }
-    return entry.isFile() ? "keep" : "other";
-  } catch {
-    return "other"; // e.g. ENOTDIR: a parent is a file.
+function entryAt(
+  probe: Pick<PathProbe, "isLink" | "kind">,
+  path: string,
+): "keep" | "other" | undefined {
+  const link = probe.isLink(path);
+  if (link === undefined) {
+    return undefined;
   }
+  return !link && probe.kind(path) === "file" ? "keep" : "other";
 }
 
 /**
@@ -76,62 +79,27 @@ function entryAt(path: string): "keep" | "other" | undefined {
  * directory's nearest existing ancestor (itself included) must resolve, with
  * symlinks followed, to a directory inside the project or to the project.
  *
+ * @param probe - resolves and looks at the directories.
  * @param realProject - the project directory with symlinks resolved.
  * @param dir - where a file would be created.
  * @returns false for a dangling symlink, a file in the way, or a path outside.
  */
-function landsInside(realProject: string, dir: string): boolean {
+function landsInside(
+  probe: Pick<PathProbe, "realpath" | "isLink" | "kind">,
+  realProject: string,
+  dir: string,
+): boolean {
   for (let d = dir; ; d = dirname(d)) {
-    if (lstatSync(d, { throwIfNoEntry: false }) !== undefined) {
-      const real = realpath(d);
+    if (probe.isLink(d) !== undefined) {
+      const real = probe.realpath(d);
       return (
         real !== undefined &&
         (real === realProject || isInside(realProject, real)) &&
-        statSync(real).isDirectory()
+        probe.kind(real) === "dir"
       );
     }
     if (dirname(d) === d) {
       return false;
     }
-  }
-}
-
-/**
- * Writes the scaffold's files, each with `wx` so nothing existing is
- * replaced, and pyproject.toml last. If any write fails, the files and
- * directories this run created are removed, and pyproject.toml is untouched
- * unless its own write was the one that failed.
- *
- * @param files - the files to create.
- * @param config - the pyproject.toml change, written last.
- * @returns undefined on success, or which file failed and why.
- */
-export function writeAll(files: readonly Change[], config: Change): string | undefined {
-  const created: string[] = [];
-  const dirs: string[] = [];
-  let current = config.path;
-  try {
-    for (const file of files) {
-      current = file.path;
-      const made = mkdirSync(dirname(file.path), { recursive: true });
-      if (made !== undefined) {
-        dirs.push(made);
-      }
-      writeFileSync(file.path, file.after, { flag: "wx" });
-      created.push(file.path);
-    }
-    current = config.path;
-    writeFileSync(config.path, config.after);
-    return undefined;
-  } catch (err) {
-    for (const path of [...created].reverse()) {
-      rmSync(path, { force: true });
-    }
-    // Each is the first directory one mkdir created: everything below it is this run's.
-    for (const dir of [...dirs].reverse()) {
-      rmSync(dir, { recursive: true, force: true });
-    }
-    const reason = err instanceof Error ? err.message : String(err);
-    return `${current}: ${reason}`;
   }
 }

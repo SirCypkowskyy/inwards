@@ -1,19 +1,26 @@
+/**
+ * `inwards init`: the setup wizard's entry point. It sorts out the flags
+ * (`--list-styles`, `--style`, `--agent`, `--scaffold`, `--package`), asks
+ * with the picker on a terminal when nothing was chosen, then writes a
+ * preset's `[tool.inwards]`, the example scaffold and an agent's wiring, and
+ * prints the annotated tree with a check's result. Everything it touches
+ * comes in through the `InitContext`; it refuses rather than overwrites.
+ */
 import { dirname } from "node:path";
-import process from "node:process";
 import { parseConfig, VERSION } from "@inwards/core";
-import { pick } from "../adapters/picker.ts";
-import { print } from "../adapters/stdio.ts";
+import { print } from "../platform/print.ts";
 import { agentChanges, apply, DEFAULT_IGNORE, initCommand, PRERELEASE } from "./agents.ts";
 import {
   AGENTS,
   type Change,
+  type InitContext,
   type InitFlags,
   type InitPlan,
   isAgent,
   type Target,
 } from "./contracts.ts";
-import { report } from "./report.ts";
-import { planScaffold, writeAll } from "./scaffold.ts";
+import { report, type Setup } from "./report.ts";
+import { planScaffold } from "./scaffold.ts";
 import {
   configTable,
   describeStyles,
@@ -34,35 +41,50 @@ const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--pac
  * picker (no `--style` and no `--agent`, on a terminal), `--style` with or
  * without `--agent`, or `--agent` alone exactly as before.
  *
+ * @param ctx - the platform, the check runner and init's writer and picker.
  * @param paths - positionals after `init`; there must be none.
  * @param flags - the parsed options.
  * @param usage - the CLI's usage text, for a bad `--agent`.
  * @returns the exit code: 0 done, 2 for a usage error or something init won't overwrite.
  */
-export async function initMain(paths: string[], flags: InitFlags, usage: string): Promise<number> {
+export async function initMain(
+  ctx: InitContext,
+  paths: string[],
+  flags: InitFlags,
+  usage: string,
+): Promise<number> {
   const dryRun = flags["dry-run"] === true;
   if (paths.length > 0) {
-    return print(usage, 2);
+    return print(ctx.io.streams, usage, 2);
   }
   if (flags["list-styles"] === true) {
-    return print(describeStyles(flags.package ?? "<package>"), 0);
+    return print(ctx.io.streams, describeStyles(flags.package ?? "<package>"), 0);
   }
   if (flags.agent !== undefined && !isAgent(flags.agent)) {
-    return print(`${usage}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
+    return print(ctx.io.streams, `${usage}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
   }
   if (flags.style !== undefined && !isStyle(flags.style)) {
-    return print(`inwards init: --style must be one of: ${STYLE_NAMES.join(", ")}`, 2);
+    return print(
+      ctx.io.streams,
+      `inwards init: --style must be one of: ${STYLE_NAMES.join(", ")}`,
+      2,
+    );
   }
   const { agent, style } = flags;
   if (style === undefined && agent !== undefined) {
     return flags.scaffold === true || flags.package !== undefined
-      ? print("inwards init: --scaffold and --package need --style.", 2)
-      : initCommand(agent, dryRun);
+      ? print(ctx.io.streams, "inwards init: --scaffold and --package need --style.", 2)
+      : initCommand(ctx, agent, dryRun);
   }
   if (style !== undefined) {
-    return await styleCommand({ style, scaffold: flags.scaffold === true, agent }, flags, dryRun);
+    return await styleCommand(
+      ctx,
+      { style, scaffold: flags.scaffold === true, agent },
+      flags,
+      dryRun,
+    );
   }
-  return await interactive(flags, dryRun);
+  return await interactive(ctx, flags, dryRun);
 }
 
 /**
@@ -71,34 +93,36 @@ export async function initMain(paths: string[], flags: InitFlags, usage: string)
  * 2 at once with the flags and the styles. The prompt library is imported
  * only here, so no other command pays for loading it.
  *
+ * @param ctx - the platform, the check runner and init's writer and picker.
  * @param flags - the parsed options (`--scaffold`, `--package`).
  * @param dryRun - `--dry-run`.
  * @returns the exit code of the chosen init, or 2.
  */
-async function interactive(flags: InitFlags, dryRun: boolean): Promise<number> {
-  const terminal =
-    process.stdin.isTTY === true && process.stdout.isTTY === true && !process.env["CI"];
+async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean): Promise<number> {
+  const { runtime } = ctx.io;
+  const terminal = runtime.stdinIsTTY && runtime.stdoutIsTTY && !runtime.ci;
   if (!terminal) {
     return print(
+      ctx.io.streams,
       `inwards init: choose what to set up; there is no terminal to ask in.\n${HOW}\n\n${describeStyles(flags.package ?? "<package>")}`,
       2,
     );
   }
-  const target = findTarget(flags.package);
+  const target = findTarget(ctx.io, flags.package);
   if (typeof target === "string") {
-    return print(`inwards init: ${target}`, 2);
+    return print(ctx.io.streams, `inwards init: ${target}`, 2);
   }
   if (!target.configured && target.pkg === undefined) {
-    return print(noPackage(target.path), 2);
+    return print(ctx.io.streams, noPackage(ctx.io.runtime.cwd, target.path), 2);
   }
-  const plan = await pick(target, flags);
+  const plan = await ctx.init.picker.pick(target, flags);
   if (plan === undefined) {
     return 2;
   }
   if (plan.style === undefined) {
-    return plan.agent === undefined ? 0 : initCommand(plan.agent, dryRun);
+    return plan.agent === undefined ? 0 : initCommand(ctx, plan.agent, dryRun);
   }
-  return await styleCommand({ ...plan, style: plan.style }, flags, dryRun);
+  return await styleCommand(ctx, { ...plan, style: plan.style }, flags, dryRun);
 }
 
 /**
@@ -107,6 +131,7 @@ async function interactive(flags: InitFlags, dryRun: boolean): Promise<number> {
  * result of a check. Refuses (exit 2, nothing written) when the table exists
  * or a file it would create is already there.
  *
+ * @param ctx - the platform, the check runner and init's writer and picker.
  * @param plan - the style, whether to scaffold, and the agent.
  * @param plan.style - the preset.
  * @param flags - `--package`.
@@ -114,51 +139,58 @@ async function interactive(flags: InitFlags, dryRun: boolean): Promise<number> {
  * @returns 0 once written (or printed), 2 when init would overwrite something.
  */
 async function styleCommand(
+  ctx: InitContext,
   plan: InitPlan & { style: StyleName },
   flags: InitFlags,
   dryRun: boolean,
 ): Promise<number> {
-  const target = findTarget(flags.package);
+  const target = findTarget(ctx.io, flags.package);
   if (typeof target === "string") {
-    return print(`inwards init: ${target}`, 2);
+    return print(ctx.io.streams, `inwards init: ${target}`, 2);
   }
   if (target.configured) {
     return print(
-      `inwards init: ${shown(target.path)} already has [tool.inwards]; --style never rewrites layers. To wire an agent, run \`inwards init --agent ${AGENTS.join("|")}\`.`,
+      ctx.io.streams,
+      `inwards init: ${shown(ctx.io.runtime.cwd, target.path)} already has [tool.inwards]; --style never rewrites layers. To wire an agent, run \`inwards init --agent ${AGENTS.join("|")}\`.`,
       2,
     );
   }
   if (target.pkg === undefined) {
-    return print(noPackage(target.path), 2);
+    return print(ctx.io.streams, noPackage(ctx.io.runtime.cwd, target.path), 2);
   }
   const style = STYLES[plan.style];
   const project = dirname(target.path);
-  if (project !== process.cwd()) {
-    print(`inwards init: using ${shown(target.path)}, the nearest pyproject.toml above here.`, 0);
+  if (project !== ctx.io.runtime.cwd) {
+    print(
+      ctx.io.streams,
+      `inwards init: using ${shown(ctx.io.runtime.cwd, target.path)}, the nearest pyproject.toml above here.`,
+      0,
+    );
   }
-  const root = sourceRoot(project, target.pkg, target.text);
+  const root = sourceRoot(ctx.io, project, target.pkg, target.text);
   const config = withTable(target, style, target.pkg, root);
   if (typeof config === "string") {
-    return print(`inwards init: ${config}`, 2);
+    return print(ctx.io.streams, `inwards init: ${config}`, 2);
   }
   const { files, refused } = plan.scaffold
-    ? planScaffold(project, style, target.pkg, root)
+    ? planScaffold(ctx.io.probe, project, { style, pkg: target.pkg, root })
     : { files: [], refused: [] };
   if (refused.length > 0) {
     return print(
-      `inwards init: --scaffold never replaces an existing file or symlink, or writes outside the project, and these are in the way:\n  ${refused.map(shown).join("\n  ")}\nNothing was written.`,
+      ctx.io.streams,
+      `inwards init: --scaffold never replaces an existing file or symlink, or writes outside the project, and these are in the way:\n  ${refused.map((p) => shown(ctx.io.runtime.cwd, p)).join("\n  ")}\nNothing was written.`,
       2,
     );
   }
-  const wiring = plan.agent === undefined ? [] : agentChanges(plan.agent, project);
+  const wiring = plan.agent === undefined ? [] : agentChanges(ctx, plan.agent, project);
   if (typeof wiring === "string") {
-    return print(`inwards init: ${wiring}`, 2);
+    return print(ctx.io.streams, `inwards init: ${wiring}`, 2);
   }
   const agentEdits = wiring.filter((c) => c.before !== c.after);
   if (dryRun) {
-    return apply([config, ...files, ...agentEdits], true);
+    return apply(ctx, [config, ...files, ...agentEdits], true);
   }
-  return await commit({ configPath: target.path, style, pkg: target.pkg, root }, plan, {
+  return await commit(ctx, { configPath: target.path, style, pkg: target.pkg, root }, plan, {
     config,
     files,
     agentEdits,
@@ -169,6 +201,7 @@ async function styleCommand(
  * Writes what `styleCommand` planned: the scaffold's files, then
  * pyproject.toml (all or nothing), then the agent's wiring, and prints the report.
  *
+ * @param ctx - the platform, the check runner and init's writer.
  * @param setup - the pyproject.toml, the preset, the package and the config root.
  * @param plan - what was chosen, for the messages and the next steps.
  * @param changes - the config change, the scaffold's files and the agent's edits.
@@ -178,32 +211,39 @@ async function styleCommand(
  * @returns 0 once written, 2 when a write failed.
  */
 async function commit(
-  setup: Parameters<typeof report>[0],
+  ctx: InitContext,
+  setup: Setup,
   plan: InitPlan,
   changes: { config: Change; files: Change[]; agentEdits: Change[] },
 ): Promise<number> {
   const { config, files, agentEdits } = changes;
-  const failed = writeAll(files, config);
+  const failed = ctx.init.files.writeAll(files, config);
   if (failed !== undefined) {
-    return print(`inwards init: could not write ${failed}. Nothing was written.`, 2);
+    return print(
+      ctx.io.streams,
+      `inwards init: could not write ${failed}. Nothing was written.`,
+      2,
+    );
   }
   const example = files.length > 0 ? ` and ${files.length} example files` : "";
   print(
-    `inwards init: wrote the ${setup.style.name} preset to ${shown(config.path)}${example}.`,
+    ctx.io.streams,
+    `inwards init: wrote the ${setup.style.name} preset to ${shown(ctx.io.runtime.cwd, config.path)}${example}.`,
     0,
   );
   if (agentEdits.length > 0) {
     try {
-      apply(agentEdits, false);
+      apply(ctx, agentEdits, false);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return print(
+        ctx.io.streams,
         `inwards init: the layers are written, but wiring ${plan.agent} failed (${reason}); fix that and run \`inwards init --agent ${plan.agent}\`.`,
         2,
       );
     }
   }
-  return await report(setup, plan);
+  return await report(ctx, setup, plan);
 }
 
 /**

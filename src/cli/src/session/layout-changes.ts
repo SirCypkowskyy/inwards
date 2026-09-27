@@ -11,8 +11,10 @@
  * `[tool.inwards.rules]` doesn't apply to the prefix and move checks: they
  * catch a layer moved away, a dodge, not a rule to phase in (ADR-027). It
  * does apply to INW008.
+ *
+ * Pure over what it is given: the caller supplies each config's text with the
+ * manifests, and start identity comes from the invocation's `StartIdentity`.
  */
-import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import {
   checkMoves,
@@ -25,28 +27,34 @@ import {
   packagesOf,
 } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
-import { existedAtStart } from "./old-errors.ts";
+import type { StartIdentity } from "./start-identity.ts";
 
 /**
  * Finds the layout errors this session introduced, per config: emptied
  * prefixes, moved layer code, and missing required members.
  *
  * @param project - the real project root.
- * @param configs - the valid configs now, by project-relative path (the same as at start, or the gate fails anyway).
+ * @param configs - the valid configs now, and each one's pyproject.toml text for locating
+ *   findings, by project-relative path (the same as at start, or the gate fails anyway).
+ * @param configs.valid - the parsed configs.
+ * @param configs.texts - their pyproject.toml texts.
  * @param before - the session-start manifest: project-relative Python path to content hash.
  * @param now - the manifest now.
  * @returns the new errors, located in each pyproject.toml.
  */
 export function newLayoutErrors(
   project: string,
-  configs: Record<string, InwardsConfig>,
+  {
+    valid: configs,
+    texts,
+  }: { valid: Record<string, InwardsConfig>; texts: Readonly<Record<string, string>> },
   before: Readonly<Record<string, string>>,
   now: Readonly<Record<string, string>>,
 ): Diagnostic[] {
   return Object.entries(configs).flatMap(([rel, config]) => {
     const path = join(project, rel);
     const root = resolve(dirname(path), config.root);
-    const file = { path: rel, text: readFileSync(path, "utf8") };
+    const file = { path: rel, text: texts[rel] ?? "" };
     const was = modulesUnder(project, root, before);
     const is = modulesUnder(project, root, now);
     const [wasPaths, isPaths] = [pathsUnder(project, root, before), pathsUnder(project, root, now)];
@@ -74,17 +82,19 @@ export function newLayoutErrors(
  * session start as itself (`existedAtStart`): legacy layout, reported but
  * never blocking. A start path that is now a symlink doesn't count.
  *
+ * @param identity - this invocation's start identity checks.
  * @param d - a diagnostic whose path is project-relative.
  * @param project - the real project root.
  * @param start - the session's start record.
  * @returns true for such a finding.
  */
 export function preexistingShape(
+  identity: Pick<StartIdentity, "existedAtStart">,
   d: Diagnostic,
   project: string,
-  start: { manifest: Readonly<Record<string, string>> },
+  start: { manifest: Record<string, string> },
 ): boolean {
-  return d.code === "INW007" && existedAtStart(project, start, { base: project }, d.file);
+  return d.code === "INW007" && identity.existedAtStart(project, start, { base: project }, d.file);
 }
 
 /**

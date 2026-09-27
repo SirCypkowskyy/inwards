@@ -3,7 +3,8 @@
  * Every write goes to `<project>/.inwards/state` after checking that neither
  * level is a symlink and that the directory really lives in the project; log
  * files are opened with O_NOFOLLOW where the OS has it; pruning removes only
- * regular files. See session.ts for the limits of these checks.
+ * regular files. See `session/record.ts` for the limits of these checks.
+ * Implements the `StateFiles` contract (`nodeStateFiles`).
  */
 import {
   closeSync,
@@ -12,11 +13,17 @@ import {
   mkdirSync,
   openSync,
   readdirSync,
+  renameSync,
   rmSync,
+  statSync,
+  writeFileSync,
   writeSync,
 } from "node:fs";
 import { join } from "node:path";
-import { isInside, realpath } from "../paths/lexical.ts";
+import process from "node:process";
+import { isInside } from "../paths/lexical.ts";
+import type { StateFiles } from "../platform/contracts.ts";
+import { nodePathProbe } from "./filesystem.ts";
 
 /** Session files older than a week (in ms) are pruned when a new session starts. */
 const MAX_AGE_MS = 604_800_000;
@@ -36,7 +43,7 @@ const OWNER_ONLY = 0o600;
  * @param path - the log file.
  * @param line - one line of text, ending in a newline.
  */
-export function appendLine(path: string, line: string): void {
+function appendLine(path: string, line: string): void {
   if (existsAsNonFile(path)) {
     throw new Error(`${path} is not a regular file`);
   }
@@ -75,7 +82,7 @@ function existsAsNonFile(path: string): boolean {
  * @param dir - the state directory, already checked to be inside the project.
  * @param current - the id of the session that is starting.
  */
-export function prune(dir: string, current: string): void {
+function prune(dir: string, current: string): void {
   const now = Date.now();
   const sessions = new Map<string, { paths: string[]; mtime: number }>();
   for (const name of readdirSync(dir)) {
@@ -113,7 +120,7 @@ export function prune(dir: string, current: string): void {
  * @returns the state directory.
  * @throws when the directory resolves to somewhere outside the project.
  */
-export function stateDir(project: string): string {
+function stateDir(project: string): string {
   // One level at a time, refusing symlinks before anything is created, so not
   // even an empty directory appears at a link's target.
   let dir = project;
@@ -128,7 +135,7 @@ export function stateDir(project: string): string {
       // already there: checked above that it is a real directory
     }
   }
-  const real = realpath(dir);
+  const real = nodePathProbe.realpath(dir);
   if (real === undefined || !isInside(project, real)) {
     throw new Error(`${dir} resolves outside the project`);
   }
@@ -156,7 +163,7 @@ function existsAsNonDirectory(path: string): boolean {
  * @param project - the real project root.
  * @returns the state directory, or undefined when it is missing or not safe to use.
  */
-export function existingStateDir(project: string): string | undefined {
+function existingStateDir(project: string): string | undefined {
   let dir = project;
   for (const part of [".inwards", "state"]) {
     dir = join(dir, part);
@@ -168,7 +175,7 @@ export function existingStateDir(project: string): string | undefined {
       return undefined;
     }
   }
-  const real = realpath(dir);
+  const real = nodePathProbe.realpath(dir);
   return real !== undefined && isInside(project, real) ? dir : undefined;
 }
 
@@ -178,6 +185,40 @@ export function existingStateDir(project: string): string | undefined {
  * @param project - the real project root.
  * @returns `<project>/.inwards/state`.
  */
-export function statePath(project: string): string {
+function statePath(project: string): string {
   return join(project, ".inwards", "state");
 }
+
+/**
+ * Writes a new file atomically: a temporary file named with the process id,
+ * created exclusively, then a rename over the final name.
+ *
+ * @param dir - a state directory that `stateDir` returned.
+ * @param name - the final file name.
+ * @param text - the content.
+ * @throws when the temporary file exists or the rename fails.
+ */
+function publish(dir: string, name: string, text: string): void {
+  const temp = join(dir, `.${name}.${process.pid}.tmp`);
+  writeFileSync(temp, text, { flag: "wx" });
+  renameSync(temp, join(dir, name)); // rename replaces a planted symlink, never follows it
+}
+
+/** Session and run-log state on the real filesystem. */
+export const nodeStateFiles: StateFiles = {
+  statePath,
+  stateDir,
+  existingStateDir,
+  appendLine,
+  publish,
+  remove(path: string): void {
+    rmSync(path, { force: true });
+  },
+  rotate(path: string, maxBytes: number, rotated: string): void {
+    const size = statSync(path, { throwIfNoEntry: false })?.size ?? 0;
+    if (size >= maxBytes) {
+      renameSync(path, rotated);
+    }
+  },
+  prune,
+};

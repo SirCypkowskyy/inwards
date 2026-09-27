@@ -2,16 +2,14 @@
  * The `inwards stats` command: finds the project, reads its run logs, and
  * prints the hypothesis numbers, each next to its chapter-2 threshold.
  */
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import process from "node:process";
-import { print } from "../adapters/stdio.ts";
-import { realpath } from "../paths/lexical.ts";
-import { git, projectConfigs } from "../project/snapshot.ts";
+import type { Platform } from "../platform/contracts.ts";
+import { print } from "../platform/print.ts";
+import { projectConfigs } from "../project/snapshot.ts";
 import { exportRunLogs } from "../runlog/export.ts";
 import { logDirs, readRunLogs } from "../runlog/runs.ts";
 import { computeStats, type Stats } from "../runlog/stats.ts";
+import type { AppDeps } from "./deps.ts";
 
 const PERCENT = 100;
 
@@ -22,48 +20,66 @@ const PERCENT = 100;
  * config below it. With `--export FILE`, it writes the merged log instead of
  * the numbers, with `--redact` hashing every path.
  *
+ * @param deps - the platform and the export storage.
  * @param format - `text` or `json`.
  * @param dir - the DIR argument, if given.
  * @param sharing - `--export` and `--redact`.
  * @param sharing.export - the file to write the merged log to.
  * @param sharing.redact - hash the paths in it.
  * @returns 0, or 2 for a bad format, `--redact` without `--export`, or a missing directory.
+ * @throws {ConfigError} when the export target is a log or the export key can't be used.
  */
 export function statsCommand(
+  deps: AppDeps,
   format: string,
   dir: string | undefined,
   sharing: { export?: string | undefined; redact?: boolean | undefined } = {},
 ): number {
+  const { io } = deps;
   if (format !== "text" && format !== "json") {
-    return print("inwards stats supports --format text or json", 2);
+    return print(io.streams, "inwards stats supports --format text or json", 2);
   }
   if (sharing.redact && !sharing.export) {
-    return print("--redact goes with --export FILE: it hashes the paths in the exported log.", 2);
+    return print(
+      io.streams,
+      "--redact goes with --export FILE: it hashes the paths in the exported log.",
+      2,
+    );
   }
-  const cwd = process.cwd();
+  const { cwd } = io.runtime;
   const root =
     dir ??
-    (process.env["CLAUDE_PROJECT_DIR"] ||
-      git(cwd, ["rev-parse", "--show-toplevel"])?.trim() ||
-      projectRoot(cwd));
-  const project = realpath(root);
+    (io.runtime.claudeProjectDir ||
+      io.git.run(cwd, ["rev-parse", "--show-toplevel"])?.trim() ||
+      projectRoot(io, cwd));
+  const project = io.probe.realpath(root);
   if (!project) {
-    return print(`No such directory: ${root}`, 2);
+    return print(io.streams, `No such directory: ${root}`, 2);
   }
-  const { valid, invalid } = projectConfigs(project);
+  const { valid, invalid } = projectConfigs(io, project);
   const dirs = logDirs(project, [...Object.keys(valid), ...invalid]);
   if (sharing.export) {
-    const written = exportRunLogs(dirs, sharing.export, sharing.redact ? { project } : undefined);
+    const written = exportRunLogs(
+      { ...io, exports: deps.exports },
+      dirs,
+      sharing.export,
+      sharing.redact ? { project } : undefined,
+    );
     const how = sharing.redact ? ", paths and fingerprints hashed with .inwards/export-key" : "";
     return print(
+      io.streams,
       `Wrote ${written} log lines to ${sharing.export}${how}. Read it before you send it.`,
       0,
     );
   }
-  const { lines, skipped } = readRunLogs(dirs);
+  const { lines, skipped } = readRunLogs(io.read, dirs);
   const stats = computeStats(lines, skipped);
-  const pretty = process.stdout.isTTY ? 2 : undefined;
-  return print(format === "json" ? JSON.stringify(stats, null, pretty) : renderStatsText(stats), 0);
+  const pretty = io.runtime.stdoutIsTTY ? 2 : undefined;
+  return print(
+    io.streams,
+    format === "json" ? JSON.stringify(stats, null, pretty) : renderStatsText(stats),
+    0,
+  );
 }
 
 /**
@@ -105,17 +121,20 @@ function renderStatsText(stats: Stats): string {
  * below the home directory (as written or through a symlink), so a stray
  * `~/.inwards` is never taken from a project below home.
  *
+ * @param io - probes paths and knows the home directory.
  * @param start - the working directory.
  * @returns that folder, or `start` when none qualifies.
  */
-function projectRoot(start: string): string {
-  const homes = new Set([homedir(), realpath(homedir())]);
+function projectRoot(io: Pick<Platform, "probe" | "runtime">, start: string): string {
+  const { home } = io.runtime;
+  const homes = new Set([home, io.probe.realpath(home)]);
   let outermost: string | undefined;
   for (let dir = start; !homes.has(dir) && dirname(dir) !== dir; dir = dirname(dir)) {
-    if (existsSync(join(dir, ".inwards", "state"))) {
+    if (io.probe.exists(join(dir, ".inwards", "state"))) {
       return dir;
     }
-    if (["runs.jsonl", "runs.1.jsonl"].some((name) => existsSync(join(dir, ".inwards", name)))) {
+    const logs = ["runs.jsonl", "runs.1.jsonl"];
+    if (logs.some((name) => io.probe.exists(join(dir, ".inwards", name)))) {
       outermost = dir;
     }
   }

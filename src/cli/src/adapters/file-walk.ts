@@ -1,5 +1,11 @@
+/**
+ * Walking a project tree for its files, behind the `FileWalker` contract.
+ * The rules (skips, symlinks, cycles, layer packages walked in full) are
+ * described on `collectPythonFiles`.
+ */
 import { type Dirent, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
+import type { FileWalker } from "../platform/contracts.ts";
 
 // Only names that can never hold first-party code. `build/` or `dist/` inside a
 // package is still Python the agent can import, so those are walked.
@@ -42,7 +48,7 @@ export function collectPythonFiles(paths: string[], open: readonly string[] = []
  * @param open - directories walked without the skip rules.
  * @returns unique paths, sorted.
  */
-export function collectFiles(
+function collectFiles(
   paths: string[],
   match: (name: string) => boolean,
   open: readonly string[] = [],
@@ -206,3 +212,9 @@ function realOrUndefined(path: string): string | undefined {
 function isPythonFile(name: string): boolean {
   return name.endsWith(".py") || name.endsWith(".pyi");
 }
+
+/** The walk behind the `FileWalker` contract. */
+export const nodeFileWalker: FileWalker = {
+  pythonFiles: collectPythonFiles,
+  files: collectFiles,
+};

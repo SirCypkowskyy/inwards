@@ -11,9 +11,9 @@
  * `git update-index --assume-unchanged`, a gitignored or untracked file, or a
  * pyvenv.cfg disguise inside a layer all show up as changed. In a changed
  * file, only violations it didn't have at session start block; the old ones
- * go along as context when the gate blocks for something else (`legacy.ts`).
+ * go along as context when the gate blocks for something else (`session/old-errors.ts`).
  * Under `agent-suppressions = "deny"`, the default, an inline suppression
- * that wasn't there at session start hides nothing (`legacy.ts`).
+ * that wasn't there at session start hides nothing (`session/agent-suppressions.ts`).
  *
  * The gate also fails closed when it can't trust the session: no start
  * record, a `[tool.inwards]` table that differs from the start snapshot (a
@@ -24,78 +24,80 @@
  * with the unresolved violations shown to the user (see `escalation.ts`).
  * If the gate itself fails, it blocks once with the error, then lets the turn end.
  */
-import { existsSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
-import process from "node:process";
+import { join } from "node:path";
 import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
-import { print } from "../adapters/stdio.ts";
-import { findConfig, realpath } from "../paths/lexical.ts";
+import type { Platform } from "../platform/contracts.ts";
+import { print } from "../platform/print.ts";
 import { changedBaselines } from "../project/baseline.ts";
-import { runCheck } from "../project/check.ts";
-import { projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
-import { noteRun, noteSuppressions } from "../runlog/record.ts";
+import { projectConfigs, projectManifest } from "../project/snapshot.ts";
+import { rejectedNote } from "../session/agent-suppressions.ts";
+import { fingerprint } from "../session/fingerprint.ts";
 import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";
+import { createStartLookups } from "../session/lookups.ts";
+import { oldNote } from "../session/old-errors.ts";
 import {
-  agentSuppressions,
-  oldErrors,
-  oldNote,
-  rejectedNote,
-  relinked,
-} from "../session/old-errors.ts";
-import {
-  fingerprint,
   isSessionId,
   readSession,
   recordPass,
   recordStop,
   type SessionState,
 } from "../session/record.ts";
+import { changedFiles, checkChanged } from "./changed-files.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
+import { type HookDeps, hookProject } from "./protocol.ts";
 import { settingsProblem } from "./settings.ts";
-
-const PYTHON_FILE = /\.pyi?$/u;
 
 /**
  * Runs the Stop gate for one hook payload. An error inside the gate blocks
  * once with the message, then lets the turn end (exit 1, shown to the user),
  * so a broken gate can't keep a session going forever.
  *
+ * @param deps - the platform, this invocation's run log and the check runner.
  * @param input - the Stop payload (`session_id`, `stop_hook_active`).
  * @returns 2 to keep the agent working (reasons on stderr), 1 to end the turn
  *   with a message to the user, 0 to let it end quietly.
  */
-export async function stopGate(input: Record<string, unknown>): Promise<number> {
+export async function stopGate(deps: HookDeps, input: Record<string, unknown>): Promise<number> {
   const active = input["stop_hook_active"] === true;
+  const { streams } = deps.io;
   try {
-    return await gate(input, active);
+    return await gate(deps, input, active);
   } catch (err) {
     const why = `inwards: the Stop gate failed: ${err instanceof Error ? err.message : String(err)}`;
     return active
-      ? print(`${why}. The turn ends unchecked; run \`inwards check\`.`, 1)
-      : print(`${why}. Run \`inwards check\`, fix what it reports, and tell the user.`, 2);
+      ? print(streams, `${why}. The turn ends unchecked; run \`inwards check\`.`, 1)
+      : print(streams, `${why}. Run \`inwards check\`, fix what it reports, and tell the user.`, 2);
   }
 }
 
 /**
  * The gate proper, see the module comment.
  *
+ * @param deps - the platform, this invocation's run log and the check runner.
  * @param input - the Stop payload.
  * @param active - `stop_hook_active`: this turn was already kept going by a Stop hook.
  * @returns the exit code, as for `stopGate`.
+ * @throws when the project, the state or a check fails; `stopGate` turns that into one block.
  */
-async function gate(input: Record<string, unknown>, active: boolean): Promise<number> {
-  const project = realpath(process.env["CLAUDE_PROJECT_DIR"] || process.cwd());
+async function gate(
+  deps: HookDeps,
+  input: Record<string, unknown>,
+  active: boolean,
+): Promise<number> {
+  const { io } = deps;
+  const project = hookProject(io);
   const id = input["session_id"];
   if (!project) {
     return 0;
   }
-  const { valid: configs, found } = projectConfigs(project);
-  const state = isSessionId(id) ? readSession(project, id) : undefined;
+  const { valid: configs, found } = projectConfigs(io, project);
+  const state = isSessionId(id) ? readSession(io, project, id) : undefined;
   if (!(isSessionId(id) && state)) {
     if (Object.keys(configs).length === 0 || active) {
       return 0; // not an Inwards project, or the last safety valve after a block
     }
     return block(
+      io,
       [
         "Inwards has no record of how this session started (.inwards/state is missing), so it can't tell what you changed. Run `inwards check`, fix what it reports, and ask the user to review before finishing.",
       ],
@@ -106,26 +108,16 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   const edited =
     baselines === undefined
       ? []
-      : changedBaselines(project, Object.keys(state.start.configs), baselines);
-  const problems = trustProblems(project, configs, state, edited);
-  const manifest = projectManifest(project, configs);
-  const changed = changedFiles(project, state, manifest);
-  // A baseline changed during the session can't be trusted, so none is applied,
-  // and project mode falls back to the changed files.
-  const { report, old, rejected, strangers, governing } = await checkChanged(
+      : changedBaselines(io, project, Object.keys(state.start.configs), baselines);
+  const problems = trustProblems(io, project, state, { configs, edited });
+  const { report, old, rejected, strangers, governing, changed } = await review(
+    deps,
     project,
-    changed,
-    { start: state.start, now: configs, found },
-    edited.length === 0,
+    state,
+    { configs, found, edited },
   );
-  // Shape findings on files that predate the session are legacy, like old violations.
-  const layout = newLayoutErrors(project, configs, state.start.manifest, manifest);
-  report.diagnostics = [
-    ...layout,
-    ...notIn(layout, report.diagnostics).filter((d) => !preexistingShape(d, project, state.start)),
-  ];
-  noteRun(project, changed, report.diagnostics); // old errors aren't the session's
-  noteSuppressions(report, rejected);
+  deps.runlog.noteRun(project, changed, report.diagnostics); // old errors aren't the session's
+  deps.runlog.noteSuppressions(report, rejected);
   for (const [file, config] of strangers) {
     problems.push(
       `${file} is governed by ${config}, which didn't exist when the session started, so its layers can't be trusted. Ask the user about it.`,
@@ -133,14 +125,77 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
   }
   if (problems.length === 0 && !report.diagnostics.some((d) => d.severity === "error")) {
     if (state.stops > 0) {
-      recordPass(project, id); // ends the streak, so a later turn starts counting at 0
+      recordPass(io, project, id); // ends the streak, so a later turn starts counting at 0
     }
     return 0;
   }
   const limit = escalationLimit(state.start.configs, governing);
   const escalated = errorsOf(report).some((d) => (state.seen.get(fingerprint(d)) ?? 0) >= limit);
   const turn = { streak: active ? state.stops : 0, limit, fresh: !active, escalated };
-  return blockOrYield(project, id, turn, { problems, report, old, rejected });
+  return blockOrYield(io, { project, id }, turn, { problems, report, old, rejected });
+}
+
+/**
+ * Checks what the session changed, with one set of start lookups for this
+ * invocation: the changed files against their session-start configs (or the
+ * whole project, for `stop-gate = "project"`), plus the layout comparison
+ * with the session start. Shape findings on files that predate the session
+ * are legacy, like old violations. A baseline changed during the session
+ * can't be trusted, so none is applied, and project mode falls back to the
+ * changed files.
+ *
+ * @param deps - the platform and the check runner.
+ * @param project - the real project root.
+ * @param state - the session state.
+ * @param now - the valid configs now, where each was found, and the baselines
+ *   that changed during the session.
+ * @param now.configs - the valid configs now.
+ * @param now.found - where each was found.
+ * @param now.edited - baselines that changed during the session.
+ * @returns the report, the old errors, the rejected suppressions, the files
+ *   under configs unknown at start, the governing configs, and the changed files.
+ * @throws when a config or a changed file can't be read, or a check fails.
+ */
+async function review(
+  deps: HookDeps,
+  project: string,
+  state: SessionState,
+  {
+    configs,
+    found,
+    edited,
+  }: {
+    configs: Record<string, InwardsConfig>;
+    found: Record<string, string[]>;
+    edited: readonly string[];
+  },
+): Promise<Awaited<ReturnType<typeof checkChanged>> & { changed: string[] }> {
+  const { io } = deps;
+  const manifest = projectManifest(io, project, configs);
+  const lookups = createStartLookups({ ...io, check: deps.check }, project);
+  const changed = changedFiles(io, lookups, state, manifest);
+  const checked = await checkChanged(
+    lookups,
+    changed,
+    { start: state.start, now: configs, found },
+    edited.length === 0,
+  );
+  const texts = Object.fromEntries(
+    Object.keys(configs).map((rel) => [rel, io.read.text(join(project, rel))]),
+  );
+  const layout = newLayoutErrors(
+    project,
+    { valid: configs, texts },
+    state.start.manifest,
+    manifest,
+  );
+  checked.report.diagnostics = [
+    ...layout,
+    ...notIn(layout, checked.report.diagnostics).filter(
+      (d) => !preexistingShape(lookups.identity, d, project, state.start),
+    ),
+  ];
+  return { ...checked, changed };
 }
 
 /**
@@ -149,8 +204,10 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
  * tells the agent to ask the user; after the last one, the turn ends with the
  * unresolved problems shown to the user.
  *
- * @param project - the real project root.
- * @param id - the session id.
+ * @param io - writes the session log, the unresolved record and the output.
+ * @param session - the real project root and the session id.
+ * @param session.project - the real project root.
+ * @param session.id - the session id.
  * @param turn - blocks so far in this turn, blocks allowed, whether this is the
  *   turn's first Stop, and whether a violation has already escalated.
  * @param found - the problems, the report, the old errors left out of it, and
@@ -158,23 +215,23 @@ async function gate(input: Record<string, unknown>, active: boolean): Promise<nu
  * @returns 2 to block, 0 to let the turn end.
  */
 function blockOrYield(
-  project: string,
-  id: string,
+  io: Platform,
+  { project, id }: { project: string; id: string },
   turn: { streak: number; limit: number; fresh: boolean; escalated: boolean },
   found: { problems: string[]; report: Report; old: Diagnostic[]; rejected: Diagnostic[] },
 ): number {
   const { streak, limit, fresh, escalated } = turn;
   const { problems, report, old, rejected } = found;
   if (streak >= limit) {
-    return yieldTurn(project, id, { problems, diagnostics: errorsOf(report) });
+    return yieldTurn(io, project, id, { problems, diagnostics: errorsOf(report) });
   }
-  recordStop(project, id, fresh);
+  recordStop(io, project, id, fresh);
   const ask = escalated || streak + 1 === limit ? [askUser(limit)] : [];
   const context = [
     ...(rejected.length > 0 ? [rejectedNote(rejected)] : []),
     ...(old.length > 0 ? [oldNote(old)] : []),
   ];
-  return block([...problems, ...ask, ...context], report);
+  return block(io, [...problems, ...ask, ...context], report);
 }
 
 /**
@@ -209,17 +266,19 @@ function errorsOf(report: Report): Diagnostic[] {
  * changed `[tool.inwards]` or baseline, or Claude Code settings without the
  * Inwards hooks.
  *
+ * @param io - reads the Claude Code settings and knows where the user's live.
  * @param project - the real project root.
- * @param configs - the valid configs now.
  * @param state - the session state.
- * @param edited - baselines that changed during the session.
+ * @param now - the valid configs now, and the baselines that changed during the session.
+ * @param now.configs - the valid configs now.
+ * @param now.edited - baselines that changed during the session.
  * @returns the problems, one sentence each.
  */
 function trustProblems(
+  io: Pick<Platform, "read" | "runtime">,
   project: string,
-  configs: Record<string, InwardsConfig>,
   state: SessionState,
-  edited: readonly string[],
+  { configs, edited }: { configs: Record<string, InwardsConfig>; edited: readonly string[] },
 ): string[] {
   const problems: string[] = [];
   if (JSON.stringify(configs) !== JSON.stringify(state.start.configs)) {
@@ -232,7 +291,7 @@ function trustProblems(
       `${edited.join(", ")} changed during this session, so no baseline was applied. Tell the user; only they can restore it or take a new baseline.`,
     );
   }
-  const hooks = settingsProblem(project);
+  const hooks = settingsProblem(io, project);
   if (hooks !== undefined) {
     problems.push(`${hooks} Restore them (\`inwards init --agent claude\`) or ask the user.`);
   }
@@ -243,37 +302,24 @@ function trustProblems(
  * Reports why the turn can't end yet: plain lines for session problems, then
  * the diagnostics as the same compact JSON the PostToolUse hook prints.
  *
+ * @param io - writes to stderr.
+ * @param io.streams - the standard streams.
  * @param problems - reasons that aren't diagnostics.
  * @param report - the check of the changed files, if it ran.
  * @returns 2.
  */
-function block(problems: string[], report: Report | undefined): number {
+function block(
+  io: Pick<Platform, "streams">,
+  problems: string[],
+  report: Report | undefined,
+): number {
   for (const problem of problems) {
-    process.stderr.write(`inwards: ${problem}\n`);
+    io.streams.err(`inwards: ${problem}\n`);
   }
   if (report && report.diagnostics.length > 0) {
-    process.stderr.write(`${render(report, "json", { pretty: false })}\n`);
+    io.streams.err(`${render(report, "json", { pretty: false })}\n`);
   }
-  return print("", 2);
-}
-
-/**
- * Lists the configs the Stop gate checks in full: `stop-gate = "project"` at
- * session start, still valid now, at every path each was found at.
- *
- * @param start - the configs at session start, by project-relative path.
- * @param now - the valid configs now.
- * @param found - where each valid config was found now.
- * @returns absolute pyproject.toml paths.
- */
-function wholeProject(
-  start: Record<string, InwardsConfig>,
-  now: Record<string, InwardsConfig>,
-  found: Record<string, string[]>,
-): string[] {
-  return Object.entries(start)
-    .filter(([rel, config]) => config.stopGate === "project" && now[rel] !== undefined)
-    .flatMap(([rel]) => found[rel] ?? []);
+  return print(io.streams, "", 2);
 }
 
 /**
@@ -299,124 +345,4 @@ function notIn(layout: readonly Diagnostic[], found: Diagnostic[]): Diagnostic[]
  */
 function spotOf(d: Diagnostic): string {
   return `${d.code}\u0000${d.file}:${d.line}:${d.column}`;
-}
-
-/**
- * Collects the Python files this session changed: the edits the hook saw,
- * the manifest diff since SessionStart, and the start files whose path lost
- * its start identity to a symlink, even with the same bytes (`relinked`).
- *
- * @param project - the real project root.
- * @param state - the session state.
- * @param manifest - the content hashes now, from `projectManifest`.
- * @returns absolute paths of changed Python files that still exist as regular files.
- */
-function changedFiles(
-  project: string,
-  state: SessionState,
-  manifest: Record<string, string>,
-): string[] {
-  const changed = new Set([...state.edited, ...relinked(project, state.start.manifest)]);
-  for (const [path, hash] of Object.entries(manifest)) {
-    if (state.start.manifest[path] !== hash) {
-      changed.add(path);
-    }
-  }
-  return [...changed]
-    .filter((path) => PYTHON_FILE.test(path))
-    .map((path) => join(project, path))
-    .filter((path) => existsSync(path) && statSync(path).isFile());
-}
-
-/**
- * Checks changed files, each against its own config. A file whose config
- * didn't exist at session start is not checked with it: a new nested
- * pyproject.toml with a permissive table would otherwise waive the layers.
- * A file under a config that was already invalid is skipped, since that
- * config governs nothing, and so is one under a config that is invalid now
- * (the config comparison reports that). A config set to `stop-gate =
- * "project"` at session start gets a whole-project check instead, changed
- * files or not, from every path it was found at, but only while the
- * baselines can be trusted: otherwise it would report every legacy violation.
- *
- * @param project - the real project root.
- * @param files - absolute changed files.
- * @param configs - the session start, with its valid and invalid configs, and the valid configs now.
- * @param configs.start - the session start.
- * @param configs.now - the valid configs now.
- * @param configs.found - where each valid config was found now.
- * @param baseline - false to report violations the baselines accept.
- * @returns the merged report without the errors the changed files already had
- *   at session start, those errors (never in a whole-project check), the
- *   findings whose inline suppression was rejected (`agent-suppressions`), each file
- *   governed by an unknown config with that config, and the project-relative
- *   configs the checked files fall under.
- */
-async function checkChanged(
-  project: string,
-  files: string[],
-  {
-    start,
-    now,
-    found,
-  }: {
-    start: SessionState["start"];
-    now: Record<string, InwardsConfig>;
-    found: Record<string, string[]>;
-  },
-  baseline: boolean,
-): Promise<{
-  report: Report;
-  old: Diagnostic[];
-  rejected: Diagnostic[];
-  strangers: [string, string][];
-  governing: string[];
-}> {
-  // Targets by config path; undefined checks the whole project.
-  const byConfig = new Map<string, string[] | undefined>();
-  const strangers: [string, string][] = [];
-  for (const file of files) {
-    const config = findConfig(dirname(file), project);
-    if (config === undefined) {
-      continue;
-    }
-    const rel = projectPath(project, config);
-    if (start.invalid?.includes(rel)) {
-      continue;
-    }
-    if (start.configs[rel] === undefined) {
-      strangers.push([projectPath(project, file), rel]);
-    } else if (now[rel] !== undefined) {
-      byConfig.set(config, [...(byConfig.get(config) ?? []), file]);
-    }
-  }
-  for (const path of baseline ? wholeProject(start.configs, now, found) : []) {
-    byConfig.set(path, undefined);
-  }
-  const reports = await Promise.all(
-    [...byConfig].map(async ([config, group]) => {
-      const check = { configPath: config, base: project, baseline };
-      const { report, rejected } = await agentSuppressions(
-        project,
-        start,
-        check,
-        await runCheck(config, group, project, { baseline }),
-      );
-      const old = group ? await oldErrors(project, start, check, report.diagnostics) : [];
-      const diagnostics = report.diagnostics.filter((d) => !old.includes(d));
-      return { ...report, diagnostics, old, rejected };
-    }),
-  );
-  return {
-    old: reports.flatMap((r) => r.old),
-    rejected: reports.flatMap((r) => r.rejected),
-    report: {
-      diagnostics: reports.flatMap((r) => r.diagnostics),
-      suppressed: reports.flatMap((r) => r.suppressed ?? []),
-      filesChecked: reports.reduce((n, r) => n + r.filesChecked, 0),
-      durationMs: Math.max(0, ...reports.map((r) => r.durationMs)),
-    },
-    strangers,
-    governing: [...byConfig.keys()].map((config) => projectPath(project, config)),
-  };
 }

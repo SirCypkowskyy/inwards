@@ -9,8 +9,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { nodePlatform } from "../src/adapters/compose.ts";
 import { readSession } from "../src/session/record.ts";
+
 import { inwards, inwardsAsync, LAYERS, payload, project, type RunResult } from "./run.ts";
+
+const IO = nodePlatform();
 
 const ID = "session-test-1";
 
@@ -59,7 +63,7 @@ describe("session state", () => {
       "shop/domain/order.py": "X = 1\n",
     });
     expect(start(root)).toEqual({ code: 0, stdout: "", stderr: "" });
-    const state = readSession(realpathSync(root), ID);
+    const state = readSession(IO, realpathSync(root), ID);
     expect(Object.keys(state?.start.configs ?? {}).sort()).toEqual([
       "pkg/pyproject.toml",
       "pyproject.toml",
@@ -87,7 +91,7 @@ describe("session state", () => {
     expect(hook(root, edit(root, "shop/domain/order.py")).code).toBe(2);
     expect(hook(root, edit(root, "shop/domain/order.py")).code).toBe(2);
     expect(hook(root, edit(root, "shop/domain/clean.py")).code).toBe(0);
-    const state = readSession(realpathSync(root), ID);
+    const state = readSession(IO, realpathSync(root), ID);
     expect(state?.edited).toEqual(["shop/domain/order.py", "shop/domain/clean.py"]);
     expect([...(state?.seen.values() ?? [])]).toEqual([2]); // one violation, seen twice
   });
@@ -107,7 +111,7 @@ describe("session state", () => {
       }),
     );
     expect((await Promise.all(runs)).map((r) => r.code)).toEqual(new Array<number>(20).fill(2));
-    const state = readSession(realpathSync(root), ID);
+    const state = readSession(IO, realpathSync(root), ID);
     expect(state?.edited).toHaveLength(20);
     expect(state?.seen.size).toBe(20);
   });
@@ -125,7 +129,7 @@ describe("session state", () => {
     hook(root, edit(root, "shop/domain/order.py"));
     start(root, ID, "compact");
     start(root, ID, "resume");
-    expect(readSession(realpathSync(root), ID)).toBeUndefined();
+    expect(readSession(IO, realpathSync(root), ID)).toBeUndefined();
   });
 
   test("a resume keeps the original start", () => {
@@ -133,7 +137,7 @@ describe("session state", () => {
     start(root);
     writeFileSync(join(root, "shop/domain/new.py"), "Y = 2\n");
     start(root, ID, "resume");
-    const manifest = readSession(realpathSync(root), ID)?.start.manifest ?? {};
+    const manifest = readSession(IO, realpathSync(root), ID)?.start.manifest ?? {};
     expect(Object.keys(manifest)).toEqual(["shop/domain/order.py", "shop/infrastructure/db.py"]);
   });
 
@@ -153,7 +157,7 @@ describe("session state", () => {
       join(root, `.inwards/state/${ID}.jsonl`),
       '{"t":"edit","at":"x","file":"a.py","fingerprints":"not-an-array"}\n',
     );
-    expect(readSession(realpathSync(root), ID)?.edited).toEqual([]);
+    expect(readSession(IO, realpathSync(root), ID)?.edited).toEqual([]);
   });
 
   test("a new session prunes others past 50 or older than a week, never itself", () => {
@@ -179,7 +183,7 @@ describe("session state", () => {
     symlinkSync(real, link);
     start(real);
     hook(real, edit(link, "shop/domain/order.py"));
-    expect(readSession(realpathSync(real), ID)?.edited).toEqual(["shop/domain/order.py"]);
+    expect(readSession(IO, realpathSync(real), ID)?.edited).toEqual(["shop/domain/order.py"]);
   });
 
   test("resume and compact create nothing in a project without state", () => {
@@ -195,8 +199,8 @@ describe("session state", () => {
     writeFileSync(join(root, "shop/domain/new.py"), "Y = 2\n");
     start(root);
     hook(root, payload("session-start", root, { session_id: "no-source", source: undefined }));
-    const manifest = readSession(realpathSync(root), ID)?.start.manifest ?? {};
+    const manifest = readSession(IO, realpathSync(root), ID)?.start.manifest ?? {};
     expect(Object.keys(manifest)).toEqual(["shop/domain/order.py", "shop/infrastructure/db.py"]);
-    expect(readSession(realpathSync(root), "no-source")).toBeUndefined();
+    expect(readSession(IO, realpathSync(root), "no-source")).toBeUndefined();
   });
 });

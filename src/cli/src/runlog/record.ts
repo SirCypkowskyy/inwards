@@ -9,20 +9,24 @@
  *
  * Line schema `inwards/run@1` (documented in docs/chapters/08-Run-Log.md):
  * `{ v, at, session_id, event, tool, files, lines, fingerprints, codes, severities, suppressed, rejected, exit, durationMs }`.
- * `inwards stats` (stats.ts) turns it into the hypothesis numbers.
+ * `inwards stats` (`runlog/stats.ts`) turns it into the hypothesis numbers.
+ *
+ * `createRunLog` holds what one invocation's handlers noted; `main.ts` makes
+ * one per invocation and writes the line at the end.
  */
-import { readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import process from "node:process";
 import { type Diagnostic, parseConfig, type Report } from "@inwards/core";
-import { appendLine, existingStateDir, stateDir } from "../adapters/state-files.ts";
-import { findConfig } from "../paths/lexical.ts";
+import type { Platform } from "../platform/contracts.ts";
+import { findConfig } from "../project/config-discovery.ts";
 import { projectPath } from "../project/snapshot.ts";
-import { fingerprint } from "../session/record.ts";
+import { fingerprint } from "../session/fingerprint.ts";
 
 /** Size at which the log is rotated: 5 MiB. */
 const MAX_BYTES = 5_242_880;
 const LINE_BREAK = /\r\n|\r|\n/u;
+
+/** What the run log touches. */
+export type RunLogIo = Pick<Platform, "probe" | "read" | "clock" | "runtime" | "state">;
 
 /** Lines an edit added and removed in one file, from the tool call. */
 interface LineCount {
@@ -31,120 +35,115 @@ interface LineCount {
   removed: number;
 }
 
-/**
- * What a handler checked, collected for the log line. The CLI runs one
- * command per process, so a module-level note is enough.
- */
-const noted: {
-  files: string[];
-  diagnostics: Diagnostic[];
-  suppressed: number;
-  rejected: Diagnostic[];
-} = { files: [], diagnostics: [], suppressed: 0, rejected: [] };
-
-/**
- * Notes files and violations a handler checked, for this run's log line.
- *
- * @param project - the real project root.
- * @param files - absolute paths of the files or directories checked.
- * @param diagnostics - what the check reported.
- */
-export function noteRun(
-  project: string,
-  files: readonly string[],
-  diagnostics: readonly Diagnostic[],
-): void {
-  noted.files.push(...files.map((file) => projectPath(project, file) || "."));
-  noted.diagnostics.push(...diagnostics);
+/** One invocation's run log: what its handlers noted, and the line it writes. */
+export interface RunLog {
+  /**
+   * Notes files and violations a handler checked, for this run's log line.
+   *
+   * @param project - the real project root.
+   * @param files - absolute paths of the files or directories checked.
+   * @param diagnostics - what the check reported.
+   */
+  noteRun: (project: string, files: readonly string[], diagnostics: readonly Diagnostic[]) => void;
+  /**
+   * Notes what inline suppressions did in this run, for its log line.
+   *
+   * @param report - the check, whose `suppressed` findings a comment hid.
+   * @param rejected - findings whose suppression the hooks didn't honour (`agent-suppressions`).
+   */
+  noteSuppressions: (report: Pick<Report, "suppressed">, rejected: readonly Diagnostic[]) => void;
+  /**
+   * Appends one run to the log, if it is on. Best effort: nothing in here,
+   * not even deciding whether the log is on, can change what the hook or
+   * check returns.
+   *
+   * @param project - the real project root.
+   * @param run - the event, the hook payload, the exit code; `force` for `check --log`.
+   */
+  logRun: (
+    project: string,
+    run: { event: string; input?: Record<string, unknown>; exit: number; force?: boolean },
+  ) => void;
 }
 
 /**
- * Notes what inline suppressions did in this run, for its log line.
+ * Creates the run log for one invocation.
  *
- * @param report - the check, whose `suppressed` findings a comment hid.
- * @param rejected - findings whose suppression the hooks didn't honour (`agent-suppressions`).
+ * @param io - reads configs, tells the time and the environment, and writes the log.
+ * @returns a run log with nothing noted yet.
  */
-export function noteSuppressions(
-  report: Pick<Report, "suppressed">,
-  rejected: readonly Diagnostic[],
-): void {
-  noted.suppressed += report.suppressed?.length ?? 0;
-  noted.rejected.push(...rejected);
-}
-
-/**
- * Appends one run to the log, if it is on. Best effort: nothing in here,
- * not even deciding whether the log is on, can change what the hook or
- * check returns.
- *
- * @param project - the real project root.
- * @param run - the event, the hook payload, the exit code; `force` for `check --log`.
- */
-export function logRun(
-  project: string,
-  run: { event: string; input?: Record<string, unknown>; exit: number; force?: boolean },
-): void {
-  try {
-    if (!runLogEnabled(project, run.force === true)) {
-      return;
-    }
-    const path = join(dirname(stateDir(project)), "runs.jsonl");
-    rotate(path);
-    const { input } = run;
-    const files = [...new Set(noted.files)];
-    const line = {
-      v: 1,
-      at: new Date().toISOString(),
-      session_id: typeof input?.["session_id"] === "string" ? input["session_id"] : null,
-      event: run.event,
-      tool: typeof input?.["tool_name"] === "string" ? input["tool_name"] : null,
-      files,
-      lines: run.event === "PostToolUse" && input ? lineCounts(project, input, files) : [],
-      fingerprints: noted.diagnostics.map(fingerprint),
-      codes: noted.diagnostics.map((d) => d.code),
-      severities: noted.diagnostics.map((d) => d.severity),
-      suppressed: noted.suppressed,
-      rejected: noted.rejected.map(fingerprint),
-      exit: run.exit,
-      // Since the process started (Bun's performance clock), so startup counts too.
-      durationMs: Math.round(performance.now() * 10) / 10,
-    };
-    appendLine(path, `${JSON.stringify(line)}\n`);
-  } catch {
-    // best effort, see above
-  }
+export function createRunLog(io: RunLogIo): RunLog {
+  const noted: {
+    files: string[];
+    diagnostics: Diagnostic[];
+    suppressed: number;
+    rejected: Diagnostic[];
+  } = { files: [], diagnostics: [], suppressed: 0, rejected: [] };
+  return {
+    noteRun(project: string, files: readonly string[], diagnostics: readonly Diagnostic[]): void {
+      noted.files.push(...files.map((file) => projectPath(io.probe, project, file) || "."));
+      noted.diagnostics.push(...diagnostics);
+    },
+    noteSuppressions(report: Pick<Report, "suppressed">, rejected: readonly Diagnostic[]): void {
+      noted.suppressed += report.suppressed?.length ?? 0;
+      noted.rejected.push(...rejected);
+    },
+    logRun(
+      project: string,
+      run: { event: string; input?: Record<string, unknown>; exit: number; force?: boolean },
+    ): void {
+      try {
+        if (!runLogEnabled(io, project, run.force === true)) {
+          return;
+        }
+        const path = join(dirname(io.state.stateDir(project)), "runs.jsonl");
+        io.state.rotate(path, MAX_BYTES, join(dirname(path), "runs.1.jsonl"));
+        const { input } = run;
+        const files = [...new Set(noted.files)];
+        const line = {
+          v: 1,
+          at: io.clock.now().toISOString(),
+          session_id: typeof input?.["session_id"] === "string" ? input["session_id"] : null,
+          event: run.event,
+          tool: typeof input?.["tool_name"] === "string" ? input["tool_name"] : null,
+          files,
+          lines: run.event === "PostToolUse" && input ? lineCounts(io, project, input, files) : [],
+          fingerprints: noted.diagnostics.map(fingerprint),
+          codes: noted.diagnostics.map((d) => d.code),
+          severities: noted.diagnostics.map((d) => d.severity),
+          suppressed: noted.suppressed,
+          rejected: noted.rejected.map(fingerprint),
+          exit: run.exit,
+          durationMs: Math.round(io.clock.elapsed() * 10) / 10,
+        };
+        io.state.appendLine(path, `${JSON.stringify(line)}\n`);
+      } catch {
+        // best effort, see above
+      }
+    },
+  };
 }
 
 /**
  * Tells whether the run log is on for a project.
  *
+ * @param io - reads the config, the environment and the state directory.
  * @param project - the project root.
  * @param force - `check --log`: on regardless of the switches.
  * @returns true when switched on and the project uses Inwards (a root config or session state).
+ * @throws {ConfigError} when the root config is invalid (the caller treats that as off).
  */
-function runLogEnabled(project: string, force: boolean): boolean {
-  const env = process.env["INWARDS_RUN_LOG"];
-  const config = findConfig(project, project);
-  const usesInwards = config !== undefined || existingStateDir(project) !== undefined;
+function runLogEnabled(io: RunLogIo, project: string, force: boolean): boolean {
+  const env = io.runtime.runLog;
+  const config = findConfig(io, project, project);
+  const usesInwards = config !== undefined || io.state.existingStateDir(project) !== undefined;
   if (!usesInwards || (!force && (env === "0" || env === "false"))) {
     return false;
   }
   if (force || env === "1" || env === "true") {
     return true;
   }
-  return config !== undefined && parseConfig(readFileSync(config, "utf8")).runLog === true;
-}
-
-/**
- * Moves a full log aside.
- *
- * @param path - the log file.
- */
-function rotate(path: string): void {
-  const size = statSync(path, { throwIfNoEntry: false })?.size ?? 0;
-  if (size >= MAX_BYTES) {
-    renameSync(path, join(dirname(path), "runs.1.jsonl"));
-  }
+  return config !== undefined && parseConfig(io.read.text(config)).runLog === true;
 }
 
 /**
@@ -153,12 +152,14 @@ function rotate(path: string): void {
  * count. A Write replaces the whole file, so every line counts as added;
  * `replace_all` counts one occurrence.
  *
+ * @param io - resolves real paths and knows the process cwd.
  * @param project - the real project root.
  * @param input - the hook payload.
  * @param checked - project-relative files the run checked.
  * @returns one count for the edited file, or none when it wasn't checked.
  */
 function lineCounts(
+  io: Pick<RunLogIo, "probe" | "runtime">,
   project: string,
   input: Record<string, unknown>,
   checked: readonly string[],
@@ -171,8 +172,8 @@ function lineCounts(
     return [];
   }
   // Relative to the payload's cwd, as the hook resolves it.
-  const cwd = typeof input["cwd"] === "string" ? input["cwd"] : process.cwd();
-  const file = projectPath(project, resolve(cwd, tool.file_path));
+  const cwd = typeof input["cwd"] === "string" ? input["cwd"] : io.runtime.cwd;
+  const file = projectPath(io.probe, project, resolve(cwd, tool.file_path));
   if (!checked.includes(file)) {
     return [];
   }
