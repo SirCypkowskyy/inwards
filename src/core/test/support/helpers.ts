@@ -8,9 +8,9 @@ import {
   type ProjectIndex,
   parseConfig,
   type SourceFile,
-} from "../src/index.ts";
-import type { ModuleLookup } from "../src/lookup/module-lookup.ts";
-import { createPythonParser } from "../src/python/parser.ts";
+} from "../../src/index.ts";
+import type { ModuleLookup } from "../../src/lookup/module-lookup.ts";
+import { createPythonParser } from "../../src/python/parser.ts";
 
 /**
  * Reads a WASM file from an installed package.

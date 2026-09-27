@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, type Diagnostic, type ImportRef, parseConfig } from "../src/index.ts";
-import { checkLibraries } from "../src/rules/pure-domain.ts";
-import { check, file, OWNERS } from "./helpers.ts";
+import { ConfigError, type Diagnostic, type ImportRef, parseConfig } from "../../src/index.ts";
+import { checkLibraries } from "../../src/rules/pure-domain.ts";
+import { check, file, OWNERS } from "../support/helpers.ts";
 
 const TARGET = /imports "(?<t>[^"]+)"/u;
 

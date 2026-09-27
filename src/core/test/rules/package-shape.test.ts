@@ -11,8 +11,8 @@ import {
   parseConfig,
   probeMembers,
   rootPathOf,
-} from "../src/index.ts";
-import { file, grammars } from "./helpers.ts";
+} from "../../src/index.ts";
+import { file, grammars } from "../support/helpers.ts";
 
 const FASTAPI = `[tool.inwards]
 root = "."

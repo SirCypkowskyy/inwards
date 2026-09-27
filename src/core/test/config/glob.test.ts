@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { globMatches, isGlob } from "../src/config/glob.ts";
-import { memberMatches } from "../src/config/shape.ts";
+import { globMatches, isGlob } from "../../src/config/glob.ts";
+import { memberMatches } from "../../src/config/shape.ts";
 
 describe("globMatches: parity with Python's fnmatch.fnmatchcase", () => {
   // Each row was checked with CPython 3.14's fnmatch.fnmatchcase(text, glob).

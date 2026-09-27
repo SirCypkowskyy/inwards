@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { skeletonImports } from "../src/python/prescan.ts";
-import { mentionsDynamicImport } from "../src/rules/dynamic-import/imports.ts";
-import { check, file, found, parser } from "./helpers.ts";
+import { skeletonImports } from "../../../src/python/prescan.ts";
+import { mentionsDynamicImport } from "../../../src/rules/dynamic-import/imports.ts";
+import { check, file, found, parser } from "../../support/helpers.ts";
 
 describe("INW011 dynamic-import: call forms", () => {
   test.each([

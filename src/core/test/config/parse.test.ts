@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigError, declaresInwards, parseConfig, VERSION } from "../src/index.ts";
+import { ConfigError, declaresInwards, parseConfig, VERSION } from "../../src/index.ts";
 
 /** This release without a pre-release suffix, and a version always newer (built so a release PR's bump can't break the tests). */
 const CURRENT = VERSION.replace(/-.*$/u, "");

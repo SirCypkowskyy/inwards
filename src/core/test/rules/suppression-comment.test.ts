@@ -3,8 +3,8 @@
  * on the line a finding points at.
  */
 import { describe, expect, test } from "bun:test";
-import { ConfigError, Engine, parseConfig, render } from "../src/index.ts";
-import { file, grammars, PROJECT } from "./helpers.ts";
+import { ConfigError, Engine, parseConfig, render } from "../../src/index.ts";
+import { file, grammars, PROJECT } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]
 layers = [

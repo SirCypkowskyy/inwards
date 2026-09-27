@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { check, file, found } from "./helpers.ts";
+import { check, file, found } from "../../support/helpers.ts";
 
 describe("INW011: edge cases", () => {
   test.each([

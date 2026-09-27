@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { check, engine, file, indexOn } from "./helpers.ts";
+import { check, engine, file, indexOn } from "../support/helpers.ts";
 
 /**
  * Lists the INW010 findings for a snippet checked as a domain module.

@@ -9,8 +9,8 @@ import {
   membersFrom,
   packagesOf,
   parseConfig,
-} from "../src/index.ts";
-import { file, grammars, PROJECT } from "./helpers.ts";
+} from "../../src/index.ts";
+import { file, grammars, PROJECT } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]
 layers = [

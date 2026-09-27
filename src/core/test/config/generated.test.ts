@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type Diagnostic, Engine, parseConfig } from "../src/index.ts";
-import { check, file, grammars, indexOn } from "./helpers.ts";
+import { type Diagnostic, Engine, parseConfig } from "../../src/index.ts";
+import { check, file, grammars, indexOn } from "../support/helpers.ts";
 
 const LAYERS = `layers = [
   { name = "domain", modules = ["shop.domain"] },

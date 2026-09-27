@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Engine, parseConfig } from "../src/index.ts";
-import { check, file, found, grammars, PROJECT, unverifiable } from "./helpers.ts";
+import { Engine, parseConfig } from "../../../src/index.ts";
+import { check, file, found, grammars, PROJECT, unverifiable } from "../../support/helpers.ts";
 
 describe("INW011: computed targets in an inner layer are unverifiable", () => {
   test.each([

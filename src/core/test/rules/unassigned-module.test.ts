@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { parseConfig } from "../src/index.ts";
-import { checkPrefixes } from "../src/rules/unassigned-module/layout.ts";
-import { check, engine, file, OWNERS, PROJECT } from "./helpers.ts";
+import { parseConfig } from "../../src/index.ts";
+import { checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
+import { check, engine, file, OWNERS, PROJECT } from "../support/helpers.ts";
 
 describe("INW006 unassigned-module", () => {
   test("a layer importing first-party code outside every layer is an error", () => {

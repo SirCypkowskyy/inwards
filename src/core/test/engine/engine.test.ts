@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { RULES, render } from "../src/index.ts";
-import { check, file } from "./helpers.ts";
+import { RULES, render } from "../../src/index.ts";
+import { check, file } from "../support/helpers.ts";
 
 describe("INW001 layer-dependency", () => {
   test("domain importing infrastructure is a violation with a fix", () => {

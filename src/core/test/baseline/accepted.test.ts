@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { baselineKey, type Diagnostic } from "../src/index.ts";
-import { check, engine, file, PROJECT } from "./helpers.ts";
+import { baselineKey, type Diagnostic } from "../../src/index.ts";
+import { check, engine, file, PROJECT } from "../support/helpers.ts";
 
 const PATH = "shop/domain/order.py";
 const STUB = "shop/domain/order.pyi";

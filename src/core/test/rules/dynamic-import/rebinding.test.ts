@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { found, unverifiable } from "./helpers.ts";
+import { found, unverifiable } from "../../support/helpers.ts";
 
 describe("INW011: a user-defined exec or eval is not a builtin with a computed source", () => {
   test.each([
