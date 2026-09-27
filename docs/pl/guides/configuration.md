@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 8da96dd11d491afc0dba18caecc3bb22f36903582729f9569269003f2afbad94
+source_hash: e976c612361fb991e426279cc3be37774ddafec4e11833a3daac73f191f17f38
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -149,7 +149,7 @@ Jakie elementy pakiet może, musi i nie może zawierać (INW007, INW008) oraz gd
 
 Typ: tablica tabel. Domyślnie: brak.
 
-Konteksty ograniczone albo wycinki: co każdy z nich posiada, które z jego modułów mogą importować inne konteksty i od których kontekstów może zależeć. [INW002](../rules/INW002.md) ogranicza każdy kontekst do kontekstów wymienionych w jego `depends-on`; INW003 będzie pilnować, żeby kod z zewnątrz korzystał tylko z modułów `public` kontekstu, a dopóki nie trafi do wydania, `public` jest wczytywane i sprawdzane, ale niczego nie zgłasza.
+Konteksty ograniczone albo wycinki: co każdy z nich posiada, które z jego modułów mogą importować inne konteksty i od których kontekstów może zależeć. [INW002](../rules/INW002.md) ogranicza każdy kontekst do kontekstów wymienionych w jego `depends-on`; [INW003](../rules/INW003.md) pilnuje, żeby kod spoza kontekstu korzystał tylko z jego modułów `public`.
 
 <!-- config: fragment -->
 

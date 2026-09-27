@@ -26,6 +26,7 @@ const FILES = [
 const RECORDED: Readonly<Record<string, string>> = {
   "1": "772064cde6ec46ab82c1f30cc8dc39de9ecd8c46870a6619cfb214b83f07c7b4",
   "2": "db0c5e3dee5bfa621e01f167e09b0a70e2dfa3da19c615edaddad6c20ab1f961",
+  "3": "b3cff4906e54d42e15b86ec57a9bf290f82b57306a7678bbb4d9f0eb83e4bde3",
 };
 
 test("the extraction revision changes with the code it describes", () => {

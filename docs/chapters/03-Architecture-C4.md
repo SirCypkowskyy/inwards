@@ -79,7 +79,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW002, INW005, INW006, INW007, INW008, INW010, INW011 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW002, INW003, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code` |
 | **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server/server.ts` | :white_check_mark: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; with a fresh engine when `pyproject.toml` changes; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
@@ -110,7 +110,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / index</small>"]
@@ -160,7 +160,7 @@ sequenceDiagram
         E-->>A: INW000
     else file names a loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(full text)
-        E->>R: INW001 + INW002 + INW005 + INW006 + INW010 + INW011
+        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011
         R-->>E: diagnostics
         E-->>A: diagnostics
     else everything else
@@ -169,21 +169,21 @@ sequenceDiagram
             P-->>E: skeleton (imports only)
             E->>T: parse(skeleton)
             T-->>E: tiny tree
-            E->>R: INW001 + INW002 + INW005 + INW006 + INW010 (imports)
+            E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 (imports)
             alt no violations (the common case)
                 R-->>E: []
                 E-->>A: []
             else violations found
                 E->>T: parse(full text)
                 T-->>E: full tree
-                E->>R: INW001 + INW002 + INW005 + INW006 + INW010 (imports from full tree)
+                E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 (imports from full tree)
                 R-->>E: confirmed diagnostics
                 E-->>A: diagnostics
             end
         else skeleton refused (odd import placement)
             P-->>E: null
             E->>T: parse(full text)
-            E->>R: INW001 + INW002 + INW005 + INW006 + INW010
+            E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010
             R-->>E: diagnostics
             E-->>A: diagnostics
         end
@@ -347,7 +347,7 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | INW000 | `unsupported-encoding` | A file in a layer declares an encoding (PEP 263) such as `unicode_escape` or `utf-7`, under which text Inwards reads as a comment can be a real import to CPython. The file is reported, not skipped | :white_check_mark: |
 | INW001 | `layer-dependency` | An inner layer importing an outer one | :white_check_mark: |
 | INW002 | `context-independence` | A bounded context or vertical slice importing another context its `depends-on` doesn't declare, static or dynamic, whether or not a layer owns the file. Either end outside every context is left alone, and a nested context is a context of its own. See [contexts](guides/configuration.md#contexts) | :white_check_mark: |
-| INW003 | `public-api-only` | Importing past a context's public module (`__init__` or `api.py`) | :material-progress-clock: [#53](https://github.com/SirCypkowskyy/inwards/issues/53) |
+| INW003 | `public-api-only` | An import, from outside a context (another context or none), of one of its modules that isn't at or under its `public` prefixes, static or dynamic. An import INW002 already reports gets no INW003. The fix names the public module that exposes the imported name, when one does | :white_check_mark: |
 | INW004 | `no-cycles` | Import cycles between modules or contexts | :material-progress-clock: needs the graph, [#54](https://github.com/SirCypkowskyy/inwards/issues/54) |
 | INW005 | `pure-domain` | A layer importing a third-party or standard-library module its `allow-libraries` / `deny-libraries` / `extend-deny-libraries` don't let it use, static or dynamic, in functions and behind `TYPE_CHECKING` too. The innermost of two or more layers denies frameworks, database and network clients and stdlib I/O (`sqlalchemy`, `fastapi`, `requests`, `subprocess`...) by default; `extend-deny-libraries` adds to that list, `deny-libraries` replaces it. First-party code is left to INW001 and INW006. See [Libraries per layer](guides/libraries.md) | :white_check_mark: |
 | INW006 | `unassigned-module` | An import from a layer into first-party code that belongs to no layer, including the package above the layers (`from shop import x` runs `shop/__init__.py`, which no layer owns), static or dynamic (error); layer code moved out of every layer during a session (error); a package outside every layer and `ignore` (warning); a layer prefix matching no module (warning), a layer with no live prefix, or a prefix emptied during the session (error). Unknown keys and overlapping prefixes are config errors | :white_check_mark: |
@@ -381,6 +381,7 @@ src/
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
 │   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
+│   │   │   ├── public-api-only.ts       # INW003: a context's public modules
 │   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
 │   │   │   │                            #   layout.ts (dead prefixes, layer code moved away)

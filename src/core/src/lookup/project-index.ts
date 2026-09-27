@@ -19,6 +19,8 @@ import { type ModuleLookup, type PathKind, probeLookup } from "./module-lookup.t
 const NON_ASCII = /[^ -~\t\n\r\f]/u;
 /** What a package's `__init__.py` spells when it merges with packages elsewhere (pkgutil or pkg_resources style). */
 const EXTENDS_PATH = /__path__|declare_namespace/u;
+/** A Python identifier in ASCII, the only names `exposes` looks for. */
+const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 
 /** Reads the imports of one file; the engine supplies it, so this module needs no parser. */
 type ImportReader = (file: SourceFile) => readonly ImportRef[];
@@ -172,6 +174,44 @@ export class ProjectIndex {
   }
 
   /**
+   * Tells whether a module defines a name at its top level (`def`, `class`,
+   * an assignment) or imports it, so other code can import the name from
+   * there: INW003's fix names the public module that does. Aliased imports
+   * (`as`) and `__all__` aren't followed. Reads the module once.
+   *
+   * @param module - a dotted module name.
+   * @param name - an identifier, e.g. `Discount`.
+   * @returns true when the module's file defines or imports the name.
+   */
+  exposes(module: string, name: string): boolean {
+    const file = IDENTIFIER.test(name) ? this.fileOf(module) : undefined;
+    if (file === undefined) {
+      return false;
+    }
+    const defines = new RegExp(
+      `^(?:(?:async[ \\t]+)?def|class)[ \\t]+${name}\\b|^${name}[ \\t]*(?::|=(?!=))`,
+      "mu",
+    );
+    return (
+      defines.test(this.text(file)) || this.importsOf(file).some((ref) => bindsName(ref, name))
+    );
+  }
+
+  /**
+   * Finds a module's file on disk: `a/b.py`, else `a/b/__init__.py`.
+   *
+   * @param module - a dotted module name.
+   * @returns the file, text not yet read, or undefined when neither exists.
+   */
+  private fileOf(module: string): Listed | undefined {
+    const base = module.split(".").join("/");
+    const path = [`${base}.py`, `${base}/__init__.py`].find(
+      (candidate) => this.source.kind(candidate) === "file",
+    );
+    return path === undefined ? undefined : { path, ...moduleNameFor(path) };
+  }
+
+  /**
    * Lists the project's Python files under their module names, once.
    *
    * @returns every listed file, text not yet read.
@@ -222,16 +262,40 @@ export class ProjectIndex {
    * @returns true when one of the file's imports resolves to that module.
    */
   private fileImports(file: Listed, module: string): boolean {
-    let refs = this.imports.get(file.path);
-    if (refs === undefined) {
-      refs = this.readImports({ ...file, text: this.text(file) });
-      this.imports.set(file.path, refs);
-    }
     // The owner is a prefix of the target, so the string test spares most probes.
-    return refs.some(
+    return this.importsOf(file).some(
       (ref) =>
         (ref.target === module || ref.target.startsWith(`${module}.`)) &&
         this.ownerOf(ref.target) === module,
     );
   }
+
+  /**
+   * Reads a file's imports through the engine's reader, once.
+   *
+   * @param file - a listed file.
+   * @returns its imports.
+   */
+  private importsOf(file: Listed): readonly ImportRef[] {
+    let refs = this.imports.get(file.path);
+    if (refs === undefined) {
+      refs = this.readImports({ ...file, text: this.text(file) });
+      this.imports.set(file.path, refs);
+    }
+    return refs;
+  }
+}
+
+/**
+ * Tells whether an import binds a name in the importing module: `from X
+ * import name` and `import name` do, unless `as` renames it.
+ *
+ * @param ref - one import of the module.
+ * @param name - an identifier.
+ * @returns true when the import makes `name` importable from the module.
+ */
+function bindsName(ref: ImportRef, name: string): boolean {
+  const bound = ref.from === undefined ? name : `${ref.from}.${name}`;
+  const renamed = new RegExp(`\\b${name}[ \\t]+as\\b`, "u");
+  return ref.target === bound && !renamed.test(ref.statement);
 }

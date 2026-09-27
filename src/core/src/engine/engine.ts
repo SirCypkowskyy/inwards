@@ -33,6 +33,7 @@ import {
 } from "../rules/dynamic-import/imports.ts";
 import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
+import { checkPublicApi } from "../rules/public-api-only.ts";
 import { checkLibraries } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
@@ -256,7 +257,10 @@ export class Engine {
     project: ProjectIndex,
   ): Diagnostic[] {
     const { layers, contexts = [] } = this.config;
-    const across = checkContextDependencies(file, imports, contexts, project.ownerOf);
+    const across = [
+      ...checkContextDependencies(file, imports, contexts, project.ownerOf),
+      ...checkPublicApi(file, imports, contexts, project),
+    ];
     if (!this.layered(file)) {
       const warning = unassignedWarning(file, this.config);
       return warning ? [warning, ...across] : across;
@@ -303,7 +307,10 @@ export class Engine {
       const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
       const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
       const { contexts = [] } = this.config;
-      found.push(...checkContextDependencies(file, readable, contexts, project.ownerOf));
+      found.push(
+        ...checkContextDependencies(file, readable, contexts, project.ownerOf),
+        ...checkPublicApi(file, readable, contexts, project),
+      );
       if (this.layered(file)) {
         found.push(
           ...checkDynamicImports(file, refs, layers),

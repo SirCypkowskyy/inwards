@@ -144,7 +144,7 @@ Which members a package may, must and must not hold (INW007, INW008), and where 
 
 Type: array of tables. Default: none.
 
-Bounded contexts or slices: what each one owns, which of its modules other contexts may import, and which contexts it may depend on. [INW002](../rules/INW002.md) keeps each context to the contexts its `depends-on` lists; INW003 will keep callers to a context's `public` modules, and until it ships, `public` is parsed and checked but reports nothing.
+Bounded contexts or slices: what each one owns, which of its modules other contexts may import, and which contexts it may depend on. [INW002](../rules/INW002.md) keeps each context to the contexts its `depends-on` lists; [INW003](../rules/INW003.md) keeps code outside a context to its `public` modules.
 
 <!-- config: fragment -->
 
