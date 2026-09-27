@@ -131,11 +131,11 @@ export interface Git {
 /** Time, injected so tests and logs agree on it. */
 export interface Clock {
   /**
-   * The current wall-clock time.
+   * The current wall-clock time, as the logs and state files record it.
    *
-   * @returns now.
+   * @returns an ISO 8601 UTC timestamp, e.g. `2026-09-27T12:00:00.000Z`.
    */
-  now: () => Date;
+  now: () => string;
   /**
    * Milliseconds on the monotonic clock since the process started.
    *

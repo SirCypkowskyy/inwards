@@ -97,7 +97,7 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
     // Only a session that already has state is continued. This never creates
     // .inwards/ in a project without Inwards, nor a start for a lost session.
     if (io.probe.exists(io.state.statePath(project))) {
-      append(io, project, id, { t: "resume", at: io.clock.now().toISOString(), source });
+      append(io, project, id, { t: "resume", at: io.clock.now(), source });
     }
     return;
   }
@@ -114,7 +114,7 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
   io.state.prune(dir, id);
   const baselines = baselineHashes(io, project, Object.keys(configs));
   const start: SessionStart = {
-    at: io.clock.now().toISOString(),
+    at: io.clock.now(),
     head,
     configs,
     invalid,
@@ -143,7 +143,7 @@ export function recordEdit(
 ): void {
   append(io, project, id, {
     t: "edit",
-    at: io.clock.now().toISOString(),
+    at: io.clock.now(),
     file: projectPath(io.probe, project, file),
     // Once per edit: the same import twice in a file is one attempt, not two.
     fingerprints: [...new Set(diagnostics.map(fingerprint))],
@@ -166,7 +166,7 @@ export function recordStop(
   id: string,
   fresh: boolean,
 ): void {
-  append(io, project, id, { t: "stop", at: io.clock.now().toISOString(), fresh });
+  append(io, project, id, { t: "stop", at: io.clock.now(), fresh });
 }
 
 /**
@@ -182,7 +182,7 @@ export function recordPass(
   project: string,
   id: string,
 ): void {
-  append(io, project, id, { t: "pass", at: io.clock.now().toISOString() });
+  append(io, project, id, { t: "pass", at: io.clock.now() });
 }
 
 /**

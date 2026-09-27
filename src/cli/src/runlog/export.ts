@@ -19,6 +19,7 @@ import { createHmac } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { ConfigError } from "@inwards/core";
 import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
+import { parseTime } from "../platform/time.ts";
 import type { ExportFiles } from "./contracts.ts";
 import { parseLine, type RunLine } from "./runs.ts";
 
@@ -68,7 +69,7 @@ export function exportRunLogs(
   const hash = redact ? keyedHash(io.exports.exportKey(redact.project)) : undefined;
   const lines = logs
     .flatMap((log) => readKnownLines(io, log))
-    .sort((a, b) => Date.parse(String(a["at"])) - Date.parse(String(b["at"])))
+    .sort((a, b) => parseTime(String(a["at"])) - parseTime(String(b["at"])))
     .map((line) => (hash ? redactLine(line, hash) : line));
   io.exports.writeOwnerOnly(path, lines.map((line) => `${JSON.stringify(line)}\n`).join(""));
   return lines.length;

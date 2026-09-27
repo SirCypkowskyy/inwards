@@ -71,7 +71,7 @@ export function yieldTurn(
   );
   try {
     const dir = io.state.stateDir(project);
-    const record = { at: io.clock.now().toISOString(), summary, files };
+    const record = { at: io.clock.now(), summary, files };
     io.state.publish(dir, `${id}.unresolved.json`, JSON.stringify(record));
   } catch {
     // best effort: the user still sees the summary now

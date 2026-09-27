@@ -7,15 +7,7 @@
  * do I/O or lets one rule reach into another.
  */
 import { describe, expect, test } from "bun:test";
-import {
-  copyFileSync,
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -100,7 +92,6 @@ function lintAs(path: string, text: string): { code: number | null; out: string 
   const root = mkdtempSync(join(tmpdir(), "inwards-core-arch-"));
   try {
     copyFileSync(join(REPO, "biome.jsonc"), join(root, "biome.jsonc"));
-    cpSync(join(REPO, "biome-plugins"), join(root, "biome-plugins"), { recursive: true });
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
     const run = Bun.spawnSync(
@@ -137,28 +128,30 @@ describe("no I/O in the engine", () => {
         '/** Fetches. */\nexport const load = (): Promise<Response> => fetch("https://x");\n',
         "noRestrictedGlobals",
       ],
-      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
-      ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
-      ["/** Stamps. */\nexport const now: () => number = Date.now;\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "noRestrictedGlobals"],
+      ["/** Stamps. */\nexport const now = (): string => Date();\n", "noRestrictedGlobals"],
       [
-        "const D = Date;\n\n/** Stamps. */\nexport const now = (): Date => new D();\n",
-        "Clock contract",
+        "const D = Date;\n\n/** Stamps. */\nexport const now = (): unknown => new D();\n",
+        "noRestrictedGlobals",
       ],
-      ["/** Stamps. */\nexport const now = (): string => globalThis.Date();\n", "Clock contract"],
+      [
+        "/** Stamps. */\nexport const now = (): number => Date.parse(new Date(Date.now()).toISOString());\n",
+        "noRestrictedGlobals",
+      ],
+      [
+        '/** Stamps. */\nexport const now = (): unknown => (globalThis as Record<string, unknown>)["Date"];\n',
+        "noRestrictedGlobals",
+      ],
+      [
+        '/** Escapes. */\nexport const g = (): unknown => Function("return this")();\n',
+        "noRestrictedGlobals",
+      ],
     ];
     for (const [text, rule] of probes) {
       const result = lintAs("src/core/src/rules/probe.ts", text);
       expect(result.code).not.toBe(0);
       expect(result.out).toContain(rule);
     }
-  });
-
-  test("parsing and building dates stays allowed", () => {
-    const pure = lintAs(
-      "src/core/src/rules/probe.ts",
-      "/** Parses. */\nexport const at = (s: string): number => Date.parse(s);\n\n/** Builds. */\nexport const of = (ms: number): Date => new Date(ms);\n",
-    );
-    expect(pure.out).not.toContain("Clock contract");
   });
 });
 

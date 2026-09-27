@@ -167,9 +167,11 @@
       // The CLI's policy folders do no I/O of their own: files, git, the
       // environment and the streams come in through platform/contracts.ts,
       // implemented in adapters/ and wired in main.ts (#176). The same goes for
-      // the network and the clock (the plugin rejects Date.now(), new Date()
-      // and performance.now()). node:path and node:crypto stay allowed: path
-      // text and hashing are pure.
+      // the network and the clock: Date, performance and the global object are
+      // denied outright, since pattern matching on their uses leaked (a clock
+      // read nested in Date.parse, globalThis["Date"]); platform/time.ts parses
+      // recorded timestamps behind the one exception. node:path and node:crypto
+      // stay allowed: path text and hashing are pure.
       "includes": [
         "src/cli/src/claude-code/**",
         "src/cli/src/commands/**",
@@ -181,7 +183,6 @@
         "src/cli/src/runlog/**",
         "src/cli/src/session/**"
       ],
-      "plugins": ["./biome-plugins/no-direct-clock.grit"],
       "linter": {
         "rules": {
           "nursery": { "noBunModules": "error" },
@@ -259,7 +260,11 @@
                   "WebSocket": "Policy code makes no network connections; add a contract and an adapter if it must.",
                   "XMLHttpRequest": "Policy code makes no network requests; add a contract and an adapter if it must.",
                   "EventSource": "Policy code makes no network connections; add a contract and an adapter if it must.",
-                  "performance": "Take durations from the Clock contract (elapsed)."
+                  "performance": "Take durations from the Clock contract (elapsed).",
+                  "Date": "Take the time from the Clock contract; parse a recorded timestamp with platform/time.ts.",
+                  "globalThis": "Reach nothing through the global object; take what you need through a contract.",
+                  "global": "Reach nothing through the global object; take what you need through a contract.",
+                  "Function": "No code built from strings."
                 }
               }
             }
@@ -274,10 +279,9 @@
     },
     {
       // The engine is pure: no runtime globals, no Node or Bun modules, no env,
-      // no network and no clock (the plugin rejects Date.now(), new Date() and
-      // performance.now(); durations come from the adapter).
+      // no network and no clock (Date, performance and the global object are
+      // denied; durations and times come from the adapter).
       "includes": ["src/core/src/**"],
-      "plugins": ["./biome-plugins/no-direct-clock.grit"],
       "linter": {
         "rules": {
           "correctness": { "noNodejsModules": "error" },
@@ -295,7 +299,11 @@
                   "WebSocket": "The engine does no I/O: take what you need as a parameter or a port.",
                   "XMLHttpRequest": "The engine does no I/O: take what you need as a parameter or a port.",
                   "EventSource": "The engine does no I/O: take what you need as a parameter or a port.",
-                  "performance": "The engine doesn't time itself; the adapter measures durations."
+                  "performance": "The engine doesn't time itself; the adapter measures durations.",
+                  "Date": "The engine reads no clock and parses no dates; the adapter does.",
+                  "globalThis": "The engine reaches nothing through the global object.",
+                  "global": "The engine reaches nothing through the global object.",
+                  "Function": "No code built from strings."
                 }
               }
             }

@@ -106,7 +106,7 @@
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
-      { "name": "cli-test", "patterns": ["src/cli/**"] },
+      { "name": "cli-test", "patterns": ["src/cli/test/**"] },
       { "name": "vscode", "patterns": ["src/vscode-extension/**"] },
       { "name": "scripts", "patterns": ["scripts/**"] },
       { "name": "eval", "patterns": ["eval/**"] },

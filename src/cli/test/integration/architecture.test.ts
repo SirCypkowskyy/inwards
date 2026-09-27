@@ -10,7 +10,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -35,6 +34,7 @@ import { tempDir } from "../support/temp.ts";
 const REPO = resolve(import.meta.dir, "../../../..");
 const SRC = join(REPO, "src/cli/src");
 const BIOME = join(REPO, "node_modules/.bin/biome");
+const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /** Folders that hold policy: no I/O of their own, no concrete adapters. */
 const POLICY = [
   "claude-code",
@@ -88,7 +88,6 @@ const FINDING: Diagnostic = {
 function lintAs(path: string, text: string): { code: number | null; out: string } {
   const root = tempDir("inwards-arch-");
   copyFileSync(join(REPO, "biome.jsonc"), join(root, "biome.jsonc"));
-  cpSync(join(REPO, "biome-plugins"), join(root, "biome-plugins"), { recursive: true });
   mkdirSync(dirname(join(root, path)), { recursive: true });
   writeFileSync(join(root, path), text);
   const run = Bun.spawnSync(
@@ -220,13 +219,23 @@ describe("boundaries", () => {
         '/** Fetches. */\nexport const load = (): Promise<Response> => fetch("https://x");\n',
         "noRestrictedGlobals",
       ],
-      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
-      ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
-      ["/** Stamps. */\nexport const now = (): string => Date();\n", "Clock contract"],
-      ["/** Stamps. */\nexport const now: () => number = Date.now;\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "noRestrictedGlobals"],
+      ["/** Stamps. */\nexport const now = (): string => Date();\n", "noRestrictedGlobals"],
       [
-        "const D = Date;\n\n/** Stamps. */\nexport const now = (): Date => new D();\n",
-        "Clock contract",
+        "const D = Date;\n\n/** Stamps. */\nexport const now = (): unknown => new D();\n",
+        "noRestrictedGlobals",
+      ],
+      [
+        "/** Stamps. */\nexport const now = (): number => Date.parse(new Date(Date.now()).toISOString());\n",
+        "noRestrictedGlobals",
+      ],
+      [
+        '/** Stamps. */\nexport const now = (): unknown => (globalThis as Record<string, unknown>)["Date"];\n',
+        "noRestrictedGlobals",
+      ],
+      [
+        '/** Escapes. */\nexport const g = (): unknown => Function("return this")();\n',
+        "noRestrictedGlobals",
       ],
       [
         'import { resolve4 } from "node:dns/promises";\n\n/** Resolves. */\nexport const ask = resolve4;\n',
@@ -246,16 +255,12 @@ describe("boundaries", () => {
       expect(result.code).not.toBe(0);
       expect(result.out).toContain(rule);
     }
-    const parse = lintAs(
-      "src/cli/src/session/probe.ts",
-      "/** Parses. */\nexport const at = (s: string): number => Date.parse(s);\n",
-    );
-    expect(parse.out).not.toContain("Clock contract");
+    // Adapters implement the Clock, so they may name Date.
     const adapter = lintAs(
       "src/cli/src/adapters/probe.ts",
-      "/** Stamps. */\nexport const now = (): number => Date.now();\n",
+      "/** Stamps. */\nexport const now = (): string => new Date().toISOString();\n",
     );
-    expect(adapter.out).not.toContain("Clock contract");
+    expect(adapter.out).not.toContain("noRestrictedGlobals");
   });
 
   test("an adapter may import node:fs", () => {
@@ -264,6 +269,17 @@ describe("boundaries", () => {
       'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',
     );
     expect(adapter.out).not.toContain("noRestrictedImports");
+  });
+
+  test("a file in a new source folder has no zone, so fallow reports it", () => {
+    const run = Bun.spawnSync(
+      [FALLOW, "guard", "--format", "json", "src/cli/src/new-folder/module.ts"],
+      { cwd: REPO },
+    );
+    const parsed: { files: { zone: unknown; boundary: { coverage_required: boolean } }[] } =
+      JSON.parse(run.stdout.toString());
+    expect(parsed.files[0]?.zone).toBeNull();
+    expect(parsed.files[0]?.boundary.coverage_required).toBe(true);
   });
 
   test("every source folder has a fallow zone, and no policy zone may import adapters", () => {

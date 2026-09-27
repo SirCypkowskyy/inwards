@@ -45,12 +45,11 @@ Enforced by:
   `node:child_process`, `node:os`, `node:process`, `node:readline`, the
   network modules (`node:http`, `node:https`, `node:net`, `node:dns`, ...)
   or `node:perf_hooks`, subpaths included (`node:fs/promises`,
-  `node:dns/promises`), nor use the `Bun`, `process`, `fetch` or
-  `performance` globals. The `no-direct-clock` GritQL plugin rejects any
-  use of `Date` that reads the clock, aliases included (`Date.now`, `Date()`,
-  `new Date()`, `const D = Date`): take the time from `Clock`. `node:path`,
-  `node:crypto`, `Date.parse`, `new Date(value)` and the `Date` type are
-  fine; they are pure.
+  `node:dns/promises`), nor use the `Bun`, `process`, `fetch`,
+  `performance`, `Date`, `globalThis`, `global` or `Function` globals. Take
+  the time from `Clock` (an ISO string), and parse a recorded timestamp with
+  `platform/time.ts`, the one place allowed to name `Date`. `node:path` and
+  `node:crypto` are fine; they are pure.
 - **`bun run check:cycles`**: no import cycles, type imports included. It
   asks the pinned TypeScript (tsgo) for the syntax tree and the resolved
   modules, so comments can't hide an edge and extensionless imports count.

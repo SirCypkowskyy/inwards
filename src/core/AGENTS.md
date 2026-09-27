@@ -40,10 +40,10 @@ Enforced by:
   fallow fails (`requireAllFiles`) until the folder gets a zone and rules.
   The forbidden-call list (`Bun.*`, `process.*`, `fs.*`, `console.*`, ...)
   covers every core zone.
-- **Biome** (`biome.jsonc`): no Node or Bun modules, no `process`, `Bun`,
-  `Deno`, `fetch` or `performance` globals, no `process.env`, and the
-  `no-direct-clock` plugin rejects any use of `Date` that reads the clock,
-  aliases included (`Date.parse`, `new Date(value)` and the type are fine).
+- **Biome** (`biome.jsonc`): no Node or Bun modules, no `process.env`, and
+  no `process`, `Bun`, `Deno`, `fetch`, `performance`, `Date`, `globalThis`,
+  `global` or `Function` globals: the engine reads no clock and reaches
+  nothing through the global object.
 - **`bun run check:cycles`**: no import cycles, type imports included.
 - **`src/core/test/architecture.test.ts`** and **`api.test.ts`**: probe the
   above by behaviour (the zones through `fallow guard`, so they test what
