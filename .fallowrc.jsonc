@@ -90,8 +90,6 @@
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
-      // Anything else under src/ has no zone of its own yet and may import nothing.
-      { "name": "core-unzoned", "patterns": ["src/core/src/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
       { "name": "adapter-parity", "patterns": ["src/cli/test/integration/lsp-parity.test.ts"] },
       // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
@@ -108,8 +106,6 @@
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
-      // Anything else under src/ has no zone of its own yet and may import nothing.
-      { "name": "cli-unzoned", "patterns": ["src/cli/src/**"] },
       { "name": "cli-test", "patterns": ["src/cli/**"] },
       { "name": "vscode", "patterns": ["src/vscode-extension/**"] },
       { "name": "scripts", "patterns": ["scripts/**"] },
@@ -262,7 +258,6 @@
           "core-report"
         ]
       },
-      { "from": "core-unzoned", "allow": [] },
       // Its own tests and the prescan differential test may reach internals.
       {
         "from": "core-dev",
@@ -365,7 +360,6 @@
         "from": "cli-main",
         "allow": ["core-api", "cli-adapters", "cli-commands", "cli-init", "cli-platform"]
       },
-      { "from": "cli-unzoned", "allow": [] },
       {
         "from": "cli-test",
         "allow": [

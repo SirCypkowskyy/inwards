@@ -404,8 +404,9 @@ done until both match the code.
   them and only `main.ts` (through `adapters/compose.ts`) wires them in.
   Biome refuses `node:fs`, `node:child_process`, `node:os`, the network
   modules, `process`, `Bun` and `fetch` in those folders, and a GritQL plugin
-  (`biome-plugins/no-direct-clock.grit`) refuses `Date.now()`, `new Date()`
-  and `performance.now()`. fallow's zones refuse imports of `adapters/`.
+  (`biome-plugins/no-direct-clock.grit`) refuses every use of `Date` that
+  reads the clock, aliases included, and `performance.now()`. fallow's zones
+  refuse imports of `adapters/`.
   Relative paths from the command line resolve against `Runtime.cwd`, never
   the process's own working directory.
   Mutable state lives in objects made per invocation (`createStartLookups`,

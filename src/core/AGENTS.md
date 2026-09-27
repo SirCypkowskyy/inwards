@@ -36,15 +36,18 @@ Enforced by:
 
 - **fallow zones** (`.fallowrc.jsonc`): one zone per folder and one per
   rule, with explicit edges. Rules may use `rules/shared` and the folders
-  below it, never each other. A new folder falls into `core-unzoned`, which
-  may import nothing. The forbidden-call list (`Bun.*`, `process.*`, `fs.*`,
-  `console.*`, ...) covers every core zone.
+  below it, never each other. A file in a new folder matches no zone, and
+  fallow fails (`requireAllFiles`) until the folder gets a zone and rules.
+  The forbidden-call list (`Bun.*`, `process.*`, `fs.*`, `console.*`, ...)
+  covers every core zone.
 - **Biome** (`biome.jsonc`): no Node or Bun modules, no `process`, `Bun`,
   `Deno`, `fetch` or `performance` globals, no `process.env`, and the
-  `no-direct-clock` plugin rejects `Date.now()` and `new Date()`.
+  `no-direct-clock` plugin rejects any use of `Date` that reads the clock,
+  aliases included (`Date.parse`, `new Date(value)` and the type are fine).
 - **`bun run check:cycles`**: no import cycles, type imports included.
 - **`src/core/test/architecture.test.ts`** and **`api.test.ts`**: probe the
-  above by behaviour, and pin the public exports.
+  above by behaviour (the zones through `fallow guard`, so they test what
+  fallow actually applies), and pin every public export, types included.
 
 When a change seems to need a new edge, move the shared piece down (into
 `rules/shared/`, `lookup/` or `python/`) rather than widening a rule's zone.
@@ -58,8 +61,9 @@ When a change seems to need a new edge, move the shared piece down (into
   isn't garbage collected.
 - **`ProjectIndex` caches** what it has listed, probed and read, and never
   sees later changes. Building one is free; a long-lived adapter builds a new
-  one when files are created, deleted or renamed (and on saves if it relies
-  on `importersOf`).
+  one when files are created, deleted or renamed, and on saves too if it
+  relies on `importersOf` or `extendsPath` (an edited `__init__.py` can start
+  or stop extending its package's path).
 
 ## Where new code goes
 

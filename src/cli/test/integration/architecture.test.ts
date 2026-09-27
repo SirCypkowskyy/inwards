@@ -223,6 +223,11 @@ describe("boundaries", () => {
       ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
       ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
       ["/** Stamps. */\nexport const now = (): string => Date();\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now: () => number = Date.now;\n", "Clock contract"],
+      [
+        "const D = Date;\n\n/** Stamps. */\nexport const now = (): Date => new D();\n",
+        "Clock contract",
+      ],
       [
         'import { resolve4 } from "node:dns/promises";\n\n/** Resolves. */\nexport const ask = resolve4;\n',
         "noRestrictedImports",

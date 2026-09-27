@@ -13,37 +13,78 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const SRC = join(REPO, "src/core/src");
 const BIOME = join(REPO, "node_modules/.bin/biome");
-/** A whole-line `//` comment in `.fallowrc.jsonc`. */
-const LINE_COMMENT = /^\s*\/\/.*$/gmu;
+const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /** The extension of a single-module rule. */
 const TS_SUFFIX = /\.ts$/u;
 
-/** The part of `.fallowrc.jsonc` these tests read. */
-interface FallowConfig {
-  boundaries: {
-    zones: { name: string; patterns: string[] }[];
-    rules: { from: string; allow: string[] }[];
+/** What `fallow guard --format json` says about one file. */
+interface Guarded {
+  path: string;
+  zone: { name: string } | null;
+  boundary: {
+    unrestricted: boolean;
+    allowed_zones: string[];
+    allowed_type_only_zones: string[];
+    forbidden_calls: string[];
+    coverage_required: boolean;
   };
 }
 
 /**
- * Reads the fallow configuration, comments dropped.
+ * Asks fallow which zone and rules apply to files, the way its checks apply
+ * them (first matching zone wins), rather than re-reading the config here.
  *
- * @returns the zones and their rules.
+ * @param paths - repo-relative paths; they need not exist.
+ * @returns fallow's answer for each path.
  */
-function fallowConfig(): FallowConfig {
-  const text = readFileSync(join(REPO, ".fallowrc.jsonc"), "utf8").replace(LINE_COMMENT, "");
-  return JSON.parse(text);
+function guard(paths: readonly string[]): Guarded[] {
+  const run = Bun.spawnSync([FALLOW, "guard", "--format", "json", ...paths], { cwd: REPO });
+  const parsed: { files: Guarded[] } = JSON.parse(run.stdout.toString());
+  return parsed.files;
+}
+
+/**
+ * Lists the TypeScript modules below a directory.
+ *
+ * @param dir - an absolute directory.
+ * @returns absolute paths.
+ */
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return sources(path);
+    }
+    return entry.name.endsWith(".ts") ? [path] : [];
+  });
+}
+
+/**
+ * Names the zone a core source file must be in: `core-api` for index.ts,
+ * `core-rule-<name>` for a rule's module or folder, `core-rules-shared` for
+ * rules/shared, and `core-<folder>` for everything else.
+ *
+ * @param path - a repo-relative path under src/core/src.
+ * @returns the expected zone name.
+ */
+function expectedZone(path: string): string {
+  const [top, next] = path.slice("src/core/src/".length).split("/");
+  if (top === "index.ts") {
+    return "core-api";
+  }
+  if (top === "rules" && next !== undefined) {
+    return next === "shared" ? "core-rules-shared" : `core-rule-${next.replace(TS_SUFFIX, "")}`;
+  }
+  return `core-${top}`;
 }
 
 /**
@@ -98,6 +139,12 @@ describe("no I/O in the engine", () => {
       ],
       ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
       ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now: () => number = Date.now;\n", "Clock contract"],
+      [
+        "const D = Date;\n\n/** Stamps. */\nexport const now = (): Date => new D();\n",
+        "Clock contract",
+      ],
+      ["/** Stamps. */\nexport const now = (): string => globalThis.Date();\n", "Clock contract"],
     ];
     for (const [text, rule] of probes) {
       const result = lintAs("src/core/src/rules/probe.ts", text);
@@ -105,46 +152,54 @@ describe("no I/O in the engine", () => {
       expect(result.out).toContain(rule);
     }
   });
+
+  test("parsing and building dates stays allowed", () => {
+    const pure = lintAs(
+      "src/core/src/rules/probe.ts",
+      "/** Parses. */\nexport const at = (s: string): number => Date.parse(s);\n\n/** Builds. */\nexport const of = (ms: number): Date => new Date(ms);\n",
+    );
+    expect(pure.out).not.toContain("Clock contract");
+  });
 });
 
-describe("zones", () => {
-  const config = fallowConfig();
-  const zones = config.boundaries.zones.filter((zone) => zone.name.startsWith("core-"));
-  const rules = new Map(config.boundaries.rules.map((rule) => [rule.from, rule.allow]));
+describe("zones, as fallow applies them", () => {
+  const files = sources(SRC).map((path) => relative(REPO, path));
+  const guarded = guard(files);
 
-  test("every source folder and every rule has a zone", () => {
-    const patterns = zones.flatMap((zone) => zone.patterns);
-    const folders = readdirSync(SRC, { withFileTypes: true }).filter((e) => e.isDirectory());
-    for (const folder of folders.filter((f) => f.name !== "rules")) {
-      expect(patterns).toContain(`src/core/src/${folder.name}/**`);
-    }
-    for (const entry of readdirSync(join(SRC, "rules"), { withFileTypes: true })) {
-      const name = entry.name.replace(TS_SUFFIX, "");
-      const pattern = entry.isDirectory()
-        ? `src/core/src/rules/${name}/**`
-        : `src/core/src/rules/${name}.ts`;
-      expect(patterns).toContain(pattern);
+  test("every source file sits in its own folder's or rule's zone", () => {
+    expect(guarded.length).toBe(files.length);
+    for (const file of guarded) {
+      expect({ path: file.path, zone: file.zone?.name }).toEqual({
+        path: file.path,
+        zone: expectedZone(file.path),
+      });
+      expect(file.boundary.unrestricted).toBe(false);
+      expect(file.boundary.forbidden_calls).toEqual(expect.arrayContaining(["fs.*", "process.*"]));
     }
   });
 
-  test("the rules share only rules/shared", () => {
-    const ruleZones = zones
-      .map((zone) => zone.name)
-      .filter((name) => name.startsWith("core-rule-"));
-    expect(ruleZones.length).toBeGreaterThan(0);
-    for (const zone of ruleZones) {
-      const allowed = rules.get(zone) ?? [];
-      expect(allowed.filter((target) => target.startsWith("core-rule-"))).toEqual([]);
-      expect(allowed).not.toContain("core-engine");
+  test("a rule may import rules/shared and the folders below, never another rule", () => {
+    const ruleFiles = guarded.filter((f) => f.zone?.name.startsWith("core-rule-"));
+    expect(ruleFiles.length).toBeGreaterThan(0);
+    for (const file of ruleFiles) {
+      const reachable = [...file.boundary.allowed_zones, ...file.boundary.allowed_type_only_zones];
+      expect(reachable.filter((z) => z.startsWith("core-rule-") && z !== file.zone?.name)).toEqual(
+        [],
+      );
+      expect(reachable).not.toContain("core-engine");
     }
   });
 
-  test("no production core zone imports outside core", () => {
-    for (const zone of zones.filter((z) => z.name !== "core-dev")) {
-      for (const target of rules.get(zone.name) ?? []) {
-        expect(target.startsWith("core-")).toBe(true);
-        expect(target).not.toBe("core-dev");
-      }
+  test("no production core file may import outside core", () => {
+    for (const file of guarded) {
+      const reachable = [...file.boundary.allowed_zones, ...file.boundary.allowed_type_only_zones];
+      expect(reachable.filter((z) => !z.startsWith("core-") || z === "core-dev")).toEqual([]);
     }
+  });
+
+  test("a file in a new folder has no zone, and fallow reports it until it gets one", () => {
+    const [fresh] = guard(["src/core/src/new-folder/module.ts"]);
+    expect(fresh?.zone).toBeNull();
+    expect(fresh?.boundary.coverage_required).toBe(true);
   });
 });
