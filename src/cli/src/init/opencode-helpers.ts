@@ -258,13 +258,18 @@ function toolInput(tool, args, directory) {
  * of an edit's oldString. Without exactly one exact match (or one at all,
  * with replaceAll) OpenCode tries looser matches: trimmed lines, collapsed
  * whitespace, a leading BOM dropped. The config guard simulates the exact,
- * normalised match only, so the two could change different lines.
+ * normalised match only, so the two could change different lines. The
+ * guard also drops a leading BOM from both strings and OpenCode doesn't, so
+ * such an edit is never simulated as written.
  *
  * @param input - the edit's tool input, as the hook reads it.
  * @returns true when the edit's target is up to OpenCode's fallbacks.
  */
 function inexact(input) {
   const from = String(input.old_string ?? "").replaceAll("\\r\\n", "\\n");
+  if (from.startsWith("\\uFEFF") || String(input.new_string ?? "").startsWith("\\uFEFF")) {
+    return true;
+  }
   if (from === "") {
     return false; // creates a file, which the guard simulates
   }

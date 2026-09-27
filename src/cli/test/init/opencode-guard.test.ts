@@ -44,6 +44,13 @@ test("an edit of the config whose oldString doesn't match exactly once is refuse
   // A leading BOM, which the guard drops: no exact match, so OpenCode's looser matches decide.
   const bom = { ...edit, oldString: "\uFEFF# owner: shop.domain", newString: "# owner: shop" };
   expect(await refusal(hooks, "edit", bom)).toContain("must match exactly once");
+  // A BOM inside the file matches exactly, but the guard would still drop the one in oldString.
+  writeFileSync(
+    config,
+    readFileSync(config, "utf8").replace('"shop.domain"', '"\uFEFFshop.domain"'),
+  );
+  const inner = { ...edit, oldString: "\uFEFFshop.domain", newString: "shop" };
+  expect(await refusal(hooks, "edit", inner)).toContain("must match exactly once");
   // With replaceAll every exact match changes, which the guard simulates and judges.
   expect(await refusal(hooks, "edit", { ...edit, replaceAll: true })).toContain("[tool.inwards]");
   const unique = { ...edit, oldString: "# owner: shop.domain", newString: "# owner: shop" };
