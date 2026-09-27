@@ -103,7 +103,7 @@ export function carried(now: readonly Diagnostic[], before: readonly Diagnostic[
  * @returns one line of advice, then one line per violation.
  */
 export function oldNote(old: readonly Diagnostic[]): string {
-  const lines = old.map((d) => `- ${d.file}:${d.line} ${d.code} ${stableMessage(d.message)}`);
+  const lines = old.map((d) => `- ${d.file}:${d.line} ${d.code} ${stableMessage(d)}`);
   return [
     "These violations were already in the file when the session started, so they don't block. Leave them unless the task needs that code, and mention them to the user:",
     ...lines,
