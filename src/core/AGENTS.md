@@ -39,8 +39,9 @@ Enforced by:
   below it, never each other. A new folder falls into `core-unzoned`, which
   may import nothing. The forbidden-call list (`Bun.*`, `process.*`, `fs.*`,
   `console.*`, ...) covers every core zone.
-- **Biome** (`biome.jsonc`): no Node or Bun modules, no `process`, `Bun` or
-  `Deno` globals, no `process.env`.
+- **Biome** (`biome.jsonc`): no Node or Bun modules, no `process`, `Bun`,
+  `Deno`, `fetch` or `performance` globals, no `process.env`, and the
+  `no-direct-clock` plugin rejects `Date.now()` and `new Date()`.
 - **`bun run check:cycles`**: no import cycles, type imports included.
 - **`src/core/test/architecture.test.ts`** and **`api.test.ts`**: probe the
   above by behaviour, and pin the public exports.

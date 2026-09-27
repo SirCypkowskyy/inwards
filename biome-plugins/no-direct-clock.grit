@@ -1,7 +1,9 @@
 // Policy code reads the time through the Clock contract, so a test can fix it
-// and a run's timestamps come from one place (#176). Date.parse and
-// new Date(value) are pure and stay allowed. Scoped by the overrides in
-// biome.jsonc that list this file.
+// and a run's timestamps come from one place; the engine doesn't read it at
+// all (#176). Date.parse and new Date(value) are pure and stay allowed.
+// Imports of node:perf_hooks and the performance global are denied in
+// biome.jsonc, so an alias can't read the clock either. Scoped by the
+// overrides in biome.jsonc that list this file.
 language js
 
 or {
@@ -13,5 +15,5 @@ or {
   `new globalThis.Date()`,
   `globalThis.performance.now()`
 } as $read where {
-  register_diagnostic(span=$read, message="Read the time through the Clock contract (platform/contracts.ts), not the system clock.")
+  register_diagnostic(span=$read, message="Read the time through the Clock contract (src/cli/src/platform/contracts.ts), not the system clock; the engine takes it from its caller.")
 }

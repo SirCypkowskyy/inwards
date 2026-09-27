@@ -273,8 +273,11 @@
       "linter": { "rules": { "performance": { "noBarrelFile": "off" } } }
     },
     {
-      // The engine is pure: no runtime globals, no Node or Bun modules, no env.
+      // The engine is pure: no runtime globals, no Node or Bun modules, no env,
+      // no network and no clock (the plugin rejects Date.now(), new Date() and
+      // performance.now(); durations come from the adapter).
       "includes": ["src/core/src/**"],
+      "plugins": ["./biome-plugins/no-direct-clock.grit"],
       "linter": {
         "rules": {
           "correctness": { "noNodejsModules": "error" },
@@ -287,7 +290,12 @@
                 "deniedGlobals": {
                   "Bun": "The engine also runs on Node inside VS Code. Take I/O through a port instead (see GrammarBinaries).",
                   "Deno": "The engine must stay runtime-agnostic.",
-                  "process": "The engine has no process: take what you need as a parameter or a port."
+                  "process": "The engine has no process: take what you need as a parameter or a port.",
+                  "fetch": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "WebSocket": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "XMLHttpRequest": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "EventSource": "The engine does no I/O: take what you need as a parameter or a port.",
+                  "performance": "The engine doesn't time itself; the adapter measures durations."
                 }
               }
             }

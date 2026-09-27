@@ -9,6 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   copyFileSync,
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -58,6 +59,7 @@ function lintAs(path: string, text: string): { code: number | null; out: string 
   const root = mkdtempSync(join(tmpdir(), "inwards-core-arch-"));
   try {
     copyFileSync(join(REPO, "biome.jsonc"), join(root, "biome.jsonc"));
+    cpSync(join(REPO, "biome-plugins"), join(root, "biome-plugins"), { recursive: true });
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
     const run = Bun.spawnSync(
@@ -85,6 +87,22 @@ describe("no I/O in the engine", () => {
       );
       expect(global.code).not.toBe(0);
       expect(global.out).toContain("noRestrictedGlobals");
+    }
+  });
+
+  test("a core module can't reach the network or read the clock", () => {
+    const probes: [string, string][] = [
+      [
+        '/** Fetches. */\nexport const load = (): Promise<Response> => fetch("https://x");\n',
+        "noRestrictedGlobals",
+      ],
+      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
+    ];
+    for (const [text, rule] of probes) {
+      const result = lintAs("src/core/src/rules/probe.ts", text);
+      expect(result.code).not.toBe(0);
+      expect(result.out).toContain(rule);
     }
   });
 });
