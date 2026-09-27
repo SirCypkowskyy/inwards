@@ -91,7 +91,10 @@ export function cycleDiagnostic(cycle: Cycle): Diagnostic | undefined {
   const path = cycle.path.join(" -> ");
   // The group's size and a hash of its links are part of the message, so a
   // baseline taken before the group changed stops matching.
-  const links = [...new Set(cycle.inside.map((edge) => `${edge.from} ${edge.to}`))].sort();
+  // JSON pairs: a context name may hold a space, so a plain join could make two links one.
+  const links = [
+    ...new Set(cycle.inside.map((edge) => JSON.stringify([edge.from, edge.to]))),
+  ].sort();
   const noun = cycle.kind === "modules" ? "modules" : "contexts";
   const group = `The group holds ${cycle.members.length} ${noun} and ${links.length} links between them (link hash ${linkHash(links)}).`;
   const message =
@@ -118,7 +121,7 @@ const HASH_DIGITS = 8;
  * Hashes a group's links, so two groups of one size but different links get
  * different messages.
  *
- * @param links - the group's links, `from to`, deduplicated and sorted.
+ * @param links - the group's links as JSON pairs, deduplicated and sorted.
  * @returns 16 hex digits.
  */
 function linkHash(links: readonly string[]): string {

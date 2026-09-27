@@ -17,6 +17,7 @@ import {
   parseConfig,
   type SourceFile,
 } from "../../src/index.ts";
+import { type Cycle, cycleDiagnostic, type Edge } from "../../src/rules/import-cycles/cycles.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]
@@ -84,6 +85,46 @@ const MODULE_CYCLE = {
   "shop/domain/orders/total.py": "import shop.domain.orders.order\n",
 };
 
+/**
+ * Builds one link of a context cycle, all on the same import.
+ *
+ * @param from - the context the import is in.
+ * @param to - the context it lands in.
+ * @returns a link between the two contexts.
+ */
+function contextEdge(from: string, to: string): Edge {
+  const ref = {
+    target: "shop.n1",
+    statement: "import shop.n1",
+    line: 1,
+    column: 7,
+    endLine: 1,
+    endColumn: 14,
+  };
+  return { from, to, file: file("shop/n0.py", "import shop.n1\n"), ref };
+}
+
+/**
+ * Builds a group of five contexts, anchor <-> billing plus one more link.
+ *
+ * @param from - where the extra link starts.
+ * @param to - where it ends.
+ * @returns the cycle `findCycles` would report for the group.
+ */
+function contextGroup(from: string, to: string): Cycle {
+  return {
+    kind: "contexts",
+    path: ["anchor", "billing", "anchor"],
+    steps: [contextEdge("anchor", "billing"), contextEdge("billing", "anchor")],
+    members: ["anchor", "billing", "billing europe", "europe support", "support"],
+    inside: [
+      contextEdge("anchor", "billing"),
+      contextEdge("billing", "anchor"),
+      contextEdge(from, to),
+    ],
+  };
+}
+
 describe("module cycles", () => {
   test("one cycle, reported once with its path, on the first step's import", async () => {
     const found = await cycles(`${LAYERS}cycles = ["modules"]\n`, MODULE_CYCLE);
@@ -91,7 +132,7 @@ describe("module cycles", () => {
       [
         "shop/domain/orders/line.py",
         1,
-        "Modules import each other in a cycle: shop.domain.orders.line -> shop.domain.orders.total -> shop.domain.orders.order -> shop.domain.orders.line. The group holds 3 modules and 3 links between them (link hash 1d0a7ed90b3266a1).",
+        "Modules import each other in a cycle: shop.domain.orders.line -> shop.domain.orders.total -> shop.domain.orders.order -> shop.domain.orders.line. The group holds 3 modules and 3 links between them (link hash 3a2165a22279425f).",
       ],
     ]);
     expect(found[0]?.fix.steps[0]).toContain(
@@ -138,7 +179,7 @@ describe("context cycles", () => {
     expect(found.map((d) => [d.file, d.message])).toEqual([
       [
         "shop/app/billing/charge.py",
-        "Contexts import each other in a cycle: billing -> orders -> billing. The group holds 2 contexts and 2 links between them (link hash 054cdff0361084c5).",
+        "Contexts import each other in a cycle: billing -> orders -> billing. The group holds 2 contexts and 2 links between them (link hash 2872782f020003a0).",
       ],
     ]);
     expect(found[0]?.fix.steps.at(-1)).toContain("Don't edit [tool.inwards] yourself.");
@@ -243,6 +284,12 @@ describe("what the report stands on", () => {
     expect(old?.message).toContain("4 modules and 6 links");
     expect(rewired?.message).toContain("4 modules and 6 links");
     expect(old && rewired && baselineKey(rewired)).not.toBe(old && baselineKey(old));
+  });
+
+  test("links between contexts whose names hold spaces never hash alike", () => {
+    const one = cycleDiagnostic(contextGroup("billing europe", "support"));
+    const other = cycleDiagnostic(contextGroup("billing", "europe support"));
+    expect(one?.message).not.toBe(other?.message);
   });
 
   test("an inline suppression of INW004 is itself an INW009 error", async () => {
