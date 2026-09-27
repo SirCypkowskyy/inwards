@@ -13,7 +13,8 @@ const LOOKUPS = 3;
 export const Inwards = async ({ client, directory }) => {
   /**
    * What the plugin knows about each top-level session:
-   * - whether the Stop gate sent it back to work, and whether that message is still on its way;
+   * - whether the Stop gate sent it back to work, whether that message is still
+   *   on its way or couldn't be sent, and which turn the gate is answering;
    * - how many messages the user sent, and how many idles came: only the
    *   latest idle, from after the user's latest message, runs the gate;
    * - whether a turn is running;
@@ -28,7 +29,8 @@ export const Inwards = async ({ client, directory }) => {
       sessions.set(id, {
         continued: false,
         awaiting: false,
-        running: false,
+        running: undefined,
+        unsent: undefined,
         generation: 0,
         idles: 0,
         busy: false,
@@ -150,27 +152,37 @@ export const Inwards = async ({ client, directory }) => {
     if (!current(s, idle)) {
       return; // a later idle, a message or a turn made this one stale
     }
-    s.running = true;
-    let result;
+    s.running = idle.generation;
     try {
-      result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
+      await answer(id, s, idle);
     } finally {
-      s.running = false;
+      s.running = undefined;
     }
+  };
+
+  /**
+   * Runs the gate for an idle that stands and passes on what it says. A gate
+   * message that couldn't be sent is sent again instead: the gate already
+   * counted that attempt.
+   *
+   * @param id - the session.
+   * @param s - its state.
+   * @param idle - the idle's number and the user's message count when it came.
+   */
+  const answer = async (id, s, idle) => {
+    if (s.unsent !== undefined) {
+      await deliver(id, s, s.unsent);
+      return;
+    }
+    const result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
     // The gate has counted this attempt, so a later idle doesn't make the result stale;
     // a message from the user, or a turn that started, does.
     if (idle.generation !== s.generation || s.busy || s.awaiting) {
       return;
     }
     if (result.code === 2) {
-      const was = s.continued;
       s.continued = true;
-      s.awaiting = true;
-      if (!(await send(id, { parts: [{ type: "text", text: STOP_PREFACE + result.stderr }] }))) {
-        // Not sent: the agent never got this attempt, so the next idle runs the gate as before.
-        s.awaiting = false;
-        s.continued = was;
-      }
+      await deliver(id, s, STOP_PREFACE + result.stderr);
       return;
     }
     s.continued = false;
@@ -180,6 +192,20 @@ export const Inwards = async ({ client, directory }) => {
     if (message) {
       await note(id, message);
     }
+  };
+
+  /**
+   * Sends the gate's message, which starts another turn; one that fails is kept for the next idle.
+   *
+   * @param id - the session.
+   * @param s - its state.
+   * @param text - the message.
+   */
+  const deliver = async (id, s, text) => {
+    s.awaiting = true;
+    const sent = await send(id, { parts: [{ type: "text", text }] });
+    s.unsent = sent ? undefined : text;
+    s.awaiting = sent;
   };
 
   return {
@@ -208,8 +234,8 @@ export const Inwards = async ({ client, directory }) => {
         const id = event.properties.sessionID;
         // Before anything waits: later idles and messages make this one stale.
         const known = sessions.get(id);
-        if (known?.running) {
-          return; // the gate is already answering this idle
+        if (known !== undefined && known.running === known.generation) {
+          return; // the gate is already answering this turn's idle
         }
         const seen = known ? { number: ++known.idles, generation: known.generation } : undefined;
         if (known) {
@@ -244,6 +270,7 @@ export const Inwards = async ({ client, directory }) => {
       s.generation += 1;
       s.continued = false;
       s.awaiting = false;
+      s.unsent = undefined;
       s.chosen = {
         ...(input.agent ? { agent: input.agent } : {}),
         ...(input.model ? { model: input.model } : {}),

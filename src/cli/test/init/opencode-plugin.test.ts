@@ -160,3 +160,40 @@ test("a gate message that couldn't be sent doesn't use up an attempt", async () 
   await fire(hooks, "session.idle", s); // blocks again: the agent never got the first
   expect(sent.map((m) => [m.noReply, m.text.startsWith(STOP)])).toEqual([[false, true]]);
 });
+
+test("a gate message that fails later is sent again, without running the gate again", async () => {
+  const root = initProject();
+  const config = join(root, "pyproject.toml");
+  writeFileSync(
+    config,
+    readFileSync(config, "utf8").replace(
+      "[tool.inwards]\n",
+      "[tool.inwards]\nescalate-after = 2\n",
+    ),
+  );
+  const { hooks, sent } = await load(root, root, { promptAt: [1] });
+  const s = "ses_resend";
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await fire(hooks, "session.idle", s); // attempt 1, sent
+  await say(hooks, s, sent[0]?.text ?? "");
+  await fire(hooks, "session.idle", s); // attempt 2, the message fails
+  await fire(hooks, "session.idle", s); // the same message again, not a third attempt
+  expect(sent.map((m) => [m.noReply, m.text.startsWith(STOP)])).toEqual([
+    [false, true],
+    [false, true],
+  ]);
+});
+
+test("an idle of a newer turn is kept while the gate still answers the older one", async () => {
+  const root = initProject();
+  const { hooks, sent } = await load(root);
+  const s = "ses_turns";
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  const older = fire(hooks, "session.idle", s);
+  await say(hooks, s, "Also rename the class.");
+  const newer = fire(hooks, "session.idle", s);
+  await Promise.all([older, newer]);
+  expect(sent).toHaveLength(1);
+});

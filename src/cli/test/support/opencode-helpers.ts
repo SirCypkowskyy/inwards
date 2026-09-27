@@ -62,6 +62,8 @@ export interface Failures {
   get?: number;
   /** Prompts that fail before one succeeds. */
   prompt?: number;
+  /** Which prompts fail, counting every prompt from 0. */
+  promptAt?: readonly number[];
 }
 
 /**
@@ -96,7 +98,7 @@ export async function load(
 ): Promise<Loaded> {
   const sent: Sent[] = [];
   const parents = new Map<string, string>();
-  const failing = { get: failures.get ?? 0, prompt: failures.prompt ?? 0 };
+  const failing = { get: failures.get ?? 0, prompt: failures.prompt ?? 0, calls: 0 };
   const client = {
     session: {
       promptAsync: ({
@@ -106,8 +108,10 @@ export async function load(
         path: { id: string };
         body: PromptBody;
       }): Promise<{ error?: string }> => {
-        if (failing.prompt > 0) {
-          failing.prompt -= 1;
+        const call = failing.calls;
+        failing.calls += 1;
+        if (failing.prompt > 0 || failures.promptAt?.includes(call)) {
+          failing.prompt = Math.max(0, failing.prompt - 1);
           return Promise.resolve({ error: "HTTP 500" });
         }
         const text = body.parts.map((p) => p.text).join("");
