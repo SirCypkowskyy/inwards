@@ -9,7 +9,15 @@ import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts
 import { configGuard } from "./guard.ts";
 import { agentSuppressions, existedAtStart, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
 import { print } from "./output.ts";
-import { findConfig, isInside, PATH_SEPARATORS, physicalRealpath, realpath } from "./paths.ts";
+import {
+  findConfig,
+  isInside,
+  PATH_SEPARATORS,
+  physicalRealpath,
+  realpath,
+  shownDiagnostics,
+  shownReport,
+} from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
 import {
@@ -173,7 +181,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
     rememberEdit(target.project, id, target.file, blocking);
     return report.diagnostics.length === 0
       ? 0
-      : reply(report, { old, blocking, rejected }, escalation);
+      : reply(report, { old, blocking, rejected }, escalation, target);
   } catch (err) {
     if (err instanceof ConfigError) {
       return print(`inwards: config error: ${err.message}`, 2);
@@ -193,6 +201,7 @@ async function postToolUse(input: Record<string, unknown>): Promise<number> {
  * @param split - the errors the file already had at session start, the ones
  *   that block, and the findings whose suppression was rejected.
  * @param escalation - the escalation limit, if this run reached it, from `escalationOf`.
+ * @param where - the real project root and the report's base, to show paths from the project.
  * @returns 2 to block, 0 when everything is context.
  */
 function reply(
@@ -203,13 +212,17 @@ function reply(
     rejected,
   }: { old: Diagnostic[]; blocking: Diagnostic[]; rejected: Diagnostic[] },
   escalation: { limit: number; every: boolean } | undefined,
+  { project, cwd }: { project: string; cwd: string },
 ): number {
-  const shown = { ...report, diagnostics: report.diagnostics.filter((d) => !old.includes(d)) };
+  const left = { ...report, diagnostics: report.diagnostics.filter((d) => !old.includes(d)) };
+  const shown = shownReport(project, cwd, left);
   const json = shown.diagnostics.length > 0 ? render(shown, "json", { pretty: false }) : "";
   const ask = escalation === undefined ? "" : `inwards: ${askUser(escalation.limit)}\n`;
   const note = [
-    ...(rejected.length > 0 ? [`inwards: ${rejectedNote(rejected)}\n`] : []),
-    ...(old.length > 0 ? [`inwards: ${oldNote(old)}\n`] : []),
+    ...(rejected.length > 0
+      ? [`inwards: ${rejectedNote(shownDiagnostics(project, cwd, rejected))}\n`]
+      : []),
+    ...(old.length > 0 ? [`inwards: ${oldNote(shownDiagnostics(project, cwd, old))}\n`] : []),
   ].join("");
   if (blocking.length > 0 && escalation?.every !== true) {
     process.stderr.write(`${ask}${note}${json}\n`); // a new violation still blocks
