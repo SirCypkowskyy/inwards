@@ -14,7 +14,8 @@ export const Inwards = async ({ client, directory }) => {
   /**
    * What the plugin knows about each top-level session:
    * - whether the Stop gate sent it back to work, whether that message is still
-   *   on its way or couldn't be sent, and which turn the gate is answering;
+   *   on its way or couldn't be sent, which turn it is (a user's message or
+   *   the gate's starts one), and which turn the gate is answering;
    * - how many messages the user sent, and how many idles came: only the
    *   latest idle, from after the user's latest message, runs the gate;
    * - whether a turn is running;
@@ -29,6 +30,7 @@ export const Inwards = async ({ client, directory }) => {
       sessions.set(id, {
         continued: false,
         awaiting: false,
+        turn: 0,
         running: undefined,
         unsent: undefined,
         generation: 0,
@@ -152,7 +154,7 @@ export const Inwards = async ({ client, directory }) => {
     if (!current(s, idle)) {
       return; // a later idle, a message or a turn made this one stale
     }
-    s.running = idle.generation;
+    s.running = s.turn;
     try {
       await answer(id, s, idle);
     } finally {
@@ -242,7 +244,7 @@ export const Inwards = async ({ client, directory }) => {
         const id = event.properties.sessionID;
         // Before anything waits: later idles and messages make this one stale.
         const known = sessions.get(id);
-        if (known !== undefined && known.running === known.generation) {
+        if (known !== undefined && known.running === known.turn) {
           return; // the gate is already answering this turn's idle
         }
         const seen = known ? { number: ++known.idles, generation: known.generation } : undefined;
@@ -270,12 +272,14 @@ export const Inwards = async ({ client, directory }) => {
         // The gate's message arrived: the continued turn begins, and idles queued before it are stale.
         s.awaiting = false;
         s.busy = true;
+        s.turn += 1;
       }
       if (own) {
         return;
       }
       // A message the user sends starts a new turn, with the agent, model and variant they picked.
       s.generation += 1;
+      s.turn += 1;
       s.continued = false;
       s.awaiting = false;
       s.unsent = undefined;

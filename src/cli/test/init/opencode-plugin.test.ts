@@ -240,3 +240,24 @@ test("a gate message that fails after the user moved on isn't sent in the new tu
   await fire(hooks, "session.idle", s);
   expect(sent).toEqual([]);
 });
+
+test("the continued turn's idle, arriving before the gate's request answers, is still checked", async () => {
+  const root = initProject();
+  const s = "ses_early_idle";
+  const ref: { hooks?: Hooks; idle?: Promise<void> } = {};
+  const { hooks, sent } = await load(root, root, {
+    // OpenCode takes the message and the continued turn ends, all before the request answers.
+    during: async (call: number, text: string): Promise<void> => {
+      if (call === 0 && ref.hooks) {
+        await ref.hooks["chat.message"]({ sessionID: s }, { parts: [{ type: "text", text }] });
+        ref.idle = fire(ref.hooks, "session.idle", s);
+      }
+    },
+  });
+  ref.hooks = hooks;
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await fire(hooks, "session.idle", s);
+  await ref.idle;
+  expect(sent.filter((m) => m.text.startsWith(STOP))).toHaveLength(2);
+});
