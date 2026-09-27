@@ -110,6 +110,9 @@
     {
       // Tests and scripts hold fixture strings (TOML snippets, adversarial
       // Python) that the entropy check reads as secrets. None are credentials.
+      // Narrowing this to fixture files was measured under #176: 70 findings
+      // in 22 test and script files, inline fixtures all, so it stays scoped
+      // to tests and scripts.
       "includes": ["**/test/**", "**/scripts/**"],
       "linter": { "rules": { "security": { "noSecrets": "off" } } }
     },

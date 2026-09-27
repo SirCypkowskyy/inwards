@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: a57058afebfa0c64d9f84f122d4d1650d5d9c07a92cc3f4f5d0cb06c24c6aa82
+source_hash: 4d98dbd92f3b23c7e6aa45667272ccc7213044efd48ec5285bbd3c5ab4123a81
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -86,8 +86,8 @@ flowchart TB
 |---|---|---|---|
 | **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
-| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
-| **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
+| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
+| **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :white_check_mark: `init --agent` dla `claude`, `aider` i `agents-md` |
 | **Stan sesji i run log** | Pliki JSON i JSON Lines, tylko lokalnie | `.inwards/state/`, `.inwards/runs.jsonl` | :white_check_mark: (run log opcjonalny, [rozdział 8](08-Run-Log.md)) |
 | **Pamięć podręczna** | Listy importów kluczowane hashem zawartości | `.inwards/cache` | :material-progress-clock: [#56](https://github.com/SirCypkowskyy/inwards/issues/56) |
@@ -416,7 +416,12 @@ src/
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
 │   │                      #   the grammars, the picker; compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
-└── vscode-extension/src/  # extension.ts + selector.ts (client), server.ts + config-file.ts (LSP), workspace.ts (INW007/INW008 pass)
+└── vscode-extension/
+    ├── src/
+    │   ├── client/        # extension.ts (activation, starts the server), selector.ts
+    │   └── server/        # server.ts (LSP), workspace.ts (INW007/INW008 pass), config-file.ts
+    ├── scripts/           # copy-wasm.ts: grammars next to dist/server.js
+    └── test/              # LSP harness and tests, packaged.test.ts on the built dist/
 ```
 
 Poza `src/`: `scripts/` buduje pliki binarne i wheele oraz sprawdza wersje i nawigację dokumentacji, `packaging/` zawiera README wheela i rezerwacje nazw, `eval/` to środowisko ewaluacji agentów, `bench/` generuje syntetyczne repozytorium do benchmarków i porównuje na nim dwa buildy dla bramki regresji w PR-ach, a `examples/clean-app` to aplikacja, którą sprawdza CI.

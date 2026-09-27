@@ -6,8 +6,9 @@
  * code, URLs and abbreviations such as "e.g." are left out before counting,
  * so dotted file names or version numbers don't pass for sentence ends.
  *
- * Usage: `bun run scripts/check-module-overviews.ts DIR...` (CI passes the
- * packages restructured so far). Exit 0 when every module passes, 1 otherwise.
+ * Usage: `bun run scripts/check-module-overviews.ts DIR...` (CI passes every
+ * directory with TypeScript: src, scripts, eval, bench, docs/test). Exit 0
+ * when every module passes, 1 otherwise.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";

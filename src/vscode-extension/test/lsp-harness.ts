@@ -1,11 +1,14 @@
+/**
+ * @file A minimal LSP client for the tests: it bundles the language server the way
+ * the extension ships it (CommonJS, grammars next to `server.js`), or runs an
+ * already built one, talks to it over stdio, and records what it publishes.
+ * Each test file makes its own harness, since Bun shares modules between files.
+ */
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-
-// The language server over stdio, bundled the way the extension ships it
-// (CommonJS, grammars next to server.js), talking to a minimal LSP client.
 
 export const PYPROJECT = `[tool.inwards]
 layers = [{ name = "app", modules = ["app"] }]
@@ -15,7 +18,7 @@ packages = ["app.*"]
 allow = ["router", "schemas", "utils"]
 require = ["__init__", "router", "service"]
 `;
-const TIMEOUT_MS = 15_000;
+export const TIMEOUT_MS = 15_000;
 /** How long to wait for a refresh that must not happen: well past the server's 100 ms debounce. */
 export const QUIET_MS = 500;
 const HEADER_END = "\r\n\r\n";
@@ -75,7 +78,8 @@ export interface Harness {
   codesOnceIncluding: (path: string, code: string, present?: boolean) => Promise<string[]>;
   diagnosticsOnce: (path: string, ready: (found: Published[]) => boolean) => Promise<Published[]>;
   popups: () => string[];
-  cleanup: () => void;
+  /** Kills every server this harness started, waits for them, and removes `tmp`. */
+  cleanup: () => Promise<void>;
 }
 
 /**
@@ -99,7 +103,7 @@ export function write(root: string, files: Record<string, string>): void {
  */
 export async function until(
   ready: () => boolean,
-  deadline = Date.now() + TIMEOUT_MS,
+  deadline: number = Date.now() + TIMEOUT_MS,
 ): Promise<void> {
   if (ready() || Date.now() > deadline) {
     return;
@@ -117,7 +121,8 @@ export async function until(
 async function bundle(tmp: string): Promise<string> {
   const out = join(tmp, "dist");
   const built = await Bun.build({
-    entrypoints: [join(import.meta.dir, "../src/server.ts")],
+    entrypoints: [join(import.meta.dir, "../src/server/server.ts")],
+    naming: { entry: "[name].[ext]" },
     outdir: out,
     target: "node",
     format: "cjs",
@@ -170,11 +175,16 @@ async function listen(stdout: ReadableStream<Uint8Array>, log: Log): Promise<voi
  * bundled server (built once), and what its servers send. Each test file
  * makes its own, since Bun shares modules between the files it runs.
  *
+ * @param shipped - run this built server with this runtime instead of
+ *   bundling one, to test the package as it ships.
+ * @param shipped.server - the built `dist/server.js`.
+ * @param shipped.runtime - the executable that runs it (Node, as VS Code does).
  * @returns the harness; call `cleanup` in `afterAll`.
  */
-export function lspHarness(): Harness {
+export function lspHarness(shipped?: { server: string; runtime: string }): Harness {
   const tmp = mkdtempSync(join(tmpdir(), "inwards-lsp-"));
-  const bundled = bundle(tmp);
+  const bundled = shipped === undefined ? bundle(tmp) : Promise.resolve(shipped.server);
+  const runtime = shipped?.runtime ?? process.execPath;
   const log: Log = {
     published: new Map(),
     publishes: new Map(),
@@ -182,6 +192,8 @@ export function lspHarness(): Harness {
     received: [],
   };
   const { published, publishes, answered, received } = log;
+  /** Every server started, so cleanup reaps them even when a test fails early. */
+  const started: Bun.Subprocess[] = [];
 
   /**
    * Starts the bundled server on a project and completes the LSP handshake.
@@ -190,17 +202,19 @@ export function lspHarness(): Harness {
    * @param id - the initialize request's id, unique across the file's servers.
    * @param capabilities - the client capabilities to announce.
    * @returns the running server.
+   * @throws {Error} when the server doesn't answer `initialize` in time.
    */
   async function startServer(
     root: string,
     id: number,
     capabilities: Record<string, unknown>,
   ): Promise<Server> {
-    const server = Bun.spawn([process.execPath, await bundled, "--stdio"], {
+    const server = Bun.spawn([runtime, await bundled, "--stdio"], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "ignore",
     });
+    started.push(server);
     /**
      * Sends one JSON-RPC message to the server.
      *
@@ -224,6 +238,9 @@ export function lspHarness(): Harness {
       },
     });
     await until(() => answered.has(id));
+    if (!answered.has(id)) {
+      throw new Error(`the server did not answer initialize within ${TIMEOUT_MS} ms`);
+    }
     send({ method: "initialized", params: {} });
     return { send, kill: (): void => server.kill() };
   }
@@ -301,6 +318,16 @@ export function lspHarness(): Harness {
     codesOnceIncluding,
     diagnosticsOnce,
     popups,
-    cleanup: (): void => rmSync(tmp, { recursive: true, force: true }),
+    cleanup: async (): Promise<void> => {
+      try {
+        // The servers are disposable: SIGKILL can't be ignored, so waiting ends.
+        for (const server of started) {
+          server.kill("SIGKILL");
+        }
+        await Promise.all(started.map((server) => server.exited));
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
   };
 }

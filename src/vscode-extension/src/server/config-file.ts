@@ -1,6 +1,7 @@
 /**
- * The language server's side of pyproject.toml: reading the config, and
- * turning a config error into what the editor shows.
+ * @file The language server's side of pyproject.toml: reading the config, and
+ * turning a config error into what the editor shows. A file that exists but
+ * can't be read is a config error, never a missing config (#163).
  */
 import { lstatSync, readFileSync } from "node:fs";
 import { ConfigError, declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";

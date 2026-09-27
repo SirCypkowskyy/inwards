@@ -1,3 +1,8 @@
+/**
+ * @file The benchmark comparison's arithmetic: nearest-rank percentiles, the
+ * threshold judgement on paired ratios, and the Markdown table. A slower head
+ * must fail the gate and an equal one pass.
+ */
 import { describe, expect, test } from "bun:test";
 import { judge, markdown, percentile } from "../compare.ts";
 

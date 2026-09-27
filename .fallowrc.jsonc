@@ -107,7 +107,15 @@
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
       { "name": "cli-test", "patterns": ["src/cli/test/**"] },
-      { "name": "vscode", "patterns": ["src/vscode-extension/**"] },
+      // The extension (#176): the VS Code client and the language server run in
+      // different processes and share nothing but the protocol. A file in a new
+      // src/ folder matches no zone, so fallow fails until it gets one.
+      { "name": "vscode-client", "patterns": ["src/vscode-extension/src/client/**"] },
+      { "name": "vscode-server", "patterns": ["src/vscode-extension/src/server/**"] },
+      {
+        "name": "vscode-dev",
+        "patterns": ["src/vscode-extension/test/**", "src/vscode-extension/scripts/**"]
+      },
       { "name": "scripts", "patterns": ["scripts/**"] },
       { "name": "eval", "patterns": ["eval/**"] },
       { "name": "bench", "patterns": ["bench/**"] },
@@ -378,9 +386,17 @@
           "cli-json"
         ]
       },
-      { "from": "vscode", "allow": ["core-api"] },
+      // The client talks to VS Code and the server only; the server reaches the
+      // engine through `@inwards/core`; neither imports the other.
+      { "from": "vscode-client", "allow": [] },
+      { "from": "vscode-server", "allow": ["core-api"] },
+      // The extension's tests and build scripts exercise both sides.
+      { "from": "vscode-dev", "allow": ["core-api", "vscode-client", "vscode-server"] },
       // The one test that builds the module index through both adapters (#44).
-      { "from": "adapter-parity", "allow": ["core-api", "cli-adapters", "cli-project", "vscode"] },
+      {
+        "from": "adapter-parity",
+        "allow": ["core-api", "cli-adapters", "cli-project", "vscode-server"]
+      },
       { "from": "scripts", "allow": [] },
       // The eval harness reads layers the way the CLI does, through the public API,
       // and recognises config guard denials by the CLI's own ASK_USER text.

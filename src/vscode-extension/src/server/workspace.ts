@@ -1,5 +1,5 @@
 /**
- * The language server's view of the project on disk: the workspace pass
+ * @file The language server's view of the project on disk: the workspace pass
  * (INW007 and INW008 for every Python file under the config root, from a
  * directory listing alone) and the files behind the engine's module index.
  * The pass reads and parses nothing, so it reaches files the user hasn't

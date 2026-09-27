@@ -1,3 +1,10 @@
+/**
+ * @file The Inwards language server: it wraps `@inwards/core` over LSP for VS Code.
+ * It checks open Python documents on every change, runs the workspace pass
+ * (INW007 and INW008 from the listing) for files nobody opened, reloads the
+ * config when pyproject.toml changes, and rebuilds the module index on file
+ * events. Its state lives as long as the server; reloads are serialized.
+ */
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import process from "node:process";

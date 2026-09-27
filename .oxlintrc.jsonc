@@ -35,14 +35,14 @@
     "jsdoc-js/require-param": ["error", { "checkDestructured": false, "checkConstructors": true }],
     "jsdoc-js/require-returns": ["error", { "checkGetters": true }]
   },
-  // Stricter documentation for the packages restructured under #176 (the CLI
-  // and core; the extension joins in its own PR). Every module opens
+  // Stricter documentation for every TypeScript file (#176): each module opens
   // with an @file overview, destructured parameters are documented property
   // by property, descriptions must say more than the name, and a function
-  // that throws directly says so.
+  // that throws directly says so. The docs site's browser scripts (plain JS)
+  // keep the base rules above.
   "overrides": [
     {
-      "files": ["src/cli/**/*.ts", "src/core/**/*.ts"],
+      "files": ["**/*.ts"],
       "rules": {
         "jsdoc-js/require-file-overview": [
           "error",

@@ -1,5 +1,5 @@
 /**
- * Records Claude Code hook payloads and compares their shape with the fixtures.
+ * @file Records Claude Code hook payloads and compares their shape with the fixtures.
  *
  *   bun run scripts/claude-payload-drift.ts <dir>
  *
@@ -132,7 +132,7 @@ function nameOf(p: Record<string, unknown>): string | undefined {
  * Reads a JSON object from a file.
  *
  * @param path - the file.
- * @returns the object.
+ * @returns the parsed top-level object.
  * @throws {Error} when the file holds something other than an object.
  */
 function readObject(path: string): Record<string, unknown> {

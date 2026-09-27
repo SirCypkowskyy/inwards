@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Engine, type ProjectIndex, parseConfig } from "@inwards/core";
-import { projectFiles } from "../../../vscode-extension/src/workspace.ts";
+import { projectFiles } from "../../../vscode-extension/src/server/workspace.ts";
 import { nodePlatform, nodeProjectIo } from "../../src/adapters/compose.ts";
 import { loadGrammars } from "../../src/adapters/grammars.ts";
 import { indexProject } from "../../src/project/check.ts";

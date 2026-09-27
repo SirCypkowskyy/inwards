@@ -1,14 +1,17 @@
+/**
+ * @file A config that can't be read is a config error, as in the CLI, never a
+ * missing config that silently turns the checks off (#163). Permissions,
+ * dangling symlinks and directories the user can't enter are each covered.
+ */
 import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-import { readConfig } from "../src/config-file.ts";
+import { readConfig } from "../src/server/config-file.ts";
 import { openProject } from "./config-helpers.ts";
 import { type Harness, lspHarness, PYPROJECT, until, WATCHING, write } from "./lsp-harness.ts";
 
-// A config that can't be read is a config error, as in the CLI, never a
-// missing config that silently turns the checks off (#163).
 const harness: Harness = lspHarness();
 const {
   tmp: TMP,

@@ -1,9 +1,14 @@
+/**
+ * @file The workspace pass without a server: which files it lists and checks for
+ * INW007 and INW008. Symlinks inside the root are followed, and those leaving
+ * it are not.
+ */
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseConfig } from "@inwards/core";
-import { workspaceDiagnostics } from "../src/workspace.ts";
+import { workspaceDiagnostics } from "../src/server/workspace.ts";
 
 const TMP = mkdtempSync(join(tmpdir(), "inwards-workspace-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));

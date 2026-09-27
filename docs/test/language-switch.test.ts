@@ -1,3 +1,8 @@
+/**
+ * @file The docs site's language switch: `counterpart` must map a page and its
+ * anchor between the English site and its Polish mirror, in both directions.
+ * The switch runs in the browser, so this is its only test.
+ */
 import { describe, expect, test } from "bun:test";
 import { counterpart } from "../chapters/javascripts/language-switch.mjs";
 

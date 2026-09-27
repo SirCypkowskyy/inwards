@@ -1,3 +1,8 @@
+/**
+ * @file Helpers for the config tests: a config the rule table breaks, and a project
+ * opened on its own server. Each call hands out a fresh initialize id, so
+ * several servers can share one test file's harness.
+ */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -7,7 +12,7 @@ import { type Harness, PYPROJECT, type Server, write } from "./lsp-harness.ts";
 let nextId = 100;
 
 /** A config the rule table breaks: INW099 is no rule. */
-export const UNKNOWN_CODE = `${PYPROJECT}\n[tool.inwards.rules]\nignore = ["INW099"]\n`;
+export const UNKNOWN_CODE: string = `${PYPROJECT}\n[tool.inwards.rules]\nignore = ["INW099"]\n`;
 
 /**
  * Starts a server on a project whose router imports a missing module, and

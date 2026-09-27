@@ -1,3 +1,9 @@
+/**
+ * @file The corpus runner's pure parts: reading the manifest, turning a repo's layers
+ * into the `[tool.inwards]` table, and parsing prescan-diff's summary line. The
+ * summary format is checked against prescan-diff's own source, so the two
+ * can't drift apart.
+ */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

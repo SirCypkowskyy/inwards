@@ -1,3 +1,8 @@
+/**
+ * @file The language server end to end: diagnostics on unopened files, INW008 once
+ * a member is deleted, INW010 clearing when a module appears, and the watcher
+ * fallback. Without watched-file support, every check uses a fresh index.
+ */
 import { afterAll, expect, test } from "bun:test";
 import { renameSync, rmSync } from "node:fs";
 import { join } from "node:path";

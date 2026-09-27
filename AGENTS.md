@@ -5,18 +5,39 @@ Claude Code expands on load; Codex, Cursor and other agents read this file
 directly. Never add content to `CLAUDE.md`.
 
 Architecture linter for Python, written in TypeScript on Bun, in three
-packages that depend one way, onto the engine:
+packages that depend one way, onto the engine (chapter 3 of the docs has the
+pictures). Each package has its own guide, which adds to this one: read it
+before working there. Its `CLAUDE.md` holds only `@AGENTS.md`, so Claude Code
+loads the package guide when it works in that folder; this root file doesn't
+import them.
 
 - `src/core`: the engine. Pure, no I/O; everything outside comes through
   ports (`GrammarBinaries`, `ProjectFiles`, `ListDir`), and adapters import
-  `@inwards/core` (its `index.ts`) only. It is organised in feature folders,
-  one per rule under `rules/` (#176). Read
-  [`src/core/AGENTS.md`](src/core/AGENTS.md) before working there.
-- `src/cli`: the command line and the Claude Code hook adapter, organised
-  in feature folders with the I/O behind contracts (#176). Read
-  [`src/cli/AGENTS.md`](src/cli/AGENTS.md) before working there: it says
-  what each folder owns, who may import whom, and where new code goes.
-- `src/vscode-extension`: the editor adapter (LSP client and server).
+  `@inwards/core` (its `index.ts`) only. Feature folders, one module or
+  folder per rule under `rules/`. Guide:
+  [`src/core/AGENTS.md`](src/core/AGENTS.md).
+- `src/cli`: the command line and the Claude Code hook adapter. Feature
+  folders with the I/O behind contracts, wired in `main.ts`. Guide:
+  [`src/cli/AGENTS.md`](src/cli/AGENTS.md).
+- `src/vscode-extension`: the editor adapter, a VS Code client and a
+  language server in separate folders. Guide:
+  [`src/vscode-extension/AGENTS.md`](src/vscode-extension/AGENTS.md).
+
+Where to start:
+
+- **A new rule or config key**: `src/core/AGENTS.md`, "Where new code goes";
+  the rule's docs page goes in `docs/chapters/rules/` and `docs/pl/rules/`.
+- **A new hook event or CLI command**: `src/cli/AGENTS.md`, "Where new code
+  goes".
+- **Something the editor shows or a new extension setting**:
+  `src/vscode-extension/AGENTS.md`.
+- **A docs change**: "Polish docs" below; the English page and its Polish
+  translation change in the same PR.
+
+The boundaries are enforced, not just described: fallow zones per folder
+(`.fallowrc.jsonc`, where a file in a new folder fails until it gets a
+zone), Biome's I/O and global rules per folder (`biome.jsonc`),
+`check:cycles`, and each package's architecture tests.
 
 Docs live in `docs/` (Zensical), with the architecture in chapter 3. The plan lives in GitHub issues on
 `SirCypkowskyy/inwards`: epics #1 to #7 are milestones M0 to M6, and every
@@ -191,7 +212,7 @@ bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
 bun run typecheck       # tsc (TypeScript 7), strictest flags (tsconfig.base.json)
 bun run fallow          # dead code, unused deps, boundaries, zero clone groups
 bun run check:cycles    # no import cycles, type-only imports included (tsgo's own parse)
-bun run check:overviews # every module's @file overview is 2+ sentences (src/cli and src/core so far)
+bun run check:overviews # every module's @file overview is 2+ sentences
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
 uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
@@ -377,7 +398,7 @@ done until both match the code.
 - **Every module opens with an overview** (`@file`, two or more sentences):
   what it is for, what it owns, and what it deliberately doesn't do ("no
   I/O; the caller supplies file contents"). `lint:docs` requires the tag and
-  `check:overviews` the prose, in the packages restructured under #176.
+  `check:overviews` the prose, in every TypeScript file.
 - **Every function is documented** (`lint:docs`) with a TSDoc block,
   including private helpers and arrow functions bound to a name:
   - first line: a title that says what it does;
