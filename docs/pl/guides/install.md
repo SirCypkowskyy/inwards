@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 82a4351e2ea4f1d5eb3e9bcbbba363c11bee336c0d867d2160f0b3434fbcfa9c
+source_hash: c0c23d69958db1024e7e89cd716c68b95c3643b350a4e00b6cf85afc808eb99d
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -157,7 +157,7 @@ src/app/  (hexagonal)
 inwards check: 0 violations, 0 warnings.
 
 Try the example: uv run python -m app.bootstrap book 2
-Wire an agent: inwards init --agent claude|aider|agents-md
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 ```
 
 Gdy Inwards trafi na PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), druga linia zmieni się w `uvx inwards init --style hexagonal --scaffold` i nie trzeba będzie niczego wcześniej instalować.
@@ -224,4 +224,4 @@ Uruchom je też, zanim włączysz hooki agenta. Hooki Claude Code już traktują
 
 Gdy projekt ma baseline, `stop-gate = "project"` w `[tool.inwards]` sprawia, że Stop gate w Claude Code sprawdza cały projekt względem baseline'u, a nie tylko pliki zmienione w sesji, więc naruszenie w dowolnym miejscu blokuje turę ([rozdział 4](../04-AI-Integration.md)). Sprawdzenie pomija parsowanie potwierdzające tam, gdzie baseline akceptuje wszystko, co znalazł prescan, więc w pełni pokryte baseline'em sprawdzenie kosztuje mniej więcej tyle, co czyste.
 
-Następnie podłącz Inwards do swojego agenta: [Claude Code](claude-code.md), [Aider](aider.md) albo dowolny agent czytający [AGENTS.md](agents-md.md). Żeby pull requesty łamiące warstwę nie przechodziły, dodaj workflow [GitHub Actions](ci.md).
+Następnie podłącz Inwards do swojego agenta: [Claude Code](claude-code.md), [OpenCode](opencode.md), [Aider](aider.md) albo dowolny agent czytający [AGENTS.md](agents-md.md). Żeby pull requesty łamiące warstwę nie przechodziły, dodaj workflow [GitHub Actions](ci.md).

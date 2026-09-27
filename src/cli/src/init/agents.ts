@@ -1,5 +1,5 @@
 /**
- * @file `inwards init --agent claude|aider|agents-md [--dry-run]`: wires Inwards into
+ * @file `inwards init --agent claude|opencode|aider|agents-md [--dry-run]`: wires Inwards into
  * a coding agent. Every change is computed first as (file, before, after), so
  * `--dry-run` can print it and a second run finds nothing to do. Anything init
  * can't edit safely stops it with exit 2 instead of being rewritten.
@@ -12,6 +12,8 @@ import { print } from "../platform/print.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import type { Agent, Change, InitContext } from "./contracts.ts";
 import { lineDiff } from "./diff.ts";
+import { gitignore } from "./gitignore.ts";
+import { opencodePlugin } from "./opencode.ts";
 
 /** How to start this Inwards without a shell: an executable and its leading arguments. */
 interface Exec {
@@ -44,7 +46,6 @@ const EXE_SUFFIX = /\.exe$/iu;
 export const PRERELEASE: RegExp = /-.*$/u;
 /** What `init` puts in `ignore`: tooling that belongs to no layer. */
 export const DEFAULT_IGNORE: readonly string[] = ["tests", "scripts", "migrations", "conftest"];
-const LINE_BREAK = /\r?\n/u;
 const SECTION_BEGIN = "<!-- inwards:begin -->";
 const SECTION_END = "<!-- inwards:end -->";
 const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\][ \t]*(?:#.*)?$/mu;
@@ -100,11 +101,7 @@ export function agentChanges(ctx: InitContext, agent: Agent, project: string): C
       0,
     );
   } else {
-    const change =
-      agent === "claude"
-        ? // settings.local.json: the hook holds this machine's binary path, so it must not be committed.
-          claudeSettings(ctx, join(project, ".claude", "settings.local.json"), exec)
-        : agentsSection(ctx, join(project, "AGENTS.md"));
+    const change = wiring(ctx, agent, project, exec);
     if (typeof change === "string") {
       return change;
     }
@@ -113,6 +110,31 @@ export function agentChanges(ctx: InitContext, agent: Agent, project: string): C
   // Every agent: session state and the run log (`check --log`) both live in .inwards/.
   changes.push(gitignore(ctx, join(project, ".gitignore"), agent));
   return changes;
+}
+
+/**
+ * Computes the one file an agent's wiring writes.
+ *
+ * @param ctx - reads the current file.
+ * @param agent - Claude Code, OpenCode or an AGENTS.md reader.
+ * @param project - the directory of the project's pyproject.toml.
+ * @param exec - how to start Inwards.
+ * @returns the change, or an error when the file can't be edited safely.
+ */
+function wiring(
+  ctx: InitContext,
+  agent: Exclude<Agent, "aider">,
+  project: string,
+  exec: Exec,
+): Change | string {
+  if (agent === "claude") {
+    // settings.local.json: the hook holds this machine's binary path, so it must not be committed.
+    return claudeSettings(ctx, join(project, ".claude", "settings.local.json"), exec);
+  }
+  if (agent === "opencode") {
+    return opencodePlugin(ctx, join(project, ".opencode", "plugins", "inwards.js"), exec);
+  }
+  return agentsSection(ctx, join(project, "AGENTS.md"));
 }
 
 /**
@@ -313,35 +335,6 @@ function withoutOurHook(group: unknown): unknown {
   }
   const others = group["hooks"].filter((entry) => !isOurHook(entry));
   return others.length === 0 ? undefined : { ...group, hooks: others };
-}
-
-/**
- * Adds what Inwards writes locally to the project's .gitignore: `.inwards/`
- * (session state, run log) for every agent, and for Claude Code the
- * machine-specific `.claude/settings.local.json` that holds the hooks.
- *
- * @param ctx - reads the current file.
- * @param path - the project's .gitignore.
- * @param agent - which agent is being wired up.
- * @returns the change (unchanged when every entry is already there).
- */
-function gitignore(ctx: InitContext, path: string, agent: Agent): Change {
-  const before = readIfThere(ctx, path);
-  const text = before ?? "";
-  const lines = new Set(text.split(LINE_BREAK).map((l) => l.trim()));
-  const wanted = [
-    lines.has(".inwards/") || lines.has(".inwards") ? "" : ".inwards/",
-    agent !== "claude" || lines.has(".claude/settings.local.json")
-      ? ""
-      : ".claude/settings.local.json",
-  ].filter((entry) => entry !== "");
-  if (wanted.length === 0) {
-    return { path, before, after: text };
-  }
-  const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const base = text === "" || text.endsWith("\n") ? text : `${text}${eol}`;
-  const added = ["# Inwards: local state and machine-specific hooks", ...wanted].join(eol);
-  return { path, before, after: `${base}${added}${eol}` };
 }
 
 /**

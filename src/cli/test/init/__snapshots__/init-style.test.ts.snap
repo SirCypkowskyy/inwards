@@ -33,7 +33,7 @@ src/my_app/  (layered)
 inwards check: 0 violations, 0 warnings.
 
 Try the example: uv run python -m my_app.bootstrap book 2
-Wire an agent: inwards init --agent claude|aider|agents-md
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 "
 ,
   "table": 
@@ -91,7 +91,7 @@ src/my_app/  (clean)
 inwards check: 0 violations, 0 warnings.
 
 Try the example: uv run python -m my_app.bootstrap book 2
-Wire an agent: inwards init --agent claude|aider|agents-md
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 "
 ,
   "table": 
@@ -151,7 +151,7 @@ src/my_app/  (hexagonal)
 inwards check: 0 violations, 0 warnings.
 
 Try the example: uv run python -m my_app.bootstrap book 2
-Wire an agent: inwards init --agent claude|aider|agents-md
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 "
 ,
   "table": 

@@ -152,7 +152,7 @@ src/app/  (hexagonal)
 inwards check: 0 violations, 0 warnings.
 
 Try the example: uv run python -m app.bootstrap book 2
-Wire an agent: inwards init --agent claude|aider|agents-md
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 ```
 
 Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
@@ -219,4 +219,4 @@ Run it before you turn on the agent hooks, too. The Claude Code hooks already tr
 
 Once a project has a baseline, `stop-gate = "project"` in `[tool.inwards]` makes the Claude Code Stop gate check the whole project against it instead of only the files the session changed, so a violation anywhere blocks the turn ([chapter 4](../04-AI-Integration.md)). A check skips the confirming parse where the baseline accepts everything the prescan found, so a fully baselined check costs about as much as a clean one.
 
-Next, wire Inwards into your agent: [Claude Code](claude-code.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md). To fail pull requests that break a layer, add the [GitHub Actions](ci.md) workflow.
+Next, wire Inwards into your agent: [Claude Code](claude-code.md), [OpenCode](opencode.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md). To fail pull requests that break a layer, add the [GitHub Actions](ci.md) workflow.

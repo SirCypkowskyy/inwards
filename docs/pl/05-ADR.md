@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 52d3f082a376cd07d9ba08980a36b8475d6d2c694e1cc55df3ed5c10c1535d45
+source_hash: e884fa69b61ae3de520183c75fc4aee6f0990093f44602e77ee1fbc97dfb0ac7
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -845,3 +845,32 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Zgłaszanie każdego cyklu elementarnego:* ich liczba eksploduje wraz z rozmiarem grupy; jeden najkrótszy cykl na grupę wystarcza do działania, a następne uruchomienie pokaże kolejny.
 - *Cykle modułów domyślnie włączone:* ustawienie bardziej rygorystyczne, ale aktualizacja, która wywraca większość kodu, uczy ludzi wyłączać regułę.
 
+## ADR-033: OpenCode przez plugin, który uruchamia hook Claude Code { #adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook }
+
+**Stan:** Przyjęty · 2026-09-27 · [#170](https://github.com/SirCypkowskyy/inwards/issues/170)
+
+**Kontekst.** Ewaluacje agentów ([#48](https://github.com/SirCypkowskyy/inwards/issues/48)) działają na OpenCode, a Inwards może mierzyć tylko agenta, do którego jest podłączony. OpenCode nie ma ustawień hooków takich jak Claude Code. Ładuje pluginy JavaScript z `.opencode/plugins/`, a plugin dostaje zdarzenia i wywołania narzędzi: `tool.execute.before` może rzucić wyjątek, żeby zablokować wywołanie, `tool.execute.after` może zmienić wynik narzędzia, a zdarzenie `session.idle` przychodzi po zakończeniu tury. Reguły, zapis sesji, strażnik konfiguracji i bramka Stop już istnieją jako `inwards hook claude-code`. Projekt i jego gwarancje opierają się na OpenCode 1.18.31.
+
+**Decyzja.**
+
+- **Plugin, który tłumaczy, i jedna implementacja hooka.** `inwards init --agent opencode` zapisuje `.opencode/plugins/inwards.js`, zwykły JavaScript bez kroku budowania i bez zależności. Plugin zamienia zdarzenia OpenCode na ładunki, które wysyła Claude Code, i uruchamia z nimi `inwards hook claude-code`: `session.created` staje się SessionStart, `tool.execute.before` dla `edit`, `write` i `bash` staje się PreToolUse (z przemianowanymi `filePath`, `oldString` i resztą), `tool.execute.after` dla `edit`, `write` i `apply_patch` staje się PostToolUse, a `session.idle` staje się Stop. Na razie nie ma `inwards hook opencode`; nagrane ładunki pozostają jedynym kontraktem.
+- **Tak jak plik ustawień Claude Code, plugin zawiera ścieżkę do pliku binarnego na tej maszynie.** Uruchamia Inwards bez powłoki, pod bezwzględną ścieżką znalezioną przez `init`, a `init` dodaje go do `.gitignore`. Pierwsza linia oznacza plik jako zapisany przez `init`, który odmawia zastąpienia pliku bez niej.
+- **Blokada to rzucony błąd; znalezisko dołącza do wyniku narzędzia.** Odmowa z PreToolUse staje się `Error` z powodem strażnika, który OpenCode pokazuje modelowi zamiast uruchomić narzędzie. Znalezisko z PostToolUse jest dopisywane do wyniku narzędzia, który model czyta przed następnym krokiem.
+- **Bramka Stop zaczyna kolejną turę.** Gdy bramka blokuje przy `session.idle`, plugin wysyła jej powody do sesji przez `client.session.promptAsync`, z nagłówkiem „Inwards Stop gate (sent by the Inwards plugin, not the user)”. Bez nagłówka model wziął raport za użytkownika, który powtarza prośbę. Plugin trzyma `stop_hook_active` dla każdej sesji i czyści je, gdy użytkownik wyśle wiadomość, więc `escalate-after` działa tak jak w Claude Code.
+- **Czego strażnik nie przeczyta, tego plugin odmawia.** Strażnik konfiguracji ocenia edycję po starym i nowym tekście, a `apply_patch` nie ma żadnego z nich. Dlatego plugin odmawia łatki, która dotyka `pyproject.toml`, `.opencode/`, `opencode.json(c)`, `.inwards/` albo `inwards-baseline.json`, oraz `edit` albo `write` czterech ostatnich, które w Claude Code obejmuje `permissions.deny`.
+- **Subagenty dzielą sesję najwyższego poziomu**, tak jak w Claude Code: wywołania sesji podrzędnej używają identyfikatora sesji jej korzenia, a bramka Stop działa tylko dla sesji najwyższego poziomu.
+- **Bramka Stop sprawdza plik pluginu**, a nie ustawienia Claude Code, gdy `INWARDS_HOOK_HOST=opencode` mówi, kto wywołuje.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Reguły, strażnik, bramka Stop i eskalacja mają jedną implementację, a ich zmiana trafia do OpenCode bez zmiany pluginu.
+- :material-plus-circle-outline: Test end-to-end uruchamia `opencode run` z prawdziwym modelem, gdy jest skonfigurowany: agent zapisuje import na zewnątrz, czyta INW001 w wyniku narzędzia i go poprawia.
+- :material-minus-circle-outline: OpenCode nie może odmówić zakończenia tury. Powody bramki przychodzą jako nowa wiadomość po zakończeniu tury, a `opencode run` w tym momencie kończy działanie, więc nieinteraktywne uruchomienie nie dostaje drugiej tury; sprawdzenie po edycji i tak dociera do agenta. [Przewodnik](guides/opencode.md#what-holds-on-opencode) wymienia każdą różnicę.
+- :material-minus-circle-outline: Plugin nie może zablokować wiadomości wysłanej przez użytkownika, a nowa wiadomość zeruje licznik `escalate-after`, tak jak nowa tura w Claude Code.
+- :material-minus-circle-outline: Polecenie Bash nadal może usunąć plugin. Bramka Stop działającej sesji to zauważy, ale przy następnym starcie OpenCode nie ładuje niczego, co mogłoby to zauważyć, jak po usunięciu pliku ustawień Claude Code.
+
+**Alternatywy.**
+
+- *Punkt wejścia `inwards hook opencode`, który czyta kształty OpenCode:* tłumaczenie przeszłoby do przetestowanego CLI, ale dodałoby drugi kontrakt ładunków dla API pluginów, które wciąż się zmienia. Tłumaczenie jest małe; może się przenieść później.
+- *Plugin, który implementuje sprawdzenia na nowo w JavaScripcie:* bez procesu na każde zdarzenie, ale z dwiema implementacjami każdej reguły i strażnika.
+- *Blokowanie końca tury przez `chat.message` albo uprawnienia:* żadne z nich nie działa przy końcu tury; `session.idle` to jedyny punkt, a przychodzi po turze.

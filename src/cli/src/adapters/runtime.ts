@@ -28,6 +28,7 @@ export function readRuntime(): Runtime {
     pid: process.pid,
     execPath: process.execPath,
     ci: Boolean(env["CI"]),
+    hookHost: env["INWARDS_HOOK_HOST"] === "opencode" ? "opencode" : "claude-code",
     stdinIsTTY: process.stdin.isTTY === true,
     stdoutIsTTY: process.stdout.isTTY === true,
   };

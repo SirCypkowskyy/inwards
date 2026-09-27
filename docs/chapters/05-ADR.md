@@ -840,3 +840,32 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *Report every elementary cycle:* the count explodes with the size of a group; one shortest cycle per group is enough to act on, and the next run shows the next.
 - *Module cycles on by default:* the stricter setting, but an upgrade that fails most codebases teaches people to turn the rule off.
 
+## ADR-033: OpenCode through a plugin that runs the Claude Code hook
+
+**Status:** Accepted · 2026-09-27 · [#170](https://github.com/SirCypkowskyy/inwards/issues/170)
+
+**Context.** The agent evals ([#48](https://github.com/SirCypkowskyy/inwards/issues/48)) run on OpenCode, and Inwards can only measure an agent it's wired into. OpenCode has no hook settings like Claude Code's. It loads JavaScript plugins from `.opencode/plugins/`, and a plugin gets events and tool calls: `tool.execute.before` can throw to block a call, `tool.execute.after` can change the tool's output, and the `session.idle` event fires after a turn has ended. The rules, the session record, the config guard and the Stop gate already exist as `inwards hook claude-code`. The design and its guarantees are based on OpenCode 1.18.31.
+
+**Decision.**
+
+- **A plugin that translates, one hook implementation.** `inwards init --agent opencode` writes `.opencode/plugins/inwards.js`, plain JavaScript with no build step and no dependencies. The plugin turns OpenCode's events into the payloads Claude Code sends and runs `inwards hook claude-code` with them: `session.created` becomes SessionStart, `tool.execute.before` for `edit`, `write` and `bash` becomes PreToolUse (with `filePath`, `oldString` and the rest renamed), `tool.execute.after` for `edit`, `write` and `apply_patch` becomes PostToolUse, and `session.idle` becomes Stop. There is no `inwards hook opencode` for now; the recorded payloads stay the one contract.
+- **Like Claude Code's settings file, the plugin holds this machine's path to the binary.** It starts Inwards with no shell, by the absolute path `init` found, and `init` adds it to `.gitignore`. A first line marks the file as written by `init`, which refuses to replace a file without it.
+- **A block is a thrown error; a finding joins the tool result.** A PreToolUse deny becomes an `Error` with the guard's reason, which OpenCode shows to the model instead of running the tool. A PostToolUse finding is appended to the tool's output, which the model reads before its next step.
+- **The Stop gate starts another turn.** When the gate blocks on `session.idle`, the plugin sends its reasons into the session with `client.session.promptAsync`, prefaced "Inwards Stop gate (sent by the Inwards plugin, not the user)". Without the preface, a model took the report for the user repeating a request. The plugin keeps `stop_hook_active` per session and clears it when the user sends a message, so `escalate-after` works as on Claude Code.
+- **What the guard can't read, the plugin refuses.** The config guard judges an edit by its old and new text, and `apply_patch` has neither. So the plugin refuses a patch that touches `pyproject.toml`, `.opencode/`, `opencode.json(c)`, `.inwards/` or `inwards-baseline.json`, and an `edit` or `write` of the last four, which on Claude Code `permissions.deny` covers.
+- **Subagents share their top-level session**, as on Claude Code: a child session's calls use its root's session id, and the Stop gate runs for top-level sessions only.
+- **The Stop gate checks the plugin file**, not Claude Code's settings, when `INWARDS_HOOK_HOST=opencode` says who is calling.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The rules, the guard, the Stop gate and escalation have one implementation, and a change to them reaches OpenCode with no plugin change.
+- :material-plus-circle-outline: An end-to-end test runs `opencode run` with a real model when one is configured: the agent writes an outward import, reads INW001 in the tool result and fixes it.
+- :material-minus-circle-outline: OpenCode can't refuse the end of a turn. The gate's reasons arrive as a new message after the turn ended, and `opencode run` exits at that point, so a non-interactive run gets no second turn; the per-edit check still reaches the agent. [The guide](guides/opencode.md#what-holds-on-opencode) lists every difference.
+- :material-minus-circle-outline: The plugin can't block a message the user sends, and a new message resets the `escalate-after` count, as a new turn does on Claude Code.
+- :material-minus-circle-outline: A Bash command can still delete the plugin. The Stop gate of the running session notices, but the next OpenCode start loads nothing to notice with, as when Claude Code's settings file is deleted.
+
+**Alternatives.**
+
+- *An `inwards hook opencode` entry point that reads OpenCode's shapes:* the translation would move into the tested CLI, but it would add a second payload contract for a plugin API that is still changing. The translation is small; it can move later.
+- *A plugin that reimplements the checks in JavaScript:* no process per event, but two implementations of every rule and of the guard.
+- *Blocking the end of a turn through `chat.message` or permissions:* neither runs when a turn ends; `session.idle` is the only point, and it comes after the turn.
