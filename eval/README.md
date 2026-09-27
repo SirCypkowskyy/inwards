@@ -217,7 +217,7 @@ models would cost about USD 6.50 and 45 minutes at these prices.
 
 #134 makes both hooks treat a violation a file already had at session start
 as context, not a block: they read the file from git at the session's start
-commit and check it. `src/cli/test/stop-legacy.test.ts` replays the three
+commit and check it. `src/cli/test/claude-code/stop-legacy.test.ts` replays the three
 edited-file `seeded-*` cases (the example app, the eval config, the fixture,
 the task's edit): the edit and the Stop both pass, the old violation comes
 back as a note, and a second copy of it or a new violation in the same file

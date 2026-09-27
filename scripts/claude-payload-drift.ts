@@ -6,7 +6,7 @@
  * Without `<dir>/payloads`, runs a headless `claude -p` session (Haiku, capped
  * at $0.25) in `<dir>` with hooks that save every payload there, and a second
  * session in `<dir>/retry` when the first skipped a call a fixture needs. Then
- * compares the first payload per fixture in src/cli/test/fixtures/claude-code
+ * compares the first payload per fixture in src/cli/test/support/fixtures/claude-code
  * by field names and JSON types, never values. Prints a Markdown report.
  * Exit codes: 0 no drift, 1 drift, 3 the session failed or never made a call
  * (not drift). Run nightly by .github/workflows/nightly-e2e.yml.
@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, join, resolve } from "node:path";
 import process from "node:process";
 
-const FIXTURES = resolve(import.meta.dir, "../src/cli/test/fixtures/claude-code");
+const FIXTURES = resolve(import.meta.dir, "../src/cli/test/support/fixtures/claude-code");
 const EVENTS = ["SessionStart", "PreToolUse", "PostToolUse", "Stop"];
 // One call per tool fixture: left to itself, Haiku sometimes writes the file once.
 const PROMPT = [

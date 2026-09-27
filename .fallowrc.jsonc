@@ -32,7 +32,7 @@
       { "name": "core-api", "patterns": ["src/core/src/index.ts"] },
       { "name": "core", "patterns": ["src/core/src/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
-      { "name": "adapter-parity", "patterns": ["src/cli/test/lsp-parity.test.ts"] },
+      { "name": "adapter-parity", "patterns": ["src/cli/test/integration/lsp-parity.test.ts"] },
       // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
       { "name": "cli-main", "patterns": ["src/cli/src/main.ts"] },
       { "name": "cli-adapters", "patterns": ["src/cli/src/adapters/**"] },
