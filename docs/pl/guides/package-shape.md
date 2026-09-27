@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: fa152c3b7f6f74b52c4414609385035c7b4d2729bae6f6aa27a540ffbc41671f
+source_hash: 203b23b8919c9d896a3b5d3bc93a54bc420c51478ae0daf883d31b502616cbc6
 ---
 
 # Kształt pakietu { #package-shape }
@@ -13,6 +13,8 @@ Reguły warstw (INW001) patrzą na importy. Nie widzą, gdzie kod *leży*: nowy 
 | INW008 `missing-member` | brakuje elementu, którego wymaga kształt | w `__init__.py` pakietu albo w jego pierwszym pliku, jeśli `__init__.py` nie ma |
 
 ## Konfiguracja { #configure-it }
+
+<!-- config: fragment -->
 
 ```toml title="pyproject.toml"
 [[tool.inwards.shape]]

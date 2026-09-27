@@ -106,7 +106,7 @@ const PRERELEASE = /-.*$/u;
 const RELEASE = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/u;
 
 /** Keys `[tool.inwards]` understands; anything else is a typo or a newer feature. */
-const TABLE_KEYS: ReadonlySet<string> = new Set([
+export const TABLE_KEYS: ReadonlySet<string> = new Set([
   "root",
   "layers",
   "required-version",
@@ -121,7 +121,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "agent-suppressions",
   "contexts",
 ]);
-const LAYER_KEYS: ReadonlySet<string> = new Set([
+export const LAYER_KEYS: ReadonlySet<string> = new Set([
   "name",
   "modules",
   "allow-libraries",

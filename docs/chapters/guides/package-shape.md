@@ -9,6 +9,8 @@ Layer rules (INW001) look at imports. They can't see where code *lives*: a new `
 
 ## Configure it
 
+<!-- config: fragment -->
+
 ```toml title="pyproject.toml"
 [[tool.inwards.shape]]
 packages = ["app.*"]                  # which packages: selectors, see below

@@ -25,7 +25,12 @@ export interface ContextSpec {
 }
 
 /** Keys one `[[tool.inwards.contexts]]` entry understands. */
-const CONTEXT_KEYS: ReadonlySet<string> = new Set(["name", "modules", "public", "depends-on"]);
+export const CONTEXT_KEYS: ReadonlySet<string> = new Set([
+  "name",
+  "modules",
+  "public",
+  "depends-on",
+]);
 
 /**
  * Validates `[[tool.inwards.contexts]]`: each entry on its own, then the
@@ -64,10 +69,7 @@ export function parseContexts(value: unknown): { contexts?: ContextSpec[] } {
  * @param contexts - the parsed contexts.
  * @returns the owning context, or undefined when no context owns the module.
  */
-export function contextOf(
-  module: string,
-  contexts: readonly ContextSpec[],
-): ContextSpec | undefined {
+function contextOf(module: string, contexts: readonly ContextSpec[]): ContextSpec | undefined {
   let best: ContextSpec | undefined;
   let bestLength = -1;
   for (const context of contexts) {

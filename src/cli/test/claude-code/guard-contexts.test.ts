@@ -1,7 +1,8 @@
 /**
  * @file The config guard covers `[[tool.inwards.contexts]]` (#51): the table is
  * part of `[tool.inwards]`, so an agent can't add a context or loosen a
- * context's `depends-on` or `public` to let an import through.
+ * context's `depends-on` or `public` to let an import through. Each case runs
+ * the real PreToolUse hook on a project whose config already has a context.
  */
 import { expect, test } from "bun:test";
 import { denied, pre } from "../support/guard-helpers.ts";

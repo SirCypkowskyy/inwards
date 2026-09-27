@@ -72,6 +72,8 @@ The diagnostic comes from the working scaffold in this repository, run on a copy
 
 To phase rules in, a `[tool.inwards.rules]` table sets which rules report and how loudly:
 
+<!-- config: fragment -->
+
 ```toml title="pyproject.toml"
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]      # these rules never report (optional)

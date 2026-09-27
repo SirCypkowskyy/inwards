@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: a3cd4b80fb7feb313be49bf6e8245f8ec0ade2ef42187c310ce5fd205247350e
+source_hash: 41c59ccdb7c69600207fe2d66632e22879f06b4a1d6d2e99b734c9e601f60bdf
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -24,6 +24,8 @@ Kody od INW002 do INW004 są zarezerwowane dla reguł zaplanowanych, ale jeszcze
 ## Konfiguracja reguł { #configure-rules }
 
 Tabela `[tool.inwards.rules]` w `pyproject.toml` określa, które reguły zgłaszają i jak głośno ([ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)):
+
+<!-- config: fragment -->
 
 ```toml title="pyproject.toml"
 [tool.inwards.rules]

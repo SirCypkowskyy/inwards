@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 4b381d96aef05784ad1ec0cf8c32390787ea4b6558790effaefddcb295650801
+source_hash: d02ab5e7ca8a644fc9df3c6edc45ed2cac8715c560ec1a8edb0103aefc9a9eaa
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -76,6 +76,8 @@ Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować wła
 Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii `examples/clean-app` z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
 
 Żeby wprowadzać reguły stopniowo, tabela `[tool.inwards.rules]` ustala, które reguły zgłaszają naruszenia i na jakim poziomie:
+
+<!-- config: fragment -->
 
 ```toml title="pyproject.toml"
 [tool.inwards.rules]

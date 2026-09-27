@@ -34,14 +34,14 @@ export interface NameRule {
   onlyIn: string[];
 }
 
-const SHAPE_KEYS: ReadonlySet<string> = new Set([
+export const SHAPE_KEYS: ReadonlySet<string> = new Set([
   "packages",
   "allow",
   "require",
   "forbid",
   "extra",
 ]);
-const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
+export const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
 /** A member name as a directory lists it: `x.py`, `x.pyi` or `x/`. */
 const MEMBER = /^(?<stem>[^/]+?)(?<kind>\.pyi?|\/)$/u;
 /** A member pattern: a glob stem, optionally ending in `.py` or `/`. */

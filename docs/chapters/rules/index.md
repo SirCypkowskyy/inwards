@@ -20,6 +20,8 @@ The codes INW002 to INW004 are reserved for rules that are planned but not built
 
 A `[tool.inwards.rules]` table in `pyproject.toml` says which rules report and how loudly ([ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)):
 
+<!-- config: fragment -->
+
 ```toml title="pyproject.toml"
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]      # these rules never report
