@@ -141,3 +141,22 @@ test("idles queued behind one that sent the gate's message send nothing more", a
   await Promise.all([fire(hooks, "session.idle", s), fire(hooks, "session.idle", s)]);
   expect(sent).toHaveLength(1);
 });
+
+test("a gate message that couldn't be sent doesn't use up an attempt", async () => {
+  const root = initProject();
+  const config = join(root, "pyproject.toml");
+  writeFileSync(
+    config,
+    readFileSync(config, "utf8").replace(
+      "[tool.inwards]\n",
+      "[tool.inwards]\nescalate-after = 1\n",
+    ),
+  );
+  const { hooks, sent } = await load(root, root, { prompt: 1 });
+  const s = "ses_unsent";
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await fire(hooks, "session.idle", s); // blocks, but the message fails
+  await fire(hooks, "session.idle", s); // blocks again: the agent never got the first
+  expect(sent.map((m) => [m.noReply, m.text.startsWith(STOP)])).toEqual([[false, true]]);
+});

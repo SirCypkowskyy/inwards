@@ -230,6 +230,20 @@ describe.skipIf(process.platform === "win32")(
       ]);
     });
 
+    test("a patch through a link to the project still reaches the guard", async () => {
+      const root = initProject();
+      mkdirSync(join(root, "config"));
+      renameSync(join(root, "pyproject.toml"), join(root, "config/settings.toml"));
+      symlinkSync(join(root, "config/settings.toml"), join(root, "pyproject.toml"));
+      const alias = `${root}-alias`;
+      symlinkSync(root, alias);
+      const { hooks } = await load(root);
+      const header = `*** Update File: ${join(alias, "config/settings.toml")}`;
+      expect(await refusal(hooks, "apply_patch", { patchText: patch(header) })).toContain(
+        "apply_patch may not change",
+      );
+    });
+
     test("a PreToolUse that exits 2 blocks the call with its stderr", async () => {
       const root = initProject();
       const path = join(root, PLUGIN);

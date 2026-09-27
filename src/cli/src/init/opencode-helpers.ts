@@ -178,19 +178,37 @@ function inwardsOwn(path) {
  * @returns true when the config guard must see the change.
  */
 function configFile(path) {
-  if (names(CONFIG, path)) {
+  if (names(CONFIG, path) || resolvesTo(path, ["pyproject.toml"])) {
     return true;
   }
-  const target = real(String(path ?? ""));
-  const top = resolve(PROJECT);
-  for (let dir = dirname(resolve(String(path ?? ""))); ; dir = dirname(dir)) {
+  const written = resolve(String(path ?? ""));
+  const target = real(written);
+  // The directories above the path as written, and above where it really is.
+  return [
+    [dirname(written), resolve(PROJECT)],
+    [dirname(target), real(PROJECT)],
+  ].some(([start, top]) => linksFromAbove(start, top, target));
+}
+
+/**
+ * Tells whether a pyproject.toml in a directory, or in one above it up to
+ * the project, links to a file.
+ *
+ * @param start - the first directory to look in.
+ * @param top - the project directory, where the search stops.
+ * @param target - the file's real path.
+ * @returns true when one of them resolves to it.
+ */
+function linksFromAbove(start, top, target) {
+  for (let dir = start; dir === top || dir.startsWith(top + sep); dir = dirname(dir)) {
     if (real(join(dir, "pyproject.toml")) === target) {
       return true;
     }
-    if (dir === top || dirname(dir) === dir || !dir.startsWith(top)) {
-      return false;
+    if (dir === top) {
+      break;
     }
   }
+  return false;
 }
 
 /**

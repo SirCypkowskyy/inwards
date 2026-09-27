@@ -28,6 +28,7 @@ export const Inwards = async ({ client, directory }) => {
       sessions.set(id, {
         continued: false,
         awaiting: false,
+        running: false,
         generation: 0,
         idles: 0,
         busy: false,
@@ -149,17 +150,26 @@ export const Inwards = async ({ client, directory }) => {
     if (!current(s, idle)) {
       return; // a later idle, a message or a turn made this one stale
     }
-    const result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
+    s.running = true;
+    let result;
+    try {
+      result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
+    } finally {
+      s.running = false;
+    }
     // The gate has counted this attempt, so a later idle doesn't make the result stale;
     // a message from the user, or a turn that started, does.
     if (idle.generation !== s.generation || s.busy || s.awaiting) {
       return;
     }
     if (result.code === 2) {
+      const was = s.continued;
       s.continued = true;
       s.awaiting = true;
       if (!(await send(id, { parts: [{ type: "text", text: STOP_PREFACE + result.stderr }] }))) {
-        s.awaiting = false; // not sent: the next idle runs the gate again
+        // Not sent: the agent never got this attempt, so the next idle runs the gate as before.
+        s.awaiting = false;
+        s.continued = was;
       }
       return;
     }
@@ -198,6 +208,9 @@ export const Inwards = async ({ client, directory }) => {
         const id = event.properties.sessionID;
         // Before anything waits: later idles and messages make this one stale.
         const known = sessions.get(id);
+        if (known?.running) {
+          return; // the gate is already answering this idle
+        }
         const seen = known ? { number: ++known.idles, generation: known.generation } : undefined;
         if (known) {
           known.busy = false; // now, so activity seen while this handler waits isn't overwritten
