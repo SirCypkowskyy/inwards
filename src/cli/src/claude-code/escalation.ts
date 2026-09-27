@@ -16,14 +16,14 @@
  */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import type { Diagnostic } from "@inwards/core";
+import { CONFIG_DEFAULTS, type Diagnostic } from "@inwards/core";
 import type { FileReader, Platform } from "../platform/contracts.ts";
 
 /** What escalation touches: the state directory, file hashes, the clock and stdout. */
 export type EscalationIo = Pick<Platform, "probe" | "read" | "clock" | "state" | "streams">;
 
 /** Attempts before escalating, when the config doesn't say. */
-export const DEFAULT_ESCALATE_AFTER = 3;
+export const DEFAULT_ESCALATE_AFTER: number = CONFIG_DEFAULTS.escalateAfter;
 const UNRESOLVED = /\.unresolved\.json$/u;
 
 /**

@@ -9,6 +9,7 @@
  */
 
 import type { Severity } from "../contracts/records.ts";
+import { CONFIG_DEFAULTS } from "./defaults.ts";
 import { globMatches, isGlob } from "./glob.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -166,7 +167,7 @@ function tables(value: unknown, key: string): Record<string, unknown>[] {
 function parseShape(entry: Record<string, unknown>, i: number): ShapeSpec {
   const where = `tool.inwards.shape[${i}]`;
   rejectUnknownKeys(entry, SHAPE_KEYS, where);
-  const { extra = "error" } = entry;
+  const { extra = CONFIG_DEFAULTS.shapeExtra } = entry;
   if (extra !== "error" && extra !== "warning") {
     throw new ConfigError(`${where}.extra must be "error" or "warning".`);
   }

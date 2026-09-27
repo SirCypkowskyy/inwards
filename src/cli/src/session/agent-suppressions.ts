@@ -12,6 +12,7 @@
 import { resolve } from "node:path";
 import {
   type AgentSuppressions,
+  CONFIG_DEFAULTS,
   type Diagnostic,
   parseConfig,
   type Report,
@@ -120,5 +121,5 @@ function modeOf(
   const config = start
     ? start.configs[projectPath(lookups.probe, lookups.project, configPath)]
     : parseConfig(lookups.read.text(configPath));
-  return config?.agentSuppressions ?? "deny";
+  return config?.agentSuppressions ?? CONFIG_DEFAULTS.agentSuppressions;
 }

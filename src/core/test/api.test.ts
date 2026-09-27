@@ -74,6 +74,7 @@ test("the runtime exports are unchanged", async () => {
   // A namespace import would be the natural spelling; Biome allows only this one.
   const core = await import("../src/index.ts");
   expect(Object.keys(core).sort()).toEqual([
+    "CONFIG_DEFAULTS",
     "ConfigError",
     "DOCS_BASE",
     "Engine",
@@ -123,6 +124,7 @@ test("index.ts re-exports exactly these names, types included", () => {
     [
       "AgentSuppressions",
       "Checked",
+      "CONFIG_DEFAULTS",
       "ConfigError",
       "ContextSpec",
       "DOCS_BASE",

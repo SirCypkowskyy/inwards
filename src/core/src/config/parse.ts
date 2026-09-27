@@ -8,6 +8,7 @@
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
 import { type ContextSpec, parseContexts } from "./contexts.ts";
+import { CONFIG_DEFAULTS } from "./defaults.ts";
 import { parseGenerated } from "./generated.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
@@ -198,7 +199,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
   }
   rejectUnknownKeys(raw, TABLE_KEYS, "tool.inwards");
-  const { root = ".", layers } = raw;
+  const { root = CONFIG_DEFAULTS.root, layers } = raw;
   if (typeof root !== "string") {
     throw new ConfigError("tool.inwards.root must be a string.");
   }
