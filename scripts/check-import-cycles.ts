@@ -14,7 +14,7 @@ import { dirname, join, normalize, relative } from "node:path";
 import process from "node:process";
 
 const ROOT = join(import.meta.dir, "..");
-const SPECIFIER = /(?:\bfrom|\bimport)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/gu;
+const SPECIFIER = /(?:\bfrom|\bimport)\s*\(?\s*["'](?<spec>\.{1,2}\/[^"']+)["']/gu;
 
 /**
  * Lists every TypeScript source file below a directory, declarations excluded.
@@ -44,11 +44,21 @@ function graphOf(files: readonly string[]): Map<string, string[]> {
     files.map((file) => {
       const text = readFileSync(file, "utf8");
       const targets = [...text.matchAll(SPECIFIER)]
-        .map((match) => normalize(join(dirname(file), match[1] ?? "")))
+        .map((match) => normalize(join(dirname(file), match.groups?.["spec"] ?? "")))
         .filter((target) => known.has(target));
       return [file, [...new Set(targets)]];
     }),
   );
+}
+
+/** Tarjan's bookkeeping for one walk of the graph. */
+interface Walk {
+  graph: ReadonlyMap<string, readonly string[]>;
+  index: Map<string, number>;
+  low: Map<string, number>;
+  stack: string[];
+  onStack: Set<string>;
+  found: string[][];
 }
 
 /**
@@ -59,54 +69,78 @@ function graphOf(files: readonly string[]): Map<string, string[]> {
  * @returns the cycles, each as its member files.
  */
 function cycles(graph: ReadonlyMap<string, readonly string[]>): string[][] {
-  const index = new Map<string, number>();
-  const low = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const found: string[][] = [];
-  let next = 0;
-
-  /**
-   * Visits one node and everything reachable from it.
-   *
-   * @param node - the file to visit.
-   */
-  function visit(node: string): void {
-    index.set(node, next);
-    low.set(node, next);
-    next += 1;
-    stack.push(node);
-    onStack.add(node);
-    for (const successor of graph.get(node) ?? []) {
-      if (!index.has(successor)) {
-        visit(successor);
-        low.set(node, Math.min(low.get(node) ?? 0, low.get(successor) ?? 0));
-      } else if (onStack.has(successor)) {
-        low.set(node, Math.min(low.get(node) ?? 0, index.get(successor) ?? 0));
-      }
-    }
-    if (low.get(node) === index.get(node)) {
-      const group: string[] = [];
-      let member: string | undefined;
-      do {
-        member = stack.pop();
-        if (member !== undefined) {
-          onStack.delete(member);
-          group.push(member);
-        }
-      } while (member !== undefined && member !== node);
-      if (group.length > 1) {
-        found.push(group.sort());
-      }
-    }
-  }
-
+  const walk: Walk = {
+    graph,
+    index: new Map(),
+    low: new Map(),
+    stack: [],
+    onStack: new Set(),
+    found: [],
+  };
   for (const node of graph.keys()) {
-    if (!index.has(node)) {
-      visit(node);
+    if (!walk.index.has(node)) {
+      visit(walk, node);
     }
   }
-  return found;
+  return walk.found;
+}
+
+/**
+ * Visits one node and everything reachable from it, recording each finished
+ * group of more than one node.
+ *
+ * @param walk - the walk's bookkeeping, updated in place.
+ * @param node - the file to visit.
+ */
+function visit(walk: Walk, node: string): void {
+  walk.index.set(node, walk.index.size);
+  walk.low.set(node, walk.index.get(node) ?? 0);
+  walk.stack.push(node);
+  walk.onStack.add(node);
+  for (const next of walk.graph.get(node) ?? []) {
+    if (!walk.index.has(next)) {
+      visit(walk, next);
+      lower(walk, node, walk.low.get(next));
+    } else if (walk.onStack.has(next)) {
+      lower(walk, node, walk.index.get(next));
+    }
+  }
+  if (walk.low.get(node) === walk.index.get(node)) {
+    const group = popGroup(walk, node);
+    if (group.length > 1) {
+      walk.found.push(group.sort());
+    }
+  }
+}
+
+/**
+ * Lowers a node's low-link to a value, if it is lower.
+ *
+ * @param walk - the walk's bookkeeping, updated in place.
+ * @param node - the node whose low-link may drop.
+ * @param value - the candidate, from a successor.
+ */
+function lower(walk: Walk, node: string, value: number | undefined): void {
+  walk.low.set(node, Math.min(walk.low.get(node) ?? 0, value ?? 0));
+}
+
+/**
+ * Pops the finished group whose root is a node off the stack.
+ *
+ * @param walk - the walk's bookkeeping, updated in place.
+ * @param root - the group's root.
+ * @returns the group's members.
+ */
+function popGroup(walk: Walk, root: string): string[] {
+  const group: string[] = [];
+  for (let member = walk.stack.pop(); member !== undefined; member = walk.stack.pop()) {
+    walk.onStack.delete(member);
+    group.push(member);
+    if (member === root) {
+      break;
+    }
+  }
+  return group;
 }
 
 const packages = readdirSync(join(ROOT, "src"), { withFileTypes: true })

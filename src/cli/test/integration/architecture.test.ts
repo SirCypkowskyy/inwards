@@ -40,6 +40,20 @@ const POLICY = [
   "runlog",
   "session",
 ];
+/** The run-log fields these tests read. */
+interface LogLine {
+  files: string[];
+  fingerprints: string[];
+}
+
+/** The part of `.fallowrc.jsonc` these tests read. */
+interface FallowConfig {
+  boundaries: {
+    zones: { name: string; patterns: string[] }[];
+    rules: { from: string; allow: string[] }[];
+  };
+}
+
 const FINDING: Diagnostic = {
   code: "INW001",
   rule: "layers",
@@ -89,17 +103,17 @@ describe("invocation state", () => {
     first.noteRun(root, [join(root, "shop/domain/order.py")], [FINDING]);
     second.logRun(root, { event: "check", exit: 0, force: true });
     first.logRun(root, { event: "check", exit: 1, force: true });
-    const lines = readFileSync(join(root, ".inwards/runs.jsonl"), "utf8")
+    const lines: LogLine[] = readFileSync(join(root, ".inwards/runs.jsonl"), "utf8")
       .trim()
       .split("\n")
-      .map((line) => JSON.parse(line) as { files: string[]; fingerprints: string[] });
+      .map((line): LogLine => JSON.parse(line));
     expect(lines.map((line) => line.files)).toEqual([[], ["shop/domain/order.py"]]);
     expect(lines.map((line) => line.fingerprints.length)).toEqual([0, 1]);
   });
 
   test("two start identities in one process don't share their caches", () => {
     const root = project({ "shop/domain/order.py": "X = 1\n", "shop/domain/saved.py": "X = 1\n" });
-    const probe = nodePlatform().probe;
+    const { probe } = nodePlatform();
     const real = probe.realpath(root) ?? root;
     const file = join(real, "shop/domain/order.py");
     const first = createStartIdentity(probe);
@@ -140,12 +154,7 @@ describe("boundaries", () => {
 
   test("every source folder has a fallow zone, and no policy zone may import adapters", () => {
     const text = readFileSync(join(REPO, ".fallowrc.jsonc"), "utf8").replace(/^\s*\/\/.*$/gmu, "");
-    const config = JSON.parse(text) as {
-      boundaries: {
-        zones: { name: string; patterns: string[] }[];
-        rules: { from: string; allow: string[] }[];
-      };
-    };
+    const config: FallowConfig = JSON.parse(text);
     const patterns = config.boundaries.zones.flatMap((zone) => zone.patterns);
     const folders = readdirSync(SRC, { withFileTypes: true }).filter((entry) =>
       entry.isDirectory(),

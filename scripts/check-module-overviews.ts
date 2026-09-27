@@ -15,7 +15,10 @@ import process from "node:process";
 
 const ROOT = join(import.meta.dir, "..");
 const MIN_SENTENCES = 2;
-const LEADING_BLOCK = /^(?:#![^\n]*\n)?\s*\/\*\*([\s\S]*?)\*\//u;
+const LEADING_BLOCK = /^(?:#![^\n]*\n)?\s*\/\*\*(?<body>[\s\S]*?)\*\//u;
+const COMMENT_STAR = /^\s*\*\s?/u;
+const FILE_TAG = /^.*@file\s*/u;
+const WHITESPACE = /\s+/gu;
 const ABBREVIATIONS = /\b(?:e\.g|i\.e|etc|vs|cf)\./giu;
 const INLINE_CODE = /`[^`]*`/gu;
 const URL = /\bhttps?:\/\/[^\s]*[^\s.,;:!?]/gu;
@@ -47,20 +50,20 @@ function modules(dir: string): string[] {
  * @returns the prose, or undefined when there is no leading `@file` block.
  */
 export function overviewProse(text: string): string | undefined {
-  const block = LEADING_BLOCK.exec(text)?.[1];
+  const block = LEADING_BLOCK.exec(text)?.groups?.["body"];
   if (block === undefined || !block.includes("@file")) {
     return undefined;
   }
-  const lines = block.split("\n").map((line) => line.replace(/^\s*\*\s?/u, ""));
+  const lines = block.split("\n").map((line) => line.replace(COMMENT_STAR, ""));
   const start = lines.findIndex((line) => line.includes("@file"));
   const prose: string[] = [];
   for (const [i, line] of lines.slice(start).entries()) {
     if (i > 0 && line.trimStart().startsWith("@")) {
       break;
     }
-    prose.push(i === 0 ? line.replace(/^.*@file\s*/u, "") : line);
+    prose.push(i === 0 ? line.replace(FILE_TAG, "") : line);
   }
-  return prose.join(" ").replace(/\s+/gu, " ").trim();
+  return prose.join(" ").replace(WHITESPACE, " ").trim();
 }
 
 /**

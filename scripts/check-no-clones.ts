@@ -12,10 +12,13 @@ import process from "node:process";
 const run = Bun.spawnSync(["fallow", "dupes", "--format", "json", "--no-fragments"], {
   stderr: "inherit",
 });
-const report = JSON.parse(run.stdout.toString()) as {
+/** The part of `fallow dupes --format json` this check reads. */
+interface DupesReport {
   stats: { clone_groups: number; duplicated_lines: number };
-};
-const { clone_groups: groups, duplicated_lines: lines } = report.stats;
+}
+const report: DupesReport = JSON.parse(run.stdout.toString());
+const groups: number = report.stats.clone_groups;
+const lines: number = report.stats.duplicated_lines;
 if (groups > 0) {
   process.stderr.write(
     `fallow found ${groups} clone group(s), ${lines} duplicated lines. Run \`bun x fallow dupes\` to see them.\n`,
