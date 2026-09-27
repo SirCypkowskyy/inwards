@@ -14,6 +14,7 @@ import { createRunLog } from "../runlog/record.ts";
 import type { CheckRunner } from "../session/contracts.ts";
 import { nodeBaselineWriter } from "./baseline-files.ts";
 import { nodeExportFiles } from "./export-files.ts";
+import { fileExtractionCache } from "./extraction-cache.ts";
 import { nodeFileWalker } from "./file-walk.ts";
 import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { nodeGit } from "./git.ts";
@@ -45,13 +46,14 @@ export function nodePlatform(): Platform {
 }
 
 /**
- * What a check reads on the real process: the platform plus the grammars.
+ * What a check reads on the real process: the platform, the grammars and the
+ * extraction cache (used only by the runs that ask for it).
  *
  * @param io - the platform.
  * @returns the project I/O.
  */
 export function nodeProjectIo(io: Platform): ProjectIo {
-  return { ...io, grammars: loadGrammars };
+  return { ...io, grammars: loadGrammars, extractionCache: fileExtractionCache };
 }
 
 /**

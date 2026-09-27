@@ -1,9 +1,9 @@
 /**
  * @file What the project feature needs from outside, besides the shared platform
- * contracts: the tree-sitter binaries for the engine, and a safe way to
- * replace a baseline file. Types only.
+ * contracts: the tree-sitter binaries for the engine, the extraction cache on
+ * disk, and a safe way to replace a baseline file. Types only.
  */
-import type { GrammarBinaries } from "@inwards/core";
+import type { ExtractionCache, GrammarBinaries } from "@inwards/core";
 import type { Clock, FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 
 /** Replacing a committed file in place without writing through a planted symlink. */
@@ -30,4 +30,13 @@ export interface ProjectIo {
    * @returns the two WASM blobs.
    */
   grammars: () => Promise<GrammarBinaries>;
+  /**
+   * Opens the extraction cache under a project's `.inwards/cache`, for the
+   * runs that ask for it (`inwards check` and `inwards baseline`, never the hooks).
+   *
+   * @param project - the directory of the pyproject.toml, with symlinks resolved.
+   * @param wasm - the grammars the engine loads, which name the cache's namespace.
+   * @returns the cache, or undefined when it can't be used safely.
+   */
+  extractionCache?: (project: string, wasm: GrammarBinaries) => ExtractionCache | undefined;
 }

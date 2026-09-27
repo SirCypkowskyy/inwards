@@ -29,6 +29,7 @@ export type {
   SourceFile,
   Span,
   Suppressed,
+  SuppressionComment,
 } from "./contracts/records.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";

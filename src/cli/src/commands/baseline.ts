@@ -8,6 +8,7 @@ import { resolve } from "node:path";
 import { parseConfig } from "@inwards/core";
 import { print } from "../platform/print.ts";
 import { BASELINE_FILE, writeBaseline } from "../project/baseline.ts";
+import { diskCacheWanted } from "../project/check.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import type { AppDeps } from "./deps.ts";
 
@@ -17,16 +18,24 @@ import type { AppDeps } from "./deps.ts";
  *
  * @param deps - the platform, the check runner and the baseline writer.
  * @param config - the `--config` path, if given.
+ * @param noCache - `--no-cache`: parse every file, without `.inwards/cache`.
  * @returns 0 once written, 2 without a config.
  * @throws {ConfigError} when the config is invalid or the baseline can't be written.
  */
-export async function baselineCommand(deps: AppDeps, config: string | undefined): Promise<number> {
+export async function baselineCommand(
+  deps: AppDeps,
+  config: string | undefined,
+  noCache = false,
+): Promise<number> {
   const { io } = deps;
   const configPath = config ? resolve(io.runtime.cwd, config) : findConfig(io, io.runtime.cwd);
   if (!configPath) {
     return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
   }
-  const report = await deps.check(configPath, undefined, io.runtime.cwd, { baseline: false });
+  const report = await deps.check(configPath, undefined, io.runtime.cwd, {
+    baseline: false,
+    cache: diskCacheWanted(io.runtime, noCache),
+  });
   // The check has parsed the config already, so this can't throw.
   const { rules } = parseConfig(io.read.text(configPath));
   const accepted = writeBaseline(

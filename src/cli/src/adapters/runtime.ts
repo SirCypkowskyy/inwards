@@ -22,6 +22,7 @@ export function readRuntime(): Runtime {
     runLog: env["INWARDS_RUN_LOG"],
     forceColor: Boolean(env["FORCE_COLOR"]),
     noColor: Boolean(env["NO_COLOR"]),
+    noCache: Boolean(env["INWARDS_NO_CACHE"]),
     home: homedir(),
     platform: process.platform,
     pid: process.pid,

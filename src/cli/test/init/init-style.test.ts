@@ -33,7 +33,10 @@ describe("inwards init --style X --scaffold on a fresh uv project", () => {
     expect({
       stdout: stable(run.stdout, root),
       table: stable(`[tool.inwards]${table}`, root),
-      created: Object.keys(files).filter((path) => !(path in UV_PROJECT)),
+      // What init made; the check's own cache under .inwards/ isn't part of it.
+      created: Object.keys(files).filter(
+        (path) => !(path in UV_PROJECT || path.startsWith(".inwards/cache/")),
+      ),
       check: check.summary,
     }).toMatchSnapshot();
     // uv's own package file is kept as it was.

@@ -160,6 +160,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "SourceFile",
       "Span",
       "Suppressed",
+      "SuppressionComment",
       "VERSION",
       "baselineKey",
       "checkLayers",

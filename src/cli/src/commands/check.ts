@@ -8,6 +8,7 @@ import { dirname, resolve } from "node:path";
 import { type Format, render } from "@inwards/core";
 import { shownReport } from "../paths/display.ts";
 import { print } from "../platform/print.ts";
+import { diskCacheWanted } from "../project/check.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import type { AppDeps } from "./deps.ts";
 
@@ -19,6 +20,7 @@ export interface CheckOptions {
   format?: string | undefined;
   config?: string | undefined;
   "max-diagnostics"?: string | undefined;
+  "no-cache"?: boolean | undefined;
 }
 
 /**
@@ -46,6 +48,8 @@ function isFormat(value: string): value is Format {
  * @param options.config - the `--config` path, if given.
  * @param options."max-diagnostics" - `--max-diagnostics`: a whole number, and not with SARIF,
  *   whose readers (code scanning) should see every finding.
+ * @param options."no-cache" - `--no-cache`: parse every file, reading and writing no
+ *   `.inwards/cache` (as `INWARDS_NO_CACHE=1` does).
  * @param log - `--log`: append this run to `.inwards/runs.jsonl` even when the run log is off.
  * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad option or no config.
  * @throws {ConfigError} when the config or the baseline is invalid.
@@ -53,7 +57,7 @@ function isFormat(value: string): value is Format {
 export async function checkCommand(
   deps: AppDeps,
   paths: string[],
-  { format = "text", config, "max-diagnostics": max }: CheckOptions,
+  { format = "text", config, "max-diagnostics": max, "no-cache": noCache }: CheckOptions,
   log: boolean,
 ): Promise<number> {
   const { io } = deps;
@@ -78,7 +82,8 @@ export async function checkCommand(
   }
 
   const targets = paths.length > 0 ? paths.map((p) => resolve(cwd, p)) : undefined;
-  const report = await deps.check(configPath, targets, cwd, {});
+  const cache = diskCacheWanted(io.runtime, noCache);
+  const report = await deps.check(configPath, targets, cwd, { cache });
 
   // Agents and hooks read a pipe, and indentation there is wasted tokens.
   const pretty = io.runtime.stdoutIsTTY;
