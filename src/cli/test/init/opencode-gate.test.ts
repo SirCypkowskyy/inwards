@@ -154,3 +154,69 @@ test("a kept gate message that arrives after all isn't sent again at the next id
   await fire(hooks, "session.idle", s); // the continued turn ends clean
   expect(sent.filter((m) => m.text.startsWith(STOP))).toEqual([]);
 });
+
+/**
+ * Runs a Stop check that answers late, with a shell command that rewrites
+ * the domain module starting and ending while it runs.
+ *
+ * @param before - the module's text when the turn ends.
+ * @param after - its text once the command ran.
+ * @returns how many Stop gate messages were sent.
+ */
+async function commandDuringStop(before: string, after: string): Promise<number> {
+  const root = initProject();
+  slowHook(root, 1);
+  const { hooks, sent } = await load(root);
+  const s = "ses_cmd_cycle";
+  const order = join(root, "shop/domain/order.py");
+  await fire(hooks, "session.created", s);
+  await say(hooks, s, "Edit the module.");
+  writeFileSync(order, before);
+  const first = fire(hooks, "session.idle", s); // the hook reads the module, then answers late
+  await pause(700);
+  await status(hooks, s, "busy"); // `!cmd`
+  writeFileSync(order, after);
+  await status(hooks, s, "idle");
+  const second = fire(hooks, "session.idle", s);
+  await Promise.all([first, second]);
+  return sent.filter((m) => m.text.startsWith(STOP)).length;
+}
+
+test("a shell command that runs and ends while the Stop hook runs makes the gate check again", async () => {
+  expect(await commandDuringStop(LEAK, "X = 1\n")).toBe(0); // the stale block isn't sent
+  expect(await commandDuringStop("X = 1\n", LEAK)).toBe(1); // the stale pass doesn't hide the change
+}, 30_000);
+
+test("an abort of a turn whose session couldn't be looked up sends nobody back", async () => {
+  const root = initProject();
+  const { hooks, sent } = await load(root, root, { get: 3 });
+  const s = "ses_resumed_abort";
+  await say(hooks, s, "Add the import.");
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  const aborted = { name: "MessageAbortedError", data: { message: "aborted" } };
+  await hooks.event({
+    event: { type: "session.error", properties: { sessionID: s, error: aborted } },
+  });
+  await fire(hooks, "session.idle", s);
+  expect(sent).toEqual([]);
+});
+
+test("a gate message whose request threw isn't sent again at once, only at the next idle", async () => {
+  const root = initProject();
+  const calls: number[] = [];
+  const { hooks, sent } = await load(root, root, {
+    throwAt: [0],
+    during: (call: number): Promise<void> => {
+      calls.push(call);
+      return Promise.resolve();
+    },
+  });
+  const s = "ses_threw";
+  await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await fire(hooks, "session.idle", s);
+  expect([calls.length, sent.length]).toEqual([1, 0]);
+  await fire(hooks, "session.idle", s);
+  expect(sent.map((m) => m.text.startsWith(STOP))).toEqual([true]);
+});

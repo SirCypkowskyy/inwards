@@ -24,9 +24,14 @@ test("a command that runs in Inwards' own directories is refused, wherever it ru
   );
   expect(found).toEqual(dirs.map(() => expect.stringContaining("may not run in")));
   expect(await refusal(hooks, "bash", { command: "ls", workdir: "shop" })).toBe("");
+  // Without a workdir, a command runs where OpenCode was started.
+  const inside = await load(root, join(root, ".opencode/plugins"));
+  expect(await refusal(inside.hooks, "bash", { command: "rm inwards.js" })).toContain(
+    "may not run in",
+  );
 });
 
-test("an edit of the config whose oldString appears twice is refused, even where the guard would allow it", async () => {
+test("an edit of the config whose oldString doesn't match exactly once is refused, even where the guard would allow it", async () => {
   const root = initProject();
   const config = join(root, "pyproject.toml");
   writeFileSync(
@@ -35,7 +40,12 @@ test("an edit of the config whose oldString appears twice is refused, even where
   );
   const { hooks } = await load(root);
   const edit = { filePath: config, oldString: "shop.domain", newString: "shop" };
-  expect(await refusal(hooks, "edit", edit)).toContain("appears more than once");
+  expect(await refusal(hooks, "edit", edit)).toContain("must match exactly once");
+  // A leading BOM, which the guard drops: no exact match, so OpenCode's looser matches decide.
+  const bom = { ...edit, oldString: "\uFEFF# owner: shop.domain", newString: "# owner: shop" };
+  expect(await refusal(hooks, "edit", bom)).toContain("must match exactly once");
+  // With replaceAll every exact match changes, which the guard simulates and judges.
+  expect(await refusal(hooks, "edit", { ...edit, replaceAll: true })).toContain("[tool.inwards]");
   const unique = { ...edit, oldString: "# owner: shop.domain", newString: "# owner: shop" };
   expect(await refusal(hooks, "edit", unique)).toBe("");
 });

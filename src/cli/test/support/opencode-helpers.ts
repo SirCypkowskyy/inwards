@@ -78,6 +78,8 @@ export interface Failures {
   prompt?: number;
   /** Which prompts fail, counting every prompt from 0. */
   promptAt?: readonly number[];
+  /** Which prompts throw, as a dropped connection does, counting every prompt from 0. */
+  throwAt?: readonly number[];
   /** Runs while a prompt request is in flight, before it answers: OpenCode may take the message then. */
   during?: (call: number, text: string) => Promise<void>;
 }
@@ -127,6 +129,9 @@ export async function load(
         const call = failing.calls;
         failing.calls += 1;
         await failures.during?.(call, body.parts.map((p) => p.text).join(""));
+        if (failures.throwAt?.includes(call)) {
+          throw new Error("socket hang up");
+        }
         if (failing.prompt > 0 || failures.promptAt?.includes(call)) {
           failing.prompt = Math.max(0, failing.prompt - 1);
           return Promise.resolve({ error: "HTTP 500" });
@@ -201,11 +206,12 @@ export async function say(
 export const INWARDS_LINE: RegExp = /^const INWARDS = .*$/mu;
 
 /**
- * Makes every hook run of the plugin start late, so a test can act while the
- * hook runs.
+ * Makes every hook run of the plugin answer late: Inwards runs, then the
+ * run waits before it exits, so a test can act after the hook has read the
+ * project and before the plugin gets its answer.
  *
  * @param root - the project directory.
- * @param seconds - how long each run waits before Inwards starts.
+ * @param seconds - how long each run waits after Inwards is done.
  */
 export function slowHook(root: string, seconds: number): void {
   const path = join(root, PLUGIN);
@@ -216,7 +222,7 @@ export function slowHook(root: string, seconds: number): void {
   const slow = [
     "sh",
     "-c",
-    `sleep ${seconds}; exec "$0" "$@"`,
+    `"$0" "$@"; code=$?; sleep ${seconds}; exit $code`,
     ...(Array.isArray(command) ? command : []),
   ];
   writeFileSync(path, text.replace(INWARDS_LINE, `const INWARDS = ${JSON.stringify(slow)};`));

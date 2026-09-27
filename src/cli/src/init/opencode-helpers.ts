@@ -254,26 +254,32 @@ function toolInput(tool, args, directory) {
 }
 
 /**
- * Tells whether an edit's oldString appears more than once in its file.
- * OpenCode then skips the exact match and tries looser ones, so the change
- * lands where the config guard's simulation can't say.
+ * Tells whether OpenCode would change something other than the exact match
+ * of an edit's oldString. Without exactly one exact match (or one at all,
+ * with replaceAll) OpenCode tries looser matches: trimmed lines, collapsed
+ * whitespace, a leading BOM dropped. The config guard simulates the exact,
+ * normalised match only, so the two could change different lines.
  *
  * @param input - the edit's tool input, as the hook reads it.
- * @returns true when the edit replaces one of several matches.
+ * @returns true when the edit's target is up to OpenCode's fallbacks.
  */
-function ambiguous(input) {
+function inexact(input) {
   const from = String(input.old_string ?? "").replaceAll("\\r\\n", "\\n");
-  if (input.replace_all || from === "") {
-    return false;
+  if (from === "") {
+    return false; // creates a file, which the guard simulates
   }
   let text;
   try {
-    text = readFileSync(input.file_path, "utf8").replaceAll("\\r\\n", "\\n");
+    // As OpenCode reads it: the BOM dropped, then the text matched as is.
+    text = readFileSync(input.file_path, "utf8").replace(/^\\uFEFF/u, "").replaceAll("\\r\\n", "\\n");
   } catch {
     return false; // a missing file: the guard denies what it can't simulate
   }
   const first = text.indexOf(from);
-  return first !== -1 && text.indexOf(from, first + 1) !== -1;
+  if (first === -1) {
+    return true;
+  }
+  return !input.replace_all && text.lastIndexOf(from) !== first;
 }
 
 /**
