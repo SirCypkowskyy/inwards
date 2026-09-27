@@ -174,9 +174,24 @@ describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
         // As written this spells shop/domain/legacy.py; the OS opens shop/domain/new/legacy.py.
         const edit = postedFrom(root, join(link, "shop/domain/hop"), "../legacy.py");
         expect(edit.code).toBe(2);
+        // Shortened, the path would read ../new/legacy.py: from hop, that is new/new/legacy.py.
+        expect(edit.stderr).not.toContain('"file":"../new/legacy.py"');
         expect(edit.stderr).not.toContain("already in the file when the session started");
         expect(edit.stderr).toContain(blocked);
       }
+    });
+
+    test("through a link to the root and a cwd alias, a shortened note path still opens the file", () => {
+      const root = session({ [Original]: "import shop.infrastructure.db\n" });
+      const link = `${root}-link`;
+      symlinkSync(root, link);
+      symlinkSync("original", join(root, "shop/domain/alias"));
+      const cwd = join(link, "shop/domain/alias");
+      const edit = postedFrom(root, cwd, "legacy.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("\n- ../original/legacy.py:1 INW001");
+      // The shell resolves `..` from where the link points, as the agent's tools do.
+      expect(Bun.spawnSync(["test", "-f", "../original/legacy.py"], { cwd }).exitCode).toBe(0);
     });
 
     test("through a link to the root, the notes name files from the project, not ../../private/var", () => {

@@ -125,7 +125,10 @@ const CLIMB = /^(?:\.\.\/)*/u;
  *
  * Display only: the hooks' start identity (`legacy.ts`) reads the report's
  * own paths against its own base, and must never see these. A path that
- * doesn't climb, or that climbs no less when respelled, is left as it is.
+ * doesn't climb, or that climbs no less when respelled, is left as it is,
+ * and so is one that opened from the base names another file: `relative`
+ * reads the base as text, but through a link below the root the OS
+ * resolves `..` from the link's target.
  *
  * @param project - the real project root.
  * @param base - the directory the report's paths are relative to.
@@ -137,7 +140,9 @@ function shownPath(project: string, base: string, file: string): string {
     return file;
   }
   const shown = posix(relative(underRoot(project, base), underRoot(project, resolve(base, file))));
-  return climb(shown) < climb(file) ? shown : file;
+  const target = realpath(resolve(base, file));
+  const same = target !== undefined && physicalRealpath(base, shown) === target;
+  return same && climb(shown) < climb(file) ? shown : file;
 }
 
 /**
