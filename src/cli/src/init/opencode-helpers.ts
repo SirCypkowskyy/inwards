@@ -20,8 +20,10 @@ const PROTECTED = /(^|[\\\\/])(\\.opencode[\\\\/]|opencode\\.jsonc?$|\\.inwards[
 const CONFIG = /(^|[\\\\/])pyproject\\.toml$/iu;
 /** A command that names one of those files, or the config. */
 const MENTIONS = /pyproject\\.toml|\\.opencode|opencode\\.jsonc?|\\.inwards|inwards-baseline/iu;
-/** Patch headers as OpenCode reads them, with any spacing around the colon. */
-const PATCH_FILE = /^[ \\t]*\\*\\*\\*[ \\t]*(?:(?:Add|Update|Delete)[ \\t]+File|Move[ \\t]+to)[ \\t]*:[ \\t]*(.*?)[ \\t]*$/gimu;
+/** Patch headers, read at least as leniently as OpenCode does; the path is trimmed as its parser trims it. */
+const PATCH_FILE = /^\\s*\\*\\*\\*\\s*(?:(?:Add|Update|Delete)\\s+File|Move\\s+to)\\s*:(.*)$/gimu;
+/** Inwards' own files and this plugin, by where they are in the project; links to them count too. */
+const OWN_FILES = [".opencode", ".inwards", "inwards-baseline.json", "opencode.json", "opencode.jsonc"];
 /** Marks the messages the plugin sends, so they don't count as the user's. */
 const OWN = "(sent by the Inwards plugin, not the user)";
 const STOP_PREFACE = \`Inwards Stop gate \${OWN}: the turn can't end yet. Fix what follows, then finish your turn.\\n\\n\`;
@@ -136,6 +138,43 @@ function names(pattern, path) {
 }
 
 /**
+ * Tells whether a path is, or lies inside, one of the project's own files
+ * once links on both sides are resolved: \\\`settings.toml\\\` when
+ * \\\`pyproject.toml\\\` links to it, say.
+ *
+ * @param path - an absolute path.
+ * @param names - files of the project, relative to it.
+ * @returns true when the path resolves into one of them.
+ */
+function resolvesTo(path, names) {
+  const target = real(String(path ?? ""));
+  return names.some((name) => {
+    const own = real(join(PROJECT, name));
+    return target === own || target.startsWith(own + sep);
+  });
+}
+
+/**
+ * Tells whether a path is Inwards' own: the plugin, the state, the baseline or OpenCode's config.
+ *
+ * @param path - an absolute path.
+ * @returns true when no tool may change it without the user.
+ */
+function inwardsOwn(path) {
+  return names(PROTECTED, path) || resolvesTo(path, OWN_FILES);
+}
+
+/**
+ * Tells whether a path is a pyproject.toml, or the project's config reached through a link.
+ *
+ * @param path - an absolute path.
+ * @returns true when the config guard must see the change.
+ */
+function configFile(path) {
+  return names(CONFIG, path) || resolvesTo(path, ["pyproject.toml"]);
+}
+
+/**
  * Makes a tool's path absolute, against the directory OpenCode runs in.
  *
  * @param directory - OpenCode's working directory.
@@ -177,7 +216,10 @@ function toolInput(tool, args, directory) {
  * @returns absolute paths.
  */
 function patchedFiles(text, directory) {
-  return [...String(text ?? "").matchAll(PATCH_FILE)].map((m) => absolute(directory, m[1]));
+  return [...String(text ?? "").matchAll(PATCH_FILE)]
+    .map((m) => m[1].trim())
+    .filter((path) => path !== "")
+    .map((path) => absolute(directory, path));
 }
 
 /**
@@ -191,7 +233,7 @@ function touchesRules(tool, input) {
   if (tool === "bash") {
     return MENTIONS.test(String(input.command ?? ""));
   }
-  return names(CONFIG, input.file_path) || names(PROTECTED, input.file_path);
+  return configFile(input.file_path) || inwardsOwn(input.file_path);
 }
 
 /**

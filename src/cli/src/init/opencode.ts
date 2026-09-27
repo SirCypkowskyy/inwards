@@ -52,7 +52,7 @@ function pluginSource(command: readonly string[]): string {
 // It holds this machine's path to Inwards and is in .gitignore.
 import { createHash } from "node:crypto";
 import { readFileSync, readlinkSync, realpathSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const INWARDS = ${JSON.stringify(command)};

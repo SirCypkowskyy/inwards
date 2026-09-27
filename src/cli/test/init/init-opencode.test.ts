@@ -9,7 +9,15 @@
  * refused rather than let through unchecked.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
@@ -99,13 +107,20 @@ describe.skipIf(process.platform === "win32")("links", () => {
     symlinkSync(join(root, PLUGIN), join(root, "alias.js"));
     symlinkSync(join(root, "pyproject.toml"), join(root, "config.toml"));
     symlinkSync(join(root, ".inwards/missing.json"), join(root, "dangling.json"));
+    mkdirSync(join(root, ".inwards"), { recursive: true });
+    symlinkSync(join(root, ".inwards"), join(root, "state"));
+    writeFileSync(join(root, "state.json"), "");
+    rmSync(join(root, "state.json"));
+    symlinkSync(join(root, "state/x.json"), join(root, "state.json"));
     const { hooks } = await load(root);
     const found = await Promise.all([
       refusal(hooks, "write", { filePath: "alias.js", content: "" }),
+      refusal(hooks, "write", { filePath: "state.json", content: "" }),
       refusal(hooks, "write", { filePath: "dangling.json", content: "" }),
       refusal(hooks, "apply_patch", { patchText: patch("*** Update File: config.toml") }),
     ]);
     expect(found).toEqual([
+      expect.stringContaining("is Inwards' own"),
       expect.stringContaining("is Inwards' own"),
       expect.stringContaining("is Inwards' own"),
       expect.stringContaining("apply_patch may not change"),
@@ -140,6 +155,8 @@ describe("the guard in the plugin", () => {
       "*** Delete File:\t.opencode/plugins/inwards.js",
       "***  Add File :  .inwards/state/x.json",
       "*** Update File: shop/x.py\n*** Move to:inwards-baseline.json",
+      "*** Update File:pyproject.toml\u00a0",
+      "\u00a0*** Update File:\u000bpyproject.toml",
     ];
     const found = await Promise.all(
       headers.map((h) => refusal(hooks, "apply_patch", { patchText: patch(h) })),
@@ -188,3 +205,29 @@ describe("the guard in the plugin", () => {
     expect(out.output).toContain("Inwards couldn't check");
   });
 });
+
+describe.skipIf(process.platform === "win32")(
+  "the config behind a link, and a hook that exits 2",
+  () => {
+    test("a patch of the file pyproject.toml links to is refused", async () => {
+      const root = initProject();
+      renameSync(join(root, "pyproject.toml"), join(root, "settings.toml"));
+      symlinkSync(join(root, "settings.toml"), join(root, "pyproject.toml"));
+      const { hooks } = await load(root);
+      expect(
+        await refusal(hooks, "apply_patch", { patchText: patch("*** Update File: settings.toml") }),
+      ).toContain("apply_patch may not change");
+    });
+
+    test("a PreToolUse that exits 2 blocks the call with its stderr", async () => {
+      const root = initProject();
+      const path = join(root, PLUGIN);
+      const script = 'const INWARDS = ["sh", "-c", "echo usage: nope >&2; exit 2"];';
+      writeFileSync(path, readFileSync(path, "utf8").replace(INWARDS_LINE, script));
+      const { hooks } = await load(root);
+      expect(await refusal(hooks, "write", { filePath: "shop/domain/order.py", content: "" })).toBe(
+        "usage: nope",
+      );
+    });
+  },
+);

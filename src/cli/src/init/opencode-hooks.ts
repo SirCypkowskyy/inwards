@@ -9,10 +9,13 @@
 /** The exported plugin; it needs the helpers in `PLUGIN_HELPERS` above it. */
 export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }) => {
   /**
-   * What the plugin knows about each top-level session: whether the Stop gate
-   * sent it back to work (and its message hasn't arrived yet), how many messages the user sent (a Stop result from
-   * before the latest one is stale), whether a turn is running, the agent and
-   * model the user picked, and the queue that keeps its Stop checks in order.
+   * What the plugin knows about each top-level session:
+   * - whether the Stop gate sent it back to work, and whether that message is still on its way;
+   * - how many messages the user sent, and how many idles came: only the
+   *   latest idle, from after the user's latest message, runs the gate;
+   * - whether a turn is running;
+   * - the agent, model and variant the user picked;
+   * - how it started, and the queue that runs its Stop checks one at a time.
    */
   const sessions = new Map();
   /** A subagent's session, by the top-level session it works for. */
@@ -23,8 +26,9 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
         continued: false,
         awaiting: false,
         generation: 0,
+        idles: 0,
         busy: false,
-        started: false,
+        starting: undefined,
         chosen: {},
         queue: Promise.resolve(),
       });
@@ -33,11 +37,28 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
   };
 
   /**
+   * Sends a message into a session. The SDK reports a failed request in its
+   * result rather than throwing, so both count as not sent.
+   *
+   * @param id - the session.
+   * @param body - the prompt body, without the session's chosen agent and model.
+   * @returns true when the request was accepted.
+   */
+  const send = async (id, body) => {
+    try {
+      const result = await client.session.promptAsync({ path: { id }, body: { ...state(id).chosen, ...body } });
+      return !result?.error;
+    } catch {
+      return false;
+    }
+  };
+
+  /**
    * Finds the top-level session a session works for. A subagent's session
-   * created before OpenCode started is looked up once.
+   * created before OpenCode started is looked up; a failed lookup is tried again next time.
    *
    * @param id - any session id.
-   * @returns the id of its top-level session.
+   * @returns the id of its top-level session, or undefined while a lookup fails.
    */
   const root = async (id) => {
     if (parents.has(id)) {
@@ -46,52 +67,68 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
     if (sessions.has(id)) {
       return id;
     }
+    let found;
     try {
-      const parentID = (await client.session.get({ path: { id } }))?.data?.parentID;
-      if (parentID) {
-        const top = await root(parentID);
-        parents.set(id, top);
-        return top;
-      }
+      found = await client.session.get({ path: { id } });
     } catch {
-      return id; // unknown for now: ask again next time
+      return undefined;
+    }
+    if (found?.error || !found?.data) {
+      return undefined;
+    }
+    const parentID = found.data.parentID;
+    if (parentID) {
+      const top = await root(parentID);
+      if (top !== undefined) {
+        parents.set(id, top);
+      }
+      return top;
     }
     state(id);
     return id;
   };
 
   /**
-   * Records how a top-level session starts, once; a session OpenCode resumed
-   * gets a resume, which only logs itself.
+   * Records how a top-level session starts, once; every hook of the session
+   * waits for it. A session OpenCode resumed gets a resume, which only logs itself.
    *
    * @param id - a top-level session.
    * @param source - "startup" for a new session, "resume" otherwise.
+   * @returns when the record is written.
    */
-  const start = async (id, source) => {
+  const start = (id, source) => {
     const s = state(id);
-    if (s.started) {
-      return;
-    }
-    s.started = true;
-    const result = await hook({ session_id: id, hook_event_name: "SessionStart", source });
-    const context = output(result.stdout).hookSpecificOutput?.additionalContext;
-    if (context) {
-      await note(id, context);
-    }
+    s.starting ??= (async () => {
+      const result = await hook({ session_id: id, hook_event_name: "SessionStart", source });
+      const context = output(result.stdout).hookSpecificOutput?.additionalContext;
+      if (context) {
+        await note(id, context);
+      }
+    })();
+    return s.starting;
   };
 
   /**
-   * Adds a message to a session for the model and the user to read, without starting a turn.
+   * Adds a message to a session for the model and the user to read, without
+   * starting a turn. A turn that is running may still read it.
    *
    * @param id - the session.
    * @param text - what to say.
    */
   const note = async (id, text) => {
-    await client.session.promptAsync({
-      path: { id },
-      body: { ...state(id).chosen, noReply: true, parts: [{ type: "text", text: NOTE_PREFACE + text }] },
-    });
+    await send(id, { noReply: true, parts: [{ type: "text", text: NOTE_PREFACE + text }] });
   };
+
+  /**
+   * Tells whether an idle still stands: the latest one, after the user's
+   * latest message, with no turn running and no message from the gate on its way.
+   *
+   * @param s - the session's state.
+   * @param idle - what the idle saw: its number and the user's message count.
+   * @returns true when the gate may run, or act on its result.
+   */
+  const current = (s, idle) =>
+    idle.number === s.idles && idle.generation === s.generation && !s.busy && !s.awaiting;
 
   /**
    * Runs the Stop gate for a top-level session that went idle. OpenCode can't
@@ -99,26 +136,21 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
    * reasons, as the agent the user picked.
    *
    * @param id - the session.
-   * @param generation - the user's message count when the session went idle.
+   * @param idle - the idle's number and the user's message count when it came.
    */
-  const stop = async (id, generation) => {
+  const stop = async (id, idle) => {
     const s = state(id);
-    if (s.awaiting || generation !== s.generation) {
-      return; // an idle from before the gate's last message, or the user's, arrived
+    if (!current(s, idle)) {
+      return; // a later idle, a message or a turn made this one stale
     }
     const result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
-    if (generation !== s.generation || s.busy || s.awaiting) {
+    if (!current(s, idle)) {
       return; // the user or the agent moved on while the gate ran
     }
     if (result.code === 2) {
       s.continued = true;
       s.awaiting = true;
-      try {
-        await client.session.promptAsync({
-          path: { id },
-          body: { ...s.chosen, parts: [{ type: "text", text: STOP_PREFACE + result.stderr }] },
-        });
-      } catch {
+      if (!(await send(id, { parts: [{ type: "text", text: STOP_PREFACE + result.stderr }] }))) {
         s.awaiting = false; // not sent: the next idle runs the gate again
       }
       return;
@@ -137,7 +169,10 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
       if (event.type === "session.created") {
         const { id, parentID } = event.properties.info;
         if (parentID) {
-          parents.set(id, await root(parentID));
+          const top = await root(parentID);
+          if (top !== undefined) {
+            parents.set(id, top);
+          }
           return;
         }
         await start(id, "startup");
@@ -146,49 +181,60 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
         if (sessions.has(id)) {
           state(id).busy = event.properties.status?.type === "busy";
         }
+      } else if (event.type === "session.error") {
+        const id = event.properties.sessionID;
+        if (sessions.has(id)) {
+          state(id).awaiting = false; // a message that failed after it was accepted
+        }
       } else if (event.type === "session.idle") {
         const id = event.properties.sessionID;
-        // Before anything waits: a message the user sends after this idle makes it stale.
-        const seen = sessions.get(id)?.generation;
+        // Before anything waits: later idles and messages make this one stale.
+        const known = sessions.get(id);
+        const seen = known ? { number: ++known.idles, generation: known.generation } : undefined;
         if ((await root(id)) !== id) {
-          return; // a subagent: the gate runs for the session it works for
+          return; // a subagent, or not known yet: the gate runs for the session it works for
         }
         await start(id, "resume");
         const s = state(id);
         s.busy = false;
-        const generation = seen ?? s.generation;
-        s.queue = s.queue.then(() => stop(id, generation)).catch(() => undefined);
+        const idle = seen ?? { number: ++s.idles, generation: s.generation };
+        s.queue = s.queue.then(() => stop(id, idle)).catch(() => undefined);
         await s.queue;
       }
     },
     "chat.message": async (input, out) => {
       const id = await root(input.sessionID);
       if (id !== input.sessionID) {
-        return; // a prompt to a subagent is part of its parent's turn
+        return; // a prompt to a subagent is part of its parent's turn; an unknown session waits
       }
       const s = state(id);
       const own = ownMessage(out?.parts);
       if (own === "stop") {
-        s.awaiting = false; // the gate's message arrived: the continued turn begins
+        // The gate's message arrived: the continued turn begins, and idles queued before it are stale.
+        s.awaiting = false;
+        s.busy = true;
       }
       if (own) {
         return;
       }
-      // A message the user sends starts a new turn, with the agent and model they picked.
+      // A message the user sends starts a new turn, with the agent, model and variant they picked.
       s.generation += 1;
       s.continued = false;
       s.awaiting = false;
       s.chosen = {
         ...(input.agent ? { agent: input.agent } : {}),
         ...(input.model ? { model: input.model } : {}),
+        ...(input.variant ? { variant: input.variant } : {}),
       };
     },
     "tool.execute.before": async (input, out) => {
-      const session = await root(input.sessionID);
+      const top = await root(input.sessionID);
+      if (top !== undefined) {
+        await start(top, "resume");
+      }
+      const session = top ?? input.sessionID;
       if (input.tool === "apply_patch") {
-        const guarded = patchedFiles(out.args?.patchText, directory).filter(
-          (p) => names(PROTECTED, p) || names(CONFIG, p),
-        );
+        const guarded = patchedFiles(out.args?.patchText, directory).filter((p) => inwardsOwn(p) || configFile(p));
         if (guarded.length > 0) {
           throw new Error(
             \`Inwards: apply_patch may not change \${guarded.join(", ")}; use the edit tool, which the config guard checks, or ask the user.\`,
@@ -201,13 +247,17 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
         return;
       }
       const tool_input = toolInput(input.tool, out.args ?? {}, directory);
-      if (name !== "Bash" && names(PROTECTED, tool_input.file_path)) {
+      if (name !== "Bash" && inwardsOwn(tool_input.file_path)) {
         throw new Error(\`Inwards: \${tool_input.file_path} is Inwards' own; ask the user to change it.\`);
       }
       const result = await hook({ session_id: session, hook_event_name: "PreToolUse", tool_name: name, tool_input });
       const reason = denial(result.stdout);
       if (reason !== undefined) {
         throw new Error(reason);
+      }
+      if (result.code === 2) {
+        // As in Claude Code: exit 2 blocks the call, with stderr as the reason.
+        throw new Error(result.stderr.trim() || "Inwards refused this call.");
       }
       if (broken(result) && touchesRules(input.tool, tool_input)) {
         throw new Error(
@@ -216,7 +266,11 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
       }
     },
     "tool.execute.after": async (input, out) => {
-      const session = await root(input.sessionID);
+      const top = await root(input.sessionID);
+      if (top !== undefined) {
+        await start(top, "resume");
+      }
+      const session = top ?? input.sessionID;
       const files =
         input.tool === "apply_patch"
           ? patchedFiles(input.args?.patchText, directory)

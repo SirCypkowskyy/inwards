@@ -21,7 +21,7 @@ test("a bad edit gets its findings, and the Stop gate sends the agent back once,
   const { hooks, sent } = await load(root);
   const s = "ses_stop";
   await fire(hooks, "session.created", s);
-  await say(hooks, s, "Add the import.", "reviewer");
+  await say(hooks, s, "Add the import.", { agent: "reviewer", variant: "high" });
   const order = join(root, "shop/domain/order.py");
   writeFileSync(order, LEAK);
   const out = { output: "Edit applied." };
@@ -32,7 +32,9 @@ test("a bad edit gets its findings, and the Stop gate sends the agent back once,
   expect(out.output).toContain("INW001");
 
   await fire(hooks, "session.idle", s);
-  expect(sent.map((m) => [m.id, m.agent, m.noReply])).toEqual([[s, "reviewer", false]]);
+  expect(sent.map((m) => [m.id, m.agent, m.variant, m.noReply])).toEqual([
+    [s, "reviewer", "high", false],
+  ]);
   expect(sent[0]?.text).toStartWith(STOP);
   expect(sent[0]?.text).toContain("INW001");
 
@@ -113,4 +115,29 @@ test("the Stop gate reports a plugin removed, or rewritten with the marker kept"
   writeFileSync(path, original);
   await fire(hooks, "session.idle", s);
   expect(sent).toHaveLength(2);
+});
+
+test("a failed request is tried again: a lookup isn't cached, and an unsent gate message doesn't hold the next idle", async () => {
+  const root = initProject();
+  const { hooks, sent, parents } = await load(root, root, { get: 1, prompt: 1 });
+  const [top, child] = ["ses_retry", "ses_retry_child"];
+  await fire(hooks, "session.created", top);
+  parents.set(child, top);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await fire(hooks, "session.idle", child); // the lookup fails: not treated as a top-level session for good
+  await fire(hooks, "session.idle", top); // the prompt fails
+  expect(sent).toEqual([]);
+  await fire(hooks, "session.idle", child);
+  await fire(hooks, "session.idle", top);
+  expect(sent.map((m) => m.id)).toEqual([top]);
+});
+
+test("idles queued behind one that sent the gate's message send nothing more", async () => {
+  const root = initProject();
+  const { hooks, sent } = await load(root);
+  const s = "ses_dupes";
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await Promise.all([fire(hooks, "session.idle", s), fire(hooks, "session.idle", s)]);
+  expect(sent).toHaveLength(1);
 });

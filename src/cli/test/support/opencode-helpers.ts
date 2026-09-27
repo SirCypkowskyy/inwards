@@ -16,13 +16,19 @@ export interface Sent {
   text: string;
   noReply: boolean;
   agent: string | undefined;
+  variant: string | undefined;
 }
 
 /** The hooks the plugin returns, as the tests call them. */
 export interface Hooks {
   event: (input: { event: { type: string; properties: unknown } }) => Promise<void>;
   "chat.message": (
-    input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+    input: {
+      sessionID: string;
+      agent?: string;
+      model?: { providerID: string; modelID: string };
+      variant?: string;
+    },
     output: { parts: { type: string; text: string }[] },
   ) => Promise<void>;
   "tool.execute.before": (
@@ -46,7 +52,16 @@ export interface Loaded {
 interface PromptBody {
   noReply?: boolean;
   agent?: string;
+  variant?: string;
   parts: { text: string }[];
+}
+
+/** How the stand-in client misbehaves: its first few requests fail as the SDK reports failures. */
+export interface Failures {
+  /** Session lookups that fail before one succeeds. */
+  get?: number;
+  /** Prompts that fail before one succeeds. */
+  prompt?: number;
 }
 
 /**
@@ -70,25 +85,47 @@ export function initProject(): string {
  *
  * @param root - the project directory.
  * @param directory - where OpenCode runs; the project by default.
+ * @param failures - requests of the stand-in client that fail first.
  * @returns the plugin's hooks, the messages sent so far, and the parent table.
  * @throws {Error} when the file exports no plugin.
  */
-export async function load(root: string, directory: string = root): Promise<Loaded> {
+export async function load(
+  root: string,
+  directory: string = root,
+  failures: Failures = {},
+): Promise<Loaded> {
   const sent: Sent[] = [];
   const parents = new Map<string, string>();
+  const failing = { get: failures.get ?? 0, prompt: failures.prompt ?? 0 };
   const client = {
     session: {
-      promptAsync: ({ path, body }: { path: { id: string }; body: PromptBody }): Promise<void> => {
+      promptAsync: ({
+        path,
+        body,
+      }: {
+        path: { id: string };
+        body: PromptBody;
+      }): Promise<{ error?: string }> => {
+        if (failing.prompt > 0) {
+          failing.prompt -= 1;
+          return Promise.resolve({ error: "HTTP 500" });
+        }
         const text = body.parts.map((p) => p.text).join("");
-        sent.push({ id: path.id, text, noReply: body.noReply === true, agent: body.agent });
-        return Promise.resolve();
+        const { agent, variant } = body;
+        sent.push({ id: path.id, text, noReply: body.noReply === true, agent, variant });
+        return Promise.resolve({});
       },
       get: ({
         path,
       }: {
         path: { id: string };
-      }): Promise<{ data: { parentID: string | undefined } }> =>
-        Promise.resolve({ data: { parentID: parents.get(path.id) } }),
+      }): Promise<{ data?: { parentID: string | undefined }; error?: string }> => {
+        if (failing.get > 0) {
+          failing.get -= 1;
+          return Promise.resolve({ error: "HTTP 500" });
+        }
+        return Promise.resolve({ data: { parentID: parents.get(path.id) } });
+      },
     },
   };
   // A query string loads a fresh copy, as a restarted OpenCode would.
@@ -128,11 +165,15 @@ export async function fire(
  * @param hooks - the plugin's hooks.
  * @param id - the session.
  * @param text - the message.
- * @param agent - the agent the user picked.
+ * @param picked - the agent and variant the user picked.
+ * @param picked.agent - the agent, if any.
+ * @param picked.variant - the model variant, if any.
  */
-export async function say(hooks: Hooks, id: string, text: string, agent?: string): Promise<void> {
-  await hooks["chat.message"](
-    { sessionID: id, ...(agent ? { agent } : {}) },
-    { parts: [{ type: "text", text }] },
-  );
+export async function say(
+  hooks: Hooks,
+  id: string,
+  text: string,
+  picked: { agent?: string; variant?: string } = {},
+): Promise<void> {
+  await hooks["chat.message"]({ sessionID: id, ...picked }, { parts: [{ type: "text", text }] });
 }
