@@ -88,3 +88,30 @@ describe("baselined violations skip the confirming parse", () => {
     expect(shown(engine.checkFiles(files, PROJECT, accepted), accepted)).toEqual(plain);
   });
 });
+
+describe("INW006's older wording", () => {
+  test("gives the same keys as the current one", () => {
+    const pairs = [
+      [
+        '"shop.common" belongs to no layer, so its imports are not checked.',
+        '"shop.common" belongs to no layer, so no layer rule checks its imports.',
+      ],
+      [
+        'Layer "domain" imports "shop.common.money.Money", which belongs to no layer, so nothing checks what "shop.common" imports.',
+        'Layer "domain" imports "shop.common.money.Money", which belongs to no layer, so no layer rule checks what "shop.common" imports.',
+      ],
+    ];
+    /**
+     * The baseline key of an INW006 message.
+     *
+     * @param message - an old or a current INW006 message.
+     * @returns its key for one module.
+     */
+    function key(message: string): string {
+      return baselineKey({ code: "INW006", module: "shop.domain.order", message });
+    }
+    for (const [old = "", now = ""] of pairs) {
+      expect(key(old)).toBe(key(now));
+    }
+  });
+});

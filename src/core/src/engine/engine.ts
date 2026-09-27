@@ -125,8 +125,9 @@ export class Engine {
    * whose text names a loader (`mentionsDynamicImport`) skips the skeleton and
    * gets the full parse, which also looks for dynamic imports (INW011).
    *
-   * A file outside every layer isn't parsed: besides its shape, it gets at
-   * most an INW006 warning naming its package.
+   * A file outside every layer and every context isn't parsed: besides its
+   * shape, it gets at most an INW006 warning naming its package. A file a
+   * context owns but no layer does gets that warning and the context rules.
    *
    * Inline suppression comments then hide the findings they cover and add
    * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).

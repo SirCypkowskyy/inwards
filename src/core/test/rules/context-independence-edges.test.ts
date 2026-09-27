@@ -24,8 +24,12 @@ describe("what an import is judged by", () => {
   });
 
   test("a name with no module on disk is judged by its spelling", async () => {
-    const { check }: ContextFixture = await contextFixture();
-    const codes = check(PLACE, "import shop.shipping.gone\n").map((d) => d.code);
+    // No module owns "plugins.vendor.sdk": only the fallback to its spelling finds the context.
+    expect(CONTEXT_PROJECT.ownerOf("plugins.vendor.sdk")).toBeUndefined();
+    const { check }: ContextFixture = await contextFixture({
+      toml: '\n[[tool.inwards.contexts]]\nname = "vendor"\nmodules = ["plugins.vendor"]\n',
+    });
+    const codes = check(PLACE, "import plugins.vendor.sdk\n").map((d) => d.code);
     expect(codes).toContain("INW002");
   });
 });
