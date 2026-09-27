@@ -3,7 +3,7 @@ name: Docs
 on:
   push:
     branches: [develop]
-    paths: ["docs/**", "scripts/check-docs-translation.py", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "schema/**", "scripts/check-docs-translation.py", "scripts/publish-schema.sh", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
   workflow_dispatch:
 
 # Only the deploy job can write to Pages or mint an OIDC token, and it runs
@@ -36,6 +36,8 @@ jobs:
       - run: uv run scripts/check-docs-translation.py --mark-stale
         continue-on-error: true
       - run: uv run zensical build -f docs/zensical.pl.toml --clean --strict
+      # The [tool.inwards] JSON Schema, served where its $id points.
+      - run: bash scripts/publish-schema.sh
       - uses: actions/upload-pages-artifact@v5
         with:
           path: docs/site
