@@ -5,6 +5,7 @@
  * pins this list, so a change to it is deliberate.
  */
 export { baselineKey, stableMessage } from "./baseline/accepted.ts";
+export type { ContextSpec } from "./config/contexts.ts";
 export {
   type AgentSuppressions,
   declaresInwards,

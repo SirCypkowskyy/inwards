@@ -55,6 +55,15 @@ describe("config guard: pyproject.toml", () => {
       },
     ],
     [
+      "an Edit that adds a context in [[tool.inwards.contexts]]",
+      "Edit",
+      {
+        old_string: 'attrs==23.1"]\n',
+        new_string:
+          'attrs==23.1"]\n\n[[tool.inwards.contexts]]\nname = "orders"\nmodules = ["shop.domain"]\n',
+      },
+    ],
+    [
       "an Edit that selects rules with a dotted key",
       "Edit",
       { old_string: "[tool.inwards]\n", new_string: '[tool.inwards]\nrules.select = ["INW005"]\n' },

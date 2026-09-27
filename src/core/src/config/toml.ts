@@ -37,3 +37,17 @@ export function rejectUnknownKeys(
     throw new ConfigError(`Unknown key ${where}.${unknown}. Known keys: ${[...known].join(", ")}.`);
   }
 }
+
+/** A dotted Python name: identifiers joined by dots, e.g. `http.client` or `shop.orders`. */
+const DOTTED_NAME = /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*$/u;
+
+/**
+ * Tells whether a value is a dotted Python name, as a module or import name
+ * in the config must be.
+ *
+ * @param value - any value from the parsed document.
+ * @returns true for a string of identifiers joined by dots, with no wildcards.
+ */
+export function isDottedName(value: unknown): value is string {
+  return typeof value === "string" && DOTTED_NAME.test(value);
+}

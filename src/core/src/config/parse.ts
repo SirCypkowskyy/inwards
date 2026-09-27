@@ -7,10 +7,11 @@
  */
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
+import { type ContextSpec, parseContexts } from "./contexts.ts";
 import { parseGenerated } from "./generated.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
-import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 export interface LayerSpec {
   name: string;
@@ -82,6 +83,12 @@ export interface InwardsConfig {
    * Absent when not set.
    */
   agentSuppressions?: AgentSuppressions;
+  /**
+   * Bounded contexts or slices, `[[tool.inwards.contexts]]`: which modules each
+   * owns, which of them other contexts may import, and which contexts it may
+   * depend on (INW002, INW003). Absent when not set or empty.
+   */
+  contexts?: ContextSpec[];
 }
 
 /** What the hooks do with a suppression the agent added, see `InwardsConfig.agentSuppressions`. */
@@ -111,6 +118,7 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "names",
   "rules",
   "agent-suppressions",
+  "contexts",
 ]);
 const LAYER_KEYS: ReadonlySet<string> = new Set([
   "name",
@@ -119,9 +127,6 @@ const LAYER_KEYS: ReadonlySet<string> = new Set([
   "deny-libraries",
   "extend-deny-libraries",
 ]);
-
-/** An import name: dotted Python identifiers, e.g. `http.client` (INW005 library lists). */
-const DOTTED_NAME = /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*$/u;
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
 const INWARDS_WORD = /\binwards\b/u;
@@ -212,6 +217,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...parseShapeKeys(raw),
     ...parseRules(raw["rules"]),
     ...agentSuppressionsKey(raw["agent-suppressions"]),
+    ...parseContexts(raw["contexts"]),
   };
   return config;
 }
@@ -349,7 +355,7 @@ function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
  */
 function libraryList(layer: unknown, i: number, key: string): string[] | undefined {
   const value = isRecord(layer) ? layer[key] : undefined;
-  const valid = isModuleList(value) && value.every((entry) => DOTTED_NAME.test(entry));
+  const valid = isModuleList(value) && value.every((entry) => isDottedName(entry));
   if (value !== undefined && !valid) {
     throw new ConfigError(
       `tool.inwards.layers[${i}].${key} must be a list of import names such as "sqlalchemy" or "http.client": no globs, and no distribution names like "python-dateutil".`,

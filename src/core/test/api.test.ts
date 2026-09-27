@@ -11,6 +11,7 @@ import { join } from "node:path";
 import type {
   AgentSuppressions,
   Checked,
+  ContextSpec,
   Diagnostic,
   Fix,
   Format,
@@ -45,6 +46,7 @@ const TYPE_PREFIX = /^type\s+/u;
 type PublicTypes = [
   AgentSuppressions,
   Checked,
+  ContextSpec,
   Diagnostic,
   Fix,
   Format,
@@ -122,6 +124,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "AgentSuppressions",
       "Checked",
       "ConfigError",
+      "ContextSpec",
       "DOCS_BASE",
       "Diagnostic",
       "Engine",
