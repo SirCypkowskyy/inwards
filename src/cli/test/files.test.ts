@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { collectPythonFiles } from "../src/files.ts";
+import { collectPythonFiles } from "../src/adapters/file-walk.ts";
 import { tempDir } from "./temp.ts";
 
 test("walks build/dist/site inside packages, skips venvs and hidden dirs", () => {

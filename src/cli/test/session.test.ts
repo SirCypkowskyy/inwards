@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { readSession } from "../src/session.ts";
+import { readSession } from "../src/session/record.ts";
 import { inwards, inwardsAsync, LAYERS, payload, project, type RunResult } from "./run.ts";
 
 const ID = "session-test-1";

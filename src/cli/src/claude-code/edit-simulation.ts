@@ -10,7 +10,7 @@
 import { lstatSync, readlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { physicalRealpath } from "./paths.ts";
+import { physicalRealpath } from "../paths/lexical.ts";
 
 const BOM = "﻿";
 

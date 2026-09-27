@@ -1,6 +1,8 @@
 import { dirname } from "node:path";
 import process from "node:process";
 import { parseConfig, VERSION } from "@inwards/core";
+import { pick } from "../adapters/picker.ts";
+import { print } from "../adapters/stdio.ts";
 import {
   AGENTS,
   type Agent,
@@ -11,12 +13,9 @@ import {
   initCommand,
   isAgent,
   PRERELEASE,
-} from "./init.ts";
-import { report } from "./init-report.ts";
-import { findTarget, noPackage, shown, sourceRoot, type Target } from "./init-target.ts";
-import { planScaffold, writeAll } from "./init-write.ts";
-import { print } from "./output.ts";
-import { pick } from "./picker.ts";
+} from "./agents.ts";
+import { report } from "./report.ts";
+import { planScaffold, writeAll } from "./scaffold.ts";
 import {
   configTable,
   describeStyles,
@@ -26,6 +25,7 @@ import {
   type Style,
   type StyleName,
 } from "./styles.ts";
+import { findTarget, noPackage, shown, sourceRoot, type Target } from "./target.ts";
 
 /** The `init` options main.ts parsed. */
 export interface InitFlags {

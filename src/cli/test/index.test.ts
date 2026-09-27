@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { indexProject } from "../src/project.ts";
+import { indexProject } from "../src/project/check.ts";
 import { LAYERS, project } from "./run.ts";
 
 test("indexes every module, including one under a build/ directory", async () => {

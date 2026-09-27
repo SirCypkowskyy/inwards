@@ -7,8 +7,8 @@
  */
 import { lstatSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Change } from "./init.ts";
-import { isInside, realpath } from "./paths.ts";
+import { isInside, realpath } from "../paths/lexical.ts";
+import type { Change } from "./agents.ts";
 import { type Style, scaffoldFiles } from "./styles.ts";
 
 /** The scaffold's files to create, and the paths that stop it. */

@@ -8,10 +8,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { type InwardsConfig, parseConfig, VERSION } from "@inwards/core";
-import { isOurHook } from "./claude-settings.ts";
+import { print } from "../adapters/stdio.ts";
+import { isOurHook } from "../claude-code/settings.ts";
+import { findConfig } from "../paths/lexical.ts";
 import { lineDiff } from "./diff.ts";
-import { print } from "./output.ts";
-import { findConfig } from "./paths.ts";
 
 export const AGENTS = ["claude", "aider", "agents-md"] as const;
 export type Agent = (typeof AGENTS)[number];
@@ -161,7 +161,7 @@ function inwardsExec(): Exec {
   const exe = process.execPath;
   const fromSource = basename(exe).replace(EXE_SUFFIX, "") === "bun";
   return fromSource
-    ? { command: exe, args: [resolve(import.meta.dir, "main.ts")] }
+    ? { command: exe, args: [resolve(import.meta.dir, "../main.ts")] }
     : { command: exe, args: [] };
 }
 

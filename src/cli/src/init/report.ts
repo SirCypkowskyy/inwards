@@ -6,11 +6,11 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import process from "node:process";
-import { AGENTS } from "./init.ts";
-import type { InitPlan } from "./init-style.ts";
-import { print } from "./output.ts";
-import { posix } from "./paths.ts";
-import { runCheck } from "./project.ts";
+import { print } from "../adapters/stdio.ts";
+import { posix } from "../paths/lexical.ts";
+import { runCheck } from "../project/check.ts";
+import { AGENTS } from "./agents.ts";
+import type { InitPlan } from "./style.ts";
 import { drawTree, MISSING, type Style } from "./styles.ts";
 
 /** A project init has just configured: its pyproject.toml, the preset, the package and the config root. */

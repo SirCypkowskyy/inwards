@@ -25,10 +25,10 @@ import {
   rootPathOf,
   type SourceFile,
 } from "@inwards/core";
+import { collectPythonFiles } from "../adapters/file-walk.ts";
+import { loadGrammars } from "../adapters/grammars.ts";
+import { isInside, posix, realpath } from "../paths/lexical.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
-import { collectPythonFiles } from "./files.ts";
-import { loadGrammars } from "./grammars.ts";
-import { isInside, posix, realpath } from "./paths.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {

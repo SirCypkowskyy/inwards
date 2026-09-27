@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Engine, type ProjectIndex, parseConfig } from "@inwards/core";
 import { projectFiles } from "../../vscode-extension/src/workspace.ts";
-import { loadGrammars } from "../src/grammars.ts";
-import { indexProject } from "../src/project.ts";
+import { loadGrammars } from "../src/adapters/grammars.ts";
+import { indexProject } from "../src/project/check.ts";
 
 // #44: the CLI and the language server build the engine's module index from
 // their own file walks; on the examples both must give the same answers.

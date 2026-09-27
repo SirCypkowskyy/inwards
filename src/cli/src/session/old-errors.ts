@@ -36,10 +36,10 @@ import {
   type Report,
   stableMessage,
 } from "@inwards/core";
-import { posix, realpath } from "./paths.ts";
-import { runCheck } from "./project.ts";
-import { fingerprint } from "./session.ts";
-import { git, projectPath } from "./snapshot.ts";
+import { posix, realpath } from "../paths/lexical.ts";
+import { runCheck } from "../project/check.ts";
+import { git, projectPath } from "../project/snapshot.ts";
+import { fingerprint } from "./record.ts";
 
 /** What a session started from, as far as file content and configs go. */
 interface Start {

@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { appendFileSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { startText, unchangedFiles } from "../src/legacy.ts";
+import { startText, unchangedFiles } from "../src/session/old-errors.ts";
 import { inwards, payload, project } from "./run.ts";
 import { git, ID, put, session, stop } from "./stop-helpers.ts";
 import {

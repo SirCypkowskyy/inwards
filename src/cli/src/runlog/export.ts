@@ -16,7 +16,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import { closeSync, constants, lstatSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { ConfigError } from "@inwards/core";
-import { realpath } from "./paths.ts";
+import { realpath } from "../paths/lexical.ts";
 import { parseLine, type RunLine } from "./runs.ts";
 
 const LINE_BREAK = /\r?\n/u;

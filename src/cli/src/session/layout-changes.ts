@@ -24,8 +24,8 @@ import {
   moduleNameFor,
   packagesOf,
 } from "@inwards/core";
-import { existedAtStart } from "./legacy.ts";
-import { isInside, posix } from "./paths.ts";
+import { isInside, posix } from "../paths/lexical.ts";
+import { existedAtStart } from "./old-errors.ts";
 
 /**
  * Finds the layout errors this session introduced, per config: emptied

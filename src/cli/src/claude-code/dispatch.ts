@@ -5,10 +5,7 @@ import { readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
-import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
-import { configGuard } from "./guard.ts";
-import { agentSuppressions, existedAtStart, oldErrors, oldNote, rejectedNote } from "./legacy.ts";
-import { print } from "./output.ts";
+import { print } from "../adapters/stdio.ts";
 import {
   findConfig,
   isInside,
@@ -17,9 +14,17 @@ import {
   realpath,
   shownDiagnostics,
   shownReport,
-} from "./paths.ts";
-import { runCheck } from "./project.ts";
-import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
+} from "../paths/lexical.ts";
+import { runCheck } from "../project/check.ts";
+import { projectPath } from "../project/snapshot.ts";
+import { logRun, noteRun, noteSuppressions } from "../runlog/record.ts";
+import {
+  agentSuppressions,
+  existedAtStart,
+  oldErrors,
+  oldNote,
+  rejectedNote,
+} from "../session/old-errors.ts";
 import {
   fingerprint,
   isSessionId,
@@ -27,9 +32,10 @@ import {
   readSessionStart,
   recordEdit,
   recordStart,
-} from "./session.ts";
-import { projectPath } from "./snapshot.ts";
-import { stopGate } from "./stop.ts";
+} from "../session/record.ts";
+import { configGuard } from "./config-guard.ts";
+import { askUser, DEFAULT_ESCALATE_AFTER, takeUnresolved } from "./escalation.ts";
+import { stopGate } from "./stop-gate.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 

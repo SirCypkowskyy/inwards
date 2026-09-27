@@ -6,9 +6,9 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
 import { inwardsTable } from "@inwards/core";
-import { isRecord } from "./init.ts";
-import { isDir } from "./init-report.ts";
-import { posix } from "./paths.ts";
+import { posix } from "../paths/lexical.ts";
+import { isRecord } from "./agents.ts";
+import { isDir } from "./report.ts";
 
 /** A pyproject.toml found from the cwd, and what init needs to know about it. */
 export interface Target {

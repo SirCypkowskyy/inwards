@@ -21,11 +21,11 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { inwardsTable } from "@inwards/core";
-import { BASELINE_FILE } from "./baseline.ts";
-import { holdsInwardsHooks } from "./claude-settings.ts";
-import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-sim.ts";
-import { findConfig, isInside, realpath } from "./paths.ts";
-import { readsOnly, runsInwards } from "./shell.ts";
+import { findConfig, isInside, realpath } from "../paths/lexical.ts";
+import { BASELINE_FILE } from "../project/baseline.ts";
+import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-simulation.ts";
+import { holdsInwardsHooks } from "./settings.ts";
+import { readsOnly, runsInwards } from "./shell-reader.ts";
 
 const SETTINGS_FILES = ["settings.json", "settings.local.json"];
 /** `.inwards`, or a prefix of it (`.inw*`), as a path segment in a shell command. */

@@ -26,9 +26,9 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import type { Diagnostic, InwardsConfig } from "@inwards/core";
-import { baselineHashes } from "./baseline.ts";
-import { git, projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
-import { appendLine, prune, stateDir, statePath } from "./state-files.ts";
+import { appendLine, prune, stateDir, statePath } from "../adapters/state-files.ts";
+import { baselineHashes } from "../project/baseline.ts";
+import { git, projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
 
 /** Session ids come from the agent's payload, so only a safe file name is accepted. */
 const SESSION_ID = /^[\w-]{1,128}$/u;

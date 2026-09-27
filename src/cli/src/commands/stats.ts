@@ -6,12 +6,12 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
-import { exportRunLogs } from "./log-export.ts";
-import { print } from "./output.ts";
-import { realpath } from "./paths.ts";
-import { logDirs, readRunLogs } from "./runs.ts";
-import { git, projectConfigs } from "./snapshot.ts";
-import { computeStats, type Stats } from "./stats.ts";
+import { print } from "../adapters/stdio.ts";
+import { realpath } from "../paths/lexical.ts";
+import { git, projectConfigs } from "../project/snapshot.ts";
+import { exportRunLogs } from "../runlog/export.ts";
+import { logDirs, readRunLogs } from "../runlog/runs.ts";
+import { computeStats, type Stats } from "../runlog/stats.ts";
 
 const PERCENT = 100;
 

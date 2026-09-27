@@ -4,8 +4,8 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRunLogs } from "../src/runs.ts";
-import { computeStats, type Stats } from "../src/stats.ts";
+import { readRunLogs } from "../src/runlog/runs.ts";
+import { computeStats, type Stats } from "../src/runlog/stats.ts";
 import { LAYERS, project } from "./run.ts";
 
 /**

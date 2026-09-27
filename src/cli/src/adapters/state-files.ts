@@ -16,7 +16,7 @@ import {
   writeSync,
 } from "node:fs";
 import { join } from "node:path";
-import { isInside, realpath } from "./paths.ts";
+import { isInside, realpath } from "../paths/lexical.ts";
 
 /** Session files older than a week (in ms) are pruned when a new session starts. */
 const MAX_AGE_MS = 604_800_000;

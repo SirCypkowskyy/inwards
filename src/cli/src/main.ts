@@ -4,14 +4,14 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { ConfigError, type Format, parseConfig, render, VERSION } from "@inwards/core";
-import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
-import { hookClaudeCode } from "./hook.ts";
-import { type InitFlags, initMain } from "./init-style.ts";
-import { print } from "./output.ts";
-import { findConfig, realpath, shownReport } from "./paths.ts";
-import { runCheck } from "./project.ts";
-import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
-import { statsCommand } from "./stats-command.ts";
+import { print } from "./adapters/stdio.ts";
+import { hookClaudeCode } from "./claude-code/dispatch.ts";
+import { statsCommand } from "./commands/stats.ts";
+import { type InitFlags, initMain } from "./init/style.ts";
+import { findConfig, realpath, shownReport } from "./paths/lexical.ts";
+import { BASELINE_FILE, writeBaseline } from "./project/baseline.ts";
+import { runCheck } from "./project/check.ts";
+import { logRun, noteRun, noteSuppressions } from "./runlog/record.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const USAGE = `inwards ${VERSION}

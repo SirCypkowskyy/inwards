@@ -19,7 +19,7 @@ import { lstatSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import { join } from "node:path";
 import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
-import { existingStateDir, stateDir } from "./state-files.ts";
+import { existingStateDir, stateDir } from "../adapters/state-files.ts";
 
 /** Attempts before escalating, when the config doesn't say. */
 export const DEFAULT_ESCALATE_AFTER = 3;

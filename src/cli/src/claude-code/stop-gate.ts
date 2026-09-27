@@ -28,15 +28,20 @@ import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
-import { changedBaselines } from "./baseline.ts";
-import { settingsProblem } from "./claude-settings.ts";
-import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
-import { agentSuppressions, oldErrors, oldNote, rejectedNote, relinked } from "./legacy.ts";
-import { print } from "./output.ts";
-import { findConfig, realpath } from "./paths.ts";
-import { newLayoutErrors, preexistingShape } from "./prefixes.ts";
-import { runCheck } from "./project.ts";
-import { noteRun, noteSuppressions } from "./runlog.ts";
+import { print } from "../adapters/stdio.ts";
+import { findConfig, realpath } from "../paths/lexical.ts";
+import { changedBaselines } from "../project/baseline.ts";
+import { runCheck } from "../project/check.ts";
+import { projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
+import { noteRun, noteSuppressions } from "../runlog/record.ts";
+import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";
+import {
+  agentSuppressions,
+  oldErrors,
+  oldNote,
+  rejectedNote,
+  relinked,
+} from "../session/old-errors.ts";
 import {
   fingerprint,
   isSessionId,
@@ -44,8 +49,9 @@ import {
   recordPass,
   recordStop,
   type SessionState,
-} from "./session.ts";
-import { projectConfigs, projectManifest, projectPath } from "./snapshot.ts";
+} from "../session/record.ts";
+import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
+import { settingsProblem } from "./settings.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 

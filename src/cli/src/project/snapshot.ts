@@ -9,9 +9,9 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { ConfigError, declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";
-import { collectFiles, collectPythonFiles } from "./files.ts";
-import { posix, realpath } from "./paths.ts";
-import { layerDirs } from "./project.ts";
+import { collectFiles, collectPythonFiles } from "../adapters/file-walk.ts";
+import { posix, realpath } from "../paths/lexical.ts";
+import { layerDirs } from "./check.ts";
 
 /** Every `[tool.inwards]` table in a project, by project-relative pyproject.toml path. */
 export interface ProjectConfigs {

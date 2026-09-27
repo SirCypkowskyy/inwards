@@ -4,10 +4,10 @@
  * It ends by printing the equivalent command, so the next run can skip it.
  * The caller has already checked that stdin and stdout are TTYs.
  */
-import { AGENTS, type Agent } from "./init.ts";
-import type { InitFlags, InitPlan } from "./init-style.ts";
-import type { Target } from "./init-target.ts";
-import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "./styles.ts";
+import { AGENTS, type Agent } from "../init/agents.ts";
+import type { InitFlags, InitPlan } from "../init/style.ts";
+import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "../init/styles.ts";
+import type { Target } from "../init/target.ts";
 
 const AGENT_HINTS: Readonly<Record<Agent, string>> = {
   claude: "hooks in .claude/settings.local.json",

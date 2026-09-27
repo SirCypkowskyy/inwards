@@ -15,10 +15,10 @@ import { readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { type Diagnostic, parseConfig, type Report } from "@inwards/core";
-import { findConfig } from "./paths.ts";
-import { fingerprint } from "./session.ts";
-import { projectPath } from "./snapshot.ts";
-import { appendLine, existingStateDir, stateDir } from "./state-files.ts";
+import { appendLine, existingStateDir, stateDir } from "../adapters/state-files.ts";
+import { findConfig } from "../paths/lexical.ts";
+import { projectPath } from "../project/snapshot.ts";
+import { fingerprint } from "../session/record.ts";
 
 /** Size at which the log is rotated: 5 MiB. */
 const MAX_BYTES = 5_242_880;
