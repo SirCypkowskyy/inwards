@@ -62,6 +62,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
 | Rule codes | INW000, INW001, ... INW011 | |
 | Rule names | `package-shape`, `missing-member` | |
+| front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
 | File and config names | `pyproject.toml`, `[tool.inwards]`, `AGENTS.md`, `escalate-after`, ... | |
 | Product names | Claude Code, Aider, Codex, Cursor, Copilot, Ruff, ty, mypy, import-linter, tree-sitter, Bun, Zensical, ... | |
@@ -116,6 +117,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | extension (VS Code) | rozszerzenie |
 | fail (a check, gate, job, PR) | oblewać, nie przechodzić, kończyć się błędem |
 | fix composer | kompozytor poprawek |
+| fix safety (rule page section) | bezpieczeństwo poprawki |
+| flagged / fixed (rule page example) | zgłoszony / poprawiony (przykład) |
 | first-party (code, module) | własny (kod, moduł projektu) |
 | gate (short for Stop gate) | bramka |
 | generated module (`generated`: `*_pb2`, `_version`) | moduł generowany (przy budowaniu) |
@@ -157,6 +160,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | release draft | szkic (wydania) |
 | rule | reguła |
 | rule catalogue | katalog reguł |
+| rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
 | session | sesja |

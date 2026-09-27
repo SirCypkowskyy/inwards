@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: 03b5fb28179118566d2c549db5061adfed22acc9892ce49f8e86d86873555577
+source_hash: 725fc87566c4328b5450839f60726916e1f776a5f2a7d53f315fa9cab45193e3
 hide:
   - navigation
 ---
@@ -26,7 +26,7 @@ Deklarujesz swoje warstwy w `pyproject.toml`. `inwards check` zgłasza błąd, g
         2. Declare a typing.Protocol in `shop.domain` (for example `shop.domain.ports`) that describes only what this module needs from `SqlOrderRepository`.
         3. Type this module against that Protocol and receive the implementation through a constructor or function parameter.
         4. Make the class in "infrastructure" satisfy the Protocol, and wire it in the outermost layer (the composition root).
-      docs: https://sircypkowskyy.github.io/inwards/03-Architecture-C4/#rule-catalogue
+      docs: https://sircypkowskyy.github.io/inwards/rules/INW001/
 
     Found 1 violation in 1 file (16.8 ms).
     ```

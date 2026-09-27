@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 62cf985d8caea9e136bb3c601ec76cbcdd370573cb7f61ce56f39dc5eab7b856
+source_hash: 9180cde0a00a746336318b432477794c1298c524ec4633e1536bff6673d2cd49
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -344,6 +344,8 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 - Moduły, które nie należą do żadnej warstwy, nie są same sprawdzane. INW006 to uwidacznia (ostrzeżenie na pakiet, błąd dla importu do takiego pakietu z warstwy i martwe prefiksy), ale importy wewnątrz nieprzypisanego pakietu pozostają niesprawdzone, dopóki użytkownik go nie przypisze. Moduły bez źródeł, głębokość `ignore`, przemianowane pakiety najwyższego poziomu i sprawdzanie prefiksów w zakresie ścieżek są otwarte w [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Katalog reguł { #rule-catalogue }
+
+Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md), z przykładami, poprawkami i konfiguracją; diagnostyki linkują do niej.
 
 | Kod | Nazwa | Co wyłapuje | Stan |
 |---|---|---|---|
