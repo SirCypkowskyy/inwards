@@ -5,7 +5,7 @@ import process from "node:process";
 import { parseArgs } from "node:util";
 import { ConfigError, type Format, parseConfig, render, VERSION } from "@inwards/core";
 import { print } from "./adapters/stdio.ts";
-import { hookClaudeCode } from "./claude-code/dispatch.ts";
+import { hookClaudeCode } from "./commands/hook.ts";
 import { statsCommand } from "./commands/stats.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import { initMain } from "./init/style.ts";
