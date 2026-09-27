@@ -7,7 +7,8 @@ import { ConfigError, type Format, parseConfig, render, VERSION } from "@inwards
 import { print } from "./adapters/stdio.ts";
 import { hookClaudeCode } from "./claude-code/dispatch.ts";
 import { statsCommand } from "./commands/stats.ts";
-import { type InitFlags, initMain } from "./init/style.ts";
+import type { InitFlags } from "./init/contracts.ts";
+import { initMain } from "./init/style.ts";
 import { findConfig, realpath, shownReport } from "./paths/lexical.ts";
 import { BASELINE_FILE, writeBaseline } from "./project/baseline.ts";
 import { runCheck } from "./project/check.ts";

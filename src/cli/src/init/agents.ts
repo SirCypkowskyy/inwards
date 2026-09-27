@@ -10,18 +10,10 @@ import process from "node:process";
 import { type InwardsConfig, parseConfig, VERSION } from "@inwards/core";
 import { print } from "../adapters/stdio.ts";
 import { isOurHook } from "../claude-code/settings.ts";
+import { isRecord } from "../json/guards.ts";
 import { findConfig } from "../paths/lexical.ts";
+import type { Agent, Change } from "./contracts.ts";
 import { lineDiff } from "./diff.ts";
-
-export const AGENTS = ["claude", "aider", "agents-md"] as const;
-export type Agent = (typeof AGENTS)[number];
-
-/** One file init wants to write: its current text (undefined if absent) and the new text. */
-export interface Change {
-  path: string;
-  before: string | undefined;
-  after: string;
-}
 
 /** How to start this Inwards without a shell: an executable and its leading arguments. */
 interface Exec {
@@ -58,16 +50,6 @@ const LINE_BREAK = /\r?\n/u;
 const SECTION_BEGIN = "<!-- inwards:begin -->";
 const SECTION_END = "<!-- inwards:end -->";
 const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\][ \t]*(?:#.*)?$/mu;
-
-/**
- * Tells whether a string names an agent init supports.
- *
- * @param value - the `--agent` value.
- * @returns true for claude, aider or agents-md.
- */
-export function isAgent(value: string | undefined): value is Agent {
-  return AGENTS.some((agent) => agent === value);
-}
 
 /**
  * Runs init for one agent in the project whose config is found from the cwd.
@@ -396,14 +378,4 @@ function separator(text: string): string {
     return "";
   }
   return text.endsWith("\n") ? "\n" : "\n\n";
-}
-
-/**
- * Tells whether a parsed JSON value is a plain object.
- *
- * @param value - any parsed JSON value.
- * @returns true for a non-null, non-array object.
- */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -6,19 +6,10 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
 import { inwardsTable } from "@inwards/core";
+import { isDir } from "../adapters/filesystem.ts";
+import { isRecord } from "../json/guards.ts";
 import { posix } from "../paths/lexical.ts";
-import { isRecord } from "./agents.ts";
-import { isDir } from "./report.ts";
-
-/** A pyproject.toml found from the cwd, and what init needs to know about it. */
-export interface Target {
-  path: string;
-  text: string;
-  /** True when it already has `[tool.inwards]`. */
-  configured: boolean;
-  /** The import package: `--package`, or `[project].name` normalised; undefined when neither is set. */
-  pkg: string | undefined;
-}
+import type { Target } from "./contracts.ts";
 
 const PACKAGE_NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/u;
 const NAME_SEPARATORS = /[-_.]+/gu;

@@ -10,6 +10,7 @@
 import { lstatSync, readlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { isRecord } from "../json/guards.ts";
 import { physicalRealpath } from "../paths/lexical.ts";
 
 const BOM = "﻿";
@@ -130,14 +131,4 @@ function danglingTarget(path: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-/**
- * Tells whether a parsed JSON value is a plain object.
- *
- * @param value - any parsed JSON value.
- * @returns true for a non-null, non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

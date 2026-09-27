@@ -3,14 +3,14 @@
  * tree annotated with each layer and what it may import, then the result of
  * a check run in process, then what to try next.
  */
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import process from "node:process";
+import { isDir } from "../adapters/filesystem.ts";
 import { print } from "../adapters/stdio.ts";
 import { posix } from "../paths/lexical.ts";
 import { runCheck } from "../project/check.ts";
-import { AGENTS } from "./agents.ts";
-import type { InitPlan } from "./style.ts";
+import { AGENTS, type InitPlan } from "./contracts.ts";
 import { drawTree, MISSING, type Style } from "./styles.ts";
 
 /** A project init has just configured: its pyproject.toml, the preset, the package and the config root. */
@@ -84,18 +84,4 @@ function annotatedTree(setup: Setup): string {
     }
     return existsSync(`${path}.py`) ? "file" : "missing";
   });
-}
-
-/**
- * Tells whether a path is a directory.
- *
- * @param path - any path.
- * @returns true for an existing directory.
- */
-export function isDir(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
 }

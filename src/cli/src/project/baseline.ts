@@ -28,6 +28,7 @@ import {
   ruleLevel,
   stableMessage,
 } from "@inwards/core";
+import { isRecord } from "../json/guards.ts";
 
 export const BASELINE_FILE = "inwards-baseline.json";
 const SCHEMA = "inwards/baseline@1";
@@ -182,16 +183,6 @@ function isEntry(value: unknown): value is Entry {
     Number.isInteger(value["count"]) &&
     value["count"] > 0
   );
-}
-
-/**
- * Tells whether a parsed JSON value is an object.
- *
- * @param value - the value.
- * @returns true for a non-null, non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

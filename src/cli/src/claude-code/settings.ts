@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import process from "node:process";
+import { isRecord } from "../json/guards.ts";
 
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
@@ -197,14 +198,4 @@ function readSettings(path: string): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
-}
-
-/**
- * Tells whether a parsed JSON value is a plain object.
- *
- * @param value - any parsed JSON value.
- * @returns true for a non-null, non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

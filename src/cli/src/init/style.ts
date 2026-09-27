@@ -3,17 +3,15 @@ import process from "node:process";
 import { parseConfig, VERSION } from "@inwards/core";
 import { pick } from "../adapters/picker.ts";
 import { print } from "../adapters/stdio.ts";
+import { agentChanges, apply, DEFAULT_IGNORE, initCommand, PRERELEASE } from "./agents.ts";
 import {
   AGENTS,
-  type Agent,
-  agentChanges,
-  apply,
   type Change,
-  DEFAULT_IGNORE,
-  initCommand,
+  type InitFlags,
+  type InitPlan,
   isAgent,
-  PRERELEASE,
-} from "./agents.ts";
+  type Target,
+} from "./contracts.ts";
 import { report } from "./report.ts";
 import { planScaffold, writeAll } from "./scaffold.ts";
 import {
@@ -25,24 +23,7 @@ import {
   type Style,
   type StyleName,
 } from "./styles.ts";
-import { findTarget, noPackage, shown, sourceRoot, type Target } from "./target.ts";
-
-/** The `init` options main.ts parsed. */
-export interface InitFlags {
-  agent?: string | undefined;
-  style?: string | undefined;
-  scaffold?: boolean | undefined;
-  package?: string | undefined;
-  "list-styles"?: boolean | undefined;
-  "dry-run"?: boolean | undefined;
-}
-
-/** What to do, once flags or the picker have decided. */
-export interface InitPlan {
-  style: StyleName | undefined;
-  scaffold: boolean;
-  agent: Agent | undefined;
-}
+import { findTarget, noPackage, shown, sourceRoot } from "./target.ts";
 
 const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--dry-run]
   inwards init --agent ${AGENTS.join("|")} [--dry-run]    (the project already has [tool.inwards])

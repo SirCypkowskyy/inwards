@@ -21,6 +21,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { inwardsTable } from "@inwards/core";
+import { isRecord } from "../json/guards.ts";
 import { findConfig, isInside, realpath } from "../paths/lexical.ts";
 import { BASELINE_FILE } from "../project/baseline.ts";
 import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-simulation.ts";
@@ -304,14 +305,4 @@ function disablesHooks(text: string): boolean {
  */
 function usesInwards(project: string): boolean {
   return existsSync(join(project, ".inwards")) || findConfig(project, project) !== undefined;
-}
-
-/**
- * Tells whether a parsed value is a plain object.
- *
- * @param value - any parsed value.
- * @returns true for a non-null, non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
