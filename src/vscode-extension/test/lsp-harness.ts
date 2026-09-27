@@ -319,11 +319,15 @@ export function lspHarness(shipped?: { server: string; runtime: string }): Harne
     diagnosticsOnce,
     popups,
     cleanup: async (): Promise<void> => {
-      for (const server of started) {
-        server.kill();
+      try {
+        // The servers are disposable: SIGKILL can't be ignored, so waiting ends.
+        for (const server of started) {
+          server.kill("SIGKILL");
+        }
+        await Promise.all(started.map((server) => server.exited));
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
       }
-      await Promise.all(started.map((server) => server.exited));
-      rmSync(tmp, { recursive: true, force: true });
     },
   };
 }

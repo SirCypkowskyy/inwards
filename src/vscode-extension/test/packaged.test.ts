@@ -32,6 +32,10 @@ const SHIPPED = [
 const NODE = Bun.which("node");
 /** The build, the packaging and a server start, with room to spare. */
 const SLOW_MS: number = TIMEOUT_MS * 2;
+/** The longest the build or the packaging may run before it is killed. */
+const COMMAND_MS = 20_000;
+/** The build and the packaging together, with room to spare. */
+const SETUP_MS: number = COMMAND_MS * 3;
 /** The `./` a manifest path may start with. */
 const DOT_SLASH = /^\.\//u;
 /** Entries that must not ship: sources, tests, build scripts and the agent guides. */
@@ -47,12 +51,14 @@ let entries: string[] = [];
  * Runs a command in the extension package and fails loudly when it fails.
  *
  * @param cmd - the command and its arguments.
- * @throws {Error} with the command's output when it exits non-zero.
+ * @throws {Error} with the command's output when it exits non-zero or is
+ *   killed for running past `COMMAND_MS`.
  */
 function run(cmd: string[]): void {
-  const done = Bun.spawnSync(cmd, { cwd: PACKAGE });
+  const done = Bun.spawnSync(cmd, { cwd: PACKAGE, timeout: COMMAND_MS, killSignal: "SIGKILL" });
   if (done.exitCode !== 0) {
-    throw new Error(`${cmd.join(" ")} failed:\n${done.stdout}${done.stderr}`);
+    const how = done.exitCode === null ? `was killed after ${COMMAND_MS} ms` : "failed";
+    throw new Error(`${cmd.join(" ")} ${how}:\n${done.stdout}${done.stderr}`);
   }
 }
 
@@ -71,12 +77,15 @@ beforeAll(() => {
     VSIX,
   ]);
   entries = unzip(readFileSync(VSIX), UNPACKED);
-}, SLOW_MS);
+}, SETUP_MS);
 
 afterAll(async () => {
-  await harness.cleanup();
-  rmSync(STAGE, { recursive: true, force: true });
-  rmSync(DIST, { recursive: true, force: true });
+  try {
+    await harness.cleanup();
+  } finally {
+    rmSync(STAGE, { recursive: true, force: true });
+    rmSync(DIST, { recursive: true, force: true });
+  }
 });
 
 test("the VSIX holds the manifest's main, the server and both grammars, and no tests", () => {
