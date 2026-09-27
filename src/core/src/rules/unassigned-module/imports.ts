@@ -8,7 +8,6 @@
  * - layer prefixes that match nothing, and layer code moved out of every
  *   layer, are reported against pyproject.toml (see `layout.ts`).
  */
-import { contextOf } from "../../config/contexts.ts";
 import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
@@ -119,7 +118,7 @@ function outsideLayers(
   pkg: string,
 ): { message: string; fix: Diagnostic["fix"] } {
   return {
-    message: `Layer "${source.name}" imports "${ref.target}", which belongs to no layer, so nothing checks what "${pkg}" imports.`,
+    message: `Layer "${source.name}" imports "${ref.target}", which belongs to no layer, so no layer rule checks what "${pkg}" imports.`,
     fix: {
       summary: `Move the code into a layer, or ask the user which layer "${pkg}" belongs to.`,
       steps: [
@@ -174,10 +173,7 @@ export function unassignedWarning(file: SourceFile, config: InwardsConfig): Diag
   return diagnostic(RULES.INW006, file, {
     span: { line: 1, column: 1, endLine: 1, endColumn: 1 },
     severity: "warning",
-    message:
-      config.contexts && contextOf(file.module, config.contexts)
-        ? `"${pkg}" belongs to no layer, so only its context's rules check its imports.`
-        : `"${pkg}" belongs to no layer, so its imports are not checked.`,
+    message: `"${pkg}" belongs to no layer, so no layer rule checks its imports.`,
     fix: {
       summary: `Put the code under a layer's package, or ask the user to assign "${pkg}".`,
       steps: [

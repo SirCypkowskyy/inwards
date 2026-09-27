@@ -8,16 +8,21 @@ import type { Diagnostic } from "../contracts/records.ts";
 
 /** INW001 and INW011 end with the whole layer order, which isn't part of the violation. */
 const DIRECTION = / Allowed direction: [^\n]*$/u;
+/**
+ * INW006's import error ends with what that means for the package, worded
+ * differently before INW002 ("nothing checks"); older baselines still match.
+ */
+const UNCHECKED = /, so (?:nothing|no layer rule) checks what "[^"]*" imports\.$/u;
 
 /**
  * Drops the part of a message that depends on the rest of the config, so
  * adding an unrelated layer doesn't bring every accepted violation back.
  *
  * @param message - a diagnostic message.
- * @returns the message without its "Allowed direction" sentence.
+ * @returns the message without its "Allowed direction" sentence or INW006's closing clause.
  */
 export function stableMessage(message: string): string {
-  return message.replace(DIRECTION, "");
+  return message.replace(DIRECTION, "").replace(UNCHECKED, ".");
 }
 
 /**

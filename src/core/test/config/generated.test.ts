@@ -120,7 +120,7 @@ describe("generated modules and INW010 (#160)", () => {
     expect(rest).toEqual([]);
     expect(d?.code).toBe("INW006");
     expect(d?.message).toBe(
-      'Layer "domain" imports "shop.persistence.orders_pb2.Order", which belongs to no layer, so nothing checks what "shop.persistence" imports.',
+      'Layer "domain" imports "shop.persistence.orders_pb2.Order", which belongs to no layer, so no layer rule checks what "shop.persistence" imports.',
     );
   });
 });

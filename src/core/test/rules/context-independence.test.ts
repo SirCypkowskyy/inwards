@@ -9,91 +9,11 @@
  * in no layer is still checked; and INW001 and INW002 add up.
  */
 import { describe, expect, test } from "bun:test";
-import { type Diagnostic, Engine, parseConfig } from "../../src/index.ts";
-import { file, grammars, indexOn } from "../support/helpers.ts";
+import { Engine, parseConfig } from "../../src/index.ts";
+import { CONTEXT_PROJECT, type ContextFixture, contextFixture } from "../support/contexts.ts";
+import { file, grammars } from "../support/helpers.ts";
 
-const CONFIG = parseConfig(`
-[tool.inwards]
-layers = [
-  { name = "domain", modules = ["shop.orders.domain", "shop.billing.domain", "shop.shipping.domain", "shop.shared"] },
-  { name = "app", modules = ["shop.orders.app", "shop.billing.app", "shop.billing.tax", "shop.shipping.app"] },
-]
-
-[[tool.inwards.contexts]]
-name = "orders"
-modules = ["shop.orders"]
-depends-on = ["billing"]
-
-[[tool.inwards.contexts]]
-name = "billing"
-modules = ["shop.billing"]
-
-[[tool.inwards.contexts]]
-name = "tax"
-modules = ["shop.billing.tax"]
-
-[[tool.inwards.contexts]]
-name = "shipping"
-modules = ["shop.shipping"]
-`);
-
-const MODULES = [
-  "shop/orders/domain/order.py",
-  "shop/orders/app/place.py",
-  "shop/billing/domain/invoice.py",
-  "shop/billing/app/charge.py",
-  "shop/billing/tax/rates.py",
-  "shop/shipping/domain/parcel.py",
-  "shop/shipping/app/ship.py",
-  "shop/shipping/api.py",
-  "shop/shared/money.py",
-];
-
-/**
- * Lists a module file and the packages above it, as the disk would.
- *
- * @param path - the module's path.
- * @returns each package directory with its `__init__.py`, then the file.
- */
-function onDisk(path: string): [string, "file" | "dir"][] {
-  const parts = path.split("/");
-  const entries: [string, "file" | "dir"][] = [];
-  for (let i = 1; i < parts.length; i += 1) {
-    const dir = parts.slice(0, i).join("/");
-    entries.push([dir, "dir"], [`${dir}/__init__.py`, "file"]);
-  }
-  entries.push([path, "file"]);
-  return entries;
-}
-
-/** The project on disk: every module above, with its packages. */
-const PROJECT = indexOn(new Map(MODULES.flatMap(onDisk)));
-
-const ENGINE: Engine = await Engine.create(grammars(), CONFIG);
-
-/**
- * Checks one file of the fixture.
- *
- * @param path - where it sits.
- * @param text - its source.
- * @returns every diagnostic.
- */
-function check(path: string, text: string): Diagnostic[] {
-  return ENGINE.checkFiles([file(path, text)], PROJECT);
-}
-
-/**
- * Lists the INW002 findings of one file.
- *
- * @param path - where it sits.
- * @param text - its source.
- * @returns each finding's line and message.
- */
-function across(path: string, text: string): [number, string][] {
-  return check(path, text)
-    .filter((d) => d.code === "INW002")
-    .map((d) => [d.line, d.message]);
-}
+const { check, across }: ContextFixture = await contextFixture();
 
 describe("declared and undeclared dependencies", () => {
   test("orders may import billing, which it declares", () => {
@@ -170,7 +90,7 @@ describe("every way to import counts", () => {
       ["INW002", "error"],
     ]);
     expect(found[0]?.message).toBe(
-      '"shop.shipping.api" belongs to no layer, so only its context\'s rules check its imports.',
+      '"shop.shipping.api" belongs to no layer, so no layer rule checks its imports.',
     );
   });
 });
@@ -190,11 +110,13 @@ describe("with the other rules", () => {
   });
 
   test("without contexts, nothing is reported", async () => {
-    const { contexts: _unused, ...withoutContexts } = CONFIG;
-    const plain = await Engine.create(grammars(), withoutContexts);
+    const layersOnly = parseConfig(`[tool.inwards]
+layers = [{ name = "all", modules = ["shop"] }]
+`);
+    const plain = await Engine.create(grammars(), layersOnly);
     const found = plain.checkFiles(
       [file("shop/orders/app/place.py", "from shop.shipping.app import ship\n")],
-      PROJECT,
+      CONTEXT_PROJECT,
     );
     expect(found.filter((d) => d.code === "INW002")).toEqual([]);
   });
