@@ -10,9 +10,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   AgentSuppressions,
+  CachedExtraction,
   Checked,
   ContextSpec,
   Diagnostic,
+  ExtractionCache,
+  ExtractionIdentity,
   Fix,
   Format,
   GrammarBinaries,
@@ -45,9 +48,12 @@ const TYPE_PREFIX = /^type\s+/u;
 /** Every type `index.ts` exports; the tuple fails to compile when one goes missing. */
 type PublicTypes = [
   AgentSuppressions,
+  CachedExtraction,
   Checked,
   ContextSpec,
   Diagnostic,
+  ExtractionCache,
+  ExtractionIdentity,
   Fix,
   Format,
   GrammarBinaries,
@@ -123,6 +129,7 @@ test("index.ts re-exports exactly these names, types included", () => {
   expect(names).toEqual(
     [
       "AgentSuppressions",
+      "CachedExtraction",
       "Checked",
       "CONFIG_DEFAULTS",
       "ConfigError",
@@ -130,6 +137,8 @@ test("index.ts re-exports exactly these names, types included", () => {
       "DOCS_BASE",
       "Diagnostic",
       "Engine",
+      "ExtractionCache",
+      "ExtractionIdentity",
       "Fix",
       "Format",
       "GrammarBinaries",
@@ -151,6 +160,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "SourceFile",
       "Span",
       "Suppressed",
+      "SuppressionComment",
       "VERSION",
       "baselineKey",
       "checkLayers",

@@ -84,6 +84,22 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 - Only INW010 reads the key. The other rules see a generated module that isn't on disk as missing: an outward import of one is still INW001, and INW006 names the nearest package that exists. The Architecture chapter's [known limitations](../03-Architecture-C4.md#known-limitations) list the cases where that makes a finding differ between the two checkouts.
 - The config guard denies an agent's edit of the key, as for every key in `[tool.inwards]`.
 
+## Caching between runs
+
+`inwards check` and `inwards baseline` keep what they read out of each file (its imports and suppression comments) in `.inwards/cache`, next to the `pyproject.toml`. An entry is found by a hash of the file's content, its module name and the Inwards version's extraction rules, so an edited file is simply read again. On the 2,100-file benchmark repo a warm cache made a full check 2.6 to 3 times faster; the run that fills it was a quarter to two thirds slower, depending on the filesystem. To keep the cache between workflow runs, restore it before **Check**:
+
+```yaml
+      - uses: actions/cache@v6
+        with:
+          path: .inwards/cache
+          key: inwards-${{ runner.os }}-${{ github.sha }}
+          restore-keys: inwards-${{ runner.os }}-
+```
+
+- **The cache is trusted, not checked.** A cached check believes what an entry says a file imports. Anyone who can write `.inwards/cache` can make it miss a violation, and a pull request can commit a `.inwards/cache` of its own. Where the check is the gate for code you don't trust, run `inwards check --no-cache`, or set `INWARDS_NO_CACHE=1` for the job. The Claude Code hooks never read the cache, so this doesn't touch the agent loop ([ADR-031](../05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)).
+- **It stays small.** A run prunes each of the cache's 256 parts when it first writes there, and again whenever its own writes take the part past 512 KB: entries older than 30 days go, then the oldest ones until the part is under the limit. That keeps a namespace (one folder under `.inwards/cache`) near 128 MB at most. An Inwards version whose extraction rules changed gives every file a new key in the same namespace, so the old entries age out or are pushed out. A new cache format or new grammars start a new namespace; the old folder is no longer read and stays until you delete it.
+- **Nothing to configure.** Delete `.inwards/cache` whenever you like. `inwards init` already adds `.inwards/` to `.gitignore`.
+
 ## Code scanning availability
 
 Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does while it is private (`continue-on-error: ${{ github.event.repository.private }}`).

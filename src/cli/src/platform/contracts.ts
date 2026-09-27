@@ -161,6 +161,8 @@ export interface Runtime {
   forceColor: boolean;
   /** `NO_COLOR` is set to a non-empty value. */
   noColor: boolean;
+  /** `INWARDS_NO_CACHE` is set to a non-empty value: `check` and `baseline` skip the disk cache. */
+  noCache: boolean;
   /** The user's home directory. */
   home: string;
   /** `process.platform`. */

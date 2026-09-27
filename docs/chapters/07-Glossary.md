@@ -91,6 +91,9 @@ Escalation
 Evasion
 :   An agent changing code so that a check goes quiet without fixing the design, for example moving an import into a function. Chapter 4 lists the evasions Inwards handles.
 
+Extraction cache
+:   `.inwards/cache`: what `inwards check` and `inwards baseline` read out of each file (its import skeleton, static imports and suppression comments), keyed by a hash of its content, module name and extraction rules. The hooks never read it; the language server keeps its own in memory. `--no-cache` or `INWARDS_NO_CACHE=1` turns it off. See [ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read).
+
 Fingerprint
 :   A 16-hex-digit hash of a violation's rule code, module and message. The session state and the run log use it to recognise the same violation across edits, independent of its line number.
 

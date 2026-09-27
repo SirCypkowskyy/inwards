@@ -1,10 +1,11 @@
 /**
  * @file The benchmark comparison's arithmetic: nearest-rank percentiles, the
- * threshold judgement on paired ratios, and the Markdown table. A slower head
- * must fail the gate and an equal one pass.
+ * threshold judgement on paired ratios, and the Markdown tables. A slower head
+ * must fail the gate and an equal one pass; the cache table reports what an
+ * empty cache costs and what a warm one saves.
  */
 import { describe, expect, test } from "bun:test";
-import { judge, markdown, percentile } from "../compare.ts";
+import { cacheMarkdown, judge, markdown, percentile } from "../compare.ts";
 
 describe("bench compare", () => {
   test("percentile uses the nearest rank", () => {
@@ -35,5 +36,11 @@ describe("bench compare", () => {
   test("the table names the slower metric", () => {
     const slow = judge("full check", { base: [100], head: [150] }, 0.2);
     expect(markdown([slow], 0.2)).toContain("**full check more than 20% slower");
+  });
+
+  test("the cache table shows the empty cache's cost and the warm speed-up", () => {
+    const table = cacheMarkdown({ none: [100, 100], empty: [110, 110], warm: [20, 20] });
+    expect(table).toContain("| empty cache | 110.0 / 110.0 | 10.0% slower |");
+    expect(table).toContain("| warm cache | 20.0 / 20.0 | 5.0× faster |");
   });
 });

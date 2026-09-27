@@ -26,7 +26,7 @@ import {
   type SourceFile,
 } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
+import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
 
@@ -46,19 +46,38 @@ interface Project {
 }
 
 /**
+ * Tells whether a command may use the extraction cache on disk: yes unless
+ * `--no-cache` or `INWARDS_NO_CACHE` says otherwise.
+ *
+ * @param runtime - the environment, for `INWARDS_NO_CACHE`.
+ * @param flag - the command's `--no-cache`, if given.
+ * @returns true to pass `cache: true` to the check.
+ */
+export function diskCacheWanted(
+  runtime: Pick<Runtime, "noCache">,
+  flag: boolean | undefined,
+): boolean {
+  return !(flag === true || runtime.noCache);
+}
+
+/**
  * Reads the config and builds an engine for it.
  *
- * @param io - reads the config and loads the grammars.
+ * @param io - reads the config, loads the grammars and opens the extraction cache.
  * @param configPath - absolute path of the pyproject.toml to use.
+ * @param cache - true to give the engine the disk cache, when `io` has one.
  * @returns the engine and the config root, as written and resolved.
  * @throws {ConfigError} when the config is invalid.
  */
-async function openProject(io: ProjectIo, configPath: string): Promise<Project> {
+async function openProject(io: ProjectIo, configPath: string, cache = false): Promise<Project> {
   const configText = io.read.text(configPath);
   const config = parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
+  const wasm = await io.grammars();
+  const dir = dirname(configPath);
+  const store = cache ? io.extractionCache?.(io.probe.realpath(dir) ?? dir, wasm) : undefined;
   return {
-    engine: await Engine.create(await io.grammars(), config),
+    engine: await Engine.create(wasm, config, store ? { cache: store } : {}),
     config,
     configPath,
     configText,
@@ -183,6 +202,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * @param options.baseline - false to report violations the baseline accepts.
  * @param options.required - true to add INW008 for the targets' packages.
  * @param options.texts - content to check instead of a file's, by absolute path.
+ * @param options.cache - true to read and fill the extraction cache on disk
+ *   (`inwards check` and `inwards baseline`); the hooks never pass it (#56).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -195,15 +216,17 @@ export async function runCheck(
     baseline = true,
     required = false,
     texts,
+    cache = false,
   }: {
     base: string;
     baseline?: boolean | undefined;
     required?: boolean | undefined;
     texts?: ReadonlyMap<string, string> | undefined;
+    cache?: boolean | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
-  const project = await openProject(io, configPath);
+  const project = await openProject(io, configPath, cache);
   const files = loadSources(io, project, { targets, base, texts });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;

@@ -1,6 +1,7 @@
 /**
  * @file The records the engine and its adapters exchange: source files, import
- * references, spans, diagnostics with their fixes, and suppressed findings.
+ * references, spans, diagnostics with their fixes, suppressed findings, and the
+ * extraction-cache port with the per-file data it holds.
  * Plain data with no behaviour, so every core folder may import it and it
  * imports nothing.
  */
@@ -67,4 +68,68 @@ export interface Suppressed {
    * stays hidden if the suppression isn't honoured (the hooks' `agent-suppressions`).
    */
   baselined?: boolean;
+}
+
+/** One `# inwards: ignore` comment as read. */
+export interface SuppressionComment {
+  span: Span;
+  codes: string[];
+  reason: string;
+  /** Why it suppresses nothing, one sentence each; empty when it is valid. */
+  problems: string[];
+}
+
+/**
+ * What a cached extraction depends on: the engine's extraction revision and
+ * everything about the file that a parse reads. The adapter adds the identity
+ * of the grammar it loaded and its own storage format to the key.
+ */
+export interface ExtractionIdentity {
+  /** `EXTRACTION_REVISION`: bumped whenever normalisation, extraction or suppression parsing changes. */
+  revision: string;
+  /** The normalised text. */
+  text: string;
+  module: string;
+  isPackage: boolean;
+}
+
+/**
+ * What the engine derives from one file's text alone, component by
+ * component. A missing component was never computed; an empty list means
+ * computed and empty. Nothing here depends on the config or on other files.
+ */
+export interface CachedExtraction {
+  /**
+   * The prescan's import skeleton, or `"refused"` when the prescan declined
+   * the file. A file whose text sent it past the prescan was skipped, which
+   * isn't cached: the prescan may still run on it later.
+   */
+  skeleton?: ImportRef[] | "refused";
+  /** The static imports of a full parse. Never interchangeable with the skeleton. */
+  full?: ImportRef[];
+  /** The suppression comments of a full parse. */
+  comments?: SuppressionComment[];
+}
+
+/**
+ * Where an adapter keeps extractions between checks. Synchronous, and
+ * allowed to forget: `get` returns undefined for anything missing, stale or
+ * unreadable, and `set` may drop an entry. It is acceleration, never a source
+ * of truth, so no result may differ with or without it.
+ */
+export interface ExtractionCache {
+  /**
+   * Looks up what is known about a file's text.
+   *
+   * @param identity - the file and the engine's extraction revision.
+   * @returns the cached components, or undefined on a miss.
+   */
+  get: (identity: ExtractionIdentity) => CachedExtraction | undefined;
+  /**
+   * Stores what is known about a file's text, replacing the previous entry.
+   *
+   * @param identity - the file and the engine's extraction revision.
+   * @param value - every component known so far.
+   */
+  set: (identity: ExtractionIdentity, value: CachedExtraction) => void;
 }

@@ -33,6 +33,7 @@ import {
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { type ConfigProblem, configDiagnostics, problemOf, readConfig } from "./config-file.ts";
+import { memoryCache } from "./memory-cache.ts";
 import { mayHoldModule, projectFiles, workspaceDiagnostics } from "./workspace.ts";
 
 /** A valid config and what the server built from it. */
@@ -56,6 +57,8 @@ let configPath: string | undefined;
 let problem: ConfigProblem | undefined;
 /** The last workspace pass (INW007 and INW008 from the listing), by absolute path. */
 let workspace = new Map<string, CoreDiagnostic[]>();
+/** What the engine read out of each file's text, across config reloads (#56). */
+const extractions = memoryCache();
 /** The full check of each open document, by absolute path. */
 const opened = new Map<string, { uri: string; found: CoreDiagnostic[] }>();
 /** What the client reports for modules: every path, created or deleted (a rename is both). */
@@ -258,6 +261,7 @@ async function load(): Promise<State | undefined> {
   const engine = await Engine.create(
     { runtime: wasm("web-tree-sitter.wasm"), python: wasm("tree-sitter-python.wasm") },
     config,
+    { cache: extractions },
   );
   const root = resolve(dirname(configPath), config.root);
   return { engine, config, root, index: engine.index(projectFiles(root)) };
