@@ -115,3 +115,32 @@ describe("INW006's older wording", () => {
     }
   });
 });
+
+/**
+ * An INW004 message whose context name holds "Allowed direction: ".
+ *
+ * @param hash - the group's link hash.
+ * @returns the message.
+ */
+function cycle(hash: string): string {
+  return `Contexts import each other in a cycle: anchor -> billing Allowed direction: EU -> anchor. The group holds 2 contexts and 2 links between them (link hash ${hash}).`;
+}
+
+describe("what a key drops", () => {
+  test("only INW001 and INW011 lose the layer order, and only INW006 its closing clause", () => {
+    const module = "shop.domain.order";
+    const layered =
+      'Layer "domain" imports "shop.infrastructure.db". Allowed direction: domain <- infrastructure';
+    expect(baselineKey({ code: "INW001", module, message: layered })).toBe(
+      baselineKey({ code: "INW001", module, message: `${layered} <- api` }),
+    );
+    // A context may be named anything, "Allowed direction: " included; INW004's link hash must stay.
+    expect(baselineKey({ code: "INW004", module, message: cycle("aaaa") })).not.toBe(
+      baselineKey({ code: "INW004", module, message: cycle("bbbb") }),
+    );
+    const unchecked = '"shop.common" belongs to no layer, so its imports are not checked.';
+    expect(baselineKey({ code: "INW010", module, message: unchecked })).toContain(
+      "are not checked",
+    );
+  });
+});

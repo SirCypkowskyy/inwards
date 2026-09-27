@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: cd71915bb5723a8d6647ca01fa22be212d356f0c9a606dbb0748f77d9c736395
+source_hash: 1eeddaa267fae0d6194750094966456c26925a359f92673bb1a9c227f2a56649
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -13,6 +13,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 | [INW001](INW001.md) | `layer-dependency` | Import z warstwy wewnętrznej do zewnętrznej | błąd | tak |
 | [INW002](INW002.md) | `context-independence` | Import z jednego kontekstu ograniczonego do innego, którego nie deklaruje jego `depends-on` | błąd | tak |
 | [INW003](INW003.md) | `public-api-only` | Import niepublicznego modułu kontekstu spoza tego kontekstu | błąd | tak |
+| [INW004](INW004.md) | `import-cycles` | Moduły albo konteksty ograniczone, które importują się nawzajem w cyklu (przy sprawdzaniu całego projektu) | błąd | nie |
 | [INW005](INW005.md) | `pure-domain` | Import biblioteki, na który konfiguracja warstwy nie pozwala, np. SQLAlchemy w domenie | błąd | tak |
 | [INW006](INW006.md) | `unassigned-module` | Własny kod poza wszystkimi warstwami i prefiksy warstw, do których nie pasuje żaden moduł | błąd, część diagnostyk to ostrzeżenia | tak |
 | [INW007](INW007.md) | `package-shape` | Element pakietu, na który jego kształt nie pozwala, albo nazwa poza pakietami, do których należy | błąd, część diagnostyk to ostrzeżenia | nie |
@@ -21,7 +22,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 | [INW010](INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | błąd | tak |
 | [INW011](INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | błąd | tak |
 
-Kod INW004 jest zarezerwowany dla reguły zaplanowanej, ale jeszcze niezbudowanej: cykli importów ([#54](https://github.com/SirCypkowskyy/inwards/issues/54)). [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia je razem z resztą.
+[Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia każdą regułę razem z resztą projektu.
 
 ## Konfiguracja reguł { #configure-rules }
 

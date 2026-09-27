@@ -17,15 +17,26 @@ const DIRECTION = / Allowed direction: [^\n]*$/u;
 const UNCHECKED =
   /, so (?:(?:nothing|no layer rule) checks what "[^"]*" imports|its imports are not checked|no layer rule checks its imports)\.$/u;
 
+/** The rules whose messages end with the layer order. */
+const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
+
 /**
  * Drops the part of a message that depends on the rest of the config, so
  * adding an unrelated layer doesn't bring every accepted violation back.
+ * Only the rules that write those clauses lose them: another rule's message
+ * may quote a name the user chose, such as a context called "billing Allowed
+ * direction: EU", and must stay whole.
  *
- * @param message - a diagnostic message.
- * @returns the message without its "Allowed direction" sentence or INW006's closing clause.
+ * @param d - a diagnostic or baseline entry: its rule code and message.
+ * @param d.code - which rule wrote it, which decides what is dropped.
+ * @param d.message - the text to normalise.
+ * @returns the message without INW001's and INW011's "Allowed direction" sentence or INW006's closing clause.
  */
-export function stableMessage(message: string): string {
-  return message.replace(DIRECTION, "").replace(UNCHECKED, ".");
+export function stableMessage({ code, message }: Pick<Diagnostic, "code" | "message">): string {
+  if (WITH_DIRECTION.has(code)) {
+    return message.replace(DIRECTION, "");
+  }
+  return code === "INW006" ? message.replace(UNCHECKED, ".") : message;
 }
 
 /**
@@ -36,7 +47,7 @@ export function stableMessage(message: string): string {
  * @returns rule, module and stable message joined.
  */
 export function baselineKey(d: Pick<Diagnostic, "code" | "module" | "message">): string {
-  return `${d.code}\u0000${d.module}\u0000${stableMessage(d.message)}`;
+  return `${d.code}\u0000${d.module}\u0000${stableMessage(d)}`;
 }
 
 /**

@@ -184,8 +184,9 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
 /**
  * Loads the config and engine, then checks the Python files under the targets.
  * A whole-project run (no targets) also checks the layer prefixes and shape
- * selectors against the modules found (INW006, INW007) and every shaped
- * package's required members (INW008). With `required`, a partial run checks
+ * selectors against the modules found (INW006, INW007), every shaped
+ * package's required members (INW008) and the import cycles among the
+ * checked files (INW004). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
  * Errors the config's baseline accepts are left out, unless `baseline` is
  * false; findings inline comments suppress go in `suppressed`. The duration
@@ -231,7 +232,9 @@ export async function runCheck(
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
   const index = project.engine.index(projectFiles(io, project));
-  const { diagnostics, suppressed } = project.engine.check(files, index, accepted);
+  // A whole-project run also looks for import cycles (INW004), which one file can't show.
+  const whole = targets === undefined;
+  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, { whole });
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));

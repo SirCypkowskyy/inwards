@@ -7,8 +7,8 @@
 export { baselineKey, stableMessage } from "./baseline/accepted.ts";
 export type { ContextSpec } from "./config/contexts.ts";
 export { CONFIG_DEFAULTS } from "./config/defaults.ts";
+export type { AgentSuppressions } from "./config/hook-keys.ts";
 export {
-  type AgentSuppressions,
   declaresInwards,
   type InwardsConfig,
   inwardsTable,

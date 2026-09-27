@@ -71,6 +71,10 @@
         ]
       },
       {
+        "name": "core-rule-import-cycles",
+        "patterns": ["src/core/src/rules/import-cycles.ts", "src/core/src/rules/import-cycles/**"]
+      },
+      {
         "name": "core-rule-pure-domain",
         "patterns": ["src/core/src/rules/pure-domain.ts", "src/core/src/rules/pure-domain/**"]
       },
@@ -181,6 +185,10 @@
         "allow": ["core-contracts", "core-meta", "core-config", "core-lookup"]
       },
       {
+        "from": "core-rule-import-cycles",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-lookup"]
+      },
+      {
         "from": "core-rule-pure-domain",
         "allow": [
           "core-contracts",
@@ -260,6 +268,7 @@
           "core-rule-layer-dependency",
           "core-rule-context-independence",
           "core-rule-public-api-only",
+          "core-rule-import-cycles",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
           "core-rule-package-shape",
@@ -283,6 +292,7 @@
           "core-rule-layer-dependency",
           "core-rule-context-independence",
           "core-rule-public-api-only",
+          "core-rule-import-cycles",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
           "core-rule-package-shape",
@@ -309,6 +319,7 @@
           "core-rule-layer-dependency",
           "core-rule-context-independence",
           "core-rule-public-api-only",
+          "core-rule-import-cycles",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
           "core-rule-package-shape",
@@ -483,6 +494,10 @@
         },
         {
           "from": "core-rule-public-api-only",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-import-cycles",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

@@ -9,8 +9,8 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha. Eleven rules (INW001 layer direction, INW011 dynamic imports,
-INW002 dependencies between bounded contexts, INW003 their public modules, INW005 libraries per layer, INW006 code outside every layer, INW010 imports of first-party modules that don't exist, INW007/INW008 package shape, INW000 encodings that could hide
+Status: pre-alpha. Twelve rules (INW001 layer direction, INW011 dynamic imports,
+INW002 dependencies between bounded contexts, INW003 their public modules, INW004 import cycles, INW005 libraries per layer, INW006 code outside every layer, INW010 imports of first-party modules that don't exist, INW007/INW008 package shape, INW000 encodings that could hide
 imports, INW009 inline suppressions without a reason) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
 a config guard and escalation to the user (`--agent aider` and `--agent agents-md` cover Aider

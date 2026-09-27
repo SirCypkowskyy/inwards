@@ -169,3 +169,16 @@ Each context has:
 - `depends-on` (default `[]`): the contexts this one may import from. It is direct: not passed on, and not granted in return. A name may refer to a context declared further down. The context's own name, an unknown name and a repeated name are config errors.
 
 Contexts and layers add up: a declared dependency or a public module never allows an import that the layer order forbids, and belonging to a context says nothing about the layer, or the other way round. A context uses only its own `depends-on` and `public`, even when its prefixes sit inside another context's. [ADR-030](../05-ADR.md#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) has the reasoning.
+
+### `cycles` { #cycles }
+
+Type: list of `"modules"` and `"contexts"`. Default: `["contexts"]`.
+
+Which import cycles [INW004](../rules/INW004.md) reports on whole-project runs: between contexts, between modules, both, or none (`[]`). The default only matters once `contexts` are declared, so upgrading doesn't fail a project that lives with module cycles; add `"modules"` to catch those too.
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+cycles = ["modules", "contexts"]
+```

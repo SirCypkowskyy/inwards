@@ -70,6 +70,14 @@
       "enum": ["changed", "project"],
       "default": "changed"
     },
+    "cycles": {
+      "description": "Which import cycles INW004 reports: between modules, between bounded contexts, both, or none ([]).",
+      "markdownDescription": "Which import cycles INW004 reports: between modules, between bounded contexts, both, or none ([]).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#cycles)",
+      "type": "array",
+      "items": { "enum": ["modules", "contexts"] },
+      "uniqueItems": true,
+      "default": ["contexts"]
+    },
     "shape": {
       "description": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.",
       "markdownDescription": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
@@ -133,6 +141,7 @@
         "INW001",
         "INW002",
         "INW003",
+        "INW004",
         "INW005",
         "INW006",
         "INW007",

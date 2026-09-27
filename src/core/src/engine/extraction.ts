@@ -28,7 +28,7 @@ import { commentsIn } from "../rules/suppression-comment.ts";
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "3";
+export const EXTRACTION_REVISION = "4";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {
@@ -86,6 +86,39 @@ export class Extractor {
     } finally {
       tree.delete(); // WASM memory is not garbage collected
     }
+  }
+
+  /**
+   * The static imports of a file whose imports all end by a given line, read
+   * from a parse of the text up to that line: much less than the whole file
+   * when the imports sit at the top (INW004's confirmation). That text parses
+   * without an error only when the cut is outside every string, bracket and
+   * continuation, and then Python tokenises it as it does the start of the
+   * whole file, so it holds the same imports. Otherwise, the whole file is
+   * parsed. Nothing is cached for the text up to the line.
+   *
+   * @param src - the source file, with normalised text.
+   * @param lastLine - the 1-based line where its last import ends.
+   * @returns its static imports.
+   */
+  importsUpTo(src: SourceFile, lastLine: number): readonly ImportRef[] {
+    const known = this.lookup(src);
+    if (known?.full !== undefined) {
+      return known.full;
+    }
+    const end = lineEnd(src.text, lastLine);
+    if (end < src.text.length) {
+      const head = { ...src, text: src.text.slice(0, end) };
+      const tree = parsePython(this.parser, head.text);
+      try {
+        if (!tree.rootNode.hasError) {
+          return extractImports(tree, head);
+        }
+      } finally {
+        tree.delete(); // WASM memory is not garbage collected
+      }
+    }
+    return this.full(src).imports;
   }
 
   /**
@@ -149,4 +182,23 @@ function identityOf(src: SourceFile): ExtractionIdentity {
     module: src.module,
     isPackage: src.isPackage,
   };
+}
+
+/**
+ * Finds where a line ends, past its newline.
+ *
+ * @param text - normalised text.
+ * @param line - a 1-based line; 0 for none.
+ * @returns the offset just after that line's newline, or the text's length.
+ */
+function lineEnd(text: string, line: number): number {
+  let end = 0;
+  for (let n = 0; n < line; n += 1) {
+    const next = text.indexOf("\n", end);
+    if (next === -1) {
+      return text.length;
+    }
+    end = next + 1;
+  }
+  return end;
 }

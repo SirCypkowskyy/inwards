@@ -66,6 +66,41 @@ function importSkeleton(source: string): Skeleton | null {
   return { text: out.join("\n"), indent };
 }
 
+/** A line that starts an import at the top level. */
+const TOP_IMPORT = /^(?:import[ \t]|from[ \t])/u;
+/** A line with nothing but whitespace and perhaps a comment. */
+const NOTHING = /^[ \t\f]*(?:#.*)?$/u;
+
+/**
+ * Tells whether a file holds nothing but top-level imports, comments and
+ * blank lines up to a line. When the prescan accepted the file, its skeleton
+ * is then that same text with the comments blanked, which parsed cleanly into
+ * imports alone, so a full parse reads exactly the skeleton's imports there.
+ * Anything else (a docstring, code, an indented import) says nothing either way.
+ *
+ * @param source - normalised file text.
+ * @param lastLine - the 1-based line of the skeleton's last imported name.
+ * @returns true when every line up to `lastLine` is an import, a comment or blank.
+ */
+export function onlyImportsUpTo(source: string, lastLine: number): boolean {
+  const lines = source.split("\n");
+  const indent: number[] = [];
+  const scratch = { lines: new Array<string>(lines.length).fill(""), indent };
+  // An import may run past `lastLine` (a parenthesised list), and is copied whole.
+  for (let i = 0; i < Math.min(lastLine, lines.length); i += 1) {
+    const line = lines[i] ?? "";
+    if (NOTHING.test(line)) {
+      continue;
+    }
+    const last = TOP_IMPORT.test(line) ? copyLogicalLine(lines, i, 0, scratch) : null;
+    if (last === null) {
+      return false;
+    }
+    i = last;
+  }
+  return true;
+}
+
 /**
  * Copies one logical import line into the skeleton.
  * A logical line runs until its parentheses balance and it does not end in a
