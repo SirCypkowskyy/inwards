@@ -19,7 +19,10 @@ export { type RuleSettings, ruleLevel } from "./config/rule-settings.ts";
 export type { NameRule, ShapeSpec } from "./config/shape.ts";
 export { ConfigError } from "./config/toml.ts";
 export type {
+  CachedExtraction,
   Diagnostic,
+  ExtractionCache,
+  ExtractionIdentity,
   Fix,
   ImportRef,
   Severity,

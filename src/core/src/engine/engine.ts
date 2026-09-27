@@ -9,16 +9,21 @@ import type { Parser } from "web-tree-sitter";
 import { acceptedModules } from "../baseline/accepted.ts";
 import type { InwardsConfig } from "../config/parse.ts";
 import { applyRules } from "../config/rule-settings.ts";
-import type { Diagnostic, ImportRef, SourceFile, Suppressed } from "../contracts/records.ts";
+import type {
+  Diagnostic,
+  ExtractionCache,
+  ImportRef,
+  SourceFile,
+  Suppressed,
+  SuppressionComment,
+} from "../contracts/records.ts";
 import { type ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import {
   createPythonParser,
-  extractImports,
   type GrammarBinaries,
   normalizeSource,
   parsePython,
 } from "../python/parser.ts";
-import { skeletonImports } from "../python/prescan.ts";
 import {
   checkDynamicImports,
   extractDynamicImports,
@@ -28,15 +33,11 @@ import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
 import { checkLibraries } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
-import {
-  commentsIn,
-  mentionsSuppression,
-  type SuppressionComment,
-  suppress,
-} from "../rules/suppression-comment.ts";
+import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
 import { checkUnassignedImports, unassignedWarning } from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { Extractor } from "./extraction.ts";
 
 /** A file after the prescan, before any full parse. */
 interface Scan {
@@ -65,17 +66,20 @@ export interface Checked {
 export class Engine {
   private readonly parser: Parser;
   private readonly config: InwardsConfig;
+  private readonly extractor: Extractor;
 
   /**
-   * Stores a ready parser and a validated config.
+   * Stores a ready parser, a validated config and the extraction helper.
    * Private: `Engine.create` is the only way in, because loading the grammar is async.
    *
    * @param parser - tree-sitter parser with the Python grammar already set.
    * @param config - layers and root read from `[tool.inwards]`.
+   * @param cache - where extractions are kept between checks, if anywhere.
    */
-  private constructor(parser: Parser, config: InwardsConfig) {
+  private constructor(parser: Parser, config: InwardsConfig, cache: ExtractionCache | undefined) {
     this.parser = parser;
     this.config = config;
+    this.extractor = new Extractor(parser, cache);
   }
 
   /**
@@ -83,12 +87,23 @@ export class Engine {
    * Initialises the tree-sitter runtime and loads the Python grammar once;
    * every later check reuses that parser.
    *
+   * With `options.cache`, what the engine reads out of a file's text (the
+   * import skeleton, the full parse's static imports, the suppression
+   * comments) is kept there and reused while the text is unchanged (#56).
+   * Results never differ with or without it.
+   *
    * @param wasm - the tree-sitter runtime and Python grammar as WASM bytes.
    * @param config - layers and root read from `[tool.inwards]`.
+   * @param options - optional inputs.
+   * @param options.cache - where extractions are kept between checks.
    * @returns an engine ready to check files.
    */
-  static async create(wasm: GrammarBinaries, config: InwardsConfig): Promise<Engine> {
-    return new Engine(await createPythonParser(wasm), config);
+  static async create(
+    wasm: GrammarBinaries,
+    config: InwardsConfig,
+    options: { cache?: ExtractionCache } = {},
+  ): Promise<Engine> {
+    return new Engine(await createPythonParser(wasm), config, options.cache);
   }
 
   /**
@@ -144,8 +159,7 @@ export class Engine {
     }
     const dynamic = mentionsDynamicImport(src.text);
     // A file with a suppression comment gets the full parse, which also reads the comments.
-    const fast =
-      dynamic || mentionsSuppression(src.text) ? null : skeletonImports(this.parser, src);
+    const fast = dynamic || mentionsSuppression(src.text) ? null : this.extractor.skeleton(src);
     const found = fast ? this.importFindings(src, fast, project) : null;
     return { found, exact: found?.length === 0, dynamic };
   }
@@ -163,7 +177,18 @@ export class Engine {
     confirmed: Confirmed,
   ): { kept: Diagnostic[]; suppressed: Suppressed[] } {
     const found = [...shapeFindings(src, this.config), ...confirmed.found];
-    return suppress(this.parser, src, { ...confirmed, found }, this.config.rules);
+    // Read the comments here, through the cache, rather than let suppress() parse.
+    const needed =
+      confirmed.comments === undefined &&
+      mentionsSuppression(src.text) &&
+      !found.some((d) => d.code === "INW000");
+    const comments = needed ? this.extractor.full(src).comments : confirmed.comments;
+    return suppress(
+      this.parser,
+      src,
+      comments === undefined ? { found } : { found, comments },
+      this.config.rules,
+    );
   }
 
   /**
@@ -229,38 +254,24 @@ export class Engine {
    * @returns the violations found, and the suppression comments of a file that mentions them.
    */
   private fullCheck(file: SourceFile, dynamic: boolean, project: ProjectIndex): Confirmed {
+    if (!dynamic) {
+      const { imports, comments } = this.extractor.full(file);
+      return ordered(file, this.importFindings(file, imports, project), comments);
+    }
     const { layers } = this.config;
     const tree = parsePython(this.parser, file.text);
     try {
-      const found = this.importFindings(file, extractImports(tree, file), project);
-      if (dynamic) {
-        const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
-        const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
-        found.push(
-          ...checkDynamicImports(file, refs, layers),
-          ...checkLibraries(file, readable, layers, project.ownerOf),
-          ...checkUnassignedImports(file, readable, layers, project.ownerOf),
-        );
-      }
-      found.sort((a, b) => a.line - b.line || a.column - b.column);
-      return mentionsSuppression(file.text) ? { found, comments: commentsIn(tree) } : { found };
-    } finally {
-      tree.delete(); // WASM memory is not garbage collected
-    }
-  }
-
-  /**
-   * Extracts every import from a full parse of the file.
-   * The slow, exact path. The tree is freed before returning because WASM
-   * memory is not garbage collected.
-   *
-   * @param file - the source file, with normalised text.
-   * @returns every import statement target with its span.
-   */
-  private imports(file: SourceFile): ImportRef[] {
-    const tree = parsePython(this.parser, file.text);
-    try {
-      return extractImports(tree, file);
+      const { imports, comments } = this.extractor.fromTree(file, tree);
+      const found = this.importFindings(file, imports, project);
+      // Dynamic imports are never cached: they depend on other files (ownerOf).
+      const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
+      const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
+      found.push(
+        ...checkDynamicImports(file, refs, layers),
+        ...checkLibraries(file, readable, layers, project.ownerOf),
+        ...checkUnassignedImports(file, readable, layers, project.ownerOf),
+      );
+      return ordered(file, found, comments);
     } finally {
       tree.delete(); // WASM memory is not garbage collected
     }
@@ -278,7 +289,7 @@ export class Engine {
   index(files: ProjectFiles): ProjectIndex {
     return new ProjectIndex(files, (file) => {
       const src = { ...file, text: normalizeSource(file.text) };
-      return skeletonImports(this.parser, src) ?? this.imports(src);
+      return this.extractor.skeleton(src) ?? this.extractor.full(src).imports;
     });
   }
 
@@ -368,4 +379,18 @@ export class Engine {
       ),
     };
   }
+}
+
+/**
+ * Orders a full parse's findings and attaches the comments when the file may
+ * hold a suppression, as suppress() expects.
+ *
+ * @param file - the source file, with normalised text.
+ * @param found - the findings, in any order.
+ * @param comments - the file's suppression comments.
+ * @returns the findings in source order, with the comments when they matter.
+ */
+function ordered(file: SourceFile, found: Diagnostic[], comments: SuppressionComment[]): Confirmed {
+  found.sort((a, b) => a.line - b.line || a.column - b.column);
+  return mentionsSuppression(file.text) ? { found, comments } : { found };
 }
