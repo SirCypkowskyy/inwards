@@ -202,10 +202,18 @@ export const Inwards = async ({ client, directory }) => {
    * @param text - the message.
    */
   const deliver = async (id, s, text) => {
+    const generation = s.generation;
     s.awaiting = true;
     const sent = await send(id, { parts: [{ type: "text", text }] });
-    s.unsent = sent ? undefined : text;
-    s.awaiting = sent;
+    // The user may have moved on while the request ran, and OpenCode may
+    // already have taken the message (clearing awaiting): only a failure for
+    // this turn changes anything.
+    if (!sent && generation === s.generation) {
+      s.awaiting = false;
+      s.unsent = text;
+    } else if (sent) {
+      s.unsent = undefined;
+    }
   };
 
   return {

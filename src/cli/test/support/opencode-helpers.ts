@@ -64,6 +64,8 @@ export interface Failures {
   prompt?: number;
   /** Which prompts fail, counting every prompt from 0. */
   promptAt?: readonly number[];
+  /** Runs while a prompt request is in flight, before it answers: OpenCode may take the message then. */
+  during?: (call: number, text: string) => Promise<void>;
 }
 
 /**
@@ -101,7 +103,7 @@ export async function load(
   const failing = { get: failures.get ?? 0, prompt: failures.prompt ?? 0, calls: 0 };
   const client = {
     session: {
-      promptAsync: ({
+      promptAsync: async ({
         path,
         body,
       }: {
@@ -110,6 +112,7 @@ export async function load(
       }): Promise<{ error?: string }> => {
         const call = failing.calls;
         failing.calls += 1;
+        await failures.during?.(call, body.parts.map((p) => p.text).join(""));
         if (failing.prompt > 0 || failures.promptAt?.includes(call)) {
           failing.prompt = Math.max(0, failing.prompt - 1);
           return Promise.resolve({ error: "HTTP 500" });

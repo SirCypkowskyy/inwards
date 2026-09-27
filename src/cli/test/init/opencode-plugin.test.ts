@@ -11,7 +11,7 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
-import { fire, initProject, load, PLUGIN, say } from "../support/opencode-helpers.ts";
+import { fire, type Hooks, initProject, load, PLUGIN, say } from "../support/opencode-helpers.ts";
 
 const STOP = "Inwards Stop gate (sent by the Inwards plugin, not the user)";
 const LEAK = "import shop.infrastructure.db\n";
@@ -196,4 +196,47 @@ test("an idle of a newer turn is kept while the gate still answers the older one
   const newer = fire(hooks, "session.idle", s);
   await Promise.all([older, newer]);
   expect(sent).toHaveLength(1);
+});
+
+test("a gate message OpenCode takes before the request answers doesn't hold the next idle", async () => {
+  const root = initProject();
+  const s = "ses_ack";
+  const ref: { hooks?: Hooks } = {};
+  const { hooks, sent } = await load(root, root, {
+    // OpenCode runs chat.message for the message while the request is still open.
+    during: async (_call: number, text: string): Promise<void> => {
+      if (ref.hooks) {
+        await say(ref.hooks, s, text);
+      }
+    },
+  });
+  ref.hooks = hooks;
+  await fire(hooks, "session.created", s);
+  writeFileSync(join(root, "shop/domain/order.py"), LEAK);
+  await fire(hooks, "session.idle", s);
+  await fire(hooks, "session.idle", s); // the continued turn ends, the violation still there
+  expect(sent.filter((m) => m.text.startsWith(STOP))).toHaveLength(2);
+});
+
+test("a gate message that fails after the user moved on isn't sent in the new turn", async () => {
+  const root = initProject();
+  const s = "ses_moved_on";
+  const order = join(root, "shop/domain/order.py");
+  const ref: { hooks?: Hooks } = {};
+  const { hooks, sent } = await load(root, root, {
+    promptAt: [0],
+    // The user writes, and fixes the file, while the gate's request is open; then it fails.
+    during: async (call: number): Promise<void> => {
+      if (call === 0 && ref.hooks) {
+        await say(ref.hooks, s, "Leave it, I'll fix it.");
+        writeFileSync(order, "X = 1\n");
+      }
+    },
+  });
+  ref.hooks = hooks;
+  await fire(hooks, "session.created", s);
+  writeFileSync(order, LEAK);
+  await fire(hooks, "session.idle", s);
+  await fire(hooks, "session.idle", s);
+  expect(sent).toEqual([]);
 });
