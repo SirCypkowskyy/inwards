@@ -174,7 +174,7 @@ bun run bench/corpus.ts --bin dist/inwards-linux-x64 --dir ~/.cache/inwards-corp
   <figcaption>The engine's unit tests, including the prescan and colour-output cases.</figcaption>
 </figure>
 
-Two checks keep the agent-facing tests honest. A code fence in `docs/chapters/guides` that follows a `<!-- e2e -->` line and one blank line (without it, the comment breaks a list item) runs as an E2E case in a fresh project, against the compiled binary in CI (`src/cli/test/docs.test.ts`); untagged fences are never run. Every night, `.github/workflows/nightly-e2e.yml` records the Claude Code hook payloads again with a headless `claude -p` session and opens an issue when a field is added, removed or changes type against the recorded fixtures.
+Two checks keep the agent-facing tests honest. A code fence in `docs/chapters/guides` or `docs/chapters/rules` that follows a `<!-- e2e -->` line and one blank line (without it, the comment breaks a list item) runs as an E2E case in a fresh project, against the compiled binary in CI (`src/cli/test/docs.test.ts`); untagged fences are never run. The fences run in the system's bash, which on macOS is bash 3.2, so the harness never puts a heredoc inside `$(...)`: bash 3.2 matches quotes across it, and one apostrophe in a documented message breaks the script. Every night, `.github/workflows/nightly-e2e.yml` records the Claude Code hook payloads again with a headless `claude -p` session and opens an issue when a field is added, removed or changes type against the recorded fixtures.
 
 The screenshots in these docs come from `scripts/screenshots.py`, which runs each command for real and renders the terminal output with Rich.
 

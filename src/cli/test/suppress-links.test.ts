@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { renameSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { inwards, payload, type RunResult } from "./run.ts";
+import { inwards, LAYERS, payload, type RunResult } from "./run.ts";
 import { ID, put, session, stop } from "./stop-helpers.ts";
 import { LEGACY, NO_LAZY_FETCH, posted, SUPPRESSED } from "./suppress-helpers.ts";
 
@@ -71,6 +71,12 @@ function postedFrom(root: string, cwd: string, file: string): RunResult {
   });
   return inwards(["hook", "claude-code"], { cwd: root, stdin: input });
 }
+
+/** A suppression the agent may not borrow, and an old violation's excuse: what each leaves blocking. */
+const AGENT_FINDINGS = [
+  [SUPPRESSED, "wasn't in the file when the session started"],
+  ["import shop.infrastructure.db\n", '"code":"INW001"'],
+] as const;
 
 describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
   "the start identity is the path as written, below the real project root",
@@ -138,6 +144,67 @@ describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
       put(root, LEGACY, `${SUPPRESSED}TOTAL = 1\n`);
       expect(postedFrom(root, link, join(link, LEGACY)).code).toBe(0);
       expect(stop(root).code).toBe(0);
+    });
+
+    test("a config below a directory alias, with the cwd above it, gives the alias nothing", () => {
+      for (const [text, blocked] of AGENT_FINDINGS) {
+        const root = session({
+          "real/pyproject.toml": LAYERS,
+          "real/shop/infrastructure/db.py": "",
+          "real/shop/domain/legacy.py": text,
+        });
+        symlinkSync("real", join(root, "alias"));
+        const edit = postedFrom(root, root, join(root, "alias/shop/domain/legacy.py"));
+        expect(edit.code).toBe(2);
+        expect(edit.stderr).toContain('"file":"alias/shop/domain/legacy.py"');
+        expect(edit.stderr).not.toContain("already in the file when the session started");
+        expect(edit.stderr).toContain(blocked);
+      }
+    });
+
+    test("through a link to the root, `..` out of an alias can't borrow the start file it spells", () => {
+      for (const [text, blocked] of AGENT_FINDINGS) {
+        const root = session({ [LEGACY]: text });
+        const link = `${root}-link`;
+        symlinkSync(root, link);
+        // A new file with the start file's bytes, and a link one level deeper than its name.
+        put(root, "shop/domain/new/legacy.py", text);
+        put(root, "shop/domain/new/sub/__init__.py", "");
+        symlinkSync("new/sub", join(root, "shop/domain/hop"));
+        // As written this spells shop/domain/legacy.py; the OS opens shop/domain/new/legacy.py.
+        const edit = postedFrom(root, join(link, "shop/domain/hop"), "../legacy.py");
+        expect(edit.code).toBe(2);
+        // Shortened, the path would read ../new/legacy.py: from hop, that is new/new/legacy.py.
+        expect(edit.stderr).not.toContain('"file":"../new/legacy.py"');
+        expect(edit.stderr).not.toContain("already in the file when the session started");
+        expect(edit.stderr).toContain(blocked);
+      }
+    });
+
+    test("through a link to the root and a cwd alias, a shortened note path still opens the file", () => {
+      const root = session({ [Original]: "import shop.infrastructure.db\n" });
+      const link = `${root}-link`;
+      symlinkSync(root, link);
+      symlinkSync("original", join(root, "shop/domain/alias"));
+      const cwd = join(link, "shop/domain/alias");
+      const edit = postedFrom(root, cwd, "legacy.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("\n- ../original/legacy.py:1 INW001");
+      // The shell resolves `..` from where the link points, as the agent's tools do.
+      expect(Bun.spawnSync(["test", "-f", "../original/legacy.py"], { cwd }).exitCode).toBe(0);
+    });
+
+    test("through a link to the root, the notes name files from the project, not ../../private/var", () => {
+      const root = session({ [LEGACY]: "import shop.infrastructure.db\n" });
+      const link = `${root}-link`;
+      symlinkSync(root, link);
+      symlinkSync("legacy.py", join(root, "shop/domain/alias.py"));
+      // The payload's cwd is the path as written; the hook's own cwd is the real one.
+      const edit = postedFrom(link, link, join(link, "shop/domain/alias.py"));
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("\n- shop/domain/legacy.py:1 INW001");
+      expect(edit.stderr).toContain('"file":"shop/domain/alias.py"');
+      expect(edit.stderr).not.toContain("../");
     });
   },
 );

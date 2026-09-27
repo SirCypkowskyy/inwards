@@ -8,7 +8,7 @@ import { BASELINE_FILE, writeBaseline } from "./baseline.ts";
 import { hookClaudeCode } from "./hook.ts";
 import { type InitFlags, initMain } from "./init-style.ts";
 import { print } from "./output.ts";
-import { findConfig, realpath } from "./paths.ts";
+import { findConfig, realpath, shownReport } from "./paths.ts";
 import { runCheck } from "./project.ts";
 import { logRun, noteRun, noteSuppressions } from "./runlog.ts";
 import { statsCommand } from "./stats-command.ts";
@@ -194,9 +194,11 @@ async function checkCommand(
   const pretty = process.stdout.isTTY === true;
   const color = process.env["FORCE_COLOR"] ? true : pretty && !process.env["NO_COLOR"];
   const maxDiagnostics = max === undefined ? undefined : Number(max);
-  process.stdout.write(`${render(report, format, { pretty, color, maxDiagnostics })}\n`);
-  const exit = report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
   const project = realpath(dirname(configPath));
+  // Paths from the project even when --config spells it through a link (macOS /var).
+  const shown = project ? shownReport(project, process.cwd(), report) : report;
+  process.stdout.write(`${render(shown, format, { pretty, color, maxDiagnostics })}\n`);
+  const exit = report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
   if (project) {
     noteRun(project, targets ?? [project], report.diagnostics);
     noteSuppressions(report, []);

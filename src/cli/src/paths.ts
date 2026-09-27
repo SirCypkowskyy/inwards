@@ -4,7 +4,7 @@
  */
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
-import { declaresInwards } from "@inwards/core";
+import { type Diagnostic, declaresInwards, type Report } from "@inwards/core";
 
 export const PATH_SEPARATORS = /[\\/]/u;
 
@@ -109,4 +109,103 @@ export function findConfig(
  */
 export function posix(path: string): string {
   return path.split(sep).join("/");
+}
+
+/** The `../` segments a forward-slash path starts with. */
+const CLIMB = /^(?:\.\.\/)*/u;
+
+/**
+ * Shows a report path from the project, whichever way the base and the file
+ * spell the project root. On macOS `/var` is a link to `/private/var`: the
+ * hook's base is the payload's cwd as written (`/var/...`), a file checked
+ * under its real module name is real (`/private/var/...`), and the path
+ * between them climbs to `/` (`../../private/var/...`). The part of each
+ * side up to the project root is respelled as the real root; below the root
+ * both stay as written, so an alias directory keeps its name.
+ *
+ * Display only: the hooks' start identity (`legacy.ts`) reads the report's
+ * own paths against its own base, and must never see these. A path that
+ * doesn't climb, or that climbs no less when respelled, is left as it is,
+ * and so is one that opened from the base names another file: `relative`
+ * reads the base as text, but through a link below the root the OS
+ * resolves `..` from the link's target.
+ *
+ * @param project - the real project root.
+ * @param base - the directory the report's paths are relative to.
+ * @param file - a report path, with forward slashes.
+ * @returns the path to show, with forward slashes.
+ */
+function shownPath(project: string, base: string, file: string): string {
+  if (!file.startsWith("../")) {
+    return file;
+  }
+  const shown = posix(relative(underRoot(project, base), underRoot(project, resolve(base, file))));
+  const target = realpath(resolve(base, file));
+  const same = target !== undefined && physicalRealpath(base, shown) === target;
+  return same && climb(shown) < climb(file) ? shown : file;
+}
+
+/**
+ * Measures how far a path climbs before it goes down.
+ *
+ * @param path - a relative path, with forward slashes.
+ * @returns the length of its leading `../` run.
+ */
+function climb(path: string): number {
+  return CLIMB.exec(path)?.[0].length ?? 0;
+}
+
+/**
+ * Respells a path's way into the project as the real project root: the
+ * outermost directory on it (itself included) whose real path is the root
+ * is replaced by the root, and the rest is kept as written.
+ *
+ * @param project - the real project root.
+ * @param path - an absolute path.
+ * @returns the path under the real root, or unchanged when it isn't in the project.
+ */
+function underRoot(project: string, path: string): string {
+  const chain: string[] = [];
+  for (let dir = path; chain.at(-1) !== dir; dir = dirname(dir)) {
+    chain.push(dir);
+  }
+  const root = chain.reverse().find((dir) => realpath(dir) === project);
+  return root === undefined ? path : join(project, relative(root, path));
+}
+
+/**
+ * Copies findings with their paths as `shownPath` shows them, for output.
+ *
+ * @param project - the real project root.
+ * @param base - the directory their paths are relative to.
+ * @param diagnostics - the findings, whose own paths stay untouched.
+ * @returns new findings with the paths to show.
+ */
+export function shownDiagnostics(
+  project: string,
+  base: string,
+  diagnostics: readonly Diagnostic[],
+): Diagnostic[] {
+  return diagnostics.map((d) => ({ ...d, file: shownPath(project, base, d.file) }));
+}
+
+/**
+ * Copies a report with every path as `shownPath` shows it, for output: the
+ * findings and the suppressed ones SARIF lists.
+ *
+ * @param project - the real project root.
+ * @param base - the directory its paths are relative to.
+ * @param report - the report, whose own paths stay untouched.
+ * @returns a new report with the paths to show.
+ */
+export function shownReport(project: string, base: string, report: Report): Report {
+  const suppressed = report.suppressed?.map((s) => ({
+    ...s,
+    diagnostic: { ...s.diagnostic, file: shownPath(project, base, s.diagnostic.file) },
+  }));
+  return {
+    ...report,
+    diagnostics: shownDiagnostics(project, base, report.diagnostics),
+    ...(suppressed === undefined ? {} : { suppressed }),
+  };
 }

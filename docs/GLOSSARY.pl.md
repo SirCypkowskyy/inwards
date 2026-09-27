@@ -58,6 +58,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | commit, merge, squash | commit, merge, squash | verbs: "scalić" is fine for merge |
 | workflow (GitHub Actions) | workflow | |
 | wheel | wheel (wheela, wheele) | the Python package format |
+| heredoc | heredoc (heredoca, heredoki) | a shell `<<'EOF'` block |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
 | Rule codes | INW000, INW001, ... INW011 | |

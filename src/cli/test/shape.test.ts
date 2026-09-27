@@ -216,6 +216,19 @@ describe.skipIf(process.platform === "win32")(
       }
     });
 
+    test("PostToolUse through a link to the root: `..` out of an alias can't borrow a start file", () => {
+      const root = legacy("shop/domain/legacy.py");
+      const link = `${root}-link`;
+      symlinkSync(root, link);
+      put(root, "shop/domain/new/legacy.py", "X = 1\n");
+      put(root, "shop/domain/new/sub/__init__.py", "");
+      symlinkSync("new/sub", join(root, "shop/domain/hop"));
+      // As written this spells the start file shop/domain/legacy.py; the OS opens the new one.
+      const edit = postedFrom(root, join(link, "shop/domain/hop"), "../legacy.py");
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain('"code":"INW007"');
+    });
+
     test("Stop: a start file swapped for a symlink to a renamed copy blocks", () => {
       const root = legacy("shop/domain/legacy.py");
       renameSync(join(root, "shop/domain/legacy.py"), join(root, "shop/domain/saved.py"));
