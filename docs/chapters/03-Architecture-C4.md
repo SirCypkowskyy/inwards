@@ -106,15 +106,15 @@ flowchart LR
     end
 
     subgraph enginebox["Engine: @inwards/core"]
-        config["<b>Config parser</b><br/><small>config.ts<br/>smol-toml, validation</small>"]
-        pre["<b>Import skeleton prescan</b><br/><small>prescan.ts<br/>blanks non-import lines</small>"]
-        parser["<b>Parser adapter</b><br/><small>python.ts<br/>web-tree-sitter</small>"]
-        extract["<b>Import extractor + resolver</b><br/><small>python.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>rules.ts: registry<br/>layers.ts: INW001<br/>libraries.ts: INW005<br/>dynamic.ts: INW011<br/>unassigned.ts + layout.ts: INW006<br/>unknown.ts: INW010<br/>shape.ts: INW007 + INW008<br/>encoding.ts: INW000</small>"]
+        config["<b>Config parser</b><br/><small>config/parse.ts<br/>smol-toml, validation</small>"]
+        pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
+        parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
+        extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
-        report["<b>Reporters</b><br/><small>reporters.ts<br/>text · concise · json · sarif</small>"]
-        engine["<b>Engine facade</b><br/><small>engine.ts<br/>checkFile / checkFiles / check / index</small>"]
-        modgraph["<b>Module index</b><br/><small>project.ts: first-party modules,<br/>importers on demand</small>"]
+        report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
+        engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / index</small>"]
+        modgraph["<b>Module index</b><br/><small>lookup/project-index.ts: first-party modules,<br/>importers on demand</small>"]
     end
 
     cfgtext --> config --> engine
@@ -136,7 +136,7 @@ flowchart LR
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
-| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`rules.ts`); SARIF `rules[]` is built from it | INW001, INW005 for the libraries a layer may import, INW006 for code outside every layer, INW010 for first-party modules that don't exist, INW007/INW008 for package shape, INW011 for dynamic imports (literal targets, and unverifiable ones in inner layers), and INW000 for files whose encoding could hide imports. Planned rules are listed below |
+| Rules | Pure functions from `(file, imports, config)` to `Diagnostic[]`. Code, name, default severity, summary and docs link of every rule live in one registry (`meta/registry.ts`); SARIF `rules[]` is built from it | INW001, INW005 for the libraries a layer may import, INW006 for code outside every layer, INW010 for first-party modules that don't exist, INW007/INW008 for package shape, INW011 for dynamic imports (literal targets, and unverifiable ones in inner layers), and INW000 for files whose encoding could hide imports. Planned rules are listed below |
 | Fix composer | Builds numbered repair steps from the actual import and layer names | The steps name real modules, not placeholders |
 | Reporters | Text for humans, `inwards/diagnostics@1` JSON for agents, SARIF 2.1.0 for GitHub | JSON fields may be added but never removed or renamed |
 | Engine facade | Orchestrates prescan, rules and the confirming full parse | The only thing the adapters call. The package shape (INW007) is checked first, from the path alone. A file outside every layer isn't parsed (it gets at most an INW006 warning). A layered file whose text names a module loader skips the prescan (see below) |
@@ -361,41 +361,38 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 
 ```text
 src/
-├── core/                  # engine, no I/O
+├── core/                  # engine, no I/O; src/core/AGENTS.md explains the rules
 │   ├── src/
-│   │   ├── config.ts      # [tool.inwards] parsing and validation
-│   │   ├── toml.ts        # ConfigError and the checks shared by the config parsers
-│   │   ├── prescan.ts     # import skeleton fast path
-│   │   ├── python.ts      # tree-sitter adapter, import extraction, module names
-│   │   ├── rules.ts       # rule registry: code, name, severity, docs
-│   │   ├── rule-config.ts # [tool.inwards.rules]: select, ignore, severity
-│   │   ├── suppress.ts    # INW009: inline suppression comments, what they hide
-│   │   ├── layers.ts      # INW001 + fix composer
-│   │   ├── libraries.ts   # INW005: libraries per layer, default deny list
-│   │   ├── stdlib.ts      # standard-library module names (INW005)
-│   │   ├── dynamic.ts     # INW011: dynamic imports, loader hint for the engine
-│   │   ├── loader-targets.ts  # what import_module, __import__ and run_module load
-│   │   ├── computed-source.ts  # which exec / eval calls with a computed source count
-│   │   ├── unassigned.ts  # INW006: code outside every layer, first-party probe
-│   │   ├── unknown.ts     # INW010: first-party modules that don't exist, closest names
-│   │   ├── generated.ts   # INW010: `generated` patterns, the default list
-│   │   ├── layout.ts      # INW006: dead prefixes, layer code moved out of every layer
-│   │   ├── shape.ts       # INW007 + INW008: package shape, ListMembers port
-│   │   ├── shape-config.ts  # [[tool.inwards.shape]] / [[tool.inwards.names]], selectors, patterns
-│   │   ├── shape-fix.ts   # INW007/INW008 wording, likely target
-│   │   ├── glob.ts        # fnmatch globs, matched without regex backtracking
-│   │   ├── callees.ts     # which calls are loaders, through aliases
-│   │   ├── literals.ts    # string literals and call arguments, as Python reads them
-│   │   ├── encoding.ts    # INW000: declared encodings that can hide imports
-│   │   ├── reporters.ts   # text / concise / json / sarif
-│   │   ├── engine.ts      # facade
-│   │   ├── baseline.ts    # baseline keys, which findings a baseline accepts
-│   │   ├── project.ts     # module index (the engine's project input), importers on demand
-│   │   ├── types.ts       # SourceFile, Diagnostic, Fix, Span
-│   │   ├── index.ts       # the public API adapters import
-│   │   └── meta.ts        # VERSION, DOCS_BASE
+│   │   ├── index.ts       # the public API adapters import (pinned by test/api.test.ts)
+│   │   ├── contracts/     # records.ts: SourceFile, ImportRef, Diagnostic, Fix, Span, Suppressed
+│   │   ├── meta/          # product.ts (VERSION, DOCS_BASE), registry.ts (every rule's code,
+│   │   │                  #   name, severity, docs link; diagnostic())
+│   │   ├── config/        # [tool.inwards]: parse.ts, rule-settings.ts ([tool.inwards.rules]),
+│   │   │                  #   shape.ts (shapes and names), generated.ts, glob.ts (fnmatch),
+│   │   │                  #   source-span.ts (where a value sits in pyproject.toml), toml.ts
+│   │   ├── python/        # parser.ts (tree-sitter, import extraction), module-names.ts,
+│   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
+│   │   │                  #   literals.ts, stdlib.ts
+│   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
+│   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
+│   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
+│   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
+│   │   │   │              #   edit-distance.ts
+│   │   │   ├── unsupported-encoding.ts  # INW000
+│   │   │   ├── layer-dependency.ts      # INW001 + fix composer
+│   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
+│   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
+│   │   │   │                            #   layout.ts (dead prefixes, layer code moved away)
+│   │   │   ├── package-shape/           # INW007 + INW008: shape.ts, fix.ts (wording, likely target)
+│   │   │   ├── suppression-comment.ts   # INW009: inline suppressions, what they hide
+│   │   │   ├── unknown-first-party.ts   # INW010: first-party modules that don't exist
+│   │   │   └── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
+│   │   │                                #   loader-targets.ts, computed-source.ts
+│   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
+│   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut
+│   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
-│   └── test/              # bun test
+│   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters

@@ -9,7 +9,9 @@ packages that depend one way, onto the engine:
 
 - `src/core`: the engine. Pure, no I/O; everything outside comes through
   ports (`GrammarBinaries`, `ProjectFiles`, `ListDir`), and adapters import
-  `@inwards/core` (its `index.ts`) only.
+  `@inwards/core` (its `index.ts`) only. It is organised in feature folders,
+  one per rule under `rules/` (#176). Read
+  [`src/core/AGENTS.md`](src/core/AGENTS.md) before working there.
 - `src/cli`: the command line and the Claude Code hook adapter, organised
   in feature folders with the I/O behind contracts (#176). Read
   [`src/cli/AGENTS.md`](src/cli/AGENTS.md) before working there: it says
@@ -189,7 +191,7 @@ bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
 bun run typecheck       # tsc (TypeScript 7), strictest flags (tsconfig.base.json)
 bun run fallow          # dead code, unused deps, boundaries, zero clone groups
 bun run check:cycles    # no import cycles, type-only imports included (tsgo's own parse)
-bun run check:overviews # every module's @file overview is 2+ sentences (src/cli so far)
+bun run check:overviews # every module's @file overview is 2+ sentences (src/cli and src/core so far)
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
 uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
@@ -381,7 +383,7 @@ done until both match the code.
   - first line: a title that says what it does;
   - then 1-3 lines of description (what, and why when it isn't obvious);
   - a longer section when the behaviour has edge cases, invariants or a
-    non-obvious reason (see `importSkeleton` in `src/core/src/prescan.ts`);
+    non-obvious reason (see `importSkeleton` in `src/core/src/python/prescan.ts`);
   - `@param` for every parameter and `@returns` for every non-void return,
     with a description that says more than the name; a destructured or
     object parameter documents each property (`@param opts.cwd - ...`);
