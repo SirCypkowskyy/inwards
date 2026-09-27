@@ -164,6 +164,57 @@
       "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
     },
     {
+      // The CLI's policy folders do no I/O of their own: files, git, the
+      // environment and the streams come in through platform/contracts.ts,
+      // implemented in adapters/ and wired in main.ts (#176). node:path and
+      // node:crypto stay allowed: path text and hashing are pure.
+      "includes": [
+        "src/cli/src/claude-code/**",
+        "src/cli/src/commands/**",
+        "src/cli/src/init/**",
+        "src/cli/src/json/**",
+        "src/cli/src/paths/**",
+        "src/cli/src/platform/**",
+        "src/cli/src/project/**",
+        "src/cli/src/runlog/**",
+        "src/cli/src/session/**"
+      ],
+      "linter": {
+        "rules": {
+          "nursery": { "noBunModules": "error" },
+          "style": {
+            "noProcessEnv": "error",
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "node:fs": "Read and write through the platform contracts (PathProbe, FileReader, StateFiles, ...), not node:fs.",
+                  "node:fs/promises": "Read and write through the platform contracts, not node:fs/promises.",
+                  "node:child_process": "Run git through the Git contract; nothing else may start a process.",
+                  "node:os": "Take the home directory and platform from the Runtime contract.",
+                  "node:process": "Take the environment, cwd and streams from the Runtime and Streams contracts.",
+                  "fs": "Read and write through the platform contracts, not fs.",
+                  "child_process": "Run git through the Git contract.",
+                  "os": "Take the home directory and platform from the Runtime contract.",
+                  "process": "Take the environment and streams from the Runtime and Streams contracts."
+                }
+              }
+            },
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "Bun": "Bun's APIs belong in src/cli/src/adapters/; take what you need through a contract.",
+                  "process": "Take the environment, cwd and streams from the Runtime and Streams contracts.",
+                  "Deno": "The CLI runs on Bun; take I/O through a contract."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       // The engine's public API: adapters import `@inwards/core` and nothing deeper.
       "includes": ["src/core/src/index.ts"],
       "linter": { "rules": { "performance": { "noBarrelFile": "off" } } }

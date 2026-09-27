@@ -23,6 +23,7 @@ import { terminalPicker } from "./picker.ts";
 import { readRuntime, systemClock } from "./runtime.ts";
 import { nodeStateFiles } from "./state-files.ts";
 import { processStreams } from "./stdio.ts";
+import { parseToml } from "./toml.ts";
 
 /**
  * The platform on the real process: filesystem, git, clock, environment,
@@ -77,6 +78,7 @@ export function compose(): AppDeps {
       files: nodeInitFiles,
       picker: terminalPicker,
       entry: resolve(import.meta.dir, "../main.ts"),
+      toml: parseToml,
     },
   };
 }

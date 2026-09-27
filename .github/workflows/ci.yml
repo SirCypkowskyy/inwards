@@ -41,6 +41,8 @@ jobs:
         run: bun run typecheck
       - name: Fallow (dead code, unused deps, architecture boundaries, duplication)
         run: bun run fallow
+      - name: No import cycles, type imports included (fallow sees runtime ones only)
+        run: bun run check:cycles
       # A full CPython: Ubuntu 26.04's python3 ships its stdlib tests in a separate
       # package, which shrank the corpus from 2,273 files to 626.
       - uses: actions/setup-python@v7

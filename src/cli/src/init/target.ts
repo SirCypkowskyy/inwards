@@ -14,6 +14,8 @@ interface TargetIo {
   probe: Pick<PathProbe, "exists" | "kind" | "isLink">;
   read: Pick<FileReader, "text" | "list">;
   runtime: Pick<Runtime, "cwd">;
+  /** Parses TOML, undefined when it doesn't parse. */
+  toml: (text: string) => unknown;
 }
 
 const PACKAGE_NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/u;
@@ -49,18 +51,24 @@ export function findTarget(io: TargetIo, pkgFlag: string | undefined): Target | 
   if (pkgFlag !== undefined && !isPackageName(pkgFlag)) {
     return `--package ${pkgFlag} is not a Python package name.`;
   }
-  return { path, text, configured: table !== undefined, pkg: pkgFlag ?? projectPackage(text) };
+  return {
+    path,
+    text,
+    configured: table !== undefined,
+    pkg: pkgFlag ?? projectPackage(io.toml, text),
+  };
 }
 
 /**
  * Reads `[project].name` and turns it into the import package the way uv
  * does: lowercase, with runs of `-`, `_` and `.` made one `_`.
  *
+ * @param toml - parses TOML.
  * @param text - the pyproject.toml text.
  * @returns the package, or undefined when there is no usable name.
  */
-function projectPackage(text: string): string | undefined {
-  const doc = parseToml(text);
+function projectPackage(toml: TargetIo["toml"], text: string): string | undefined {
+  const doc = toml(text);
   const project = isRecord(doc) ? doc["project"] : undefined;
   const name = isRecord(project) ? project["name"] : undefined;
   if (typeof name !== "string") {
@@ -68,20 +76,6 @@ function projectPackage(text: string): string | undefined {
   }
   const pkg = name.toLowerCase().replace(NAME_SEPARATORS, "_");
   return isPackageName(pkg) ? pkg : undefined;
-}
-
-/**
- * Parses TOML, returning undefined instead of throwing.
- *
- * @param text - the pyproject.toml text.
- * @returns the document, or undefined when it doesn't parse.
- */
-function parseToml(text: string): unknown {
-  try {
-    return Bun.TOML.parse(text);
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -130,7 +124,7 @@ export function shown(cwd: string, path: string): string {
  * @throws when `src/` is a directory that can't be listed.
  */
 export function sourceRoot(
-  io: Pick<TargetIo, "probe" | "read">,
+  io: Pick<TargetIo, "probe" | "read" | "toml">,
   project: string,
   pkg: string,
   text: string,
@@ -142,17 +136,18 @@ export function sourceRoot(
   if (io.probe.kind(join(project, rel)) === "dir") {
     return ".";
   }
-  return usesUvBuild(text) || holdsPython(io, join(project, "src")) ? "src" : ".";
+  return usesUvBuild(io.toml, text) || holdsPython(io, join(project, "src")) ? "src" : ".";
 }
 
 /**
  * Tells whether pyproject.toml builds with uv_build, as `uv init --package` sets up.
  *
+ * @param toml - parses TOML.
  * @param text - the pyproject.toml text.
  * @returns true for `build-backend = "uv_build"`.
  */
-function usesUvBuild(text: string): boolean {
-  const doc = parseToml(text);
+function usesUvBuild(toml: TargetIo["toml"], text: string): boolean {
+  const doc = toml(text);
   const build = isRecord(doc) ? doc["build-system"] : undefined;
   return isRecord(build) && build["build-backend"] === "uv_build";
 }

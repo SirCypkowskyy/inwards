@@ -100,6 +100,13 @@ export interface InitDeps {
   picker: Picker;
   /** Absolute path of the CLI's `main.ts`, for running Inwards from source under Bun. */
   entry: string;
+  /**
+   * Parses TOML, returning undefined instead of throwing.
+   *
+   * @param text - the TOML text.
+   * @returns the document, or undefined when it doesn't parse.
+   */
+  toml: (text: string) => unknown;
 }
 
 /** Everything an init function is given. */

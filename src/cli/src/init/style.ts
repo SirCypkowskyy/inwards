@@ -108,9 +108,9 @@ async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean):
       2,
     );
   }
-  const target = findTarget(ctx.io, flags.package);
-  if (typeof target === "string") {
-    return print(ctx.io.streams, `inwards init: ${target}`, 2);
+  const target = lookUpTarget(ctx, flags);
+  if (typeof target === "number") {
+    return target;
   }
   if (!target.configured && target.pkg === undefined) {
     return print(ctx.io.streams, noPackage(ctx.io.runtime.cwd, target.path), 2);
@@ -144,9 +144,9 @@ async function styleCommand(
   flags: InitFlags,
   dryRun: boolean,
 ): Promise<number> {
-  const target = findTarget(ctx.io, flags.package);
-  if (typeof target === "string") {
-    return print(ctx.io.streams, `inwards init: ${target}`, 2);
+  const target = lookUpTarget(ctx, flags);
+  if (typeof target === "number") {
+    return target;
   }
   if (target.configured) {
     return print(
@@ -167,7 +167,7 @@ async function styleCommand(
       0,
     );
   }
-  const root = sourceRoot(ctx.io, project, target.pkg, target.text);
+  const root = sourceRoot({ ...ctx.io, toml: ctx.init.toml }, project, target.pkg, target.text);
   const config = withTable(target, style, target.pkg, root);
   if (typeof config === "string") {
     return print(ctx.io.streams, `inwards init: ${config}`, 2);
@@ -289,4 +289,16 @@ function separator(text: string, eol: string): string {
     return "";
   }
   return text.endsWith(eol) ? eol : `${eol}${eol}`;
+}
+
+/**
+ * Finds the project init works on, or says why there is none.
+ *
+ * @param ctx - the platform and init's TOML parser.
+ * @param flags - `--package`.
+ * @returns the target, or exit code 2 once the reason is printed.
+ */
+function lookUpTarget(ctx: InitContext, flags: InitFlags): Target | number {
+  const target = findTarget({ ...ctx.io, toml: ctx.init.toml }, flags.package);
+  return typeof target === "string" ? print(ctx.io.streams, `inwards init: ${target}`, 2) : target;
 }

@@ -14,6 +14,7 @@
     "test": "bun test",
     "lint:docs": "oxlint --config .oxlintrc.jsonc --deny-warnings",
     "fallow": "fallow dead-code && fallow dupes",
+    "check:cycles": "bun run scripts/check-import-cycles.ts",
     "build:cli": "bun run scripts/build-binaries.ts",
     "check:self": "bun run src/cli/src/main.ts check examples/clean-app"
   },
