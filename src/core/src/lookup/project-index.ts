@@ -25,6 +25,9 @@ const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 /** Reads the imports of one file; the engine supplies it, so this module needs no parser. */
 type ImportReader = (file: SourceFile) => readonly ImportRef[];
 
+/** Reads the names a file binds at its top level; the engine supplies it too. */
+type BindingReader = (file: SourceFile) => ReadonlySet<string>;
+
 /** A listed Python file, before its text is read. */
 type Listed = Omit<SourceFile, "text">;
 
@@ -79,6 +82,8 @@ export class ProjectIndex {
   readonly listDir: ListDir;
   private readonly source: ProjectFiles;
   private readonly readImports: ImportReader;
+  private readonly readBindings: BindingReader | undefined;
+  private readonly bindings = new Map<string, ReadonlySet<string>>();
   private listed: readonly Listed[] | undefined;
   private names: ReadonlySet<string> | undefined;
   private readonly imports = new Map<string, readonly ImportRef[]>();
@@ -92,10 +97,12 @@ export class ProjectIndex {
    *
    * @param source - the adapter's listing, probe and reader, rooted at the config root.
    * @param readImports - reads one file's imports (skeleton first, full parse as fallback).
+   * @param readBindings - reads the names one file binds at its top level (full parse), for `exposes`.
    */
-  constructor(source: ProjectFiles, readImports: ImportReader) {
+  constructor(source: ProjectFiles, readImports: ImportReader, readBindings?: BindingReader) {
     this.source = source;
     this.readImports = readImports;
+    this.readBindings = readBindings;
     this.listDir = source.listDir;
     // Imports share prefixes, so each path is probed once: INW010 asks for every import.
     // A long-lived adapter must rebuild the index when a path that could be a module is
@@ -174,38 +181,39 @@ export class ProjectIndex {
   }
 
   /**
-   * Tells whether a module defines a name at its top level (`def`, `class`,
-   * an assignment) or imports it, so other code can import the name from
-   * there: INW003's fix names the public module that does. Aliased imports
-   * (`as`) and `__all__` aren't followed. Reads the module once.
+   * Tells whether a module binds a name at its top level (a `def`, a
+   * `class`, an assignment with a value, or an import, under its `as` name),
+   * so other code can import the name from it: INW003's fix names the public
+   * module that does. Reads the module's full syntax tree once, through the
+   * engine's reader; without one, nothing is exposed.
    *
    * @param module - a dotted module name.
    * @param name - an identifier, e.g. `Discount`.
-   * @returns true when the module's file defines or imports the name.
+   * @returns true when the module's file binds the name.
    */
   exposes(module: string, name: string): boolean {
-    const file = IDENTIFIER.test(name) ? this.fileOf(module) : undefined;
-    if (file === undefined) {
+    const file = this.readBindings && IDENTIFIER.test(name) ? this.fileOf(module) : undefined;
+    if (file === undefined || this.readBindings === undefined) {
       return false;
     }
-    const defines = new RegExp(
-      `^(?:(?:async[ \\t]+)?def|class)[ \\t]+${name}\\b|^${name}[ \\t]*(?::|=(?!=))`,
-      "mu",
-    );
-    return (
-      defines.test(this.text(file)) || this.importsOf(file).some((ref) => bindsName(ref, name))
-    );
+    let names = this.bindings.get(file.path);
+    if (names === undefined) {
+      names = this.readBindings({ ...file, text: this.text(file) });
+      this.bindings.set(file.path, names);
+    }
+    return names.has(name);
   }
 
   /**
-   * Finds a module's file on disk: `a/b.py`, else `a/b/__init__.py`.
+   * Finds a module's file on disk: `a/b.py`, `a/b/__init__.py`, then their
+   * `.pyi` stubs, which describe the same names.
    *
    * @param module - a dotted module name.
    * @returns the file, text not yet read, or undefined when neither exists.
    */
   private fileOf(module: string): Listed | undefined {
     const base = module.split(".").join("/");
-    const path = [`${base}.py`, `${base}/__init__.py`].find(
+    const path = [`${base}.py`, `${base}/__init__.py`, `${base}.pyi`, `${base}/__init__.pyi`].find(
       (candidate) => this.source.kind(candidate) === "file",
     );
     return path === undefined ? undefined : { path, ...moduleNameFor(path) };
@@ -284,18 +292,4 @@ export class ProjectIndex {
     }
     return refs;
   }
-}
-
-/**
- * Tells whether an import binds a name in the importing module: `from X
- * import name` and `import name` do, unless `as` renames it.
- *
- * @param ref - one import of the module.
- * @param name - an identifier.
- * @returns true when the import makes `name` importable from the module.
- */
-function bindsName(ref: ImportRef, name: string): boolean {
-  const bound = ref.from === undefined ? name : `${ref.from}.${name}`;
-  const renamed = new RegExp(`\\b${name}[ \\t]+as\\b`, "u");
-  return ref.target === bound && !renamed.test(ref.statement);
 }

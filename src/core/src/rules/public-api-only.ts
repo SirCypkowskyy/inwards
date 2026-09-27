@@ -38,22 +38,24 @@ interface Breach {
  *
  * @param file - the file the imports come from.
  * @param imports - its imports, relative ones already resolved.
- * @param contexts - the configured contexts; none means nothing to check.
  * @param project - finds the module a name lives in, and what a module exposes.
+ * @param rule - the configured contexts, and whether INW002 is on.
+ * @param rule.contexts - the configured contexts; none means nothing to check.
+ * @param rule.defer - true when INW002 is on, so an undeclared dependency is left to it.
  * @returns one diagnostic per import past another context's public modules.
  */
 export function checkPublicApi(
   file: SourceFile,
   imports: readonly ImportRef[],
-  contexts: readonly ContextSpec[],
   project: PublicLookup,
+  { contexts, defer }: { contexts: readonly ContextSpec[]; defer: boolean },
 ): Diagnostic[] {
   if (contexts.length === 0) {
     return [];
   }
   const source = contextOf(file.module, contexts);
   return imports.flatMap((ref) => {
-    const breach = breachOf(ref, source, contexts, project.ownerOf);
+    const breach = breachOf(ref, { source, contexts, defer }, project.ownerOf);
     if (breach === undefined) {
       return [];
     }
@@ -67,15 +69,20 @@ export function checkPublicApi(
  * Decides whether one import stops short of a context's public modules.
  *
  * @param ref - the import.
- * @param source - the importing file's context, if any.
- * @param contexts - the configured contexts.
+ * @param where - the importing file's context, all contexts, and whether INW002 is on.
+ * @param where.source - the importing file's context, if any.
+ * @param where.contexts - the configured contexts.
+ * @param where.defer - true to leave an undeclared dependency to INW002.
  * @param ownerOf - finds the module an imported name lives in.
  * @returns the breach, or undefined when the import is fine or INW002's to report.
  */
 function breachOf(
   ref: ImportRef,
-  source: ContextSpec | undefined,
-  contexts: readonly ContextSpec[],
+  {
+    source,
+    contexts,
+    defer,
+  }: { source: ContextSpec | undefined; contexts: readonly ContextSpec[]; defer: boolean },
   ownerOf: ModuleLookup,
 ): Breach | undefined {
   if (ref.target === "") {
@@ -87,7 +94,7 @@ function breachOf(
   if (target === undefined || target === source) {
     return undefined;
   }
-  if (source !== undefined && !source.dependsOn.includes(target.name)) {
+  if (defer && source !== undefined && !source.dependsOn.includes(target.name)) {
     return undefined; // INW002: the dependency itself isn't declared
   }
   const open = target.public.some((prefix) => module === prefix || module.startsWith(`${prefix}.`));
@@ -110,9 +117,15 @@ function fixFor(breach: Breach, project: PublicLookup): Diagnostic["fix"] {
   const keep =
     "Do not reach the module another way (through a function-level import, TYPE_CHECKING or importlib); Inwards checks those too.";
   if (home !== undefined) {
+    // Only a statement that imports this one name, unrenamed, can be swapped whole.
+    const single = new RegExp(`^from\\s+[\\w.]+\\s+import\\s+${name}$`, "u");
+    const alone = single.test(ref.statement.trim());
+    const swap = alone
+      ? `Replace \`${ref.statement}\` with \`from ${home} import ${name}\`.`
+      : `In \`${ref.statement}\`, import \`${name}\` from \`${home}\` instead: move it to its own \`from ${home} import ${name}\`, keeping its \`as\` name if it has one, and leave the other names where they are.`;
     return {
       summary: `Import "${name}" from "${home}", the public module of "${target.name}" that exposes it.`,
-      steps: [`Replace \`${ref.statement}\` with \`from ${home} import ${name}\`.`, keep],
+      steps: [swap, keep],
     };
   }
   if (target.public.length === 0) {

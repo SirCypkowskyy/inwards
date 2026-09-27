@@ -7,9 +7,8 @@
  */
 import type { Parser } from "web-tree-sitter";
 import { acceptedModules } from "../baseline/accepted.ts";
-import { contextOf } from "../config/contexts.ts";
 import type { InwardsConfig } from "../config/parse.ts";
-import { applyRules } from "../config/rule-settings.ts";
+import { applyRules, ruleLevel } from "../config/rule-settings.ts";
 import type {
   Diagnostic,
   ExtractionCache,
@@ -19,6 +18,7 @@ import type {
   SuppressionComment,
 } from "../contracts/records.ts";
 import { type ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
+import { topLevelBindings } from "../python/bindings.ts";
 import {
   createPythonParser,
   type GrammarBinaries,
@@ -126,9 +126,11 @@ export class Engine {
    * whose text names a loader (`mentionsDynamicImport`) skips the skeleton and
    * gets the full parse, which also looks for dynamic imports (INW011).
    *
-   * A file outside every layer and every context isn't parsed: besides its
-   * shape, it gets at most an INW006 warning naming its package. A file a
-   * context owns but no layer does gets that warning and the context rules.
+   * A file outside every layer isn't parsed unless contexts are declared:
+   * besides its shape, it gets at most an INW006 warning naming its package.
+   * With contexts, every file is parsed, since any of them may import a
+   * context (INW002, INW003); outside the layers it gets that warning and
+   * the context rules.
    *
    * Inline suppression comments then hide the findings they cover and add
    * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).
@@ -154,7 +156,7 @@ export class Engine {
    */
   private scan(src: SourceFile, project: ProjectIndex): Scan {
     const layered = this.layered(src);
-    if (!(layered || this.inContext(src))) {
+    if (!(layered || this.config.contexts)) {
       const warning = unassignedWarning(src, this.config);
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
@@ -182,15 +184,14 @@ export class Engine {
   }
 
   /**
-   * Tells whether a bounded context owns a file, so INW002 checks its imports
-   * even when no layer owns it.
+   * Tells whether INW002 reports undeclared dependencies, so INW003 leaves
+   * them alone; with INW002 off, INW003 still holds such imports to the
+   * public modules.
    *
-   * @param src - the source file.
-   * @returns true when one of the configured contexts owns its module.
+   * @returns true unless `[tool.inwards.rules]` turns INW002 off.
    */
-  private inContext(src: SourceFile): boolean {
-    const { contexts } = this.config;
-    return contexts !== undefined && contextOf(src.module, contexts) !== undefined;
+  private defersToInw002(): boolean {
+    return ruleLevel("INW002", this.config.rules) !== "off";
   }
 
   /**
@@ -259,7 +260,7 @@ export class Engine {
     const { layers, contexts = [] } = this.config;
     const across = [
       ...checkContextDependencies(file, imports, contexts, project.ownerOf),
-      ...checkPublicApi(file, imports, contexts, project),
+      ...checkPublicApi(file, imports, project, { contexts, defer: this.defersToInw002() }),
     ];
     if (!this.layered(file)) {
       const warning = unassignedWarning(file, this.config);
@@ -309,7 +310,7 @@ export class Engine {
       const { contexts = [] } = this.config;
       found.push(
         ...checkContextDependencies(file, readable, contexts, project.ownerOf),
-        ...checkPublicApi(file, readable, contexts, project),
+        ...checkPublicApi(file, readable, project, { contexts, defer: this.defersToInw002() }),
       );
       if (this.layered(file)) {
         found.push(
@@ -334,10 +335,21 @@ export class Engine {
    * @returns a lazy index that lists and reads only when a rule asks.
    */
   index(files: ProjectFiles): ProjectIndex {
-    return new ProjectIndex(files, (file) => {
-      const src = { ...file, text: normalizeSource(file.text) };
-      return this.extractor.skeleton(src) ?? this.extractor.full(src).imports;
-    });
+    return new ProjectIndex(
+      files,
+      (file) => {
+        const src = { ...file, text: normalizeSource(file.text) };
+        return this.extractor.skeleton(src) ?? this.extractor.full(src).imports;
+      },
+      (file) => {
+        const tree = parsePython(this.parser, normalizeSource(file.text));
+        try {
+          return topLevelBindings(tree);
+        } finally {
+          tree.delete(); // WASM memory is not garbage collected
+        }
+      },
+    );
   }
 
   /**

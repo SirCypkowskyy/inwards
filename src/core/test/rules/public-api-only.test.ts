@@ -86,6 +86,51 @@ describe("which imports stay inside the public modules", () => {
   });
 });
 
+describe("what else counts", () => {
+  test("a caller outside every layer and every context is held to them too", async () => {
+    const { check }: ContextFixture = await contextFixture(API_ONLY);
+    const text =
+      'import shop.billing.domain.invoice\nimport importlib\nimportlib.import_module("shop.billing.app.charge")\n';
+    expect(codes(check("shop/main.py", text))).toEqual(["INW006", "INW003", "INW003"]);
+  });
+
+  test("with INW002 off, an undeclared dependency still gets INW003", async () => {
+    const { check }: ContextFixture = await contextFixture({
+      ...API_ONLY,
+      toml: '\n[tool.inwards.rules]\nignore = ["INW002"]\n',
+    });
+    expect(
+      codes(check("shop/shipping/app/ship.py", "import shop.billing.domain.invoice\n")),
+    ).toEqual(["INW003"]);
+  });
+
+  test("a parent context's public prefix doesn't open a nested context", async () => {
+    const { check }: ContextFixture = await contextFixture({
+      public: { billing: ["shop.billing"] },
+      dependsOn: { orders: ["tax"] },
+    });
+    expect(codes(check(PLACE, "from shop.billing.domain import invoice\n"))).toEqual([]);
+    expect(codes(check(PLACE, "from shop.billing.tax import rates\n"))).toEqual(["INW003"]);
+  });
+
+  test("a name with no module on disk is judged by its spelling", async () => {
+    const { check }: ContextFixture = await contextFixture({
+      dependsOn: { orders: ["vendor"] },
+      toml: '\n[[tool.inwards.contexts]]\nname = "vendor"\nmodules = ["plugins.vendor"]\n',
+    });
+    expect(codes(check(PLACE, "import plugins.vendor.sdk\n"))).toContain("INW003");
+  });
+
+  test("a dynamic import from a file in a context but in no layer", async () => {
+    const { check }: ContextFixture = await contextFixture({
+      ...API_ONLY,
+      dependsOn: { shipping: ["billing"] },
+    });
+    const text = 'import importlib\nimportlib.import_module("shop.billing.domain.invoice")\n';
+    expect(codes(check("shop/shipping/api.py", text))).toEqual(["INW006", "INW003"]);
+  });
+});
+
 describe("the fix", () => {
   const texts = new Map([
     [
@@ -113,6 +158,18 @@ describe("the fix", () => {
     );
     expect(summary("from shop.billing.app.charge import total\n")).toContain('"shop.billing.api"');
     expect(summary("from shop.billing.app.charge import RATE\n")).toContain('"shop.billing.api"');
+  });
+
+  test("keeps an alias and the other names of the statement", async () => {
+    const { check }: ContextFixture = await contextFixture({ ...OPEN, texts });
+    for (const text of [
+      "from shop.billing.app.charge import refund as credit\n",
+      "from shop.billing.app.charge import refund, other\n",
+    ]) {
+      const [step] = check(PLACE, text)[0]?.fix.steps ?? [];
+      expect(step).toContain("keeping its `as` name if it has one");
+      expect(step).toStartWith("In `from shop.billing.app.charge import refund");
+    }
   });
 
   test("lists the public modules when none exposes the name", async () => {
