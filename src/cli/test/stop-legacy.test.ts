@@ -225,12 +225,17 @@ describe("violations the hooks still block, and what they never run", () => {
   test("a smudge filter or fsmonitor the agent planted in git's config never runs", () => {
     const root = seeded("seeded-function-import");
     const marker = join(root, "MARKER");
-    const run = `"sh -c 'echo pwned > ${marker}; cat'"`;
+    // Forward slashes: in a git config value a backslash starts an escape, and
+    // Windows' `D:\a\...` would make the whole file unreadable to git.
+    const run = `"sh -c 'echo pwned > ${marker.replaceAll("\\", "/")}; cat'"`;
     writeFileSync(join(root, ".gitattributes"), "*.py filter=pwn\n");
     appendFileSync(
       join(root, ".git/config"),
       `[filter "pwn"]\n\tsmudge = ${run}\n\tprocess = ${run}\n[core]\n\tfsmonitor = ${run}\n`,
     );
+    // The planted commands are live: git reads the config, so a pass isn't a broken fixture.
+    const planted = Bun.spawnSync(["git", "config", "--get", "filter.pwn.smudge"], { cwd: root });
+    expect(planted.stdout.toString()).toContain("echo pwned");
     // Excused where the start blob can be read safely, blocked (the fallback) where it can't.
     const code = NO_LAZY_FETCH ? 0 : 2;
     expect(agentEdits(root, ORDER, EUROS).code).toBe(code);

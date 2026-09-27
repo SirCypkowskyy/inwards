@@ -32,6 +32,21 @@ test("SARIF artifact URIs use forward slashes on every OS", () => {
   expect(uri).toEqual({ uri: "shop/domain/deep/order.py", uriBaseId: "%SRCROOT%" });
 });
 
+test("--config through a link to the project names files from the real cwd (macOS /var)", () => {
+  const real = project({
+    "pyproject.toml": LAYERS.replace('"shop.domain"', '"shop.domain", "shop.gone"'),
+    "shop/domain/order.py": "import shop.infrastructure.db\n",
+    "shop/infrastructure/db.py": "",
+  });
+  const link = `${real}-link`;
+  symlinkSync(real, link);
+  // The CLI's cwd is always real; the config path keeps the link as written.
+  const config = join(link, "pyproject.toml");
+  const { stdout } = inwards(["check", "--format", "json", "--config", config], { cwd: real });
+  const files = JSON.parse(stdout).diagnostics.map((d: { file: string }) => d.file);
+  expect(files).toEqual(["pyproject.toml", "shop/domain/order.py"]);
+});
+
 test("a symlinked alias of a layer can't hide its violations", () => {
   const root = project({
     "pyproject.toml": LAYERS,

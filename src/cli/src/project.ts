@@ -95,17 +95,19 @@ export function layerDirs(configPath: string, config: InwardsConfig): string[] {
  * Files outside the config root are dropped: they have no module name in the
  * project. A file reached through an alias and through its real path gets one
  * entry per distinct (module, real file), so it is never reported twice.
+ * Each is shown under the config root as `view` spells it, whichever name
+ * found it.
  *
  * @param project - the loaded project.
  * @param targets - absolute files or directories; undefined means the config root.
- * @param base - directory that report paths are made relative to.
+ * @param view - where report paths start from, and the root's spelling (`viewFrom`).
  * @param texts - content to check instead of what is on disk, by absolute path.
  * @returns the source files, with forward-slash paths on every OS.
  */
 function loadSources(
   project: Project,
   targets: string[] | undefined,
-  base: string,
+  view: View,
   texts?: ReadonlyMap<string, string>,
 ): SourceFile[] {
   const { lexicalRoot, realRoot } = project;
@@ -114,17 +116,50 @@ function loadSources(
   for (const abs of collectPythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
     const text = texts?.get(abs) ?? readFileSync(abs, "utf8");
     const real = realpath(abs) ?? abs;
-    for (const { rel, shown } of moduleNames(abs, lexicalRoot, realRoot)) {
+    for (const rel of moduleNames(abs, lexicalRoot, realRoot)) {
       const named = moduleNameFor(rel);
       // Keyed on the real file too: order.py and order.pyi are one module, two files.
       const key = `${named.module}\u0000${real}`;
       if (!seen.has(key)) {
         seen.add(key);
-        files.push({ path: posix(relative(base, shown)), text, ...named });
+        files.push({ path: posix(relative(view.from, join(view.root, rel))), text, ...named });
       }
     }
   }
   return files;
+}
+
+/** Where report paths start from, and how they spell the config root and the config. */
+interface View {
+  from: string;
+  root: string;
+  config: string;
+}
+
+/**
+ * Picks one spelling of the config root for every path in a report, the one
+ * the base is written in. On macOS `/var` and `/tmp` are links into
+ * `/private`, so the hook's cwd as written (`/var/...`) and the real root
+ * (`/private/var/...`) name the same directory, and a path relative to one
+ * in the other's spelling reads `../../private/var/...`. A file is shown as
+ * the root in the base's spelling plus its root-relative path, which keeps a
+ * symlinked alias below the root as written. A base below neither spelling
+ * (the CLI's cwd is always real) is compared on real paths.
+ *
+ * @param project - the loaded project.
+ * @param base - directory that report paths are made relative to.
+ * @returns the directory paths start from, and the root and config to name files under.
+ */
+function viewFrom(project: Project, base: string): View {
+  const { lexicalRoot, realRoot, configPath } = project;
+  if (base === lexicalRoot || isInside(lexicalRoot, base)) {
+    return { from: base, root: lexicalRoot, config: configPath };
+  }
+  const config = realpath(configPath) ?? configPath;
+  if (base === realRoot || isInside(realRoot, base)) {
+    return { from: base, root: realRoot, config };
+  }
+  return { from: realpath(base) ?? base, root: realRoot, config };
 }
 
 /**
@@ -183,15 +218,16 @@ export async function runCheck(
 ): Promise<Report> {
   const started = performance.now();
   const project = await openProject(configPath);
-  const files = loadSources(project, targets, base, texts);
+  const view = viewFrom(project, base);
+  const files = loadSources(project, targets, view, texts);
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(configPath, project.config.rules) : undefined;
   const index = project.engine.index(projectFiles(project));
   const { diagnostics, suppressed } = project.engine.check(files, index, accepted);
-  const shownRoot = posix(relative(base, project.lexicalRoot));
+  const shownRoot = posix(relative(view.from, view.root));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
-    const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
+    const pyproject = { path: posix(relative(view.from, view.config)), text: project.configText };
     const paths = files.map(rootPathOf);
     const packages = packagesOf(paths);
     diagnostics.unshift(
@@ -268,22 +304,18 @@ export async function indexProject(configPath: string): Promise<ProjectIndex> {
  * @param abs - the file as found.
  * @param lexicalRoot - the config root as written.
  * @param realRoot - the config root with symlinks resolved.
- * @returns each name as a root-relative path, with the path to show for it.
+ * @returns each name as a root-relative path.
  */
-function moduleNames(
-  abs: string,
-  lexicalRoot: string,
-  realRoot: string,
-): { rel: string; shown: string }[] {
-  const names: { rel: string; shown: string }[] = [];
+function moduleNames(abs: string, lexicalRoot: string, realRoot: string): string[] {
+  const names: string[] = [];
   if (isInside(lexicalRoot, abs)) {
-    names.push({ rel: relative(lexicalRoot, abs), shown: abs });
+    names.push(relative(lexicalRoot, abs));
   }
   const real = realpath(abs);
   if (real !== undefined && isInside(realRoot, real)) {
     const rel = relative(realRoot, real);
-    if (!names.some((n) => n.rel === rel)) {
-      names.push({ rel, shown: real });
+    if (!names.includes(rel)) {
+      names.push(rel);
     }
   }
   return names;

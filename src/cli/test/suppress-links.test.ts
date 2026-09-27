@@ -139,5 +139,18 @@ describe.skipIf(!NO_LAZY_FETCH || process.platform === "win32")(
       expect(postedFrom(root, link, join(link, LEGACY)).code).toBe(0);
       expect(stop(root).code).toBe(0);
     });
+
+    test("through a link to the root, the notes name files from the project, not ../../private/var", () => {
+      const root = session({ [LEGACY]: "import shop.infrastructure.db\n" });
+      const link = `${root}-link`;
+      symlinkSync(root, link);
+      symlinkSync("legacy.py", join(root, "shop/domain/alias.py"));
+      // The payload's cwd is the path as written; the hook's own cwd is the real one.
+      const edit = postedFrom(link, link, join(link, "shop/domain/alias.py"));
+      expect(edit.code).toBe(2);
+      expect(edit.stderr).toContain("\n- shop/domain/legacy.py:1 INW001");
+      expect(edit.stderr).toContain('"file":"shop/domain/alias.py"');
+      expect(edit.stderr).not.toContain("../");
+    });
   },
 );

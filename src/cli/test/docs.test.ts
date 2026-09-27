@@ -70,16 +70,20 @@ function script(markdown: string): string {
         const mkdir = `mkdir -p -- "$(dirname -- '${fence.file}')"`;
         return `${mkdir}\ncat > '${fence.file}' <<'E2E_EOF'\n${fence.body}\nE2E_EOF`;
       }
+      // Text goes into $(...) only through a function: bash 3.2 (macOS /bin/bash)
+      // matches quotes inside $(...) across a heredoc body, so the apostrophe in
+      // a documented "Don't" there ends the script with "unexpected EOF".
       if (fence.lang === "sh" && isOutput(all[i + 1])) {
         // The exit code is free; the documented output below must appear in full.
-        return `E2E_OUT=$( { ${fence.body}\n} 2>&1 ) || true`;
+        return `e2e_run() {\n${fence.body}\n}\nE2E_OUT=$(e2e_run 2>&1) || true`;
       }
       if (fence.lang === "sh") {
         return fence.body;
       }
       if (isOutput(fence) && all[i - 1]?.lang === "sh") {
         return [
-          `E2E_WANT=$(cat <<'E2E_EOF'\n${fence.body}\nE2E_EOF\n)`,
+          `e2e_want() {\ncat <<'E2E_EOF'\n${fence.body}\nE2E_EOF\n}`,
+          "E2E_WANT=$(e2e_want)",
           `[[ "$E2E_OUT" == *"$E2E_WANT"* ]] || { printf 'documented output not in:\\n%s\\n' "$E2E_OUT" >&2; exit 1; }`,
         ].join("\n");
       }
