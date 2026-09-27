@@ -171,11 +171,16 @@ async function listen(stdout: ReadableStream<Uint8Array>, log: Log): Promise<voi
  * bundled server (built once), and what its servers send. Each test file
  * makes its own, since Bun shares modules between the files it runs.
  *
+ * @param shipped - run this built server with this runtime instead of
+ *   bundling one, to test the package as it ships.
+ * @param shipped.server - the built `dist/server.js`.
+ * @param shipped.runtime - the executable that runs it (Node, as VS Code does).
  * @returns the harness; call `cleanup` in `afterAll`.
  */
-export function lspHarness(): Harness {
+export function lspHarness(shipped?: { server: string; runtime: string }): Harness {
   const tmp = mkdtempSync(join(tmpdir(), "inwards-lsp-"));
-  const bundled = bundle(tmp);
+  const bundled = shipped === undefined ? bundle(tmp) : Promise.resolve(shipped.server);
+  const runtime = shipped?.runtime ?? process.execPath;
   const log: Log = {
     published: new Map(),
     publishes: new Map(),
@@ -197,7 +202,7 @@ export function lspHarness(): Harness {
     id: number,
     capabilities: Record<string, unknown>,
   ): Promise<Server> {
-    const server = Bun.spawn([process.execPath, await bundled, "--stdio"], {
+    const server = Bun.spawn([runtime, await bundled, "--stdio"], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "ignore",
