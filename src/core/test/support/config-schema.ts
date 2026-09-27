@@ -99,17 +99,31 @@ export function parserError(text: string): string | undefined {
 }
 
 /**
+ * Tells whether a parsed TOML value is a table (not an array).
+ *
+ * @param value - any parsed value.
+ * @returns true for a table.
+ */
+function isTable(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && !Array.isArray(value);
+}
+
+/**
  * Merges a fragment's `[tool.inwards]` keys into the minimal config.
  *
  * @param fragment - TOML that sets some keys of `[tool.inwards]`.
  * @returns the complete config's text.
- * @throws {Error} when the fragment isn't valid TOML.
+ * @throws {Error} when the fragment isn't valid TOML, or its `tool` or
+ *   `tool.inwards` isn't a table: merging would silently repair it.
  */
 export function merged(fragment: string): string {
   const base = parse(MINIMAL);
   const extra = parse(fragment);
   const baseTool = isRecord(base["tool"]) ? base["tool"] : {};
-  const extraTool = isRecord(extra["tool"]) ? extra["tool"] : {};
+  if (!(isTable(extra["tool"]) && isTable(extra["tool"]["inwards"] ?? {}))) {
+    throw new Error("tool and tool.inwards must be tables");
+  }
+  const extraTool = extra["tool"];
   const inwards = {
     ...(isRecord(baseTool["inwards"]) ? baseTool["inwards"] : {}),
     ...(isRecord(extraTool["inwards"]) ? extraTool["inwards"] : {}),

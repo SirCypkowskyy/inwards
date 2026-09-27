@@ -96,6 +96,27 @@ describe("checking a page", () => {
     expect(snippetProblems("p", page("[tool.ruff]\nx = 1", "fragment"))).not.toEqual([]);
   });
 
+  test("a fence inside a blockquote is checked", () => {
+    const quoted = "> ```toml\n> [tool.inwards]\n> layers = []\n> ```\n";
+    expect(snippetProblems("p", `# Page\n\n${quoted}`)).not.toEqual([]);
+  });
+
+  test("unparsable TOML that mentions inwards needs a marker", () => {
+    expect(snippetProblems("p", page('["tool".inwards]\nlayers = ['))).not.toEqual([]);
+  });
+
+  test("a fragment whose table isn't a table fails instead of being repaired", () => {
+    expect(snippetProblems("p", page("[tool]\ninwards = 3", "fragment"))).not.toEqual([]);
+  });
+
+  test("an invalid example's key must match exactly", () => {
+    const typo = '[tool.inwards]\nstop-gate = "changed"\nstop-gate-typo = true';
+    expect(snippetProblems("p", page(typo, "invalid tool.inwards.stop-gate"))).not.toEqual([]);
+    expect(snippetProblems("p", page(typo, "invalid tool.inwards.stop-gate-typo"))).toEqual([]);
+    // "Known keys: ..." lists stop-gate too; it must not count.
+    expect(snippetProblems("p", page(typo, "invalid tool.inwards"))).not.toEqual([]);
+  });
+
   test("a marker not one blank line before a fence is a problem", () => {
     const markdown = `<!-- config: fragment -->\nText.\n\n${page(`[tool.inwards]\n${LAYERS}`)}`;
     expect(snippetProblems("p", markdown)).not.toEqual([]);

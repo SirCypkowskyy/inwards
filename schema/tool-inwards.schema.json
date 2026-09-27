@@ -118,7 +118,7 @@
     "memberPattern": {
       "description": "A member pattern: a name or fnmatch glob (*, ?, [seq], [!seq]), optionally ending in .py or /. Inwards also rejects a reversed range such as [z-a].",
       "type": "string",
-      "pattern": "^(\\[!?\\]?[^\\]/.]*\\]|[^/.\\[])+(\\.py|/)?$"
+      "pattern": "^(?:\\[(?:!(?:\\][^\\]/.]*|[^\\]/.][^\\]/.]*)|\\][^\\]/.]*|[^\\]/.!][^\\]/.]*)\\]|[^/.\\[])+(\\.py|/)?$"
     },
     "libraryList": {
       "type": "array",

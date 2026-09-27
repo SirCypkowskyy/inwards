@@ -19,8 +19,12 @@ const MARKER_LINE = /^\s*<!--\s*config\s*:\s*(?<rest>[^>]*?)\s*-->\s*$/u;
 const MARKER_ANYWHERE = /<!--\s*config\s*:/gu;
 /** Runs of whitespace, between words of an info string or a marker. */
 const WHITESPACE = /\s+/u;
-/** A spelling of the table's name in text TOML can't parse. */
-const TABLE_TEXT = /\btool\s*\.\s*inwards\b|["']tool["']\s*\.\s*["']inwards["']/u;
+/** Mentions Inwards at all: an unparsable TOML fence that does needs a marker. */
+const MENTIONS_INWARDS = /inwards/iu;
+/** Blockquote markers at the start of a line, which fences may sit inside. */
+const QUOTE_PREFIX = /^\s*(?:>\s?)+/u;
+/** The first config key a parser error names, e.g. `tool.inwards.contexts[0].name`. */
+const ERROR_KEY = /tool\.inwards(?:\.[\w-]+|\[\d+\])*/u;
 
 /** One fenced code block. */
 export interface Fence {
@@ -41,7 +45,8 @@ export interface Fence {
  * @returns the fences, in page order.
  */
 export function fences(markdown: string): Fence[] {
-  const lines = markdown.split("\n");
+  // A fence inside a blockquote is read as if the quote markers weren't there.
+  const lines = markdown.split("\n").map((line) => line.replace(QUOTE_PREFIX, ""));
   const found: Fence[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const open = OPEN.exec(lines[i] ?? "")?.groups;
@@ -109,18 +114,19 @@ function dedent(lines: readonly string[], indent: number): string {
 }
 
 /**
- * Tells whether a TOML snippet is about Inwards' config, from its parsed
- * table when it parses, else from the text.
+ * Tells whether a TOML snippet is about Inwards' config: from its parsed
+ * table when it parses, and, when it doesn't, whenever it mentions Inwards at
+ * all, so no spelling of a broken header can slip past unclassified.
  *
  * @param body - the fence's TOML.
- * @returns true when it holds `[tool.inwards]` in any spelling.
+ * @returns true when it holds `[tool.inwards]` in any spelling, or can't be read and mentions Inwards.
  */
 export function isInwardsSnippet(body: string): boolean {
   try {
     const doc = parse(body);
     return isRecord(doc["tool"]) && doc["tool"]["inwards"] !== undefined;
   } catch {
-    return TABLE_TEXT.test(body);
+    return MENTIONS_INWARDS.test(body);
   }
 }
 
@@ -185,7 +191,9 @@ function fenceProblems(where: string, body: string, marker: string | undefined):
 }
 
 /**
- * Checks an example marked invalid: the parser must fail, naming its key.
+ * Checks an example marked invalid: the parser must fail, and the first key
+ * its error names must be exactly the marker's key, so a longer key with the
+ * same start, or one in the list of known keys, doesn't count.
  *
  * @param where - the page and line, for messages.
  * @param config - the example merged into the minimal config.
@@ -198,7 +206,7 @@ function invalidProblems(where: string, config: string, args: readonly string[])
     return [`${where}: an invalid example must name the one key its error names`];
   }
   const error = parserError(config);
-  if (error?.includes(key) === true) {
+  if (error !== undefined && ERROR_KEY.exec(error)?.[0] === key) {
     return [];
   }
   return [
