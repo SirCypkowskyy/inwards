@@ -5,18 +5,38 @@ Claude Code expands on load; Codex, Cursor and other agents read this file
 directly. Never add content to `CLAUDE.md`.
 
 Architecture linter for Python, written in TypeScript on Bun, in three
-packages that depend one way, onto the engine:
+packages that depend one way, onto the engine (chapter 3 of the docs has the
+pictures). Each package has its own guide, which adds to this one: read it
+before working there. Its `CLAUDE.md` holds only `@AGENTS.md`, so Claude Code
+loads the package guide when it works in that folder; this root file doesn't
+import them.
 
 - `src/core`: the engine. Pure, no I/O; everything outside comes through
   ports (`GrammarBinaries`, `ProjectFiles`, `ListDir`), and adapters import
-  `@inwards/core` (its `index.ts`) only. It is organised in feature folders,
-  one per rule under `rules/` (#176). Read
-  [`src/core/AGENTS.md`](src/core/AGENTS.md) before working there.
-- `src/cli`: the command line and the Claude Code hook adapter, organised
-  in feature folders with the I/O behind contracts (#176). Read
-  [`src/cli/AGENTS.md`](src/cli/AGENTS.md) before working there: it says
-  what each folder owns, who may import whom, and where new code goes.
-- `src/vscode-extension`: the editor adapter (LSP client and server).
+  `@inwards/core` (its `index.ts`) only. Feature folders, one module or
+  folder per rule under `rules/`. Guide:
+  [`src/core/AGENTS.md`](src/core/AGENTS.md).
+- `src/cli`: the command line and the Claude Code hook adapter. Feature
+  folders with the I/O behind contracts, wired in `main.ts`. Guide:
+  [`src/cli/AGENTS.md`](src/cli/AGENTS.md).
+- `src/vscode-extension`: the editor adapter, a VS Code client and a
+  language server in separate folders. Guide:
+  [`src/vscode-extension/AGENTS.md`](src/vscode-extension/AGENTS.md).
+
+Where to start:
+
+- **A new rule or config key**: `src/core/AGENTS.md`, "Where new code goes";
+  the rule's docs page goes in `docs/chapters/rules/` and `docs/pl/rules/`.
+- **A new hook event or CLI command**: `src/cli/AGENTS.md`, "Where new code
+  goes".
+- **Something the editor shows or a new extension setting**:
+  `src/vscode-extension/AGENTS.md`.
+- **A docs change**: "Polish docs" below; the English page and its Polish
+  translation change in the same PR.
+
+The boundaries are enforced, not just described: fallow zones per folder
+(`.fallowrc.jsonc`), Biome's I/O rules per folder (`biome.jsonc` and
+`biome-plugins/`), `check:cycles`, and each package's architecture tests.
 
 Docs live in `docs/` (Zensical), with the architecture in chapter 3. The plan lives in GitHub issues on
 `SirCypkowskyy/inwards`: epics #1 to #7 are milestones M0 to M6, and every

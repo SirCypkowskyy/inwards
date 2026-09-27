@@ -49,6 +49,7 @@ test("every package path in the docs and guides exists", () => {
     "AGENTS.md",
     "src/cli/AGENTS.md",
     "src/core/AGENTS.md",
+    "src/vscode-extension/AGENTS.md",
     "README.md",
     "eval/README.md",
   ];
