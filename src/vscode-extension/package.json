@@ -30,7 +30,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "build": "bun build src/extension.ts src/server.ts --outdir dist --target node --format cjs --external vscode && bun run scripts/copy-wasm.ts",
+    "build": "bun build src/client/extension.ts src/server/server.ts --outdir dist --entry-naming [name].[ext] --target node --format cjs --external vscode && bun run scripts/copy-wasm.ts",
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {

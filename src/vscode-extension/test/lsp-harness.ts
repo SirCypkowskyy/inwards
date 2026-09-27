@@ -117,7 +117,8 @@ export async function until(
 async function bundle(tmp: string): Promise<string> {
   const out = join(tmp, "dist");
   const built = await Bun.build({
-    entrypoints: [join(import.meta.dir, "../src/server.ts")],
+    entrypoints: [join(import.meta.dir, "../src/server/server.ts")],
+    naming: { entry: "[name].[ext]" },
     outdir: out,
     target: "node",
     format: "cjs",

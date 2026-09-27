@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { DOCUMENT_SELECTOR } from "../src/selector.ts";
+import { DOCUMENT_SELECTOR } from "../src/client/selector.ts";
 import { openProject, UNKNOWN_CODE } from "./config-helpers.ts";
 import {
   type Harness,

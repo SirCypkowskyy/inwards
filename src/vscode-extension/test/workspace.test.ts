@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseConfig } from "@inwards/core";
-import { workspaceDiagnostics } from "../src/workspace.ts";
+import { workspaceDiagnostics } from "../src/server/workspace.ts";
 
 const TMP = mkdtempSync(join(tmpdir(), "inwards-workspace-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));

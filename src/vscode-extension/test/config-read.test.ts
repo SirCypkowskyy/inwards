@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-import { readConfig } from "../src/config-file.ts";
+import { readConfig } from "../src/server/config-file.ts";
 import { openProject } from "./config-helpers.ts";
 import { type Harness, lspHarness, PYPROJECT, until, WATCHING, write } from "./lsp-harness.ts";
 
