@@ -33,6 +33,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
+| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -738,3 +739,36 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *Teach the module index that generated modules exist, for every rule:* INW006 would word its finding the same in both checkouts, but INW005, INW006 and the language server would believe in files that aren't there, and the index would need the config.
 - *A per-file INW010 ignore in the config:* one more place to keep in sync with the code, and the per-line suppression already exists.
 - *fnmatch bracket sets, as in the shape member patterns:* a set's contents escape the character check, and `*` and `?` cover every case the issue names.
+
+## ADR-030: Bounded contexts as a `contexts` table of literal prefixes
+
+**Status:** Accepted · 2026-09-27 · [#51](https://github.com/SirCypkowskyy/inwards/issues/51)
+
+**Context.** Layers describe one onion: an ordered list in which every module may import the layers before it. Bounded contexts and vertical slices cut across that. `orders` and `billing` each have a domain and an application, and orders may use billing only through billing's API. [ADR-005](#adr-005-configuration-lives-in-pyprojecttoml) promised that such non-linear rules would get their own tables, so the simple case stays simple. INW002 (contexts depend on each other only as declared) and INW003 (outside callers use only a context's public modules) need a shared definition of what a context owns and allows.
+
+**Decision.**
+
+- **A `[[tool.inwards.contexts]]` table**, one entry per context, with `name`, `modules`, `public` and `depends-on`. [The configuration reference](guides/configuration.md#contexts) lists the keys.
+- **Literal prefixes, longest match wins.** `modules` and `public` are full dotted module names, as layer entries are. The context whose prefix matches the most of a module owns it, so nested contexts work and the order of the tables never matters. The same prefix in two contexts is a config error. Glob selectors (`shop.*`) are left to [#191](https://github.com/SirCypkowskyy/inwards/issues/191), which brings them to layers first; until then a wildcard in a context is a config error, not a silent literal.
+- **`public` is absolute and owned.** A public entry is a full module name, not relative to its context, and the context must own it under the longest-match rule. A module is public when it lies at or under a public prefix and its owner is this context, so a context nested inside a public package keeps its own internals private. Public status belongs to modules: an imported name is first resolved to its module.
+- **`depends-on` is direct.** It names the contexts this one may import from. It isn't passed on through a chain and isn't granted in return. Forward references are fine; the context's own name, an unknown name and a repeat are config errors. Cycles between contexts are allowed by the parser; INW004 may forbid them.
+- **Contexts and layers add up.** A declared dependency or a public module never allows an import that the layer order forbids, and belonging to a context says nothing about the layer, or the other way round. Context checks apply whether or not a layer owns the file.
+- **Permissions, for INW002 and INW003.** INW002 requires a `depends-on` only between two different owned contexts, and says nothing when either end belongs to no context. INW003 requires a public target for every caller outside the target's context, including callers that belong to no context. A context uses only its own declarations, even when its prefixes sit inside another context's.
+- **A JSON Schema** for the whole table, draft-07 for SchemaStore compatibility, published with the docs and attached to each release. It checks structure; the parser also checks relations between entries, which draft-07 can't express. Tests keep the two equal: keys, rule codes and defaults.
+
+**Consequences.**
+
+- :material-plus-circle-outline: One definition of ownership and permission for INW002 and INW003, decided before either rule is written, so they can't disagree.
+- :material-plus-circle-outline: A config with no `contexts` behaves exactly as before, and `contexts = []` means the same.
+- :material-plus-circle-outline: Editors can complete and check `[tool.inwards]` with the schema, and the docs' own examples are validated against it.
+- :material-minus-circle-outline: A project with twenty slices lists twenty contexts until #191 brings globs.
+- :material-minus-circle-outline: `public` can't express "only these names from the module"; re-exports and `__all__` are out of scope.
+- :material-minus-circle-outline: Until INW002 and INW003 ship, a `contexts` table is parsed and checked but reports nothing.
+
+**Alternatives.**
+
+- *import-linter's contracts (independence, forbidden, layers as separate contract types):* expressive, but every contract names its modules again, and the relations between contracts aren't checked. One table with ownership rules keeps each module's context in one place. `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) will translate contracts.
+- *Contexts inside `layers` (a layer per context):* mixes two independent dimensions and makes every context repeat the onion.
+- *First match wins, as for shapes:* makes the order of the tables change the architecture. Longest match is what layers already do.
+- *Relative `public` entries (`api` meaning the context's `api`):* shorter, but ambiguous with several prefixes per context and inconsistent with every other module name in the config.
+

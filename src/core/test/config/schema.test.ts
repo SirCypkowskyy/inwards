@@ -29,6 +29,8 @@ const TOML_FENCE =
 const MARKER = /<!--\s*config:[^>]*-->/gu;
 /** Mentions the table, so the snippet is about Inwards' config. */
 const INWARDS_TABLE = /\[\s*tool\.inwards/u;
+/** A link from a schema description to an anchor of the configuration reference. */
+const REFERENCE_ANCHOR = /guides\/configuration\/#(?<anchor>[a-z-]+)\)/gu;
 /** The smallest valid config a fragment is merged into. */
 const MINIMAL = '[tool.inwards]\nlayers = [{ name = "domain", modules = ["shop.domain"] }]\n';
 
@@ -222,6 +224,15 @@ describe("the schema and the parser agree", () => {
 
   test("on the rule codes, taken from the registry", () => {
     expect(schema.definitions?.["ruleCode"]?.enum?.sort()).toEqual(Object.keys(RULES).sort());
+  });
+
+  test("its reference links land on anchors the configuration page has", () => {
+    const page = read("docs/chapters/guides/configuration.md");
+    const anchors = [...JSON.stringify(schema).matchAll(REFERENCE_ANCHOR)].map(
+      (m) => m.groups?.["anchor"] ?? "",
+    );
+    expect(anchors.length).toBeGreaterThan(0);
+    expect(anchors.filter((anchor) => !page.includes(`{ #${anchor} }`))).toEqual([]);
   });
 
   test("on the defaults", () => {

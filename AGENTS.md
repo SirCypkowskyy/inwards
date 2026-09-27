@@ -443,3 +443,17 @@ done until both match the code.
 
 Docs (except `docs/pl/`), commit messages and PR text in English, plain and specific (the
 `humanizer` skill's rules): no filler, no em dashes, numbers over adjectives.
+
+Docs snippets are tested, so mark what isn't a complete example:
+
+- A shell fence after `<!-- e2e -->` runs against the compiled CLI
+  (`src/cli/test/integration/docs.test.ts`).
+- A TOML fence with `[tool.inwards]` must be a complete, valid config, which
+  `src/core/test/config/schema.test.ts` parses and validates against
+  `schema/tool-inwards.schema.json`. A partial one gets
+  `<!-- config: fragment -->` (merged into a minimal config, then checked) and
+  a deliberately wrong one `<!-- config: invalid -->`. The marker sits on its
+  own line, one blank line before the fence, in both languages.
+- A new `[tool.inwards]` key updates the parser, the schema and
+  `guides/configuration.md` (EN and PL) together; the schema test fails
+  until all three agree.

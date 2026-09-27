@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 4d98dbd92f3b23c7e6aa45667272ccc7213044efd48ec5285bbd3c5ab4123a81
+source_hash: f2569ad9af975c7a841d02960fc7246dfeec436cbdde04d8c6d6c196fc4a4240
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -137,7 +137,7 @@ flowchart LR
 
 | Komponent | Odpowiedzialność | Uwagi |
 |---|---|---|
-| Parser konfiguracji | Czyta `[tool.inwards]`, waliduje je i podaje dokładnie ten klucz, który jest błędny | Rzuca `ConfigError`. CLI zamienia go na kod wyjścia 2 |
+| Parser konfiguracji | Czyta `[tool.inwards]`, waliduje je i podaje dokładnie ten klucz, który jest błędny | Rzuca `ConfigError`. CLI zamienia go na kod wyjścia 2. Te same klucze opisuje dla edytorów [JSON Schema](guides/configuration.md#editor-completion), a testy pilnują zgodności obu |
 | Prescan szkieletu importów | Zostawia tylko linie importów, usuwa im wcięcie, a resztę czyści, żeby numery linii się nie przesunęły | Odmawia przetworzenia pliku, gdy `import` pojawia się w miejscu, którego nie umie wyjaśnić, co wymusza pełne parsowanie. Zobacz [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Adapter parsera | Inicjalizuje web-tree-sitter z bajtów i parsuje | Jawnie zwalnia każde drzewo, bo pamięć WASM nie jest odśmiecana |
 | Ekstraktor importów | Znajduje węzły `import` / `from ... import` w dowolnym miejscu drzewa i rozwiązuje importy względne | `from shop import infrastructure` jest zapisywane jako `shop.infrastructure`, więc nie prześlizgnie się |

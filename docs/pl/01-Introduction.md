@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: d02ab5e7ca8a644fc9df3c6edc45ed2cac8715c560ec1a8edb0103aefc9a9eaa
+source_hash: 8d67bb777dd4256ef6c8c19c5f02354ba17702b61a16845cde59bb3bcafd093d
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -47,6 +47,8 @@ layers = [
   { name = "interface",      modules = ["shop.api"] },
 ]
 ```
+
+Każdy klucz opisuje [dokumentacja konfiguracji](guides/configuration.md), która podaje też JSON Schema do podpowiedzi i sprawdzania w edytorze.
 
 <figure markdown="span">
   ![inwards check na czystym kodzie](../assets/screens/check-clean.svg){ loading=lazy }

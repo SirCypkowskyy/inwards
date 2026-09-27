@@ -43,6 +43,8 @@ layers = [
 ]
 ```
 
+Every key is described in the [configuration reference](guides/configuration.md), which also links a JSON Schema for completion and checking in the editor.
+
 <figure markdown="span">
   ![inwards check on a clean codebase](assets/screens/check-clean.svg){ loading=lazy }
   <figcaption>The example app as shipped: every import points inward.</figcaption>

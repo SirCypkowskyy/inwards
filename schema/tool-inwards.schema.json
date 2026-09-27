@@ -3,7 +3,7 @@
   "$id": "https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json",
   "title": "[tool.inwards]",
   "description": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.",
-  "markdownDescription": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#top)",
+  "markdownDescription": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#configuration-reference)",
   "type": "object",
   "additionalProperties": false,
   "required": ["layers"],
@@ -80,7 +80,7 @@
     },
     "names": {
       "description": "Where a member name may appear (INW007).",
-      "markdownDescription": "Where a member name may appear (INW007).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#names)",
+      "markdownDescription": "Where a member name may appear (INW007).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
       "type": "array",
       "items": {
         "$ref": "#/definitions/name"
@@ -162,7 +162,7 @@
         },
         "allow-libraries": {
           "description": "Libraries the layer may import; when set, any other third-party library is denied (INW005).",
-          "markdownDescription": "Libraries the layer may import; when set, any other third-party library is denied (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#allow-libraries)",
+          "markdownDescription": "Libraries the layer may import; when set, any other third-party library is denied (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
           "allOf": [
             {
               "$ref": "#/definitions/libraryList"
@@ -171,7 +171,7 @@
         },
         "deny-libraries": {
           "description": "Libraries the layer may not import, stdlib included (INW005).",
-          "markdownDescription": "Libraries the layer may not import, stdlib included (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#deny-libraries)",
+          "markdownDescription": "Libraries the layer may not import, stdlib included (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
           "allOf": [
             {
               "$ref": "#/definitions/libraryList"
@@ -180,7 +180,7 @@
         },
         "extend-deny-libraries": {
           "description": "Libraries added to the layer's deny list or to the innermost layer's default list (INW005).",
-          "markdownDescription": "Libraries added to the layer's deny list or to the innermost layer's default list (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#extend-deny-libraries)",
+          "markdownDescription": "Libraries added to the layer's deny list or to the innermost layer's default list (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
           "allOf": [
             {
               "$ref": "#/definitions/libraryList"
@@ -242,7 +242,7 @@
       "properties": {
         "pattern": {
           "description": "One member pattern, such as test_*.",
-          "markdownDescription": "One member pattern, such as test_*.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#names)",
+          "markdownDescription": "One member pattern, such as test_*.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
           "allOf": [
             {
               "$ref": "#/definitions/memberPattern"
@@ -251,7 +251,7 @@
         },
         "only-in": {
           "description": "Package selectors where members matching the pattern may appear.",
-          "markdownDescription": "Package selectors where members matching the pattern may appear.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#names)",
+          "markdownDescription": "Package selectors where members matching the pattern may appear.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
           "type": "array",
           "minItems": 1,
           "items": {

@@ -35,6 +35,7 @@ nav = [
   { "Start" = "index.md" },
   { "Pierwsze kroki" = [
     { "Instalacja" = "guides/install.md" },
+    { "Konfiguracja" = "guides/configuration.md" },
     { "Claude Code" = "guides/claude-code.md" },
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
