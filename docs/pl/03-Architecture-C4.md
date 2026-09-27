@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: f2569ad9af975c7a841d02960fc7246dfeec436cbdde04d8c6d6c196fc4a4240
+source_hash: e7e179426dec6691be78667ecfe25b47691ec1bf525641c8fbf4055ab8b2036b
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -84,7 +84,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW010, INW011 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW002, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
 | **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
@@ -115,7 +115,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / index</small>"]
@@ -159,13 +159,13 @@ sequenceDiagram
     participant R as Reguły
 
     A->>E: checkFile({path, module, text}, index)
-    alt plik poza wszystkimi warstwami
+    alt plik poza wszystkimi warstwami i kontekstami
         E-->>A: ostrzeżenie INW006 dla jego pakietu albo [] (bez parsowania)
     else zadeklarowane kodowanie, którego Inwards nie umie czytać
         E-->>A: INW000
     else plik wymienia loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(pełny tekst)
-        E->>R: INW001 + INW005 + INW006 + INW010 + INW011
+        E->>R: INW001 + INW002 + INW005 + INW006 + INW010 + INW011
         R-->>E: diagnostyki
         E-->>A: diagnostyki
     else wszystko inne
@@ -174,21 +174,21 @@ sequenceDiagram
             P-->>E: szkielet (same importy)
             E->>T: parse(szkielet)
             T-->>E: maleńkie drzewo
-            E->>R: INW001 + INW005 + INW006 + INW010 (importy)
+            E->>R: INW001 + INW002 + INW005 + INW006 + INW010 (importy)
             alt brak naruszeń (typowy przypadek)
                 R-->>E: []
                 E-->>A: []
             else znaleziono naruszenia
                 E->>T: parse(pełny tekst)
                 T-->>E: pełne drzewo
-                E->>R: INW001 + INW005 + INW006 + INW010 (importy z pełnego drzewa)
+                E->>R: INW001 + INW002 + INW005 + INW006 + INW010 (importy z pełnego drzewa)
                 R-->>E: potwierdzone diagnostyki
                 E-->>A: diagnostyki
             end
         else szkielet odrzucony (nietypowe położenie importu)
             P-->>E: null
             E->>T: parse(pełny tekst)
-            E->>R: INW001 + INW005 + INW006 + INW010
+            E->>R: INW001 + INW002 + INW005 + INW006 + INW010
             R-->>E: diagnostyki
             E-->>A: diagnostyki
         end
@@ -351,7 +351,7 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 |---|---|---|---|
 | INW000 | `unsupported-encoding` | Plik w warstwie deklaruje kodowanie (PEP 263), takie jak `unicode_escape` albo `utf-7`, przy którym tekst, który Inwards czyta jako komentarz, może być dla CPythona prawdziwym importem. Plik jest zgłaszany, a nie pomijany | :white_check_mark: |
 | INW001 | `layer-dependency` | Warstwa wewnętrzna importująca zewnętrzną | :white_check_mark: |
-| INW002 | `context-independence` | Jeden kontekst ograniczony albo pionowy wycinek importujący wewnętrzne moduły innego | :material-progress-clock: [#52](https://github.com/SirCypkowskyy/inwards/issues/52) |
+| INW002 | `context-independence` | Kontekst ograniczony albo pionowy wycinek importujący inny kontekst, którego jego `depends-on` nie deklaruje, statycznie albo dynamicznie, niezależnie od tego, czy plik należy do warstwy. Koniec poza wszystkimi kontekstami jest pomijany, a kontekst zagnieżdżony jest osobnym kontekstem. Zobacz [konteksty](guides/configuration.md#contexts) | :white_check_mark: |
 | INW003 | `public-api-only` | Import z pominięciem publicznego modułu kontekstu (`__init__` albo `api.py`) | :material-progress-clock: [#53](https://github.com/SirCypkowskyy/inwards/issues/53) |
 | INW004 | `no-cycles` | Cykle importów między modułami albo kontekstami | :material-progress-clock: wymaga grafu, [#54](https://github.com/SirCypkowskyy/inwards/issues/54) |
 | INW005 | `pure-domain` | Warstwa importująca moduł zewnętrzny albo z biblioteki standardowej, na który nie pozwalają jej `allow-libraries` / `deny-libraries` / `extend-deny-libraries`, statycznie albo dynamicznie, także w funkcjach i pod `TYPE_CHECKING`. Najbardziej wewnętrzna z dwóch lub więcej warstw domyślnie zabrania frameworków, klientów baz danych i sieci oraz operacji wejścia-wyjścia z biblioteki standardowej (`sqlalchemy`, `fastapi`, `requests`, `subprocess`...); `extend-deny-libraries` dopisuje wpisy do tej listy, a `deny-libraries` ją zastępuje. Własny kod zostaje dla INW001 i INW006. Zobacz [Biblioteki w warstwach](guides/libraries.md) | :white_check_mark: |
@@ -385,6 +385,7 @@ src/
 │   │   │   │              #   edit-distance.ts
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
+│   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
 │   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
 │   │   │   │                            #   layout.ts (dead prefixes, layer code moved away)

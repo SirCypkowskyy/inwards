@@ -7,6 +7,7 @@
  */
 import type { Parser } from "web-tree-sitter";
 import { acceptedModules } from "../baseline/accepted.ts";
+import { contextOf } from "../config/contexts.ts";
 import type { InwardsConfig } from "../config/parse.ts";
 import { applyRules } from "../config/rule-settings.ts";
 import type {
@@ -24,6 +25,7 @@ import {
   normalizeSource,
   parsePython,
 } from "../python/parser.ts";
+import { checkContextDependencies } from "../rules/context-independence.ts";
 import {
   checkDynamicImports,
   extractDynamicImports,
@@ -149,7 +151,8 @@ export class Engine {
    * @returns the findings so far, and what the full parse would still have to do.
    */
   private scan(src: SourceFile, project: ProjectIndex): Scan {
-    if (layerIndexOf(src.module, this.config.layers) === -1) {
+    const layered = this.layered(src);
+    if (!(layered || this.inContext(src))) {
       const warning = unassignedWarning(src, this.config);
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
@@ -161,7 +164,31 @@ export class Engine {
     // A file with a suppression comment gets the full parse, which also reads the comments.
     const fast = dynamic || mentionsSuppression(src.text) ? null : this.extractor.skeleton(src);
     const found = fast ? this.importFindings(src, fast, project) : null;
-    return { found, exact: found?.length === 0, dynamic };
+    // Outside every layer, the unassigned-package warning needs no confirmation.
+    const unsettled = layered ? found : found?.filter((d) => d.code !== "INW006");
+    return { found, exact: unsettled?.length === 0, dynamic };
+  }
+
+  /**
+   * Tells whether a layer owns a file.
+   *
+   * @param src - the source file.
+   * @returns true when one of the configured layers owns its module.
+   */
+  private layered(src: SourceFile): boolean {
+    return layerIndexOf(src.module, this.config.layers) !== -1;
+  }
+
+  /**
+   * Tells whether a bounded context owns a file, so INW002 checks its imports
+   * even when no layer owns it.
+   *
+   * @param src - the source file.
+   * @returns true when one of the configured contexts owns its module.
+   */
+  private inContext(src: SourceFile): boolean {
+    const { contexts } = this.config;
+    return contexts !== undefined && contextOf(src.module, contexts) !== undefined;
   }
 
   /**
@@ -209,11 +236,13 @@ export class Engine {
   }
 
   /**
-   * Applies the rules that look at import statements: INW001, INW005, INW006 and INW010.
+   * Applies the rules that look at import statements: INW001, INW002, INW005, INW006 and INW010.
    * An import of a module that doesn't exist gets INW010 alone, not INW006
    * as well, and one that climbs above the top-level package (empty target)
    * reaches no other rule. An outward import gets INW001 alone, even when its
-   * module doesn't exist either.
+   * module doesn't exist either. INW002 is independent of the layer rules: an
+   * import can break a layer and a context boundary at once. A file outside
+   * every layer gets only INW002 and its unassigned-package warning.
    *
    * @param file - the source file.
    * @param imports - its imports.
@@ -225,7 +254,12 @@ export class Engine {
     imports: readonly ImportRef[],
     project: ProjectIndex,
   ): Diagnostic[] {
-    const { layers } = this.config;
+    const { layers, contexts = [] } = this.config;
+    const across = checkContextDependencies(file, imports, contexts, project.ownerOf);
+    if (!this.layered(file)) {
+      const warning = unassignedWarning(file, this.config);
+      return warning ? [warning, ...across] : across;
+    }
     // INW001's fix deletes an outward import; "create the module" would contradict it.
     const outward = new Set(outwardImports(file, imports, layers).map((o) => o.ref));
     const unknown = checkUnknownImports(
@@ -241,6 +275,7 @@ export class Engine {
       ...checkLibraries(file, resolved, layers, project.ownerOf),
       ...checkUnassignedImports(file, existing, layers, project.ownerOf),
       ...unknown.found,
+      ...across,
     ];
   }
 
@@ -266,11 +301,15 @@ export class Engine {
       // Dynamic imports are never cached: they depend on other files (ownerOf).
       const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
       const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
-      found.push(
-        ...checkDynamicImports(file, refs, layers),
-        ...checkLibraries(file, readable, layers, project.ownerOf),
-        ...checkUnassignedImports(file, readable, layers, project.ownerOf),
-      );
+      const { contexts = [] } = this.config;
+      found.push(...checkContextDependencies(file, readable, contexts, project.ownerOf));
+      if (this.layered(file)) {
+        found.push(
+          ...checkDynamicImports(file, refs, layers),
+          ...checkLibraries(file, readable, layers, project.ownerOf),
+          ...checkUnassignedImports(file, readable, layers, project.ownerOf),
+        );
+      }
       return ordered(file, found, comments);
     } finally {
       tree.delete(); // WASM memory is not garbage collected

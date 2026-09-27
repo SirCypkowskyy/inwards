@@ -48,6 +48,7 @@ nav = [
     { "Przegląd" = "rules/index.md" },
     { "INW000 unsupported-encoding" = "rules/INW000.md" },
     { "INW001 layer-dependency" = "rules/INW001.md" },
+    { "INW002 context-independence" = "rules/INW002.md" },
     { "INW005 pure-domain" = "rules/INW005.md" },
     { "INW006 unassigned-module" = "rules/INW006.md" },
     { "INW007 package-shape" = "rules/INW007.md" },

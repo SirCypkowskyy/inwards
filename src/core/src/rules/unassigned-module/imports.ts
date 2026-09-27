@@ -8,6 +8,7 @@
  * - layer prefixes that match nothing, and layer code moved out of every
  *   layer, are reported against pyproject.toml (see `layout.ts`).
  */
+import { contextOf } from "../../config/contexts.ts";
 import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
@@ -173,7 +174,10 @@ export function unassignedWarning(file: SourceFile, config: InwardsConfig): Diag
   return diagnostic(RULES.INW006, file, {
     span: { line: 1, column: 1, endLine: 1, endColumn: 1 },
     severity: "warning",
-    message: `"${pkg}" belongs to no layer, so its imports are not checked.`,
+    message:
+      config.contexts && contextOf(file.module, config.contexts)
+        ? `"${pkg}" belongs to no layer, so only its context's rules check its imports.`
+        : `"${pkg}" belongs to no layer, so its imports are not checked.`,
     fix: {
       summary: `Put the code under a layer's package, or ask the user to assign "${pkg}".`,
       steps: [

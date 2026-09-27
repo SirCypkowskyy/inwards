@@ -74,7 +74,10 @@ export function parseContexts(value: unknown): { contexts?: ContextSpec[] } {
  * @param contexts - the parsed contexts.
  * @returns the owning context, or undefined when no context owns the module.
  */
-function contextOf(module: string, contexts: readonly ContextSpec[]): ContextSpec | undefined {
+export function contextOf(
+  module: string,
+  contexts: readonly ContextSpec[],
+): ContextSpec | undefined {
   let best: ContextSpec | undefined;
   let bestLength = -1;
   for (const context of contexts) {

@@ -6,6 +6,7 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 |---|---|---|---|---|
 | [INW000](INW000.md) | `unsupported-encoding` | A declared source encoding under which a comment can be a real import | error | no |
 | [INW001](INW001.md) | `layer-dependency` | An import from an inner layer into an outer one | error | yes |
+| [INW002](INW002.md) | `context-independence` | An import from one bounded context into another its `depends-on` doesn't declare | error | yes |
 | [INW005](INW005.md) | `pure-domain` | A library import a layer's config doesn't allow, such as SQLAlchemy in the domain | error | yes |
 | [INW006](INW006.md) | `unassigned-module` | First-party code outside every layer, and layer prefixes that match nothing | error, some findings warn | yes |
 | [INW007](INW007.md) | `package-shape` | A package member its shape doesn't allow, or a name outside the packages it belongs in | error, some findings warn | no |
@@ -14,7 +15,7 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | error | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | error | yes |
 
-The codes INW002 to INW004 are reserved for rules that are planned but not built: context independence ([#52](https://github.com/SirCypkowskyy/inwards/issues/52)), public API only ([#53](https://github.com/SirCypkowskyy/inwards/issues/53)) and import cycles ([#54](https://github.com/SirCypkowskyy/inwards/issues/54)). The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists them with the rest.
+The codes INW003 and INW004 are reserved for rules that are planned but not built: public API only ([#53](https://github.com/SirCypkowskyy/inwards/issues/53)) and import cycles ([#54](https://github.com/SirCypkowskyy/inwards/issues/54)). The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists them with the rest.
 
 ## Configure rules
 
@@ -37,7 +38,7 @@ To accept one finding for good, put a suppression on the line it points at, with
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-Rules that point at a line of Python can be suppressed this way: INW001, INW005, INW006, INW010 and INW011. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
+Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW005, INW006, INW010 and INW011. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
 
 ## Page format
 

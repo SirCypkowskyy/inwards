@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 41c59ccdb7c69600207fe2d66632e22879f06b4a1d6d2e99b734c9e601f60bdf
+source_hash: 036ad591334fb295869d903d043c8aca75c600a31c172448e1cf15e7ebc6dec9
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -11,6 +11,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 |---|---|---|---|---|
 | [INW000](INW000.md) | `unsupported-encoding` | Zadeklarowane kodowanie źródła, w którym komentarz może być prawdziwym importem | błąd | nie |
 | [INW001](INW001.md) | `layer-dependency` | Import z warstwy wewnętrznej do zewnętrznej | błąd | tak |
+| [INW002](INW002.md) | `context-independence` | Import z jednego kontekstu ograniczonego do innego, którego nie deklaruje jego `depends-on` | błąd | tak |
 | [INW005](INW005.md) | `pure-domain` | Import biblioteki, na który konfiguracja warstwy nie pozwala, np. SQLAlchemy w domenie | błąd | tak |
 | [INW006](INW006.md) | `unassigned-module` | Własny kod poza wszystkimi warstwami i prefiksy warstw, do których nie pasuje żaden moduł | błąd, część diagnostyk to ostrzeżenia | tak |
 | [INW007](INW007.md) | `package-shape` | Element pakietu, na który jego kształt nie pozwala, albo nazwa poza pakietami, do których należy | błąd, część diagnostyk to ostrzeżenia | nie |
@@ -19,7 +20,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 | [INW010](INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | błąd | tak |
 | [INW011](INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | błąd | tak |
 
-Kody od INW002 do INW004 są zarezerwowane dla reguł zaplanowanych, ale jeszcze niezbudowanych: niezależności kontekstów ([#52](https://github.com/SirCypkowskyy/inwards/issues/52)), wyłącznie publicznego API ([#53](https://github.com/SirCypkowskyy/inwards/issues/53)) i cykli importów ([#54](https://github.com/SirCypkowskyy/inwards/issues/54)). [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia je razem z resztą.
+Kody INW003 i INW004 są zarezerwowane dla reguł zaplanowanych, ale jeszcze niezbudowanych: wyłącznie publicznego API ([#53](https://github.com/SirCypkowskyy/inwards/issues/53)) i cykli importów ([#54](https://github.com/SirCypkowskyy/inwards/issues/54)). [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia je razem z resztą.
 
 ## Konfiguracja reguł { #configure-rules }
 
@@ -42,7 +43,7 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW005, INW006, INW010 i INW011. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
+W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW005, INW006, INW010 i INW011. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
 
 ## Format strony { #page-format }
 
