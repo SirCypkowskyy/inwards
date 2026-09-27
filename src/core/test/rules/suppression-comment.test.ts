@@ -1,6 +1,8 @@
 /**
- * Inline suppressions (#50, ADR-028): `# inwards: ignore[CODE] reason="..."`
- * on the line a finding points at.
+ * @file Inline suppressions (#50, ADR-028): `# inwards: ignore[CODE] reason="..."`
+ * on the line a finding points at. Valid, invalid (INW009 error) and unused
+ * (INW009 warning) comments, the counts in every report format, and
+ * `agent-suppressions`.
  */
 import { describe, expect, test } from "bun:test";
 import { ConfigError, Engine, parseConfig, render } from "../../src/index.ts";
@@ -35,6 +37,7 @@ function run(text: string, using: Engine = engine): { found: string[]; hidden: s
  *
  * @param text - the domain module's source.
  * @returns the message.
+ * @throws {Error} when the check reports no INW009 or more than one.
  */
 function inw009(text: string): string {
   const d = engine

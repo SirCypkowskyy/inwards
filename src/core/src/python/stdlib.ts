@@ -1,4 +1,9 @@
 /**
+ * @file The top-level module names of the Python standard library, which INW005
+ * needs to tell a stdlib import from a third-party one. The list is data kept
+ * by hand; `STDLIB` says how to regenerate it.
+ */
+/**
  * Top-level modules of the Python standard library: the union of
  * `sys.stdlib_module_names` on CPython 3.11 to 3.14, plus the modules 3.10 and
  * older still had (`binhex`, `formatter`, `parser`, `symbol`, ...), so a

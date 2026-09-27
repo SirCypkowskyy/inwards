@@ -1,6 +1,7 @@
 /**
- * What every part of the `[tool.inwards]` parser shares: the error it throws
- * and the checks for walking untrusted TOML without casts.
+ * @file What every part of the `[tool.inwards]` parser shares: the error it throws
+ * and the checks for walking untrusted TOML without casts. Adapters catch
+ * `ConfigError` and report it as a config error, never as a crash.
  */
 
 export class ConfigError extends Error {

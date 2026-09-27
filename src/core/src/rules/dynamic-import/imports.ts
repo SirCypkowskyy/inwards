@@ -1,5 +1,5 @@
 /**
- * INW011: dynamic imports with string-literal targets.
+ * @file INW011: dynamic imports with string-literal targets.
  *
  * `importlib.import_module("shop.infrastructure.db")` creates the same
  * dependency as `import shop.infrastructure.db`, and so does
@@ -15,7 +15,7 @@
  * - `exec`, `eval` and `compile` with a literal source: the source is parsed
  *   as Python, and every import in it, static or dynamic, counts at the call.
  *
- * Aliases are resolved in `callees.ts`, literals are read in `literals.ts`,
+ * Aliases are resolved in `callees.ts`, literals are read in `python/literals.ts`,
  * the targets of module loaders in `loader-targets.ts`.
  *
  * A target Inwards can't read (a variable, an f-string field, a literal with a

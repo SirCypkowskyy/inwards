@@ -1,5 +1,5 @@
 /**
- * Baseline keys: how a diagnostic matches an accepted violation. The CLI owns
+ * @file Baseline keys: how a diagnostic matches an accepted violation. The CLI owns
  * the baseline file; the engine only receives its keys and counts as data, so
  * it can skip the confirming parse of a module whose skeleton findings the
  * baseline accepts in full (see `acceptedModules`).

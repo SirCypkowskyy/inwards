@@ -1,3 +1,8 @@
+/**
+ * @file INW011 for computed targets: a loader or `exec` whose target isn't a literal
+ * is unverifiable in an inner layer. The tests cover aliases, the exempt cases
+ * and how the report is worded and re-levelled.
+ */
 import { describe, expect, test } from "bun:test";
 import { Engine, parseConfig } from "../../../src/index.ts";
 import { check, file, found, grammars, PROJECT, unverifiable } from "../../support/helpers.ts";

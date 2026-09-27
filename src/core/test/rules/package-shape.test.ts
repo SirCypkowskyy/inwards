@@ -1,3 +1,8 @@
+/**
+ * @file INW007 package-shape and INW008 missing-member: members a package may, must
+ * and must not hold, where a name may appear, and the shape config. File names
+ * and targets are checked the way adapters list them.
+ */
 import { describe, expect, test } from "bun:test";
 import {
   ConfigError,
@@ -99,7 +104,7 @@ describe("INW007 package-shape", () => {
      * Lists the codes checkShape reports for a path.
      *
      * @param path - a root-relative path.
-     * @returns the codes.
+     * @returns the rule codes reported, e.g. `INW007`.
      */
     function codes(path: string): string[] {
       return checkShape(file(path, ""), kinds).map((d) => d.code);

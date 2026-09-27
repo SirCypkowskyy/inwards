@@ -1,3 +1,8 @@
+/**
+ * @file The baseline shortcut: a file whose skeleton findings the baseline accepts
+ * in full skips the confirming parse. The tests check that the answer stays
+ * the same either way.
+ */
 import { describe, expect, test } from "bun:test";
 import { baselineKey, type Diagnostic } from "../../src/index.ts";
 import { check, engine, file, PROJECT } from "../support/helpers.ts";
@@ -16,6 +21,7 @@ const SPELLINGS: string[] = ["", LEAK, QUOTED, STRING, `${QUOTED}${LEAK}`, `${LE
  *
  * @param count - accepted copies.
  * @returns accepted copies by baseline key.
+ * @throws {Error} when the leak isn't a violation, so the test setup is wrong.
  */
 function accepting(count: number): Map<string, number> {
   const [leak] = check(file(PATH, LEAK));

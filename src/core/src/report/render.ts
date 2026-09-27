@@ -1,3 +1,8 @@
+/**
+ * @file Renders a check's report as text, concise, JSON or SARIF. Pure string
+ * building: the adapter writes the result, and colour is added only when the
+ * caller asks for it.
+ */
 import type { Diagnostic, Suppressed } from "../contracts/records.ts";
 import { DOCS_BASE, VERSION } from "../meta/product.ts";
 import { RULES } from "../meta/registry.ts";
@@ -45,8 +50,10 @@ interface View extends Report {
  * @param report - the diagnostics plus file count and timing.
  * @param format - `text` for people, `concise` (one line each) for agents on
  *   a token budget, `json` (`inwards/diagnostics@1`) or `sarif` for tools.
- * @param options - `pretty` indents JSON and SARIF (default true); `color`
- *   adds ANSI codes to text (default false); `maxDiagnostics` caps the list.
+ * @param options - how to lay the output out.
+ * @param options.pretty - indent JSON and SARIF (default true).
+ * @param options.color - add ANSI colour codes to text (default false).
+ * @param options.maxDiagnostics - show at most this many diagnostics; the rest are counted.
  * @returns the rendered report, without a trailing newline.
  */
 export function render(
@@ -198,6 +205,8 @@ function footer(report: View, c: Paint): string[] {
  * Says what the baseline accepted and what has been fixed since it was taken.
  *
  * @param report - the check's report.
+ * @param report.baselined - violations the baseline accepted.
+ * @param report.resolved - baseline entries no longer found.
  * @returns zero or one line.
  */
 function baselineNote({ baselined = 0, resolved = 0 }: Report): string[] {
@@ -225,7 +234,7 @@ function codeLabel(d: Diagnostic, c: Paint): string {
  * Counts errors and warnings. `violations` in every report means errors,
  * which are what the exit code follows.
  *
- * @param diagnostics - the diagnostics.
+ * @param diagnostics - the findings a report shows.
  * @returns how many are errors and how many warnings.
  */
 function counts(diagnostics: readonly Diagnostic[]): { errors: number; warnings: number } {
@@ -298,7 +307,9 @@ function toUriPath(path: string): string {
  * `inSource` suppression whose justification is the comment's reason, so
  * viewers show it as suppressed rather than lose it.
  *
- * @param report - the diagnostics to print and the suppressed findings; the counts and the cut are not part of SARIF.
+ * @param report - the report as capped for display; the counts and the cut are not part of SARIF.
+ * @param report.shown - the diagnostics to print.
+ * @param report.suppressed - the findings inline comments hid, printed as suppressed results.
  * @param indent - spaces per level, or undefined for one line.
  * @returns the SARIF log.
  */

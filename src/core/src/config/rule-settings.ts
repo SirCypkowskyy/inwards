@@ -1,5 +1,5 @@
 /**
- * Per-rule configuration, `[tool.inwards.rules]`: which rules report
+ * @file Per-rule configuration, `[tool.inwards.rules]`: which rules report
  * (`select`, `ignore`) and at what severity (`severity`), so a team can phase
  * rules in. Codes are exact; an unknown one is a config error. INW000 can't be
  * ignored or re-levelled: a file whose declared encoding can hide imports is
@@ -9,7 +9,7 @@
  * Every core function that returns diagnostics to an adapter applies these
  * settings (`applyRules`), so the CLI, the hooks, the Stop gate and the
  * language server agree. The exception is the session layout comparison in
- * `layout.ts`: it stops a layer being moved away, so it ignores the table.
+ * `rules/unassigned-module/layout.ts`: it stops a layer being moved away, so it ignores the table.
  */
 
 import type { Diagnostic, Severity } from "../contracts/records.ts";
@@ -152,7 +152,7 @@ function isSeverity(value: unknown): value is Severity {
 /**
  * Says what the config does to one rule's findings.
  *
- * @param code - the rule's code.
+ * @param code - a code such as `INW001`.
  * @param rules - the project's `[tool.inwards.rules]`, if any.
  * @returns "off" when the rule doesn't report, the severity every finding
  *   gets, or undefined when the findings keep their own.

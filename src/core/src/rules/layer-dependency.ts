@@ -1,3 +1,8 @@
+/**
+ * @file INW001 layer-dependency: an inner layer never imports an outer one. Which
+ * imports point outward is decided in `rules/shared/layer-ownership.ts`, shared
+ * with INW011; this module words the diagnostic and its fix.
+ */
 import type { LayerSpec } from "../config/parse.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import { diagnostic, RULES } from "../meta/registry.ts";

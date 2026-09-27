@@ -1,5 +1,5 @@
 /**
- * INW006 layout checks against pyproject.toml: layer prefixes that match no
+ * @file INW006 layout checks against pyproject.toml: layer prefixes that match no
  * module (a warning for one dead prefix, an error when a whole layer matches
  * nothing or a prefix stopped matching during the session), and layer code
  * moved out of every layer during a session.
@@ -189,7 +189,7 @@ function matchesAny(prefix: string, modules: ReadonlySet<string>): boolean {
  *
  * @param prefix - the prefix that matches nothing.
  * @param vanished - true when it matched at session start.
- * @returns the fix.
+ * @returns a summary and steps: restore the package, or fix or drop the prefix.
  */
 function prefixFix(prefix: string, vanished: boolean): Diagnostic["fix"] {
   if (vanished) {

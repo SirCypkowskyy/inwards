@@ -1,3 +1,8 @@
+/**
+ * @file INW006 unassigned-module: imports into code outside every layer, files
+ * outside every layer, and layer prefixes that match nothing. The session
+ * checks (a prefix emptied or layer code moved) are covered too.
+ */
 import { describe, expect, test } from "bun:test";
 import { parseConfig } from "../../src/index.ts";
 import { checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";

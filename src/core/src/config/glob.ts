@@ -1,5 +1,5 @@
 /**
- * fnmatch globs without regular expressions: `*`, `?`, `[seq]` and `[!seq]`,
+ * @file fnmatch globs without regular expressions: `*`, `?`, `[seq]` and `[!seq]`,
  * matched as Python's `fnmatch.fnmatchcase` matches them, one code point per
  * character. Used for shape member patterns (INW007, INW008) and `generated`
  * (INW010).
@@ -137,7 +137,7 @@ function matchesOne(token: Token, c: string): boolean {
 /**
  * Tells whether a glob is well formed (see `parse`).
  *
- * @param glob - the glob.
+ * @param glob - an fnmatch pattern from `generated` or a shape member.
  * @returns false for an unclosed `[` or a reversed range.
  */
 export function isGlob(glob: string): boolean {

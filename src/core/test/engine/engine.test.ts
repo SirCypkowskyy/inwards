@@ -1,3 +1,9 @@
+/**
+ * @file The engine end to end: INW001 on real parses, the reporters, the import
+ * skeleton prescan and the text reporter's colour. It also pins the source
+ * quirks (BOMs, lone carriage returns, backslash continuations) earlier
+ * reviews found.
+ */
 import { describe, expect, test } from "bun:test";
 import { RULES, render } from "../../src/index.ts";
 import { check, file } from "../support/helpers.ts";

@@ -1,3 +1,10 @@
+/**
+ * @file Parses `[tool.inwards]` from pyproject.toml into an `InwardsConfig`: the
+ * layers, `ignore`, `generated`, the per-rule settings, shapes and names, and
+ * the hook settings (`escalate-after`, `run-log`, `stop-gate`,
+ * `agent-suppressions`). Unknown keys and wrong types throw `ConfigError`, so
+ * a typo fails loudly instead of quietly turning a rule off.
+ */
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
 import { parseGenerated } from "./generated.ts";
@@ -300,7 +307,7 @@ function isStopGate(value: unknown): value is StopGate {
  * @param layer - the raw entry.
  * @param i - its index, for messages.
  * @param seen - layer names so far, updated in place.
- * @returns the layer.
+ * @returns the validated layer, with its optional library lists.
  * @throws {ConfigError} for unknown keys, a missing or repeated name, or bad modules or libraries.
  */
 function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {

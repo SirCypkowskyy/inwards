@@ -1,5 +1,5 @@
 /**
- * Works out which calls in a file are module loaders, whatever they are called
+ * @file Works out which calls in a file are module loaders, whatever they are called
  * locally. `il.import_module`, `im` and `getattr(importlib, "import_module")`
  * can all be `importlib.import_module`.
  *
@@ -138,7 +138,7 @@ function bindImport(stmt: Node, bindings: Bindings): void {
 /**
  * Reads a `name = expr` assignment; other targets (tuples, attributes) are skipped.
  *
- * @param node - an `assignment` node.
+ * @param node - an `assignment` node from the module or a function body.
  * @returns the assigned name and value, or nothing for another shape.
  */
 function plainAssignment(node: Node): { name: string; right: Node }[] {
@@ -216,7 +216,7 @@ function importEntry(entry: Node): { name: string; alias: string | undefined } {
  * Spells a dotted name the way Python does, ignoring spaces and comments.
  *
  * @param node - a `dotted_name` or `identifier` node.
- * @returns the dotted name.
+ * @returns the name's parts joined by dots, spaces and comments dropped.
  */
 function dottedName(node: Node): string {
   const parts = node.type === "dotted_name" ? namedChildren(node) : [node];

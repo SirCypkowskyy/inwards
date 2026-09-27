@@ -1,3 +1,8 @@
+/**
+ * @file Parsing `[tool.inwards]`: accepted and rejected tables, `declaresInwards`,
+ * `required-version`, and the config integrity checks INW006 reports. Every
+ * rejection must name the key that caused it.
+ */
 import { describe, expect, test } from "bun:test";
 import { ConfigError, declaresInwards, parseConfig, VERSION } from "../../src/index.ts";
 

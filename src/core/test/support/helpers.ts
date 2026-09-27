@@ -1,3 +1,8 @@
+/**
+ * @file Shared helpers for the core tests: the grammar bytes, a ready parser, an
+ * engine built from a pyproject.toml snippet, and source files made from a
+ * path and text. Tests import these instead of repeating the setup.
+ */
 import { readFileSync } from "node:fs";
 import type { Parser } from "web-tree-sitter";
 import {
@@ -83,7 +88,7 @@ const ON_DISK: ReadonlyMap<string, "file" | "dir"> = new Map([
  *
  * @param disk - what is at each root-relative path.
  * @param texts - file contents by path; a missing file reads as empty.
- * @returns the index.
+ * @returns a module index backed by the two maps.
  */
 export function indexOn(
   disk: ReadonlyMap<string, "file" | "dir">,

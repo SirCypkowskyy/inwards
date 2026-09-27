@@ -1,5 +1,5 @@
 /**
- * Fast path. Architecture rules only need imports, and in real code imports
+ * @file Fast path. Architecture rules only need imports, and in real code imports
  * sit on their own logical lines. We blank out every other line (keeping line
  * numbers), dedent the import lines, and let tree-sitter parse that skeleton.
  * It is roughly 20x less work than parsing the whole file.
@@ -75,7 +75,9 @@ function importSkeleton(source: string): Skeleton | null {
  * @param lines - all rows of the file.
  * @param first - index of the row where the import starts.
  * @param pad - leading whitespace width removed from the first row.
- * @param into - skeleton rows and per-row dedent, written in place.
+ * @param into - the skeleton being built, written in place.
+ * @param into.lines - the skeleton's rows.
+ * @param into.indent - the columns removed from each row.
  * @returns the index of the last row copied, or null if the file ends first.
  */
 function copyLogicalLine(

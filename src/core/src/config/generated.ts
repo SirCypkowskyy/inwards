@@ -1,5 +1,5 @@
 /**
- * `generated` in `[tool.inwards]`: modules a build step writes, which INW010
+ * @file `generated` in `[tool.inwards]`: modules a build step writes, which INW010
  * treats as existing when they aren't on disk (#160, ADR-029). A developer's
  * checkout has `orders_pb2.py` from protoc and `_version.py` from
  * setuptools-scm; a fresh CI checkout doesn't, so without this the same

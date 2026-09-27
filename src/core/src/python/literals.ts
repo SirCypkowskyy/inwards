@@ -1,5 +1,5 @@
 /**
- * Reads constant values out of Python syntax nodes: string, bytes and integer
+ * @file Reads constant values out of Python syntax nodes: string, bytes and integer
  * literals, and the arguments of a call. INW011 uses these to find the module
  * name a loader is given, as Python would compute it before the call runs.
  */
@@ -18,8 +18,8 @@ export function namedChildren(node: Node): Node[] {
 /**
  * Spells an identifier the way Python does: NFKC-normalised.
  *
- * @param node - an `identifier` node.
- * @returns the normalised name.
+ * @param node - a name as tree-sitter parsed it (an `identifier` node).
+ * @returns the identifier's text in NFKC form, as Python compares names.
  */
 export function identifierName(node: Node): string {
   return node.text.normalize("NFKC");

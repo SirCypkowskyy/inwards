@@ -1,3 +1,10 @@
+/**
+ * @file Parses Python with tree-sitter and reads the import statements out of the
+ * tree, resolved to dotted targets with their spans. The grammars come from the
+ * adapter as WASM bytes (`GrammarBinaries`); the engine never looks for them on
+ * disk. The runtime is loaded once per process, because `Parser.init` sets up a
+ * global WASM module.
+ */
 import { Language, type Node, Parser, type Tree } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../contracts/records.ts";
 import { packageOf, resolveRelative } from "./module-names.ts";

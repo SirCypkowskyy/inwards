@@ -1,5 +1,5 @@
 /**
- * Inline suppressions (ADR-028): `# inwards: ignore[INW001] reason="why"` on
+ * @file Inline suppressions (ADR-028): `# inwards: ignore[INW001] reason="why"` on
  * the line a finding points at hides that finding. For a parenthesised
  * import that is the line of the imported name, not the `from` line.
  * Several codes go in one comment, `ignore[INW001,INW005]`, and the comment
@@ -138,9 +138,9 @@ export function commentsIn(tree: Tree): SuppressionComment[] {
 /**
  * Parses one directive and lists what is wrong with it.
  *
- * @param node - the comment node.
+ * @param node - the tree-sitter `comment` node holding the directive.
  * @param rest - the text after `# inwards: ignore`.
- * @returns the comment.
+ * @returns the codes, the reason and the problems found, with the comment's span.
  */
 function readComment(node: Node, rest: string): SuppressionComment {
   const span = {
@@ -190,7 +190,7 @@ function codeProblem(code: string): string[] {
  * warning for the codes that matched no finding on its line.
  *
  * @param file - the source file.
- * @param comment - the comment.
+ * @param comment - one `# inwards: ignore` directive as read.
  * @param used - `line\0code` of every finding a suppression hid.
  * @param rules - the project's `[tool.inwards.rules]`, if any.
  * @returns zero or one finding.

@@ -29,7 +29,7 @@ export type PathKind = (relPath: string) => "file" | "dir" | undefined;
  * The longest existing prefix of a target wins.
  *
  * @param kind - tells what is at a forward-slash path relative to the config root.
- * @returns the lookup.
+ * @returns a function from an import target to the first-party module that holds it.
  */
 export function probeLookup(kind: PathKind): ModuleLookup {
   return (target: string): string | undefined => {

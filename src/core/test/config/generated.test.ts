@@ -1,3 +1,8 @@
+/**
+ * @file `generated` in `[tool.inwards]` (#160): parsing the list, and INW010
+ * treating a generated module as existing when it isn't on disk. A fresh CI
+ * checkout and a developer's checkout must get the same answer.
+ */
 import { describe, expect, test } from "bun:test";
 import { type Diagnostic, Engine, parseConfig } from "../../src/index.ts";
 import { check, file, grammars, indexOn } from "../support/helpers.ts";
@@ -12,7 +17,7 @@ const LAYERS = `layers = [
  * Builds an engine over the test layers with a `generated` setting.
  *
  * @param generated - the TOML value of `generated`, or undefined to leave it out.
- * @returns the engine.
+ * @returns an engine over LAYERS with that setting.
  */
 async function engineWith(generated: string | undefined): Promise<Engine> {
   const key = generated === undefined ? "" : `generated = ${generated}\n`;

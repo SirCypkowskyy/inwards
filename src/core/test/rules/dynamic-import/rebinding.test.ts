@@ -1,3 +1,8 @@
+/**
+ * @file INW011 when a name is rebound: a user-defined `exec` or `eval` is not the
+ * builtin, and some rebindings don't shadow it at the call. The accepted false
+ * positives of the conservative exemption are pinned too.
+ */
 import { describe, expect, test } from "bun:test";
 import { found, unverifiable } from "../../support/helpers.ts";
 

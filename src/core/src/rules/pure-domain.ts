@@ -1,5 +1,5 @@
 /**
- * INW005 pure-domain: which libraries a layer may import. INW001 only sees
+ * @file INW005 pure-domain: which libraries a layer may import. INW001 only sees
  * first-party layers, so `import sqlalchemy` in the domain passes it. Each
  * layer may set `allow-libraries` and `deny-libraries`; an entry names a
  * module and covers its submodules (`http.client`, `sqlalchemy`).

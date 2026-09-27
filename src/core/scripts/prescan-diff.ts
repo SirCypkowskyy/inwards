@@ -1,5 +1,5 @@
 /**
- * Differential test for the import-skeleton prescan (ADR-004).
+ * @file Differential test for the import-skeleton prescan (ADR-004).
  *
  * Every file has its imports extracted twice: from the full parse and from the
  * skeleton. The skeleton may find extra imports (the engine confirms those

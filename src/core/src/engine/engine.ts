@@ -1,3 +1,10 @@
+/**
+ * @file The engine: parses a file, runs the rules over it, then applies inline
+ * suppressions and `[tool.inwards.rules]`. It also decides which rule wins when
+ * several would report the same import, and when the full parse can be skipped
+ * (the prescan, the baseline shortcut). Adapters build one with `Engine.create`
+ * per config and call `checkFile` or `checkFiles`.
+ */
 import type { Parser } from "web-tree-sitter";
 import { acceptedModules } from "../baseline/accepted.ts";
 import type { InwardsConfig } from "../config/parse.ts";
@@ -94,7 +101,7 @@ export class Engine {
    * The text is normalised first (BOM dropped, lone \r turned into \n), so
    * reported lines and columns match what an editor shows. A file in a layer
    * that declares an encoding Inwards can't read faithfully gets one INW000
-   * diagnostic instead of a check (see `encoding.ts`).
+   * diagnostic instead of a check (see `rules/unsupported-encoding.ts`).
    *
    * The skeleton keeps import statements only, so it can't see
    * `importlib.import_module("...")` or `exec("import ...")`. A file in a layer
@@ -105,7 +112,7 @@ export class Engine {
    * most an INW006 warning naming its package.
    *
    * Inline suppression comments then hide the findings they cover and add
-   * INW009 for the ones that are invalid or unused (see `suppress.ts`).
+   * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
@@ -145,7 +152,7 @@ export class Engine {
 
   /**
    * Adds the package-shape findings to a file's confirmed ones and applies
-   * its suppression comments (see `suppress.ts`).
+   * its suppression comments (see `rules/suppression-comment.ts`).
    *
    * @param src - the source file, with normalised text.
    * @param confirmed - its confirmed findings, and its comments if the full parse read them.
@@ -266,7 +273,7 @@ export class Engine {
    * like `checkFile`.
    *
    * @param files - the adapter's view of the files under the config root.
-   * @returns the index.
+   * @returns a lazy index that lists and reads only when a rule asks.
    */
   index(files: ProjectFiles): ProjectIndex {
     return new ProjectIndex(files, (file) => {

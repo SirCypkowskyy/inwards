@@ -1,5 +1,5 @@
 /**
- * Wording for INW007 and INW008. Messages name the member and the package
+ * @file Wording for INW007 and INW008. Messages name the member and the package
  * only, never the allowed list, so a baseline entry survives a change to
  * `allow`. The fix steps list the allowed members and name the member the
  * code most likely belongs in: a built-in synonym, a suffix match, or the

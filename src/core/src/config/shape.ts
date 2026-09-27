@@ -1,5 +1,5 @@
 /**
- * `[[tool.inwards.shape]]` and `[[tool.inwards.names]]`: which members a
+ * @file `[[tool.inwards.shape]]` and `[[tool.inwards.names]]`: which members a
  * package may, must and must not hold, and where a member name may appear.
  *
  * Package selectors use import-linter's grammar (ADR-018): `a.b` is exact,
@@ -121,9 +121,9 @@ export function shapeFor(shapes: readonly ShapeSpec[], pkg: string): ShapeSpec |
 /**
  * Matches selector segments against name segments, `**` taking one or more.
  *
- * @param selector - the selector's segments.
- * @param name - the package's segments.
- * @returns true on a full match.
+ * @param selector - a selector split on dots, `*` and `**` included.
+ * @param name - a dotted package name split on dots.
+ * @returns true when the selector covers every segment of the name.
  */
 function matchSegments(selector: readonly string[], name: readonly string[]): boolean {
   const [head, ...rest] = selector;
@@ -142,8 +142,8 @@ function matchSegments(selector: readonly string[], name: readonly string[]): bo
  * Checks that a key holds an array of tables.
  *
  * @param value - the raw `shape` or `names` value.
- * @param key - the key, for messages.
- * @returns the tables.
+ * @param key - `shape` or `names`, for messages.
+ * @returns the entries, each still unvalidated.
  * @throws {ConfigError} when it isn't an array of tables.
  */
 function tables(value: unknown, key: string): Record<string, unknown>[] {
@@ -160,7 +160,7 @@ function tables(value: unknown, key: string): Record<string, unknown>[] {
  *
  * @param entry - the raw table.
  * @param i - its index, for messages.
- * @returns the shape.
+ * @returns the entry's selectors and member lists, validated.
  * @throws {ConfigError} naming the bad key.
  */
 function parseShape(entry: Record<string, unknown>, i: number): ShapeSpec {
@@ -203,7 +203,7 @@ function parseName(entry: Record<string, unknown>, i: number): NameRule {
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
- * @returns the selectors.
+ * @returns the selectors as written, each checked.
  * @throws {ConfigError} when the list is empty or a selector is malformed.
  */
 function selectors(value: unknown, where: string): string[] {
@@ -224,7 +224,7 @@ function selectors(value: unknown, where: string): string[] {
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
- * @returns the patterns.
+ * @returns the member patterns as written, each checked.
  * @throws {ConfigError} naming a pattern that isn't `name`, `name/` or `name.py`.
  */
 function patterns(value: unknown, where: string): string[] {

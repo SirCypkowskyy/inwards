@@ -36,13 +36,13 @@
     "jsdoc-js/require-returns": ["error", { "checkGetters": true }]
   },
   // Stricter documentation for the packages restructured under #176 (the CLI
-  // first; core and the extension join in their own PRs). Every module opens
+  // and core; the extension joins in its own PR). Every module opens
   // with an @file overview, destructured parameters are documented property
   // by property, descriptions must say more than the name, and a function
   // that throws directly says so.
   "overrides": [
     {
-      "files": ["src/cli/**/*.ts"],
+      "files": ["src/cli/**/*.ts", "src/core/**/*.ts"],
       "rules": {
         "jsdoc-js/require-file-overview": [
           "error",

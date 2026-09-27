@@ -1,3 +1,7 @@
+/**
+ * @file INW011 edge cases that earlier reviews found: odd call shapes, nesting and
+ * spellings the extraction must not miss. Each test names the case it pins.
+ */
 import { describe, expect, test } from "bun:test";
 import { check, file, found } from "../../support/helpers.ts";
 

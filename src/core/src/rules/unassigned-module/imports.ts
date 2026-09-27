@@ -1,5 +1,5 @@
 /**
- * INW006 unassigned-module: code that belongs to no layer is not checked, so
+ * @file INW006 unassigned-module: code that belongs to no layer is not checked, so
  * an agent that creates `shop/persistence/` and imports it from the domain
  * would escape every rule. This module closes that gap three ways:
  *

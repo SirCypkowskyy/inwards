@@ -1,3 +1,8 @@
+/**
+ * @file The fnmatch globs used by shape members and `generated`. They must match
+ * exactly as Python's `fnmatch.fnmatchcase` does, and in bounded time on
+ * hostile patterns.
+ */
 import { describe, expect, test } from "bun:test";
 import { globMatches, isGlob } from "../../src/config/glob.ts";
 import { memberMatches } from "../../src/config/shape.ts";

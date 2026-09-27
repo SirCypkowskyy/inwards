@@ -1,5 +1,5 @@
 /**
- * Source encoding declarations (PEP 263).
+ * @file Source encoding declarations (PEP 263).
  *
  * Adapters read files as UTF-8. That is exact for UTF-8 and safe for any
  * ASCII-compatible single-byte encoding, because import statements are ASCII

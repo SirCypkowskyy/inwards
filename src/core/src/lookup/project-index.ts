@@ -1,5 +1,5 @@
 /**
- * The project-wide view the per-file rules can't give: which first-party
+ * @file The project-wide view the per-file rules can't give: which first-party
  * module an import lands in, every first-party module, and who imports a
  * given module. It is the engine's project input (ADR-006): every adapter
  * (the CLI's check, hook and Stop gate, the language server) builds one with

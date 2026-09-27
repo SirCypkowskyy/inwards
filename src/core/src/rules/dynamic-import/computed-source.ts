@@ -1,5 +1,5 @@
 /**
- * Decides whether an `exec`, `eval` or `compile` call whose source isn't a
+ * @file Decides whether an `exec`, `eval` or `compile` call whose source isn't a
  * literal is an unverifiable dynamic import (INW011). It isn't when:
  *
  * - the call is `compile`, which only builds a code object: running that
@@ -169,7 +169,7 @@ function writesNamespace(id: Node): boolean {
  * Tells whether a node could leave the builtin (or an unknown value) under a name.
  *
  * @param node - a node of one of the `BINDERS` types.
- * @param name - the name.
+ * @param name - the identifier the call uses, e.g. `exec`.
  * @param bindings - what names mean in the calling module.
  * @param ownerOf - finds first-party modules, whose imports may re-export the builtin.
  * @returns true for a loader-valued binding, a risky import, `global`, `nonlocal` or `del`.
@@ -257,8 +257,8 @@ function wrappedByLoader(node: Node, bindings: Bindings): boolean {
  * Tells whether a node binds a name in a way certain to have run before the call.
  *
  * @param node - a node of one of the `BINDERS` types.
- * @param name - the name.
- * @param call - the call.
+ * @param name - the identifier the call uses, e.g. `exec`.
+ * @param call - the `exec`, `eval` or `compile` call node.
  * @returns true for a binding that meets conditions 3 and 4 of `rebound`.
  */
 function surelyBinds(node: Node, name: string, call: Node): boolean {
@@ -300,7 +300,7 @@ function surelyBinds(node: Node, name: string, call: Node): boolean {
  * the body of a function that encloses the call.
  *
  * @param statement - a statement node.
- * @param call - the call.
+ * @param call - the `exec`, `eval` or `compile` call node.
  * @returns true when the statement's bindings are in effect at the call.
  */
 function direct(statement: Node, call: Node): boolean {

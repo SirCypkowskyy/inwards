@@ -1,3 +1,8 @@
+/**
+ * @file INW010 unknown-first-party: an import of a first-party module that doesn't
+ * exist, and a relative import that climbs above the top-level package. The
+ * suggested module in the fix is checked as well.
+ */
 import { describe, expect, test } from "bun:test";
 import { check, engine, file, indexOn } from "../support/helpers.ts";
 

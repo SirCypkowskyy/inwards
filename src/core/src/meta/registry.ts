@@ -1,5 +1,5 @@
 /**
- * The rule registry: every rule's code, name, default severity, one-line
+ * @file The rule registry: every rule's code, name, default severity, one-line
  * summary and docs link, in one place. Rule modules build their diagnostics
  * with `diagnostic()` and reporters list rules from `RULES`, so adding a rule
  * touches only its own module and this file.

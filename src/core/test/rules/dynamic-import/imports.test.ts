@@ -1,3 +1,8 @@
+/**
+ * @file INW011 dynamic-import: which loader calls are found and how their literal
+ * targets resolve (call forms, aliases, literal spellings, relative targets).
+ * It also covers what is deliberately not reported.
+ */
 import { describe, expect, test } from "bun:test";
 import { skeletonImports } from "../../../src/python/prescan.ts";
 import { mentionsDynamicImport } from "../../../src/rules/dynamic-import/imports.ts";

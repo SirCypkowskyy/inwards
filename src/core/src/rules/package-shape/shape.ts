@@ -1,5 +1,5 @@
 /**
- * INW007 package-shape and INW008 missing-member: which members a package may,
+ * @file INW007 package-shape and INW008 missing-member: which members a package may,
  * must and must not hold (`[[tool.inwards.shape]]`), and where a member name
  * may appear (`[[tool.inwards.names]]`).
  *

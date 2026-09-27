@@ -1,3 +1,9 @@
+/**
+ * @file The public API of `@inwards/core`, the only module the adapters import.
+ * It re-exports the engine, the config parser, the reporters and the records
+ * they exchange. Everything else in core is internal and may move; `test/api.test.ts`
+ * pins this list, so a change to it is deliberate.
+ */
 export { baselineKey, stableMessage } from "./baseline/accepted.ts";
 export {
   type AgentSuppressions,

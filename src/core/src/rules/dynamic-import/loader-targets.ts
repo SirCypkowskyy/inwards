@@ -1,8 +1,8 @@
 /**
- * What an `import_module`, `__import__` or `run_module` call loads, read from
+ * @file What an `import_module`, `__import__` or `run_module` call loads, read from
  * its arguments as Python would compute them before the call runs. A target
  * that isn't a literal comes back as `COMPUTED`, which INW011 reports as
- * unverifiable in inner layers (see `dynamic.ts`).
+ * unverifiable in inner layers (see `imports.ts`).
  */
 import type { Node } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
@@ -111,7 +111,7 @@ function importModuleTargets(call: Node, file: SourceFile): Loaded[] {
 /**
  * Reads the `package` argument of `import_module` as name parts.
  *
- * @param node - the argument.
+ * @param node - the `package` argument's expression.
  * @param file - the calling file, which `__package__` and `__name__` refer to.
  * @returns the package split into parts, or null when it isn't known statically.
  */

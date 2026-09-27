@@ -1,3 +1,8 @@
+/**
+ * @file `[tool.inwards.rules]`: parsing `select`, `ignore` and `severity`, and
+ * applying them in the engine and in the checks adapters call directly.
+ * INW000 and the session layout checks must stay on whatever the table says.
+ */
 import { describe, expect, test } from "bun:test";
 import {
   ConfigError,

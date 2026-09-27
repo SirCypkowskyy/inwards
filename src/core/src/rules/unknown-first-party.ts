@@ -1,5 +1,5 @@
 /**
- * INW010 unknown-first-party: an import of a first-party module that doesn't
+ * @file INW010 unknown-first-party: an import of a first-party module that doesn't
  * exist, the typical agent hallucination (`from shop.domain.pricing import
  * DiscountPolicy` with no `pricing`), and a relative import that climbs above
  * the top-level package. Existence is decided by probing the disk
@@ -158,8 +158,10 @@ function absent(
  *
  * @param file - the importing file.
  * @param project - the module index, to look inside candidate directories.
- * @param where - the package the missing module would live in, the missing
- *   member's name, and the package's directory listing.
+ * @param where - where the missing module would have been.
+ * @param where.owner - the package the missing module would live in.
+ * @param where.missing - the missing member's name.
+ * @param where.entries - the package's directory listing.
  * @returns up to `SUGGESTIONS` dotted names, closest first, ties in name order.
  */
 function suggestions(

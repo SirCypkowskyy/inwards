@@ -1,3 +1,9 @@
+/**
+ * @file The records the engine and its adapters exchange: source files, import
+ * references, spans, diagnostics with their fixes, and suppressed findings.
+ * Plain data with no behaviour, so every core folder may import it and it
+ * imports nothing.
+ */
 /** 1-based line and column, the convention every editor and SARIF viewer uses. */
 export interface Span {
   line: number;

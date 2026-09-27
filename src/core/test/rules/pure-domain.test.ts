@@ -1,3 +1,8 @@
+/**
+ * @file INW005 pure-domain: which libraries a layer may import, with
+ * `allow-libraries`, `deny-libraries` and the default list for the innermost
+ * layer. First-party imports are left to INW001 and INW006.
+ */
 import { describe, expect, test } from "bun:test";
 import { ConfigError, type Diagnostic, type ImportRef, parseConfig } from "../../src/index.ts";
 import { checkLibraries } from "../../src/rules/pure-domain.ts";
