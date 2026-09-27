@@ -1,6 +1,7 @@
 /**
- * Reads bench/corpus.json, the pinned repos bench/corpus.ts runs, and turns
+ * @file Reads bench/corpus.json, the pinned repos bench/corpus.ts runs, and turns
  * an entry's layering into the `[tool.inwards]` table it is checked with.
+ * The manifest is validated on read, so a typo fails before any download.
  */
 import { readFileSync } from "node:fs";
 

@@ -1,11 +1,14 @@
+/**
+ * @file A minimal LSP client for the tests: it bundles the language server the way
+ * the extension ships it (CommonJS, grammars next to `server.js`), or runs an
+ * already built one, talks to it over stdio, and records what it publishes.
+ * Each test file makes its own harness, since Bun shares modules between files.
+ */
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-
-// The language server over stdio, bundled the way the extension ships it
-// (CommonJS, grammars next to server.js), talking to a minimal LSP client.
 
 export const PYPROJECT = `[tool.inwards]
 layers = [{ name = "app", modules = ["app"] }]
@@ -99,7 +102,7 @@ export function write(root: string, files: Record<string, string>): void {
  */
 export async function until(
   ready: () => boolean,
-  deadline = Date.now() + TIMEOUT_MS,
+  deadline: number = Date.now() + TIMEOUT_MS,
 ): Promise<void> {
   if (ready() || Date.now() > deadline) {
     return;

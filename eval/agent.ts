@@ -1,5 +1,5 @@
 /**
- * How the eval starts Claude Code: which binary, with which environment and
+ * @file How the eval starts Claude Code: which binary, with which environment and
  * flags. The environment is built from an allowlist, so nothing from the
  * shell that launched the eval (another Claude Code session's variables, its
  * effort level, plugin directories on PATH) reaches the agent under test.
@@ -79,6 +79,7 @@ function agentEnv(): Record<string, string> {
  *
  * @param effort - The `--effort` level to pass, if any.
  * @returns The setup every run uses.
+ * @throws {Error} when `claude` isn't on PATH or can't start with the eval's environment.
  */
 export function agentSetup(effort: string | undefined): AgentSetup {
   const claude = Bun.which("claude");

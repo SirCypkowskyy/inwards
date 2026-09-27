@@ -1,5 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["bun", "node"] },
+  // #176: every export's type must be derivable from its own module.
+  // isolatedDeclarations needs declaration; noEmit (from the base) still holds.
+  "compilerOptions": {
+    "types": ["bun", "node"],
+    "declaration": true,
+    "isolatedDeclarations": true
+  },
   "include": ["src", "scripts", "test"]
 }

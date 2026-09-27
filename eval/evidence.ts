@@ -1,5 +1,5 @@
 /**
- * Readers for what one eval run left behind: the stream-json transcript, the
+ * @file Readers for what one eval run left behind: the stream-json transcript, the
  * project's run log, the session state and the output of `inwards check` and
  * `inwards stats`. Each validates the shape instead of trusting it, because
  * the transcript belongs to Claude Code and may change. EVASIONS lists the

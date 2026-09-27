@@ -1,3 +1,9 @@
+/**
+ * @file The VS Code side of the extension: it starts the language server
+ * (`dist/server.js`) over IPC for Python files and pyproject.toml, and stops it
+ * when VS Code unloads the extension. A thin client: all the checking happens
+ * in the server.
+ */
 import { join } from "node:path";
 import type { ExtensionContext } from "vscode";
 import {

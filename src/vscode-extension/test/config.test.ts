@@ -1,3 +1,9 @@
+/**
+ * @file How the language server treats pyproject.toml: a config error pops up once
+ * and sits on the file, rule-table changes apply without a restart, and saves
+ * re-read the config when the client can't watch files. The server never
+ * checks pyproject.toml as Python.
+ */
 import { afterAll, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";

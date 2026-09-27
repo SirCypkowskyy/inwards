@@ -1,5 +1,5 @@
 /**
- * Offline agent eval: does an agent fix a violation when the Inwards hooks tell it to?
+ * @file Offline agent eval: does an agent fix a violation when the Inwards hooks tell it to?
  *
  *   bun run eval/run.ts [--model sonnet] [--only INW001/tempt-active-record] [--runs 3]
  *                       [--effort high] [--dry-run]
@@ -72,6 +72,7 @@ const SETTINGS = ".claude/settings.local.json";
  * @param cwd - Working directory.
  * @param okCodes - Exit codes that count as success; anything else throws.
  * @returns The exit code and stdout.
+ * @throws {Error} when the exit code isn't in `okCodes`, with the command's stderr.
  */
 function sh(cmd: string[], cwd: string, okCodes: number[] = [0]): { code: number; out: string } {
   const p = Bun.spawnSync(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
@@ -417,7 +418,7 @@ function runOne(target: RunTarget): CaseResult {
  * Lists the fixture ids, `<RULE>/<case>`, sorted.
  *
  * @param only - Keep just this id, when given.
- * @returns The ids.
+ * @returns `<RULE>/<case>` ids in sorted order.
  */
 function fixtureIds(only: string | undefined): string[] {
   return readdirSync(join(REPO, "eval/fixtures"))
@@ -430,6 +431,8 @@ function fixtureIds(only: string | undefined): string[] {
  * Runs every fixture (or the one `--only` names) `--runs` times and writes the
  * reports, or with `--dry-run` only sets them up. The binary copy is removed
  * at the end.
+ *
+ * @throws {Error} when `--runs` isn't a positive number.
  */
 function main(): void {
   const { values } = parseArgs({
@@ -462,7 +465,13 @@ function main(): void {
 /**
  * Runs the fixtures and writes the results after every run, so a crash later loses nothing.
  *
- * @param plan - Fixture ids, runs per fixture, model, the `--only` filter, the binary and the agent.
+ * @param plan - What to run.
+ * @param plan.ids - the fixture ids, `<RULE>/<case>`.
+ * @param plan.runs - runs per fixture.
+ * @param plan.model - the model the agent uses.
+ * @param plan.only - the `--only` filter, recorded in the report.
+ * @param plan.inwards - the path of the built inwards binary.
+ * @param plan.agent - the agent setup every run uses.
  */
 function runAll(plan: {
   ids: string[];

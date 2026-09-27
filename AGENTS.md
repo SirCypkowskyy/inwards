@@ -191,7 +191,7 @@ bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
 bun run typecheck       # tsc (TypeScript 7), strictest flags (tsconfig.base.json)
 bun run fallow          # dead code, unused deps, boundaries, zero clone groups
 bun run check:cycles    # no import cycles, type-only imports included (tsgo's own parse)
-bun run check:overviews # every module's @file overview is 2+ sentences (src/cli and src/core so far)
+bun run check:overviews # every module's @file overview is 2+ sentences
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
 uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
@@ -377,7 +377,7 @@ done until both match the code.
 - **Every module opens with an overview** (`@file`, two or more sentences):
   what it is for, what it owns, and what it deliberately doesn't do ("no
   I/O; the caller supplies file contents"). `lint:docs` requires the tag and
-  `check:overviews` the prose, in the packages restructured under #176.
+  `check:overviews` the prose, in every TypeScript file.
 - **Every function is documented** (`lint:docs`) with a TSDoc block,
   including private helpers and arrow functions bound to a name:
   - first line: a title that says what it does;

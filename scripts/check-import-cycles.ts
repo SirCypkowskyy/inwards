@@ -224,8 +224,8 @@ function lower(walk: Walk, node: string, value: number | undefined): void {
  * Pops the finished group whose root is a node off the stack.
  *
  * @param walk - the walk's bookkeeping, updated in place.
- * @param root - the group's root.
- * @returns the group's members.
+ * @param root - the node the group was entered from (its low-link equals its index).
+ * @returns the files in the group, root included.
  */
 function popGroup(walk: Walk, root: string): string[] {
   const group: string[] = [];

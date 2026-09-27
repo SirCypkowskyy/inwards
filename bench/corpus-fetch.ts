@@ -1,6 +1,7 @@
 /**
- * Checks out the repos of bench/corpus.json for bench/corpus.ts: shallow,
+ * @file Checks out the repos of bench/corpus.json for bench/corpus.ts: shallow,
  * sparse, at the pinned commit, reusing a clean checkout from an earlier run.
+ * A failed fetch is retried with a growing pause before the run gives up.
  */
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
