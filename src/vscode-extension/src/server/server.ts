@@ -153,7 +153,7 @@ documents.onDidSave(({ document }) => {
   const path = fileURLToPath(document.uri);
   if (!watching && path === configPath) {
     enqueue(reload);
-  } else if (!watching && state?.config.contexts !== undefined && PYTHON.test(path)) {
+  } else if (!watching && state?.config.contexts && mayHoldModule(state.root, path)) {
     enqueue(reindex);
   }
 });
