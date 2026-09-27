@@ -2,7 +2,7 @@
  * @file The extraction cache's pruning and failed writes (#56). Pruning drops
  * stale temporary files this cache named and entries past their age, and
  * keeps a shard under its byte limit even when one run writes a lot to it.
- * It never deletes through a shard that became a link during the run. A
+ * It never writes or deletes through a shard that became a link during the run. A
  * write that fails leaves no temporary file and never throws into the check.
  */
 import { describe, expect, test } from "bun:test";
@@ -10,6 +10,7 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
   symlinkSync,
@@ -85,7 +86,7 @@ describe("pruning", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  test("a shard that became a link mid-run is never pruned through", () => {
+  test("a shard that became a link mid-run is neither written nor pruned through", () => {
     const root = tempDir("inwards-cache-");
     const run = fileExtractionCache(root, WASM);
     const [first = "", ...rest] = textsInShard("3c", 8);
@@ -110,6 +111,7 @@ describe("pruning", () => {
     for (const path of planted) {
       expect(existsSync(path)).toBe(true);
     }
+    expect(readdirSync(outside)).toHaveLength(planted.length); // nothing published there
   });
 });
 

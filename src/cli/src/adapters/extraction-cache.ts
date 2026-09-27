@@ -210,6 +210,10 @@ function writeEntry(run: Run, identity: ExtractionIdentity, value: CachedExtract
   if (bytes > MAX_ENTRY_BYTES || !shardReady(run, at.shard, true)) {
     return; // too big to cache, or nowhere safe to put it: the file is simply parsed each time
   }
+  if (!chainIntact(run.project, chainTo(run, at.shard))) {
+    run.shards.set(at.shard, false); // a directory became a link since the run looked
+    return;
+  }
   run.temps += 1;
   const temp = join(at.shard, `.${at.key}.${run.nonce}.${run.temps}.tmp`);
   if (!publish(temp, at.path, text)) {
@@ -233,12 +237,22 @@ function writeEntry(run: Run, identity: ExtractionIdentity, value: CachedExtract
  *   changed, and then the run writes to the shard no more.
  */
 function pruneChecked(run: Run, shard: string): number {
-  const parts = [...run.chain, shard.slice(run.namespace.length + 1)];
-  if (chainIntact(run.project, parts)) {
+  if (chainIntact(run.project, chainTo(run, shard))) {
     return prune(shard, Date.now());
   }
   run.shards.set(shard, false);
   return MAX_SHARD_BYTES;
+}
+
+/**
+ * Names the directories from the project down to a shard.
+ *
+ * @param run - this run, which knows the chain to its namespace.
+ * @param shard - the shard directory.
+ * @returns the chain, outermost first.
+ */
+function chainTo(run: Run, shard: string): string[] {
+  return [...run.chain, shard.slice(run.namespace.length + 1)];
 }
 
 /**

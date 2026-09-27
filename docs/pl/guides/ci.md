@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: a31970effbaff97c069a61eb608c7001cdf55ebad18587bcfd8ed001daed8304
+source_hash: bc33c98e37b20db3ca8f46758f92aaafd6ce110513c734893d22f055295d1979
 ---
 
 # GitHub Actions { #github-actions }

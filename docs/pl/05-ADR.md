@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 6ce9d9a61701942ef2a2b0f1ca99aa1913777095ca09b6435eadf76db5f8b098
+source_hash: 624f37217ab1c203cea12a48fe4d525e03774459ded1369b5be3ce86cf557b74
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -799,7 +799,7 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-plus-circle-outline: Ciepłe `inwards check` pomija parsowanie niezmienionych plików: na syntetycznym repozytorium 3,0 raza szybciej (0,46 s wobec 1,25 s, p50). Benchmark podaje osobno uruchomienia bez pamięci podręcznej, z pustą i z ciepłą.
 - :material-plus-circle-outline: Nic w `.inwards/cache` nie może zmienić wyników hooków, co sprawdza test z podrzuconym wpisem.
 - :material-minus-circle-outline: `inwards check` z pamięcią podręczną jej ufa. Każdy, kto może pisać do projektu, może sprawić, że przeoczy ono naruszenie. CI, które odtwarza pamięć podręczną z niezaufanej gałęzi, powinno używać `--no-cache`, jak mówi [przewodnik po GitHub Actions](guides/ci.md#caching-between-runs).
-- :material-minus-circle-outline: Katalogi są sprawdzane po ścieżce, a nie trzymane otwarte. Proces, który w trakcie uruchomienia podmieni któryś na dowiązanie, może skierować zapisy tego uruchomienia gdzie indziej. Taki proces i tak może pisać do projektu i uruchamiać polecenia; przycinanie ponownie sprawdza łańcuch katalogów i nigdy nie usuwa niczego poza własnymi nazwami pamięci podręcznej.
+- :material-minus-circle-outline: Katalogi są sprawdzane po ścieżce, a nie trzymane otwarte: Node nie ma `openat` ani `unlinkat`. Pamięć podręczna zakłada, że ten, kto może pisać do projektu, działa też jako użytkownik, tak jak agent z dostępem do powłoki; proces, który może tylko pisać pliki i ściga się z uruchomieniem, podmieniając katalog na dowiązanie między sprawdzeniem a zapisem albo przycinaniem, może skierować tę jedną operację gdzie indziej. Każda publikacja i każde przycinanie najpierw sprawdza cały łańcuch katalogów i przestaje używać części, która się zmieniła, a przycinanie usuwa tylko nazwy, które zapisuje sama pamięć podręczna.
 - :material-minus-circle-outline: Rewizję trzeba podnosić ręcznie; test odcisku zauważa tylko, że pliki się zmieniły.
 - :material-minus-circle-outline: Pusta pamięć podręczna płaci za zapis każdego pliku: uruchomienie, które ją wypełnia, było na syntetycznym repozytorium o 27% wolniejsze. Benchmark podaje ten koszt, ale go nie bramkuje, bo zależy bardziej od systemu plików runnera niż od kodu.
 

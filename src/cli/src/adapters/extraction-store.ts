@@ -6,10 +6,11 @@
  * a skipped write, so the check falls back to parsing.
  *
  * The directories are checked with `lstat`, not held open, so a process that
- * swaps one for a link between the check and the use can redirect a write.
- * Such a process can already write the project and run commands as the user;
- * the checks keep a planted link from being followed by accident, and pruning
- * checks the whole chain again and deletes only names this cache writes.
+ * swaps one for a link between the check and the use can redirect a write or
+ * a prune. The cache assumes whoever writes the project also runs as the
+ * user (ADR-031). The checks keep a planted link from being followed: the
+ * whole chain is checked again before every publication and every prune, and
+ * pruning deletes only names this cache writes.
  */
 import {
   closeSync,
@@ -22,6 +23,7 @@ import {
   readSync,
   renameSync,
   rmSync,
+  type Stats,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -117,7 +119,8 @@ function realDirectory(dir: string): boolean {
 /**
  * Reads a regular file of at most `MAX_ENTRY_BYTES`, through one descriptor:
  * a link, a FIFO, a directory, a bigger file or one that grows while it is
- * read reads as nothing.
+ * read reads as nothing. The path is looked at with `lstat` first as well,
+ * since Windows has neither `O_NOFOLLOW` nor `O_NONBLOCK`.
  *
  * @param path - the entry file.
  * @returns its text, or undefined.
@@ -125,6 +128,9 @@ function realDirectory(dir: string): boolean {
 export function readBounded(path: string): string | undefined {
   let fd: number | undefined;
   try {
+    if (!lstatSync(path).isFile()) {
+      return undefined; // a planted link, even where open(2) can't refuse one
+    }
     fd = openSync(path, READ_FLAGS);
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.size > MAX_ENTRY_BYTES) {
@@ -140,9 +146,22 @@ export function readBounded(path: string): string | undefined {
   } catch {
     return undefined; // missing or unreadable: a miss
   } finally {
+    closeQuietly(fd);
+  }
+}
+
+/**
+ * Closes a descriptor, ignoring every failure: what was read stands.
+ *
+ * @param fd - the descriptor, if one was opened.
+ */
+function closeQuietly(fd: number | undefined): void {
+  try {
     if (fd !== undefined) {
       closeSync(fd);
     }
+  } catch {
+    // nothing more to do with it
   }
 }
 
@@ -170,12 +189,14 @@ export function publish(temp: string, path: string, text: string): boolean {
  * Removes a file, ignoring every failure.
  *
  * @param path - the file.
+ * @returns true once it is gone.
  */
-function removeQuietly(path: string): void {
+function removeQuietly(path: string): boolean {
   try {
     rmSync(path, { force: true });
+    return true;
   } catch {
-    // a file that can't be removed is left to a later prune
+    return false; // left to a later prune
   }
 }
 
@@ -183,38 +204,75 @@ function removeQuietly(path: string): void {
  * Keeps a shard small: stale temporary files and old entries go, then the
  * oldest entries until the shard is under its byte limit. Only regular files
  * named as this cache names them are touched, and every failure is ignored.
+ * Only bytes actually removed are subtracted; a shard that can't be listed
+ * counts as full, so the next write tries again.
  *
  * @param shard - one shard directory, checked by the caller just before.
  * @param now - the current time, in milliseconds since the epoch.
- * @returns the bytes of entries left in the shard.
+ * @returns the bytes of entries left in the shard, as far as it could tell.
  */
 export function prune(shard: string, now: number): number {
-  let total = 0;
-  try {
-    const entries: { path: string; size: number; mtime: number }[] = [];
-    for (const name of readdirSync(shard)) {
-      const path = join(shard, name);
-      const stat = lstatSync(path);
-      if (!stat.isFile()) {
-        continue;
-      }
-      if (TEMP_NAME.test(name) && now - stat.mtimeMs > STALE_TEMP_MS) {
-        removeQuietly(path);
-      } else if (ENTRY_NAME.test(name)) {
-        entries.push({ path, size: stat.size, mtime: stat.mtimeMs });
-      }
+  const entries = listShard(shard, now);
+  if (entries === undefined) {
+    return MAX_SHARD_BYTES + 1;
+  }
+  entries.sort((a, b) => a.mtime - b.mtime);
+  let total = entries.reduce((sum, e) => sum + e.size, 0);
+  for (const e of entries) {
+    if (total <= MAX_SHARD_BYTES && now - e.mtime <= MAX_AGE_MS) {
+      break;
     }
-    entries.sort((a, b) => a.mtime - b.mtime);
-    total = entries.reduce((sum, e) => sum + e.size, 0);
-    for (const e of entries) {
-      if (now - e.mtime <= MAX_AGE_MS && total <= MAX_SHARD_BYTES) {
-        break;
-      }
-      removeQuietly(e.path);
+    if (removeQuietly(e.path)) {
       total -= e.size;
     }
-  } catch {
-    // pruning is best effort
   }
   return total;
+}
+
+/**
+ * Lists a shard's entries, removing its stale temporary files on the way.
+ * Anything that isn't a regular file with a name this cache writes is skipped.
+ *
+ * @param shard - one shard directory.
+ * @param now - the current time, in milliseconds since the epoch.
+ * @returns each entry's path, size and age, or undefined when the shard can't be listed.
+ */
+function listShard(
+  shard: string,
+  now: number,
+): { path: string; size: number; mtime: number }[] | undefined {
+  let names: string[];
+  try {
+    names = readdirSync(shard);
+  } catch {
+    return undefined;
+  }
+  const entries: { path: string; size: number; mtime: number }[] = [];
+  for (const name of names) {
+    const path = join(shard, name);
+    const stat = statQuietly(path);
+    if (stat === undefined || !stat.isFile()) {
+      continue; // gone since the listing, or not ours
+    }
+    if (TEMP_NAME.test(name) && now - stat.mtimeMs > STALE_TEMP_MS) {
+      removeQuietly(path);
+    } else if (ENTRY_NAME.test(name)) {
+      entries.push({ path, size: stat.size, mtime: stat.mtimeMs });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Looks at a path without following a link, ignoring every failure.
+ *
+ * @param path - a file in a shard, from its listing.
+ * @returns what is there, or undefined when nothing is or it can't be looked at.
+ */
+function statQuietly(path: string): Stats | undefined {
+  try {
+    return lstatSync(path);
+  } catch {
+    return undefined;
+  }
 }
