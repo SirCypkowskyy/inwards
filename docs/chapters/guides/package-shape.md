@@ -116,7 +116,7 @@ pattern = "test_*"
 only-in = ["tests", "tests.**"]
 ```
 
-Both configs are test fixtures (`src/cli/test/fixtures/shapes/`): each passes `inwards check` with 0 findings, and the tests plant `helpers.py`, `services/x.py` and `test_x.py` to check that each fails with the fix above.
+Both configs are test fixtures (`src/cli/test/support/fixtures/shapes/`): each passes `inwards check` with 0 findings, and the tests plant `helpers.py`, `services/x.py` and `test_x.py` to check that each fails with the fix above.
 
 ## Not covered yet
 

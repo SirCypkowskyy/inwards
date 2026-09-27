@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 9180cde0a00a746336318b432477794c1298c524ec4633e1536bff6673d2cd49
+source_hash: 42f4d98617e41f3556ff26552912e733bd658fecb59048a541008b97fc222a61
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -88,7 +88,7 @@ flowchart TB
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
 | **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
-| **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init.ts` | :white_check_mark: `init --agent` dla `claude`, `aider` i `agents-md` |
+| **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :white_check_mark: `init --agent` dla `claude`, `aider` i `agents-md` |
 | **Stan sesji i run log** | Pliki JSON i JSON Lines, tylko lokalnie | `.inwards/state/`, `.inwards/runs.jsonl` | :white_check_mark: (run log opcjonalny, [rozdział 8](08-Run-Log.md)) |
 | **Pamięć podręczna** | Listy importów kluczowane hashem zawartości | `.inwards/cache` | :material-progress-clock: [#56](https://github.com/SirCypkowskyy/inwards/issues/56) |
 
@@ -402,39 +402,23 @@ src/
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # bun test
 ├── cli/
-│   ├── src/
-│   │   ├── main.ts        # commands: check, baseline, stats, init, hook claude-code
-│   │   ├── project.ts     # load the config and sources, run a check
-│   │   ├── baseline.ts    # inwards-baseline.json: write, apply, hash for the Stop gate
-│   │   ├── files.ts       # file walk: skips, symlinks, layer packages walked in full
-│   │   ├── paths.ts       # real paths, containment, config discovery (ADR-013)
-│   │   ├── grammars.ts    # .wasm files embedded in the binary
-│   │   ├── output.ts      # stdout / stderr without console.*
-│   │   ├── hook.ts        # hook entry: SessionStart, PostToolUse, dispatch
-│   │   ├── guard.ts       # PreToolUse config guard
-│   │   ├── shell.ts       # reads Bash commands for `inwards hook` / `inwards baseline`
-│   │   ├── edit-sim.ts    # applies an Edit/Write/MultiEdit in memory for the guard
-│   │   ├── stop.ts        # Stop gate
-│   │   ├── prefixes.ts    # INW006 and INW008 layout checks against the session start
-│   │   ├── escalation.ts  # escalate-after, unresolved records
-│   │   ├── session.ts     # session state: start record, edits, fingerprints
-│   │   ├── snapshot.ts    # configs, content hashes and HEAD of the project now
-│   │   ├── state-files.ts # .inwards/state writes, symlink checks, pruning
-│   │   ├── runlog.ts      # opt-in .inwards/runs.jsonl
-│   │   ├── runs.ts        # reads the run logs back for stats
-│   │   ├── stats.ts       # the hypothesis numbers from the run log
-│   │   ├── stats-command.ts  # inwards stats: finds the logs, prints the report
-│   │   ├── log-export.ts  # stats --export [--redact]: one shareable log file
-│   │   ├── init.ts        # inwards init --agent
-│   │   ├── init-style.ts  # inwards init --style / --scaffold, the entry for every init
-│   │   ├── init-report.ts # the annotated tree and check after init --style
-│   │   ├── init-target.ts # the pyproject.toml, package and src layout init --style uses
-│   │   ├── init-write.ts  # scaffold writes: no symlinks, nothing outside, all or nothing
-│   │   ├── styles.ts      # the presets and the scaffold's Python templates
-│   │   ├── picker.ts      # the interactive init (@clack/prompts, loaded lazily)
-│   │   ├── claude-settings.ts  # finds the Inwards hooks in Claude Code settings
-│   │   └── diff.ts        # line diff for init --dry-run
-│   └── test/              # CLI, hook, Stop gate and E2E tests, snapshots
+│   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
+│   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
+│   │   ├── commands/      # check, baseline, stats, hook: thin, handed AppDeps
+│   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
+│   │   │                  #   guard (Bash reader, edit simulation), PostToolUse, the Stop gate
+│   │   │                  #   and its changed-file checks, escalation, settings
+│   │   ├── session/       # the session record, start identity and content, old errors,
+│   │   │                  #   agent suppressions, layout changes against the session start
+│   │   ├── project/       # running a check, the baseline, config discovery, project snapshots
+│   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
+│   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
+│   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
+│   │   ├── platform/      # the contracts for everything outside the process, and print()
+│   │   ├── json/          # type guards for parsed JSON and TOML
+│   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
+│   │                      #   the grammars, the picker; compose.ts wires them into AppDeps
+│   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
 └── vscode-extension/src/  # extension.ts + selector.ts (client), server.ts + config-file.ts (LSP), workspace.ts (INW007/INW008 pass)
 ```
 

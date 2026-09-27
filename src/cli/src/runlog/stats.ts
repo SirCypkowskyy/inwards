@@ -1,7 +1,7 @@
 /**
  * @file `inwards stats`: the business-hypothesis numbers from the run log
  * (docs/chapters/08-Run-Log.md), next to the thresholds chapter 2 sets.
- * The log is read by runs.ts and the report printed by stats-command.ts.
+ * The log is read by `runs.ts` and the report printed by `commands/stats.ts`.
  */
 import { errorsOf, preexisting, type RunLine, ruleCodes, stopRuns } from "./runs.ts";
 

@@ -27,8 +27,12 @@ jobs:
       - uses: actions/checkout@v7
       - name: Every version field matches .release-please-manifest.json
         run: bash scripts/check-version.sh
-      - name: CLAUDE.md only imports AGENTS.md (edit AGENTS.md instead)
-        run: test "$(cat CLAUDE.md)" = "@AGENTS.md"
+      - name: Every CLAUDE.md only imports the AGENTS.md next to it (edit AGENTS.md instead)
+        run: |
+          for f in $(git ls-files '*CLAUDE.md'); do
+            test "$(cat "$f")" = "@AGENTS.md" || { echo "$f must hold only @AGENTS.md"; exit 1; }
+            test -f "$(dirname "$f")/AGENTS.md" || { echo "$f has no AGENTS.md next to it"; exit 1; }
+          done
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
