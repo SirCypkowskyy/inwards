@@ -34,7 +34,66 @@
     // the rest of the engine.
     "zones": [
       { "name": "core-api", "patterns": ["src/core/src/index.ts"] },
-      { "name": "core", "patterns": ["src/core/src/**"] },
+      // The engine, one zone per folder and one per rule (#176); see
+      // src/core/AGENTS.md for what each owns.
+      { "name": "core-contracts", "patterns": ["src/core/src/contracts/**"] },
+      { "name": "core-meta", "patterns": ["src/core/src/meta/**"] },
+      { "name": "core-config", "patterns": ["src/core/src/config/**"] },
+      { "name": "core-python", "patterns": ["src/core/src/python/**"] },
+      { "name": "core-lookup", "patterns": ["src/core/src/lookup/**"] },
+      { "name": "core-rules-shared", "patterns": ["src/core/src/rules/shared/**"] },
+      {
+        "name": "core-rule-unsupported-encoding",
+        "patterns": [
+          "src/core/src/rules/unsupported-encoding.ts",
+          "src/core/src/rules/unsupported-encoding/**"
+        ]
+      },
+      {
+        "name": "core-rule-layer-dependency",
+        "patterns": [
+          "src/core/src/rules/layer-dependency.ts",
+          "src/core/src/rules/layer-dependency/**"
+        ]
+      },
+      {
+        "name": "core-rule-pure-domain",
+        "patterns": ["src/core/src/rules/pure-domain.ts", "src/core/src/rules/pure-domain/**"]
+      },
+      {
+        "name": "core-rule-unassigned-module",
+        "patterns": [
+          "src/core/src/rules/unassigned-module.ts",
+          "src/core/src/rules/unassigned-module/**"
+        ]
+      },
+      {
+        "name": "core-rule-package-shape",
+        "patterns": ["src/core/src/rules/package-shape.ts", "src/core/src/rules/package-shape/**"]
+      },
+      {
+        "name": "core-rule-suppression-comment",
+        "patterns": [
+          "src/core/src/rules/suppression-comment.ts",
+          "src/core/src/rules/suppression-comment/**"
+        ]
+      },
+      {
+        "name": "core-rule-unknown-first-party",
+        "patterns": [
+          "src/core/src/rules/unknown-first-party.ts",
+          "src/core/src/rules/unknown-first-party/**"
+        ]
+      },
+      {
+        "name": "core-rule-dynamic-import",
+        "patterns": ["src/core/src/rules/dynamic-import.ts", "src/core/src/rules/dynamic-import/**"]
+      },
+      { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
+      { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
+      { "name": "core-report", "patterns": ["src/core/src/report/**"] },
+      // Anything else under src/ has no zone of its own yet and may import nothing.
+      { "name": "core-unzoned", "patterns": ["src/core/src/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
       { "name": "adapter-parity", "patterns": ["src/cli/test/integration/lsp-parity.test.ts"] },
       // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
@@ -62,11 +121,174 @@
       { "name": "docs", "patterns": ["docs/**"] }
     ],
     "rules": [
-      // The engine imports nothing of ours; adapters come to it.
-      { "from": "core", "allow": [] },
-      { "from": "core-api", "allow": ["core"] },
+      // The engine imports nothing outside src/core; adapters come to it. Inside,
+      // folders depend downwards: contracts, then meta (product metadata and the
+      // rule registry), then config; python and lookup beside it; then the rules,
+      // which share only rules/shared and never import each other; then baseline,
+      // engine and report. index.ts may re-export any of them (#176).
+      { "from": "core-contracts", "allow": [] },
+      { "from": "core-meta", "allow": ["core-contracts"] },
+      { "from": "core-config", "allow": ["core-contracts", "core-meta"] },
+      { "from": "core-python", "allow": ["core-contracts"] },
+      { "from": "core-lookup", "allow": ["core-contracts", "core-python"] },
+      { "from": "core-rules-shared", "allow": ["core-contracts", "core-meta", "core-config"] },
+      {
+        "from": "core-rule-unsupported-encoding",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-layer-dependency",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-pure-domain",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-unassigned-module",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-package-shape",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-suppression-comment",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-unknown-first-party",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-dynamic-import",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      { "from": "core-baseline", "allow": ["core-contracts"] },
+      {
+        "from": "core-engine",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-unsupported-encoding",
+          "core-rule-layer-dependency",
+          "core-rule-pure-domain",
+          "core-rule-unassigned-module",
+          "core-rule-package-shape",
+          "core-rule-suppression-comment",
+          "core-rule-unknown-first-party",
+          "core-rule-dynamic-import",
+          "core-baseline"
+        ]
+      },
+      { "from": "core-report", "allow": ["core-contracts", "core-meta"] },
+      {
+        "from": "core-api",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-unsupported-encoding",
+          "core-rule-layer-dependency",
+          "core-rule-pure-domain",
+          "core-rule-unassigned-module",
+          "core-rule-package-shape",
+          "core-rule-suppression-comment",
+          "core-rule-unknown-first-party",
+          "core-rule-dynamic-import",
+          "core-baseline",
+          "core-engine",
+          "core-report"
+        ]
+      },
+      { "from": "core-unzoned", "allow": [] },
       // Its own tests and the prescan differential test may reach internals.
-      { "from": "core-dev", "allow": ["core-api", "core"] },
+      {
+        "from": "core-dev",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-unsupported-encoding",
+          "core-rule-layer-dependency",
+          "core-rule-pure-domain",
+          "core-rule-unassigned-module",
+          "core-rule-package-shape",
+          "core-rule-suppression-comment",
+          "core-rule-unknown-first-party",
+          "core-rule-dynamic-import",
+          "core-baseline",
+          "core-engine",
+          "core-report"
+        ]
+      },
       // The CLI reaches the engine through `@inwards/core` (index.ts) only, and
       // its folders depend downwards: pure leaves (platform, json, paths), then
       // project, session, runlog, then claude-code and init, then commands.
@@ -182,7 +404,75 @@
     "calls": {
       "forbidden": [
         {
-          "from": "core",
+          "from": "core-api",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-contracts",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-meta",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-config",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-python",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-lookup",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rules-shared",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-unsupported-encoding",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-layer-dependency",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-pure-domain",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-unassigned-module",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-package-shape",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-suppression-comment",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-unknown-first-party",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-dynamic-import",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-baseline",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-engine",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-report",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         }
       ]

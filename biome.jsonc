@@ -286,7 +286,8 @@
               "options": {
                 "deniedGlobals": {
                   "Bun": "The engine also runs on Node inside VS Code. Take I/O through a port instead (see GrammarBinaries).",
-                  "Deno": "The engine must stay runtime-agnostic."
+                  "Deno": "The engine must stay runtime-agnostic.",
+                  "process": "The engine has no process: take what you need as a parameter or a port."
                 }
               }
             }
