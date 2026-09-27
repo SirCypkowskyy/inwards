@@ -39,17 +39,17 @@ then `commands`. Only `main.ts` imports `adapters/`. `eval/` may import
 Enforced by:
 
 - **fallow zones** (`.fallowrc.jsonc`): one zone per folder with its allowed
-  edges. A new folder falls into `cli-unzoned`, which may import nothing,
-  until it gets a zone and rules.
+  edges. A file in a new folder matches no zone, and fallow fails
+  (`requireAllFiles`) until the folder gets a zone and rules.
 - **Biome** (`biome.jsonc`): the policy folders can't import `node:fs`,
   `node:child_process`, `node:os`, `node:process`, `node:readline`, the
   network modules (`node:http`, `node:https`, `node:net`, `node:dns`, ...)
   or `node:perf_hooks`, subpaths included (`node:fs/promises`,
-  `node:dns/promises`), nor use the `Bun`, `process`, `fetch` or
-  `performance` globals. The `no-direct-clock` GritQL plugin rejects
-  `Date.now()`, `Date()`, `new Date()` and `performance.now()`: take the
-  time from `Clock`. `node:path`, `node:crypto` and `Date.parse` are fine; they
-  are pure.
+  `node:dns/promises`), nor use the `Bun`, `process`, `fetch`,
+  `performance`, `Date`, `globalThis`, `global` or `Function` globals. Take
+  the time from `Clock` (an ISO string), and parse a recorded timestamp with
+  `platform/time.ts`, the one place allowed to name `Date`. `node:path` and
+  `node:crypto` are fine; they are pure.
 - **`bun run check:cycles`**: no import cycles, type imports included. It
   asks the pinned TypeScript (tsgo) for the syntax tree and the resolved
   modules, so comments can't hide an edge and extensionless imports count.

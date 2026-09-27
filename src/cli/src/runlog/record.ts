@@ -106,7 +106,7 @@ export function createRunLog(io: RunLogIo): RunLog {
         const files = [...new Set(noted.files)];
         const line = {
           v: 1,
-          at: io.clock.now().toISOString(),
+          at: io.clock.now(),
           session_id: typeof input?.["session_id"] === "string" ? input["session_id"] : null,
           event: run.event,
           tool: typeof input?.["tool_name"] === "string" ? input["tool_name"] : null,

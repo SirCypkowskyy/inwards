@@ -8,6 +8,7 @@
  */
 import { dirname, join } from "node:path";
 import type { FileReader } from "../platform/contracts.ts";
+import { parseTime } from "../platform/time.ts";
 
 const LINE_BREAK = /\r?\n/u;
 
@@ -55,7 +56,7 @@ export function readRunLogs(
     }
   }
   // Stable sort: lines with the same time keep their file order.
-  lines.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  lines.sort((a, b) => parseTime(a.at) - parseTime(b.at));
   return { lines, skipped };
 }
 /**
@@ -100,7 +101,7 @@ export function stopRuns(
   for (const line of lines) {
     if (line.event === "Stop" && line.session_id !== null) {
       const runs = bySession.get(line.session_id) ?? [];
-      runs.push({ at: Date.parse(line.at), prints: line.fingerprints });
+      runs.push({ at: parseTime(line.at), prints: line.fingerprints });
       bySession.set(line.session_id, runs);
     }
   }
@@ -152,7 +153,7 @@ export function preexisting(
   for (const run of hooks) {
     const session = run.session_id ?? "";
     if (!firstEdit.has(session)) {
-      firstEdit.set(session, Date.parse(run.at));
+      firstEdit.set(session, parseTime(run.at));
     }
   }
   const checks = lines.filter((l) => l.event === "check");
@@ -160,7 +161,7 @@ export function preexisting(
   const old = new Map<string, Set<string>>();
   let next = 0;
   for (const [session, at] of firstEdit) {
-    for (; next < checks.length && Date.parse(checks[next]?.at ?? "") < at; next += 1) {
+    for (; next < checks.length && parseTime(checks[next]?.at ?? "") < at; next += 1) {
       for (const print of checks[next]?.fingerprints ?? []) {
         seen.add(print);
       }
@@ -186,7 +187,7 @@ export function parseLine(raw: string): RunLine | undefined {
     !isRecord(value) ||
     value["v"] !== 1 ||
     typeof value["at"] !== "string" ||
-    Number.isNaN(Date.parse(value["at"])) ||
+    Number.isNaN(parseTime(value["at"])) ||
     typeof value["event"] !== "string" ||
     !isStrings(value["files"]) ||
     !isStrings(value["fingerprints"]) ||

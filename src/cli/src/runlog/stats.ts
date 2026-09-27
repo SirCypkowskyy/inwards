@@ -3,6 +3,8 @@
  * (docs/chapters/08-Run-Log.md), next to the thresholds chapter 2 sets.
  * The log is read by `runs.ts` and the report printed by `commands/stats.ts`.
  */
+
+import { parseTime } from "../platform/time.ts";
 import { errorsOf, preexisting, type RunLine, ruleCodes, stopRuns } from "./runs.ts";
 
 /** How many first-reported violations were gone at the next hook run for the same file. */
@@ -159,7 +161,7 @@ function observe(pass: Pass, run: RunLine, file: string): void {
     state.foreign.add(print);
   }
   state.pending = fresh.filter((print) => !others.includes(print));
-  state.pendingAt = Date.parse(run.at);
+  state.pendingAt = parseTime(run.at);
   for (const print of state.pending) {
     state.seen.add(print);
   }

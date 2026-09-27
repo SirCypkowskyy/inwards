@@ -34,8 +34,8 @@ export function readRuntime(): Runtime {
 
 /** Wall-clock and monotonic time. */
 export const systemClock: Clock = {
-  now(): Date {
-    return new Date();
+  now(): string {
+    return new Date().toISOString();
   },
   elapsed(): number {
     // Since the process started (Bun's performance clock), so startup counts too.

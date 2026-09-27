@@ -1,6 +1,7 @@
 /**
- * @file Every `src/cli/...` path the docs and the agent guides mention exists.
- * The CLI was reorganised into folders (#176), and a guide that points at a
+ * @file Every `src/cli/...`, `src/core/...` and `src/vscode-extension/...` path
+ * the docs and the agent guides mention exists. The packages were reorganised
+ * into folders (#176), and a guide that points at a
  * file that moved sends the next agent looking in the wrong place. Accepted
  * ADR bodies are exempt: they record history, and their status column says
  * where a file went.
@@ -10,11 +11,11 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "../../../..");
-/** A repo path under the CLI: letters, digits and path punctuation, up to a space, quote or bracket. */
-const CLI_PATH = /\bsrc\/cli\/[\w./*-]*[\w/*]/gu;
+/** A repo path under a package: letters, digits and path punctuation, up to a space, quote or bracket. */
+const PACKAGE_PATH = /\bsrc\/(?:cli|core|vscode-extension)\/[\w./*-]*[\w/*]/gu;
 
 /**
- * Lists the Markdown files that may name CLI paths: the docs in both
+ * Lists the Markdown files that may name package paths: the docs in both
  * languages, the agent guides and the READMEs.
  *
  * @param dir - a directory to walk, relative to the repo.
@@ -41,17 +42,18 @@ function exists(path: string): boolean {
   return existsSync(join(REPO, star === -1 ? path : path.slice(0, star)));
 }
 
-test("every src/cli path in the docs and guides exists", () => {
+test("every package path in the docs and guides exists", () => {
   const files = [
     ...markdown("docs/chapters"),
     ...markdown("docs/pl"),
     "AGENTS.md",
     "src/cli/AGENTS.md",
+    "src/core/AGENTS.md",
     "README.md",
     "eval/README.md",
   ];
   const missing = files.flatMap((file) =>
-    [...readFileSync(join(REPO, file), "utf8").matchAll(CLI_PATH)]
+    [...readFileSync(join(REPO, file), "utf8").matchAll(PACKAGE_PATH)]
       .map((match) => match[0])
       .filter((path) => !exists(path))
       .map((path) => `${file}: ${path}`),
