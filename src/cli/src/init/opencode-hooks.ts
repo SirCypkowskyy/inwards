@@ -7,8 +7,8 @@
  */
 
 /** The exported plugin; it needs the helpers in `PLUGIN_HELPERS` above it. */
-export const PLUGIN_HOOKS = `/** How many times a session lookup is tried before the session counts as unknown for now. */
-const LOOKUPS = 3;
+export const PLUGIN_HOOKS = `/** How many times a session lookup, or the Stop gate's message, is tried before giving up for now. */
+const ATTEMPTS = 3;
 
 export const Inwards = async ({ client, directory }) => {
   /**
@@ -18,17 +18,22 @@ export const Inwards = async ({ client, directory }) => {
    *   the gate's starts one), and which turn the gate is answering;
    * - how many messages the user sent, and how many idles came: only the
    *   latest idle, from after the user's latest message, runs the gate;
-   * - whether a turn is running;
+   * - whether a turn is running, and whether one started by a message
+   *   ended unchecked: an idle after a shell command, a compaction or an
+   *   abort runs no gate;
    * - the agent, model and variant the user picked;
    * - how it started, and the queue that runs its Stop checks one at a time.
    */
   const sessions = new Map();
   /** A subagent's session, by the top-level session it works for. */
   const parents = new Map();
+  /** Sessions a message went to while their lookup failed: their next idle runs the gate. */
+  const unresolved = new Set();
   const state = (id) => {
     if (!sessions.has(id)) {
       sessions.set(id, {
         continued: false,
+        pending: false,
         awaiting: false,
         turn: 0,
         running: undefined,
@@ -76,7 +81,7 @@ export const Inwards = async ({ client, directory }) => {
       return id;
     }
     let found;
-    for (let attempt = 0; attempt < LOOKUPS && !found; attempt += 1) {
+    for (let attempt = 0; attempt < ATTEMPTS && !found; attempt += 1) {
       try {
         const answer = await client.session.get({ path: { id } });
         found = answer?.error ? undefined : answer?.data;
@@ -154,6 +159,10 @@ export const Inwards = async ({ client, directory }) => {
     if (!current(s, idle)) {
       return; // a later idle, a message or a turn made this one stale
     }
+    if (!s.pending && s.unsent === undefined) {
+      return; // no message started a turn since the last check: a shell command, a compaction or an abort
+    }
+    s.pending = false;
     s.running = s.turn;
     try {
       await answer(id, s, idle);
@@ -178,8 +187,12 @@ export const Inwards = async ({ client, directory }) => {
     }
     const result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
     // The gate has counted this attempt, so a later idle doesn't make the result stale;
-    // a message from the user, or a turn that started, does.
+    // a message from the user, or a turn that started, does. A turn with no
+    // message (a shell command) leaves this one's check to the next idle.
     if (idle.generation !== s.generation || s.busy || s.awaiting) {
+      if (idle.generation === s.generation) {
+        s.pending = true;
+      }
       return;
     }
     if (result.code === 2) {
@@ -197,25 +210,29 @@ export const Inwards = async ({ client, directory }) => {
   };
 
   /**
-   * Sends the gate's message, which starts another turn; one that fails is kept for the next idle.
+   * Sends the gate's message, which starts another turn, trying up to
+   * ATTEMPTS times; one that still fails is kept for the next idle.
    *
    * @param id - the session.
    * @param s - its state.
    * @param text - the message.
    */
   const deliver = async (id, s, text) => {
-    const generation = s.generation;
+    const { generation, turn } = s;
     s.awaiting = true;
-    const sent = await send(id, { parts: [{ type: "text", text }] });
-    // The user may have moved on while the request ran, and OpenCode may
-    // already have taken the message (clearing awaiting): only a failure for
-    // this turn changes anything.
-    if (!sent && generation === s.generation) {
-      s.awaiting = false;
-      s.unsent = text;
-    } else if (sent) {
-      s.unsent = undefined;
+    for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
+      if (await send(id, { parts: [{ type: "text", text }] })) {
+        s.unsent = undefined;
+        return;
+      }
+      // The user moved on while the request ran, or OpenCode took the message
+      // anyway (a new turn): sending it again would be stale or a duplicate.
+      if (generation !== s.generation || turn !== s.turn) {
+        return;
+      }
     }
+    s.awaiting = false;
+    s.unsent = text;
   };
 
   return {
@@ -233,12 +250,16 @@ export const Inwards = async ({ client, directory }) => {
       } else if (event.type === "session.status") {
         const id = event.properties.sessionID;
         if (sessions.has(id)) {
-          state(id).busy = event.properties.status?.type === "busy";
+          // A retry is a turn still running.
+          state(id).busy = (event.properties.status?.type ?? "idle") !== "idle";
         }
       } else if (event.type === "session.error") {
-        const id = event.properties.sessionID;
-        if (sessions.has(id)) {
-          state(id).awaiting = false; // a message that failed after it was accepted
+        const s = sessions.get(event.properties.sessionID);
+        if (s !== undefined) {
+          s.awaiting = false; // a message that failed after it was accepted
+          if (event.properties.error?.name === "MessageAbortedError") {
+            s.pending = false; // the user stopped the turn: the gate doesn't send the agent back
+          }
         }
       } else if (event.type === "session.idle") {
         const id = event.properties.sessionID;
@@ -256,6 +277,9 @@ export const Inwards = async ({ client, directory }) => {
         }
         await start(id, "resume");
         const s = state(id);
+        if (unresolved.delete(id)) {
+          s.pending = true;
+        }
         const idle = seen ?? { number: ++s.idles, generation: s.generation };
         s.queue = s.queue.then(() => stop(id, idle)).catch(() => undefined);
         await s.queue;
@@ -263,8 +287,12 @@ export const Inwards = async ({ client, directory }) => {
     },
     "chat.message": async (input, out) => {
       const id = await root(input.sessionID);
+      if (id === undefined) {
+        unresolved.add(input.sessionID); // the lookup failed: its idle runs the gate once it succeeds
+        return;
+      }
       if (id !== input.sessionID) {
-        return; // a prompt to a subagent is part of its parent's turn; an unknown session waits
+        return; // a prompt to a subagent is part of its parent's turn
       }
       const s = state(id);
       const own = ownMessage(out?.parts);
@@ -273,6 +301,8 @@ export const Inwards = async ({ client, directory }) => {
         s.awaiting = false;
         s.busy = true;
         s.turn += 1;
+        s.pending = true;
+        s.unsent = undefined;
       }
       if (own) {
         return;
@@ -280,6 +310,7 @@ export const Inwards = async ({ client, directory }) => {
       // A message the user sends starts a new turn, with the agent, model and variant they picked.
       s.generation += 1;
       s.turn += 1;
+      s.pending = true;
       s.continued = false;
       s.awaiting = false;
       s.unsent = undefined;
@@ -312,6 +343,16 @@ export const Inwards = async ({ client, directory }) => {
       const tool_input = toolInput(input.tool, out.args ?? {}, directory);
       if (name !== "Bash" && inwardsOwn(tool_input.file_path)) {
         throw new Error(\`Inwards: \${tool_input.file_path} is Inwards' own; ask the user to change it.\`);
+      }
+      // The guard reads the command, not where it runs: \`rm state.json\` in .inwards names nothing.
+      const workdir = name === "Bash" ? out.args?.workdir : undefined;
+      if (typeof workdir === "string" && workdir !== "" && inwardsOwn(absolute(directory, workdir))) {
+        throw new Error(\`Inwards: a command may not run in \${workdir}, which holds Inwards' own files; ask the user.\`);
+      }
+      if (name === "Edit" && configFile(tool_input.file_path) && ambiguous(tool_input)) {
+        throw new Error(
+          "Inwards: oldString appears more than once in this file, so the config guard can't tell which match OpenCode would change. Add surrounding lines to make it unique.",
+        );
       }
       const result = await hook({ session_id: session, hook_event_name: "PreToolUse", tool_name: name, tool_input });
       const reason = denial(result.stdout);

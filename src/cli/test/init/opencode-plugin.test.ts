@@ -1,27 +1,36 @@
 /**
  * @file The OpenCode plugin through a session. A bad edit gets its findings
  * in the tool result, and warnings reach the agent too. The Stop gate sends
- * the agent back once, as the agent the user picked, with a preface that
- * says who is speaking. A Stop result from before the user's latest
- * message, or a second idle while the first is being answered, sends
- * nothing. Subagents share their top-level session, including one resumed
- * after a restart, and a plugin file changed during the session is reported.
+ * the agent back once, as the agent, model and variant the user picked, with
+ * a preface that says who is speaking. A Stop
+ * result from before the user's latest message, or a second idle while the
+ * first is being answered, sends nothing. Subagents share their top-level
+ * session, including one resumed after a restart, and a plugin file changed
+ * during the session is reported.
  */
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
-import { fire, type Hooks, initProject, load, PLUGIN, say } from "../support/opencode-helpers.ts";
+import {
+  fire,
+  type Hooks,
+  initProject,
+  LEAK,
+  load,
+  PLUGIN,
+  STOP,
+  say,
+} from "../support/opencode-helpers.ts";
 
-const STOP = "Inwards Stop gate (sent by the Inwards plugin, not the user)";
-const LEAK = "import shop.infrastructure.db\n";
+const MODEL = { providerID: "ollama", modelID: "glm" };
 
 test("a bad edit gets its findings, and the Stop gate sends the agent back once, as the chosen agent", async () => {
   const root = initProject();
   const { hooks, sent } = await load(root);
   const s = "ses_stop";
   await fire(hooks, "session.created", s);
-  await say(hooks, s, "Add the import.", { agent: "reviewer", variant: "high" });
+  await say(hooks, s, "Add the import.", { agent: "reviewer", model: MODEL, variant: "high" });
   const order = join(root, "shop/domain/order.py");
   writeFileSync(order, LEAK);
   const out = { output: "Edit applied." };
@@ -32,8 +41,8 @@ test("a bad edit gets its findings, and the Stop gate sends the agent back once,
   expect(out.output).toContain("INW001");
 
   await fire(hooks, "session.idle", s);
-  expect(sent.map((m) => [m.id, m.agent, m.variant, m.noReply])).toEqual([
-    [s, "reviewer", "high", false],
+  expect(sent.map((m) => [m.id, m.agent, m.model, m.variant, m.noReply])).toEqual([
+    [s, "reviewer", MODEL, "high", false],
   ]);
   expect(sent[0]?.text).toStartWith(STOP);
   expect(sent[0]?.text).toContain("INW001");
@@ -64,6 +73,7 @@ test("a Stop result from before the user's latest message sends nothing", async 
   const { hooks, sent } = await load(root);
   const s = "ses_race";
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   const idle = fire(hooks, "session.idle", s);
   const again = fire(hooks, "session.idle", s);
@@ -77,6 +87,7 @@ test("subagents share their session, also when resumed after a restart", async (
   const { hooks, sent, parents } = await load(root);
   const [top, child, resumed] = ["ses_top", "ses_child", "ses_resumed"];
   await fire(hooks, "session.created", top);
+  await say(hooks, top, "Delegate the subtask.");
   await fire(hooks, "session.created", child, top);
   parents.set(resumed, child); // known to OpenCode, never created in this process
   const order = join(root, "shop/domain/order.py");
@@ -102,6 +113,7 @@ test("the Stop gate reports a plugin removed, or rewritten with the marker kept"
   const { hooks, sent } = await load(root);
   const s = "ses_gone";
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Go.");
   writeFileSync(path, `${PLUGIN_MARKER}\nexport const Inwards = async () => ({});\n`);
   await fire(hooks, "session.idle", s);
   expect(sent.at(-1)?.text).toContain("changed since OpenCode loaded it");
@@ -117,18 +129,19 @@ test("the Stop gate reports a plugin removed, or rewritten with the marker kept"
   expect(sent).toHaveLength(2);
 });
 
-test("a failed request is tried again: a lookup isn't cached, and an unsent gate message doesn't hold the next idle", async () => {
+test("a failed request is tried again: a lookup isn't cached, and the gate's message is retried at once", async () => {
   const root = initProject();
-  const { hooks, sent, parents } = await load(root, root, { get: 3, prompt: 1 });
+  const { hooks, sent, parents } = await load(root, root, { get: 3, prompt: 2 });
   const [top, child] = ["ses_retry", "ses_retry_child"];
   await fire(hooks, "session.created", top);
+  await say(hooks, top, "Delegate the subtask.");
   parents.set(child, top);
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   await fire(hooks, "session.idle", child); // the lookup fails: not treated as a top-level session for good
-  await fire(hooks, "session.idle", top); // the prompt fails
   expect(sent).toEqual([]);
-  await fire(hooks, "session.idle", child);
-  await fire(hooks, "session.idle", top);
+  await fire(hooks, "session.idle", top); // two sends fail, the third goes out
+  expect(sent.map((m) => m.id)).toEqual([top]);
+  await fire(hooks, "session.idle", child); // now known as a subagent: no gate of its own
   expect(sent.map((m) => m.id)).toEqual([top]);
 });
 
@@ -137,6 +150,7 @@ test("idles queued behind one that sent the gate's message send nothing more", a
   const { hooks, sent } = await load(root);
   const s = "ses_dupes";
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   await Promise.all([fire(hooks, "session.idle", s), fire(hooks, "session.idle", s)]);
   expect(sent).toHaveLength(1);
@@ -152,12 +166,13 @@ test("a gate message that couldn't be sent doesn't use up an attempt", async () 
       "[tool.inwards]\nescalate-after = 1\n",
     ),
   );
-  const { hooks, sent } = await load(root, root, { prompt: 1 });
+  const { hooks, sent } = await load(root, root, { prompt: 3 });
   const s = "ses_unsent";
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
-  await fire(hooks, "session.idle", s); // blocks, but the message fails
-  await fire(hooks, "session.idle", s); // blocks again: the agent never got the first
+  await fire(hooks, "session.idle", s); // blocks, but all three sends fail
+  await fire(hooks, "session.idle", s); // the same message again, not an escalated second attempt
   expect(sent.map((m) => [m.noReply, m.text.startsWith(STOP)])).toEqual([[false, true]]);
 });
 
@@ -171,13 +186,14 @@ test("a gate message that fails later is sent again, without running the gate ag
       "[tool.inwards]\nescalate-after = 2\n",
     ),
   );
-  const { hooks, sent } = await load(root, root, { promptAt: [1] });
+  const { hooks, sent } = await load(root, root, { promptAt: [1, 2, 3] });
   const s = "ses_resend";
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   await fire(hooks, "session.idle", s); // attempt 1, sent
   await say(hooks, s, sent[0]?.text ?? "");
-  await fire(hooks, "session.idle", s); // attempt 2, the message fails
+  await fire(hooks, "session.idle", s); // attempt 2, the message fails three times
   await fire(hooks, "session.idle", s); // the same message again, not a third attempt
   expect(sent.map((m) => [m.noReply, m.text.startsWith(STOP)])).toEqual([
     [false, true],
@@ -190,6 +206,7 @@ test("an idle of a newer turn is kept while the gate still answers the older one
   const { hooks, sent } = await load(root);
   const s = "ses_turns";
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   const older = fire(hooks, "session.idle", s);
   await say(hooks, s, "Also rename the class.");
@@ -212,6 +229,7 @@ test("a gate message OpenCode takes before the request answers doesn't hold the 
   });
   ref.hooks = hooks;
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   await fire(hooks, "session.idle", s);
   await fire(hooks, "session.idle", s); // the continued turn ends, the violation still there
@@ -235,6 +253,7 @@ test("a gate message that fails after the user moved on isn't sent in the new tu
   });
   ref.hooks = hooks;
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(order, LEAK);
   await fire(hooks, "session.idle", s);
   await fire(hooks, "session.idle", s);
@@ -256,6 +275,7 @@ test("the continued turn's idle, arriving before the gate's request answers, is 
   });
   ref.hooks = hooks;
   await fire(hooks, "session.created", s);
+  await say(hooks, s, "Add the import.");
   writeFileSync(join(root, "shop/domain/order.py"), LEAK);
   await fire(hooks, "session.idle", s);
   await ref.idle;

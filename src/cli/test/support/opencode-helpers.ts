@@ -4,11 +4,16 @@
  * sends and answers session lookups from a table of parents. Also the
  * shortcuts the plugin tests use to fire OpenCode events at it.
  */
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { inwards, LAYERS, project } from "./run.ts";
 
 export const PLUGIN = ".opencode/plugins/inwards.js";
+/** How every Stop gate message the plugin sends begins. */
+export const STOP = "Inwards Stop gate (sent by the Inwards plugin, not the user)";
+/** An outward import from the domain layer: INW001. */
+export const LEAK = "import shop.infrastructure.db\n";
 
 /** A message the plugin sent through the stand-in client. */
 export interface Sent {
@@ -16,7 +21,15 @@ export interface Sent {
   text: string;
   noReply: boolean;
   agent: string | undefined;
+  model: { providerID: string; modelID: string } | undefined;
   variant: string | undefined;
+}
+
+/** The agent, model and variant a user picks for a message. */
+export interface Picked {
+  agent?: string;
+  model?: { providerID: string; modelID: string };
+  variant?: string;
 }
 
 /** The hooks the plugin returns, as the tests call them. */
@@ -52,6 +65,7 @@ export interface Loaded {
 interface PromptBody {
   noReply?: boolean;
   agent?: string;
+  model?: { providerID: string; modelID: string };
   variant?: string;
   parts: { text: string }[];
 }
@@ -118,8 +132,8 @@ export async function load(
           return Promise.resolve({ error: "HTTP 500" });
         }
         const text = body.parts.map((p) => p.text).join("");
-        const { agent, variant } = body;
-        sent.push({ id: path.id, text, noReply: body.noReply === true, agent, variant });
+        const { agent, model, variant } = body;
+        sent.push({ id: path.id, text, noReply: body.noReply === true, agent, model, variant });
         return Promise.resolve({});
       },
       get: ({
@@ -172,15 +186,71 @@ export async function fire(
  * @param hooks - the plugin's hooks.
  * @param id - the session.
  * @param text - the message.
- * @param picked - the agent and variant the user picked.
- * @param picked.agent - the agent, if any.
- * @param picked.variant - the model variant, if any.
+ * @param picked - the agent, model and variant the user picked.
  */
 export async function say(
   hooks: Hooks,
   id: string,
   text: string,
-  picked: { agent?: string; variant?: string } = {},
+  picked: Picked = {},
 ): Promise<void> {
   await hooks["chat.message"]({ sessionID: id, ...picked }, { parts: [{ type: "text", text }] });
+}
+
+/** The line of the plugin that names the Inwards command. */
+export const INWARDS_LINE: RegExp = /^const INWARDS = .*$/mu;
+
+/**
+ * Makes every hook run of the plugin start late, so a test can act while the
+ * hook runs.
+ *
+ * @param root - the project directory.
+ * @param seconds - how long each run waits before Inwards starts.
+ */
+export function slowHook(root: string, seconds: number): void {
+  const path = join(root, PLUGIN);
+  const text = readFileSync(path, "utf8");
+  const command: unknown = JSON.parse(
+    INWARDS_LINE.exec(text)?.[0].slice("const INWARDS = ".length, -1) ?? "[]",
+  );
+  const slow = [
+    "sh",
+    "-c",
+    `sleep ${seconds}; exec "$0" "$@"`,
+    ...(Array.isArray(command) ? command : []),
+  ];
+  writeFileSync(path, text.replace(INWARDS_LINE, `const INWARDS = ${JSON.stringify(slow)};`));
+}
+
+/**
+ * Waits a while.
+ *
+ * @param ms - how long.
+ * @returns after that long.
+ */
+export function pause(ms: number): Promise<void> {
+  return new Promise((done) => {
+    setTimeout(done, ms);
+  });
+}
+
+/**
+ * Asks the plugin whether a tool call may run.
+ *
+ * @param hooks - the plugin's hooks.
+ * @param tool - the OpenCode tool.
+ * @param args - its arguments.
+ * @returns the refusal's message, or "" when the call may run.
+ */
+export async function refusal(
+  hooks: Hooks,
+  tool: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  try {
+    await hooks["tool.execute.before"]({ tool, sessionID: "ses_guard" }, { args });
+    return "";
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
 }

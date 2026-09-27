@@ -35,12 +35,14 @@ const STOP_PREFACE = \`Inwards Stop gate \${OWN}: the turn can't end yet. Fix wh
 const NOTE_PREFACE = \`Inwards \${OWN}: \`;
 /** How many links to follow by hand before giving up on a path. */
 const MAX_LINKS = 40;
+/** How long one hook run may take, as Claude Code's default hook timeout. */
+const HOOK_TIMEOUT_MS = 60000;
 
 /**
  * Runs the hook with one payload, in the project init wrote the plugin into.
  *
  * @param payload - a hook payload, as Claude Code would send it.
- * @returns the exit code and both output streams; code -1 when Inwards couldn't start.
+ * @returns the exit code and both output streams; code -1 when Inwards couldn't start or was stopped.
  */
 async function hook(payload) {
   try {
@@ -49,6 +51,7 @@ async function hook(payload) {
       stdin: new TextEncoder().encode(JSON.stringify({ cwd: PROJECT, ...payload })),
       stdout: "pipe",
       stderr: "pipe",
+      timeout: HOOK_TIMEOUT_MS,
       env: {
         ...process.env,
         CLAUDE_PROJECT_DIR: PROJECT,
@@ -61,7 +64,9 @@ async function hook(payload) {
       new Response(proc.stderr).text(),
       proc.exited,
     ]);
-    return { code, stdout, stderr };
+    return proc.signalCode
+      ? { code: -1, stdout, stderr: \`inwards: stopped (\${proc.signalCode}); a hook run may take \${HOOK_TIMEOUT_MS / 1000} s\` }
+      : { code, stdout, stderr };
   } catch (err) {
     return { code: -1, stdout: "", stderr: \`inwards: \${String(err)}\` };
   }
@@ -96,11 +101,14 @@ function output(stdout) {
  * Reads the reason out of a PreToolUse deny, if the hook denied.
  *
  * @param stdout - the hook's output.
- * @returns the reason, or undefined when the call may go ahead.
+ * @returns the reason (a default when the hook gave none), or undefined when the call may go ahead.
  */
 function denial(stdout) {
   const decision = output(stdout).hookSpecificOutput;
-  return decision?.permissionDecision === "deny" ? decision.permissionDecisionReason : undefined;
+  if (decision?.permissionDecision !== "deny") {
+    return undefined;
+  }
+  return decision.permissionDecisionReason || "Inwards refused this call.";
 }
 
 /**
@@ -243,6 +251,29 @@ function toolInput(tool, args, directory) {
     return { file_path: absolute(directory, args.filePath), content: args.content };
   }
   return { command: args.command };
+}
+
+/**
+ * Tells whether an edit's oldString appears more than once in its file.
+ * OpenCode then skips the exact match and tries looser ones, so the change
+ * lands where the config guard's simulation can't say.
+ *
+ * @param input - the edit's tool input, as the hook reads it.
+ * @returns true when the edit replaces one of several matches.
+ */
+function ambiguous(input) {
+  const from = String(input.old_string ?? "").replaceAll("\\r\\n", "\\n");
+  if (input.replace_all || from === "") {
+    return false;
+  }
+  let text;
+  try {
+    text = readFileSync(input.file_path, "utf8").replaceAll("\\r\\n", "\\n");
+  } catch {
+    return false; // a missing file: the guard denies what it can't simulate
+  }
+  const first = text.indexOf(from);
+  return first !== -1 && text.indexOf(from, first + 1) !== -1;
 }
 
 /**

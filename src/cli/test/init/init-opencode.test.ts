@@ -21,7 +21,7 @@ import {
 import { join } from "node:path";
 import process from "node:process";
 import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
-import { type Hooks, initProject, load, PLUGIN } from "../support/opencode-helpers.ts";
+import { INWARDS_LINE, initProject, load, PLUGIN, refusal } from "../support/opencode-helpers.ts";
 import { inwards, LAYERS, project } from "../support/run.ts";
 
 /**
@@ -34,9 +34,6 @@ function init(root: string): { code: number; stderr: string } {
   return inwards(["init", "--agent", "opencode"], { cwd: root });
 }
 
-/** The line of the plugin that names the Inwards command. */
-const INWARDS_LINE = /^const INWARDS = .*$/mu;
-
 /**
  * Wraps one patch header in a patch.
  *
@@ -45,23 +42,6 @@ const INWARDS_LINE = /^const INWARDS = .*$/mu;
  */
 function patch(header: string): string {
   return `*** Begin Patch\n${header}\n@@\n-a\n+b\n*** End Patch\n`;
-}
-
-/**
- * Asks the plugin whether a tool call may run.
- *
- * @param hooks - the plugin's hooks.
- * @param tool - the OpenCode tool.
- * @param args - its arguments.
- * @returns the refusal's message, or "" when the call may run.
- */
-async function refusal(hooks: Hooks, tool: string, args: Record<string, unknown>): Promise<string> {
-  try {
-    await hooks["tool.execute.before"]({ tool, sessionID: "ses_guard" }, { args });
-    return "";
-  } catch (err) {
-    return err instanceof Error ? err.message : String(err);
-  }
 }
 
 describe("inwards init --agent opencode", () => {
@@ -188,7 +168,11 @@ describe("the guard in the plugin", () => {
     );
     writeFileSync(path, text);
     const { hooks } = await load(root);
-    const args = { filePath: join(root, "pyproject.toml"), oldString: "a", newString: "b" };
+    const args = {
+      filePath: join(root, "pyproject.toml"),
+      oldString: '"shop.domain"',
+      newString: '"shop"',
+    };
     await expect(
       hooks["tool.execute.before"]({ tool: "edit", sessionID: s }, { args }),
     ).rejects.toThrow("couldn't check this call");
