@@ -235,7 +235,8 @@ export function prune(shard: string, now: number): number {
  *
  * @param shard - one shard directory.
  * @param now - the current time, in milliseconds since the epoch.
- * @returns each entry's path, size and age, or undefined when the shard can't be listed.
+ * @returns each entry's path, size and age, or undefined when the shard or one of
+ *   its files can't be looked at.
  */
 function listShard(
   shard: string,
@@ -250,9 +251,12 @@ function listShard(
   const entries: { path: string; size: number; mtime: number }[] = [];
   for (const name of names) {
     const path = join(shard, name);
-    const stat = statQuietly(path);
-    if (stat === undefined || !stat.isFile()) {
-      continue; // gone since the listing, or not ours
+    const stat = statOrGone(path);
+    if (stat === undefined) {
+      return undefined; // can't tell its size: count the shard as full
+    }
+    if (stat === "gone" || !stat.isFile()) {
+      continue; // removed since the listing, or not ours
     }
     if (TEMP_NAME.test(name) && now - stat.mtimeMs > STALE_TEMP_MS) {
       removeQuietly(path);
@@ -264,15 +268,16 @@ function listShard(
 }
 
 /**
- * Looks at a path without following a link, ignoring every failure.
+ * Looks at a path without following a link, telling a file that is gone
+ * from one that can't be looked at.
  *
  * @param path - a file in a shard, from its listing.
- * @returns what is there, or undefined when nothing is or it can't be looked at.
+ * @returns what is there, `"gone"` when nothing is, or undefined on any other failure.
  */
-function statQuietly(path: string): Stats | undefined {
+function statOrGone(path: string): Stats | "gone" | undefined {
   try {
     return lstatSync(path);
-  } catch {
-    return undefined;
+  } catch (err) {
+    return err instanceof Error && Reflect.get(err, "code") === "ENOENT" ? "gone" : undefined;
   }
 }
