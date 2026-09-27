@@ -14,7 +14,7 @@ import {
   literalString,
   namedChildren,
 } from "./literals.ts";
-import { packageOf, resolveRelative } from "./python.ts";
+import { packageOf, resolveRelative } from "./module-names.ts";
 import type { SourceFile } from "./types.ts";
 
 /**

@@ -23,18 +23,7 @@ import type { Node, Parser, Tree } from "web-tree-sitter";
 import { parsePython } from "./python.ts";
 import { type RuleSettings, ruleLevel } from "./rule-config.ts";
 import { diagnostic, RULES } from "./rules.ts";
-import type { Diagnostic, SourceFile, Span } from "./types.ts";
-
-/** A finding a suppression comment hid, with the comment's reason. */
-export interface Suppressed {
-  diagnostic: Diagnostic;
-  reason: string;
-  /**
-   * Set by an adapter's baseline: an entry accepts this finding too, so it
-   * stays hidden if the suppression isn't honoured (the hooks' `agent-suppressions`).
-   */
-  baselined?: boolean;
-}
+import type { Diagnostic, SourceFile, Span, Suppressed } from "./types.ts";
 
 /** One `# inwards: ignore` comment as read. */
 export interface SuppressionComment {

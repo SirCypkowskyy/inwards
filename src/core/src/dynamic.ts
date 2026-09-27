@@ -36,14 +36,14 @@ import {
 } from "./callees.ts";
 import { computedSource } from "./computed-source.ts";
 import type { LayerSpec } from "./config.ts";
-import { unreadableEncoding } from "./encoding.ts";
-import { allowedDirection, layerIndexOf, outwardImports, portSteps } from "./layers.ts";
+import { allowedDirection, layerIndexOf, outwardImports, portSteps } from "./layer-ownership.ts";
 import { argumentAt, literalSource } from "./literals.ts";
 import { type Loaded, moduleTargets, type Unreadable } from "./loader-targets.ts";
+import type { ModuleLookup } from "./module-lookup.ts";
 import { extractImports, normalizeSource, parsePython } from "./python.ts";
+import { unreadableEncoding } from "./python-encoding.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
-import type { ModuleLookup } from "./unassigned.ts";
 
 /** What the loader search needs besides the tree. */
 interface Reader {

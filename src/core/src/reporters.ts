@@ -1,7 +1,6 @@
 import { DOCS_BASE, VERSION } from "./meta.ts";
 import { RULES } from "./rules.ts";
-import type { Suppressed } from "./suppress.ts";
-import type { Diagnostic } from "./types.ts";
+import type { Diagnostic, Suppressed } from "./types.ts";
 
 /** A line break with the spaces around it; Unicode line and paragraph separators count too. */
 const LINE_BREAKS = /\s*[\r\n\u2028\u2029]+\s*/gu;

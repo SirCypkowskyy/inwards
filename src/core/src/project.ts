@@ -10,10 +10,11 @@
  *
  * Building one reads nothing, so the hook pays only for what a rule asks.
  */
-import { moduleNameFor } from "./python.ts";
-import type { ListDir } from "./shape.ts";
+
+import type { ListDir } from "./directory-listing.ts";
+import { type ModuleLookup, type PathKind, probeLookup } from "./module-lookup.ts";
+import { moduleNameFor } from "./module-names.ts";
 import type { ImportRef, SourceFile } from "./types.ts";
-import { type ModuleLookup, type PathKind, probeLookup } from "./unassigned.ts";
 
 const NON_ASCII = /[^ -~\t\n\r\f]/u;
 /** What a package's `__init__.py` spells when it merges with packages elsewhere (pkgutil or pkg_resources style). */

@@ -3,7 +3,8 @@ import { acceptedModules } from "./baseline.ts";
 import type { InwardsConfig } from "./config.ts";
 import { checkDynamicImports, extractDynamicImports, mentionsDynamicImport } from "./dynamic.ts";
 import { checkEncoding } from "./encoding.ts";
-import { checkLayers, layerIndexOf, outwardImports } from "./layers.ts";
+import { layerIndexOf, outwardImports } from "./layer-ownership.ts";
+import { checkLayers } from "./layers.ts";
 import { checkLibraries } from "./libraries.ts";
 import { skeletonImports } from "./prescan.ts";
 import { type ProjectFiles, ProjectIndex } from "./project.ts";
@@ -16,14 +17,8 @@ import {
 } from "./python.ts";
 import { applyRules } from "./rule-config.ts";
 import { shapeFindings } from "./shape.ts";
-import {
-  commentsIn,
-  mentionsSuppression,
-  type Suppressed,
-  type SuppressionComment,
-  suppress,
-} from "./suppress.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
+import { commentsIn, mentionsSuppression, type SuppressionComment, suppress } from "./suppress.ts";
+import type { Diagnostic, ImportRef, SourceFile, Suppressed } from "./types.ts";
 import { checkUnassignedImports, unassignedWarning } from "./unassigned.ts";
 import { checkUnknownImports } from "./unknown.ts";
 

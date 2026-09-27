@@ -8,48 +8,10 @@
  * is a comment to us and a real import to CPython. Inwards can't check such a
  * file, so it reports that instead of passing it.
  */
+
+import { unreadableEncoding } from "./python-encoding.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import type { Diagnostic, SourceFile } from "./types.ts";
-
-// The `s` flag matters: without it `.` stops at \r, U+2028 and U+2029, which
-// CPython treats as ordinary characters inside a comment.
-/** The declaration CPython's tokenizer looks for on line 1 or 2. */
-const CODING = /^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-\w.]+)/su;
-/** Line 1 must be blank or a comment for line 2 to count. */
-const BLANK_OR_COMMENT = /^[ \t\f]*(?:#.*)?\r?$/su;
-/** A line break as CPython counts it after normalisation: \n or \r\n. */
-const LINE_BREAK = /\r?\n/u;
-/** ASCII-compatible codecs whose bytes read as UTF-8 can't hide an import. */
-const SAFE =
-  /^(?:utf-?8(?:-.*)?|ascii|us-ascii|latin-?1|iso-latin-1|iso-?8859-\d+|cp125\d|windows-125\d)$/u;
-
-/**
- * Reads the encoding a Python file declares, the way CPython's tokenizer does.
- * Only line 1, or line 2 when line 1 is blank or a comment, can declare it.
- *
- * @param text - normalised file text.
- * @returns the declared codec name, lower-cased with `_` as `-`, or null if none.
- */
-function declaredEncoding(text: string): string | null {
-  const [first = "", second = ""] = text.split(LINE_BREAK, 2);
-  const declared =
-    CODING.exec(first) ?? (BLANK_OR_COMMENT.test(first) ? CODING.exec(second) : null);
-  const name = declared?.groups?.["name"];
-  return name ? name.toLowerCase().replaceAll("_", "-") : null;
-}
-
-/**
- * Names the declared encoding of some Python source when Inwards can't read it.
- * Used for files, and for bytes passed to `exec` or `compile`, which CPython
- * decodes by the same PEP 263 rules (a `str` source ignores the declaration).
- *
- * @param text - normalised source text.
- * @returns the declared codec when it can hide imports, or null when it is safe or undeclared.
- */
-export function unreadableEncoding(text: string): string | null {
-  const encoding = declaredEncoding(text);
-  return encoding === null || SAFE.test(encoding) ? null : encoding;
-}
 
 /**
  * Reports a file whose declared encoding Inwards can't read faithfully.

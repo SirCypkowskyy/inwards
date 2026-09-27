@@ -18,7 +18,7 @@ import type { Node } from "web-tree-sitter";
 import { type Bindings, importBindings, qualify } from "./callees.ts";
 import { argumentAt, identifierName, literalSource, namedChildren } from "./literals.ts";
 import { COMPUTED, type Loaded } from "./loader-targets.ts";
-import type { ModuleLookup } from "./unassigned.ts";
+import type { ModuleLookup } from "./module-lookup.ts";
 
 /**
  * Lists what a source-running call with a non-literal source loads.

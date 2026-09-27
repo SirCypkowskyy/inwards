@@ -14,11 +14,11 @@
  * any other layer without `deny-libraries` it adds to an empty list.
  */
 import type { LayerSpec } from "./config.ts";
-import { layerIndexOf } from "./layers.ts";
+import { layerIndexOf } from "./layer-ownership.ts";
+import type { ModuleLookup } from "./module-lookup.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import { STDLIB } from "./stdlib.ts";
 import type { Diagnostic, Fix, ImportRef, SourceFile } from "./types.ts";
-import type { ModuleLookup } from "./unassigned.ts";
 
 /** Frameworks, database and network clients, and stdlib I/O: what the domain gets by default. */
 const DEFAULT_DENY: readonly string[] = [

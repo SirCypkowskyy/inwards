@@ -13,23 +13,13 @@
  * The exported checks apply `[tool.inwards.rules]` (`applyRules`).
  */
 import type { InwardsConfig } from "./config.ts";
-import { type ConfigFile, spanOf } from "./layout.ts";
+import { type ConfigFile, spanOf } from "./config-source.ts";
+import type { ListDir, ListMembers } from "./directory-listing.ts";
 import { applyRules } from "./rule-config.ts";
 import { diagnostic, RULES } from "./rules.ts";
 import { memberMatches, selects, shapeFor } from "./shape-config.ts";
 import { type Misfit, missingFinding, nameFinding, shapeFinding } from "./shape-fix.ts";
 import type { Diagnostic, Fix, Severity, SourceFile, Span } from "./types.ts";
-
-/**
- * Lists a package's direct members, the port INW008 needs from the adapter.
- *
- * @param pkg - a dotted package name under the config root.
- * @returns member names (`x.py`, `x.pyi`, `x/`), or undefined when the package doesn't exist.
- */
-export type ListMembers = (pkg: string) => readonly string[] | undefined;
-
-/** What an adapter's file system holds in a directory. */
-export type ListDir = (relDir: string) => readonly { name: string; dir: boolean }[] | undefined;
 
 /** What a misplaced member is reported as. */
 interface Problem {

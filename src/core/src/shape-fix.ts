@@ -6,6 +6,8 @@
  * closest name within an edit distance of 2 (1 for names of 3 to 5
  * characters, 0 below that, so `db.py` isn't sent to `di.py`).
  */
+
+import { distance } from "./edit-distance.ts";
 import type { NameRule, ShapeSpec } from "./shape-config.ts";
 import type { Fix } from "./types.ts";
 
@@ -210,24 +212,4 @@ function selectorPath(selector: string): string {
     segments.pop();
   }
   return `${segments.join("/")}/`;
-}
-
-/**
- * Levenshtein distance between two names.
- *
- * @param a - one name.
- * @param b - the other.
- * @returns the fewest single-character edits between them.
- */
-export function distance(a: string, b: string): number {
-  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i += 1) {
-    const next = [i];
-    for (let j = 1; j <= b.length; j += 1) {
-      const swap = (row[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1);
-      next.push(Math.min((row[j] ?? 0) + 1, (next[j - 1] ?? 0) + 1, swap));
-    }
-    row = next;
-  }
-  return row[b.length] ?? 0;
 }

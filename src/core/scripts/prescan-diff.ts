@@ -19,13 +19,9 @@ import process from "node:process";
 import { Glob } from "bun";
 import type { Parser } from "web-tree-sitter";
 import { extractDynamicImports, mentionsDynamicImport } from "../src/dynamic.ts";
+import { moduleNameFor } from "../src/module-names.ts";
 import { skeletonImports } from "../src/prescan.ts";
-import {
-  createPythonParser,
-  extractImports,
-  moduleNameFor,
-  normalizeSource,
-} from "../src/python.ts";
+import { createPythonParser, extractImports, normalizeSource } from "../src/python.ts";
 import type { ImportRef } from "../src/types.ts";
 
 /**

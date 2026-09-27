@@ -51,3 +51,14 @@ export interface Diagnostic extends Span {
   fix: Fix;
   docs: string;
 }
+
+/** A finding a suppression comment hid, with the comment's reason. */
+export interface Suppressed {
+  diagnostic: Diagnostic;
+  reason: string;
+  /**
+   * Set by an adapter's baseline: an entry accepts this finding too, so it
+   * stays hidden if the suppression isn't honoured (the hooks' `agent-suppressions`).
+   */
+  baselined?: boolean;
+}

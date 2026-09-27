@@ -10,11 +10,12 @@
  * a build step writes (`generated`) passes even when it isn't on disk, since
  * a fresh checkout lacks it.
  */
+
+import { distance } from "./edit-distance.ts";
 import { DEFAULT_GENERATED, isGenerated } from "./generated.ts";
+import { packageOf } from "./module-names.ts";
 import type { ProjectIndex } from "./project.ts";
-import { packageOf } from "./python.ts";
 import { diagnostic, RULES } from "./rules.ts";
-import { distance } from "./shape-fix.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "./types.ts";
 
 /** How many real modules the fix suggests. */
