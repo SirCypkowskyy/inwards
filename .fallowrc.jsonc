@@ -57,6 +57,13 @@
         ]
       },
       {
+        "name": "core-rule-context-independence",
+        "patterns": [
+          "src/core/src/rules/context-independence.ts",
+          "src/core/src/rules/context-independence/**"
+        ]
+      },
+      {
         "name": "core-rule-pure-domain",
         "patterns": ["src/core/src/rules/pure-domain.ts", "src/core/src/rules/pure-domain/**"]
       },
@@ -159,6 +166,10 @@
         ]
       },
       {
+        "from": "core-rule-context-independence",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-lookup"]
+      },
+      {
         "from": "core-rule-pure-domain",
         "allow": [
           "core-contracts",
@@ -236,6 +247,7 @@
           "core-rules-shared",
           "core-rule-unsupported-encoding",
           "core-rule-layer-dependency",
+          "core-rule-context-independence",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
           "core-rule-package-shape",
@@ -257,6 +269,7 @@
           "core-rules-shared",
           "core-rule-unsupported-encoding",
           "core-rule-layer-dependency",
+          "core-rule-context-independence",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
           "core-rule-package-shape",
@@ -281,6 +294,7 @@
           "core-rules-shared",
           "core-rule-unsupported-encoding",
           "core-rule-layer-dependency",
+          "core-rule-context-independence",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
           "core-rule-package-shape",
@@ -447,6 +461,10 @@
         },
         {
           "from": "core-rule-layer-dependency",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-context-independence",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

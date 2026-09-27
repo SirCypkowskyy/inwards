@@ -104,6 +104,34 @@ describe("inwards baseline", () => {
     expect(lstatSync(join(root, BASELINE)).isSymbolicLink()).toBe(false);
   });
 
+  test("a baseline written before INW006's rewording still matches", () => {
+    const root = project({
+      "pyproject.toml": `${LAYERS}\n[tool.inwards.rules]\nseverity = { INW006 = "error" }\n`,
+      "shop/domain/order.py": "from shop.common.money import Money\n",
+      "shop/common/money.py": "class Money:\n    pass\n",
+    });
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    const path = join(root, BASELINE);
+    const written = readFileSync(path, "utf8");
+    // 0.3 kept the whole message, in its wording.
+    const old = written
+      .replace(
+        '\\"shop.common\\" belongs to no layer.',
+        '\\"shop.common\\" belongs to no layer, so its imports are not checked.',
+      )
+      .replace(
+        "which belongs to no layer.",
+        'which belongs to no layer, so nothing checks what \\"shop.common\\" imports.',
+      );
+    expect(old).not.toBe(written);
+    writeFileSync(path, old);
+    const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+    expect(code).toBe(0);
+    // The package warning, the import and the empty infrastructure layer: all still accepted.
+    expect(summary(stdout)["baselined"]).toBe(3);
+    expect(summary(stdout)["violations"]).toBe(0);
+  });
+
   test("a fixed violation is reported as resolved", () => {
     const root = legacy();
     put(root, "shop/domain/order.py", "X = 1\n");

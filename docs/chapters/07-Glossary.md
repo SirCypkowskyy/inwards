@@ -36,7 +36,7 @@ Adapter
 :   Code that connects a port to a real technology: a SQL repository, an HTTP client, a message consumer. Adapters live in outer layers.
 
 Bounded context
-:   A part of the system with its own model and language (DDD). In a Python codebase, usually a top-level package such as `billing` or `shipping`. INW002 (planned) keeps contexts from importing each other's internals.
+:   A part of the system with its own model and language (DDD). In a Python codebase, usually a top-level package such as `billing` or `shipping`. [Contexts](guides/configuration.md#contexts) are declared in `[[tool.inwards.contexts]]`; [INW002](rules/INW002.md) lets one import another only when its `depends-on` declares it.
 
 Clean Architecture
 :   Robert C. Martin's layering: entities at the centre, then use cases, then interface adapters, then frameworks. Its dependency rule is that source code dependencies point only inward.
@@ -60,7 +60,7 @@ Port
 :   An interface the inner code owns and the outer code implements. In Python, usually a `typing.Protocol`.
 
 Vertical slice
-:   Organising code by feature (`orders/`, `invoices/`) rather than by technical layer, with each slice holding its own handlers and data access. Slices shouldn't reach into each other. Glob patterns for slices in the layer config come with the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), and INW002 (planned) keeps slices apart.
+:   Organising code by feature (`orders/`, `invoices/`) rather than by technical layer, with each slice holding its own handlers and data access. Slices shouldn't reach into each other. Each slice can be declared as a [context](guides/configuration.md#contexts), and [INW002](rules/INW002.md) keeps slices apart unless `depends-on` says otherwise; glob selectors, so twenty slices don't need twenty entries, are [#191](https://github.com/SirCypkowskyy/inwards/issues/191).
 
 ## Inwards terms
 
