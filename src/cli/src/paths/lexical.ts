@@ -1,5 +1,5 @@
 /**
- * Path operations that work on the text of a path alone: containment,
+ * @file Path operations that work on the text of a path alone: containment,
  * separators, forward-slash spelling. Pure: nothing here asks the filesystem,
  * so any feature may use it. For the physical meaning of a path (symlinks,
  * `..` through a link) see `physical.ts`; for how paths are shown, `display.ts`.
@@ -7,7 +7,7 @@
 import { isAbsolute, relative, sep } from "node:path";
 
 /** Both path separators, so a Windows-style path splits the same everywhere. */
-export const PATH_SEPARATORS = /[\\/]/u;
+export const PATH_SEPARATORS: RegExp = /[\\/]/u;
 
 /**
  * Tells whether a path lies strictly below a directory.

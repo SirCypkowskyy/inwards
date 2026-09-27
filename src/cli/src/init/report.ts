@@ -1,7 +1,9 @@
 /**
- * What `inwards init --style` prints once it has written: the package as a
+ * @file What `inwards init --style` prints once it has written: the package as a
  * tree annotated with each layer and what it may import, then the result of
  * a check run in process, then what to try next.
+ * The check runs through the injected check runner with the baseline off, so
+ * the counts show every violation the new layers find.
  */
 import { dirname, join, relative, resolve } from "node:path";
 import { posix } from "../paths/lexical.ts";

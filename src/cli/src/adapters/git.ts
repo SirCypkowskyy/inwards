@@ -1,5 +1,5 @@
 /**
- * Git behind the `Git` contract. The hooks run git in a project whose
+ * @file Git behind the `Git` contract. The hooks run git in a project whose
  * `.git/config` the agent can write, so only plumbing that runs no filters,
  * hooks or pagers may go through here (`rev-parse`, `cat-file blob`), and
  * every call switches off the two config commands such plumbing could still

@@ -1,5 +1,5 @@
 /**
- * What every Claude Code hook handler shares: the dependencies it is given,
+ * @file What every Claude Code hook handler shares: the dependencies it is given,
  * where the project is, and the one sentence every denial ends with. The
  * handlers (`session-start.ts`, `config-guard.ts`, `post-tool-use.ts`,
  * `stop-gate.ts`) take `HookDeps` from `commands/hook.ts`, which gets them

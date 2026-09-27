@@ -1,5 +1,5 @@
 /**
- * Writing what `inwards init` planned, behind the `InitFiles` contract: the
+ * @file Writing what `inwards init` planned, behind the `InitFiles` contract: the
  * agent wiring files (created with their directory), and the scaffold, whose
  * files are created with `wx` so nothing existing is replaced, pyproject.toml
  * last. A failed scaffold write removes the files and directories this run

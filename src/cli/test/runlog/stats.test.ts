@@ -1,3 +1,8 @@
+/**
+ * @file `inwards stats`: the hypothesis numbers computed from the run logs
+ * match a hand-computed log. The rotated file is read first, and the CLI prints
+ * the same numbers as JSON and as text with their targets.
+ */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

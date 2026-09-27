@@ -1,3 +1,9 @@
+/**
+ * @file `inwards init --style`, with and without `--scaffold`, on a fresh uv
+ * project: the preset's table, the example package, the annotated tree and the
+ * check result. It is idempotent: a second run exits 2 and writes nothing, and
+ * so does an existing `[tool.inwards]` or a file in the way.
+ */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

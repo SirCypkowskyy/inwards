@@ -1,5 +1,5 @@
 /**
- * Finding the pyproject.toml that configures Inwards for a directory: the
+ * @file Finding the pyproject.toml that configures Inwards for a directory: the
  * nearest one above it whose parsed TOML declares `[tool.inwards]`
  * (`declaresInwards`), so any valid spelling of the table counts. The hooks
  * pass a boundary, so a config (or its text, via an error message) is never

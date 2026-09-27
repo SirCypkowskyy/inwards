@@ -1,5 +1,5 @@
 /**
- * The interactive `inwards init` on a terminal: pick a style (its layers show
+ * @file The interactive `inwards init` on a terminal: pick a style (its layers show
  * under the highlighted one), whether to scaffold the example, and an agent.
  * It ends by printing the equivalent command, so the next run can skip it.
  * The caller has already checked that stdin and stdout are TTYs.
@@ -48,7 +48,8 @@ async function pick(target: Target, flags: InitFlags): Promise<InitPlan | undefi
       initialValue: "hexagonal",
     });
     if (clack.isCancel(chosen)) {
-      return cancelled(clack.cancel);
+      cancelled(clack.cancel);
+      return;
     }
     style = chosen;
     const example = await clack.confirm({
@@ -56,7 +57,8 @@ async function pick(target: Target, flags: InitFlags): Promise<InitPlan | undefi
       initialValue: flags.scaffold === true,
     });
     if (clack.isCancel(example)) {
-      return cancelled(clack.cancel);
+      cancelled(clack.cancel);
+      return;
     }
     scaffold = example;
   }
@@ -69,7 +71,8 @@ async function pick(target: Target, flags: InitFlags): Promise<InitPlan | undefi
     initialValue: "none",
   });
   if (clack.isCancel(agent)) {
-    return cancelled(clack.cancel);
+    cancelled(clack.cancel);
+    return;
   }
   const plan = { style, scaffold, agent: agent === "none" ? undefined : agent };
   clack.outro(
@@ -101,9 +104,8 @@ function layerTree(name: StyleName, pkg: string): string {
  * Ends the picker after Ctrl-C or Escape.
  *
  * @param cancel - clack's closing line for a cancelled flow.
- * @returns undefined, the "cancelled" plan.
  */
-function cancelled(cancel: (message?: string) => void): undefined {
+function cancelled(cancel: (message?: string) => void): void {
   cancel("Cancelled; nothing was written.");
 }
 

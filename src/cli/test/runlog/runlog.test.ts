@@ -1,3 +1,8 @@
+/**
+ * @file The run log (`.inwards/runs.jsonl`): off unless enabled, one versioned
+ * line per hook or check run with files, lines written, fingerprints and exit
+ * code. It rotates at 5 MiB.
+ */
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

@@ -1,3 +1,9 @@
+/**
+ * @file Package shape (INW007/INW008) in the example configs and the hooks. The
+ * guide shows the fixtures' configs verbatim, and a Write that creates a
+ * disallowed file blocks while an edit of a file that predates the session
+ * doesn't.
+ */
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";

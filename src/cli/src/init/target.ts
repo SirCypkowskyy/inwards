@@ -1,6 +1,8 @@
 /**
- * Finding the project `inwards init --style` works on: the nearest
+ * @file Finding the project `inwards init --style` works on: the nearest
  * pyproject.toml, its import package, and whether it uses a src layout.
+ * It reads through the injected probe, reader and TOML parser, and returns an
+ * error message instead of throwing when there is no usable project.
  */
 import { dirname, join, relative } from "node:path";
 import { inwardsTable } from "@inwards/core";

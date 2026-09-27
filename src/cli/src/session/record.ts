@@ -1,5 +1,5 @@
 /**
- * Per-session state for the agent hooks: what the session started from, which
+ * @file Per-session state for the agent hooks: what the session started from, which
  * files it edited, and which violations it has seen. The Stop gate (#20) and
  * escalation (#22) read it; it is always on, unlike the opt-in run log.
  *
@@ -130,7 +130,7 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
  * @param io - resolves the file's real path, tells the time and appends to the log.
  * @param session - the real project root and a session id that passed `isSessionId`.
  * @param session.project - the real project root.
- * @param session.id - the session id.
+ * @param session.id - a session id that passed `isSessionId`.
  * @param file - the edited file, absolute.
  * @param diagnostics - what the check of that file reported (empty when clean).
  * @throws when the log can't be written.

@@ -1,3 +1,10 @@
+/**
+ * @file The config guard (PreToolUse): edits that would change
+ * `[tool.inwards]`, the session state, the baseline or the Claude Code settings
+ * are denied before they run. Harmless edits, such as a dependency bump, pass,
+ * and config discovery during a session ignores configs that appeared after it
+ * started.
+ */
 import { describe, expect, test } from "bun:test";
 import { rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

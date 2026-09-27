@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * The `inwards` command line: the composition root. It reads the process
+ * @file The `inwards` command line: the composition root. It reads the process
  * environment once, has `adapters/compose.ts` build one invocation's
  * `AppDeps` from the real adapters, parses argv, and hands off to a command
  * (`commands/`). Nothing below it imports a concrete adapter; everything
@@ -148,6 +148,7 @@ async function setupCommand(
  * early, and that is no reason for a stack trace. Other stream errors still throw.
  *
  * @param err - the stream's error.
+ * @throws {Error} the same error, when it isn't a closed pipe.
  */
 function ignoreClosedPipe(err: Error & { code?: string }): void {
   if (err.code !== "EPIPE") {

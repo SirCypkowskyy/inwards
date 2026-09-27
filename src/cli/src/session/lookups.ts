@@ -1,5 +1,5 @@
 /**
- * Everything the hooks need to compare a check with the session start, built
+ * @file Everything the hooks need to compare a check with the session start, built
  * once per invocation: start identity and start content (each with its own
  * cache), a bound check runner, and the probe and reader for the rest. A
  * hook creates one `StartLookups` and hands it to both the suppression and

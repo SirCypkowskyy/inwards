@@ -1,5 +1,5 @@
 /**
- * #134: a violation a file already had at session start is context, not a
+ * @file #134: a violation a file already had at session start is context, not a
  * block, in both the PostToolUse hook and the Stop gate. The projects mirror
  * the eval's seeded-* cases: the example app, the eval config, the fixture's
  * files, committed, then the edit the task asks for.
@@ -43,14 +43,19 @@ function seeded(fixture: string): string {
  * @param rel - the file, relative to the project.
  * @param edit - the text to replace, everywhere in the file, and its replacement.
  * @param opts - the session id (default the test session) and extra environment.
+ * @param opts.id - the session id; the test session when left out.
+ * @param opts.env - variables added to the hook's environment.
  * @returns the hook's exit code and output.
+ * @throws {Error} when the file doesn't contain the text to replace (the fixture changed).
  */
 function agentEdits(
   root: string,
   rel: string,
-  [from, to]: [string, string],
-  { id = ID, env = {} }: { id?: string; env?: Record<string, string> } = {},
+  edit: [from: string, to: string],
+  opts: { id?: string; env?: Record<string, string> } = {},
 ): RunResult {
+  const [from, to] = edit;
+  const { id = ID, env = {} } = opts;
   const before = readFileSync(join(root, rel), "utf8");
   if (!before.includes(from)) {
     throw new Error(`${rel} has no ${JSON.stringify(from)}; the fixture changed`);

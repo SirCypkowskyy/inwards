@@ -1,5 +1,5 @@
 /**
- * The architecture presets behind `inwards init --style`: each one's layers,
+ * @file The architecture presets behind `inwards init --style`: each one's layers,
  * innermost first, and the example package `--scaffold` writes for it. A
  * preset only uses what a layer-only config can express, so each names the
  * one import its layers can't forbid (its `gap`).
@@ -107,7 +107,7 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
 /**
  * Tells whether a string names a preset.
  *
- * @param value - the `--style` value.
+ * @param value - what was passed to `--style`, if anything.
  * @returns true for layered, clean or hexagonal.
  */
 export function isStyle(value: string | undefined): value is StyleName {
@@ -151,7 +151,7 @@ interface TreeNode {
  * @param style - the preset.
  * @param header - the first line, e.g. `src/app/  (hexagonal)`.
  * @param kind - tells what a module is, from its name segments below the package.
- * @returns the tree.
+ * @returns the tree as lines of text, each layer annotated.
  */
 export function drawTree(
   style: Style,

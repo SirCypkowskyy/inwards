@@ -1,5 +1,5 @@
 /**
- * What a project looks like right now, as the session start and the Stop gate
+ * @file What a project looks like right now, as the session start and the Stop gate
  * compare it: every `[tool.inwards]` table, and a content hash per Python
  * file. Paths are project-relative with forward slashes: real paths for
  * configs, the paths as walked for the manifest. The filesystem comes in

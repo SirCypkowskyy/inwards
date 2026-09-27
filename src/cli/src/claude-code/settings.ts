@@ -1,5 +1,5 @@
 /**
- * Claude Code settings as Inwards needs them: recognising its own hook entries
+ * @file Claude Code settings as Inwards needs them: recognising its own hook entries
  * (for `init`) and checking that no settings layer has switched them off (for
  * the Stop gate). Layers, lowest to highest precedence: user
  * (`$CLAUDE_CONFIG_DIR` or `~/.claude`), project (`.claude/settings.json`) and

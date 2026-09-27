@@ -1,5 +1,5 @@
 /**
- * The capabilities the CLI needs from outside the process, as small named
+ * @file The capabilities the CLI needs from outside the process, as small named
  * contracts: looking at paths, reading files, walking a tree, running git,
  * telling the time, the process environment, and the standard streams.
  *

@@ -1,3 +1,8 @@
+/**
+ * @file `[tool.inwards.rules]` (#43) across `inwards check`, the baseline and
+ * the hooks: severity overrides, `ignore` and `select`. The config guard
+ * protects the table like the rest of `[tool.inwards]`.
+ */
 import { describe, expect, test } from "bun:test";
 import { readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";

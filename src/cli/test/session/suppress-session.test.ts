@@ -1,7 +1,9 @@
 /**
- * `agent-suppressions` against the session start (#50, ADR-028): files the
+ * @file `agent-suppressions` against the session start (#50, ADR-028): files the
  * agent didn't change, `stop-gate = "project"`, new, renamed and paired
  * files, and a rejected suppression treated as if the comment weren't there.
+ * It also pins the start-content cache: each file is hashed once, and git is
+ * asked for each start blob once, failed lookups included.
  */
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
@@ -158,7 +160,7 @@ describe("the unchanged-file check", () => {
     /**
      * Reads a file and records that it did.
      *
-     * @param file - the file.
+     * @param file - the path the check asks for.
      * @returns its bytes.
      */
     function read(file: string): Uint8Array {

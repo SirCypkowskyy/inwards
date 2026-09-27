@@ -1,5 +1,5 @@
 /**
- * What the project feature needs from outside, besides the shared platform
+ * @file What the project feature needs from outside, besides the shared platform
  * contracts: the tree-sitter binaries for the engine, and a safe way to
  * replace a baseline file. Types only.
  */

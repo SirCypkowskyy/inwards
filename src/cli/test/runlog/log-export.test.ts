@@ -1,3 +1,8 @@
+/**
+ * @file `inwards stats --export [--redact]`: every readable run-log line in
+ * time order, in a file only its owner can read. With `--redact`, paths and
+ * fingerprints are HMACs keyed by a per-project key kept in `.inwards/`.
+ */
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

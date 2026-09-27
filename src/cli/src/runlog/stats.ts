@@ -1,5 +1,5 @@
 /**
- * `inwards stats`: the business-hypothesis numbers from the run log
+ * @file `inwards stats`: the business-hypothesis numbers from the run log
  * (docs/chapters/08-Run-Log.md), next to the thresholds chapter 2 sets.
  * The log is read by runs.ts and the report printed by stats-command.ts.
  */
@@ -174,10 +174,10 @@ function observe(pass: Pass, run: RunLine, file: string): void {
  * having seen what a `check` reported before the session's first edit, and
  * what the file's last run in another session still had.
  *
- * @param pass - the state of the pass.
- * @param session - the session id.
- * @param file - the file.
- * @returns the state.
+ * @param pass - everything tallied so far.
+ * @param session - the run's session id.
+ * @param file - a project-relative Python path.
+ * @returns the tally for that session and file, created on first use.
  */
 function fileState(pass: Pass, session: string, file: string): FileState {
   const key = `${session}${SEP}${file}`;

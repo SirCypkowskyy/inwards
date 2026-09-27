@@ -1,3 +1,9 @@
+/**
+ * @file `inwards init --agent`: the Claude Code hooks, the Aider lint line and
+ * the AGENTS.md section. It keeps the user's own hooks and settings, pins
+ * `required-version`, and installs a hook that runs with no shell, no PATH and
+ * no virtualenv.
+ */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

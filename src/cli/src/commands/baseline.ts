@@ -1,5 +1,5 @@
 /**
- * `inwards baseline`: accepts the violations a project already has, so only
+ * @file `inwards baseline`: accepts the violations a project already has, so only
  * new ones fail. It checks the whole project without the baseline and writes
  * every error to `inwards-baseline.json` next to the config, replacing the
  * old one (see `project/baseline.ts` for what the file holds).

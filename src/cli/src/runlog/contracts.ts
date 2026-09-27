@@ -1,5 +1,5 @@
 /**
- * What `inwards stats --export` needs from outside: the project's export key,
+ * @file What `inwards stats --export` needs from outside: the project's export key,
  * kept and read without following symlinks, and a file written for the
  * owner only. Types only.
  */

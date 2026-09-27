@@ -1,3 +1,10 @@
+/**
+ * @file `inwards stats` edge cases (#112): concurrent sessions on one file, a
+ * module's .py and .pyi, projects outside git, and packages whose log sits
+ * above them.
+ * Each case comes from a review of #112 and pins how a violation is attributed
+ * when the log alone is ambiguous.
+ */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";

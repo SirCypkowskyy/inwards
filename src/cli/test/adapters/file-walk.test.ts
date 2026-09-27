@@ -1,3 +1,10 @@
+/**
+ * @file The project file walk (`adapters/file-walk.ts`): what it skips and what
+ * it keeps. It walks build/dist/site inside packages, skips virtualenvs and
+ * hidden directories, lists a file under every name Python could import it by,
+ * survives symlink cycles, and never follows a link out of the directory it was
+ * asked to walk.
+ */
 import { expect, test } from "bun:test";
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";

@@ -1,5 +1,5 @@
 /**
- * The process behind the `Runtime` and `Clock` contracts: the environment
+ * @file The process behind the `Runtime` and `Clock` contracts: the environment
  * variables Inwards reads, the working directory, the platform and the
  * clocks. `readRuntime` is called once, by
  * `main.ts`; nothing else in the CLI reads `process` for these.

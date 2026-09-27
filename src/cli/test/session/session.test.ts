@@ -1,3 +1,10 @@
+/**
+ * @file The session record the hooks keep in `.inwards/state`: SessionStart
+ * records every config and a content manifest, edits and their fingerprints are
+ * appended, and a project without `[tool.inwards]` gets no state at all.
+ * It reads the state back through `readSession` with the real platform, as the
+ * hooks do.
+ */
 import { describe, expect, test } from "bun:test";
 import {
   mkdirSync,

@@ -1,5 +1,5 @@
 /**
- * `inwards check`: checks the Python files under the given paths (or the
+ * @file `inwards check`: checks the Python files under the given paths (or the
  * whole config root) against `[tool.inwards]` and writes the report to
  * stdout in the chosen format. Exit codes follow Ruff: 0 clean (warnings
  * allowed), 1 errors, 2 usage or config error.

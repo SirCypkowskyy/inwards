@@ -1,3 +1,8 @@
+/**
+ * @file The compiled binary end to end against the recorded Claude Code hook
+ * payloads in `support/fixtures/claude-code`. The exit codes and output are
+ * pinned in a snapshot, and garbage on stdin is a clean exit 1.
+ */
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";

@@ -1,3 +1,9 @@
+/**
+ * @file The Stop gate against edits made around the hooks: Bash writes,
+ * disguised directories, new nested configs, FIFOs and similar tricks. Each
+ * must still be caught, and a failing gate blocks once and then lets the turn
+ * end.
+ */
 import { describe, expect, test } from "bun:test";
 import { chmodSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

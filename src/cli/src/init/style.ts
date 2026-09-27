@@ -1,5 +1,5 @@
 /**
- * `inwards init`: the setup wizard's entry point. It sorts out the flags
+ * @file `inwards init`: the setup wizard's entry point. It sorts out the flags
  * (`--list-styles`, `--style`, `--agent`, `--scaffold`, `--package`), asks
  * with the picker on a terminal when nothing was chosen, then writes a
  * preset's `[tool.inwards]`, the example scaffold and an agent's wiring, and
@@ -95,7 +95,7 @@ export async function initMain(
  *
  * @param ctx - the platform, the check runner and init's writer and picker.
  * @param flags - the parsed options (`--scaffold`, `--package`).
- * @param dryRun - `--dry-run`.
+ * @param dryRun - print the changes instead of writing them (`--dry-run`).
  * @returns the exit code of the chosen init, or 2.
  */
 async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean): Promise<number> {

@@ -1,5 +1,5 @@
 /**
- * Loading a project: its config, its Python sources under their module names,
+ * @file Loading a project: its config, its Python sources under their module names,
  * and a check run over them. The engine does no I/O (ADR-006), so all file
  * reading happens here, through the injected `ProjectIo`: paths are probed,
  * files read and trees walked by whatever the caller wired in.
@@ -179,6 +179,10 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  *   `baseline: false` reports every violation (for `inwards baseline`),
  *   `required: true` adds INW008 for the targets' packages (for the hook), `texts`
  *   checks the given content instead of a file's (a file as it was at session start).
+ * @param options.base - directory that report paths are made relative to.
+ * @param options.baseline - false to report violations the baseline accepts.
+ * @param options.required - true to add INW008 for the targets' packages.
+ * @param options.texts - content to check instead of a file's, by absolute path.
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -256,7 +260,7 @@ function requiredAround(
  *
  * @param io - reads, walks and probes the project and loads the grammars.
  * @param configPath - absolute path of the pyproject.toml to use.
- * @returns the project index.
+ * @returns a lazy index of the project's modules, for lookups by name.
  * @throws {ConfigError} when the config is invalid.
  */
 export async function indexProject(io: ProjectIo, configPath: string): Promise<ProjectIndex> {

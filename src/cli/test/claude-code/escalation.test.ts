@@ -1,3 +1,9 @@
+/**
+ * @file Escalation across the hooks: a violation that survives `escalate-after`
+ * attempts makes the hooks stop blocking and tell the agent to ask the user.
+ * The user sees what is unresolved when the turn ends, and the next session
+ * hears of it.
+ */
 import { describe, expect, test } from "bun:test";
 import { existsSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";

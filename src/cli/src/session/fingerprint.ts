@@ -1,5 +1,5 @@
 /**
- * The identity of a violation across hook runs and sessions: same rule, same
+ * @file The identity of a violation across hook runs and sessions: same rule, same
  * module, same message (which names the offending import target), hashed
  * short. The session log, escalation and the run log count repeats by it.
  * Pure: hashing only.

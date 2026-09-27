@@ -1,3 +1,8 @@
+/**
+ * @file The rule documentation pages (docs/chapters/rules, docs/pl/rules) agree
+ * with the rule registry. Every rule has a page in both languages with the full
+ * front matter, and every diagnostic's link points at its page.
+ */
 import { expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";

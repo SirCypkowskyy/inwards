@@ -1,3 +1,8 @@
+/**
+ * @file The config guard's reading of Bash commands that only read protected
+ * files (#135). Such a command is let through, anything that might write is
+ * denied, and even very long commands are read in linear time.
+ */
 import { describe, expect, test } from "bun:test";
 import { denied, pre } from "../support/guard-helpers.ts";
 import { session } from "../support/stop-helpers.ts";

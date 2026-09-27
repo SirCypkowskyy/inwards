@@ -1,5 +1,5 @@
 /**
- * Layout checks for a session: which layer prefixes stopped matching modules
+ * @file Layout checks for a session: which layer prefixes stopped matching modules
  * between SessionStart and now, whether layer code moved out of every layer
  * (INW006), and which required package members went missing (INW008).
  * `git mv shop/domain shop/core` takes every domain module out of the check,
@@ -86,6 +86,7 @@ export function newLayoutErrors(
  * @param d - a diagnostic whose path is project-relative.
  * @param project - the real project root.
  * @param start - the session's start record.
+ * @param start.manifest - SHA-256 of every Python file at session start, by project path.
  * @returns true for such a finding.
  */
 export function preexistingShape(

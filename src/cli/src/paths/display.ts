@@ -1,5 +1,5 @@
 /**
- * How report paths are shown to people and agents. On macOS `/var` is a link
+ * @file How report paths are shown to people and agents. On macOS `/var` is a link
  * to `/private/var`, so a report can mix two spellings of the project root
  * and print `../../private/var/...`. These helpers respell the part of a path
  * up to the project root as the real root, and only when the result still

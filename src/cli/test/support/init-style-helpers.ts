@@ -1,6 +1,8 @@
 /**
- * Shared by the `inwards init --style` tests: a fresh uv project, and ways to
+ * @file Shared by the `inwards init --style` tests: a fresh uv project, and ways to
  * run init and compare a project's files before and after.
+ * The projects look like what `uv init --package` makes, so the tests exercise
+ * init on the layout users start from.
  */
 import { lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync } from "node:fs";
 import { join, relative, sep } from "node:path";

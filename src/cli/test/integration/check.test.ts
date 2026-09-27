@@ -1,3 +1,8 @@
+/**
+ * @file `inwards check` output paths on every OS: diagnostics and SARIF use
+ * forward slashes. A `--config` spelled through a link to the project names
+ * files from the real cwd (the macOS /var case).
+ */
 import { expect, test } from "bun:test";
 import { symlinkSync } from "node:fs";
 import { join } from "node:path";

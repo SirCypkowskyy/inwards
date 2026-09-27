@@ -1,3 +1,8 @@
+/**
+ * @file Helpers for the config guard tests: build a PreToolUse payload for an
+ * Edit, Write or Bash call, run the guard, and tell whether it denied the call.
+ * They drive the compiled CLI like Claude Code does.
+ */
 import { isAbsolute, join } from "node:path";
 import { inwards, payload, type RunResult } from "./run.ts";
 
@@ -22,6 +27,7 @@ export function pre(root: string, tool: string, input: Record<string, unknown>):
  *
  * @param result - the hook run.
  * @returns the reason, or undefined when the call was let through.
+ * @throws {Error} when the hook didn't exit 0, which a PreToolUse run always should.
  */
 export function denied(result: RunResult): string | undefined {
   if (result.code !== 0) {

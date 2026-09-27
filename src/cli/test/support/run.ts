@@ -1,3 +1,8 @@
+/**
+ * @file How the CLI tests run Inwards: the compiled binary when `INWARDS_BIN`
+ * is set (as CI does), else `bun` on the source. It also builds throwaway
+ * projects from a file map and loads recorded Claude Code hook payloads.
+ */
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
@@ -41,6 +46,9 @@ export interface RunResult {
  *
  * @param args - CLI arguments, e.g. `["check", "--format", "json"]`.
  * @param opts - working directory, optional stdin text, and extra environment.
+ * @param opts.cwd - the directory to run in.
+ * @param opts.stdin - text to pipe to stdin; none when undefined.
+ * @param opts.env - variables added to the test environment.
  * @returns the exit code and both output streams as text.
  */
 export function inwards(
@@ -69,6 +77,8 @@ const TMP = tempDir("inwards-e2e-");
  *
  * @param args - CLI arguments.
  * @param opts - working directory and stdin text.
+ * @param opts.cwd - the directory to run in.
+ * @param opts.stdin - text to pipe to stdin.
  * @returns the exit code and captured output, once the process ends.
  */
 export async function inwardsAsync(

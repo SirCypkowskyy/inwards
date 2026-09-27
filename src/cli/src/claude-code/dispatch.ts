@@ -1,5 +1,5 @@
 /**
- * Routes a Claude Code hook payload to the handler for its event:
+ * @file Routes a Claude Code hook payload to the handler for its event:
  * SessionStart, PreToolUse (the config guard), PostToolUse and Stop (the
  * gate). Any other event passes with exit 0, so a hook installed for more
  * events than Inwards handles never blocks the agent.

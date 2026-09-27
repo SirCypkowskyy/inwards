@@ -1,5 +1,5 @@
 /**
- * The standard streams behind the `Streams` contract. Output goes through
+ * @file The standard streams behind the `Streams` contract. Output goes through
  * `write`, not console.*: with FORCE_COLOR set, Bun paints console.error red,
  * and the JSON an agent parses would arrive wrapped in ANSI codes.
  */

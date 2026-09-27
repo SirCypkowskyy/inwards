@@ -4,6 +4,8 @@
  * process, the policy folders really can't reach node:fs or the `process`
  * global (Biome rejects a probe file), and every source folder has a fallow
  * zone that keeps policy away from the concrete adapters.
+ * These tests would fail if a refactor put a cache back into a module global or
+ * let a policy folder reach the filesystem directly.
  */
 import { describe, expect, test } from "bun:test";
 import {

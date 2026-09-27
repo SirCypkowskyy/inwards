@@ -1,8 +1,9 @@
 /**
- * `agent-suppressions` and the #134 excuse against symlinks (#50, ADR-028): a
+ * @file `agent-suppressions` and the #134 excuse against symlinks (#50, ADR-028): a
  * file has a start identity only when its path as written is its physical
  * path, so an alias the agent creates, a cwd inside one, `..` through one,
  * or a start file swapped for a link never borrows another file's start record.
+ * Each test pins one bypass that an earlier review found.
  */
 import { describe, expect, test } from "bun:test";
 import { renameSync, symlinkSync } from "node:fs";

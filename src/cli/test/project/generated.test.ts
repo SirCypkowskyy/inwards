@@ -1,3 +1,10 @@
+/**
+ * @file Generated modules for INW010 (#160): `*_pb2`, `*_pb2_grpc` and
+ * `_version` pass whether or not the file exists, a configured pattern does
+ * too, and `generated = []` turns the exemption off.
+ * Each case runs twice, with and without the generated file on disk, because
+ * that is the difference between a dev checkout and CI.
+ */
 import { describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";

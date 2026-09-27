@@ -1,5 +1,5 @@
 /**
- * Wires the real adapters into one invocation's `AppDeps`: the production
+ * @file Wires the real adapters into one invocation's `AppDeps`: the production
  * composition. `main.ts` calls it once per process; a test calls it to get
  * the real filesystem, git and streams, or to run two independent
  * invocations in one process. This is the only place the adapters meet.

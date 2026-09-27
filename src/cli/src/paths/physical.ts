@@ -1,5 +1,5 @@
 /**
- * The physical meaning of a path: what the OS opens, as opposed to what the
+ * @file The physical meaning of a path: what the OS opens, as opposed to what the
  * path says as text. `path.resolve` folds `dlink/..` away, but the OS follows
  * `dlink` first, so `dlink/../x.py` can be a different file. The hooks judge
  * agent-supplied paths this way (ADR-013). Filesystem access comes in through

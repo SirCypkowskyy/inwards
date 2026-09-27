@@ -1,5 +1,5 @@
 /**
- * The run log, `.inwards/runs.jsonl`: one JSON line per hook or check run, so
+ * @file The run log, `.inwards/runs.jsonl`: one JSON line per hook or check run, so
  * the business hypothesis (fixed within one retry, violations per 1,000
  * agent-written lines) can be measured from real sessions. Off by default,
  * local only, and never sent anywhere. It is on when `INWARDS_RUN_LOG=1` or
@@ -59,6 +59,10 @@ export interface RunLog {
    *
    * @param project - the real project root.
    * @param run - the event, the hook payload, the exit code; `force` for `check --log`.
+   * @param run.event - the hook event, or `check`.
+   * @param run.input - the hook payload, if there is one.
+   * @param run.exit - the exit code the run returns.
+   * @param run.force - `check --log`: log even when the run log is off.
    */
   logRun: (
     project: string,

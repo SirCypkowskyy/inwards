@@ -1,5 +1,5 @@
 /**
- * `agent-suppressions` in the hooks (#50, ADR-028). Under `"deny"`, the
+ * @file `agent-suppressions` in the hooks (#50, ADR-028). Under `"deny"`, the
  * default, an inline suppression counts only when its file is byte for byte
  * what it was at session start (the agent didn't change it), or when the
  * file as it was at session start had the same finding suppressed too, copy

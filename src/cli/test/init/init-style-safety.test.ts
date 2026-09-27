@@ -1,3 +1,9 @@
+/**
+ * @file Where `inwards init --style` writes, and what it refuses: it names the
+ * pyproject.toml it will change, picks the source root carefully, and never
+ * writes through a symlink, outside the project, or halfway.
+ * A refused run leaves the project byte for byte as it was.
+ */
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";

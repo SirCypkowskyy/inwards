@@ -1,5 +1,5 @@
 /**
- * The shared vocabulary of `inwards init`: which agents it can wire up, the
+ * @file The shared vocabulary of `inwards init`: which agents it can wire up, the
  * options it was given, the plan it settles on, the project it works on, and
  * the file changes it computes before writing anything.
  *
@@ -20,7 +20,7 @@ export type Agent = (typeof AGENTS)[number];
 /**
  * Tells whether a string names an agent init supports.
  *
- * @param value - the `--agent` value.
+ * @param value - what was passed to `--agent`, if anything.
  * @returns true for claude, aider or agents-md.
  */
 export function isAgent(value: string | undefined): value is Agent {

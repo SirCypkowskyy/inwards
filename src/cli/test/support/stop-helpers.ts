@@ -1,6 +1,8 @@
 /**
- * Helpers for the Stop gate tests: a git project with the Inwards hooks and a
+ * @file Helpers for the Stop gate tests: a git project with the Inwards hooks and a
  * started session, and the hook events an agent's turn produces.
+ * They drive the CLI the way Claude Code does, through recorded payload shapes,
+ * so the Stop gate is tested as it runs in a real session.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -25,6 +27,7 @@ function hook(root: string, stdin: string): RunResult {
  *
  * @param root - the project directory.
  * @param args - git arguments.
+ * @throws {Error} when git fails, with its stderr.
  */
 export function git(root: string, ...args: string[]): void {
   const run = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], {

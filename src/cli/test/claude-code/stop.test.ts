@@ -1,3 +1,8 @@
+/**
+ * @file The Stop gate: what a session changed is checked before the turn may
+ * end. Pre-existing violations never block a clean edit, a violating edit
+ * blocks at most `escalate-after` times, and a clean pass ends the streak.
+ */
 import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

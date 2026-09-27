@@ -43,6 +43,8 @@ jobs:
         run: bun run fallow
       - name: No import cycles, type imports included (fallow sees runtime ones only)
         run: bun run check:cycles
+      - name: Every module opens with a real overview (the packages restructured under #176)
+        run: bun run check:overviews
       # A full CPython: Ubuntu 26.04's python3 ships its stdlib tests in a separate
       # package, which shrank the corpus from 2,273 files to 626.
       - uses: actions/setup-python@v7

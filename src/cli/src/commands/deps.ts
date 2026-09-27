@@ -1,5 +1,5 @@
 /**
- * What the CLI's commands are given: everything the hook handlers get, plus
+ * @file What the CLI's commands are given: everything the hook handlers get, plus
  * the storage only some commands write (the baseline, the export). `main.ts`
  * builds one `AppDeps` per invocation from the adapters; commands never
  * import an adapter themselves.

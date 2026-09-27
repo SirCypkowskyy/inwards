@@ -1,5 +1,5 @@
 /**
- * Walking a project tree for its files, behind the `FileWalker` contract.
+ * @file Walking a project tree for its files, behind the `FileWalker` contract.
  * The rules (skips, symlinks, cycles, layer packages walked in full) are
  * described on `collectPythonFiles`.
  */

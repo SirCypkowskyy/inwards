@@ -1,7 +1,9 @@
 /**
- * Inline suppressions (#50, ADR-028) through the CLI and the Claude Code
+ * @file Inline suppressions (#50, ADR-028) through the CLI and the Claude Code
  * hooks: the check's summary and SARIF, and `agent-suppressions`, which by
  * default keeps an agent from silencing a violation with a comment.
+ * A missing reason, an unknown code and an unused suppression are INW009
+ * findings of their own.
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";

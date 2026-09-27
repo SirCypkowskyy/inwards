@@ -1,5 +1,5 @@
 /**
- * Reading a Bash command the way the config guard needs to: does any command
+ * @file Reading a Bash command the way the config guard needs to: does any command
  * in it run `inwards hook` or `inwards baseline`, and does it only read? A
  * word-by-word reading, not one regex, so it stays linear on any input and can
  * skip what bash never runs (quoted heredoc bodies, backticks in single quotes).
@@ -380,7 +380,7 @@ function endWord(reading: Reading): void {
 /**
  * Tells whether one simple command is a reader with harmless arguments.
  *
- * @param words - the command's words.
+ * @param words - one simple command, split into words the way bash does.
  * @returns true when its program is in READERS (`git` only with a subcommand
  *   in GIT_READS) and no argument is one that writes.
  */

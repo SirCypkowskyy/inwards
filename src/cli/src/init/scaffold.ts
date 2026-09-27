@@ -1,5 +1,5 @@
 /**
- * Planning what `inwards init --style --scaffold` creates without touching
+ * @file Planning what `inwards init --style --scaffold` creates without touching
  * anything it shouldn't: a scaffold file never replaces an existing entry (a
  * dangling symlink included) and never lands outside the project through a
  * symlinked directory. Writing the plan, with rollback, is the `InitFiles`
@@ -27,7 +27,7 @@ interface ScaffoldPlan {
  * @param probe - looks at what is already there.
  * @param project - the project directory.
  * @param preset - what to scaffold.
- * @param preset.style - the preset.
+ * @param preset.style - the layer preset, e.g. layered.
  * @param preset.pkg - the import package.
  * @param preset.root - the config root.
  * @returns the files to create and the refused paths.

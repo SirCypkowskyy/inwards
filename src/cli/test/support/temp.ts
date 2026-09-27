@@ -1,5 +1,5 @@
 /**
- * Temporary directories for the CLI tests. `bun test` fires neither `exit`
+ * @file Temporary directories for the CLI tests. `bun test` fires neither `exit`
  * nor `beforeExit`, and a helper module is loaded once for every test file,
  * so an `afterAll` in it would run after the first file. Instead every
  * directory is registered here and `preload.ts`, which bunfig.toml loads,

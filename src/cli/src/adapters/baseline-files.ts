@@ -1,5 +1,5 @@
 /**
- * Writing `inwards-baseline.json`, behind the `BaselineWriter` contract. A
+ * @file Writing `inwards-baseline.json`, behind the `BaselineWriter` contract. A
  * temporary file and a rename replace a planted symlink instead of writing
  * through it; a path that can't be replaced (a directory) is a config error.
  */

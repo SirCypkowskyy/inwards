@@ -1,5 +1,5 @@
 /**
- * The filesystem side of session state, kept apart from what the state means.
+ * @file The filesystem side of session state, kept apart from what the state means.
  * Every write goes to `<project>/.inwards/state` after checking that neither
  * level is a symlink and that the directory really lives in the project; log
  * files are opened with O_NOFOLLOW where the OS has it; pruning removes only
@@ -42,6 +42,8 @@ const OWNER_ONLY = 0o600;
  *
  * @param path - the log file.
  * @param line - one line of text, ending in a newline.
+ * @throws {Error} when something other than a regular file sits at the path,
+ *   or the file can't be opened or written.
  */
 function appendLine(path: string, line: string): void {
   if (existsAsNonFile(path)) {

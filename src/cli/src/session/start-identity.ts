@@ -1,5 +1,5 @@
 /**
- * Which file a path named at session start. The hooks excuse a file's old
+ * @file Which file a path named at session start. The hooks excuse a file's old
  * violations, honour its old suppressions and pass its old package shape only
  * when the file is the same one the session started with (#134, #50, #169).
  * An agent can create symlinks, so "the same path" isn't enough: the

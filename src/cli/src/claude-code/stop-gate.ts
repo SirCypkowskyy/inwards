@@ -1,5 +1,5 @@
 /**
- * The Stop gate: before the agent may end its turn, check what this session
+ * @file The Stop gate: before the agent may end its turn, check what this session
  * changed, and nothing else, so a legacy repo's old violations never block.
  * A config with `stop-gate = "project"` gets a whole-project check against
  * its baseline instead, which also catches a violation in a file the session
@@ -207,11 +207,19 @@ async function review(
  * @param io - writes the session log, the unresolved record and the output.
  * @param session - the real project root and the session id.
  * @param session.project - the real project root.
- * @param session.id - the session id.
+ * @param session.id - the payload's session id, which names its state files.
  * @param turn - blocks so far in this turn, blocks allowed, whether this is the
  *   turn's first Stop, and whether a violation has already escalated.
+ * @param turn.streak - how many times the Stop gate has blocked this turn already.
+ * @param turn.limit - how many blocks the config allows (`escalate-after`).
+ * @param turn.fresh - true for the turn's first Stop, which restarts the count.
+ * @param turn.escalated - a violation has already reached the limit this session.
  * @param found - the problems, the report, the old errors left out of it, and
  *   the findings whose suppression was rejected.
+ * @param found.problems - session problems that aren't diagnostics.
+ * @param found.report - the check of what the session changed.
+ * @param found.old - errors the changed files already had at session start.
+ * @param found.rejected - findings whose inline suppression wasn't honoured.
  * @returns 2 to block, 0 to let the turn end.
  */
 function blockOrYield(

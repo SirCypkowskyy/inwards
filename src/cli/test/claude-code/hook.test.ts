@@ -1,3 +1,9 @@
+/**
+ * @file The PostToolUse hook end to end through `inwards hook claude-code`:
+ * which files it checks, how it resolves the payload's paths, and what it tells
+ * the agent. A clean file passes silently; a violation blocks with the finding
+ * on stderr.
+ */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, symlinkSync } from "node:fs";
 import { join } from "node:path";

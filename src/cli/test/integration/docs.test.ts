@@ -1,3 +1,9 @@
+/**
+ * @file Runs the documented shell snippets: every guide and rule page tags its
+ * runnable commands with `<!-- e2e -->`, and each one must work against the
+ * compiled CLI with the output the page shows. The harness is written for bash
+ * 3.2, which macOS ships.
+ */
 import { expect, test } from "bun:test";
 import { chmodSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -33,7 +39,7 @@ interface Fence {
  * Fences may sit in a list item, so the item's indent is removed from each line.
  *
  * @param markdown - the page's text.
- * @returns the fences.
+ * @returns each tagged shell fence with its expected output, in page order.
  */
 function fences(markdown: string): Fence[] {
   return [...markdown.matchAll(TAGGED)].map(({ groups: g = {} }) => {

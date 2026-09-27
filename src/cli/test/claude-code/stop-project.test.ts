@@ -1,3 +1,9 @@
+/**
+ * @file The Stop gate with `stop-gate = "project"`: the whole project is
+ * checked against the baseline, so a violation in a file the session never
+ * touched blocks. A baseline deleted during the session falls back to the
+ * changed files.
+ */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";

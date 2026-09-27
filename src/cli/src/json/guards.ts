@@ -1,5 +1,5 @@
 /**
- * Type guards for values parsed from JSON or TOML: settings files, hook
+ * @file Type guards for values parsed from JSON or TOML: settings files, hook
  * payloads, baselines and pyproject tables. The CLI reads all of them as
  * `unknown` and narrows them here before looking inside.
  *

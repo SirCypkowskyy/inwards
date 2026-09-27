@@ -1,5 +1,5 @@
 /**
- * Escalation: some violations need a human decision, and blocking forever only
+ * @file Escalation: some violations need a human decision, and blocking forever only
  * teaches the agent to game the check. When the same violation survives
  * `escalate-after` attempts (default 3), the hooks stop blocking and tell the
  * agent to summarise it and ask the user:
@@ -39,7 +39,7 @@ export function askUser(attempts: number): string {
 /**
  * Lists violations one per line, for people.
  *
- * @param diagnostics - the violations.
+ * @param diagnostics - the findings still unresolved.
  * @returns lines like `- shop/domain/order.py:3 INW001 Layer "domain" imports ...`.
  */
 function listViolations(diagnostics: readonly Diagnostic[]): string {
@@ -54,6 +54,8 @@ function listViolations(diagnostics: readonly Diagnostic[]): string {
  * @param project - the real project root; diagnostic paths are relative to it.
  * @param id - the session id, which names the record.
  * @param found - session problems that aren't diagnostics, and the violations still there.
+ * @param found.problems - session problems that aren't diagnostics, one sentence each.
+ * @param found.diagnostics - the violations still there when the turn ends.
  * @returns 0; the message goes to stdout as the Stop hook's `systemMessage`.
  */
 export function yieldTurn(
@@ -109,7 +111,7 @@ export function takeUnresolved(io: EscalationIo, project: string): string | unde
  * Reads one unresolved record, refusing anything but a regular file.
  *
  * @param io - tells what the path is and reads it.
- * @param path - the record's path.
+ * @param path - an `<id>.unresolved.json` file in the state directory.
  * @returns the summary and file hashes, or undefined when unreadable.
  */
 function readRecord(

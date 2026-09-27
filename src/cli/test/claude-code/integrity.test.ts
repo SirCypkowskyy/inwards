@@ -1,3 +1,8 @@
+/**
+ * @file INW006 (code outside every layer) in the CLI and the Stop gate,
+ * including the layer moves a prefix check alone would miss. Legacy tooling
+ * packages only warn, while emptying a layer or moving its code away fails.
+ */
 import { describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";

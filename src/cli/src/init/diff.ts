@@ -1,4 +1,9 @@
 /**
+ * @file A line diff for `inwards init --dry-run`, which prints each change it
+ * would make before making it. Pure: a longest-common-subsequence table over
+ * the two texts' lines, no I/O.
+ */
+/**
  * Shows how one text becomes another, line by line: `-` for removed lines,
  * `+` for added ones. Used by `inwards init --dry-run`; files are small, so a
  * plain longest-common-subsequence table is fast enough.

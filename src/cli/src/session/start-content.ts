@@ -1,5 +1,5 @@
 /**
- * What a file contained when the session started, proven against the start
+ * @file What a file contained when the session started, proven against the start
  * manifest's SHA-256. The content comes from git: the raw blob at the commit
  * the session started on, or that blob with CRLF line endings (what
  * `core.autocrlf` checks out), whichever matches the hash. Never `cat-file

@@ -1,5 +1,5 @@
 /**
- * Violations a file already had when the session started. The PostToolUse
+ * @file Violations a file already had when the session started. The PostToolUse
  * hook and the Stop gate hand them to the agent as context instead of
  * blocking on them, so an agent isn't pushed to rewrite code its task didn't
  * need (#134). A violation the agent adds to the same file still blocks.

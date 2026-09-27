@@ -1,5 +1,5 @@
 /**
- * The config guard (PreToolUse): an agent that can edit the rules isn't
+ * @file The config guard (PreToolUse): an agent that can edit the rules isn't
  * constrained by them, so edits that would change them are denied before
  * they happen, with a reason that tells the agent to ask the user.
  *
@@ -108,6 +108,8 @@ function problemWith(
  * @param io - probes and reads files and knows the environment.
  * @param project - the real project root.
  * @param path - the target as written and where it would land.
+ * @param path.lexical - the target as the tool wrote it, made absolute.
+ * @param path.real - where a write would land with symlinks followed, if anything on the way exists.
  * @param edit - applies the tool call to the file's normalised text.
  * @returns why the edit is denied, or undefined to let it through.
  * @throws when the target exists but can't be read.
@@ -157,6 +159,8 @@ function fileProblem(
  * @param io - resolves real paths and reads configs.
  * @param project - the real project root.
  * @param path - the target as written and where it would land.
+ * @param path.lexical - the target as the tool wrote it, made absolute.
+ * @param path.real - where a write would land with symlinks followed, if anything on the way exists.
  * @returns true when that config's real path is the target.
  */
 function isConfigTarget(

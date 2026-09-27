@@ -1,5 +1,5 @@
 /**
- * The SessionStart hook: at startup or /clear, record where the session
+ * @file The SessionStart hook: at startup or /clear, record where the session
  * starts (HEAD, every `[tool.inwards]` table and a content-hash manifest of
  * the Python files) for the Stop gate and the config guard, and hand the
  * model what earlier sessions left unresolved. A resume or compact only logs

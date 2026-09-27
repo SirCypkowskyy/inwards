@@ -1,3 +1,10 @@
+/**
+ * @file The module index the CLI builds for the engine: every module is
+ * indexed, including ones under build/, and importers are found however the
+ * import is spelled, relative imports included.
+ * The index is lazy, so these tests also show that asking for one module
+ * doesn't walk the whole tree.
+ */
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { nodePlatform, nodeProjectIo } from "../../src/adapters/compose.ts";

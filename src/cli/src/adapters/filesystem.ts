@@ -1,5 +1,5 @@
 /**
- * The real filesystem behind the `PathProbe` and `FileReader` contracts
+ * @file The real filesystem behind the `PathProbe` and `FileReader` contracts
  * (`platform/contracts.ts`). Observations answer "not there" instead of
  * throwing; reads throw, as the contract says. Writes are not here: each
  * kind of state the CLI writes has its own adapter with its own safety rules

@@ -1,8 +1,10 @@
 /**
- * Reading the run logs (`inwards/run@1`, docs/chapters/08-Run-Log.md) for
+ * @file Reading the run logs (`inwards/run@1`, docs/chapters/08-Run-Log.md) for
  * `inwards stats`: every `.inwards/runs.1.jsonl` and `.inwards/runs.jsonl`
  * in the project, since the hooks log at the project root and `check` next
  * to its config.
+ * Torn or foreign lines are counted as skipped rather than guessed at, and the
+ * files are read through the injected reader.
  */
 import { dirname, join } from "node:path";
 import type { FileReader } from "../platform/contracts.ts";
@@ -214,7 +216,7 @@ export function parseLine(raw: string): RunLine | undefined {
 /**
  * Tells whether a parsed value is an object.
  *
- * @param value - the value.
+ * @param value - a field of a parsed log line.
  * @returns true for a non-null, non-array object.
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -223,7 +225,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Tells whether a value is an array of strings.
  *
- * @param value - the value.
+ * @param value - a field of a parsed log line.
  * @returns true for string[].
  */
 function isStrings(value: unknown): value is string[] {
@@ -242,7 +244,7 @@ function isAligned(value: unknown, prints: readonly string[]): value is string[]
 /**
  * Tells whether a value is a plausible duration.
  *
- * @param value - the value.
+ * @param value - a field of a parsed log line.
  * @returns true for a finite number of milliseconds, zero or more.
  */
 function isDuration(value: unknown): value is number {
@@ -251,7 +253,7 @@ function isDuration(value: unknown): value is number {
 /**
  * Tells whether a value is one entry of a line's `lines`.
  *
- * @param value - the value.
+ * @param value - a field of a parsed log line.
  * @returns true for `{file, added, removed}`.
  */
 function isLineCount(value: unknown): value is RunLine["lines"][number] {

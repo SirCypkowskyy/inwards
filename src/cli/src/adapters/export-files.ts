@@ -1,8 +1,10 @@
 /**
- * Storage for `inwards stats --export`, behind the `ExportFiles` contract: the
+ * @file Storage for `inwards stats --export`, behind the `ExportFiles` contract: the
  * per-project HMAC key in `.inwards/export-key` (made once, never leaving
  * the machine, read with O_NOFOLLOW so a planted symlink isn't followed), and
  * the export file, written for the owner only.
+ * Hashing and choosing what to export are policy, in `runlog/export.ts`; only
+ * the key and the file live here.
  */
 import { randomBytes } from "node:crypto";
 import { closeSync, constants, lstatSync, openSync, readFileSync, writeFileSync } from "node:fs";
@@ -65,7 +67,7 @@ function readKey(path: string): string | undefined {
  * Creates the key, or reads the one a concurrent export just created.
  *
  * @param dir - the project's `.inwards/`.
- * @returns the key.
+ * @returns 64 hex digits: a new key, or the one a concurrent export wrote first.
  */
 function createKey(dir: string): string {
   const path = join(dir, "export-key");

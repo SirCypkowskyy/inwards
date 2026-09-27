@@ -1,5 +1,5 @@
 /**
- * The PostToolUse hook: after the agent writes a Python file, check that one
+ * @file The PostToolUse hook: after the agent writes a Python file, check that one
  * file, split what it finds into what blocks (new errors) and what is context
  * (warnings, violations the file already had at session start, rejected
  * suppressions, errors that just reached the escalation limit), record the
@@ -97,6 +97,10 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
  *
  * @param deps - the platform and the check runner.
  * @param target - the file, the report base, the project and the path as written.
+ * @param target.file - the edited file, absolute, as the agent named it.
+ * @param target.cwd - the payload's cwd, which report paths are relative to.
+ * @param target.project - the real project root.
+ * @param target.written - each checked file's path exactly as the agent wrote it.
  * @param start - the session's start record, if it has one.
  * @param configPath - the config to check the file with.
  * @returns the report as if rejected suppressions weren't there, the rejected
@@ -137,7 +141,13 @@ async function checkEdit(
  * @param split - the errors the file already had at session start, the ones
  *   that block, the findings whose suppression was rejected, and the escalation
  *   limit if this run reached it (`escalationOf`).
+ * @param split.old - errors the file already had at session start.
+ * @param split.blocking - new errors, which block.
+ * @param split.rejected - findings whose inline suppression wasn't honoured.
+ * @param split.escalation - the limit and whether every error reached it, if this run escalates.
  * @param where - the real project root and the report's base, to show paths from the project.
+ * @param where.project - the real project root.
+ * @param where.cwd - the directory the report's paths are relative to.
  * @returns 2 to block, 0 when everything is context.
  */
 function reply(

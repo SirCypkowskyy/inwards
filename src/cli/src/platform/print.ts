@@ -1,5 +1,5 @@
 /**
- * The CLI's one way to say something and return an exit code: stdout when
+ * @file The CLI's one way to say something and return an exit code: stdout when
  * the code is 0, stderr otherwise. It writes through the `Streams` contract,
  * so it works the same with the real streams and with a test's fake.
  */

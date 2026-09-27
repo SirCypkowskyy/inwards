@@ -1,5 +1,5 @@
 /**
- * `inwards stats --export FILE [--redact]`: one file a design partner can
+ * @file `inwards stats --export FILE [--redact]`: one file a design partner can
  * send, holding every run-log line of the project in time order.
  *
  * Each line is rebuilt from the `inwards/run@1` fields with checked types,

@@ -1,5 +1,5 @@
 /**
- * The baseline: violations a project already had when it adopted Inwards,
+ * @file The baseline: violations a project already had when it adopted Inwards,
  * accepted so that only new ones fail. It lives next to the pyproject.toml it
  * belongs to and is committed, so every clone, hook and CI run sees the same
  * list. Entries match by rule, module and message, never by line, so moving
@@ -44,7 +44,7 @@ interface Entry {
  * Where a config's baseline lives: next to its pyproject.toml.
  *
  * @param configPath - the pyproject.toml.
- * @returns the baseline path.
+ * @returns `inwards-baseline.json` next to the config.
  */
 function baselinePath(configPath: string): string {
   return join(dirname(configPath), BASELINE_FILE);
@@ -121,7 +121,7 @@ export function writeBaseline(
  * @param io - reads the baseline.
  * @param configPath - the pyproject.toml.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
- * @returns the dormant entries.
+ * @returns the entries whose rule is off, or down to a warning, now.
  */
 function dormantEntries(
   io: BaselineReads,
@@ -317,7 +317,7 @@ export function baselineHashes(
  * @param io - looks at and reads the path.
  * @param io.probe - tells what the path is.
  * @param io.read - reads its bytes.
- * @param path - the baseline path.
+ * @param path - where the baseline is, possibly a dangling link to it.
  * @returns its SHA-256, "not a file" for a directory or special file, or
  *   "unreadable" for a dangling link or a file that can't be read.
  */

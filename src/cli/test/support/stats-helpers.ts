@@ -1,6 +1,8 @@
 /**
- * Helpers for the stats tests: run-log lines, a worked-by-hand log, and a
+ * @file Helpers for the stats tests: run-log lines, a worked-by-hand log, and a
  * project holding a log.
+ * The worked-by-hand log pins the hypothesis numbers, so a change to the stats
+ * arithmetic shows up as a failing expectation, not a silent drift.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -38,6 +40,10 @@ export function line(at: number, fields: Record<string, unknown>): string {
  * @param session - the session id.
  * @param file - the edited file.
  * @param rest - lines added, fingerprints, codes (optional) and duration.
+ * @param rest.added - lines the edit added.
+ * @param rest.prints - fingerprints the check reported.
+ * @param rest.codes - each fingerprint's rule code, if the line records them.
+ * @param rest.ms - how long the run took, in milliseconds.
  * @returns the line as JSON text.
  */
 export function edit(
@@ -58,7 +64,7 @@ export function edit(
 /**
  * Creates a project whose run log holds the given lines.
  *
- * @param lines - the log lines.
+ * @param lines - run-log lines as JSON text, for `.inwards/runs.jsonl`.
  * @returns the project directory.
  */
 export function withLog(lines: string[]): string {
@@ -85,7 +91,7 @@ export function statsOf(lines: string[]): Stats {
 //   predates `codes`: no retry, rule unknown.
 // - Retry rate 1 of 2. Violations 3 (p1, p2, p3) in 10+2+20+1+7+10 = 50 lines:
 //   60 per 1,000. Latency [30,40,50,60,200,20]: p50 40, p95 200.
-export const LOG = [
+export const LOG: string[] = [
   line(0, {
     session_id: null,
     event: "check",

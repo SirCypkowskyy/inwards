@@ -1,5 +1,5 @@
 /**
- * The shapes the session feature shares between its modules: what a session
+ * @file The shapes the session feature shares between its modules: what a session
  * started from, how a report was made, and how to run a check. Types only.
  */
 import type { InwardsConfig, Report } from "@inwards/core";

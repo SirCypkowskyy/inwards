@@ -1,6 +1,8 @@
 /**
- * The `inwards stats` command: finds the project, reads its run logs, and
+ * @file The `inwards stats` command: finds the project, reads its run logs, and
  * prints the hypothesis numbers, each next to its chapter-2 threshold.
+ * With `--export` it writes the merged log instead, optionally redacted;
+ * everything it touches comes in as `AppDeps`.
  */
 import { dirname, join } from "node:path";
 import type { Platform } from "../platform/contracts.ts";

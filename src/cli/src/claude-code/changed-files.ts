@@ -1,5 +1,5 @@
 /**
- * What a session changed, for the Stop gate: which Python files differ from
+ * @file What a session changed, for the Stop gate: which Python files differ from
  * the session start, and a check of those files, each against the config it
  * falls under at session start. A config set to `stop-gate = "project"` gets
  * a whole-project check instead. Violations a changed file already had at

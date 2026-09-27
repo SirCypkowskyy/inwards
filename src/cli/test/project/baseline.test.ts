@@ -1,3 +1,9 @@
+/**
+ * @file `inwards baseline` and how checks and hooks apply it. It writes the
+ * violations so the next check passes, and matching ignores lines and the
+ * closing "Allowed direction" sentence, so moving an import doesn't bring it
+ * back.
+ */
 import { describe, expect, test } from "bun:test";
 import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,6 +17,7 @@ const LAST_BRACKET = /\]\n$/u;
  * Creates a project with one legacy violation and takes its baseline.
  *
  * @returns the project directory.
+ * @throws {Error} when `inwards baseline` fails or accepts something other than the one violation.
  */
 function legacy(): string {
   const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });

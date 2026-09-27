@@ -1,5 +1,5 @@
 /**
- * `inwards init --agent claude|aider|agents-md [--dry-run]`: wires Inwards into
+ * @file `inwards init --agent claude|aider|agents-md [--dry-run]`: wires Inwards into
  * a coding agent. Every change is computed first as (file, before, after), so
  * `--dry-run` can print it and a second run finds nothing to do. Anything init
  * can't edit safely stops it with exit 2 instead of being rewritten.
@@ -41,9 +41,9 @@ const DENY_RULES = [
 ];
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
-export const PRERELEASE = /-.*$/u;
+export const PRERELEASE: RegExp = /-.*$/u;
 /** What `init` puts in `ignore`: tooling that belongs to no layer. */
-export const DEFAULT_IGNORE = ["tests", "scripts", "migrations", "conftest"];
+export const DEFAULT_IGNORE: readonly string[] = ["tests", "scripts", "migrations", "conftest"];
 const LINE_BREAK = /\r?\n/u;
 const SECTION_BEGIN = "<!-- inwards:begin -->";
 const SECTION_END = "<!-- inwards:end -->";

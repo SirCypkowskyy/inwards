@@ -1,5 +1,5 @@
 /**
- * `inwards hook claude-code`: the Claude Code hook command. It reads the hook
+ * @file `inwards hook claude-code`: the Claude Code hook command. It reads the hook
  * payload from stdin, hands it to the event dispatcher (`claude-code/`), and
  * logs the run. Everything it touches comes in as `HookDeps` from `main.ts`.
  */

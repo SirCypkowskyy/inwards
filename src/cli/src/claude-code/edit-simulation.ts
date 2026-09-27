@@ -1,5 +1,5 @@
 /**
- * What an Edit, Write or MultiEdit would do, worked out before it runs, for
+ * @file What an Edit, Write or MultiEdit would do, worked out before it runs, for
  * the config guard. The simulation follows Claude Code's own matching: the
  * file is read with its BOM stripped and CRLF turned into LF, and an empty
  * `old_string` creates a file that is missing or blank. Claude Code also

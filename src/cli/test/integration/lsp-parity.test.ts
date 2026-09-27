@@ -1,3 +1,8 @@
+/**
+ * @file The CLI and the language server build the same module index for the
+ * same project (#44). Both adapters feed the engine through its public ports,
+ * so any drift in their file walks shows up here.
+ */
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -17,7 +22,7 @@ const REPO = resolve(import.meta.dir, "../../../..");
  * Builds the index the way the language server does, from its workspace listing.
  *
  * @param configPath - absolute path of the pyproject.toml.
- * @returns the index.
+ * @returns the language server's module index for that config.
  */
 async function lspIndex(configPath: string): Promise<ProjectIndex> {
   const config = parseConfig(readFileSync(configPath, "utf8"));
