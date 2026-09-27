@@ -71,6 +71,8 @@ Keep one of the two annotation steps once code scanning works, or each violation
 
 A CI job checks a fresh checkout, which has only what is committed. Modules that a build step writes, such as protoc's `orders_pb2.py` and `orders_pb2_grpc.py` or the `_version.py` that setuptools-scm and hatch-vcs write, exist in a developer's checkout but not there. INW010 reports an import of a first-party module that isn't on disk, so it treats the modules `generated` in `[tool.inwards]` covers as existing, file or no file. Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`, so protoc and version modules need no config. For another generator, list every pattern you need, since the key replaces the default:
 
+<!-- config: fragment -->
+
 ```toml title="pyproject.toml"
 [tool.inwards]
 generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]

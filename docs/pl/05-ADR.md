@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: a0d463f78d4c17268730effa317316ea8eaff9fe9a9943b5f3cccb7a7af230b3
+source_hash: 6ce9d9a61701942ef2a2b0f1ca99aa1913777095ca09b6435eadf76db5f8b098
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -38,6 +38,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty, serwer języka czyta tabelę ponownie bez restartu od [#163](03-Architecture-C4.md#known-limitations) |
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :white_check_mark: Przyjęty |
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji | :white_check_mark: Przyjęty |
+| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -743,3 +744,36 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Nauczyć indeks modułów, że moduły generowane istnieją, dla wszystkich reguł:* INW006 miałby tę samą treść w obu checkoutach, ale INW005, INW006 i serwer języka wierzyłyby w pliki, których nie ma, a indeks potrzebowałby konfiguracji.
 - *Ignorowanie INW010 dla pliku w konfiguracji:* jeszcze jedno miejsce do utrzymywania w zgodzie z kodem, a wyciszenie w linii już istnieje.
 - *Zbiory w nawiasach fnmatch, jak we wzorcach elementów kształtu:* zawartość zbioru omija sprawdzenie znaków, a `*` i `?` wystarczają na każdy przypadek z issue.
+
+## ADR-030: Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami { #adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes }
+
+**Stan:** Przyjęty · 2026-09-27 · [#51](https://github.com/SirCypkowskyy/inwards/issues/51)
+
+**Kontekst.** Warstwy opisują jedną cebulę: uporządkowaną listę, w której każdy moduł może importować warstwy wymienione przed nim. Konteksty ograniczone (bounded contexts) i pionowe wycinki przecinają ją w poprzek. `orders` i `billing` mają każdy swoją domenę i aplikację, a zamówienia mogą korzystać z rozliczeń tylko przez ich API. [ADR-005](#adr-005-configuration-lives-in-pyprojecttoml) obiecywał, że takie nieliniowe reguły dostaną własne tabele, żeby prosty przypadek pozostał prosty. INW002 (konteksty zależą od siebie tylko tak, jak to zadeklarowano) i INW003 (kod z zewnątrz korzysta tylko z publicznych modułów kontekstu) potrzebują wspólnej definicji tego, co kontekst posiada i na co pozwala.
+
+**Decyzja.**
+
+- **Tabela `[[tool.inwards.contexts]]`**, jeden wpis na kontekst, z kluczami `name`, `modules`, `public` i `depends-on`. Klucze wymienia [dokumentacja konfiguracji](guides/configuration.md#contexts).
+- **Dosłowne prefiksy, wygrywa najdłuższe dopasowanie.** `modules` i `public` to pełne nazwy modułów rozdzielone kropkami, tak jak wpisy warstw. Moduł należy do kontekstu, którego prefiks dopasowuje najdłuższą część jego nazwy, więc zagnieżdżone konteksty działają, a kolejność tabel nigdy nie ma znaczenia. Ten sam prefiks w dwóch kontekstach to błąd konfiguracji. Selektory z gwiazdkami (`shop.*`) zostają dla [#191](https://github.com/SirCypkowskyy/inwards/issues/191), który wprowadzi je najpierw do warstw; do tego czasu gwiazdka w kontekście jest błędem konfiguracji, a nie po cichu dosłownym tekstem.
+- **`public` jest bezwzględne i musi należeć do kontekstu.** Wpis publiczny to pełna nazwa modułu, a nie nazwa względna wobec kontekstu, i musi należeć do tego kontekstu według reguły najdłuższego dopasowania. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu, więc kontekst zagnieżdżony w publicznym pakiecie zachowuje swoje wnętrze jako prywatne. Publiczność dotyczy modułów: importowana nazwa jest najpierw rozwiązywana do swojego modułu.
+- **`depends-on` jest bezpośrednie.** Wymienia konteksty, z których ten może importować. Nie przechodzi dalej przez łańcuch i nie działa w drugą stronę. Odwołanie do kontekstu zadeklarowanego niżej jest w porządku; własna nazwa, nieznana nazwa i powtórzenie to błędy konfiguracji. Parser dopuszcza cykle między kontekstami; może ich zabronić INW004.
+- **Konteksty i warstwy się sumują.** Zadeklarowana zależność ani moduł publiczny nigdy nie pozwalają na import, którego zabrania kolejność warstw, a przynależność do kontekstu nic nie mówi o warstwie ani odwrotnie. Sprawdzenia kontekstów działają niezależnie od tego, czy plik należy do jakiejś warstwy.
+- **Uprawnienia dla INW002 i INW003.** INW002 wymaga `depends-on` tylko między dwoma różnymi kontekstami, do których należą oba końce importu, i nic nie mówi, gdy któryś koniec nie należy do żadnego kontekstu. INW003 wymaga publicznego celu od każdego importującego spoza kontekstu celu, także od kodu, który nie należy do żadnego kontekstu. Kontekst korzysta tylko ze swoich własnych deklaracji, także wtedy, gdy jego prefiksy leżą wewnątrz innego kontekstu.
+- **JSON Schema** dla całej tabeli, w wersji draft-07 dla zgodności ze SchemaStore, publikowany z dokumentacją i dołączany do każdego wydania. Sprawdza strukturę; parser sprawdza dodatkowo relacje między wpisami, których draft-07 nie potrafi wyrazić. Testy utrzymują zgodność obu: klucze, kody reguł i wartości domyślne.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jedna definicja przynależności i uprawnień dla INW002 i INW003, ustalona, zanim powstała którakolwiek z reguł, więc nie mogą się rozjechać.
+- :material-plus-circle-outline: Konfiguracja bez `contexts` działa dokładnie jak wcześniej, a `contexts = []` znaczy to samo.
+- :material-plus-circle-outline: Edytory mogą podpowiadać i sprawdzać `[tool.inwards]` na podstawie schematu, a przykłady z samej dokumentacji są względem niego sprawdzane.
+- :material-minus-circle-outline: Projekt z dwudziestoma wycinkami wymienia dwadzieścia kontekstów, dopóki #191 nie wprowadzi gwiazdek.
+- :material-minus-circle-outline: `public` nie wyrazi „tylko te nazwy z modułu”; reeksporty i `__all__` są poza zakresem.
+- :material-minus-circle-outline: Dopóki INW002 i INW003 nie trafią do wydania, tabela `contexts` jest wczytywana i sprawdzana, ale niczego nie zgłasza.
+
+**Alternatywy.**
+
+- *Kontrakty import-lintera (niezależność, zakazy i warstwy jako osobne typy kontraktów):* ekspresyjne, ale każdy kontrakt wymienia swoje moduły od nowa, a relacje między kontraktami nie są sprawdzane. Jedna tabela z regułami przynależności trzyma kontekst każdego modułu w jednym miejscu. `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) będzie tłumaczyć kontrakty.
+- *Konteksty wewnątrz `layers` (warstwa na kontekst):* miesza dwa niezależne wymiary i każe każdemu kontekstowi powtarzać cebulę.
+- *Wygrywa pierwsze dopasowanie, jak przy kształtach:* kolejność tabel zmieniałaby wtedy architekturę. Najdłuższe dopasowanie to to, co już robią warstwy.
+- *Względne wpisy `public` (`api` jako `api` danego kontekstu):* krótsze, ale niejednoznaczne przy kilku prefiksach na kontekst i niespójne z każdą inną nazwą modułu w konfiguracji.
+

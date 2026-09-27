@@ -129,6 +129,8 @@ jobs:
         run: uv run zensical build -f docs/zensical.toml --clean --strict
       - name: Build Polish site into docs/site/pl (strict)
         run: uv run zensical build -f docs/zensical.pl.toml --clean --strict
+      - name: The [tool.inwards] JSON Schema is published where its $id points
+        run: bash scripts/publish-schema.sh
       # The strict build already rejects Markdown links to missing pages or
       # anchors; lychee also covers raw HTML hrefs, theme links and assets.
       # Offline, so a third-party outage never fails a PR: docs-links.yml checks

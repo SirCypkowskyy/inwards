@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: 6ff568bbee689741f5a67c791d9cfde146593783393e45c82dbaa082780b2851
+source_hash: a31970effbaff97c069a61eb608c7001cdf55ebad18587bcfd8ed001daed8304
 ---
 
 # GitHub Actions { #github-actions }
@@ -75,6 +75,8 @@ Gdy code scanning zacznie działać, zostaw tylko jeden z dwóch kroków z adnot
 ## Moduły generowane { #generated-modules }
 
 Zadanie CI sprawdza świeży checkout, w którym jest tylko to, co zacommitowano. Moduły zapisywane przez krok budowania, takie jak `orders_pb2.py` i `orders_pb2_grpc.py` z protoc albo `_version.py` zapisywany przez setuptools-scm i hatch-vcs, są w checkoucie programisty, ale nie tam. INW010 zgłasza import własnego modułu, którego nie ma na dysku, więc moduły objęte przez `generated` w `[tool.inwards]` traktuje jako istniejące, niezależnie od tego, czy plik jest. Bez tego klucza lista to `["*_pb2", "*_pb2_grpc", "_version"]`, więc moduły z protoc i moduły wersji nie wymagają konfiguracji. Dla innego generatora wypisz wszystkie potrzebne wzorce, bo klucz zastępuje listę domyślną:
+
+<!-- config: fragment -->
 
 ```toml title="pyproject.toml"
 [tool.inwards]

@@ -30,6 +30,7 @@ nav = [
   { "Home" = "index.md" },
   { "Getting started" = [
     { "Install" = "guides/install.md" },
+    { "Configuration" = "guides/configuration.md" },
     { "Claude Code" = "guides/claude-code.md" },
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },

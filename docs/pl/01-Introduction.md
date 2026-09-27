@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 4b381d96aef05784ad1ec0cf8c32390787ea4b6558790effaefddcb295650801
+source_hash: 8d67bb777dd4256ef6c8c19c5f02354ba17702b61a16845cde59bb3bcafd093d
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -48,6 +48,8 @@ layers = [
 ]
 ```
 
+Każdy klucz opisuje [dokumentacja konfiguracji](guides/configuration.md), która podaje też JSON Schema do podpowiedzi i sprawdzania w edytorze.
+
 <figure markdown="span">
   ![inwards check na czystym kodzie](../assets/screens/check-clean.svg){ loading=lazy }
   <figcaption>Przykładowa aplikacja w wersji z repozytorium: każdy import wskazuje do środka.</figcaption>
@@ -76,6 +78,8 @@ Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować wła
 Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii `examples/clean-app` z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
 
 Żeby wprowadzać reguły stopniowo, tabela `[tool.inwards.rules]` ustala, które reguły zgłaszają naruszenia i na jakim poziomie:
+
+<!-- config: fragment -->
 
 ```toml title="pyproject.toml"
 [tool.inwards.rules]

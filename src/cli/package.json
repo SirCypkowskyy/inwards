@@ -16,5 +16,8 @@
     "tree-sitter-python": "0.25.0",
     "web-tree-sitter": "0.27.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "ajv": "8.20.0"
+  }
 }
