@@ -143,8 +143,9 @@ describe("links and files where directories belong", () => {
     const moved = `${shard}-moved`;
     renameSync(shard, moved);
     symlinkSync(outside, shard, "junction");
-    expect(cache?.get(id("x = 1\n"))).toBeUndefined();
-    cache?.set(id("x = 1\n"), VALUE);
+    const next = fileExtractionCache(root, WASM); // shards are looked at once per run
+    expect(next?.get(id("x = 1\n"))).toBeUndefined();
+    next?.set(id("x = 1\n"), VALUE);
     expect(readdirSync(outside)).toHaveLength(1);
   });
 
@@ -222,13 +223,14 @@ describe("pruning", () => {
 });
 
 /**
- * The key the adapter gives an identity, as documented: a SHA-256 of its fields.
+ * The key the adapter gives an identity: a SHA-256 of its fields, the text by its own SHA-256.
  *
  * @param identity - the file's text, module, package flag and revision.
  * @returns 64 hex digits.
  */
 function keyOf(identity: ExtractionIdentity): string {
-  const fields = [identity.revision, identity.module, identity.isPackage, identity.text];
+  const text = createHash("sha256").update(identity.text).digest("hex");
+  const fields = [identity.revision, identity.module, identity.isPackage, text];
   return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
 }
 

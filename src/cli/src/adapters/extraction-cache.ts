@@ -29,9 +29,8 @@ import type {
   ExtractionCache,
   ExtractionIdentity,
   GrammarBinaries,
-  ImportRef,
-  SuppressionComment,
 } from "@inwards/core";
+import { type Entry, isEntry } from "./extraction-entry.ts";
 
 /** The on-disk format; bump it when the entry layout changes. */
 const FORMAT = "1";
@@ -51,16 +50,6 @@ const TEMP_NONCE_BYTES = 8;
 const SHARD_LENGTH = 2;
 /** Characters of the grammar hash in the namespace's name. */
 const GRAMMAR_ID_LENGTH = 16;
-
-/** What an entry file holds: the identity it was written for, and the components. */
-interface Entry {
-  format: string;
-  revision: string;
-  module: string;
-  isPackage: boolean;
-  textHash: string;
-  value: CachedExtraction;
-}
 
 /**
  * Opens the cache for a project, or nothing when its directories can't be
@@ -83,26 +72,76 @@ export function fileExtractionCache(
   if (namespace === undefined) {
     return undefined;
   }
-  const pruned = new Set<string>();
+  const run: Run = { namespace, shards: new Map(), pruned: new Set() };
   return {
-    get: (identity: ExtractionIdentity): CachedExtraction | undefined =>
-      readEntry(namespace, identity),
+    get: (identity: ExtractionIdentity): CachedExtraction | undefined => readEntry(run, identity),
     set(identity: ExtractionIdentity, value: CachedExtraction): void {
-      writeEntry(namespace, identity, value, pruned);
+      writeEntry(run, identity, value);
     },
   };
 }
 
+/** What one run of the cache remembers about its directories. */
+interface Run {
+  /** The cache's namespace directory, checked when the cache was opened. */
+  namespace: string;
+  /** Shards already looked at in this run: true for a real directory, false for anything else. */
+  shards: Map<string, boolean>;
+  /** Shards already pruned in this run. */
+  pruned: Set<string>;
+}
+
+/** Where an identity's entry lives, and the text hash it must record. */
+interface Located {
+  key: string;
+  textHash: string;
+  shard: string;
+  path: string;
+}
+
 /**
- * Names an identity's entry.
+ * Names an identity's entry: a SHA-256 over the revision, module, package flag
+ * and the text's own SHA-256, so the text is hashed once per lookup.
  *
+ * @param namespace - the cache's namespace directory.
  * @param identity - the file and the extraction revision.
- * @returns 64 hex digits.
+ * @returns the key, the text hash, the shard and the entry's path.
  */
-function keyOf(identity: ExtractionIdentity): string {
-  return sha256(
-    JSON.stringify([identity.revision, identity.module, identity.isPackage, identity.text]),
+function locate(namespace: string, identity: ExtractionIdentity): Located {
+  const textHash = sha256(identity.text);
+  const key = sha256(
+    JSON.stringify([identity.revision, identity.module, identity.isPackage, textHash]),
   );
+  const shard = join(namespace, key.slice(0, SHARD_LENGTH));
+  return { key, textHash, shard, path: join(shard, `${key}.json`) };
+}
+
+/**
+ * Tells whether a shard is a real directory, looking once per run. With
+ * `create`, a missing shard is made first.
+ *
+ * @param run - this run's memory of its directories.
+ * @param shard - the shard directory.
+ * @param create - true to create the shard when it is missing.
+ * @returns true when the shard can be read or written.
+ */
+function shardReady(run: Run, shard: string, create: boolean): boolean {
+  const known = run.shards.get(shard);
+  if (known !== undefined) {
+    return known;
+  }
+  if (create) {
+    const ok = safeDirs(run.namespace, [shard.slice(run.namespace.length + 1)]) !== undefined;
+    run.shards.set(shard, ok);
+    return ok;
+  }
+  try {
+    const ok = lstatSync(shard).isDirectory(); // a symlinked shard could serve entries from anywhere
+    run.shards.set(shard, ok);
+    return ok;
+  } catch {
+    return false; // missing for now: a later write may create it
+  }
 }
 
 /**
@@ -118,24 +157,22 @@ function sha256(text: string): string {
 /**
  * Reads an entry, treating anything unexpected as a miss.
  *
- * @param namespace - the cache's namespace directory.
+ * @param run - this run's memory of its directories.
  * @param identity - what is looked up.
  * @returns the entry's components, or undefined.
  */
-function readEntry(namespace: string, identity: ExtractionIdentity): CachedExtraction | undefined {
-  const key = keyOf(identity);
-  const shard = join(namespace, key.slice(0, SHARD_LENGTH));
-  const path = join(shard, `${key}.json`);
+function readEntry(run: Run, identity: ExtractionIdentity): CachedExtraction | undefined {
+  const at = locate(run.namespace, identity);
+  if (!shardReady(run, at.shard, false)) {
+    return undefined;
+  }
   try {
-    if (!lstatSync(shard).isDirectory()) {
-      return undefined; // a symlinked shard could serve entries from anywhere
-    }
-    const stat = lstatSync(path);
+    const stat = lstatSync(at.path);
     if (!stat.isFile() || stat.size > MAX_ENTRY_BYTES) {
       return undefined;
     }
-    const entry: unknown = JSON.parse(readFileSync(path, "utf8"));
-    return isEntry(entry) && matches(entry, identity) ? entry.value : undefined;
+    const entry: unknown = JSON.parse(readFileSync(at.path, "utf8"));
+    return isEntry(entry) && matches(entry, identity, at.textHash) ? entry.value : undefined;
   } catch {
     return undefined; // missing, unreadable or malformed: a miss
   }
@@ -145,47 +182,37 @@ function readEntry(namespace: string, identity: ExtractionIdentity): CachedExtra
  * Writes an entry through a temporary file and a rename, and prunes its
  * shard once per run. Failures are ignored: the check goes on without it.
  *
- * @param namespace - the cache's namespace directory.
+ * @param run - this run's memory of its directories.
  * @param identity - what the entry is for.
  * @param value - the components to store.
- * @param pruned - shards already pruned in this run, updated in place.
  */
-function writeEntry(
-  namespace: string,
-  identity: ExtractionIdentity,
-  value: CachedExtraction,
-  pruned: Set<string>,
-): void {
-  const key = keyOf(identity);
+function writeEntry(run: Run, identity: ExtractionIdentity, value: CachedExtraction): void {
+  const at = locate(run.namespace, identity);
   const entry: Entry = {
     format: FORMAT,
     revision: identity.revision,
     module: identity.module,
     isPackage: identity.isPackage,
-    textHash: sha256(identity.text),
+    textHash: at.textHash,
     value,
   };
   const text = JSON.stringify(entry);
-  if (Buffer.byteLength(text) > MAX_ENTRY_BYTES) {
-    return; // too big to cache: the file is simply parsed each time
-  }
-  const shard = safeDirs(namespace, [key.slice(0, SHARD_LENGTH)]);
-  if (shard === undefined) {
-    return;
+  if (Buffer.byteLength(text) > MAX_ENTRY_BYTES || !shardReady(run, at.shard, true)) {
+    return; // too big to cache, or nowhere safe to put it: the file is simply parsed each time
   }
   const temp = join(
-    shard,
-    `.${key}.${process.pid}.${randomBytes(TEMP_NONCE_BYTES).toString("hex")}.tmp`,
+    at.shard,
+    `.${at.key}.${process.pid}.${randomBytes(TEMP_NONCE_BYTES).toString("hex")}.tmp`,
   );
   try {
     writeFileSync(temp, text, { flag: "wx" });
-    renameSync(temp, join(shard, `${key}.json`));
+    renameSync(temp, at.path);
   } catch {
     rmSync(temp, { force: true }); // a failed write leaves nothing behind
   }
-  if (!pruned.has(shard)) {
-    pruned.add(shard);
-    prune(shard);
+  if (!run.pruned.has(at.shard)) {
+    run.pruned.add(at.shard);
+    prune(at.shard);
   }
 }
 
@@ -231,6 +258,7 @@ function prune(shard: string): void {
 /**
  * Makes sure each directory of a chain is a real directory, creating the
  * missing ones, and refuses the chain when any level is a symlink or a file.
+ * An existing directory is only looked at, never created again.
  *
  * @param base - an existing directory to start from.
  * @param parts - the directories below it, outermost first.
@@ -240,16 +268,7 @@ function safeDirs(base: string, parts: readonly string[]): string | undefined {
   let dir = base;
   for (const part of parts) {
     dir = join(dir, part);
-    try {
-      mkdirSync(dir, { mode: 0o700 });
-    } catch {
-      // already there, or can't be made: the check below decides
-    }
-    try {
-      if (!lstatSync(dir).isDirectory()) {
-        return undefined; // a symlink or a file where a directory should be
-      }
-    } catch {
+    if (!realDirectory(dir)) {
       return undefined;
     }
   }
@@ -257,130 +276,44 @@ function safeDirs(base: string, parts: readonly string[]): string | undefined {
 }
 
 /**
+ * Makes a directory unless something is there, then tells whether what is
+ * there is a real directory (not a symlink, not a file).
+ *
+ * @param dir - a path inside the cache, one level below a checked directory.
+ * @returns true for a real directory.
+ */
+function realDirectory(dir: string): boolean {
+  try {
+    return lstatSync(dir).isDirectory();
+  } catch {
+    // nothing there yet: make it below
+  }
+  try {
+    mkdirSync(dir, { mode: 0o700 });
+  } catch {
+    // made by a concurrent run, or can't be made: the check below decides
+  }
+  try {
+    return lstatSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Tells whether an entry was written for exactly this identity.
  *
  * @param entry - a well-formed entry.
  * @param identity - what was looked up.
+ * @param textHash - the SHA-256 of the identity's text.
  * @returns true when every field matches, the text by its hash.
  */
-function matches(entry: Entry, identity: ExtractionIdentity): boolean {
+function matches(entry: Entry, identity: ExtractionIdentity, textHash: string): boolean {
   return (
     entry.format === FORMAT &&
     entry.revision === identity.revision &&
     entry.module === identity.module &&
     entry.isPackage === identity.isPackage &&
-    entry.textHash === sha256(identity.text)
+    entry.textHash === textHash
   );
-}
-
-/**
- * Tells whether a parsed file is a well-formed entry.
- *
- * @param value - the parsed JSON.
- * @returns true for an entry whose components have the right shapes.
- */
-function isEntry(value: unknown): value is Entry {
-  return (
-    isRecord(value) &&
-    typeof value["format"] === "string" &&
-    typeof value["revision"] === "string" &&
-    typeof value["module"] === "string" &&
-    typeof value["isPackage"] === "boolean" &&
-    typeof value["textHash"] === "string" &&
-    isExtraction(value["value"])
-  );
-}
-
-/**
- * Tells whether a parsed value holds well-formed components.
- *
- * @param value - the entry's `value`.
- * @returns true when every present component has its shape.
- */
-function isExtraction(value: unknown): value is CachedExtraction {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const { skeleton, full, comments } = value;
-  return (
-    (skeleton === undefined || skeleton === "refused" || isImportList(skeleton)) &&
-    (full === undefined || isImportList(full)) &&
-    (comments === undefined || (Array.isArray(comments) && comments.every(isComment)))
-  );
-}
-
-/**
- * Tells whether a value is a list of import references.
- *
- * @param value - any parsed value.
- * @returns true for an array of well-formed references.
- */
-function isImportList(value: unknown): value is ImportRef[] {
-  return Array.isArray(value) && value.every(isImportRef);
-}
-
-/**
- * Tells whether a value is an import reference.
- *
- * @param value - any parsed value.
- * @returns true for a span with a target, a statement and an optional `from`.
- */
-function isImportRef(value: unknown): value is ImportRef {
-  return (
-    isSpan(value) &&
-    typeof value["target"] === "string" &&
-    typeof value["statement"] === "string" &&
-    (value["from"] === undefined || typeof value["from"] === "string")
-  );
-}
-
-/**
- * Tells whether a value is a suppression comment.
- *
- * @param value - any parsed value.
- * @returns true for a span-bearing comment with codes, a reason and problems.
- */
-function isComment(value: unknown): value is SuppressionComment {
-  return (
-    isRecord(value) &&
-    isSpan(value["span"]) &&
-    isStringList(value["codes"]) &&
-    typeof value["reason"] === "string" &&
-    isStringList(value["problems"])
-  );
-}
-
-/**
- * Tells whether a value carries a 1-based span of whole numbers.
- *
- * @param value - any parsed value.
- * @returns true when line, column, endLine and endColumn are positive integers.
- */
-function isSpan(value: unknown): value is Record<string, unknown> {
-  return (
-    isRecord(value) &&
-    ["line", "column", "endLine", "endColumn"].every(
-      (key) => Number.isInteger(value[key]) && Number(value[key]) >= 1,
-    )
-  );
-}
-
-/**
- * Tells whether a value is a list of strings.
- *
- * @param value - any parsed value.
- * @returns true for an array of strings.
- */
-function isStringList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-/**
- * Tells whether a parsed value is a JSON object.
- *
- * @param value - any parsed JSON value.
- * @returns true for a non-null, non-array object.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -96,6 +96,9 @@ Eskalacja (escalation)
 Obejście (evasion)
 :   Zmiana kodu przez agenta, po której sprawdzenie milknie, choć projekt nie został naprawiony, na przykład przeniesienie importu do funkcji. Rozdział 4 wymienia obejścia, z którymi radzi sobie Inwards.
 
+Pamięć podręczna ekstrakcji (extraction cache)
+:   `.inwards/cache`: to, co `inwards check` i `inwards baseline` odczytują z każdego pliku (szkielet importów, importy statyczne i komentarze wyciszające), pod kluczem z hasha jego treści, nazwy modułu i reguł ekstrakcji. Hooki nigdy jej nie czytają; serwer języka trzyma własną w pamięci. `--no-cache` albo `INWARDS_NO_CACHE=1` ją wyłącza. Zobacz [ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read).
+
 Fingerprint
 :   16-cyfrowy szesnastkowy hash kodu reguły, modułu i komunikatu naruszenia. Stan sesji i run log używają go, żeby rozpoznać to samo naruszenie w kolejnych edycjach, niezależnie od numeru linii.
 

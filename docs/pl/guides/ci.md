@@ -89,6 +89,22 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 - Klucz czyta tylko INW010. Pozostałe reguły widzą moduł generowany, którego nie ma na dysku, jako brakujący: import takiego modułu skierowany na zewnątrz to nadal INW001, a INW006 wskazuje najbliższy istniejący pakiet. [Znane ograniczenia](../03-Architecture-C4.md#known-limitations) w rozdziale o architekturze wymieniają przypadki, w których przez to diagnostyka różni się między dwoma checkoutami.
 - Config guard odrzuca edycję tego klucza przez agenta, tak jak każdego klucza w `[tool.inwards]`.
 
+## Pamięć podręczna między uruchomieniami { #caching-between-runs }
+
+`inwards check` i `inwards baseline` trzymają to, co odczytały z każdego pliku (jego importy i komentarze wyciszające), w `.inwards/cache` obok `pyproject.toml`. Wpis jest odnajdywany po hashu treści pliku, nazwy modułu i reguł ekstrakcji danej wersji Inwards, więc zmieniony plik jest po prostu czytany od nowa. Na repozytorium benchmarku z 2100 plikami ciepła pamięć podręczna przyspiesza pełne sprawdzenie mniej więcej trzykrotnie; uruchomienie, które ją wypełnia, jest o mniej więcej ćwierć wolniejsze. Żeby zachować pamięć podręczną między uruchomieniami workflow, odtwórz ją przed krokiem **Check**:
+
+```yaml
+      - uses: actions/cache@v6
+        with:
+          path: .inwards/cache
+          key: inwards-${{ runner.os }}-${{ github.sha }}
+          restore-keys: inwards-${{ runner.os }}-
+```
+
+- **Pamięci podręcznej się ufa, nie sprawdza się jej.** Sprawdzenie z pamięcią podręczną wierzy w to, co wpis mówi o importach pliku. Każdy, kto może pisać do `.inwards/cache`, może sprawić, że przeoczy ono naruszenie, a pull request może zacommitować własne `.inwards/cache`. Tam, gdzie sprawdzenie jest bramką dla kodu, któremu nie ufasz, uruchamiaj `inwards check --no-cache` albo ustaw `INWARDS_NO_CACHE=1` dla zadania. Hooki Claude Code nigdy nie czytają pamięci podręcznej, więc pętli agenta to nie dotyczy ([ADR-031](../05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)).
+- **Pozostaje mała.** Uruchomienie przycina każdą część pamięci podręcznej, do której pisze: znikają wpisy starsze niż 30 dni, a potem najstarsze, aż część zmieści się w 512 KB. Przy 256 częściach pamięć podręczna ma najwyżej około 128 MB. Wersja Inwards z innymi regułami ekstrakcji albo gramatykami zaczyna nową przestrzeń nazw (nowy folder w `.inwards/cache`); starej nikt już nie czyta i zostaje, dopóki jej nie usuniesz.
+- **Nic do konfigurowania.** `.inwards/cache` możesz usunąć, kiedy chcesz. `inwards init` już dodaje `.inwards/` do `.gitignore`.
+
 ## Dostępność code scanning { #code-scanning-availability }
 
 Code scanning jest darmowe w publicznych repozytoriach. W prywatnym repozytorium wymaga GitHub Code Security (części GitHub Advanced Security), które mogą kupić tylko organizacje na planie GitHub Team albo Enterprise. Bez tego krok wysyłki kończy się błędem „Code scanning is not enabled for this repository”. Wtedy albo usuń krok wysyłki i polegaj na kroku z adnotacjami, albo dodaj do niego `continue-on-error: true`, jak robi to repozytorium Inwards, dopóki jest prywatne (`continue-on-error: ${{ github.event.repository.private }}`).

@@ -34,6 +34,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
+| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -772,3 +773,33 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *First match wins, as for shapes:* makes the order of the tables change the architecture. Longest match is what layers already do.
 - *Relative `public` entries (`api` meaning the context's `api`):* shorter, but ambiguous with several prefixes per context and inconsistent with every other module name in the config.
 
+## ADR-031: A content-keyed extraction cache that the hooks never read
+
+**Status:** Accepted · 2026-09-27 · [#56](https://github.com/SirCypkowskyy/inwards/issues/56)
+
+**Context.** A full check parses every file, even when none changed since the last run: about 0.9 s for the 2,100-file synthetic repo, most of it in WASM parsing. What a file yields depends almost entirely on its own text. But the cache would sit in the project, where the agent Inwards guards can write, and the hooks are the enforcement path. A planted entry that says a file imports nothing must never let a violation past PostToolUse or the Stop gate.
+
+**Decision.**
+
+- **Only per-file facts are cached**: the prescan's import skeleton (or its refusal), the full parse's static imports and the suppression comments. Dynamic imports (INW011) aren't, because whether an imported `eval` could be the builtin depends on other files. Neither is anything the engine decides from those facts: layers, rule settings, the baseline, whether a target exists (INW010).
+- **The key is the whole identity**: the normalised text, the module name, whether the file is a package's `__init__`, and an extraction revision. The revision is bumped whenever the prescan, the parser, module naming, suppression parsing or the rule registry changes what a text yields; a test fingerprints those files and fails until it is. The namespace directory also names the cache format and a hash of the loaded grammars.
+- **The engine takes an optional port.** `Engine.create(wasm, config, { cache })` accepts any `ExtractionCache`; without one it parses as before. The engine still does no I/O ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **`inwards check` and `inwards baseline` use `.inwards/cache`; nothing else reads it.** The hooks get no cache, and the language server keeps a bounded in-memory one (5,000 entries, least recently used first) that never touches the disk. `--no-cache` or `INWARDS_NO_CACHE=1` turns the disk cache off.
+- **Reading trusts nothing.** An entry is read only if every directory on its path is a real directory, the file is a regular file under 256 KB, and its JSON has the expected shape and records the same identity; anything else is a miss.
+- **Writing is safe to race.** Each entry is written to a uniquely named temporary file and renamed into place. Two runs can overwrite each other's entries; neither sees half of one. Every failure falls back to parsing.
+- **Pruning is bounded.** Each run prunes a shard (one of 256 directories) the first time it writes there: temporary files older than an hour, entries older than 30 days, then the oldest entries until the shard is under 512 KB.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A warm `inwards check` skips parsing unchanged files: 3.0 times faster on the synthetic repo (0.46 s against 1.25 s, p50). The benchmark reports no cache, an empty cache and a warm cache separately.
+- :material-plus-circle-outline: The hooks' results can't be changed by anything in `.inwards/cache`, which a test checks with a planted entry.
+- :material-minus-circle-outline: A cached `inwards check` trusts the cache. Anyone who can write the project can make it miss a violation. CI that restores the cache from an untrusted branch should run `--no-cache`, as the [GitHub Actions guide](guides/ci.md#caching-between-runs) says.
+- :material-minus-circle-outline: The revision has to be bumped by hand; the fingerprint test only notices that the files changed.
+- :material-minus-circle-outline: An empty cache pays for a write per file: the run that fills it was 27% slower on the synthetic repo. The benchmark reports that cost and doesn't gate it, since it depends on the runner's filesystem more than on the code.
+
+**Alternatives.**
+
+- *Key by path and modification time:* cheaper to check, but a checkout or `touch` breaks it both ways, and it can't be shared between clones.
+- *One cache file per project:* fewer files, but every run rewrites all of it and concurrent runs need a lock.
+- *Cache for the hooks too, with an HMAC keyed outside the project:* the key would have to live where the agent can't read it, and the hooks check one file, where parsing isn't the cost ([chapter 6](06-Constraints-and-Quality.md#where-a-single-file-check-spends-its-time)).
+- *Cache whole results:* they depend on the config, the baseline and other files; invalidating them correctly is the hard problem this design avoids.

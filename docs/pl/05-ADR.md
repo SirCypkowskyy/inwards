@@ -39,6 +39,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :white_check_mark: Przyjęty |
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji | :white_check_mark: Przyjęty |
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :white_check_mark: Przyjęty |
+| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -777,3 +778,33 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Wygrywa pierwsze dopasowanie, jak przy kształtach:* kolejność tabel zmieniałaby wtedy architekturę. Najdłuższe dopasowanie to to, co już robią warstwy.
 - *Względne wpisy `public` (`api` jako `api` danego kontekstu):* krótsze, ale niejednoznaczne przy kilku prefiksach na kontekst i niespójne z każdą inną nazwą modułu w konfiguracji.
 
+## ADR-031: Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają { #adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read }
+
+**Stan:** Przyjęty · 2026-09-27 · [#56](https://github.com/SirCypkowskyy/inwards/issues/56)
+
+**Kontekst.** Pełne sprawdzenie parsuje każdy plik, nawet gdy żaden nie zmienił się od poprzedniego uruchomienia: około 0,9 s dla syntetycznego repozytorium z 2100 plikami, w większości na parsowanie w WASM. To, co wynika z pliku, zależy prawie wyłącznie od jego własnego tekstu. Pamięć podręczna leżałaby jednak w projekcie, do którego może pisać agent pilnowany przez Inwards, a hooki są ścieżką egzekwowania reguł. Podrzucony wpis mówiący, że plik niczego nie importuje, nigdy nie może przepuścić naruszenia przez PostToolUse ani Stop gate.
+
+**Decyzja.**
+
+- **Zapamiętywane są tylko fakty o pojedynczym pliku**: szkielet importów z prescanu (albo jego odmowa), statyczne importy z pełnego parsowania i komentarze wyciszające. Importy dynamiczne (INW011) nie są, bo to, czy zaimportowany `eval` może być wbudowanym, zależy od innych plików. Nie jest też zapamiętywane nic, co silnik wyprowadza z tych faktów: warstwy, ustawienia reguł, baseline, istnienie celu importu (INW010).
+- **Kluczem jest cała tożsamość**: znormalizowany tekst, nazwa modułu, to, czy plik jest `__init__` pakietu, oraz rewizja ekstrakcji. Rewizję podnosi się za każdym razem, gdy prescan, parser, nazywanie modułów, parsowanie wyciszeń albo rejestr reguł zmieniają to, co wynika z tekstu; test liczy odcisk tych plików i nie przechodzi, dopóki rewizja nie zostanie podniesiona. Nazwa katalogu przestrzeni nazw zawiera też format pamięci podręcznej i hash załadowanych gramatyk.
+- **Silnik przyjmuje opcjonalny port.** `Engine.create(wasm, config, { cache })` przyjmuje dowolny `ExtractionCache`; bez niego parsuje jak wcześniej. Silnik nadal nie wykonuje operacji wejścia-wyjścia ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **`inwards check` i `inwards baseline` używają `.inwards/cache`; nic innego go nie czyta.** Hooki nie dostają pamięci podręcznej, a serwer języka trzyma własną, ograniczoną, w pamięci (5000 wpisów, najpierw usuwane najdawniej używane), która nigdy nie dotyka dysku. `--no-cache` albo `INWARDS_NO_CACHE=1` wyłącza pamięć podręczną na dysku.
+- **Odczyt niczemu nie ufa.** Wpis jest czytany tylko wtedy, gdy każdy katalog na jego ścieżce jest prawdziwym katalogiem, plik jest zwykłym plikiem mniejszym niż 256 KB, a jego JSON ma oczekiwany kształt i zapisuje tę samą tożsamość; wszystko inne to chybienie.
+- **Zapis znosi wyścigi.** Każdy wpis trafia do pliku tymczasowego o unikalnej nazwie i jest przemianowywany na miejsce. Dwa uruchomienia mogą nadpisać sobie nawzajem wpisy; żadne nie zobaczy połowy wpisu. Każdy błąd kończy się zwykłym parsowaniem.
+- **Przycinanie jest ograniczone.** Każde uruchomienie przycina część pamięci podręcznej (jeden z 256 katalogów) przy pierwszym zapisie do niej: pliki tymczasowe starsze niż godzina, wpisy starsze niż 30 dni, a potem najstarsze wpisy, aż część zmieści się w 512 KB.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Ciepłe `inwards check` pomija parsowanie niezmienionych plików: na syntetycznym repozytorium 3,0 raza szybciej (0,46 s wobec 1,25 s, p50). Benchmark podaje osobno uruchomienia bez pamięci podręcznej, z pustą i z ciepłą.
+- :material-plus-circle-outline: Nic w `.inwards/cache` nie może zmienić wyników hooków, co sprawdza test z podrzuconym wpisem.
+- :material-minus-circle-outline: `inwards check` z pamięcią podręczną jej ufa. Każdy, kto może pisać do projektu, może sprawić, że przeoczy ono naruszenie. CI, które odtwarza pamięć podręczną z niezaufanej gałęzi, powinno używać `--no-cache`, jak mówi [przewodnik po GitHub Actions](guides/ci.md#caching-between-runs).
+- :material-minus-circle-outline: Rewizję trzeba podnosić ręcznie; test odcisku zauważa tylko, że pliki się zmieniły.
+- :material-minus-circle-outline: Pusta pamięć podręczna płaci za zapis każdego pliku: uruchomienie, które ją wypełnia, było na syntetycznym repozytorium o 27% wolniejsze. Benchmark podaje ten koszt, ale go nie bramkuje, bo zależy bardziej od systemu plików runnera niż od kodu.
+
+**Alternatywy.**
+
+- *Klucz ze ścieżki i czasu modyfikacji:* tańszy do sprawdzenia, ale checkout albo `touch` psują go w obie strony i nie da się go współdzielić między klonami.
+- *Jeden plik pamięci podręcznej na projekt:* mniej plików, ale każde uruchomienie przepisuje całość, a równoległe uruchomienia potrzebują blokady.
+- *Pamięć podręczna także dla hooków, z HMAC-iem kluczowanym poza projektem:* klucz musiałby leżeć tam, gdzie agent nie może go przeczytać, a hooki sprawdzają jeden plik, w którym parsowanie nie jest kosztem ([rozdział 6](06-Constraints-and-Quality.md#where-a-single-file-check-spends-its-time)).
+- *Zapamiętywanie całych wyników:* zależą od konfiguracji, baseline'u i innych plików; poprawne unieważnianie ich to właśnie ten trudny problem, którego ten projekt unika.
