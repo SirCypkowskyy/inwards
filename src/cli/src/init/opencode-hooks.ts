@@ -7,7 +7,10 @@
  */
 
 /** The exported plugin; it needs the helpers in `PLUGIN_HELPERS` above it. */
-export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }) => {
+export const PLUGIN_HOOKS = `/** How many times a session lookup is tried before the session counts as unknown for now. */
+const LOOKUPS = 3;
+
+export const Inwards = async ({ client, directory }) => {
   /**
    * What the plugin knows about each top-level session:
    * - whether the Stop gate sent it back to work, and whether that message is still on its way;
@@ -68,15 +71,18 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
       return id;
     }
     let found;
-    try {
-      found = await client.session.get({ path: { id } });
-    } catch {
+    for (let attempt = 0; attempt < LOOKUPS && !found; attempt += 1) {
+      try {
+        const answer = await client.session.get({ path: { id } });
+        found = answer?.error ? undefined : answer?.data;
+      } catch {
+        found = undefined;
+      }
+    }
+    if (!found) {
       return undefined;
     }
-    if (found?.error || !found?.data) {
-      return undefined;
-    }
-    const parentID = found.data.parentID;
+    const parentID = found.parentID;
     if (parentID) {
       const top = await root(parentID);
       if (top !== undefined) {
@@ -144,8 +150,10 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
       return; // a later idle, a message or a turn made this one stale
     }
     const result = await hook({ session_id: id, hook_event_name: "Stop", stop_hook_active: s.continued });
-    if (!current(s, idle)) {
-      return; // the user or the agent moved on while the gate ran
+    // The gate has counted this attempt, so a later idle doesn't make the result stale;
+    // a message from the user, or a turn that started, does.
+    if (idle.generation !== s.generation || s.busy || s.awaiting) {
+      return;
     }
     if (result.code === 2) {
       s.continued = true;
@@ -191,12 +199,14 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
         // Before anything waits: later idles and messages make this one stale.
         const known = sessions.get(id);
         const seen = known ? { number: ++known.idles, generation: known.generation } : undefined;
+        if (known) {
+          known.busy = false; // now, so activity seen while this handler waits isn't overwritten
+        }
         if ((await root(id)) !== id) {
           return; // a subagent, or not known yet: the gate runs for the session it works for
         }
         await start(id, "resume");
         const s = state(id);
-        s.busy = false;
         const idle = seen ?? { number: ++s.idles, generation: s.generation };
         s.queue = s.queue.then(() => stop(id, idle)).catch(() => undefined);
         await s.queue;
@@ -232,6 +242,7 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
       if (top !== undefined) {
         await start(top, "resume");
       }
+      // While OpenCode can't say whose subagent this is, the call is checked under its own id.
       const session = top ?? input.sessionID;
       if (input.tool === "apply_patch") {
         const guarded = patchedFiles(out.args?.patchText, directory).filter((p) => inwardsOwn(p) || configFile(p));
@@ -270,6 +281,7 @@ export const PLUGIN_HOOKS = `export const Inwards = async ({ client, directory }
       if (top !== undefined) {
         await start(top, "resume");
       }
+      // While OpenCode can't say whose subagent this is, the call is checked under its own id.
       const session = top ?? input.sessionID;
       const files =
         input.tool === "apply_patch"

@@ -20,8 +20,13 @@ const PROTECTED = /(^|[\\\\/])(\\.opencode[\\\\/]|opencode\\.jsonc?$|\\.inwards[
 const CONFIG = /(^|[\\\\/])pyproject\\.toml$/iu;
 /** A command that names one of those files, or the config. */
 const MENTIONS = /pyproject\\.toml|\\.opencode|opencode\\.jsonc?|\\.inwards|inwards-baseline/iu;
-/** Patch headers, read at least as leniently as OpenCode does; the path is trimmed as its parser trims it. */
-const PATCH_FILE = /^\\s*\\*\\*\\*\\s*(?:(?:Add|Update|Delete)\\s+File|Move\\s+to)\\s*:(.*)$/gimu;
+/**
+ * A patch header, read at least as leniently as OpenCode reads it. OpenCode
+ * splits a patch on "\\n" only, so the path runs to that: a "\\r" or a Unicode
+ * line separator inside it is part of the path, and it is trimmed as
+ * OpenCode trims it.
+ */
+const PATCH_FILE = /^\\s*\\*\\*\\*\\s*(?:(?:Add|Update|Delete)\\s+File|Move\\s+to)\\s*:(?<path>[^\\n]*)$/iu;
 /** Inwards' own files and this plugin, by where they are in the project; links to them count too. */
 const OWN_FILES = [".opencode", ".inwards", "inwards-baseline.json", "opencode.json", "opencode.jsonc"];
 /** Marks the messages the plugin sends, so they don't count as the user's. */
@@ -165,13 +170,27 @@ function inwardsOwn(path) {
 }
 
 /**
- * Tells whether a path is a pyproject.toml, or the project's config reached through a link.
+ * Tells whether a path is a pyproject.toml, or a config reached through a
+ * link: the file a \\\`pyproject.toml\\\` in its directory, or any directory
+ * above it in the project, links to.
  *
  * @param path - an absolute path.
  * @returns true when the config guard must see the change.
  */
 function configFile(path) {
-  return names(CONFIG, path) || resolvesTo(path, ["pyproject.toml"]);
+  if (names(CONFIG, path)) {
+    return true;
+  }
+  const target = real(String(path ?? ""));
+  const top = resolve(PROJECT);
+  for (let dir = dirname(resolve(String(path ?? ""))); ; dir = dirname(dir)) {
+    if (real(join(dir, "pyproject.toml")) === target) {
+      return true;
+    }
+    if (dir === top || dirname(dir) === dir || !dir.startsWith(top)) {
+      return false;
+    }
+  }
 }
 
 /**
@@ -216,8 +235,9 @@ function toolInput(tool, args, directory) {
  * @returns absolute paths.
  */
 function patchedFiles(text, directory) {
-  return [...String(text ?? "").matchAll(PATCH_FILE)]
-    .map((m) => m[1].trim())
+  return String(text ?? "")
+    .split("\\n")
+    .map((line) => PATCH_FILE.exec(line)?.groups?.path?.trim() ?? "")
     .filter((path) => path !== "")
     .map((path) => absolute(directory, path));
 }

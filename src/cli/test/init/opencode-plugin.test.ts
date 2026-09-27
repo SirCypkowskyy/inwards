@@ -119,7 +119,7 @@ test("the Stop gate reports a plugin removed, or rewritten with the marker kept"
 
 test("a failed request is tried again: a lookup isn't cached, and an unsent gate message doesn't hold the next idle", async () => {
   const root = initProject();
-  const { hooks, sent, parents } = await load(root, root, { get: 1, prompt: 1 });
+  const { hooks, sent, parents } = await load(root, root, { get: 3, prompt: 1 });
   const [top, child] = ["ses_retry", "ses_retry_child"];
   await fire(hooks, "session.created", top);
   parents.set(child, top);

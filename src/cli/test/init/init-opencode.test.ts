@@ -157,6 +157,8 @@ describe("the guard in the plugin", () => {
       "*** Update File: shop/x.py\n*** Move to:inwards-baseline.json",
       "*** Update File:pyproject.toml\u00a0",
       "\u00a0*** Update File:\u000bpyproject.toml",
+      "*** Delete File: scratch\u2028/../.opencode/plugins/inwards.js",
+      "*** Delete File: scratch\r/../pyproject.toml",
     ];
     const found = await Promise.all(
       headers.map((h) => refusal(hooks, "apply_patch", { patchText: patch(h) })),
@@ -209,14 +211,23 @@ describe("the guard in the plugin", () => {
 describe.skipIf(process.platform === "win32")(
   "the config behind a link, and a hook that exits 2",
   () => {
-    test("a patch of the file pyproject.toml links to is refused", async () => {
+    test("a patch of the file a pyproject.toml links to is refused, in a subdirectory too", async () => {
       const root = initProject();
       renameSync(join(root, "pyproject.toml"), join(root, "settings.toml"));
       symlinkSync(join(root, "settings.toml"), join(root, "pyproject.toml"));
+      mkdirSync(join(root, "pkg"));
+      writeFileSync(join(root, "pkg/settings.toml"), "[tool.inwards]\n");
+      symlinkSync(join(root, "pkg/settings.toml"), join(root, "pkg/pyproject.toml"));
       const { hooks } = await load(root);
-      expect(
-        await refusal(hooks, "apply_patch", { patchText: patch("*** Update File: settings.toml") }),
-      ).toContain("apply_patch may not change");
+      const found = await Promise.all(
+        ["settings.toml", "pkg/settings.toml"].map((path) =>
+          refusal(hooks, "apply_patch", { patchText: patch(`*** Update File: ${path}`) }),
+        ),
+      );
+      expect(found).toEqual([
+        expect.stringContaining("apply_patch may not change"),
+        expect.stringContaining("apply_patch may not change"),
+      ]);
     });
 
     test("a PreToolUse that exits 2 blocks the call with its stderr", async () => {
