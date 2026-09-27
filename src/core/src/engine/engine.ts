@@ -416,8 +416,8 @@ export class Engine {
         ...projectCycles(collected, {
           modes: this.config.cycles,
           contexts: this.config.contexts ?? [],
-          fullImports: (file: SourceFile): readonly ImportRef[] =>
-            this.extractor.full(file).imports,
+          fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
+            this.extractor.importsUpTo(file, lastLine),
         }),
       );
     }

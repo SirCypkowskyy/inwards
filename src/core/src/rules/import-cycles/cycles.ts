@@ -89,10 +89,11 @@ export function cycleDiagnostic(cycle: Cycle): Diagnostic | undefined {
     return undefined;
   }
   const path = cycle.path.join(" -> ");
-  // The group's size is part of the message, so a baseline taken before it grew stops matching.
-  const links = new Set(cycle.inside.map((edge) => `${edge.from}\u0000${edge.to}`)).size;
+  // The group's size and a hash of its links are part of the message, so a
+  // baseline taken before the group changed stops matching.
+  const links = [...new Set(cycle.inside.map((edge) => `${edge.from} ${edge.to}`))].sort();
   const noun = cycle.kind === "modules" ? "modules" : "contexts";
-  const group = `The group holds ${cycle.members.length} ${noun} and ${links} links between them.`;
+  const group = `The group holds ${cycle.members.length} ${noun} and ${links.length} links between them (link hash ${linkHash(links)}).`;
   const message =
     cycle.kind === "modules"
       ? `Modules import each other in a cycle: ${path}. ${group}`
@@ -102,6 +103,33 @@ export function cycleDiagnostic(cycle: Cycle): Diagnostic | undefined {
     message,
     fix: cycle.kind === "modules" ? moduleFix(cycle) : contextFix(cycle),
   });
+}
+
+/** Two polynomial string hashes, each a base and a prime modulus that keep every step exact. */
+const LINK_HASHES = [
+  { base: 131, modulus: 1_000_000_007 },
+  { base: 137, modulus: 998_244_353 },
+] as const;
+/** Hashes are written in hex, 8 digits each: each modulus is below 16^8. */
+const HEX = 16;
+const HASH_DIGITS = 8;
+
+/**
+ * Hashes a group's links, so two groups of one size but different links get
+ * different messages.
+ *
+ * @param links - the group's links, `from to`, deduplicated and sorted.
+ * @returns 16 hex digits.
+ */
+function linkHash(links: readonly string[]): string {
+  const text = links.join("\n");
+  return LINK_HASHES.map(({ base, modulus }) => {
+    let h = 0;
+    for (let i = 0; i < text.length; i += 1) {
+      h = (h * base + text.charCodeAt(i)) % modulus;
+    }
+    return h.toString(HEX).padStart(HASH_DIGITS, "0");
+  }).join("");
 }
 
 /**

@@ -3,12 +3,20 @@
  * reports one cycle per strongly connected component, with its full path, on
  * the import that makes the first step; a check of some files reports none.
  * `cycles` picks modules, contexts, both or neither, and the default is
- * contexts only. An import the skeleton reads out of a string can't make a
- * cycle, since each reported step is confirmed with the full parse. An
+ * contexts only. An import the skeleton reads out of a string, or out of a
+ * file the parser recovers from, can't make a cycle, since every file in a
+ * cyclic group is confirmed with the full parse. A group whose links change
+ * gets a new message, so a baseline can't hide it. An
  * inline suppression can't hide a cycle; the rule can be turned off.
  */
 import { describe, expect, test } from "bun:test";
-import { type Diagnostic, Engine, parseConfig, type SourceFile } from "../../src/index.ts";
+import {
+  baselineKey,
+  type Diagnostic,
+  Engine,
+  parseConfig,
+  type SourceFile,
+} from "../../src/index.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]
@@ -83,7 +91,7 @@ describe("module cycles", () => {
       [
         "shop/domain/orders/line.py",
         1,
-        "Modules import each other in a cycle: shop.domain.orders.line -> shop.domain.orders.total -> shop.domain.orders.order -> shop.domain.orders.line. The group holds 3 modules and 3 links between them.",
+        "Modules import each other in a cycle: shop.domain.orders.line -> shop.domain.orders.total -> shop.domain.orders.order -> shop.domain.orders.line. The group holds 3 modules and 3 links between them (link hash 1d0a7ed90b3266a1).",
       ],
     ]);
     expect(found[0]?.fix.steps[0]).toContain(
@@ -130,7 +138,7 @@ describe("context cycles", () => {
     expect(found.map((d) => [d.file, d.message])).toEqual([
       [
         "shop/app/billing/charge.py",
-        "Contexts import each other in a cycle: billing -> orders -> billing. The group holds 2 contexts and 2 links between them.",
+        "Contexts import each other in a cycle: billing -> orders -> billing. The group holds 2 contexts and 2 links between them (link hash 054cdff0361084c5).",
       ],
     ]);
     expect(found[0]?.fix.steps.at(-1)).toContain("Don't edit [tool.inwards] yourself.");
@@ -178,6 +186,23 @@ describe("what the report stands on", () => {
     expect(await cycles(Modules, files)).toEqual([]);
   });
 
+  test("an import in a string the skeleton misreads, or in a file the parser recovers from, makes no cycle", async () => {
+    const texts = [
+      'x = f"""{"""\nimport shop.domain.orders.line\n"""}"""\n',
+      "if x\nimport shop.domain.orders.line\n",
+      "x = [)\nimport shop.domain.orders.line\n]\n",
+    ];
+    const found = await Promise.all(
+      texts.map((text) =>
+        cycles(Modules, {
+          "shop/domain/orders/order.py": text,
+          "shop/domain/orders/line.py": "import shop.domain.orders.order\n",
+        }),
+      ),
+    );
+    expect(found).toEqual(texts.map(() => []));
+  });
+
   test("a module and its stub are one node", async () => {
     const files = {
       "shop/domain/orders/order.py": "X = 1\n",
@@ -202,6 +227,22 @@ describe("what the report stands on", () => {
     expect(before?.message).toContain("2 modules and 2 links");
     expect(after?.message).toContain("3 modules and 4 links");
     expect(after?.message).not.toBe(before?.message);
+  });
+
+  test("a group rewired at the same size gets a new baseline key", async () => {
+    // a <-> b, b <-> c, c <-> d; then d imports b instead of c.
+    const before = {
+      "shop/domain/orders/a.py": "import shop.domain.orders.b\n",
+      "shop/domain/orders/b.py": "import shop.domain.orders.a\nimport shop.domain.orders.c\n",
+      "shop/domain/orders/c.py": "import shop.domain.orders.b\nimport shop.domain.orders.d\n",
+      "shop/domain/orders/d.py": "import shop.domain.orders.c\n",
+    };
+    const after = { ...before, "shop/domain/orders/d.py": "import shop.domain.orders.b\n" };
+    const [old] = await cycles(Modules, before);
+    const [rewired] = await cycles(Modules, after);
+    expect(old?.message).toContain("4 modules and 6 links");
+    expect(rewired?.message).toContain("4 modules and 6 links");
+    expect(old && rewired && baselineKey(rewired)).not.toBe(old && baselineKey(old));
   });
 
   test("an inline suppression of INW004 is itself an INW009 error", async () => {
