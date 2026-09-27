@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 183daa7f502cce2ad77d6a5787ced18e39a369300e5cd5179925f13fe2358dc9
+source_hash: 0734aa9ca79374ef8470e24cbdf19a62f77ac84fa4bd20d0d54f6d3d7d88a999
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -25,21 +25,22 @@ Nieznany klucz, zły typ albo zła wartość to błąd konfiguracji: `inwards ch
 
 JSON Schema dla `[tool.inwards]` jest opublikowany pod adresem <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. Ten adres śledzi gałąź `develop`, tak jak ta dokumentacja. Żeby przypiąć schemat do wydania, którego używasz, weź plik `inwards-tool-schema.json` dołączony do każdego [wydania na GitHubie](https://github.com/SirCypkowskyy/inwards/releases).
 
-Edytory korzystające z [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML w VS Code i inne) podłączają go plikiem `.taplo.toml` obok `pyproject.toml`, ograniczonym do tej tabeli, żeby reszta pliku zachowała swój własny schemat:
+Edytory korzystające z [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML w VS Code i inne) przypisują schematy do całych plików: Taplo pomija `keys` reguły, gdy wybiera schemat, więc sam schemat tabeli byłby sprawdzany względem całego `pyproject.toml`. Zamiast niego użyj zbudowanego z niego schematu całego pliku, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, który sprawdza `[tool.inwards]` i zostawia wszystkie inne tabele w spokoju. Plik `.taplo.toml` obok `pyproject.toml`:
 
 ```toml title=".taplo.toml"
 [[rule]]
 include = ["**/pyproject.toml"]
-keys = ["tool.inwards"]
 
 [rule.schema]
-path = "https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json"
+path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
+
+To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane, dopóki schemat Inwards nie trafi do schematu SchemaStore ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Wydania dołączają go jako `inwards-pyproject-schema.json`.
 
 Schemat sprawdza strukturę: klucze, ich typy, dozwolone wartości, kody reguł i kształt nazw oraz wzorców. Inwards sprawdza więcej, gdy wczytuje konfigurację:
 
 - relacje między wpisami: unikalne nazwy warstw i kontekstów, prefiks w dwóch warstwach albo dwóch kontekstach, wpisy `public` należące do kontekstu, istniejące nazwy w `depends-on`;
-- dokładne nazwy modułów, tam gdzie schemat dopuszcza nieco luźniejszą postać;
+- dokładne nazwy modułów, tam gdzie schemat dopuszcza nieco luźniejszą postać, oraz zakresy w globach zapisane od końca, takie jak `[z-a]`;
 - `required-version` względem uruchomionego programu.
 
 Konfiguracja, którą schemat przyjmuje, może więc nadal być błędna, a komunikat błędu podaje klucz.

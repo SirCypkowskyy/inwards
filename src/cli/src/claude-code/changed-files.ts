@@ -8,6 +8,7 @@
  */
 import { dirname, join } from "node:path";
 import type { Diagnostic, InwardsConfig, Report } from "@inwards/core";
+import { CONFIG_DEFAULTS } from "@inwards/core";
 import type { Platform } from "../platform/contracts.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import { projectPath } from "../project/snapshot.ts";
@@ -160,6 +161,9 @@ function wholeProject(
   found: Record<string, string[]>,
 ): string[] {
   return Object.entries(start)
-    .filter(([rel, config]) => config.stopGate === "project" && now[rel] !== undefined)
+    .filter(
+      ([rel, config]) =>
+        (config.stopGate ?? CONFIG_DEFAULTS.stopGate) === "project" && now[rel] !== undefined,
+    )
     .flatMap(([rel]) => found[rel] ?? []);
 }

@@ -46,12 +46,17 @@ export function parseContexts(value: unknown): { contexts?: ContextSpec[] } {
   if (value === undefined) {
     return {};
   }
-  if (!(Array.isArray(value) && value.every(isRecord))) {
+  if (!Array.isArray(value)) {
     throw new ConfigError(
       "tool.inwards.contexts must be an array of tables: write each one as [[tool.inwards.contexts]].",
     );
   }
-  const contexts = value.map((entry, i) => parseContext(entry, i));
+  const contexts = value.map((entry: unknown, i) => {
+    if (!isRecord(entry) || Array.isArray(entry)) {
+      throw new ConfigError(`tool.inwards.contexts[${i}] must be a table.`);
+    }
+    return parseContext(entry, i);
+  });
   rejectDuplicateNames(contexts);
   rejectSharedPrefixes(contexts);
   contexts.forEach((context, i) => {

@@ -1,8 +1,9 @@
 /**
  * @file The meaning of every `[tool.inwards]` key a project leaves unset. The
- * parser leaves unset keys out of `InwardsConfig`; the engine and the adapters
- * fill them in from here, and the JSON Schema's `default` annotations are
- * tested against this object, so the three can't disagree.
+ * parser fills in `root` and each shape's `extra`; it leaves the other unset
+ * keys out of `InwardsConfig`, and the code that reads them (the hooks, the
+ * Stop gate, the run log) falls back to this object. The JSON Schema's
+ * `default` annotations are compared with it in the schema tests.
  */
 
 /** Defaults of the unset keys, by their `InwardsConfig` names (`shapeExtra` is `shape[].extra`). */

@@ -1,106 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json",
-  "title": "[tool.inwards]",
-  "description": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.",
-  "markdownDescription": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#configuration-reference)",
+  "$id": "https://sircypkowskyy.github.io/inwards/schema/pyproject.json",
+  "title": "pyproject.toml, checking [tool.inwards] only",
+  "description": "A pyproject.toml schema that checks the [tool.inwards] table and nothing else. Other tables are left unchecked.",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["layers"],
   "properties": {
-    "root": {
-      "description": "Directory, relative to pyproject.toml, that module names are computed from.",
-      "markdownDescription": "Directory, relative to pyproject.toml, that module names are computed from.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#root)",
-      "type": "string",
-      "default": "."
-    },
-    "layers": {
-      "description": "The layers, innermost first. A module may import its own layer and any layer listed before it.",
-      "markdownDescription": "The layers, innermost first. A module may import its own layer and any layer listed before it.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/definitions/layer"
-      }
-    },
-    "required-version": {
-      "description": "The oldest Inwards allowed to check this project, as \"MAJOR.MINOR.PATCH\". An older binary fails with a config error.",
-      "markdownDescription": "The oldest Inwards allowed to check this project, as \"MAJOR.MINOR.PATCH\". An older binary fails with a config error.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#required-version)",
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
-    },
-    "ignore": {
-      "description": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name.",
-      "markdownDescription": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#ignore)",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "generated": {
-      "description": "Modules a build step writes, which INW010 treats as existing: dotted names whose segments may use * and ?. A list, even an empty one, replaces the default.",
-      "markdownDescription": "Modules a build step writes, which INW010 treats as existing: dotted names whose segments may use * and ?. A list, even an empty one, replaces the default.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#generated)",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^[^.\\s/\\\\\\[\\]-]+(\\.[^.\\s/\\\\\\[\\]-]+)*$",
-        "not": {
-          "pattern": "^[*?.]+$"
+    "tool": {
+      "type": "object",
+      "properties": {
+        "inwards": {
+          "$ref": "#/definitions/inwards"
         }
-      },
-      "default": ["*_pb2", "*_pb2_grpc", "_version"]
-    },
-    "escalate-after": {
-      "description": "How many attempts at the same violation before the hooks stop blocking and tell the agent to ask the user.",
-      "markdownDescription": "How many attempts at the same violation before the hooks stop blocking and tell the agent to ask the user.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#escalate-after)",
-      "type": "integer",
-      "minimum": 1,
-      "default": 3
-    },
-    "run-log": {
-      "description": "Write the opt-in run log .inwards/runs.jsonl.",
-      "markdownDescription": "Write the opt-in run log .inwards/runs.jsonl.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#run-log)",
-      "type": "boolean",
-      "default": false
-    },
-    "stop-gate": {
-      "description": "What the Claude Code Stop gate checks: \"changed\" (the files the session changed) or \"project\" (the whole project against its baseline).",
-      "markdownDescription": "What the Claude Code Stop gate checks: \"changed\" (the files the session changed) or \"project\" (the whole project against its baseline).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#stop-gate)",
-      "enum": ["changed", "project"],
-      "default": "changed"
-    },
-    "shape": {
-      "description": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.",
-      "markdownDescription": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/shape"
-      }
-    },
-    "names": {
-      "description": "Where a member name may appear (INW007).",
-      "markdownDescription": "Where a member name may appear (INW007).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/name"
-      }
-    },
-    "rules": {
-      "$ref": "#/definitions/rules"
-    },
-    "agent-suppressions": {
-      "description": "Whether the Claude Code hooks honour an inline suppression the agent added: \"deny\" treats it as absent, \"allow\" honours it.",
-      "markdownDescription": "Whether the Claude Code hooks honour an inline suppression the agent added: \"deny\" treats it as absent, \"allow\" honours it.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#agent-suppressions)",
-      "enum": ["deny", "allow"],
-      "default": "deny"
-    },
-    "contexts": {
-      "description": "Bounded contexts or slices: what each owns, which of its modules others may import, and which contexts it may depend on (INW002, INW003).",
-      "markdownDescription": "Bounded contexts or slices: what each owns, which of its modules others may import, and which contexts it may depend on (INW002, INW003).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/context"
       }
     }
   },
@@ -143,7 +53,10 @@
     "layer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "modules"],
+      "required": [
+        "name",
+        "modules"
+      ],
       "properties": {
         "name": {
           "description": "The layer's name, unique among layers.",
@@ -192,7 +105,9 @@
     "shape": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["packages"],
+      "required": [
+        "packages"
+      ],
       "properties": {
         "packages": {
           "description": "Package selectors this shape applies to.",
@@ -230,7 +145,10 @@
         "extra": {
           "description": "How an extra member is reported: \"error\" or \"warning\".",
           "markdownDescription": "How an extra member is reported: \"error\" or \"warning\".\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
-          "enum": ["error", "warning"],
+          "enum": [
+            "error",
+            "warning"
+          ],
           "default": "error"
         }
       }
@@ -238,7 +156,10 @@
     "name": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pattern", "only-in"],
+      "required": [
+        "pattern",
+        "only-in"
+      ],
       "properties": {
         "pattern": {
           "description": "One member pattern, such as test_*.",
@@ -309,7 +230,10 @@
             ]
           },
           "additionalProperties": {
-            "enum": ["error", "warning"]
+            "enum": [
+              "error",
+              "warning"
+            ]
           }
         }
       }
@@ -317,7 +241,10 @@
     "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "modules"],
+      "required": [
+        "name",
+        "modules"
+      ],
       "properties": {
         "name": {
           "description": "The context's name: non-blank, case-sensitive, unique among contexts.",
@@ -353,6 +280,123 @@
             "pattern": "\\S"
           },
           "default": []
+        }
+      }
+    },
+    "inwards": {
+      "title": "[tool.inwards]",
+      "description": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.",
+      "markdownDescription": "Configuration of Inwards, the architecture linter for Python, in pyproject.toml. The schema checks structure, types, enums and syntax; the parser also checks relations between entries (unique names, context ownership) and required-version.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#configuration-reference)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layers"
+      ],
+      "properties": {
+        "root": {
+          "description": "Directory, relative to pyproject.toml, that module names are computed from.",
+          "markdownDescription": "Directory, relative to pyproject.toml, that module names are computed from.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#root)",
+          "type": "string",
+          "default": "."
+        },
+        "layers": {
+          "description": "The layers, innermost first. A module may import its own layer and any layer listed before it.",
+          "markdownDescription": "The layers, innermost first. A module may import its own layer and any layer listed before it.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layer"
+          }
+        },
+        "required-version": {
+          "description": "The oldest Inwards allowed to check this project, as \"MAJOR.MINOR.PATCH\". An older binary fails with a config error.",
+          "markdownDescription": "The oldest Inwards allowed to check this project, as \"MAJOR.MINOR.PATCH\". An older binary fails with a config error.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#required-version)",
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "ignore": {
+          "description": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name.",
+          "markdownDescription": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#ignore)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "generated": {
+          "description": "Modules a build step writes, which INW010 treats as existing: dotted names whose segments may use * and ?. A list, even an empty one, replaces the default.",
+          "markdownDescription": "Modules a build step writes, which INW010 treats as existing: dotted names whose segments may use * and ?. A list, even an empty one, replaces the default.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#generated)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s/\\\\\\[\\]-]+(\\.[^.\\s/\\\\\\[\\]-]+)*$",
+            "not": {
+              "pattern": "^[*?.]+$"
+            }
+          },
+          "default": [
+            "*_pb2",
+            "*_pb2_grpc",
+            "_version"
+          ]
+        },
+        "escalate-after": {
+          "description": "How many attempts at the same violation before the hooks stop blocking and tell the agent to ask the user.",
+          "markdownDescription": "How many attempts at the same violation before the hooks stop blocking and tell the agent to ask the user.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#escalate-after)",
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "run-log": {
+          "description": "Write the opt-in run log .inwards/runs.jsonl.",
+          "markdownDescription": "Write the opt-in run log .inwards/runs.jsonl.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#run-log)",
+          "type": "boolean",
+          "default": false
+        },
+        "stop-gate": {
+          "description": "What the Claude Code Stop gate checks: \"changed\" (the files the session changed) or \"project\" (the whole project against its baseline).",
+          "markdownDescription": "What the Claude Code Stop gate checks: \"changed\" (the files the session changed) or \"project\" (the whole project against its baseline).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#stop-gate)",
+          "enum": [
+            "changed",
+            "project"
+          ],
+          "default": "changed"
+        },
+        "shape": {
+          "description": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.",
+          "markdownDescription": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/shape"
+          }
+        },
+        "names": {
+          "description": "Where a member name may appear (INW007).",
+          "markdownDescription": "Where a member name may appear (INW007).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/name"
+          }
+        },
+        "rules": {
+          "$ref": "#/definitions/rules"
+        },
+        "agent-suppressions": {
+          "description": "Whether the Claude Code hooks honour an inline suppression the agent added: \"deny\" treats it as absent, \"allow\" honours it.",
+          "markdownDescription": "Whether the Claude Code hooks honour an inline suppression the agent added: \"deny\" treats it as absent, \"allow\" honours it.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#agent-suppressions)",
+          "enum": [
+            "deny",
+            "allow"
+          ],
+          "default": "deny"
+        },
+        "contexts": {
+          "description": "Bounded contexts or slices: what each owns, which of its modules others may import, and which contexts it may depend on (INW002, INW003).",
+          "markdownDescription": "Bounded contexts or slices: what each owns, which of its modules others may import, and which contexts it may depend on (INW002, INW003).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/context"
+          }
         }
       }
     }

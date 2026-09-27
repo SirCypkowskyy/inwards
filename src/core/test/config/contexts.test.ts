@@ -94,6 +94,12 @@ describe("errors name the indexed key", () => {
     expect(error('contexts = "orders"\n')).toContain("tool.inwards.contexts must be an array");
   });
 
+  test("an element that isn't a table, by its index", () => {
+    expect(error('contexts = [{ name = "a", modules = ["shop.a"] }, 3]\n')).toContain(
+      "tool.inwards.contexts[1] must be a table",
+    );
+  });
+
   test("an unknown key", () => {
     expect(
       error('[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.a"]\nexports = []\n'),

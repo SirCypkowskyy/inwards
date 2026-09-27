@@ -64,8 +64,10 @@ jobs:
         run: |
           python3 scripts/build-wheels.py dist "$GITHUB_REF_NAME"
           mv dist/wheels/*.whl dist/ && rmdir dist/wheels
-      - name: The [tool.inwards] JSON Schema, for pinning to this release
-        run: cp schema/tool-inwards.schema.json dist/inwards-tool-schema.json
+      - name: The [tool.inwards] JSON Schemas, for pinning to this release
+        run: |
+          cp schema/tool-inwards.schema.json dist/inwards-tool-schema.json
+          cp schema/pyproject.schema.json dist/inwards-pyproject-schema.json
       - name: Checksums
         working-directory: dist
         run: sha256sum inwards-* | grep -v '\.map' > SHA256SUMS && cat SHA256SUMS

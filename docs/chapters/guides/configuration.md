@@ -20,21 +20,22 @@ An unknown key, a wrong type or a bad value is a config error: `inwards check` e
 
 A JSON Schema for `[tool.inwards]` is published at <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. That URL follows the `develop` branch, like these docs. To pin the schema to the release you run, use the `inwards-tool-schema.json` file attached to each [GitHub release](https://github.com/SirCypkowskyy/inwards/releases).
 
-Editors that use [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML in VS Code, and others) attach it with a `.taplo.toml` next to `pyproject.toml`, scoped to the table so the rest of the file keeps its own schema:
+Editors that use [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML in VS Code, and others) attach schemas to whole files: Taplo ignores a rule's `keys` when it picks the schema, so the table schema alone would be checked against the entire `pyproject.toml`. Use the whole-file schema built from it instead, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, which checks `[tool.inwards]` and leaves every other table alone. A `.taplo.toml` next to `pyproject.toml`:
 
 ```toml title=".taplo.toml"
 [[rule]]
 include = ["**/pyproject.toml"]
-keys = ["tool.inwards"]
 
 [rule.schema]
-path = "https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json"
+path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
+
+This replaces the schema Taplo would otherwise take from SchemaStore for that file, so the other tables go unchecked until Inwards' schema is part of SchemaStore's ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Releases attach it as `inwards-pyproject-schema.json`.
 
 The schema checks structure: the keys, their types, the allowed values, the rule codes and the shape of names and patterns. Inwards checks more when it reads the config:
 
 - relations between entries: unique layer and context names, a prefix in two layers or two contexts, `public` entries a context owns, `depends-on` names that exist;
-- exact module names, where the schema accepts a slightly looser form;
+- exact module names, where the schema accepts a slightly looser form, and glob ranges written backwards, such as `[z-a]`;
 - `required-version` against the running binary.
 
 So a config the schema accepts can still be a config error, and the error names the key.

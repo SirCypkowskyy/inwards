@@ -15,7 +15,7 @@
  * one per invocation and writes the line at the end.
  */
 import { dirname, join, resolve } from "node:path";
-import { type Diagnostic, parseConfig, type Report } from "@inwards/core";
+import { CONFIG_DEFAULTS, type Diagnostic, parseConfig, type Report } from "@inwards/core";
 import type { Platform } from "../platform/contracts.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import { projectPath } from "../project/snapshot.ts";
@@ -147,7 +147,9 @@ function runLogEnabled(io: RunLogIo, project: string, force: boolean): boolean {
   if (force || env === "1" || env === "true") {
     return true;
   }
-  return config !== undefined && parseConfig(io.read.text(config)).runLog === true;
+  return (
+    config !== undefined && (parseConfig(io.read.text(config)).runLog ?? CONFIG_DEFAULTS.runLog)
+  );
 }
 
 /**

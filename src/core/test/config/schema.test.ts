@@ -1,57 +1,39 @@
 /**
  * @file The JSON Schema for `[tool.inwards]` (`schema/tool-inwards.schema.json`,
- * #51) and the parser agree. Their keys, enums and defaults are compared at
- * every level, every config the repository ships or documents validates, and
- * negative samples fail where they should: structural ones fail both, and
- * relations between entries fail the parser only, since draft-07 can't express
- * them. Docs snippets are classified with `<!-- config: fragment -->` or
- * `<!-- config: invalid -->`; an unmarked one must be a complete, valid config.
+ * #51) and the parser agree. Their keys, rule codes and defaults are compared,
+ * every required key, type, enum, bound and INW000 restriction is exercised on
+ * both sides, and every config the repository ships or documents validates.
+ * Relations between entries fail the parser only, since draft-07 can't express
+ * them. The whole-file schema built from the table schema is checked too:
+ * fresh, accepting whole `pyproject.toml` files, and leaving other tables alone.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import Ajv, { type ValidateFunction } from "ajv";
-import { parse, stringify } from "smol-toml";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import process from "node:process";
 import { CONTEXT_KEYS } from "../../src/config/contexts.ts";
 import { CONFIG_DEFAULTS } from "../../src/config/defaults.ts";
 import { DEFAULT_GENERATED } from "../../src/config/generated.ts";
 import { LAYER_KEYS, parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
 import { RULE_KEYS } from "../../src/config/rule-settings.ts";
 import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/shape.ts";
-import { ConfigError, isRecord } from "../../src/config/toml.ts";
 import { RULES } from "../../src/meta/registry.ts";
+import {
+  fileSchemaErrors,
+  MINIMAL,
+  parserError,
+  REPO,
+  read,
+  type Schema,
+  schema,
+  schemaErrors,
+} from "../support/config-schema.ts";
+import { snippetProblems } from "../support/snippets.ts";
 
-const REPO = resolve(import.meta.dir, "../../../..");
-/** A docs fence that holds TOML, with the marker line before it if any. */
-const TOML_FENCE =
-  /(?:^(?<marker><!--\s*config:\s*(?<kind>\w+)\s*-->)\n\n)?^ *```toml[^\n]*\n(?<body>[\s\S]*?)\n *```$/gmu;
-/** Any spelling of a config marker, so a near miss is caught. */
-const MARKER = /<!--\s*config:[^>]*-->/gu;
-/** Mentions the table, so the snippet is about Inwards' config. */
-const INWARDS_TABLE = /\[\s*tool\.inwards/u;
 /** A link from a schema description to an anchor of the configuration reference. */
 const REFERENCE_ANCHOR = /guides\/configuration\/#(?<anchor>[a-z-]+)\)/gu;
-/** The smallest valid config a fragment is merged into. */
-const MINIMAL = '[tool.inwards]\nlayers = [{ name = "domain", modules = ["shop.domain"] }]\n';
-
-/** The part of the schema these tests walk. */
-interface Schema {
-  properties?: Record<string, Schema>;
-  definitions?: Record<string, Schema>;
-  items?: Schema;
-  allOf?: Schema[];
-  // biome-ignore lint/style/useNamingConvention: the JSON Schema keyword is spelled $ref.
-  $ref?: string;
-  enum?: string[];
-  default?: unknown;
-}
-
-const schema: Schema = JSON.parse(
-  readFileSync(join(REPO, "schema/tool-inwards.schema.json"), "utf8"),
-);
-const ajv = new Ajv({ allErrors: true, strict: true });
-ajv.addKeyword("markdownDescription");
-const validate: ValidateFunction = ajv.compile(schema);
+/** Mentions the table, so a shipped file configures Inwards. */
+const INWARDS_TABLE = /\[\s*tool\.inwards/u;
 
 /**
  * Follows a `$ref` (also one wrapped in `allOf`) to its definition.
@@ -86,56 +68,6 @@ function itemsOf(key: string): Schema {
 }
 
 /**
- * Validates the `[tool.inwards]` table of a pyproject text with the schema.
- *
- * @param text - the whole TOML text.
- * @returns the schema's errors, empty when it validates.
- */
-function schemaErrors(text: string): string[] {
-  const doc = parse(text);
-  const tool = isRecord(doc["tool"]) ? doc["tool"] : {};
-  const valid = validate(tool["inwards"]);
-  return valid ? [] : (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message}`);
-}
-
-/**
- * Tells whether the parser accepts a pyproject text.
- *
- * @param text - the whole TOML text.
- * @returns the config error's message, or undefined when it parses.
- * @throws {Error} anything other than a ConfigError, which would be a bug.
- */
-function parserError(text: string): string | undefined {
-  try {
-    parseConfig(text);
-    return undefined;
-  } catch (err) {
-    if (err instanceof ConfigError) {
-      return err.message;
-    }
-    throw err;
-  }
-}
-
-/**
- * Merges a fragment's `[tool.inwards]` keys into the minimal config.
- *
- * @param fragment - TOML that sets some keys of `[tool.inwards]`.
- * @returns the complete config's text.
- */
-function merged(fragment: string): string {
-  const base = parse(MINIMAL);
-  const extra = parse(fragment);
-  const baseTool = isRecord(base["tool"]) ? base["tool"] : {};
-  const extraTool = isRecord(extra["tool"]) ? extra["tool"] : {};
-  const inwards = {
-    ...(isRecord(baseTool["inwards"]) ? baseTool["inwards"] : {}),
-    ...(isRecord(extraTool["inwards"]) ? extraTool["inwards"] : {}),
-  };
-  return stringify({ ...extra, tool: { ...extraTool, inwards } });
-}
-
-/**
  * Lists the Markdown pages below a docs directory.
  *
  * @param dir - a repo-relative directory.
@@ -152,64 +84,23 @@ function pages(dir: string): string[] {
 }
 
 /**
- * Reads a repository file, or nothing when it doesn't exist.
+ * Builds a config from the minimal one plus extra TOML.
  *
- * @param path - a repo-relative path.
- * @returns the text, empty when the file is missing.
+ * @param extra - keys or tables to add.
+ * @returns the config text.
  */
-function read(path: string): string {
-  const full = join(REPO, path);
-  return existsSync(full) ? readFileSync(full, "utf8") : "";
+function withExtra(extra: string): string {
+  return `${MINIMAL}${extra}`;
 }
 
 /**
- * Checks every Inwards TOML fence of a docs page, and that each config
- * marker sits right before a TOML fence.
+ * Builds a config whose only layer is the given inline table.
  *
- * @param path - the page's repo-relative path, for messages.
- * @param text - the page's Markdown.
- * @returns one line per problem, empty when the page is fine.
+ * @param layer - the layer's TOML inline table.
+ * @returns the config text.
  */
-function snippetProblems(path: string, text: string): string[] {
-  const problems: string[] = [];
-  let used = 0;
-  for (const match of text.matchAll(TOML_FENCE)) {
-    const { body = "", kind } = match.groups ?? {};
-    used += kind === undefined ? 0 : 1;
-    if (INWARDS_TABLE.test(body)) {
-      problems.push(...fenceProblems(`${path}: ${body.split("\n")[0]}`, body, kind));
-    }
-  }
-  const markers = (text.match(MARKER) ?? []).length;
-  if (markers !== used) {
-    problems.push(`${path}: ${markers - used} config marker(s) not right before a TOML fence`);
-  }
-  return problems;
-}
-
-/**
- * Checks one Inwards TOML fence as its marker classifies it: a complete
- * config (no marker) or a fragment must parse and validate, and an invalid
- * example must fail the parser.
- *
- * @param where - the page and the fence's first line, for messages.
- * @param body - the fence's TOML.
- * @param kind - the marker's kind (`fragment`, `invalid`), or undefined.
- * @returns one line per problem, empty when the fence is fine.
- */
-function fenceProblems(where: string, body: string, kind: string | undefined): string[] {
-  if (kind === "invalid") {
-    return parserError(body) === undefined ? [`${where}: marked invalid, but it parses`] : [];
-  }
-  if (kind !== undefined && kind !== "fragment") {
-    return [`${where}: unknown config marker "${kind}"`];
-  }
-  const config = kind === "fragment" ? merged(body) : body;
-  const error = parserError(config);
-  if (error !== undefined) {
-    return [`${where}: ${kind === "fragment" ? "fragment" : "complete config"}: ${error}`];
-  }
-  return schemaErrors(config).map((problem) => `${where}: schema: ${problem}`);
+function withLayer(layer: string): string {
+  return `[tool.inwards]\nlayers = [${layer}]\n`;
 }
 
 describe("the schema and the parser agree", () => {
@@ -226,16 +117,7 @@ describe("the schema and the parser agree", () => {
     expect(schema.definitions?.["ruleCode"]?.enum?.sort()).toEqual(Object.keys(RULES).sort());
   });
 
-  test("its reference links land on anchors the configuration page has", () => {
-    const page = read("docs/chapters/guides/configuration.md");
-    const anchors = [...JSON.stringify(schema).matchAll(REFERENCE_ANCHOR)].map(
-      (m) => m.groups?.["anchor"] ?? "",
-    );
-    expect(anchors.length).toBeGreaterThan(0);
-    expect(anchors.filter((anchor) => !page.includes(`{ #${anchor} }`))).toEqual([]);
-  });
-
-  test("on the defaults", () => {
+  test("on the defaults, as annotated and as the parser fills them in", () => {
     const props = schema.properties ?? {};
     const context = deref(itemsOf("contexts")).properties ?? {};
     const shape = deref(itemsOf("shape")).properties ?? {};
@@ -250,55 +132,79 @@ describe("the schema and the parser agree", () => {
     expect(props["generated"]?.default).toEqual([...DEFAULT_GENERATED]);
     expect(context["public"]?.default).toEqual([]);
     expect(context["depends-on"]?.default).toEqual([]);
+    const parsed = parseConfig(
+      withExtra('[[tool.inwards.shape]]\npackages = ["shop.*"]\nallow = ["x"]\n'),
+    );
+    expect([parsed.root, parsed.shape?.[0]?.extra]).toEqual([
+      CONFIG_DEFAULTS.root,
+      CONFIG_DEFAULTS.shapeExtra,
+    ]);
+  });
+
+  test("its reference links land on anchors the configuration page has", () => {
+    const page = read("docs/chapters/guides/configuration.md");
+    const anchors = [...JSON.stringify(schema).matchAll(REFERENCE_ANCHOR)].map(
+      (m) => m.groups?.["anchor"] ?? "",
+    );
+    expect(anchors.length).toBeGreaterThan(0);
+    expect(anchors.filter((anchor) => !page.includes(`{ #${anchor} }`))).toEqual([]);
   });
 });
 
-describe("every shipped config validates", () => {
-  // examples/clean-app has no pyproject.toml: the repository's own config checks it.
-  const configs = [
-    ...readdirSync(join(REPO, "examples")).map((dir) => `examples/${dir}/pyproject.toml`),
-    "eval/pyproject.toml",
-    "pyproject.toml",
-  ].filter((path) => INWARDS_TABLE.test(read(path)));
-
-  test("the list isn't empty", () => {
-    expect(configs.length).toBeGreaterThan(1);
-  });
-
-  test.each(configs)("%s", (path) => {
-    expect(parserError(read(path))).toBeUndefined();
-    expect(schemaErrors(read(path))).toEqual([]);
-  });
-});
-
-describe("docs snippets are classified and valid", () => {
-  const files = [...pages("docs/chapters"), ...pages("docs/pl")];
-
-  test.each(files)("%s", (path) => {
-    expect(snippetProblems(path, read(path))).toEqual([]);
-  });
-});
-
-/**
- * Builds a config from the minimal one plus extra TOML.
- *
- * @param extra - keys or tables to add.
- * @returns the config text.
- */
-function withExtra(extra: string): string {
-  return `${MINIMAL}${extra}`;
-}
-
-describe("negative samples", () => {
+describe("structural mistakes fail both the schema and the parser", () => {
   test.each([
-    ["an unknown key", withExtra("colour = true\n")],
+    // Required keys.
     ["no layers", '[tool.inwards]\nroot = "."\n'],
-    ["escalate-after of zero", withExtra("escalate-after = 0\n")],
-    ["an unknown stop-gate", withExtra('stop-gate = "always"\n')],
-    ["an unknown rule code", withExtra('[tool.inwards.rules]\nselect = ["INW999"]\n')],
-    ["INW000 in ignore", withExtra('[tool.inwards.rules]\nignore = ["INW000"]\n')],
-    ["a wildcard-only generated pattern", withExtra('generated = ["*"]\n')],
+    ["a layer without a name", withLayer('{ modules = ["shop"] }')],
+    ["a layer without modules", withLayer('{ name = "d" }')],
+    ["a shape without packages", withExtra('[[tool.inwards.shape]]\nallow = ["x"]\n')],
+    ["a names entry without a pattern", withExtra('[[tool.inwards.names]]\nonly-in = ["shop"]\n')],
+    ["a names entry without only-in", withExtra('[[tool.inwards.names]]\npattern = "x"\n')],
+    ["a context without a name", withExtra('[[tool.inwards.contexts]]\nmodules = ["shop.a"]\n')],
     ["a context without modules", withExtra('[[tool.inwards.contexts]]\nname = "a"\n')],
+    // Unknown keys.
+    ["an unknown key", withExtra("colour = true\n")],
+    ["an unknown layer key", withLayer('{ name = "d", modules = ["shop"], colour = 1 }')],
+    ["an unknown rules key", withExtra('[tool.inwards.rules]\nenable = ["INW001"]\n')],
+    // Types.
+    ["a non-string root", withExtra("root = 1\n")],
+    ["a non-boolean run-log", withExtra('run-log = "yes"\n')],
+    ["a fractional escalate-after", withExtra("escalate-after = 1.5\n")],
+    ["an ignore that isn't a list", withExtra('ignore = "tests"\n')],
+    ["layers that aren't an array", '[tool.inwards]\nlayers = "domain"\n'],
+    ["a generated that isn't a list", withExtra('generated = "*_pb2"\n')],
+    ["rules that aren't a table", withExtra('rules = ["INW001"]\n')],
+    ["a select that isn't a list", withExtra('[tool.inwards.rules]\nselect = "INW001"\n')],
+    ["a context that isn't a table", withExtra("contexts = [3]\n")],
+    // Enums and formats.
+    ["an unknown stop-gate", withExtra('stop-gate = "always"\n')],
+    ["an unknown agent-suppressions", withExtra('agent-suppressions = "maybe"\n')],
+    [
+      "an unknown shape extra",
+      withExtra('[[tool.inwards.shape]]\npackages = ["shop.*"]\nextra = "fatal"\n'),
+    ],
+    ["an unknown rule code", withExtra('[tool.inwards.rules]\nselect = ["INW999"]\n')],
+    ["an unknown severity", withExtra('[tool.inwards.rules]\nseverity = { INW001 = "fatal" }\n')],
+    ["a short required-version", withExtra('required-version = "1.2"\n')],
+    // Bounds.
+    ["empty layers", "[tool.inwards]\nlayers = []\n"],
+    ["escalate-after of zero", withExtra("escalate-after = 0\n")],
+    ["an empty select", withExtra("[tool.inwards.rules]\nselect = []\n")],
+    ["a shape with no packages", withExtra("[[tool.inwards.shape]]\npackages = []\n")],
+    ["names with no only-in", withExtra('[[tool.inwards.names]]\npattern = "x"\nonly-in = []\n')],
+    [
+      "a context with no modules",
+      withExtra('[[tool.inwards.contexts]]\nname = "a"\nmodules = []\n'),
+    ],
+    [
+      "a blank context name",
+      withExtra('[[tool.inwards.contexts]]\nname = " "\nmodules = ["shop.a"]\n'),
+    ],
+    // INW000 can't be turned off or re-levelled.
+    ["INW000 in ignore", withExtra('[tool.inwards.rules]\nignore = ["INW000"]\n')],
+    ["INW000 in severity", withExtra('[tool.inwards.rules]\nseverity = { INW000 = "warning" }\n')],
+    // Pattern syntax.
+    ["a wildcard-only generated pattern", withExtra('generated = ["*"]\n')],
     [
       "a wildcard in a context",
       withExtra('[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.*"]\n'),
@@ -307,11 +213,34 @@ describe("negative samples", () => {
       "a member pattern with a slash inside",
       withExtra('[[tool.inwards.shape]]\npackages = ["shop.*"]\nallow = ["a/b"]\n'),
     ],
-  ])("%s fails both the schema and the parser", (_what, text) => {
+    [
+      "an unclosed bracket in a member pattern",
+      withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nallow = ["[abc"]\n'),
+    ],
+    ["an empty selector segment", withExtra('[[tool.inwards.shape]]\npackages = ["shop..x"]\n')],
+    [
+      "a distribution name as a library",
+      withLayer('{ name = "d", modules = ["shop"], deny-libraries = ["python-dateutil"] }'),
+    ],
+  ])("%s", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).not.toEqual([]);
   });
 
+  test("INW000 may still be selected", () => {
+    const text = withExtra('[tool.inwards.rules]\nselect = ["INW000", "INW001"]\n');
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("valid member globs pass both", () => {
+    const text = withExtra(
+      '[[tool.inwards.shape]]\npackages = ["shop.*"]\nallow = ["test_*", "[!_]*", "[]x]y", "?.py", "pkg/"]\n',
+    );
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+});
+
+describe("relations between entries fail the parser only: draft-07 can't see them", () => {
   test.each([
     [
       "a repeated context name",
@@ -331,8 +260,16 @@ describe("negative samples", () => {
         '[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.a"]\npublic = ["shop.b"]\n',
       ),
     ],
+    [
+      "a repeated layer name",
+      withLayer('{ name = "d", modules = ["a"] }, { name = "d", modules = ["b"] }'),
+    ],
+    [
+      "a reversed range in a member glob",
+      withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nallow = ["[z-a]"]\n'),
+    ],
     ["a required-version newer than this Inwards", withExtra('required-version = "999.0.0"\n')],
-  ])("%s fails the parser only: the schema can't see relations", (_what, text) => {
+  ])("%s", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).toEqual([]);
   });
@@ -340,7 +277,46 @@ describe("negative samples", () => {
   test("legacy layer entries the parser accepts stay valid in the schema", () => {
     const legacy =
       '[tool.inwards]\nlayers = [{ name = "domain", modules = ["shop-domain", "shop..x"] }, { name = "empty", modules = [] }]\n';
-    expect(parserError(legacy)).toBeUndefined();
-    expect(schemaErrors(legacy)).toEqual([]);
+    expect([parserError(legacy), schemaErrors(legacy)]).toEqual([undefined, []]);
+  });
+});
+
+describe("every shipped and documented config validates", () => {
+  // examples/clean-app has no pyproject.toml: the repository's own config checks it.
+  const configs = [
+    ...readdirSync(join(REPO, "examples")).map((dir) => `examples/${dir}/pyproject.toml`),
+    "eval/pyproject.toml",
+    "pyproject.toml",
+  ].filter((path) => INWARDS_TABLE.test(read(path)));
+
+  test("the list isn't empty", () => {
+    expect(configs.length).toBeGreaterThan(1);
+  });
+
+  test.each(configs)("%s, with both the table and the whole-file schema", (path) => {
+    expect(parserError(read(path))).toBeUndefined();
+    expect(schemaErrors(read(path))).toEqual([]);
+    expect(fileSchemaErrors(read(path))).toEqual([]);
+  });
+
+  test.each([...pages("docs/chapters"), ...pages("docs/pl")])("docs: %s", (path) => {
+    expect(snippetProblems(path, read(path))).toEqual([]);
+  });
+});
+
+describe("the whole-file schema", () => {
+  test("is what scripts/build-pyproject-schema.ts builds from the table schema", () => {
+    const run = Bun.spawnSync(
+      [process.execPath, "run", "scripts/build-pyproject-schema.ts", "--check"],
+      { cwd: REPO },
+    );
+    expect([run.exitCode, run.stderr.toString()]).toEqual([0, ""]);
+  });
+
+  test("leaves other tables alone and checks [tool.inwards]", () => {
+    const other = `[project]\nname = "shop"\ndependencies = [1, 2]\n\n[tool.ruff]\nanything = { goes = true }\n\n${MINIMAL}`;
+    expect(fileSchemaErrors(other)).toEqual([]);
+    expect(fileSchemaErrors(`${other}colour = true\n`)).not.toEqual([]);
+    expect(fileSchemaErrors('[project]\nname = "no inwards at all"\n')).toEqual([]);
   });
 });

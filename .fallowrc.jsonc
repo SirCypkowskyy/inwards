@@ -11,6 +11,8 @@
     "bench/compare.ts",
     "bench/corpus.ts",
     "scripts/claude-payload-drift.ts",
+    // Run by hand after a schema change; src/core/test/config/schema.test.ts runs it with --check.
+    "scripts/build-pyproject-schema.ts",
     "packaging/placeholder/npm/bin.js"
   ],
   // Loaded by path, never imported: Bun.resolveSync("tree-sitter-python/...wasm")
