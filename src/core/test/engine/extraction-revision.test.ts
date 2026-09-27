@@ -25,6 +25,7 @@ const FILES = [
 /** The fingerprint the current revision was recorded with. */
 const RECORDED: Readonly<Record<string, string>> = {
   "1": "772064cde6ec46ab82c1f30cc8dc39de9ecd8c46870a6619cfb214b83f07c7b4",
+  "2": "db0c5e3dee5bfa621e01f167e09b0a70e2dfa3da19c615edaddad6c20ab1f961",
 };
 
 test("the extraction revision changes with the code it describes", () => {
