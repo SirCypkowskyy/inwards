@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: c7eb5a60045eed1a3079d57158cb8f1ba80bc64f38230ca7dd359d5904ac859f
+source_hash: 1dd8341b8e515974fe425261d0d7744674a4e2f268eca96918302ef5b4ceb857
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -822,14 +822,14 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - **Tylko przy sprawdzaniu całego projektu.** INW004 działa, gdy sprawdzenie obejmuje cały projekt: `inwards check` bez ścieżek, `inwards baseline`, bramka Stop z `stop-gate = "project"`. Hook po każdej edycji i serwer języka nigdy go nie zgłaszają.
 - **Z importów, które sprawdzenie i tak czyta.** Silnik zachowuje importy każdego sprawdzonego pliku, gdy je skanuje i potwierdza: ze szkieletu albo z pełnego parsowania razem z czytelnymi importami dynamicznymi. Żaden plik nie jest czytany dwa razy, a pamięć podręczna ekstrakcji ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) działa. Liczy się każdy import, także w funkcjach i za `TYPE_CHECKING`, tak jak w innych regułach.
 - **Węzłami są sprawdzone moduły.** Import to krawędź do najdłuższego sprawdzonego modułu, od którego zaczyna się jego cel. Nic innego, ani biblioteka standardowa, ani pakiet spoza sprawdzenia, nie może zamknąć cyklu i nie daje krawędzi; rozwiązanie celów nie potrzebuje systemu plików.
-- **Jedno zgłoszenie na silnie spójną grupę.** Grupy znajduje algorytm Tarjana w wersji iteracyjnej; każda dostaje najkrótszy cykl przez swój pierwszy moduł, z pełną ścieżką, przy imporcie, który robi pierwszy krok. Węzły i krawędzie są odwiedzane w posortowanej kolejności, więc zgłoszenie jest za każdym razem takie samo.
-- **Każdy zgłaszany krok jest potwierdzany.** Szkielet może odczytać import z wieloliniowego napisu. Plik, którego tekst ma potrójne cudzysłowy albo kontynuację linii ukośnikiem wstecznym, a importy pochodzą tylko ze szkieletu, jest w całości parsowany, zanim cykl przez niego zostanie zgłoszony, a wyszukiwanie rusza od nowa.
+- **Jedno zgłoszenie na silnie spójną grupę.** Grupy znajduje algorytm Tarjana w wersji iteracyjnej; każda dostaje najkrótszy cykl przez swój pierwszy moduł, z pełną ścieżką, przy imporcie, który robi pierwszy krok. Węzły i krawędzie są odwiedzane w posortowanej kolejności, więc zgłoszenie jest za każdym razem takie samo. Komunikat podaje też rozmiar grupy w elementach i powiązaniach, więc baseline sprzed jej wzrostu przestaje do niej pasować.
+- **Każdy niepewny plik w cyklicznej grupie jest potwierdzany.** Szkielet może odczytać import, którego nie ma: linię wewnątrz wieloliniowego napisu albo wewnątrz nawiasów, których zepsuty plik nigdy nie zamyka, a jedna taka krawędź może połączyć dwie grupy w jedną. Plik z krawędzią wewnątrz cyklicznej grupy jest skanowany do swojego ostatniego importu (napisy, komentarze, nawiasy, kontynuacje ukośnikiem wstecznym); jeśli linia wyglądająca na import zaczyna się poza instrukcją, plik jest parsowany w całości, a wyszukiwanie rusza od nowa, aż każda grupa opiera się na importach, które znalazłoby pełne parsowanie.
 - **`cycles` wybiera rodzaje**, domyślnie `["contexts"]`: cykle między kontekstami to pytanie architektoniczne, dla którego konteksty istnieją, a cykle modułów przy aktualizacji wywróciłyby wiele istniejących projektów. `"modules"` je dodaje; `[]` wyłącza regułę.
 - **Nie da się go wyciszyć w linii.** Sprawdzenie jednego pliku nie wie, czy wyciszony cykl nadal istnieje, a komentarz siedziałby przy jednym imporcie z wielu. Cykle, które projekt już ma, przyjmuje baseline.
 
 **Konsekwencje.**
 
-- :material-plus-circle-outline: Na syntetycznym repozytorium (2100 plików) szukanie cykli dodaje 30 do 60 ms do sprawdzenia całego projektu: krawędzie powstają ze zbioru nazw modułów, a żaden plik nie wymagał potwierdzenia. Znalazło cztery cykle, które generator tworzy, importując losowe moduły w każdej warstwie.
+- :material-plus-circle-outline: Na syntetycznym repozytorium (2100 plików) szukanie cykli dodaje od 50 do 110 ms do sprawdzenia całego projektu, zmierzone przy średnim obciążeniu około 2,5: krawędzie powstają ze zbioru nazw modułów, a żaden plik nie wymagał potwierdzającego parsowania. Znalazło cztery cykle, które generator tworzy, importując losowe moduły w każdej warstwie. Przy tym obciążeniu całe zimne sprawdzenie przekraczało budżet 1 s z szukaniem i bez niego (mediany 1,42 i 1,30 s).
 - :material-plus-circle-outline: Cykl między kontekstami jest wykrywany nawet wtedy, gdy `depends-on` pozwala na oba kierunki.
 - :material-minus-circle-outline: Edytor i hook po edycji nie pokazują cykli; bramka Stop pokazuje je tylko w trybie projektu.
 - :material-minus-circle-outline: Import podmodułu uruchamia też `__init__` jego pakietu; ten niejawny krok nie jest krawędzią, więc cykl, który zamyka się tylko przez `__init__`, nie jest wykrywany.

@@ -85,3 +85,29 @@ test("a node outside every cycle has none", () => {
   ]);
   expect(shortestCycle(graph, ["x"], "x")).toBeUndefined();
 });
+
+test("a finished component isn't pulled into a later one", () => {
+  // c -> a reaches a component that is already complete; without the on-stack check it would merge.
+  const graph = graphOf([
+    ["a", "b"],
+    ["b", "a"],
+    ["c", "d"],
+    ["d", "c"],
+    ["c", "a"],
+  ]);
+  expect(cyclicComponents(graph)).toEqual([
+    ["a", "b"],
+    ["c", "d"],
+  ]);
+});
+
+test("ties go to the first successor in sorted order, whatever the insertion order", () => {
+  const graph = graphOf([
+    ["a", "c"],
+    ["a", "b"],
+    ["b", "a"],
+    ["c", "a"],
+  ]);
+  const [component = []] = cyclicComponents(graph);
+  expect(shortestCycle(graph, component, "a")).toEqual(["a", "b", "a"]);
+});

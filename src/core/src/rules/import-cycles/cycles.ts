@@ -28,13 +28,17 @@ export interface Edge {
   ref: ImportRef;
 }
 
-/** A cycle to report: its kind, its path, and the import behind each step. */
+/** A cycle to report: its kind, its path, the import behind each step, and its group. */
 export interface Cycle {
   kind: CycleMode;
   /** The nodes, first one repeated at the end: `[a, b, a]`. */
   path: string[];
   /** The import that makes each step, in path order. */
   steps: Edge[];
+  /** Every node of the strongly connected group the cycle runs through. */
+  members: string[];
+  /** Every import between two nodes of the group. */
+  inside: Edge[];
 }
 
 /**
@@ -85,10 +89,14 @@ export function cycleDiagnostic(cycle: Cycle): Diagnostic | undefined {
     return undefined;
   }
   const path = cycle.path.join(" -> ");
+  // The group's size is part of the message, so a baseline taken before it grew stops matching.
+  const links = new Set(cycle.inside.map((edge) => `${edge.from}\u0000${edge.to}`)).size;
+  const noun = cycle.kind === "modules" ? "modules" : "contexts";
+  const group = `The group holds ${cycle.members.length} ${noun} and ${links} links between them.`;
   const message =
     cycle.kind === "modules"
-      ? `Modules import each other in a cycle: ${path}.`
-      : `Contexts import each other in a cycle: ${path}.`;
+      ? `Modules import each other in a cycle: ${path}. ${group}`
+      : `Contexts import each other in a cycle: ${path}. ${group}`;
   return diagnostic(RULES.INW004, first.file, {
     span: first.ref,
     message,
@@ -169,7 +177,17 @@ function cyclesOf(kind: CycleMode, edges: readonly Edge[]): Cycle[] {
     }
   }
   const frozen: Graph = graph;
-  return cyclicComponents(frozen).flatMap((component): Cycle[] => {
+  const components = cyclicComponents(frozen);
+  // One pass over the edges: each edge between two nodes of one group belongs to it.
+  const groupOf = new Map(components.flatMap((nodes, g) => nodes.map((node) => [node, g])));
+  const inside = components.map((): Edge[] => []);
+  for (const edge of edges) {
+    const g = groupOf.get(edge.from);
+    if (g !== undefined && g === groupOf.get(edge.to)) {
+      inside[g]?.push(edge);
+    }
+  }
+  return components.flatMap((component, g): Cycle[] => {
     const [start] = component;
     const path = start === undefined ? undefined : shortestCycle(frozen, component, start);
     if (path === undefined) {
@@ -179,7 +197,7 @@ function cyclesOf(kind: CycleMode, edges: readonly Edge[]): Cycle[] {
       const edge = first.get(`${path[i] ?? ""}\u0000${to}`);
       return edge === undefined ? [] : [edge];
     });
-    return [{ kind, path, steps }];
+    return [{ kind, path, steps, members: component, inside: inside[g] ?? [] }];
   });
 }
 

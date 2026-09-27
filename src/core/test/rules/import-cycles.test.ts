@@ -35,6 +35,10 @@ const PROJECT = indexOn(
       "shop/domain/orders/order.py",
       "shop/domain/orders/line.py",
       "shop/domain/orders/total.py",
+      "shop/domain/orders/a.py",
+      "shop/domain/orders/b.py",
+      "shop/domain/orders/c.py",
+      "shop/domain/orders/d.py",
       "shop/domain/billing/invoice.py",
       "shop/app/orders/place.py",
       "shop/app/billing/charge.py",
@@ -79,7 +83,7 @@ describe("module cycles", () => {
       [
         "shop/domain/orders/line.py",
         1,
-        "Modules import each other in a cycle: shop.domain.orders.line -> shop.domain.orders.total -> shop.domain.orders.order -> shop.domain.orders.line.",
+        "Modules import each other in a cycle: shop.domain.orders.line -> shop.domain.orders.total -> shop.domain.orders.order -> shop.domain.orders.line. The group holds 3 modules and 3 links between them.",
       ],
     ]);
     expect(found[0]?.fix.steps[0]).toContain(
@@ -126,7 +130,7 @@ describe("context cycles", () => {
     expect(found.map((d) => [d.file, d.message])).toEqual([
       [
         "shop/app/billing/charge.py",
-        "Contexts import each other in a cycle: billing -> orders -> billing.",
+        "Contexts import each other in a cycle: billing -> orders -> billing. The group holds 2 contexts and 2 links between them.",
       ],
     ]);
     expect(found[0]?.fix.steps.at(-1)).toContain("Don't edit [tool.inwards] yourself.");
@@ -147,5 +151,63 @@ describe("context cycles", () => {
       "Modules import each other in a cycle",
       "Contexts import each other in a cycle",
     ]);
+  });
+});
+
+describe("what the report stands on", () => {
+  const Modules = `${LAYERS}cycles = ["modules"]\n`;
+
+  test("an import in a string can't join two groups into one", async () => {
+    // Real: a <-> b, b -> c, c <-> d. The string in d only looks like an import of a.
+    const files = {
+      "shop/domain/orders/a.py": "import shop.domain.orders.b\n",
+      "shop/domain/orders/b.py": "import shop.domain.orders.a\nimport shop.domain.orders.c\n",
+      "shop/domain/orders/c.py": "import shop.domain.orders.d\n",
+      "shop/domain/orders/d.py":
+        'import shop.domain.orders.c\nNOTE = """\nimport shop.domain.orders.a\n"""\n',
+    };
+    const found = await cycles(Modules, files);
+    expect(found.map((d) => d.message.split(":")[1]?.split(".")[0])).toHaveLength(2);
+  });
+
+  test("an import inside brackets a malformed file never closes makes no cycle", async () => {
+    const files = {
+      "shop/domain/orders/order.py": "items = (\nimport shop.domain.orders.line\n)\n",
+      "shop/domain/orders/line.py": "import shop.domain.orders.order\n",
+    };
+    expect(await cycles(Modules, files)).toEqual([]);
+  });
+
+  test("a module and its stub are one node", async () => {
+    const files = {
+      "shop/domain/orders/order.py": "X = 1\n",
+      "shop/domain/orders/order.pyi": "from shop.domain.orders.line import Line\n",
+      "shop/domain/orders/line.py": "import shop.domain.orders.order\n",
+    };
+    expect(await cycles(Modules, files)).toHaveLength(1);
+  });
+
+  test("a group that grows gets a new message, so a baseline can't hide the new cycle", async () => {
+    const two = {
+      "shop/domain/orders/a.py": "import shop.domain.orders.b\n",
+      "shop/domain/orders/b.py": "import shop.domain.orders.a\n",
+    };
+    const three = {
+      ...two,
+      "shop/domain/orders/b.py": "import shop.domain.orders.a\nimport shop.domain.orders.c\n",
+      "shop/domain/orders/c.py": "import shop.domain.orders.b\n",
+    };
+    const [before] = await cycles(Modules, two);
+    const [after] = await cycles(Modules, three);
+    expect(before?.message).toContain("2 modules and 2 links");
+    expect(after?.message).toContain("3 modules and 4 links");
+    expect(after?.message).not.toBe(before?.message);
+  });
+
+  test("an inline suppression of INW004 is itself an INW009 error", async () => {
+    const engine = await Engine.create(grammars(), parseConfig(Modules));
+    const text = 'import shop.domain.orders.order  # inwards: ignore[INW004] reason="x"\n';
+    const found = engine.check([file("shop/domain/orders/line.py", text)], PROJECT).diagnostics;
+    expect(found.map((d) => [d.code, d.severity])).toContainEqual(["INW009", "error"]);
   });
 });

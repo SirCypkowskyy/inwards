@@ -39,7 +39,7 @@ import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
 import { checkUnassignedImports, unassignedWarning } from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
-import { type Collected, projectCycles, skeletonIsExact } from "./cycles.ts";
+import { type Collected, projectCycles } from "./cycles.ts";
 import { Extractor } from "./extraction.ts";
 import { type Checked, type Confirmed, keptOnce, ordered, type Scan } from "./stages.ts";
 
@@ -405,8 +405,7 @@ export class Engine {
       const confirmed = this.confirm(src, scan, project, skip);
       const imports = confirmed.imports ?? scan.imports;
       if (imports !== undefined) {
-        const exact = confirmed.imports !== undefined || skeletonIsExact(src.text);
-        collected.push({ file: src, imports, exact });
+        collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
       }
       const own = this.suppressIn(src, confirmed);
       suppressed.push(...own.suppressed);
