@@ -16,7 +16,7 @@
  *
  * Run by CI and `bun run check:cycles`. Exit 0 when there is none, 1 otherwise.
  */
-import { readdirSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
 import { type Node, SyntaxKind } from "typescript/unstable/ast";
@@ -87,26 +87,37 @@ function collect(node: Node, found: Node[]): void {
 }
 
 /**
- * Tells whether a path lies below a directory. TypeScript reports paths with
- * forward slashes on every OS (`C:/repo/src/a.ts`), while `node:path` builds
- * Windows paths with backslashes, so both sides are compared in one spelling.
+ * Tells whether a path lies below a directory, both spelled as `pathKey`
+ * spells them.
  *
  * @param path - an absolute file path, either separator.
  * @param dir - an absolute directory path, either separator.
  * @returns true when the path is inside the directory.
  */
 export function isInside(path: string, dir: string): boolean {
-  return slashed(path).startsWith(`${slashed(dir).replace(TRAILING_SLASH, "")}/`);
+  return pathKey(path).startsWith(`${pathKey(dir).replace(TRAILING_SLASH, "")}/`);
 }
 
 /**
- * Spells a path with forward slashes only.
+ * Spells a path the one way every source agrees on. TypeScript reports its
+ * canonical paths with forward slashes on every OS, through symlinks
+ * (`/private/var` for macOS's `/var`) and lower-cased where the file system
+ * ignores case (macOS, Windows), while its list of source files and
+ * `node:path` keep the spelling they were given. Resolving links, using `/`
+ * and lower-casing makes the two meet; two files differing only in case
+ * would collide, which no package here has.
  *
- * @param path - a path with `/` or `\\` separators.
- * @returns the same path with `/` separators.
+ * @param path - an absolute path, either separator; it need not exist.
+ * @returns the path's comparison key.
  */
-function slashed(path: string): string {
-  return path.replaceAll("\\", "/");
+export function pathKey(path: string): string {
+  let real = path;
+  try {
+    real = realpathSync.native(path);
+  } catch {
+    // not there (a test's made-up path): compare it as written
+  }
+  return real.replaceAll("\\", "/").toLowerCase();
 }
 
 /**
@@ -129,6 +140,8 @@ export async function importGraph(tsconfig: string, dir: string): Promise<Import
     const names = (await project.program.getSourceFileNames()).filter(
       (name) => isInside(name, dir) && !name.endsWith(".d.ts"),
     );
+    // A resolved target is matched to a listed file by key, not by spelling.
+    const byKey = new Map(names.map((name) => [pathKey(name), name]));
     const edges = await Promise.all(
       names.map(async (name): Promise<[string, string[]]> => {
         const file = await project.program.getSourceFile(name);
@@ -136,8 +149,8 @@ export async function importGraph(tsconfig: string, dir: string): Promise<Import
         const symbols = nodes.length === 0 ? [] : await project.checker.getSymbolAtLocation(nodes);
         const targets = symbols
           .flatMap((symbol) => symbol?.declarations ?? [])
-          .map((declaration) => declaration.path)
-          .filter((path) => isInside(path, dir) && path !== name);
+          .flatMap((declaration) => byKey.get(pathKey(declaration.path)) ?? [])
+          .filter((target) => target !== name);
         return [name, [...new Set(targets)]];
       }),
     );

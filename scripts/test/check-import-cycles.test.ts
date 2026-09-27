@@ -8,7 +8,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { cycles, importGraph, isInside } from "../check-import-cycles.ts";
+import { cycles, importGraph, isInside, pathKey } from "../check-import-cycles.ts";
 
 const TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -46,7 +46,9 @@ async function cyclesIn(files: Record<string, string>): Promise<string[][]> {
   }
   const src = join(root, "src");
   const graph = await importGraph(join(root, "tsconfig.json"), src);
-  return cycles(graph).map((group) => group.map((file) => file.slice(src.length + 1)));
+  // TypeScript may spell src through a symlink or in lower case (macOS, Windows).
+  const prefix = `${pathKey(src)}/`;
+  return cycles(graph).map((group) => group.map((file) => pathKey(file).slice(prefix.length)));
 }
 
 test("type-only imports without an extension form a cycle", async () => {
@@ -80,6 +82,11 @@ test("index modules and import() types resolve like the compiler resolves them",
     "pkg/index.ts": 'import type { A } from "../a.ts";\nexport type P = { a: A };\n',
   });
   expect(found).toEqual([["a.ts", "pkg/index.ts"]]);
+});
+
+test("containment ignores case, as TypeScript lower-cases paths on macOS and Windows", () => {
+  expect(isInside("c:/repo/src/cli/src/a.ts", "C:\\Repo\\src\\cli\\src")).toBe(true);
+  expect(isInside("/users/runner/work/src/a.ts", "/Users/runner/work/src")).toBe(true);
 });
 
 test("containment holds across separators, as TypeScript reports paths on Windows", () => {
