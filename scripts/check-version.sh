@@ -15,7 +15,7 @@ check() {
     bad=1
   fi
 }
-check src/core/src/meta.ts "$(sed -nE 's/^export const VERSION = "([^"]*)";$/\1/p' src/core/src/meta.ts)"
+check src/core/src/meta/product.ts "$(sed -nE 's/^export const VERSION = "([^"]*)";$/\1/p' src/core/src/meta/product.ts)"
 for f in src/core/package.json src/cli/package.json src/vscode-extension/package.json; do
   check "$f" "$(jq -r .version "$f")"
 done

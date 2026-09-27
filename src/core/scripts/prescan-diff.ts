@@ -18,11 +18,14 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 import { Glob } from "bun";
 import type { Parser } from "web-tree-sitter";
-import { extractDynamicImports, mentionsDynamicImport } from "../src/dynamic.ts";
-import { moduleNameFor } from "../src/module-names.ts";
-import { skeletonImports } from "../src/prescan.ts";
-import { createPythonParser, extractImports, normalizeSource } from "../src/python.ts";
-import type { ImportRef } from "../src/types.ts";
+import type { ImportRef } from "../src/contracts/records.ts";
+import { moduleNameFor } from "../src/python/module-names.ts";
+import { createPythonParser, extractImports, normalizeSource } from "../src/python/parser.ts";
+import { skeletonImports } from "../src/python/prescan.ts";
+import {
+  extractDynamicImports,
+  mentionsDynamicImport,
+} from "../src/rules/dynamic-import/imports.ts";
 
 /**
  * Reads a WASM file from an installed package.
