@@ -188,7 +188,7 @@ bun x biome ci .        # lint + format, every rule group at error
 bun run lint:docs       # oxlint + eslint-plugin-jsdoc: TSDoc on every function
 bun run typecheck       # tsc (TypeScript 7), strictest flags (tsconfig.base.json)
 bun run fallow          # dead code, unused deps, boundaries, zero clone groups
-bun run check:cycles    # no import cycles, type-only imports included
+bun run check:cycles    # no import cycles, type-only imports included (tsgo's own parse)
 bun run check:overviews # every module's @file overview is 2+ sentences (src/cli so far)
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
@@ -400,8 +400,12 @@ done until both match the code.
   filesystem, git, the environment, the clock and the streams through
   `src/cli/src/platform/contracts.ts`; `src/cli/src/adapters/` implements
   them and only `main.ts` (through `adapters/compose.ts`) wires them in.
-  Biome refuses `node:fs`, `node:child_process`, `node:os`, `process` and
-  `Bun` in those folders, and fallow's zones refuse imports of `adapters/`.
+  Biome refuses `node:fs`, `node:child_process`, `node:os`, the network
+  modules, `process`, `Bun` and `fetch` in those folders, and a GritQL plugin
+  (`biome-plugins/no-direct-clock.grit`) refuses `Date.now()`, `new Date()`
+  and `performance.now()`. fallow's zones refuse imports of `adapters/`.
+  Relative paths from the command line resolve against `Runtime.cwd`, never
+  the process's own working directory.
   Mutable state lives in objects made per invocation (`createStartLookups`,
   `createRunLog`), never in module globals.
 - Machine output (JSON, SARIF, hook stderr) goes through

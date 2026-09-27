@@ -10,6 +10,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   copyFileSync,
+  cpSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -18,8 +20,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
-import { nodePlatform } from "../../src/adapters/compose.ts";
+import { compose, nodePlatform } from "../../src/adapters/compose.ts";
+import { baselineCommand } from "../../src/commands/baseline.ts";
+import { checkCommand } from "../../src/commands/check.ts";
+import type { AppDeps } from "../../src/commands/deps.ts";
+import { statsCommand } from "../../src/commands/stats.ts";
 import { createRunLog } from "../../src/runlog/record.ts";
 import { createStartIdentity } from "../../src/session/start-identity.ts";
 import { project } from "../support/run.ts";
@@ -81,6 +88,7 @@ const FINDING: Diagnostic = {
 function lintAs(path: string, text: string): { code: number | null; out: string } {
   const root = tempDir("inwards-arch-");
   copyFileSync(join(REPO, "biome.jsonc"), join(root, "biome.jsonc"));
+  cpSync(join(REPO, "biome-plugins"), join(root, "biome-plugins"), { recursive: true });
   mkdirSync(dirname(join(root, path)), { recursive: true });
   writeFileSync(join(root, path), text);
   const run = Bun.spawnSync(
@@ -126,6 +134,64 @@ describe("invocation state", () => {
   });
 });
 
+/**
+ * Builds an invocation whose working directory is a project the process isn't in.
+ *
+ * @param cwd - the injected working directory.
+ * @returns the dependencies, with stdout and stderr collected in `out`.
+ */
+function invocationIn(cwd: string): { deps: AppDeps; out: string[] } {
+  const base = compose();
+  const out: string[] = [];
+  const streams = {
+    ...base.io.streams,
+    out: (t: string): void => {
+      out.push(t);
+    },
+    err: (t: string): void => {
+      out.push(t);
+    },
+  };
+  const io = { ...base.io, runtime: { ...base.io.runtime, cwd, stdoutIsTTY: false }, streams };
+  return { deps: { ...base, io }, out };
+}
+
+describe("the injected working directory", () => {
+  const files = {
+    "pyproject.toml":
+      '[tool.inwards]\nrun-log = true\nlayers = [\n  { name = "domain", modules = ["shop.domain"] },\n  { name = "infrastructure", modules = ["shop.infrastructure"] },\n]\n',
+    "shop/__init__.py": "",
+    "shop/domain/__init__.py": "",
+    "shop/domain/order.py": "import shop.infrastructure.db\n",
+    "shop/infrastructure/__init__.py": "",
+    "shop/infrastructure/db.py": "X = 1\n",
+  };
+
+  test("relative --config and paths are taken from it, not from the process", async () => {
+    const root = project(files);
+    expect(process.cwd()).not.toBe(root);
+    const { deps, out } = invocationIn(root);
+    const code = await checkCommand(
+      deps,
+      ["shop/domain/order.py"],
+      { format: "json", config: "pyproject.toml" },
+      false,
+    );
+    expect(code).toBe(1);
+    const report: { summary: { filesChecked: number } } = JSON.parse(out.join(""));
+    expect(report.summary.filesChecked).toBe(1);
+  });
+
+  test("baseline and stats --export write under it", async () => {
+    const root = project(files);
+    const { deps } = invocationIn(root);
+    expect(await baselineCommand(deps, "pyproject.toml")).toBe(0);
+    expect(existsSync(join(root, "inwards-baseline.json"))).toBe(true);
+    expect(statsCommand(deps, "text", ".", { export: "runs-export.jsonl" })).toBe(0);
+    expect(existsSync(join(root, "runs-export.jsonl"))).toBe(true);
+  });
+});
+
 describe("boundaries", () => {
   test("a policy folder can't import node:fs or use the process global", () => {
     for (const folder of ["session", "claude-code", "project"]) {
@@ -142,6 +208,36 @@ describe("boundaries", () => {
       expect(global.code).not.toBe(0);
       expect(global.out).toContain("noRestrictedGlobals");
     }
+  });
+
+  test("a policy folder can't reach the network or read the clock itself", () => {
+    const probes: [string, string][] = [
+      [
+        'import { get } from "node:https";\n\n/** Fetches. */\nexport const fetchIt = get;\n',
+        "noRestrictedImports",
+      ],
+      [
+        '/** Fetches. */\nexport const load = (): Promise<Response> => fetch("https://x");\n',
+        "noRestrictedGlobals",
+      ],
+      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
+    ];
+    for (const [text, rule] of probes) {
+      const result = lintAs("src/cli/src/session/probe.ts", text);
+      expect(result.code).not.toBe(0);
+      expect(result.out).toContain(rule);
+    }
+    const parse = lintAs(
+      "src/cli/src/session/probe.ts",
+      "/** Parses. */\nexport const at = (s: string): number => Date.parse(s);\n",
+    );
+    expect(parse.out).not.toContain("Clock contract");
+    const adapter = lintAs(
+      "src/cli/src/adapters/probe.ts",
+      "/** Stamps. */\nexport const now = (): number => Date.now();\n",
+    );
+    expect(adapter.out).not.toContain("Clock contract");
   });
 
   test("an adapter may import node:fs", () => {

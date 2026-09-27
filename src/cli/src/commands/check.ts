@@ -72,12 +72,12 @@ export async function checkCommand(
   }
 
   const { cwd } = io.runtime;
-  const configPath = config ? resolve(config) : findConfig(io, cwd);
+  const configPath = config ? resolve(cwd, config) : findConfig(io, cwd);
   if (!configPath) {
     return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
   }
 
-  const targets = paths.length > 0 ? paths.map((p) => resolve(p)) : undefined;
+  const targets = paths.length > 0 ? paths.map((p) => resolve(cwd, p)) : undefined;
   const report = await deps.check(configPath, targets, cwd, {});
 
   // Agents and hooks read a pipe, and indentation there is wasted tokens.

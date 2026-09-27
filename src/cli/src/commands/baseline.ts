@@ -22,7 +22,7 @@ import type { AppDeps } from "./deps.ts";
  */
 export async function baselineCommand(deps: AppDeps, config: string | undefined): Promise<number> {
   const { io } = deps;
-  const configPath = config ? resolve(config) : findConfig(io, io.runtime.cwd);
+  const configPath = config ? resolve(io.runtime.cwd, config) : findConfig(io, io.runtime.cwd);
   if (!configPath) {
     return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
   }

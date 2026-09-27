@@ -4,7 +4,7 @@
  * With `--export` it writes the merged log instead, optionally redacted;
  * everything it touches comes in as `AppDeps`.
  */
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { projectConfigs } from "../project/snapshot.ts";
@@ -54,7 +54,7 @@ export function statsCommand(
     (io.runtime.claudeProjectDir ||
       io.git.run(cwd, ["rev-parse", "--show-toplevel"])?.trim() ||
       projectRoot(io, cwd));
-  const project = io.probe.realpath(root);
+  const project = io.probe.realpath(resolve(cwd, root));
   if (!project) {
     return print(io.streams, `No such directory: ${root}`, 2);
   }

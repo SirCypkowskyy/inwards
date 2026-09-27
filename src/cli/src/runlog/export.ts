@@ -18,7 +18,7 @@
 import { createHmac } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { ConfigError } from "@inwards/core";
-import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
 import type { ExportFiles } from "./contracts.ts";
 import { parseLine, type RunLine } from "./runs.ts";
 
@@ -29,6 +29,8 @@ const HASH_LENGTH = 16;
 /** What an export touches. */
 export interface ExportIo {
   probe: Pick<PathProbe, "realpath">;
+  /** Resolves a relative `out` against the invocation's working directory. */
+  runtime: Pick<Runtime, "cwd">;
   read: Pick<FileReader, "text">;
   exports: ExportFiles;
 }
@@ -39,7 +41,8 @@ export interface ExportIo {
  *
  * @param io - reads the logs, resolves paths, and keeps the key and the output.
  * @param dirs - directories that may hold `.inwards/` logs (see `logDirs`).
- * @param out - the file to write.
+ * @param out - the file to write, as the user named it; a relative path is
+ *   taken from the invocation's working directory.
  * @param redact - with the project root: replace paths and fingerprints with keyed hashes.
  * @param redact.project - the project root, where the key lives.
  * @returns how many lines were written.
@@ -54,7 +57,8 @@ export function exportRunLogs(
   const logs = [...new Set(dirs)].flatMap((dir) =>
     ["runs.1.jsonl", "runs.jsonl"].map((name) => join(dir, ".inwards", name)),
   );
-  const target = io.probe.realpath(resolve(out)) ?? resolve(out);
+  const path = resolve(io.runtime.cwd, out);
+  const target = io.probe.realpath(path) ?? path;
   if (
     target.split(sep).includes(".inwards") ||
     logs.some((log) => io.probe.realpath(log) === target)
@@ -66,7 +70,7 @@ export function exportRunLogs(
     .flatMap((log) => readKnownLines(io, log))
     .sort((a, b) => Date.parse(String(a["at"])) - Date.parse(String(b["at"])))
     .map((line) => (hash ? redactLine(line, hash) : line));
-  io.exports.writeOwnerOnly(out, lines.map((line) => `${JSON.stringify(line)}\n`).join(""));
+  io.exports.writeOwnerOnly(path, lines.map((line) => `${JSON.stringify(line)}\n`).join(""));
   return lines.length;
 }
 

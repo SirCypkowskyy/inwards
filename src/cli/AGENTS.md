@@ -42,9 +42,15 @@ Enforced by:
   edges. A new folder falls into `cli-unzoned`, which may import nothing,
   until it gets a zone and rules.
 - **Biome** (`biome.jsonc`): the policy folders can't import `node:fs`,
-  `node:child_process`, `node:os` or `node:process`, nor use the `Bun` or
-  `process` globals. `node:path` and `node:crypto` are fine; they are pure.
-- **`bun run check:cycles`**: no import cycles, type imports included.
+  `node:child_process`, `node:os`, `node:process` or the network modules
+  (`node:http`, `node:https`, `node:net`, ...), nor use the `Bun`, `process`,
+  `fetch` or `performance` globals. The `no-direct-clock` GritQL plugin
+  rejects `Date.now()`, `new Date()` and `performance.now()`: take the time
+  from `Clock`. `node:path`, `node:crypto` and `Date.parse` are fine; they
+  are pure.
+- **`bun run check:cycles`**: no import cycles, type imports included. It
+  asks the pinned TypeScript (tsgo) for the syntax tree and the resolved
+  modules, so comments can't hide an edge and extensionless imports count.
 - **`test/integration/architecture.test.ts`**: probes all of the above by
   behaviour.
 
@@ -52,6 +58,11 @@ When a change seems to need a new edge, don't add it to the rules first.
 Move the shared piece down to the lower folder, or pass it in as a
 parameter. If the edge is really right, change the rule in its own commit
 and say why in the PR.
+
+A relative path from the command line (`--config`, check targets,
+`stats DIR`, `--export FILE`) is resolved against `Runtime.cwd`, never with a
+bare `resolve(p)`, which would read the process's working directory behind
+the contract's back.
 
 ## State lifetimes
 

@@ -3,52 +3,134 @@
  * type-only imports included. fallow reports runtime cycles already; this
  * catches the ones it doesn't: two modules that only share types through
  * each other still form a knot that makes neither understandable alone
- * (#176). It reads every `.ts` file under `src/<package>/src`, follows the
- * relative specifiers of `import`, `export ... from` and `import()`, and
- * prints each strongly connected group of more than one module.
+ * (#176). It prints each strongly connected group of more than one module.
+ *
+ * The imports come from TypeScript itself (the pinned compiler's
+ * `typescript/unstable/async` API, which runs tsgo): the syntax tree finds
+ * `import`, `export ... from`, `import x = require()`, `import()` calls and
+ * `import("...")` types, so comments and strings can't hide or invent an edge,
+ * and the checker resolves each specifier with the package's own tsconfig,
+ * so extensionless and `index` imports count too. The API is marked unstable;
+ * if a TypeScript upgrade changes it, this script fails loudly rather than
+ * passing.
  *
  * Run by CI and `bun run check:cycles`. Exit 0 when there is none, 1 otherwise.
  */
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, normalize, relative } from "node:path";
+import { readdirSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import process from "node:process";
+import { type Node, SyntaxKind } from "typescript/unstable/ast";
+import {
+  isCallExpression,
+  isExportDeclaration,
+  isExternalModuleReference,
+  isImportDeclaration,
+  isImportEqualsDeclaration,
+  isImportTypeNode,
+  isLiteralTypeNode,
+} from "typescript/unstable/ast/is";
+import { API } from "typescript/unstable/async";
 
 const ROOT = join(import.meta.dir, "..");
-const SPECIFIER = /(?:\bfrom|\bimport)\s*\(?\s*["'](?<spec>\.{1,2}\/[^"']+)["']/gu;
+
+/** Each module's imported modules, absolute paths. */
+export type ImportGraph = Map<string, string[]>;
 
 /**
- * Lists every TypeScript source file below a directory, declarations excluded.
+ * Picks the module specifier out of a node, if the node imports anything.
  *
- * @param dir - the directory to walk.
- * @returns absolute paths.
+ * @param node - any node of a source file's tree.
+ * @returns the specifier's string literal node, or undefined for other nodes.
  */
-function sources(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return entry.name === "node_modules" ? [] : sources(path);
-    }
-    return entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts") ? [path] : [];
-  });
+function specifierOf(node: Node): Node | undefined {
+  if (isImportDeclaration(node) || isExportDeclaration(node)) {
+    return node.moduleSpecifier;
+  }
+  if (isImportEqualsDeclaration(node) && isExternalModuleReference(node.moduleReference)) {
+    return node.moduleReference.expression;
+  }
+  if (isImportTypeNode(node) && isLiteralTypeNode(node.argument)) {
+    return node.argument.literal;
+  }
+  if (isCallExpression(node) && node.expression.kind === SyntaxKind.ImportKeyword) {
+    return node.arguments[0];
+  }
+  return undefined;
 }
 
 /**
- * Builds the import graph of the given files, keeping only edges to files in it.
+ * Collects the module specifiers of a source file, at any depth.
  *
- * @param files - absolute source paths.
- * @returns each file's imported files.
+ * @param file - the file's syntax tree.
+ * @returns the specifier nodes, in source order.
  */
-function graphOf(files: readonly string[]): Map<string, string[]> {
-  const known = new Set(files);
-  return new Map(
-    files.map((file) => {
-      const text = readFileSync(file, "utf8");
-      const targets = [...text.matchAll(SPECIFIER)]
-        .map((match) => normalize(join(dirname(file), match.groups?.["spec"] ?? "")))
-        .filter((target) => known.has(target));
-      return [file, [...new Set(targets)]];
-    }),
-  );
+function specifiers(file: Node): Node[] {
+  const found: Node[] = [];
+  collect(file, found);
+  return found;
+}
+
+/**
+ * Adds the module specifiers of a node and its descendants to a list.
+ *
+ * @param node - the subtree to search.
+ * @param found - the specifiers so far, appended to in source order.
+ */
+function collect(node: Node, found: Node[]): void {
+  const specifier = specifierOf(node);
+  if (specifier !== undefined) {
+    found.push(specifier);
+  }
+  node.forEachChild((child) => collect(child, found));
+}
+
+/**
+ * Tells whether a path lies below a directory.
+ *
+ * @param path - an absolute file path.
+ * @param dir - an absolute directory path.
+ * @returns true when the path is inside the directory.
+ */
+function isInside(path: string, dir: string): boolean {
+  return path.startsWith(`${dir}${sep}`);
+}
+
+/**
+ * Builds the import graph of one TypeScript project's source directory, as
+ * the compiler resolves it.
+ *
+ * @param tsconfig - absolute path of the project's tsconfig.json.
+ * @param dir - absolute path of the source directory whose modules count.
+ * @returns each module under `dir` with the modules under `dir` it imports.
+ * @throws {Error} when the compiler doesn't load the project.
+ */
+export async function importGraph(tsconfig: string, dir: string): Promise<ImportGraph> {
+  const api = new API({ cwd: ROOT });
+  try {
+    const snapshot = await api.updateSnapshot({ openProjects: [tsconfig] });
+    const project = snapshot.getProject(tsconfig) ?? snapshot.getProjects()[0];
+    if (project === undefined) {
+      throw new Error(`TypeScript did not load ${tsconfig}`);
+    }
+    const names = (await project.program.getSourceFileNames()).filter(
+      (name) => isInside(name, dir) && !name.endsWith(".d.ts"),
+    );
+    const edges = await Promise.all(
+      names.map(async (name): Promise<[string, string[]]> => {
+        const file = await project.program.getSourceFile(name);
+        const nodes = file === undefined ? [] : specifiers(file);
+        const symbols = nodes.length === 0 ? [] : await project.checker.getSymbolAtLocation(nodes);
+        const targets = symbols
+          .flatMap((symbol) => symbol?.declarations ?? [])
+          .map((declaration) => declaration.path)
+          .filter((path) => isInside(path, dir) && path !== name);
+        return [name, [...new Set(targets)]];
+      }),
+    );
+    return new Map(edges);
+  } finally {
+    await api.close();
+  }
 }
 
 /** Tarjan's bookkeeping for one walk of the graph. */
@@ -68,7 +150,7 @@ interface Walk {
  * @param graph - each node's successors.
  * @returns the cycles, each as its member files.
  */
-function cycles(graph: ReadonlyMap<string, readonly string[]>): string[][] {
+export function cycles(graph: ReadonlyMap<string, readonly string[]>): string[][] {
   const walk: Walk = {
     graph,
     index: new Map(),
@@ -143,14 +225,19 @@ function popGroup(walk: Walk, root: string): string[] {
   return group;
 }
 
-const packages = readdirSync(join(ROOT, "src"), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => join(ROOT, "src", entry.name, "src"));
-const knots = packages.flatMap((dir) => cycles(graphOf(sources(dir))));
-for (const knot of knots) {
-  process.stderr.write(
-    `import cycle (type imports included):\n  ${knot.map((f) => relative(ROOT, f)).join("\n  ")}\n`,
+if (import.meta.main) {
+  const packages = readdirSync(join(ROOT, "src"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(ROOT, "src", entry.name));
+  const graphs = await Promise.all(
+    packages.map((pkg) => importGraph(join(pkg, "tsconfig.json"), join(pkg, "src"))),
   );
+  const knots = graphs.flatMap((graph) => cycles(graph));
+  for (const knot of knots) {
+    process.stderr.write(
+      `import cycle (type imports included):\n  ${knot.map((f) => relative(ROOT, f)).join("\n  ")}\n`,
+    );
+  }
+  process.stdout.write(knots.length === 0 ? "No import cycles.\n" : "");
+  process.exitCode = knots.length === 0 ? 0 : 1;
 }
-process.stdout.write(knots.length === 0 ? "No import cycles.\n" : "");
-process.exitCode = knots.length === 0 ? 0 : 1;
