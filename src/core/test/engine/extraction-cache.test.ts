@@ -15,6 +15,7 @@ import {
   Engine,
   type ExtractionCache,
   type ExtractionIdentity,
+  type ProjectFiles,
   type ProjectIndex,
   parseConfig,
   type SourceFile,
@@ -130,6 +131,68 @@ describe("a cache never changes a result", () => {
     cache.writes = 0;
     await run(cache);
     expect(cache.writes).toBe(0);
+  });
+});
+
+/** Files on disk for the index tests: a package whose modules import each other. */
+const DISK = new Map<string, string>([
+  ["shop/__init__.py", ""],
+  ["shop/domain/__init__.py", "from . import order\n"],
+  ["shop/domain/order.py", "import shop.domain.pricing\n"],
+  ["shop/domain/pricing.py", "x = 1\n"],
+  ["shop/infrastructure/db.py", "from shop.domain import order, pricing\n"],
+  ["shop/infrastructure/weird.py", "x = (\nimport shop.domain.order\n"],
+]);
+
+/**
+ * The index test files as an adapter would give them.
+ *
+ * @returns a ProjectFiles over `DISK`, directories derived from the paths.
+ */
+function diskFiles(): ProjectFiles {
+  const dirs = new Set(
+    [...DISK.keys()].flatMap((p) =>
+      p
+        .split("/")
+        .slice(0, -1)
+        .map((_, i, a) => a.slice(0, i + 1).join("/")),
+    ),
+  );
+  return {
+    kind(rel: string): "file" | "dir" | undefined {
+      if (DISK.has(rel)) {
+        return "file";
+      }
+      return dirs.has(rel) ? "dir" : undefined;
+    },
+    list: (): string[] => [...DISK.keys()],
+    read: (rel: string): string => DISK.get(rel) ?? "",
+    listDir: (): undefined => undefined,
+  };
+}
+
+describe("the module index reads through the cache", () => {
+  test("importers agree with no cache, an empty cache and a warm one", async () => {
+    const cache = new CountingCache();
+    const modules = ["shop.domain.order", "shop.domain.pricing", "shop.domain"];
+    /**
+     * Lists who imports each module, through a fresh engine.
+     *
+     * @param store - the cache to give the engine, if any.
+     * @returns the importers of each module, sorted.
+     */
+    async function importers(store?: ExtractionCache): Promise<string[][]> {
+      const engine = await Engine.create(grammars(), CONFIG, store ? { cache: store } : {});
+      const index = engine.index(diskFiles());
+      return modules.map((m) => [...index.importersOf(m)].sort());
+    }
+    const none = await importers();
+    expect(await importers(cache)).toEqual(none);
+    expect(cache.writes).toBeGreaterThan(0);
+    cache.writes = 0;
+    expect(await importers(cache)).toEqual(none);
+    expect(cache.writes).toBe(0);
+    expect(none.flat().length).toBeGreaterThan(2);
   });
 });
 

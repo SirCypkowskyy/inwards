@@ -86,7 +86,7 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 
 ## Caching between runs
 
-`inwards check` and `inwards baseline` keep what they read out of each file (its imports and suppression comments) in `.inwards/cache`, next to the `pyproject.toml`. An entry is found by a hash of the file's content, its module name and the Inwards version's extraction rules, so an edited file is simply read again. On the 2,100-file benchmark repo a warm cache makes a full check about three times faster; the run that fills it is about a quarter slower. To keep the cache between workflow runs, restore it before **Check**:
+`inwards check` and `inwards baseline` keep what they read out of each file (its imports and suppression comments) in `.inwards/cache`, next to the `pyproject.toml`. An entry is found by a hash of the file's content, its module name and the Inwards version's extraction rules, so an edited file is simply read again. On the 2,100-file benchmark repo a warm cache made a full check 2.6 to 3 times faster; the run that fills it was a quarter to two thirds slower, depending on the filesystem. To keep the cache between workflow runs, restore it before **Check**:
 
 ```yaml
       - uses: actions/cache@v6
@@ -97,7 +97,7 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 ```
 
 - **The cache is trusted, not checked.** A cached check believes what an entry says a file imports. Anyone who can write `.inwards/cache` can make it miss a violation, and a pull request can commit a `.inwards/cache` of its own. Where the check is the gate for code you don't trust, run `inwards check --no-cache`, or set `INWARDS_NO_CACHE=1` for the job. The Claude Code hooks never read the cache, so this doesn't touch the agent loop ([ADR-031](../05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)).
-- **It stays small.** A run prunes each part of the cache it writes to: entries older than 30 days go, then the oldest ones until the part is under 512 KB. With 256 parts, that keeps the cache near 128 MB at most. An Inwards version with different extraction rules or grammars starts a new namespace (a new folder under `.inwards/cache`); the old one is no longer read and stays until you delete it.
+- **It stays small.** A run prunes each of the cache's 256 parts when it first writes there, and again whenever its own writes take the part past 512 KB: entries older than 30 days go, then the oldest ones until the part is under the limit. That keeps a namespace (one folder under `.inwards/cache`) near 128 MB at most. An Inwards version whose extraction rules changed gives every file a new key in the same namespace, so the old entries age out or are pushed out. A new cache format or new grammars start a new namespace; the old folder is no longer read and stays until you delete it.
 - **Nothing to configure.** Delete `.inwards/cache` whenever you like. `inwards init` already adds `.inwards/` to `.gitignore`.
 
 ## Code scanning availability

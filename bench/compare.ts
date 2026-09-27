@@ -233,7 +233,8 @@ function timeMode(head: string, repo: string, mode: (typeof MODES)[number]): num
     rmSync(old, { recursive: true, force: true });
     renameSync(cache, old);
   }
-  const env: Record<string, string> = mode === "none" ? { INWARDS_NO_CACHE: "1" } : {};
+  // Set either way: an INWARDS_NO_CACHE inherited from the shell would make every mode uncached.
+  const env = { INWARDS_NO_CACHE: mode === "none" ? "1" : "" };
   const elapsed = timeRun([head, "check"], repo, undefined, env);
   rmSync(old, { recursive: true, force: true });
   return elapsed;

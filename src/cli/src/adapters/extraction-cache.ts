@@ -11,19 +11,10 @@
  * through a uniquely named temporary file and a rename, so concurrent runs
  * never see half an entry; two runs may overwrite each other's additions,
  * which only costs a recomputation. Every failure falls back to no cache.
+ * The filesystem side, and what it guards against, is `extraction-store.ts`.
  */
 import { createHash, randomBytes } from "node:crypto";
-import {
-  lstatSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
 import { join } from "node:path";
-import process from "node:process";
 import type {
   CachedExtraction,
   ExtractionCache,
@@ -31,25 +22,54 @@ import type {
   GrammarBinaries,
 } from "@inwards/core";
 import { type Entry, isEntry } from "./extraction-entry.ts";
+import {
+  chainIntact,
+  isRealDirectory,
+  MAX_ENTRY_BYTES,
+  MAX_SHARD_BYTES,
+  prune,
+  publish,
+  readBounded,
+  safeDirs,
+} from "./extraction-store.ts";
 
 /** The on-disk format; bump it when the entry layout changes. */
 const FORMAT = "1";
-/** An entry bigger than this is neither written nor read. */
-export const MAX_ENTRY_BYTES = 262_144;
-/** A shard (one of 256 directories) is pruned to this many bytes, oldest entries first. */
-export const MAX_SHARD_BYTES = 524_288;
-/** Entries older than this are pruned, whether used or not. */
-export const MAX_AGE_MS = 2_592_000_000;
-/** A temporary file older than this belongs to no live writer. */
-const STALE_TEMP_MS = 3_600_000;
-/** An entry's file name: its key, 64 lowercase hex digits, and `.json`. */
-const ENTRY_NAME = /^[0-9a-f]{64}\.json$/u;
-/** Random bytes in a temporary file's name, on top of the process id. */
-const TEMP_NONCE_BYTES = 8;
 /** Characters of a key that name its shard directory. */
 const SHARD_LENGTH = 2;
 /** Characters of the grammar hash in the namespace's name. */
 const GRAMMAR_ID_LENGTH = 16;
+/** Random bytes that tell this run's temporary files from any other's. */
+const NONCE_BYTES = 6;
+
+/** What one run of the cache keeps between calls. */
+interface Run {
+  /** The project directory, where the chain of cache directories starts. */
+  project: string;
+  /** The directories from the project to the namespace, outermost first. */
+  chain: string[];
+  /** The namespace directory. */
+  namespace: string;
+  /** Names this run's temporary files. */
+  nonce: string;
+  /** Temporary files made so far. */
+  temps: number;
+  /** Shards already looked at: true for a real directory, false for anything else. */
+  shards: Map<string, boolean>;
+  /** Bytes of entries in each shard written to, as of its last prune plus this run's writes. */
+  sizes: Map<string, number>;
+  /** The last text hashed, so a lookup and the store that follows hash it once. */
+  lastText: string | undefined;
+  lastHash: string;
+}
+
+/** Where an identity's entry lives, and the text hash it must record. */
+interface Located {
+  key: string;
+  textHash: string;
+  shard: string;
+  path: string;
+}
 
 /**
  * Opens the cache for a project, or nothing when its directories can't be
@@ -64,15 +84,26 @@ export function fileExtractionCache(
   wasm: GrammarBinaries,
 ): ExtractionCache | undefined {
   const grammar = createHash("sha256").update(wasm.runtime).update(wasm.python).digest("hex");
-  const namespace = safeDirs(project, [
+  const chain = [
     ".inwards",
     "cache",
     `extraction-${FORMAT}-${grammar.slice(0, GRAMMAR_ID_LENGTH)}`,
-  ]);
+  ];
+  const namespace = safeDirs(project, chain);
   if (namespace === undefined) {
     return undefined;
   }
-  const run: Run = { namespace, shards: new Map(), pruned: new Set() };
+  const run: Run = {
+    project,
+    chain,
+    namespace,
+    nonce: randomBytes(NONCE_BYTES).toString("hex"),
+    temps: 0,
+    shards: new Map(),
+    sizes: new Map(),
+    lastText: undefined,
+    lastHash: "",
+  };
   return {
     get: (identity: ExtractionIdentity): CachedExtraction | undefined => readEntry(run, identity),
     set(identity: ExtractionIdentity, value: CachedExtraction): void {
@@ -81,39 +112,35 @@ export function fileExtractionCache(
   };
 }
 
-/** What one run of the cache remembers about its directories. */
-interface Run {
-  /** The cache's namespace directory, checked when the cache was opened. */
-  namespace: string;
-  /** Shards already looked at in this run: true for a real directory, false for anything else. */
-  shards: Map<string, boolean>;
-  /** Shards already pruned in this run. */
-  pruned: Set<string>;
-}
-
-/** Where an identity's entry lives, and the text hash it must record. */
-interface Located {
-  key: string;
-  textHash: string;
-  shard: string;
-  path: string;
-}
-
 /**
  * Names an identity's entry: a SHA-256 over the revision, module, package flag
- * and the text's own SHA-256, so the text is hashed once per lookup.
+ * and the text's own SHA-256.
  *
- * @param namespace - the cache's namespace directory.
+ * @param run - this run, which remembers the last text it hashed.
  * @param identity - the file and the extraction revision.
  * @returns the key, the text hash, the shard and the entry's path.
  */
-function locate(namespace: string, identity: ExtractionIdentity): Located {
-  const textHash = sha256(identity.text);
+function locate(run: Run, identity: ExtractionIdentity): Located {
+  if (run.lastText !== identity.text) {
+    run.lastText = identity.text;
+    run.lastHash = sha256(identity.text);
+  }
+  const textHash = run.lastHash;
   const key = sha256(
     JSON.stringify([identity.revision, identity.module, identity.isPackage, textHash]),
   );
-  const shard = join(namespace, key.slice(0, SHARD_LENGTH));
+  const shard = join(run.namespace, key.slice(0, SHARD_LENGTH));
   return { key, textHash, shard, path: join(shard, `${key}.json`) };
+}
+
+/**
+ * Hashes text.
+ *
+ * @param text - any text.
+ * @returns its SHA-256, 64 hex digits.
+ */
+function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
 }
 
 /**
@@ -130,28 +157,12 @@ function shardReady(run: Run, shard: string, create: boolean): boolean {
   if (known !== undefined) {
     return known;
   }
-  if (create) {
-    const ok = safeDirs(run.namespace, [shard.slice(run.namespace.length + 1)]) !== undefined;
-    run.shards.set(shard, ok);
-    return ok;
+  if (!(create || isRealDirectory(shard))) {
+    return false; // missing for now, or not a directory: a miss either way
   }
-  try {
-    const ok = lstatSync(shard).isDirectory(); // a symlinked shard could serve entries from anywhere
-    run.shards.set(shard, ok);
-    return ok;
-  } catch {
-    return false; // missing for now: a later write may create it
-  }
-}
-
-/**
- * Hashes text.
- *
- * @param text - any text.
- * @returns its SHA-256, 64 hex digits.
- */
-function sha256(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
+  const ok = safeDirs(run.namespace, [shard.slice(run.namespace.length + 1)]) !== undefined;
+  run.shards.set(shard, ok);
+  return ok;
 }
 
 /**
@@ -162,32 +173,30 @@ function sha256(text: string): string {
  * @returns the entry's components, or undefined.
  */
 function readEntry(run: Run, identity: ExtractionIdentity): CachedExtraction | undefined {
-  const at = locate(run.namespace, identity);
+  const at = locate(run, identity);
   if (!shardReady(run, at.shard, false)) {
     return undefined;
   }
+  const text = readBounded(at.path);
   try {
-    const stat = lstatSync(at.path);
-    if (!stat.isFile() || stat.size > MAX_ENTRY_BYTES) {
-      return undefined;
-    }
-    const entry: unknown = JSON.parse(readFileSync(at.path, "utf8"));
+    const entry: unknown = text === undefined ? undefined : JSON.parse(text);
     return isEntry(entry) && matches(entry, identity, at.textHash) ? entry.value : undefined;
   } catch {
-    return undefined; // missing, unreadable or malformed: a miss
+    return undefined; // malformed: a miss
   }
 }
 
 /**
- * Writes an entry through a temporary file and a rename, and prunes its
- * shard once per run. Failures are ignored: the check goes on without it.
+ * Writes an entry through a temporary file and a rename. A shard is pruned
+ * the first time a run writes to it and again whenever this run's writes
+ * take it past its byte limit. Failures are ignored: the check goes on.
  *
  * @param run - this run's memory of its directories.
  * @param identity - what the entry is for.
  * @param value - the components to store.
  */
 function writeEntry(run: Run, identity: ExtractionIdentity, value: CachedExtraction): void {
-  const at = locate(run.namespace, identity);
+  const at = locate(run, identity);
   const entry: Entry = {
     format: FORMAT,
     revision: identity.revision,
@@ -197,107 +206,39 @@ function writeEntry(run: Run, identity: ExtractionIdentity, value: CachedExtract
     value,
   };
   const text = JSON.stringify(entry);
-  if (Buffer.byteLength(text) > MAX_ENTRY_BYTES || !shardReady(run, at.shard, true)) {
+  const bytes = Buffer.byteLength(text);
+  if (bytes > MAX_ENTRY_BYTES || !shardReady(run, at.shard, true)) {
     return; // too big to cache, or nowhere safe to put it: the file is simply parsed each time
   }
-  const temp = join(
-    at.shard,
-    `.${at.key}.${process.pid}.${randomBytes(TEMP_NONCE_BYTES).toString("hex")}.tmp`,
-  );
-  try {
-    writeFileSync(temp, text, { flag: "wx" });
-    renameSync(temp, at.path);
-  } catch {
-    rmSync(temp, { force: true }); // a failed write leaves nothing behind
+  run.temps += 1;
+  const temp = join(at.shard, `.${at.key}.${run.nonce}.${run.temps}.tmp`);
+  if (!publish(temp, at.path, text)) {
+    return;
   }
-  if (!run.pruned.has(at.shard)) {
-    run.pruned.add(at.shard);
-    prune(at.shard);
+  const size = run.sizes.get(at.shard);
+  if (size === undefined || size + bytes > MAX_SHARD_BYTES) {
+    run.sizes.set(at.shard, pruneChecked(run, at.shard));
+  } else {
+    run.sizes.set(at.shard, size + bytes);
   }
 }
 
 /**
- * Keeps a shard small: stale temporary files and old entries go, then the
- * oldest entries until the shard is under its byte limit. Only regular files
- * with the expected names are touched, and every failure is ignored.
+ * Prunes a shard after checking again that no directory from the project
+ * down to it has become a link since the run looked.
  *
- * @param shard - one shard directory.
+ * @param run - this run's memory of its directories.
+ * @param shard - the shard directory.
+ * @returns the bytes of entries left, or `MAX_SHARD_BYTES` when the chain
+ *   changed, and then the run writes to the shard no more.
  */
-function prune(shard: string): void {
-  try {
-    const now = Date.now();
-    const entries: { path: string; size: number; mtime: number }[] = [];
-    for (const name of readdirSync(shard)) {
-      const path = join(shard, name);
-      const stat = lstatSync(path);
-      if (!stat.isFile()) {
-        continue;
-      }
-      if (name.endsWith(".tmp")) {
-        if (now - stat.mtimeMs > STALE_TEMP_MS) {
-          rmSync(path, { force: true });
-        }
-      } else if (ENTRY_NAME.test(name)) {
-        entries.push({ path, size: stat.size, mtime: stat.mtimeMs });
-      }
-    }
-    entries.sort((a, b) => a.mtime - b.mtime);
-    let total = entries.reduce((sum, e) => sum + e.size, 0);
-    for (const e of entries) {
-      if (now - e.mtime <= MAX_AGE_MS && total <= MAX_SHARD_BYTES) {
-        break;
-      }
-      rmSync(e.path, { force: true });
-      total -= e.size;
-    }
-  } catch {
-    // pruning is best effort
+function pruneChecked(run: Run, shard: string): number {
+  const parts = [...run.chain, shard.slice(run.namespace.length + 1)];
+  if (chainIntact(run.project, parts)) {
+    return prune(shard, Date.now());
   }
-}
-
-/**
- * Makes sure each directory of a chain is a real directory, creating the
- * missing ones, and refuses the chain when any level is a symlink or a file.
- * An existing directory is only looked at, never created again.
- *
- * @param base - an existing directory to start from.
- * @param parts - the directories below it, outermost first.
- * @returns the innermost directory, or undefined when the chain can't be used.
- */
-function safeDirs(base: string, parts: readonly string[]): string | undefined {
-  let dir = base;
-  for (const part of parts) {
-    dir = join(dir, part);
-    if (!realDirectory(dir)) {
-      return undefined;
-    }
-  }
-  return dir;
-}
-
-/**
- * Makes a directory unless something is there, then tells whether what is
- * there is a real directory (not a symlink, not a file).
- *
- * @param dir - a path inside the cache, one level below a checked directory.
- * @returns true for a real directory.
- */
-function realDirectory(dir: string): boolean {
-  try {
-    return lstatSync(dir).isDirectory();
-  } catch {
-    // nothing there yet: make it below
-  }
-  try {
-    mkdirSync(dir, { mode: 0o700 });
-  } catch {
-    // made by a concurrent run, or can't be made: the check below decides
-  }
-  try {
-    return lstatSync(dir).isDirectory();
-  } catch {
-    return false;
-  }
+  run.shards.set(shard, false);
+  return MAX_SHARD_BYTES;
 }
 
 /**

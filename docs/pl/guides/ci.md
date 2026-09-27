@@ -91,7 +91,7 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 
 ## Pamięć podręczna między uruchomieniami { #caching-between-runs }
 
-`inwards check` i `inwards baseline` trzymają to, co odczytały z każdego pliku (jego importy i komentarze wyciszające), w `.inwards/cache` obok `pyproject.toml`. Wpis jest odnajdywany po hashu treści pliku, nazwy modułu i reguł ekstrakcji danej wersji Inwards, więc zmieniony plik jest po prostu czytany od nowa. Na repozytorium benchmarku z 2100 plikami ciepła pamięć podręczna przyspiesza pełne sprawdzenie mniej więcej trzykrotnie; uruchomienie, które ją wypełnia, jest o mniej więcej ćwierć wolniejsze. Żeby zachować pamięć podręczną między uruchomieniami workflow, odtwórz ją przed krokiem **Check**:
+`inwards check` i `inwards baseline` trzymają to, co odczytały z każdego pliku (jego importy i komentarze wyciszające), w `.inwards/cache` obok `pyproject.toml`. Wpis jest odnajdywany po hashu treści pliku, nazwy modułu i reguł ekstrakcji danej wersji Inwards, więc zmieniony plik jest po prostu czytany od nowa. Na repozytorium benchmarku z 2100 plikami ciepła pamięć podręczna przyspieszyła pełne sprawdzenie od 2,6 do 3 razy; uruchomienie, które ją wypełnia, było wolniejsze o ćwierć do dwóch trzecich, zależnie od systemu plików. Żeby zachować pamięć podręczną między uruchomieniami workflow, odtwórz ją przed krokiem **Check**:
 
 ```yaml
       - uses: actions/cache@v6
@@ -102,7 +102,7 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 ```
 
 - **Pamięci podręcznej się ufa, nie sprawdza się jej.** Sprawdzenie z pamięcią podręczną wierzy w to, co wpis mówi o importach pliku. Każdy, kto może pisać do `.inwards/cache`, może sprawić, że przeoczy ono naruszenie, a pull request może zacommitować własne `.inwards/cache`. Tam, gdzie sprawdzenie jest bramką dla kodu, któremu nie ufasz, uruchamiaj `inwards check --no-cache` albo ustaw `INWARDS_NO_CACHE=1` dla zadania. Hooki Claude Code nigdy nie czytają pamięci podręcznej, więc pętli agenta to nie dotyczy ([ADR-031](../05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)).
-- **Pozostaje mała.** Uruchomienie przycina każdą część pamięci podręcznej, do której pisze: znikają wpisy starsze niż 30 dni, a potem najstarsze, aż część zmieści się w 512 KB. Przy 256 częściach pamięć podręczna ma najwyżej około 128 MB. Wersja Inwards z innymi regułami ekstrakcji albo gramatykami zaczyna nową przestrzeń nazw (nowy folder w `.inwards/cache`); starej nikt już nie czyta i zostaje, dopóki jej nie usuniesz.
+- **Pozostaje mała.** Uruchomienie przycina każdą z 256 części pamięci podręcznej przy pierwszym zapisie do niej i ponownie, gdy jego własne zapisy przekroczą w niej 512 KB: znikają wpisy starsze niż 30 dni, a potem najstarsze, aż część zmieści się w limicie. Dzięki temu przestrzeń nazw (jeden folder w `.inwards/cache`) ma najwyżej około 128 MB. Wersja Inwards ze zmienionymi regułami ekstrakcji daje każdemu plikowi nowy klucz w tej samej przestrzeni nazw, więc stare wpisy starzeją się albo są wypierane. Nowy format pamięci podręcznej albo nowe gramatyki zaczynają nową przestrzeń nazw; starego folderu nikt już nie czyta i zostaje, dopóki go nie usuniesz.
 - **Nic do konfigurowania.** `.inwards/cache` możesz usunąć, kiedy chcesz. `inwards init` już dodaje `.inwards/` do `.gitignore`.
 
 ## Dostępność code scanning { #code-scanning-availability }
