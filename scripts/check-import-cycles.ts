@@ -16,7 +16,7 @@
  *
  * Run by CI and `bun run check:cycles`. Exit 0 when there is none, 1 otherwise.
  */
-import { readdirSync, realpathSync } from "node:fs";
+import { readdirSync, realpathSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
 import { type Node, SyntaxKind } from "typescript/unstable/ast";
@@ -92,10 +92,11 @@ function collect(node: Node, found: Node[]): void {
  *
  * @param path - an absolute file path, either separator.
  * @param dir - an absolute directory path, either separator.
+ * @param fold - compare without case, for a file system that ignores it.
  * @returns true when the path is inside the directory.
  */
-export function isInside(path: string, dir: string): boolean {
-  return pathKey(path).startsWith(`${pathKey(dir).replace(TRAILING_SLASH, "")}/`);
+export function isInside(path: string, dir: string, fold: boolean): boolean {
+  return pathKey(path, fold).startsWith(`${pathKey(dir, fold).replace(TRAILING_SLASH, "")}/`);
 }
 
 /**
@@ -103,21 +104,67 @@ export function isInside(path: string, dir: string): boolean {
  * canonical paths with forward slashes on every OS, through symlinks
  * (`/private/var` for macOS's `/var`) and lower-cased where the file system
  * ignores case (macOS, Windows), while its list of source files and
- * `node:path` keep the spelling they were given. Resolving links, using `/`
- * and lower-casing makes the two meet; two files differing only in case
- * would collide, which no package here has.
+ * `node:path` keep the spelling they were given. Resolving links and using
+ * `/` makes the two meet; case is folded only where the file system ignores
+ * it (see `ignoresCase`), so `A.ts` and `a.ts` stay apart on Linux.
  *
  * @param path - an absolute path, either separator; it need not exist.
+ * @param fold - lower-case the key, for a file system that ignores case.
  * @returns the path's comparison key.
  */
-export function pathKey(path: string): string {
+export function pathKey(path: string, fold: boolean): string {
   let real = path;
   try {
     real = realpathSync.native(path);
   } catch {
-    // not there (a test's made-up path): compare it as written
+    // not on disk (a bundled lib file, a test's made-up path): as written
   }
-  return real.replaceAll("\\", "/").toLowerCase();
+  const slashed = real.replaceAll("\\", "/");
+  return fold ? slashed.toLowerCase() : slashed;
+}
+
+/**
+ * Tells whether the file system holding a directory ignores case, by asking
+ * whether the upper- and lower-case spellings of its path are one directory.
+ *
+ * @param dir - an existing absolute directory.
+ * @returns true when both spellings reach the same directory.
+ */
+export function ignoresCase(dir: string): boolean {
+  const upperCased = dir.toUpperCase();
+  const lowerCased = dir.toLowerCase();
+  if (upperCased === lowerCased) {
+    return false; // nothing to fold
+  }
+  try {
+    const a = statSync(upperCased);
+    const b = statSync(lowerCased);
+    return a.dev === b.dev && a.ino === b.ino;
+  } catch {
+    return false; // one spelling doesn't exist: case matters here
+  }
+}
+
+/**
+ * Indexes source files by key, refusing a file whose real path can't be read
+ * (it would silently drop out of the graph) and two files that share a key.
+ *
+ * @param names - the source files, as TypeScript lists them.
+ * @param fold - fold case, as `pathKey` does.
+ * @returns each key with its file.
+ * @throws {Error} when a file can't be resolved or two files share a key.
+ */
+export function indexByKey(names: readonly string[], fold: boolean): Map<string, string> {
+  const byKey = new Map<string, string>();
+  for (const name of names) {
+    const key = pathKey(realpathSync.native(name), fold);
+    const other = byKey.get(key);
+    if (other !== undefined) {
+      throw new Error(`${name} and ${other} are one file to this file system`);
+    }
+    byKey.set(key, name);
+  }
+  return byKey;
 }
 
 /**
@@ -127,7 +174,8 @@ export function pathKey(path: string): string {
  * @param tsconfig - absolute path of the project's tsconfig.json.
  * @param dir - absolute path of the source directory whose modules count.
  * @returns each module under `dir` with the modules under `dir` it imports.
- * @throws {Error} when the compiler doesn't load the project.
+ * @throws {Error} when the compiler doesn't load the project, or a source file
+ *   can't be resolved or shares its key with another (see `indexByKey`).
  */
 export async function importGraph(tsconfig: string, dir: string): Promise<ImportGraph> {
   const api = new API({ cwd: ROOT });
@@ -137,11 +185,12 @@ export async function importGraph(tsconfig: string, dir: string): Promise<Import
     if (project === undefined) {
       throw new Error(`TypeScript did not load ${tsconfig}`);
     }
+    const fold = ignoresCase(dir);
     const names = (await project.program.getSourceFileNames()).filter(
-      (name) => isInside(name, dir) && !name.endsWith(".d.ts"),
+      (name) => isInside(name, dir, fold) && !name.endsWith(".d.ts"),
     );
     // A resolved target is matched to a listed file by key, not by spelling.
-    const byKey = new Map(names.map((name) => [pathKey(name), name]));
+    const byKey = indexByKey(names, fold);
     const edges = await Promise.all(
       names.map(async (name): Promise<[string, string[]]> => {
         const file = await project.program.getSourceFile(name);
@@ -149,7 +198,7 @@ export async function importGraph(tsconfig: string, dir: string): Promise<Import
         const symbols = nodes.length === 0 ? [] : await project.checker.getSymbolAtLocation(nodes);
         const targets = symbols
           .flatMap((symbol) => symbol?.declarations ?? [])
-          .flatMap((declaration) => byKey.get(pathKey(declaration.path)) ?? [])
+          .flatMap((declaration) => byKey.get(pathKey(declaration.path, fold)) ?? [])
           .filter((target) => target !== name);
         return [name, [...new Set(targets)]];
       }),
