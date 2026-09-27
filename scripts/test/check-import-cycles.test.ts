@@ -8,7 +8,14 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { cycles, importGraph, isInside } from "../check-import-cycles.ts";
+import {
+  cycles,
+  ignoresCase,
+  importGraph,
+  indexByKey,
+  isInside,
+  pathKey,
+} from "../check-import-cycles.ts";
 
 const TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -46,7 +53,12 @@ async function cyclesIn(files: Record<string, string>): Promise<string[][]> {
   }
   const src = join(root, "src");
   const graph = await importGraph(join(root, "tsconfig.json"), src);
-  return cycles(graph).map((group) => group.map((file) => file.slice(src.length + 1)));
+  // TypeScript may spell src through a symlink or in lower case (macOS, Windows).
+  const fold = ignoresCase(src);
+  const prefix = `${pathKey(src, fold)}/`;
+  return cycles(graph).map((group) =>
+    group.map((file) => pathKey(file, fold).slice(prefix.length)),
+  );
 }
 
 test("type-only imports without an extension form a cycle", async () => {
@@ -82,9 +94,32 @@ test("index modules and import() types resolve like the compiler resolves them",
   expect(found).toEqual([["a.ts", "pkg/index.ts"]]);
 });
 
-test("containment holds across separators, as TypeScript reports paths on Windows", () => {
-  expect(isInside("C:/repo/src/cli/src/a.ts", "C:\\repo\\src\\cli\\src")).toBe(true);
-  expect(isInside("C:/repo/src/cli/srcx/a.ts", "C:\\repo\\src\\cli\\src")).toBe(false);
-  expect(isInside("/repo/src/a.ts", "/repo/src/")).toBe(true);
-  expect(isInside("/repo/src", "/repo/src")).toBe(false);
+test("containment folds case only when asked, as on macOS and Windows", () => {
+  expect(isInside("c:/repo/src/cli/src/a.ts", "C:\\Repo\\src\\cli\\src", true)).toBe(true);
+  expect(isInside("/users/runner/work/src/a.ts", "/Users/runner/work/src", true)).toBe(true);
+  expect(isInside("/users/runner/work/src/a.ts", "/Users/runner/work/src", false)).toBe(false);
+  expect(isInside("C:/repo/src/cli/src/a.ts", "C:\\repo\\src\\cli\\src", false)).toBe(true);
+  expect(isInside("C:/repo/src/cli/srcx/a.ts", "C:\\repo\\src\\cli\\src", false)).toBe(false);
+  expect(isInside("/repo/src/a.ts", "/repo/src/", false)).toBe(true);
+  expect(isInside("/repo/src", "/repo/src", false)).toBe(false);
+});
+
+test("files that differ only in case stay apart where case matters", async () => {
+  // Linux: A.ts and a.ts are two modules, so each pair is its own cycle.
+  const probe = mkdtempSync(join(tmpdir(), "inwards-case-"));
+  made.push(probe);
+  if (ignoresCase(probe)) {
+    return; // this file system can't hold both; nothing to check here
+  }
+  const found = await cyclesIn({
+    "A.ts": 'import type { B } from "./B.ts";\nexport type A = { b: B };\n',
+    "B.ts": 'import type { A } from "./A.ts";\nexport type B = { a: A };\n',
+    "a.ts": 'import type { b } from "./b.ts";\nexport type a = { b: b };\n',
+    "b.ts": "export type b = number;\n",
+  });
+  expect(found).toEqual([["A.ts", "B.ts"]]);
+});
+
+test("a source file that can't be resolved is an error, not a silent gap", () => {
+  expect(() => indexByKey(["/no/such/dir/a.ts"], false)).toThrow();
 });

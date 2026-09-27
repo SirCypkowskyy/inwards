@@ -99,12 +99,14 @@ function lintAs(path: string, text: string): { code: number | null; out: string 
 
 describe("invocation state", () => {
   test("two run logs in one process keep their own notes", () => {
-    const root = project({
+    const made = project({
       "pyproject.toml":
         '[tool.inwards]\nrun-log = true\nlayers = [{ name = "domain", modules = ["shop.domain"] }]\n',
       "shop/domain/order.py": "X = 1\n",
     });
     const io = nodePlatform();
+    // Callers hand the run log the project's real path; macOS's temp dir is a link.
+    const root = io.probe.realpath(made) ?? made;
     const first = createRunLog(io);
     const second = createRunLog(io);
     first.noteRun(root, [join(root, "shop/domain/order.py")], [FINDING]);
