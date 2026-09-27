@@ -8,7 +8,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { cycles, importGraph } from "../check-import-cycles.ts";
+import { cycles, importGraph, isInside } from "../check-import-cycles.ts";
 
 const TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -80,4 +80,11 @@ test("index modules and import() types resolve like the compiler resolves them",
     "pkg/index.ts": 'import type { A } from "../a.ts";\nexport type P = { a: A };\n',
   });
   expect(found).toEqual([["a.ts", "pkg/index.ts"]]);
+});
+
+test("containment holds across separators, as TypeScript reports paths on Windows", () => {
+  expect(isInside("C:/repo/src/cli/src/a.ts", "C:\\repo\\src\\cli\\src")).toBe(true);
+  expect(isInside("C:/repo/src/cli/srcx/a.ts", "C:\\repo\\src\\cli\\src")).toBe(false);
+  expect(isInside("/repo/src/a.ts", "/repo/src/")).toBe(true);
+  expect(isInside("/repo/src", "/repo/src")).toBe(false);
 });

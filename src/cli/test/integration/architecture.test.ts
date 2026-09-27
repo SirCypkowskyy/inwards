@@ -222,6 +222,19 @@ describe("boundaries", () => {
       ],
       ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "Clock contract"],
       ["/** Stamps. */\nexport const now = (): Date => new Date();\n", "Clock contract"],
+      ["/** Stamps. */\nexport const now = (): string => Date();\n", "Clock contract"],
+      [
+        'import { resolve4 } from "node:dns/promises";\n\n/** Resolves. */\nexport const ask = resolve4;\n',
+        "noRestrictedImports",
+      ],
+      [
+        'import { performance as clock } from "node:perf_hooks";\n\n/** Times. */\nexport const now = (): number => clock.now();\n',
+        "noRestrictedImports",
+      ],
+      [
+        'import { readFile } from "node:fs/promises";\n\n/** Reads. */\nexport const read = readFile;\n',
+        "noRestrictedImports",
+      ],
     ];
     for (const [text, rule] of probes) {
       const result = lintAs("src/cli/src/session/probe.ts", text);

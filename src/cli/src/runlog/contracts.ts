@@ -15,7 +15,8 @@ export interface ExportFiles {
    */
   exportKey: (project: string) => string;
   /**
-   * Writes a file readable by the owner only.
+   * Writes a file, creating it readable by the owner only. A file that already
+   * exists keeps its permissions, as on develop.
    *
    * @param path - the file.
    * @param text - its content.

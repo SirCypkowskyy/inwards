@@ -218,7 +218,34 @@
                   "worker_threads": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
                   "node:cluster": "Policy code talks to nothing outside the process; add a contract and an adapter if it must.",
                   "cluster": "Policy code talks to nothing outside the process; add a contract and an adapter if it must."
-                }
+                },
+                "patterns": [
+                  {
+                    "group": ["node:fs/*", "fs/*"],
+                    "message": "Read and write through the platform contracts, not node:fs."
+                  },
+                  {
+                    "group": [
+                      "node:dns",
+                      "node:dns/*",
+                      "dns",
+                      "dns/*",
+                      "node:inspector",
+                      "node:inspector/*",
+                      "inspector",
+                      "inspector/*"
+                    ],
+                    "message": "Policy code talks to nothing outside the process; add a contract and an adapter if it must."
+                  },
+                  {
+                    "group": ["node:readline", "node:readline/*", "readline", "readline/*"],
+                    "message": "Read the terminal through the Streams contract."
+                  },
+                  {
+                    "group": ["node:perf_hooks", "perf_hooks"],
+                    "message": "Take durations from the Clock contract (elapsed)."
+                  }
+                ]
               }
             },
             "noRestrictedGlobals": {

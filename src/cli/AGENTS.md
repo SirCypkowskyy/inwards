@@ -42,11 +42,13 @@ Enforced by:
   edges. A new folder falls into `cli-unzoned`, which may import nothing,
   until it gets a zone and rules.
 - **Biome** (`biome.jsonc`): the policy folders can't import `node:fs`,
-  `node:child_process`, `node:os`, `node:process` or the network modules
-  (`node:http`, `node:https`, `node:net`, ...), nor use the `Bun`, `process`,
-  `fetch` or `performance` globals. The `no-direct-clock` GritQL plugin
-  rejects `Date.now()`, `new Date()` and `performance.now()`: take the time
-  from `Clock`. `node:path`, `node:crypto` and `Date.parse` are fine; they
+  `node:child_process`, `node:os`, `node:process`, `node:readline`, the
+  network modules (`node:http`, `node:https`, `node:net`, `node:dns`, ...)
+  or `node:perf_hooks`, subpaths included (`node:fs/promises`,
+  `node:dns/promises`), nor use the `Bun`, `process`, `fetch` or
+  `performance` globals. The `no-direct-clock` GritQL plugin rejects
+  `Date.now()`, `Date()`, `new Date()` and `performance.now()`: take the
+  time from `Clock`. `node:path`, `node:crypto` and `Date.parse` are fine; they
   are pure.
 - **`bun run check:cycles`**: no import cycles, type imports included. It
   asks the pinned TypeScript (tsgo) for the syntax tree and the resolved

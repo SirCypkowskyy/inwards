@@ -88,8 +88,9 @@ export interface FileReader {
    * @param dir - the directory.
    * @returns its entries, or undefined when nothing, or something other than
    *   a directory, is at the path.
-   * @throws when a directory is there but can't be listed (EACCES), as on
-   *   develop: the callers let that reach the user rather than read it as empty.
+   * @throws when the path can't be examined or listed, e.g. EACCES on it or
+   *   on an ancestor, as on develop: the callers let that reach the user
+   *   rather than read it as empty.
    */
   list: (dir: string) => DirEntry[] | undefined;
 }

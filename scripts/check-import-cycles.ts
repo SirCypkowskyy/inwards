@@ -17,7 +17,7 @@
  * Run by CI and `bun run check:cycles`. Exit 0 when there is none, 1 otherwise.
  */
 import { readdirSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative } from "node:path";
 import process from "node:process";
 import { type Node, SyntaxKind } from "typescript/unstable/ast";
 import {
@@ -32,6 +32,8 @@ import {
 import { API } from "typescript/unstable/async";
 
 const ROOT = join(import.meta.dir, "..");
+/** A slash at the end of a directory path. */
+const TRAILING_SLASH = /\/$/u;
 
 /** Each module's imported modules, absolute paths. */
 export type ImportGraph = Map<string, string[]>;
@@ -85,14 +87,26 @@ function collect(node: Node, found: Node[]): void {
 }
 
 /**
- * Tells whether a path lies below a directory.
+ * Tells whether a path lies below a directory. TypeScript reports paths with
+ * forward slashes on every OS (`C:/repo/src/a.ts`), while `node:path` builds
+ * Windows paths with backslashes, so both sides are compared in one spelling.
  *
- * @param path - an absolute file path.
- * @param dir - an absolute directory path.
+ * @param path - an absolute file path, either separator.
+ * @param dir - an absolute directory path, either separator.
  * @returns true when the path is inside the directory.
  */
-function isInside(path: string, dir: string): boolean {
-  return path.startsWith(`${dir}${sep}`);
+export function isInside(path: string, dir: string): boolean {
+  return slashed(path).startsWith(`${slashed(dir).replace(TRAILING_SLASH, "")}/`);
+}
+
+/**
+ * Spells a path with forward slashes only.
+ *
+ * @param path - a path with `/` or `\\` separators.
+ * @returns the same path with `/` separators.
+ */
+function slashed(path: string): string {
+  return path.replaceAll("\\", "/");
 }
 
 /**

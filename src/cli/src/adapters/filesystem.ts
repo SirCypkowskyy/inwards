@@ -62,7 +62,9 @@ export const nodeFileReader: FileReader = {
     return readFileSync(path);
   },
   list(dir: string): DirEntry[] | undefined {
-    if (nodePathProbe.kind(dir) !== "dir") {
+    // Not nodePathProbe.kind, which reads every error as "nothing there": an
+    // ancestor the user can't enter must throw here, as on develop.
+    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
       return undefined;
     }
     return readdirSync(dir, { withFileTypes: true }).map((entry) => ({

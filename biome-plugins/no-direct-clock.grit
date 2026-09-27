@@ -7,7 +7,11 @@ language js
 or {
   `Date.now()`,
   `new Date()`,
-  `performance.now()`
+  `Date()`,
+  `performance.now()`,
+  `globalThis.Date.now()`,
+  `new globalThis.Date()`,
+  `globalThis.performance.now()`
 } as $read where {
   register_diagnostic(span=$read, message="Read the time through the Clock contract (platform/contracts.ts), not the system clock.")
 }
