@@ -6,7 +6,7 @@
  */
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const ROOT = join(import.meta.dir, "../..");
 /** A directive comment and whatever follows it on the line. */
@@ -37,13 +37,16 @@ function typeScriptFiles(dir: string): string[] {
 }
 
 test("no @ts-ignore or @ts-nocheck, and every @ts-expect-error gives a reason", () => {
-  const files = DIRS.flatMap((dir) => typeScriptFiles(dir));
+  // This file names the directives in its own text, so it is left out, compared
+  // as an absolute path: on Windows the walk spells it with backslashes.
+  const files = DIRS.flatMap((dir) => typeScriptFiles(dir)).filter(
+    (file) => resolve(ROOT, file) !== import.meta.path,
+  );
   expect(files.length).toBeGreaterThan(0);
   const bad = files.flatMap((file) =>
     [...readFileSync(join(ROOT, file), "utf8").matchAll(DIRECTIVE)]
       .filter((m) => m.groups?.["kind"] !== "expect-error" || !REASON.test(m.groups["rest"] ?? ""))
       .map((m) => `${file}: ${m[0].trim()}`),
   );
-  // This file names the directives in its own text; nothing else may.
-  expect(bad.filter((line) => !line.startsWith("scripts/test/ts-directives.test.ts"))).toEqual([]);
+  expect(bad).toEqual([]);
 });

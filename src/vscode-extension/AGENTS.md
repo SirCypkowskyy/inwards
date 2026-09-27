@@ -39,9 +39,13 @@ adapters, so `node:*` modules are allowed here.
   (`process.argv[1]`), not through `__dirname`, which Bun's bundler fixes at
   build time to the build machine's directory.
 - `vscode` is external: VS Code provides it at run time.
-- `test/packaged.test.ts` runs the real build and starts the shipped server
-  on Node. The other LSP tests bundle the server themselves, so only that
-  test catches a broken package.
+- `test/packaged.test.ts` runs the real build into an emptied `dist/`,
+  packages a VSIX with `vsce` as the release does, checks the manifest's
+  `main`, the server and both grammars are inside (and tests and guides are
+  not), and starts the server from the unpacked VSIX on Node. It needs Node
+  on PATH and fails without it. The other LSP tests bundle the server
+  themselves, so only this one catches a broken package. It deletes `dist/`
+  when done; `bun run build` makes it again.
 
 ## State that lives as long as the server
 

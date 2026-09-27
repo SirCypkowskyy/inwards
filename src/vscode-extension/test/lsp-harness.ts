@@ -18,7 +18,7 @@ packages = ["app.*"]
 allow = ["router", "schemas", "utils"]
 require = ["__init__", "router", "service"]
 `;
-const TIMEOUT_MS = 15_000;
+export const TIMEOUT_MS = 15_000;
 /** How long to wait for a refresh that must not happen: well past the server's 100 ms debounce. */
 export const QUIET_MS = 500;
 const HEADER_END = "\r\n\r\n";
@@ -78,7 +78,8 @@ export interface Harness {
   codesOnceIncluding: (path: string, code: string, present?: boolean) => Promise<string[]>;
   diagnosticsOnce: (path: string, ready: (found: Published[]) => boolean) => Promise<Published[]>;
   popups: () => string[];
-  cleanup: () => void;
+  /** Kills every server this harness started, waits for them, and removes `tmp`. */
+  cleanup: () => Promise<void>;
 }
 
 /**
@@ -191,6 +192,8 @@ export function lspHarness(shipped?: { server: string; runtime: string }): Harne
     received: [],
   };
   const { published, publishes, answered, received } = log;
+  /** Every server started, so cleanup reaps them even when a test fails early. */
+  const started: Bun.Subprocess[] = [];
 
   /**
    * Starts the bundled server on a project and completes the LSP handshake.
@@ -199,6 +202,7 @@ export function lspHarness(shipped?: { server: string; runtime: string }): Harne
    * @param id - the initialize request's id, unique across the file's servers.
    * @param capabilities - the client capabilities to announce.
    * @returns the running server.
+   * @throws {Error} when the server doesn't answer `initialize` in time.
    */
   async function startServer(
     root: string,
@@ -210,6 +214,7 @@ export function lspHarness(shipped?: { server: string; runtime: string }): Harne
       stdout: "pipe",
       stderr: "ignore",
     });
+    started.push(server);
     /**
      * Sends one JSON-RPC message to the server.
      *
@@ -233,6 +238,9 @@ export function lspHarness(shipped?: { server: string; runtime: string }): Harne
       },
     });
     await until(() => answered.has(id));
+    if (!answered.has(id)) {
+      throw new Error(`the server did not answer initialize within ${TIMEOUT_MS} ms`);
+    }
     send({ method: "initialized", params: {} });
     return { send, kill: (): void => server.kill() };
   }
@@ -310,6 +318,12 @@ export function lspHarness(shipped?: { server: string; runtime: string }): Harne
     codesOnceIncluding,
     diagnosticsOnce,
     popups,
-    cleanup: (): void => rmSync(tmp, { recursive: true, force: true }),
+    cleanup: async (): Promise<void> => {
+      for (const server of started) {
+        server.kill();
+      }
+      await Promise.all(started.map((server) => server.exited));
+      rmSync(tmp, { recursive: true, force: true });
+    },
   };
 }
