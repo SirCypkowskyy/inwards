@@ -61,6 +61,8 @@ describe("inwards init --style X --scaffold writes package shapes", () => {
       expect(init(root, "--style", style, "--scaffold").code).toBe(0);
       expect(shapeFindings(root)).toEqual({ code: 0, findings: [] });
       plant(root, "src/my_app/domain/customer.py"); // normal growth: a new entity
+      plant(root, "src/my_app/_version.py"); // written by hatch-vcs or setuptools-scm
+      plant(root, "src/my_app/__main__.py");
       expect(shapeFindings(root)).toEqual({ code: 0, findings: [] });
       plant(root, "src/my_app/helpers.py");
       expect(shapeFindings(root)).toEqual({

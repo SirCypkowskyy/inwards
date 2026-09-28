@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: ec3caa8d39e44eb5bc38aa1474ad3866d0b95a9efa050c9bba61ea161b06a96a
+source_hash: e580d2e7e8786a4a80ea6717decef51b20de822cf4f78935bf312cd5f2a49af9
 ---
 
 # Kształt pakietu { #package-shape }
@@ -127,7 +127,7 @@ Obie konfiguracje są fixture'ami testów (`src/cli/test/support/fixtures/shapes
 
 ## Kształty z presetu { #shapes-from-a-preset }
 
-`inwards init --style layered|clean|hexagonal --scaffold` zapisuje kształty dopasowane do przykładowego pakietu. Sam pakiet zawiera tylko swoje pakiety warstw, `bootstrap.py` i `__main__.py`, a `adapters/` w `hexagonal` zawiera tylko `inbound/` i `outbound/`; każdy inny element jest tam błędem, bo nie należałby do żadnej warstwy. W `clean` i `hexagonal` `application/` musi zawierać `ports/` i `use_cases/`, a każdy inny element jest tam ostrzeżeniem. Pakiety warstw nie mają kształtu, więc rosną swobodnie. [Instalacja](install.md#a-new-project-start-from-a-preset) je wymienia; `inwards init --list-styles` je wypisuje.
+`inwards init --style layered|clean|hexagonal --scaffold` zapisuje kształty dopasowane do przykładowego pakietu. Sam pakiet zawiera tylko swoje pakiety warstw, `bootstrap.py`, `__main__.py` i `_version.py` (który zapisują hatch-vcs i setuptools-scm), a `adapters/` w `hexagonal` zawiera tylko `inbound/` i `outbound/`; każdy inny element jest tam błędem, bo nie należałby do żadnej warstwy. W `clean` i `hexagonal` `application/` musi zawierać `ports/` i `use_cases/`, a każdy inny element jest tam ostrzeżeniem. Pakiety warstw nie mają kształtu, więc rosną swobodnie. [Instalacja](install.md#a-new-project-start-from-a-preset) je wymienia; `inwards init --list-styles` je wypisuje.
 
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 

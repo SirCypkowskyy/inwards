@@ -25,13 +25,14 @@ export interface StyleShape {
  * The package's own shape: its layer packages and the composition root.
  *
  * @param layers - the top-level layer packages, with a trailing `/`.
- * @returns the shape, `__main__.py` allowed so `python -m` keeps working.
+ * @returns the shape, with `__main__.py` allowed so `python -m` keeps working and
+ *   `_version.py` so a build tool (hatch-vcs, setuptools-scm) can write it.
  */
 export function topShape(layers: readonly string[]): StyleShape {
   return {
     package: "",
     require: [...layers, "bootstrap.py"],
-    allow: ["__main__.py"],
+    allow: ["__main__.py", "_version.py"],
     extra: "error",
     why: "the layers and the composition root only; anything else is an error, since no layer would hold it",
   };
