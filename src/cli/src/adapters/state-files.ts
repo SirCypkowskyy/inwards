@@ -29,8 +29,8 @@ import { nodePathProbe } from "./filesystem.ts";
 const MAX_AGE_MS = 604_800_000;
 /** At most this many sessions are kept. */
 const MAX_SESSIONS = 50;
-/** The two files a session owns: `<id>.start.json` and `<id>.jsonl`. */
-const SESSION_FILE = /\.(?:start\.json|jsonl|unresolved\.json)$/u;
+/** The files a session owns: `<id>.start.json`, `<id>.jsonl`, `<id>.content.json` and `<id>.unresolved.json`. */
+const SESSION_FILE = /\.(?:start\.json|jsonl|content\.json|unresolved\.json)$/u;
 /** O_NOFOLLOW where the OS has it (not on Windows), so a planted symlink isn't followed. */
 const NO_FOLLOW: number = constants.O_NOFOLLOW ?? 0;
 /** Mode for new state files: readable by the user only, since they name files and sessions. */

@@ -112,7 +112,7 @@ async function gate(
   const problems = trustProblems(io, project, state, { configs, edited });
   const { report, old, rejected, strangers, governing, changed } = await review(
     deps,
-    project,
+    { project, id },
     state,
     { configs, found, edited },
   );
@@ -145,7 +145,9 @@ async function gate(
  * changed files.
  *
  * @param deps - the platform and the check runner.
- * @param project - the real project root.
+ * @param session - the real project root and the session id.
+ * @param session.project - the real project root.
+ * @param session.id - the session id, which names SessionStart's copies.
  * @param state - the session state.
  * @param now - the valid configs now, where each was found, and the baselines
  *   that changed during the session.
@@ -158,7 +160,7 @@ async function gate(
  */
 async function review(
   deps: HookDeps,
-  project: string,
+  { project, id }: { project: string; id: string },
   state: SessionState,
   {
     configs,
@@ -172,7 +174,7 @@ async function review(
 ): Promise<Awaited<ReturnType<typeof checkChanged>> & { changed: string[] }> {
   const { io } = deps;
   const manifest = projectManifest(io, project, configs);
-  const lookups = createStartLookups({ ...io, check: deps.check }, project);
+  const lookups = createStartLookups({ ...io, check: deps.check }, { project, id });
   const changed = changedFiles(io, lookups, state, manifest);
   const checked = await checkChanged(
     lookups,
