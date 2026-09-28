@@ -46,14 +46,14 @@ export function nodePlatform(): Platform {
 }
 
 /**
- * What a check reads on the real process: the platform, the grammars and the
- * extraction cache (used only by the runs that ask for it).
+ * What a check reads on the real process: the platform, the grammars, the
+ * extraction cache (used only by the runs that ask for it) and TOML parsing.
  *
  * @param io - the platform.
  * @returns the project I/O.
  */
 export function nodeProjectIo(io: Platform): ProjectIo {
-  return { ...io, grammars: loadGrammars, extractionCache: fileExtractionCache };
+  return { ...io, grammars: loadGrammars, extractionCache: fileExtractionCache, toml: parseToml };
 }
 
 /**

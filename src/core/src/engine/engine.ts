@@ -50,6 +50,8 @@ export class Engine {
   private readonly parser: Parser;
   private readonly config: InwardsConfig;
   private readonly extractor: Extractor;
+  /** The top-level import packages of the uv workspace's members (INW005's wording). */
+  private readonly workspace: ReadonlySet<string>;
 
   /**
    * Stores a ready parser, a validated config and the extraction helper.
@@ -57,12 +59,19 @@ export class Engine {
    *
    * @param parser - tree-sitter parser with the Python grammar already set.
    * @param config - layers and root read from `[tool.inwards]`.
-   * @param cache - where extractions are kept between checks, if anywhere.
+   * @param options - optional inputs, see `create`.
+   * @param options.cache - where extractions are kept between checks, if anywhere.
+   * @param options.workspacePackages - the uv workspace members' import packages.
    */
-  private constructor(parser: Parser, config: InwardsConfig, cache: ExtractionCache | undefined) {
+  private constructor(
+    parser: Parser,
+    config: InwardsConfig,
+    options: { cache?: ExtractionCache; workspacePackages?: ReadonlySet<string> },
+  ) {
     this.parser = parser;
     this.config = config;
-    this.extractor = new Extractor(parser, cache);
+    this.extractor = new Extractor(parser, options.cache);
+    this.workspace = options.workspacePackages ?? new Set();
   }
 
   /**
@@ -75,18 +84,23 @@ export class Engine {
    * comments) is kept there and reused while the text is unchanged (#56).
    * Results never differ with or without it.
    *
+   * `options.workspacePackages` names the top-level import packages of the
+   * uv workspace the project belongs to. It changes only INW005's wording:
+   * an import of one is a "workspace package", not a "library" (#203).
+   *
    * @param wasm - the tree-sitter runtime and Python grammar as WASM bytes.
    * @param config - layers and root read from `[tool.inwards]`.
    * @param options - optional inputs.
    * @param options.cache - where extractions are kept between checks.
+   * @param options.workspacePackages - the uv workspace members' import packages; none by default.
    * @returns an engine ready to check files.
    */
   static async create(
     wasm: GrammarBinaries,
     config: InwardsConfig,
-    options: { cache?: ExtractionCache } = {},
+    options: { cache?: ExtractionCache; workspacePackages?: ReadonlySet<string> } = {},
   ): Promise<Engine> {
-    return new Engine(await createPythonParser(wasm), config, options.cache);
+    return new Engine(await createPythonParser(wasm), config, options);
   }
 
   /**
@@ -258,7 +272,10 @@ export class Engine {
     const existing = resolved.filter((ref) => !unknown.missing.has(ref));
     return [
       ...checkLayers(file, resolved, layers),
-      ...checkLibraries(file, resolved, layers, project.ownerOf),
+      ...checkLibraries(file, resolved, layers, {
+        ownerOf: project.ownerOf,
+        workspace: this.workspace,
+      }),
       ...checkUnassignedImports(file, existing, layers, project.ownerOf),
       ...unknown.found,
       ...across,
@@ -295,7 +312,10 @@ export class Engine {
       if (this.layered(file)) {
         found.push(
           ...checkDynamicImports(file, refs, layers),
-          ...checkLibraries(file, readable, layers, project.ownerOf),
+          ...checkLibraries(file, readable, layers, {
+            ownerOf: project.ownerOf,
+            workspace: this.workspace,
+          }),
           ...checkUnassignedImports(file, readable, layers, project.ownerOf),
         );
       }

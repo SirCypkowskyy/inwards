@@ -188,4 +188,5 @@ baseline'u); multi-word names are left uninflected where possible.
 | wall time | czas rzeczywisty |
 | warning | ostrzeżenie |
 | workspace (uv) | workspace (uv) |
+| workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |

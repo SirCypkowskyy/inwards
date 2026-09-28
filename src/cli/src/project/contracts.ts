@@ -39,4 +39,11 @@ export interface ProjectIo {
    * @returns the cache, or undefined when it can't be used safely.
    */
   extractionCache?: (project: string, wasm: GrammarBinaries) => ExtractionCache | undefined;
+  /**
+   * Parses TOML, for the uv workspace's pyproject.toml files (INW005's wording, #203).
+   *
+   * @param text - a pyproject.toml's contents.
+   * @returns the document, or undefined when it doesn't parse.
+   */
+  toml: (text: string) => unknown;
 }
