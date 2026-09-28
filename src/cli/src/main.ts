@@ -27,6 +27,8 @@ const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
                      [--config pyproject.toml] [--log] [--no-cache]
+                     (PATHS: those files only; whole-project checks such as dead layer
+                     prefixes, import cycles and symlinks in layers run without PATHS)
        inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
        inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
        inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]

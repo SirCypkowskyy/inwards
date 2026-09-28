@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 1b1a72684c4badfa6d97d6359f298d6552d4a47cc9501fb5a907c5e3f59f89de
+source_hash: 17c89127a959f1bbf85e690ecbfc6d75117d3d1883cc219db001bdebaa18b561
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -171,7 +171,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
 `--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst i `concise` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
 
-`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, a SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
+`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`, każdy osobno. Pomija sprawdzenia, które potrzebują całego projektu: martwe prefiksy i selektory warstw, zagnieżdżone projekty i dowiązania symboliczne w warstwach (INW006), selektory kształtów (INW007), wymagane elementy pakietów z kształtem (INW008) i cykle importów (INW004). Do nich uruchom `inwards check` bez ścieżek; `--help` mówi to samo. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, a SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
 
 ### Pisanie diagnostyk dla modelu { #writing-diagnostics-for-a-model }
 
