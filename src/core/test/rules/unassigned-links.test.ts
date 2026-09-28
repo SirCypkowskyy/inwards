@@ -128,11 +128,22 @@ layers = [
     }
     const [d, ...rest] = checkLinks(slices, tree(undefined));
     expect(rest).toEqual([]);
-    expect(d?.message).toContain('"shop.payments", where layer entries can match,');
+    expect(d?.message).toContain('"shop.payments", where layer entries can match, but no rule');
     // In the root, the walk names the code behind it by the link, which the layers own.
     expect(checkLinks(slices, tree("shop/orders"))).toEqual([]);
     expect(checkLinks(slices, { ...tree(undefined), links: [link("tools/x", undefined)] })).toEqual(
       [],
     );
+    // A name `import` can't spell holds no slice.
+    const assets = { ...tree(undefined), links: [link("shop/static-assets", undefined)] };
+    expect(checkLinks(slices, assets)).toEqual([]);
+  });
+
+  test("a target that holds a linked layer package's real code holds layers", () => {
+    const holding = { ...link("shop/domain/p", "packages"), holdsLayers: true };
+    expect(messages(holding)).toEqual([
+      'shop/domain/p is a symlink to "packages", which holds layers: an import of "shop.domain.p" (layer "domain") loads that code, and no layer rule sees the dependency.',
+    ]);
+    expect(messages(link("shop/domain/p", "packages"))).toEqual([]);
   });
 });

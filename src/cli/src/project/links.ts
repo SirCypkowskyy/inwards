@@ -77,6 +77,8 @@ export function linksUnder(
       path: posix(relative(root, path)),
       target: spell(target, { root, realRoot }, spellings),
       real: target,
+      // A directory holding a linked layer package's real code holds layers too.
+      ...(spellings.some(({ real }) => atOrInside(target, real)) ? { holdsLayers: true } : {}),
     }));
 }
 

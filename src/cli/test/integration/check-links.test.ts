@@ -131,6 +131,17 @@ describe.skipIf(WINDOWS)("inwards check: symlinks in layers", () => {
     expect(check(root).found).toEqual([{ code: "INW006", file: "shop/domain/alias" }]);
   });
 
+  test("a link to a directory above a linked layer package's real code is reported (review 2 P2)", () => {
+    const root = project({
+      "pyproject.toml": `${LAYERS}\n`,
+      "packages/shop/domain/order.py": "from shop.domain.p.shop.infrastructure import db\n",
+      "packages/shop/infrastructure/db.py": "X = 1\n",
+    });
+    symlinkSync("packages/shop", join(root, "shop"), "dir");
+    symlinkSync("../../../packages", join(root, "packages/shop/domain/p"), "dir");
+    expect(check(root).found).toEqual([{ code: "INW006", file: "shop/domain/p" }]);
+  });
+
   test("a new slice linked out of the root is reported (review P2-3)", () => {
     const outside = tempDir("inwards-outside-");
     mkdirSync(join(outside, "domain"));

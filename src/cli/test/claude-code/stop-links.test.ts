@@ -107,6 +107,23 @@ describe.skipIf(WINDOWS)("Stop gate: symlinks in layers", () => {
     expect(stderr).toContain('"file":"shop/domain/alias"');
   });
 
+  test("a link above a linked layer package's real code blocks (review 2 P2)", () => {
+    const root = session(
+      {
+        "packages/shop/domain/order.py": "X = 1\n",
+        "packages/shop/infrastructure/db.py": "X = 1\n",
+      },
+      (r) => {
+        rmSync(join(r, "shop"), { recursive: true });
+        symlinkSync("packages/shop", join(r, "shop"), "dir");
+      },
+    );
+    symlinkSync("../../../packages", join(root, "packages/shop/domain/p"), "dir");
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain('"file":"shop/domain/p"');
+  });
+
   test("a new slice linked out of the root blocks (review P2-3)", () => {
     const outside = tempDir("inwards-outside-");
     mkdirSync(join(outside, "domain"));

@@ -38,7 +38,16 @@ export interface LayerLink {
    * another in a session: two outside targets have no `target` to compare.
    */
   real: string;
+  /**
+   * True when the target holds layer code the name alone doesn't show: it
+   * contains the real directory of a layer package that is a link (`packages`
+   * above `packages/shop` with `shop -> packages/shop`).
+   */
+  holdsLayers?: boolean;
 }
+
+/** A Python identifier: what `import` accepts as one name segment. */
+const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u;
 
 /** The links of one config and what they are judged against. */
 export interface LinkTree {
@@ -129,7 +138,9 @@ function judge(
   if (link.target === undefined) {
     // Above the layers, only a link out of the root hides code: in the root,
     // the walk names the code behind it by the link, which the layers then own.
-    return owner !== undefined || mayHoldLayer(alias.module, layers)
+    // A name `import` can't spell (`static-assets`) holds no slice there.
+    const importable = alias.module.split(".").every((segment) => IDENTIFIER.test(segment));
+    return owner !== undefined || (importable && mayHoldLayer(alias.module, layers))
       ? outOfRoot(config, file, owner?.layer.name)
       : undefined;
   }
@@ -138,7 +149,11 @@ function judge(
   }
   const target = moduleNameFor(link.target).module;
   const into = layerMembership(target, layers);
-  const unassigned = into === undefined && target !== "" && !holdsLayer(target, layers, evidence);
+  const unassigned =
+    into === undefined &&
+    target !== "" &&
+    link.holdsLayers !== true &&
+    !holdsLayer(target, layers, evidence);
   if (into?.index === owner.index || unassigned) {
     return undefined; // same layer, or outside every layer: checked under the link's name
   }
@@ -168,7 +183,7 @@ function judge(
 function outOfRoot(config: InwardsConfig, file: SourceFile, layer: string | undefined): Diagnostic {
   const name =
     layer === undefined
-      ? `"${file.module}", where layer entries can match,`
+      ? `"${file.module}", where layer entries can match`
       : `"${file.module}" (layer "${layer}")`;
   const into = layer === undefined ? "under a layer" : `into layer "${layer}"`;
   return diagnostic(RULES.INW006, file, {
