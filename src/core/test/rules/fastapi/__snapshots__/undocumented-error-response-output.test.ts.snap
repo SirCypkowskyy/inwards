@@ -1,0 +1,25 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`FAPI002 findings name each code's source file and line 1`] = `
+{
+  "code": "FAPI002",
+  "column": 1,
+  "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI002/",
+  "endColumn": 41,
+  "endLine": 13,
+  "file": "app/orders.py",
+  "fix": {
+    "steps": [
+      "\`create_order\` can return 404 (from \`load_or_404\` at app/orders.py:10) and 409 (from \`OutOfStock\` raised at app/orders.py:16, handled in app/main.py:11), but its OpenAPI entry declares none of them.",
+      "Add \`responses={404: {"description": "..."}, 409: {"description": "..."}}\` to the decorator (with a "model" where the error has a body), or to \`APIRouter(...)\` if every route shares them.",
+      "Don't remove the \`raise\`, and don't catch the error only to silence this finding: clients generated from the schema need to know the error exists.",
+    ],
+    "summary": "Declare 404 and 409 in \`responses=\` on \`@router.post("/orders")\`.",
+  },
+  "line": 13,
+  "message": "\`create_order\` can return 404 and 409, which its OpenAPI entry doesn't declare.",
+  "module": "app.orders",
+  "rule": "undocumented-error-response",
+  "severity": "error",
+}
+`;

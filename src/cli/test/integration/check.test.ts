@@ -4,7 +4,9 @@
  * files from the real cwd (the macOS /var case). A named path outside the
  * config root is reported in every format instead of passing as clean (#200),
  * and a uv workspace checked from its root warns about each member instead of
- * passing silently (#201).
+ * passing silently (#201). Layer selectors check every slice, including code
+ * in a `node_modules` directory inside one (#191). A path-scoped check skips
+ * the whole-project checks, as `--help` says (#86).
  */
 import { expect, test } from "bun:test";
 import { symlinkSync } from "node:fs";
@@ -194,6 +196,20 @@ test("a directory that holds the root, and a whole-project run, report nothing u
   }
 });
 
+test("a path-scoped check skips the whole-project checks, and --help says so (#86)", () => {
+  const root = project({
+    "pyproject.toml": LAYERS.replace('"shop.domain"', '"shop.domain", "shop.gone"'),
+    "shop/domain/order.py": "",
+  });
+  const whole = inwards(["check", "--format", "json"], { cwd: root });
+  const scoped = inwards(["check", "--format", "json", "shop/domain/order.py"], { cwd: root });
+  expect(whole.stdout).toContain("shop.gone");
+  expect(scoped.stdout).not.toContain("shop.gone");
+  expect(inwards(["--help"], { cwd: root }).stdout).toContain(
+    "whole-project checks such as dead layer",
+  );
+});
+
 test("a named path that doesn't exist is a usage error", () => {
   const { code, stdout, stderr } = inwards(["check", "nope.py"], { cwd: rooted });
   expect(code).toBe(2);
@@ -224,6 +240,37 @@ layers = [
   expect(stdout).toContain(
     "src/packages/core is a nested project with its own pyproject.toml: its code is indexed as packages.core.src.core",
   );
-  expect(stdout).toContain("inwards check --config src/services/app/pyproject.toml");
+  expect(stdout).toContain(
+    "Give src/services/app/pyproject.toml its own [tool.inwards]; `inwards check` at the workspace root then checks it with that config.",
+  );
   expect(stdout).toContain(" 3 files, 0 violations, 2 warnings ");
+});
+
+test("layer selectors check every slice, and the fix names the importing slice", () => {
+  const root = project({
+    "pyproject.toml": `[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.*.domain", "shop.*.typo"] },
+  { name = "infrastructure", modules = ["shop.*.infra"] },
+]
+`,
+    "shop/__init__.py": "",
+    "shop/orders/domain/__init__.py": "",
+    "shop/orders/infra/db.py": "",
+    "shop/billing/domain/node_modules/leak.py": "import shop.billing.infra.db\n",
+    "shop/billing/infra/db.py": "",
+  });
+  const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+  expect(code).toBe(1);
+  const report: {
+    diagnostics: { code: string; file: string; message: string; fix: { steps: string[] } }[];
+  } = JSON.parse(stdout);
+  expect(report.diagnostics.map((d) => [d.code, d.file])).toEqual([
+    ["INW006", "pyproject.toml"],
+    ["INW001", "shop/billing/domain/node_modules/leak.py"],
+  ]);
+  expect(report.diagnostics[0]?.message).toBe('"shop.*.typo" (layer "domain") matches no module.');
+  expect(report.diagnostics[1]?.fix.steps[1]).toContain(
+    "`shop.billing.domain` (for example `shop.billing.domain.ports`)",
+  );
 });

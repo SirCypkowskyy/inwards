@@ -14,9 +14,12 @@ import process from "node:process";
 import { CONTEXT_KEYS } from "../../src/config/contexts.ts";
 import { CONFIG_DEFAULTS } from "../../src/config/defaults.ts";
 import { DEFAULT_GENERATED } from "../../src/config/generated.ts";
-import { LAYER_KEYS, parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
+import { LAYER_KEYS } from "../../src/config/layers.ts";
+import { parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
+import { optionKeys } from "../../src/config/rule-options.ts";
 import { RULE_KEYS } from "../../src/config/rule-settings.ts";
 import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/shape.ts";
+import { TEMPLATE_KEYS } from "../../src/config/templates.ts";
 import { RULES } from "../../src/meta/registry.ts";
 import {
   fileSchemaErrors,
@@ -36,13 +39,16 @@ const REFERENCE_ANCHOR = /guides\/configuration\/#(?<anchor>[a-z-]+)\)/gu;
 const INWARDS_TABLE = /\[\s*tool\.inwards/u;
 
 /**
- * Follows a `$ref` (also one wrapped in `allOf`) to its definition.
+ * Follows a `$ref` (also one wrapped in `allOf`, or the first of an `anyOf`) to its definition.
  *
  * @param node - a schema node.
  * @returns the definition it points to, or the node itself.
  */
 function deref(node: Schema): Schema {
-  const ref = node.$ref ?? node.allOf?.find((part) => part.$ref !== undefined)?.$ref;
+  const ref =
+    node.$ref ??
+    node.allOf?.find((part) => part.$ref !== undefined)?.$ref ??
+    node.anyOf?.find((part) => part.$ref !== undefined)?.$ref;
   const name = ref?.split("/").at(-1);
   return name === undefined ? node : (schema.definitions?.[name] ?? node);
 }
@@ -100,7 +106,17 @@ describe("the schema and the parser agree", () => {
     expect(keysOf(itemsOf("shape"))).toEqual([...SHAPE_KEYS].sort());
     expect(keysOf(itemsOf("names"))).toEqual([...NAME_KEYS].sort());
     expect(keysOf(itemsOf("contexts"))).toEqual([...CONTEXT_KEYS].sort());
-    expect(keysOf(schema.properties?.["rules"] ?? {})).toEqual([...RULE_KEYS].sort());
+    // Every rule but INW000 may have an options table, named after the rule.
+    const tables = Object.values(RULES)
+      .filter((rule) => rule.code !== "INW000")
+      .map((rule) => rule.name);
+    expect(keysOf(schema.properties?.["rules"] ?? {})).toEqual([...RULE_KEYS, ...tables].sort());
+    const options = deref(schema.properties?.["rules"] ?? {}).properties ?? {};
+    expect(tables.map((name) => [name, keysOf(options[name] ?? {})])).toEqual(
+      tables.map((name) => [name, [...optionKeys(name)].sort()]),
+    );
+    const template = schema.properties?.["templates"]?.additionalProperties;
+    expect(keysOf(typeof template === "object" ? template : {})).toEqual([...TEMPLATE_KEYS].sort());
   });
 
   test("on the rule codes, taken from the registry", () => {

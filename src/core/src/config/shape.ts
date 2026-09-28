@@ -25,6 +25,8 @@ export interface ShapeSpec {
   forbid?: string[];
   /** Severity of a member `allow` doesn't cover (`extra`, default error). */
   extra: Severity;
+  /** Project advice added to the INW007 fix steps (`hints`); absent when not set. */
+  hints?: string[];
 }
 
 /** One `[[tool.inwards.names]]` entry: members matching `pattern` belong only in `onlyIn`. */
@@ -40,6 +42,8 @@ export const SHAPE_KEYS: ReadonlySet<string> = new Set([
   "require",
   "forbid",
   "extra",
+  "hints",
+  "template",
 ]);
 export const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
 /** A member name as a directory lists it: `x.py`, `x.pyi` or `x/`. */
@@ -174,8 +178,11 @@ function parseShape(entry: Record<string, unknown>, i: number): ShapeSpec {
   const shape: ShapeSpec = { packages: selectors(entry["packages"], `${where}.packages`), extra };
   for (const key of ["allow", "require", "forbid"] as const) {
     if (entry[key] !== undefined) {
-      shape[key] = patterns(entry[key], `${where}.${key}`);
+      shape[key] = memberPatterns(entry[key], `${where}.${key}`);
     }
+  }
+  if (entry["hints"] !== undefined) {
+    shape.hints = strings(entry["hints"], `${where}.hints`);
   }
   return shape;
 }
@@ -195,7 +202,7 @@ function parseName(entry: Record<string, unknown>, i: number): NameRule {
   if (typeof pattern !== "string") {
     throw new ConfigError(`${where}.pattern must be one member pattern, such as "test_*".`);
   }
-  patterns([pattern], `${where}.pattern`);
+  memberPatterns([pattern], `${where}.pattern`);
   return { pattern, onlyIn: selectors(entry["only-in"], `${where}.only-in`) };
 }
 
@@ -221,14 +228,14 @@ function selectors(value: unknown, where: string): string[] {
 }
 
 /**
- * Validates a list of member patterns.
+ * Validates a list of member patterns. Templates (`templates.ts`) use it too.
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
  * @returns the member patterns as written, each checked.
  * @throws {ConfigError} naming a pattern that isn't `name`, `name/` or `name.py`.
  */
-function patterns(value: unknown, where: string): string[] {
+export function memberPatterns(value: unknown, where: string): string[] {
   const list = strings(value, where);
   const bad = list.find((p) => !(PATTERN.test(p) && isGlob(p)));
   if (bad !== undefined) {
@@ -240,14 +247,14 @@ function patterns(value: unknown, where: string): string[] {
 }
 
 /**
- * Checks that a value is a list of non-empty strings.
+ * Checks that a value is a list of non-empty strings. Templates use it for `hints`.
  *
  * @param value - the raw value.
  * @param where - the key's dotted path.
  * @returns the list.
  * @throws {ConfigError} otherwise.
  */
-function strings(value: unknown, where: string): string[] {
+export function strings(value: unknown, where: string): string[] {
   if (!(Array.isArray(value) && value.every((s) => typeof s === "string" && s !== ""))) {
     throw new ConfigError(`${where} must be a list of non-empty strings.`);
   }

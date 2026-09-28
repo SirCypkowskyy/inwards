@@ -6,7 +6,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
-import { tempDir } from "./temp.ts";
+import { STATE_HOME, tempDir } from "./temp.ts";
 
 // CI sets INWARDS_BIN to the compiled binary; locally the tests run the source.
 const REPO = resolve(import.meta.dir, "../../../..");
@@ -30,6 +30,7 @@ const ENV: Record<string, string | undefined> = {
   NO_COLOR: "",
   FORCE_COLOR: "1",
   CLAUDE_CONFIG_DIR: CLAUDE_USER_DIR,
+  XDG_STATE_HOME: STATE_HOME,
 };
 
 /** What one run of the CLI produced. */
@@ -67,6 +68,14 @@ export const LAYERS = `[tool.inwards]
 layers = [
   { name = "domain", modules = ["shop.domain"] },
   { name = "infrastructure", modules = ["shop.infrastructure"] },
+]
+`;
+
+/** Vertical slices: every slice's domain and infrastructure (layer selectors). */
+export const SLICES = `[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.*.domain"] },
+  { name = "infrastructure", modules = ["shop.*.infrastructure"] },
 ]
 `;
 

@@ -315,7 +315,9 @@ function toUriPath(path: string): string {
 
 /**
  * Renders the report as SARIF 2.1.0.
- * Enough for GitHub code scanning and most IDE viewers. Each result carries
+ * Enough for GitHub code scanning and most IDE viewers. `rules[]` lists every
+ * registered rule, an opt-in one with `defaultConfiguration.enabled = false`.
+ * Each result carries
  * the fix as text and as a `fix` property; file URIs are relative to
  * `%SRCROOT%`. A finding an inline comment hid is a result too, with an
  * `inSource` suppression whose justification is the comment's reason, so
@@ -352,7 +354,10 @@ function renderSarif(
                 name: rule.name,
                 shortDescription: { text: rule.summary },
                 helpUri: rule.docs,
-                defaultConfiguration: { level: rule.severity },
+                defaultConfiguration: {
+                  level: rule.severity,
+                  ...(rule.default === "off" ? { enabled: false } : {}),
+                },
               })),
             },
           },

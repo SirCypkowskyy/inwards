@@ -12,7 +12,9 @@ import {
   type Picker,
   type Target,
 } from "../init/contracts.ts";
-import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "../init/styles.ts";
+import { STYLES } from "../init/presets.ts";
+import { drawTree } from "../init/style-text.ts";
+import { STYLE_NAMES, type StyleName } from "../init/styles.ts";
 
 const AGENT_HINTS: Readonly<Record<Agent, string>> = {
   claude: "hooks in .claude/settings.local.json",
@@ -94,10 +96,7 @@ async function pick(target: Target, flags: InitFlags): Promise<InitPlan | undefi
  */
 function layerTree(name: StyleName, pkg: string): string {
   const style = STYLES[name];
-  const bootstrap = style.example.bootstrap.split(".");
-  const tree = drawTree(style, `${pkg.replaceAll(".", "/")}/`, (parts) =>
-    parts.join(".") === bootstrap.join(".") ? "file" : "dir",
-  );
+  const tree = drawTree(style, `${pkg.replaceAll(".", "/")}/`, () => "planned");
   return `${style.summary}\n${tree}`;
 }
 

@@ -32,7 +32,13 @@ build-backend = "uv_build"
   "src/my_app/__init__.py": 'def main() -> None:\n    print("Hello from my-app!")\n',
 };
 
-export const STYLES = ["layered", "clean", "hexagonal"] as const;
+const LINEAR_STYLES = ["layered", "clean", "hexagonal"] as const;
+/** The presets that declare contexts (INW002, INW003). */
+export const CONTEXT_STYLES = ["vertical-slices", "bounded-contexts", "django"] as const;
+export const STYLES: readonly [...typeof LINEAR_STYLES, ...typeof CONTEXT_STYLES] = [
+  ...LINEAR_STYLES,
+  ...CONTEXT_STYLES,
+];
 const RELEASE = VERSION.replace(/-.*$/u, "");
 
 /**

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: f087df8c1ea27b6e0db664d20d35cb5996307b94b24169cecea4ff05128b8144
+source_hash: 8f357d4add6d986fa1ef85b26209451a224f11be7fa1ae179ea19f4b86152320
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -150,8 +150,8 @@ inwards init: wrote the hexagonal preset to pyproject.toml and 14 example files.
 
 src/app/  (hexagonal)
 ├── adapters/
-│   ├── inbound/   inbound: may import domain, application, outbound
-│   └── outbound/  outbound: may import domain, application
+│   ├── inbound/   inbound: may import domain, application; not its sibling outbound
+│   └── outbound/  outbound: may import domain, application; not its sibling inbound
 ├── application/   application: may import domain
 ├── bootstrap.py   bootstrap: may import every other layer
 └── domain/        domain: imports no other layer
@@ -164,22 +164,34 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 
 Gdy Inwards trafi na PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), druga linia zmieni się w `uvx inwards init --style hexagonal --scaffold` i nie trzeba będzie niczego wcześniej instalować.
 
-Istnieją trzy presety, każdy z warstwami wymienionymi od najbardziej wewnętrznej. `inwards init --list-styles` wypisuje je razem z ich pakietami.
+Istnieje sześć presetów, każdy z warstwami wymienionymi od najbardziej wewnętrznej. `inwards init --list-styles` wypisuje je razem z ich pakietami.
 
 | Styl | Warstwy | Czego nie potrafi zabronić |
 |---|---|---|
 | `layered` | domain, persistence, services, presentation, bootstrap | presentation wywołującej persistence bezpośrednio (otwarte warstwy) |
 | `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importującej infrastructure |
-| `hexagonal` | domain, application, outbound (`adapters.outbound`), inbound (`adapters.inbound`), bootstrap | adapterów inbound importujących adaptery outbound |
+| `hexagonal` | domain, application, outbound (`adapters.outbound`) i inbound (`adapters.inbound`) jako [warstwy sąsiednie](configuration.md#sibling-layers), bootstrap | adaptera inbound wywołującego port zamiast przypadku użycia |
+| `vertical-slices` | shared, features, bootstrap; każdy wycinek w `features` jest kontekstem, którego modułem publicznym jest `api` | kodu używanego przez jeden wycinek, przeniesionego do `shared` |
+| `bounded-contexts` | `app.*` z szablonem `context`: domain, application, infrastructure, api w każdym kontekście; bootstrap | `api` kontekstu reeksportującego jego encje domenowe |
+| `django` | `app.*` z szablonem `django-app`: models, services, views, urls w każdej aplikacji; sam pakiet (settings, główny URLconf) | widoku używającego modeli zamiast serwisów |
 
-Każda warstwa może importować samą siebie i warstwy przed nią, więc konfiguracja złożona z samych warstw nie wyrazi luk z ostatniej kolumny; komentarz w tabeli `[tool.inwards]` nazywa tę lukę. `bootstrap.py` to korzeń kompozycji (composition root), jedyny moduł, który widzi każdą warstwę.
+Każda warstwa może importować samą siebie i warstwy przed nią, więc konfiguracja złożona z samych warstw nie wyrazi luk z ostatniej kolumny; komentarz w tabeli `[tool.inwards]` nazywa tę lukę. `bootstrap.py` to korzeń kompozycji (composition root), jedyny moduł, który widzi każdą warstwę. W `hexagonal` adaptery inbound i outbound zajmują jedno miejsce w kolejności, więc żaden nie może importować drugiego.
+
+Ostatnie trzy presety rozdzielają pakiety [kontekstami](configuration.md#contexts) i opisują pakiety [szablonem](configuration.md#templates):
+
+- **`vertical-slices`** umieszcza jeden pakiet na funkcję w `app.features`, na wspólnym jądrze `app.shared`. Każdy wycinek jest kontekstem: importuje inny wycinek tylko wtedy, gdy wymienia go jego `depends-on` ([INW002](../rules/INW002.md)), i wtedy tylko moduł `api` tego wycinka ([INW003](../rules/INW003.md)); to samo dotyczy kodu poza wszystkimi wycinkami, takiego jak `bootstrap.py`.
+- **`bounded-contexts`** nadaje każdemu pakietowi bezpośrednio pod `app` te same warstwy, `app.*.domain` < `app.*.application` < `app.*.infrastructure` < `app.*.api`, przez jeden wpis z szablonem. Konteksty przechodzą jeden do drugiego tylko przez `app.<ctx>.api`, a ponieważ `api` to najbardziej zewnętrzna rola, kontekst sięga do innego ze swojego własnego `api`.
+- **`django`** nadaje każdej aplikacji pod `app` warstwy `models` < `services` < `views` < `urls`. Sam pakiet jest najbardziej zewnętrzną warstwą, na ustawienia, główny URLconf i moduły aplikacji spoza ról, takie jak `admin.py` i `apps.py`. Aplikacje są niezależne z wyjątkiem `services`: preset wyłącza INW002, więc aplikacja może używać serwisów innej bez deklarowania tego, a INW003 zgłasza import każdego innego modułu innej aplikacji. Najbardziej wewnętrzna rola dostaje `deny-libraries = []`, bo modele importują `django.db`.
+
+Tabela kontekstów wymienia każdy pakiet z nazwy, bo `modules` kontekstu to dosłowne prefiksy. Z `--scaffold` init zapisuje wpis dla pakietu `orders` ze scaffoldu; bez niego ten sam wpis trafia do pliku jako komentarz, jako przykład do skopiowania dla każdego pakietu, który projekt ma. Pakiet bez wpisu nie jest odseparowany od pozostałych.
 
 Co zapisuje `--style` i kiedy się zatrzymuje:
 
 - **Tabela:** warstwy, `root` (`src` dla układu src, w przeciwnym razie `.`), `required-version`, domyślna lista `ignore` i komentarz z nazwą presetu i wersją Inwards. Pakiet pochodzi z `[project].name`, znormalizowanego tak jak robi to uv (`my-app` staje się `my_app`), albo z `--package`; słowo kluczowe Pythona nie może nim być. Uruchomiony w podkatalogu projektu, init używa najbliższego `pyproject.toml` powyżej i mówi, którego. Zanim pakiet powstanie, `root` to `src`, gdy backendem budowania jest uv_build albo gdy `src/` zawiera już kod w Pythonie.
 - **Nigdy nie nadpisuje warstw.** Jeśli `[tool.inwards]` już istnieje, init kończy się kodem 2 i niczego nie zapisuje. Bez `pyproject.toml` kończy się kodem 2 i proponuje `uv init --package`.
-- **`--scaffold`** zapisuje encję, port (`typing.Protocol`), przypadek użycia, adapter implementujący port, adapter sterujący z wiersza poleceń, korzeń kompozycji i jeden test w `tests/`. Nigdy niczego nie zastępuje: jeśli na drodze stoi plik albo dowiązanie symboliczne, albo katalog prowadzi przez dowiązanie poza projekt, init kończy się kodem 2, wypisuje ścieżki i niczego nie zapisuje. Istniejący `__init__.py`, taki jak ten tworzony przez uv, zostaje bez zmian. Najpierw zapisywane są pliki, a `pyproject.toml` na końcu; jeśli zapis się nie uda, init usuwa to, co utworzył, więc to samo polecenie można uruchomić ponownie.
-- **`--dry-run`** wypisuje każdą zmianę jako diff i niczego nie zapisuje. **`--agent`** łączy się z `--style`: `inwards init --style clean --agent claude` zapisuje warstwy i hooki Claude Code w jednym uruchomieniu.
+- **`--scaffold`** zapisuje encję, port (`typing.Protocol`), przypadek użycia, adapter implementujący port, adapter sterujący z wiersza poleceń, korzeń kompozycji i jeden test w `tests/`. W `vertical-slices` i `bounded-contexts` leżą one w pakiecie `orders`, za `api.py`, który reeksportuje to, czego potrzebuje korzeń kompozycji. `django` zapisuje zamiast tego aplikację `orders` (models, services, views, urls), `settings.py` i główny `urls.py`, bez testu. Nigdy niczego nie zastępuje: jeśli na drodze stoi plik albo dowiązanie symboliczne, albo katalog prowadzi przez dowiązanie poza projekt, init kończy się kodem 2, wypisuje ścieżki i niczego nie zapisuje. Istniejący `__init__.py`, taki jak ten tworzony przez uv, zostaje bez zmian. Najpierw zapisywane są pliki, a `pyproject.toml` na końcu; jeśli zapis się nie uda, init usuwa to, co utworzył, więc to samo polecenie można uruchomić ponownie.
+- **Kształty pakietów przychodzą z `--scaffold`.** Tabela dostaje wtedy także wpisy `[[tool.inwards.shape]]` ([Kształt pakietu](package-shape.md)) dla pakietów ze scaffoldu, więc ograniczone są też elementy, nie tylko importy. Sam pakiet może zawierać tylko swoje pakiety warstw, `bootstrap.py`, `__main__.py` i `_version.py` (który zapisują hatch-vcs i setuptools-scm), a w `hexagonal` `adapters/` zawiera tylko `inbound/` i `outbound/`: moduł obok nich nie należałby do żadnej warstwy, więc jest błędem INW007, a shape guard ([INW007](../rules/INW007.md)) odrzuca Write, który by go utworzył. W `clean` i `hexagonal` `application/` musi zawierać `ports/` i `use_cases/`, a wszystko inne jest tam tylko ostrzeżeniem. W `vertical-slices` `features/` zawiera tylko pakiety wycinków, a każdy wycinek musi mieć `api`; w `bounded-contexts` każdy kontekst musi mieć swoje cztery role; w `django` pakiet musi zawierać `settings.py` i `urls.py`, a każda aplikacja swoje cztery role, obok których dozwolone jest to, co zapisuje `startapp`. Same pakiety warstw nie mają kształtu, więc nowa encja, adapter czy przypadek użycia nigdy go nie naruszą. Brak wymaganego elementu to błąd INW008. Bez `--scaffold` kształty nie są zapisywane, bo opisują układ scaffoldu, a nie kod, który projekt już ma. `inwards init --list-styles` pokazuje kształty każdego presetu.
+- **`--dry-run`** wypisuje każdą zmianę jako diff i niczego nie zapisuje. **`--agent`** łączy się z `--style`: `inwards init --style clean --agent claude` zapisuje warstwy i hooki Claude Code w jednym uruchomieniu. **`--brief`** zapisuje też do `AGENTS.md` [opis architektury](agents-md.md#the-architecture-brief-opt-in), podając preset i miejsce na jego porty.
 - Po zapisie init uruchamia sprawdzenie w tym samym procesie i wypisuje powyższe drzewo. Bez `--scaffold` każdy pakiet warstwy jest oznaczony `(missing)` i nie przechodzi sprawdzenia, dopóki nie będzie miał modułu.
 
 W terminalu `inwards init` bez `--style` i bez `--agent` zadaje pytania: o styl (podświetlony pokazuje swoje warstwy), o to, czy dodać scaffold, i o to, którego agenta podłączyć. Na koniec wypisuje to samo polecenie z flagami. Bez terminala (stdin albo stdout nie jest TTY albo ustawiono `CI`) nigdy nie czeka na dane: od razu kończy się kodem 2 i wypisuje flagi oraz style. Agenci uruchamiają init właśnie w ten sposób.
@@ -209,6 +221,10 @@ inwards check
 
 `All clear` z kodem wyjścia 0 oznacza, że każdy import wskazuje do środka. Przy kodzie wyjścia 1 polecenie wypisuje każde naruszenie z ponumerowanymi krokami naprawy, a kod wyjścia 2 to błąd użycia albo konfiguracji.
 
+### Przejście z import-linter { #coming-from-import-linter }
+
+`inwards import-config` zamienia kontrakty z `.importlinter`, `setup.cfg` albo `[tool.importlinter]` na `[tool.inwards]`, a `--write` dopisuje tabelę do `pyproject.toml`. Każdy kontrakt, którego nie dało się przenieść, trafia do raportu razem z powodem. Mapowanie opisuje [Migracja z import-linter](import-linter.md).
+
 ### Istniejący kod { #on-an-existing-codebase }
 
 Kod, który już łamie swoje warstwy, nie przechodzi pierwszego sprawdzenia. Żeby mimo to wdrożyć Inwards, zaakceptuj to, co jest dziś, i blokuj tylko nowe naruszenia:
@@ -222,7 +238,7 @@ git add inwards-baseline.json
 
 `inwards baseline` sprawdza cały projekt w ramach jednej konfiguracji i zapisuje każde naruszenie do `inwards-baseline.json` obok jego `pyproject.toml`. Zacommituj ten plik: czytają go `inwards check`, hooki agentów i CI. W monorepo uruchom polecenie raz dla każdego pakietu, który ma własne `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), bo każdy plik jest sprawdzany względem baseline'u leżącego obok jego konfiguracji. Zaakceptowany import może przenieść się do innej linii i nadal przechodzić, bo wpisy są dopasowywane po regule, module i komunikacie, bez zdania „Allowed direction” z komunikatu, więc dodanie warstwy nie sprawia, że wracają. Druga kopia tego samego importu w tym samym module nie przechodzi. Gdy sprawdzenie całego projektu stwierdzi, że zaakceptowanych naruszeń już nie ma, mówi o tym. Uruchom wtedy ponownie `inwards baseline`, żeby je usunąć. Z `--format json` i istniejącym baseline'em podsumowanie liczy jedno i drugie: `baselined` przy każdym uruchomieniu, `resolved` przy sprawdzeniu całego projektu. Agenci nie mogą edytować tego pliku ani uruchamiać tego polecenia: hooki Claude Code odrzucają jedno i drugie, a Stop gate oblewa sesję, która go zmieniła, i sprawdza pliki tej sesji zupełnie bez baseline'u.
 
-Uruchom je też, zanim włączysz hooki agenta. Hooki Claude Code już traktują naruszenie, które zacommitowany plik miał na początku sesji, jako kontekst, a nie blokadę ([rozdział 4](../04-AI-Integration.md)), ale plik z niezacommitowanymi zmianami na początku sesji nie ma znanej zawartości startowej, więc blokują wszystkie jego naruszenia, a agent, którego pcha się do ich naprawy, może przepisać kod niepotrzebny do zadania. Baseline utrzymuje też na zielono `inwards check` i CI.
+Uruchom je też, zanim włączysz hooki agenta. Hooki Claude Code już traktują naruszenie, które plik miał na początku sesji, jako kontekst, a nie blokadę ([rozdział 4](../04-AI-Integration.md)), ale plik z niezacommitowanymi zmianami, zbyt duży, żeby hooki zachowały jego kopię (ponad 512 KiB albo ponad limit 4 MiB takich plików), nie ma znanej zawartości startowej, więc blokują wszystkie jego naruszenia, a agent, którego pcha się do ich naprawy, może przepisać kod niepotrzebny do zadania. Baseline utrzymuje też na zielono `inwards check` i CI.
 
 Gdy projekt ma baseline, `stop-gate = "project"` w `[tool.inwards]` sprawia, że Stop gate w Claude Code sprawdza cały projekt względem baseline'u, a nie tylko pliki zmienione w sesji, więc naruszenie w dowolnym miejscu blokuje turę ([rozdział 4](../04-AI-Integration.md)). Sprawdzenie pomija parsowanie potwierdzające tam, gdzie baseline akceptuje wszystko, co znalazł prescan, więc w pełni pokryte baseline'em sprawdzenie kosztuje mniej więcej tyle, co czyste.
 

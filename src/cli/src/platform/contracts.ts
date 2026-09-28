@@ -114,6 +114,18 @@ export interface FileWalker {
    * @returns unique paths, sorted.
    */
   files: (paths: string[], match: (name: string) => boolean, open?: readonly string[]) => string[];
+  /**
+   * Lists the symlinks below a directory that Python could import through:
+   * links to a directory or to a `.py` or `.pyi` file, each by the path it is
+   * reached through. Links to directories inside `top` are followed too (cycle
+   * guarded), links out of it never are, and nothing but hidden entries is
+   * skipped (the directories are layer packages).
+   *
+   * @param dir - the directory to walk.
+   * @param top - the real config root, the limit for following links.
+   * @returns each link as reached, with its real target; dangling links are left out.
+   */
+  links: (dir: string, top: string) => { path: string; target: string }[];
 }
 
 /** Git plumbing that runs nothing the agent could have configured (see `adapters/git.ts`). */
@@ -165,6 +177,11 @@ export interface Runtime {
   noCache: boolean;
   /** The user's home directory. */
   home: string;
+  /**
+   * Where per-user state goes: `XDG_STATE_HOME` when it is an absolute path,
+   * else `~/.local/state`. The session start witness lives below it (#88).
+   */
+  stateHome: string;
   /** `process.platform`. */
   platform: string;
   /** This process's id, for temporary file names. */
@@ -257,6 +274,16 @@ export interface StateFiles {
    */
   existingStateDir: (project: string) => string | undefined;
   /**
+   * Creates a directory outside the project for Inwards' own state, parents
+   * included, readable by the user only: where the session start witness
+   * (`session/record.ts`, #88) is kept.
+   *
+   * @param dir - the directory, absolute.
+   * @returns the directory.
+   * @throws when it can't be created, or something other than a real directory is there.
+   */
+  outsideDir: (dir: string) => string;
+  /**
    * Appends one line, refusing a symlink planted at the path.
    *
    * @param path - the log file.
@@ -295,6 +322,15 @@ export interface StateFiles {
    *
    * @param dir - the state directory.
    * @param current - the session that is starting, never pruned.
+   * @param byCount - also keep only the newest sessions (the default); false
+   *   prunes by age alone, so a flood of new sessions can't evict one.
    */
-  prune: (dir: string, current: string) => void;
+  prune: (dir: string, current: string, byCount?: boolean) => void;
+  /**
+   * Sets a file's modification time to now, so age-based pruning keeps it.
+   *
+   * @param path - the file.
+   * @throws when the file is missing or can't be changed.
+   */
+  touch: (path: string) => void;
 }

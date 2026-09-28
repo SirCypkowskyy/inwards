@@ -1,35 +1,60 @@
 /**
  * @file Per-rule configuration, `[tool.inwards.rules]`: which rules report
- * (`select`, `ignore`) and at what severity (`severity`), so a team can phase
- * rules in. Codes are exact; an unknown one is a config error. INW000 can't be
- * ignored or re-levelled: a file whose declared encoding can hide imports is
- * not checked at all, so turning INW000 off would hide that file entirely
- * (ADR-027).
+ * (`select`, `extend-select`, `ignore`), at what severity (`severity`), and
+ * each rule's options table, `[tool.inwards.rules.<rule-name>]`, so a team can
+ * phase rules in and turn opt-in rules on. Codes are exact; an unknown one is
+ * a config error. INW000 can't be ignored, re-levelled or scoped: a file whose
+ * declared encoding can hide imports is not checked at all, so turning INW000
+ * off would hide that file entirely (ADR-027).
  *
  * Every core function that returns diagnostics to an adapter applies these
  * settings (`applyRules`), so the CLI, the hooks, the Stop gate and the
- * language server agree. The exception is the session layout comparison in
- * `rules/unassigned-module/layout.ts`: it stops a layer being moved away, so it ignores the table.
+ * language server agree. The exceptions are the session comparisons in
+ * `rules/unassigned-module/layout.ts` and `links.ts`: they stop a layer being
+ * moved away or linked around, so they ignore the table.
  */
 
-import type { Diagnostic, Severity } from "../contracts/records.ts";
-import { RULES } from "../meta/registry.ts";
+import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";
+import { diagnostic, RULES, ruleFor } from "../meta/registry.ts";
+import { matchEntry } from "./layer-selector.ts";
+import { type OptionValue, optionKeys, parseOptions } from "./rule-options.ts";
+import { type ConfigFile, spanOfRuleTable } from "./source-span.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
+
+/**
+ * One rule's options table, `[tool.inwards.rules.<rule-name>]`, as parsed:
+ * values by TOML key, checked against the rule's spec in `rule-options.ts`.
+ * Every rule takes `modules`: entries in the grammar of `layers[].modules`
+ * (ADR-034), a prefix such as `shop.domain` or a selector such as
+ * `shop.*.api`, and the rule then reports only in the modules they match.
+ */
+export interface RuleOptions {
+  readonly [key: string]: OptionValue | undefined;
+}
 
 /**
  * `[tool.inwards.rules]` as parsed. Plain data: the Stop gate stores configs
  * as JSON and compares them.
  */
 export interface RuleSettings {
-  /** Only these rules report; absent means every rule. */
+  /** Only these rules report; absent means every rule that is on by default. */
   select?: string[];
-  /** These rules never report, whatever `select` says. */
+  /** These rules report too, on top of `select` or the defaults (`extend-select`). */
+  extendSelect?: string[];
+  /** These rules never report, whatever `select` or `extend-select` say. */
   ignore?: string[];
   /** The severity every finding of a rule gets, by code. */
   severity?: Record<string, Severity>;
+  /** Each rule's options table, by rule name, sorted. */
+  options?: Record<string, RuleOptions>;
 }
 
-export const RULE_KEYS: ReadonlySet<string> = new Set(["select", "ignore", "severity"]);
+export const RULE_KEYS: ReadonlySet<string> = new Set([
+  "select",
+  "extend-select",
+  "ignore",
+  "severity",
+]);
 const SEVERITIES: readonly string[] = ["error", "warning"] satisfies Severity[];
 /** Always reports at its own severity, see the module comment. */
 const FIXED = "INW000";
@@ -40,7 +65,8 @@ const FIXED = "INW000";
  * @param value - the raw `rules` value, if any.
  * @returns `{ rules }` when the table is set, else nothing.
  * @throws {ConfigError} for a key, code or severity it doesn't know, INW000 in
- *   `ignore` or `severity`, or an empty `select`.
+ *   `ignore`, `extend-select` or `severity`, an empty `select`, or a bad
+ *   options table.
  */
 export function parseRules(value: unknown): { rules?: RuleSettings } {
   if (value === undefined) {
@@ -49,8 +75,16 @@ export function parseRules(value: unknown): { rules?: RuleSettings } {
   if (!isRecord(value) || Array.isArray(value)) {
     throw new ConfigError("tool.inwards.rules must be a table.");
   }
-  rejectUnknownKeys(value, RULE_KEYS, "tool.inwards.rules");
+  const unknown = Object.keys(value).find(
+    (key) => !(RULE_KEYS.has(key) || ruleFor(key)?.name === key),
+  );
+  if (unknown !== undefined) {
+    throw new ConfigError(
+      `Unknown key tool.inwards.rules.${unknown}. Known keys: ${[...RULE_KEYS].join(", ")}, or a rule name such as layer-dependency for that rule's options.`,
+    );
+  }
   const select = codeList(value["select"], "select");
+  const extendSelect = codeList(value["extend-select"], "extend-select");
   const ignore = codeList(value["ignore"], "ignore");
   const severity = severities(value["severity"]);
   if (select?.length === 0) {
@@ -58,24 +92,66 @@ export function parseRules(value: unknown): { rules?: RuleSettings } {
       "tool.inwards.rules.select must list at least one rule code; to turn rules off, list them in ignore.",
     );
   }
+  const options = optionTables(value);
   return {
     rules: {
       ...(select === undefined ? {} : { select }),
+      ...(extendSelect === undefined ? {} : { extendSelect }),
       ...(ignore === undefined ? {} : { ignore }),
       ...(severity === undefined ? {} : { severity }),
+      ...(options === undefined ? {} : { options }),
     },
   };
 }
 
 /**
- * Validates `select` or `ignore`.
+ * Validates the options tables in `[tool.inwards.rules]`, the keys named after
+ * a rule. Names come out sorted, so reordering the tables changes nothing.
+ *
+ * @param table - the raw `rules` table, keys already checked.
+ * @returns options by rule name, or undefined when there are none.
+ * @throws {ConfigError} for a table that isn't one, an unknown key in it
+ *   (named), a bad `modules` or other option (named), or a table for INW000.
+ */
+function optionTables(table: Record<string, unknown>): Record<string, RuleOptions> | undefined {
+  const names = Object.keys(table)
+    .filter((key) => !RULE_KEYS.has(key))
+    .sort();
+  if (names.length === 0) {
+    return undefined;
+  }
+  const options: Record<string, RuleOptions> = {};
+  for (const name of names) {
+    const where = `tool.inwards.rules.${name}`;
+    const raw = table[name];
+    if (ruleFor(name)?.code === FIXED) {
+      throw new ConfigError(
+        `${where} can't be set: a file whose declared encoding can hide imports isn't checked at all, so ${FIXED} always reports it.`,
+      );
+    }
+    if (!isRecord(raw) || Array.isArray(raw)) {
+      throw new ConfigError(
+        `${where} must be a table of the rule's options, such as { modules = ["shop.api.*"] }.`,
+      );
+    }
+    rejectUnknownKeys(raw, optionKeys(name), where);
+    options[name] = parseOptions(name, raw, where);
+  }
+  return options;
+}
+
+/**
+ * Validates `select`, `extend-select` or `ignore`.
  *
  * @param value - the raw list, if any.
  * @param key - which key it is, for messages.
  * @returns the codes, or undefined when the key is absent.
  * @throws {ConfigError} when it isn't a list of known codes.
  */
-function codeList(value: unknown, key: "select" | "ignore"): string[] | undefined {
+function codeList(
+  value: unknown,
+  key: "select" | "extend-select" | "ignore",
+): string[] | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -150,22 +226,36 @@ function isSeverity(value: unknown): value is Severity {
 }
 
 /**
- * Says what the config does to one rule's findings.
+ * Says what the config does to one rule's findings. A rule is on when `select`
+ * lists it, or, without `select`, when it is on by default; `extend-select`
+ * turns it on as well, and `ignore` turns it off whatever the rest says. An
+ * options table's `modules` turns it off outside the modules it selects.
  *
  * @param code - a code such as `INW001`.
  * @param rules - the project's `[tool.inwards.rules]`, if any.
+ * @param module - the module a finding is in; empty or absent (a finding in
+ *   pyproject.toml, or a question about the whole rule) ignores `modules`.
  * @returns "off" when the rule doesn't report, the severity every finding
  *   gets, or undefined when the findings keep their own.
  */
 export function ruleLevel(
   code: string,
   rules: RuleSettings | undefined,
+  module = "",
 ): Severity | "off" | undefined {
-  if (rules === undefined || code === FIXED) {
+  if (code === FIXED) {
     return undefined;
   }
-  const { select, ignore = [], severity = {} } = rules;
-  if ((select !== undefined && !select.includes(code)) || ignore.includes(code)) {
+  const { select, extendSelect = [], ignore = [], severity = {}, options = {} } = rules ?? {};
+  const rule = ruleFor(code);
+  const chosen = select === undefined ? rule?.default !== "off" : select.includes(code);
+  const modules = rule === undefined ? undefined : options[rule.name]?.["modules"];
+  const scope = typeof modules === "object" ? modules : undefined;
+  const inScope =
+    scope === undefined ||
+    module === "" ||
+    scope.some((entry) => matchEntry(entry, module) !== undefined);
+  if (!(chosen || extendSelect.includes(code)) || ignore.includes(code) || !inScope) {
     return "off";
   }
   return Object.hasOwn(severity, code) ? severity[code] : undefined;
@@ -173,21 +263,52 @@ export function ruleLevel(
 
 /**
  * Applies `[tool.inwards.rules]` to findings: drops those of rules that are
- * off and re-levels the rest. Idempotent, and a no-op without the table.
+ * off (opt-in rules included when the table is absent) or scoped away from
+ * their module, and re-levels the rest. Idempotent.
  *
  * @param found - the findings, as the rules produced them.
  * @param rules - the project's `[tool.inwards.rules]`, if any.
  * @returns the findings to report.
  */
 export function applyRules(found: Diagnostic[], rules: RuleSettings | undefined): Diagnostic[] {
-  if (rules === undefined) {
-    return found;
-  }
   return found.flatMap((d) => {
-    const level = ruleLevel(d.code, rules);
+    const level = ruleLevel(d.code, rules, d.module);
     if (level === "off") {
       return [];
     }
     return level === undefined || level === d.severity ? [d] : [{ ...d, severity: level }];
+  });
+}
+
+/**
+ * Warns about options tables for rules that are off: they do nothing, but
+ * aren't an error, so a team can stage a rule's options before turning it on.
+ * Not filtered by the table itself, since the rule it names is off.
+ *
+ * @param rules - the project's `[tool.inwards.rules]`, if any.
+ * @param file - the pyproject.toml, to point at each table.
+ * @returns one warning per options table of a rule that is off, under that rule's code.
+ */
+export function checkRuleOptions(rules: RuleSettings | undefined, file: ConfigFile): Diagnostic[] {
+  const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
+  return Object.keys(rules?.options ?? {}).flatMap((name) => {
+    const rule = ruleFor(name);
+    if (rule === undefined || ruleLevel(rule.code, rules) !== "off") {
+      return [];
+    }
+    return [
+      diagnostic(rule, source, {
+        span: spanOfRuleTable(file.text, name),
+        severity: "warning",
+        message: `[tool.inwards.rules.${name}] sets options for ${name} (${rule.code}), which is off, so they do nothing.`,
+        fix: {
+          summary: `Ask the user whether to turn ${rule.code} on or remove [tool.inwards.rules.${name}].`,
+          steps: [
+            `To turn the rule on, add "${rule.code}" to extend-select (or select) in [tool.inwards.rules], and take it out of ignore.`,
+            "Don't edit [tool.inwards] yourself; tell the user.",
+          ],
+        },
+      }),
+    ];
   });
 }

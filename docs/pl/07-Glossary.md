@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: 89660e4eea14bdfc0a6ab49ca2a38a714c40fde5c122a0d23d9ffedcf731c570
+source_hash: 4e7164239d88d91ccd562381f48c95a9439f9e2540a3cb4735cc8588d0c1ce22
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -65,7 +65,7 @@ Port
 :   Interfejs, którego właścicielem jest kod wewnętrzny, a który implementuje kod zewnętrzny. W Pythonie zwykle `typing.Protocol`.
 
 Pionowy wycinek (vertical slice)
-:   Organizowanie kodu według funkcji (`orders/`, `invoices/`), a nie według warstwy technicznej, przy czym każdy wycinek ma własne handlery i dostęp do danych. Wycinki nie powinny sięgać do siebie nawzajem. Każdy wycinek można zadeklarować jako [kontekst](guides/configuration.md#contexts), a [INW002](rules/INW002.md) trzyma wycinki osobno, chyba że `depends-on` mówi inaczej; selektory glob, dzięki którym dwadzieścia wycinków nie wymaga dwudziestu wpisów, to [#191](https://github.com/SirCypkowskyy/inwards/issues/191).
+:   Organizowanie kodu według funkcji (`orders/`, `invoices/`), a nie według warstwy technicznej, przy czym każdy wycinek ma własne handlery i dostęp do danych. Wycinki nie powinny sięgać do siebie nawzajem. Każdy wycinek można zadeklarować jako [kontekst](guides/configuration.md#contexts), a [INW002](rules/INW002.md) trzyma wycinki osobno, chyba że `depends-on` mówi inaczej; warstwa może objąć każdy wycinek jednym [selektorem](guides/configuration.md#selectors), takim jak `shop.*.domain`.
 
 ## Terminy Inwards { #inwards-terms }
 
@@ -121,7 +121,7 @@ Odmowa prescanu (prescan refusal)
 :   Prescan rezygnuje z pliku, bo `import` pojawia się w miejscu, którego nie umie wyjaśnić. Plik dostaje wtedy pełne parsowanie. Odmowę dostaje 8,3 % plików biblioteki standardowej CPythona.
 
 Kod reguły (rule code)
-:   `INW` i trzy cyfry. Kody nigdy nie są używane ponownie, a wycofana reguła zachowuje swój numer.
+:   `INW` albo prefiks rodziny, np. `FAPI` (reguły FastAPI), i trzy cyfry. Kody nigdy nie są używane ponownie, a wycofana reguła zachowuje swój numer.
 
 Release PR
 :   Pull request, który release-please utrzymuje otwarty z następną wersją i jej changelogiem. Scalenie go tworzy wydanie ([ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)).

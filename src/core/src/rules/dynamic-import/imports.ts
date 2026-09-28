@@ -11,52 +11,45 @@
  * - `__import__(name, globals, locals, fromlist, level)`, also reached as
  *   `builtins.__import__` or `importlib.__import__`; a relative `level`
  *   resolves against the file's own package;
- * - `runpy.run_module(mod_name)`;
+ * - `runpy.run_module(mod_name)` and `pkgutil.resolve_name("mod:Obj")`;
+ * - `importlib.util.find_spec(name, package)`, and the file loaders
+ *   `importlib.util.spec_from_file_location` and
+ *   `importlib.machinery.SourceFileLoader`, which load the file at a path;
  * - `exec`, `eval` and `compile` with a literal source: the source is parsed
- *   as Python, and every import in it, static or dynamic, counts at the call.
+ *   as Python, and every import in it, static or dynamic, counts at the call;
+ *   names it binds (`from importlib import import_module as im`) count in the
+ *   calling module too;
+ * - any of these wrapped in `functools.partial(loader, ...)` with arguments
+ *   bound, read at the `partial` call.
  *
- * Aliases are resolved in `callees.ts`, literals are read in `python/literals.ts`,
- * the targets of module loaders in `loader-targets.ts`.
+ * The calls are found in `calls.ts`, aliases resolved in `callees.ts`,
+ * constants read in `python/literals.ts` (with the module's own constants from
+ * `constants.ts`), and the targets of module loaders in `loader-targets.ts`.
  *
- * A target Inwards can't read (a variable, an f-string field, a literal with a
- * `\N{...}` escape, whose decoding needs the Unicode name table, or a relative
- * `import_module` whose `package` isn't known) makes the call unverifiable. It
+ * A target Inwards can't read (a variable that isn't a module constant, an
+ * f-string field, a literal with a `\N{...}` escape, whose decoding needs the
+ * Unicode name table, or a relative `import_module` whose `package` isn't
+ * known) makes the call unverifiable. It
  * is reported in every layer but the outermost, which may import anything
  * first-party. `compile` is the exception: it only builds a code object, and
  * running that takes `exec` or `eval`, which are reported themselves.
  */
-import type { Node, Parser, Tree } from "web-tree-sitter";
-import type { LayerSpec } from "../../config/parse.ts";
+import type { Parser, Tree } from "web-tree-sitter";
+import type { LayerSpec } from "../../config/layers.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { unreadableEncoding } from "../../python/encoding.ts";
-import { argumentAt, literalSource } from "../../python/literals.ts";
-import { extractImports, normalizeSource, parsePython } from "../../python/parser.ts";
 import {
   allowedDirection,
   layerIndexOf,
   outwardImports,
+  portHome,
   portSteps,
+  rankOf,
 } from "../shared/layer-ownership.ts";
-import {
-  type Bindings,
-  builtinBindings,
-  collectBindings,
-  LOADERS,
-  qualify,
-  syntaxOf,
-} from "./callees.ts";
-import { computedSource } from "./computed-source.ts";
-import { type Loaded, moduleTargets, type Unreadable } from "./loader-targets.ts";
-
-/** What the loader search needs besides the tree. */
-interface Reader {
-  /** Parser with the Python grammar loaded, for literal `exec` sources. */
-  parser: Parser;
-  /** Finds the first-party module an import lands in (see `computedSource`). */
-  ownerOf: ModuleLookup;
-}
+import { builtinBindings } from "./callees.ts";
+import { loadingCalls, type Reader } from "./calls.ts";
+import type { Unreadable } from "./loader-targets.ts";
 
 /**
  * Treats every module as first-party: the safe default when no project index is at hand.
@@ -79,13 +72,17 @@ export interface DynamicImportRef extends ImportRef {
 /**
  * Every spelling a loading call must contain, before or after NFKC.
  * A call is resolved from a name that is either a builtin (`exec`, `eval`,
- * `compile`, `__import__`, `__builtins__`) or bound by an import statement,
- * which spells `importlib`, `runpy` or `builtins`. Import statements can't use
- * escapes, and identifiers are NFKC-normalised before the test, so any file
- * `extractDynamicImports` finds something in matches this pattern.
- * `re.compile` does not match: a builtin reached through a dot needs `builtins`.
+ * `compile`, `__import__`, `__builtins__`), bound by an import statement,
+ * which spells `importlib`, `runpy`, `pkgutil` or `builtins`, or reached
+ * through a builtin function's `__self__`. `sys.modules[...]` and
+ * `__globals__[...]` need a key that spells one of these too. Import
+ * statements can't use escapes, and identifiers are NFKC-normalised before
+ * the test, so any file `extractDynamicImports` finds something in matches
+ * this pattern. `re.compile` does not match: a builtin reached through a dot
+ * needs `builtins` or `__self__`.
  */
-const LOADER_HINT = /importlib|runpy|builtins|__import__|(?<![\w.])(?:exec|eval|compile)(?!\w)/u;
+const LOADER_HINT =
+  /importlib|runpy|pkgutil|builtins|__import__|__self__|(?<![\w.])(?:exec|eval|compile)(?!\w)/u;
 const NON_ASCII = /[^ -~\t\n\r\f]/u;
 
 /**
@@ -159,34 +156,39 @@ export function checkDynamicImports(
   layers: readonly LayerSpec[],
 ): Diagnostic[] {
   const readable = refs.filter((ref) => ref.unreadable === null);
-  const outward = outwardImports(file, readable, layers).map(({ ref, source, target }) => {
-    const message =
-      `Layer "${source.name}" imports "${ref.target}" from outer layer "${target.name}" ` +
-      `through a dynamic import (${ref.via}). Allowed direction: ${allowedDirection(layers)}.`;
-    return diagnostic(RULES.INW011, file, {
-      span: ref,
-      message,
-      fix: {
-        summary: `Remove the dynamic import and depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
-        steps: [
-          `Delete \`${ref.statement}\`. A dynamic import is still a dependency: building the module name at runtime or moving it to another loader hides it instead of removing it.`,
-          ...portSteps(source, target, ref),
-        ],
-      },
-    });
-  });
-  const own = layers[layerIndexOf(file.module, layers)];
+  const outward = outwardImports(file, readable, layers).map(
+    ({ ref, source, target, relation }) => {
+      const message =
+        `Layer "${source.name}" imports "${ref.target}" from ${relation} "${target.name}" ` +
+        `through a dynamic import (${ref.via}). Allowed direction: ${allowedDirection(layers)}.`;
+      return diagnostic(RULES.INW011, file, {
+        span: ref,
+        message,
+        fix: {
+          summary: `Remove the dynamic import and depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
+          steps: [
+            `Delete \`${ref.statement}\`. A dynamic import is still a dependency: building the module name at runtime or moving it to another loader hides it instead of removing it.`,
+            ...portSteps(file, layers, target, ref),
+          ],
+        },
+      });
+    },
+  );
+  const index = layerIndexOf(file.module, layers);
+  const own = layers[index];
   const outermost = layers.at(-1);
   if (!(own && outermost)) {
     return outward;
   }
-  const inner = own !== outermost;
+  const inner = rankOf(layers, index) < rankOf(layers, layers.length - 1);
   const unreadable = refs.flatMap((ref) => {
     const why = ref.unreadable;
     if (why?.kind === "encoding") {
       return [unreadableSource(file, ref, why.encoding)];
     }
-    return why?.kind === "computed" && inner ? [unverifiableTarget(file, ref, own, outermost)] : [];
+    return why?.kind === "computed" && inner
+      ? [unverifiableTarget(file, ref, { source: own, outermost, home: portHome(file, layers) })]
+      : [];
   });
   return [...outward, ...unreadable];
 }
@@ -196,17 +198,17 @@ export function checkDynamicImports(
  *
  * @param file - the calling file.
  * @param ref - the call.
- * @param source - the layer the file belongs to, not the outermost.
- * @param outermost - the outermost layer, where the loader may live.
+ * @param where - the layers involved and where the port goes.
+ * @param where.source - the layer the file belongs to, not the outermost.
+ * @param where.outermost - the outermost layer, where the loader may live.
+ * @param where.home - the file's matched prefix, worded by `portHome`.
  * @returns the INW011 diagnostic.
  */
 function unverifiableTarget(
   file: SourceFile,
   ref: DynamicImportRef,
-  source: LayerSpec,
-  outermost: LayerSpec,
+  { source, outermost, home }: { source: LayerSpec; outermost: LayerSpec; home: string },
 ): Diagnostic {
-  const home = source.modules[0] ?? source.name;
   const message =
     `Layer "${source.name}" makes a dynamic import (${ref.via}) with an argument Inwards can't read, ` +
     "such as a variable, an f-string field or *args, so Inwards can't verify that it points toward inner layers.";
@@ -218,7 +220,7 @@ function unverifiableTarget(
       steps: [
         `If the module is fixed, replace \`${ref.statement}\` with an import statement, or pass the loader only string literals (no variables, f-string fields, \\N{...} escapes or *args) so Inwards can check it.`,
         `If the module is chosen at runtime (plugins, settings), move the loader to the outermost layer "${outermost.name}" (the composition root) and pass what it loads into this module as a parameter.`,
-        `Type that parameter against a typing.Protocol declared in \`${home}\` (for example \`${home}.ports\`).`,
+        `Type that parameter against a typing.Protocol declared in ${home}.`,
       ],
     },
   });
@@ -248,118 +250,6 @@ function unreadableSource(file: SourceFile, ref: DynamicImportRef, encoding: str
       ],
     },
   });
-}
-
-const BUILTINS_PREFIX = /^builtins\./u;
-
-/** A module a call loads, and the call as the report names it. */
-interface Load extends Loaded {
-  via: string;
-}
-
-/**
- * Finds the loading calls under a node and what each one loads.
- * Recurses into literal `exec` sources, whose loads are reported at the
- * outer call and named after it.
- *
- * @param reader - the parser and the first-party lookup.
- * @param root - the module node to search.
- * @param file - the file being checked.
- * @param outer - names bound before this code runs (the builtins, or the caller of `exec`).
- * @returns each call that loads something, with its loads.
- */
-function loadingCalls(
-  reader: Reader,
-  root: Node,
-  file: SourceFile,
-  outer: Bindings,
-): { call: Node; loads: Load[] }[] {
-  const syntax = syntaxOf(root);
-  const bindings = collectBindings(syntax, outer);
-  const found: { call: Node; loads: Load[] }[] = [];
-  for (const call of syntax) {
-    const loads = call.type === "call" ? loadsOf(reader, call, file, bindings) : [];
-    if (loads.length > 0) {
-      found.push({ call, loads });
-    }
-  }
-  return found;
-}
-
-/**
- * Lists what one call loads, if its callee is a loader.
- *
- * @param reader - the parser and the first-party lookup.
- * @param call - a `call` node.
- * @param file - the file being checked.
- * @param bindings - what names mean in the calling module.
- * @returns the loaded modules, each with the loader's name; empty for any other call.
- */
-function loadsOf(reader: Reader, call: Node, file: SourceFile, bindings: Bindings): Load[] {
-  const fn = call.childForFieldName("function");
-  const loads: Load[] = [];
-  for (const qualified of new Set(fn ? qualify(fn, bindings) : [])) {
-    const kind = LOADERS.get(qualified);
-    if (kind) {
-      const via = qualified.replace(BUILTINS_PREFIX, "");
-      const loaded =
-        kind === "source"
-          ? (sourceTargets(reader, call, file, bindings) ??
-            computedSource(call, via, bindings, reader.ownerOf))
-          : moduleTargets(kind, call, file);
-      loads.push(...loaded.map((load) => ({ ...load, via })));
-    }
-  }
-  // A name bound to two loaders would report the same load twice.
-  const unique = new Map<string, Load>();
-  for (const load of loads) {
-    const key = `${load.target} ${load.unreadable?.kind ?? ""}`;
-    unique.set(key, unique.get(key) ?? load);
-  }
-  return [...unique.values()];
-}
-
-/**
- * Lists the imports made by the literal source of `exec`, `eval` or `compile`.
- * The source is parsed as Python. Its import statements and its own dynamic
- * imports count; relative ones resolve against the calling file, whose globals
- * the code runs in. Names the caller bound stay bound inside. Bytes are
- * decoded as CPython does: a PEP 263 declaration counts, and a codec Inwards
- * can't read makes the whole source unreadable.
- *
- * @param reader - the parser and the first-party lookup.
- * @param call - the `call` node.
- * @param file - the calling file.
- * @param bindings - names bound in the calling file.
- * @returns the modules the source imports, or null when the source isn't a literal.
- */
-function sourceTargets(
-  reader: Reader,
-  call: Node,
-  file: SourceFile,
-  bindings: Bindings,
-): Loaded[] | null {
-  const source = literalSource(argumentAt(call, 0, "source"));
-  if (source === null) {
-    return null;
-  }
-  const text = normalizeSource(source.text);
-  const encoding = source.bytes ? unreadableEncoding(text) : null;
-  if (encoding !== null) {
-    return [{ target: "", unreadable: { kind: "encoding", encoding } }];
-  }
-  const tree = parsePython(reader.parser, text);
-  try {
-    const nested = loadingCalls(reader, tree.rootNode, file, bindings);
-    return [
-      ...extractImports(tree, file).map((ref) => ({ target: ref.target, unreadable: null })),
-      ...nested.flatMap(({ loads }) =>
-        loads.map(({ target, unreadable: inner }) => ({ target, unreadable: inner })),
-      ),
-    ];
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
 }
 
 const LONGEST_STATEMENT = 120;

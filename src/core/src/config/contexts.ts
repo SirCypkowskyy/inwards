@@ -30,6 +30,7 @@ export const CONTEXT_KEYS: ReadonlySet<string> = new Set([
   "modules",
   "public",
   "depends-on",
+  "template",
 ]);
 
 /**

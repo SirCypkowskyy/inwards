@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseConfig } from "@inwards/core";
-import { workspaceDiagnostics } from "../src/server/workspace.ts";
+import { mayHoldModule, workspaceDiagnostics } from "../src/server/workspace.ts";
 
 const TMP = mkdtempSync(join(tmpdir(), "inwards-workspace-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));
@@ -62,3 +62,17 @@ test("the workspace pass follows symlinks inside the root, and not those leaving
     ["INW008", "app/users/__init__.py"],
   ]);
 });
+
+test.each([
+  ["shop/orders/node_modules/helper.py", ["shop"], true],
+  ["shop/orders/venv/site-packages/x.py", ["shop"], true],
+  ["shop/orders/node_modules/helper.py", [], false],
+  ["shop/__pycache__/order.cpython-313.pyc", ["shop"], false],
+  ["shop/.cache/x.py", ["shop"], false],
+  ["node_modules/pkg/x.py", ["shop"], false],
+] as const)(
+  "a file event at %s with layer packages %j may hold a module: %p",
+  (rel, open, want) => {
+    expect(mayHoldModule("/p", join("/p", rel), open)).toBe(want);
+  },
+);

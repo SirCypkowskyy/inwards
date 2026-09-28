@@ -145,8 +145,8 @@ inwards init: wrote the hexagonal preset to pyproject.toml and 14 example files.
 
 src/app/  (hexagonal)
 ├── adapters/
-│   ├── inbound/   inbound: may import domain, application, outbound
-│   └── outbound/  outbound: may import domain, application
+│   ├── inbound/   inbound: may import domain, application; not its sibling outbound
+│   └── outbound/  outbound: may import domain, application; not its sibling inbound
 ├── application/   application: may import domain
 ├── bootstrap.py   bootstrap: may import every other layer
 └── domain/        domain: imports no other layer
@@ -159,22 +159,34 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 
 Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
 
-Three presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
+Six presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
 
 | Style | Layers | What it can't forbid |
 |---|---|---|
 | `layered` | domain, persistence, services, presentation, bootstrap | presentation calling persistence directly (open layers) |
 | `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importing infrastructure |
-| `hexagonal` | domain, application, outbound (`adapters.outbound`), inbound (`adapters.inbound`), bootstrap | inbound adapters importing outbound ones |
+| `hexagonal` | domain, application, outbound (`adapters.outbound`) and inbound (`adapters.inbound`) as [siblings](configuration.md#sibling-layers), bootstrap | an inbound adapter calling a port instead of a use case |
+| `vertical-slices` | shared, features, bootstrap; each slice under `features` is a context whose public module is `api` | code only one slice uses moving into `shared` |
+| `bounded-contexts` | `app.*` with the `context` template: domain, application, infrastructure, api inside each context; bootstrap | a context's `api` re-exporting its domain entities |
+| `django` | `app.*` with the `django-app` template: models, services, views, urls inside each app; the package itself (settings, the root URLconf) | a view using the models instead of the services |
 
-Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer.
+Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer. In `hexagonal`, the inbound and outbound adapters share one place in the order, so neither may import the other.
+
+The last three presets keep packages apart with [contexts](configuration.md#contexts), and describe the packages with a [template](configuration.md#templates):
+
+- **`vertical-slices`** puts one package per feature under `app.features`, on a shared kernel `app.shared`. Each slice is a context: it imports another slice only when its `depends-on` names it ([INW002](../rules/INW002.md)), and then only that slice's `api` module ([INW003](../rules/INW003.md)), as does code outside every slice, such as `bootstrap.py`.
+- **`bounded-contexts`** layers every package directly below `app` the same way, `app.*.domain` < `app.*.application` < `app.*.infrastructure` < `app.*.api`, through one template entry. Contexts cross only through `app.<ctx>.api`, and since `api` is the outermost role, a context reaches another from its own `api`.
+- **`django`** layers every app below `app` as `models` < `services` < `views` < `urls`. The package itself is the outermost layer, for the settings, the root URLconf and app modules outside the roles, such as `admin.py` and `apps.py`. Apps are independent except through `services`: the preset turns INW002 off, so an app may use another's services without declaring it, and INW003 reports an import of any other module of another app. The innermost role gets `deny-libraries = []`, since models import `django.db`.
+
+The contexts table names each package, because a context's `modules` are literal prefixes. With `--scaffold`, init writes the entry for the scaffold's `orders` package; without it, the same entry is written commented out, as the example to copy for each package the project has. A package without an entry is not kept apart.
 
 What `--style` writes and when it stops:
 
 - **The table:** the layers, `root` (`src` for a src layout, else `.`), `required-version`, the default `ignore` list and a comment naming the preset and the Inwards version. The package comes from `[project].name`, normalised the way uv does it (`my-app` becomes `my_app`), or from `--package`; a Python keyword can't be one. Run below the project, init uses the nearest `pyproject.toml` above and says which. Before the package exists, `root` is `src` when the build backend is uv_build or `src/` already holds Python code.
 - **It never rewrites layers.** If `[tool.inwards]` already exists, init exits 2 and writes nothing. Without a `pyproject.toml` it exits 2 and suggests `uv init --package`.
-- **`--scaffold`** writes an entity, a port (`typing.Protocol`), a use case, an adapter that implements the port, a command-line driving adapter, the composition root and one test in `tests/`. It never replaces anything: if a file or symlink is in the way, or a directory leads outside the project through a symlink, init exits 2, lists the paths and writes nothing. An existing `__init__.py`, such as the one uv creates, is left as it is. The files go first and `pyproject.toml` last; if a write fails, init removes what it created, so the same command can run again.
-- **`--dry-run`** prints every change as a diff and writes nothing. **`--agent`** combines with `--style`: `inwards init --style clean --agent claude` writes the layers and the Claude Code hooks in one run.
+- **`--scaffold`** writes an entity, a port (`typing.Protocol`), a use case, an adapter that implements the port, a command-line driving adapter, the composition root and one test in `tests/`. In `vertical-slices` and `bounded-contexts` they sit in an `orders` package, behind an `api.py` that re-exports what the composition root needs. `django` writes an `orders` app (models, services, views, urls), `settings.py` and the root `urls.py` instead, with no test. It never replaces anything: if a file or symlink is in the way, or a directory leads outside the project through a symlink, init exits 2, lists the paths and writes nothing. An existing `__init__.py`, such as the one uv creates, is left as it is. The files go first and `pyproject.toml` last; if a write fails, init removes what it created, so the same command can run again.
+- **Package shapes come with `--scaffold`.** The table then also gets `[[tool.inwards.shape]]` entries ([Package shape](package-shape.md)) for the scaffold's packages, so the members are constrained too, not only the imports. The package itself may hold only its layer packages, `bootstrap.py`, `__main__.py` and `_version.py` (which hatch-vcs and setuptools-scm write), and in `hexagonal` `adapters/` holds only `inbound/` and `outbound/`: a module beside them would belong to no layer, so it is an INW007 error, and the shape guard ([INW007](../rules/INW007.md)) denies the Write that would create it. In `clean` and `hexagonal`, `application/` must hold `ports/` and `use_cases/`, and anything else there is only a warning. In `vertical-slices`, `features/` holds only slice packages and each slice must have `api`; in `bounded-contexts`, each context must have its four roles; in `django`, the package must hold `settings.py` and `urls.py`, and each app its four roles, with what `startapp` writes allowed beside them. The layer packages themselves have no shape, so a new entity, adapter or use case never trips one. A required member that goes missing is an INW008 error. Without `--scaffold` no shapes are written, since they describe the scaffold's layout rather than the code a project already has. `inwards init --list-styles` shows each preset's shapes.
+- **`--dry-run`** prints every change as a diff and writes nothing. **`--agent`** combines with `--style`: `inwards init --style clean --agent claude` writes the layers and the Claude Code hooks in one run. **`--brief`** also writes the [architecture brief](agents-md.md#the-architecture-brief-opt-in) into `AGENTS.md`, naming the preset and where its ports go.
 - After writing, init runs the check in process and prints the tree above. Without `--scaffold`, each layer package is marked `(missing)` and fails the check until it has a module.
 
 On a terminal, `inwards init` with neither `--style` nor `--agent` asks instead: the style (the highlighted one shows its layers), whether to scaffold, and which agent to wire. It ends by printing the same command with flags. Without a terminal (stdin or stdout isn't a TTY, or `CI` is set), it never waits for input: it exits 2 at once and lists the flags and the styles. Agents run init this way.
@@ -204,6 +216,10 @@ inwards check
 
 `All clear` with exit code 0 means every import points inward. Exit code 1 lists each violation with numbered fix steps, and exit code 2 is a usage or config error.
 
+### Coming from import-linter
+
+`inwards import-config` converts the contracts in `.importlinter`, `setup.cfg` or `[tool.importlinter]` into `[tool.inwards]`, and `--write` appends the table to `pyproject.toml`. It reports each contract it couldn't carry over, with the reason. [Migrating from import-linter](import-linter.md) has the mapping.
+
 ### On an existing codebase
 
 A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:
@@ -217,7 +233,7 @@ git add inwards-baseline.json
 
 `inwards baseline` checks the whole project under one config and writes every violation to `inwards-baseline.json` next to its `pyproject.toml`. Commit it: `inwards check`, the agent hooks and CI all read it. In a monorepo, run it once per package that has its own `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), since each file is checked against the baseline next to its own config. An accepted import can move to another line and still pass, because entries match by rule, module and message, without the message's "Allowed direction" sentence, so adding a layer doesn't bring them back. A second copy of it in the same module fails. When a whole-project check finds that accepted violations are gone, it says so. Run `inwards baseline` again to drop them. With `--format json` and a baseline present, the summary counts both: `baselined` on every run, `resolved` on a whole-project one. Agents can't edit the file or run the command: the Claude Code hooks deny both, and the Stop gate fails a session that changed it and checks that session's files with no baseline at all.
 
-Run it before you turn on the agent hooks, too. The Claude Code hooks already treat a violation that a committed file had at session start as context, not a block ([chapter 4](../04-AI-Integration.md)), but a file with uncommitted changes at session start has no known start content, so all of its violations block, and an agent pushed to fix them may rewrite code its task didn't need. The baseline also keeps `inwards check` and CI green.
+Run it before you turn on the agent hooks, too. The Claude Code hooks already treat a violation that a file had at session start as context, not a block ([chapter 4](../04-AI-Integration.md)), but a file with uncommitted changes that is too large for the hooks to keep a copy of (over 512 KiB, or past 4 MiB of such files) has no known start content, so all of its violations block, and an agent pushed to fix them may rewrite code its task didn't need. The baseline also keeps `inwards check` and CI green.
 
 Once a project has a baseline, `stop-gate = "project"` in `[tool.inwards]` makes the Claude Code Stop gate check the whole project against it instead of only the files the session changed, so a violation anywhere blocks the turn ([chapter 4](../04-AI-Integration.md)). A check skips the confirming parse where the baseline accepts everything the prescan found, so a fully baselined check costs about as much as a clean one.
 

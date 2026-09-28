@@ -48,6 +48,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | hook, agent hook | hook, hook agenta (hooka, hooki, hookach) | the four Claude Code hooks: SessionStart, PreToolUse, PostToolUse, Stop |
 | Stop gate | Stop gate | "Stop gate blokuje turę", not "bramka Stop" |
 | config guard | config guard | the PreToolUse guard |
+| shape guard | shape guard | the PreToolUse check of a new file against INW007 |
 | baseline | baseline (baseline'u); `inwards-baseline.json` | "przyjąć naruszenia do baseline'u" |
 | fingerprint | fingerprint (fingerprintu) | the 16-hex-digit hash |
 | run log | run log (run logu) | `.inwards/runs.jsonl` |
@@ -59,9 +60,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | workflow (GitHub Actions) | workflow | |
 | wheel | wheel (wheela, wheele) | the Python package format |
 | heredoc | heredoc (heredoca, heredoki) | a shell `<<'EOF'` block |
+| wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW011 | |
+| Rule codes | INW000, INW001, ... INW011, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
@@ -84,6 +86,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
 | architecture linter | linter architektury |
+| architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
 | bounded context | kontekst ograniczony (bounded context) |
 | budget (performance) | budżet |
@@ -97,6 +100,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | corpus | korpus |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
+| contract (import-linter) | kontrakt |
+| container package (a package that holds layers) | pakiet-kontener |
 | config error | błąd konfiguracji |
 | confirming parse | parsowanie potwierdzające |
 | dead prefix | martwy prefiks |
@@ -107,6 +112,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | differential test | test różnicowy |
 | domain layer, application layer, infrastructure layer | warstwa domeny, warstwa aplikacji, warstwa infrastruktury |
 | dynamic import | import dynamiczny |
+| evidence (a matching module below a package, INW006) | dowód |
 | edit distance | odległość edycyjna |
 | computed (target, source) | wyliczany (cel, kod) |
 | unverifiable (INW011 target), unreadable | niesprawdzalny, nieczytelny |
@@ -140,18 +146,29 @@ baseline'u); multi-word names are left uninflected where possible.
 | library; third-party library; standard library | biblioteka; biblioteka zewnętrzna; biblioteka standardowa |
 | inner, outer layer; innermost, outermost | warstwa wewnętrzna, zewnętrzna; najbardziej wewnętrzna, najbardziej zewnętrzna |
 | maintainer | opiekun projektu |
+| sibling (module, package; import-linter's layers) | moduł sąsiedni, sąsiedni pakiet |
+| sibling layers (a nested array in `layers`, `a \| b` in a template's roles) | warstwy sąsiednie |
+| template (`[tool.inwards.templates]`); role (a template's `roles`) | szablon; rola |
+| rank (of a layer among siblings) | miejsce (w kolejności warstw) |
 | cache (uv's, bunx's) | pamięć podręczna (uv, bunx) |
 | dev dependency | zależność deweloperska |
 | member (of a package) | element (pakietu) |
 | miss (prescan) | przeoczenie |
+| opt-in rule (default off) | reguła opt-in (domyślnie wyłączona) |
+| options table (`[tool.inwards.rules.<rule-name>]`) | tabela opcji |
 | owner (the repo's) | właściciel |
 | payload (hook input) | dane wejściowe (hooka) |
 | per-edit hook | hook edycji |
 | phase in (rules) | wprowadzać stopniowo (reguły) |
 | picker (`init` on a terminal) | kreator |
 | namespace package | pakiet przestrzeni nazw |
+| portion (of a namespace package, PEP 420) | część (pakietu przestrzeni nazw) |
+| virtualenv (`.venv`), site-packages | środowisko wirtualne (`.venv`), site-packages |
 | module index | indeks modułów |
 | package shape | kształt pakietu |
+| path operation (FastAPI) | operacja ścieżki |
+| include a router (`include_router`) | dołączać router, dołączenie |
+| unmounted router (FAPI003) | niepodpięty router |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |
@@ -168,10 +185,13 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
+| matched prefix (of a layer selector) | dopasowany prefiks |
+| truth table | tabela prawdy |
 | session | sesja |
 | session state | stan sesji |
 | session baseline (the start snapshot, not the file) | punkt odniesienia, migawka startowa |
 | severity | poziom (błąd, ostrzeżenie) |
+| shared kernel (the `shared` layer of `vertical-slices`) | wspólne jądro |
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
 | snapshot | migawka |
 | spike | eksperyment |
@@ -179,6 +199,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | string (Python) | napis |
 | suppression, inline suppression (`# inwards: ignore[...]`) | wyciszenie, wyciszenie w linii |
 | reason (of a suppression) | powód |
+| path operation (FastAPI) | operacja ścieżki |
+| exception handler (FastAPI) | handler wyjątków |
+| helper (function) | funkcja pomocnicza |
+| inclusion (`include_router`) | dołączenie |
 | finding | diagnostyka (as for diagnostic) |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |

@@ -1,0 +1,14 @@
+[project]
+name = "mypackage"
+version = "0.1.0"
+
+[tool.importlinter]
+root_package = "mypackage"
+
+[[tool.importlinter.contracts]]
+name = "Layers in every container"
+type = "layers"
+layers = ["high", "(medium)", "low"]
+containers = ["mypackage.foo", "mypackage.bar"]
+exhaustive = true
+exhaustive_ignores = ["utils"]

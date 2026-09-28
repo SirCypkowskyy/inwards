@@ -51,6 +51,13 @@ layers = [
   { name = "presentation", modules = ["my_app.presentation"] },  # CLI or HTTP handlers
   { name = "bootstrap", modules = ["my_app.bootstrap"] },        # composition root: wires the adapters into the use cases
 ]
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: the layers and the composition root only; anything else is an error, since no layer would hold it.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["domain/", "persistence/", "services/", "presentation/", "bootstrap.py"]
+allow = ["__main__.py", "_version.py"]
 "
 ,
 }
@@ -109,6 +116,20 @@ layers = [
   { name = "presentation", modules = ["my_app.presentation"] },      # CLI or HTTP handlers
   { name = "bootstrap", modules = ["my_app.bootstrap"] },            # composition root: wires the adapters into the use cases
 ]
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: the layers and the composition root only; anything else is an error, since no layer would hold it.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["domain/", "application/", "infrastructure/", "presentation/", "bootstrap.py"]
+allow = ["__main__.py", "_version.py"]
+
+# my_app.application: ports and use cases; anything else is a warning.
+[[tool.inwards.shape]]
+packages = ["my_app.application"]
+require = ["ports/", "use_cases/"]
+allow = []
+extra = "warning"
 "
 ,
 }
@@ -142,8 +163,8 @@ exports[`inwards init --style X --scaffold on a fresh uv project hexagonal: exit
 
 src/my_app/  (hexagonal)
 ├── adapters/
-│   ├── inbound/   inbound: may import domain, application, outbound
-│   └── outbound/  outbound: may import domain, application
+│   ├── inbound/   inbound: may import domain, application; not its sibling outbound
+│   └── outbound/  outbound: may import domain, application; not its sibling inbound
 ├── application/   application: may import domain
 ├── bootstrap.py   bootstrap: may import every other layer
 └── domain/        domain: imports no other layer
@@ -158,23 +179,288 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 "[tool.inwards]
 # Preset "hexagonal" (inwards init --style hexagonal, Inwards <VERSION>).
 # Layers are listed innermost first: each may import itself and the layers above it.
-# Not enforced by this preset: inbound adapters may import outbound ones; leave the wiring to bootstrap.
+# A nested array holds sibling layers: they share a place and may not import each other.
+# Not enforced by this preset: an inbound adapter may call a port directly instead of a use case.
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
 layers = [
-  { name = "domain", modules = ["my_app.domain"] },               # entities and business rules, no I/O
-  { name = "application", modules = ["my_app.application"] },     # use cases and the ports they need
-  { name = "outbound", modules = ["my_app.adapters.outbound"] },  # driven adapters: implement ports
-  { name = "inbound", modules = ["my_app.adapters.inbound"] },    # driving adapters: call use cases
-  { name = "bootstrap", modules = ["my_app.bootstrap"] },         # composition root: wires the adapters into the use cases
+  { name = "domain", modules = ["my_app.domain"] },                 # entities and business rules, no I/O
+  { name = "application", modules = ["my_app.application"] },       # use cases and the ports they need
+  [
+    { name = "outbound", modules = ["my_app.adapters.outbound"] },  # driven adapters: implement ports
+    { name = "inbound", modules = ["my_app.adapters.inbound"] },    # driving adapters: call use cases
+  ],
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },           # composition root: wires the adapters into the use cases
 ]
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: the layers and the composition root only; anything else is an error, since no layer would hold it.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["domain/", "application/", "adapters/", "bootstrap.py"]
+allow = ["__main__.py", "_version.py"]
+
+# my_app.application: ports and use cases; anything else is a warning.
+[[tool.inwards.shape]]
+packages = ["my_app.application"]
+require = ["ports/", "use_cases/"]
+allow = []
+extra = "warning"
+
+# my_app.adapters: the inbound and outbound layers only; anything else is an error, since no layer would hold it.
+[[tool.inwards.shape]]
+packages = ["my_app.adapters"]
+require = ["inbound/", "outbound/"]
+allow = []
 "
 ,
 }
 `;
 
-exports[`inwards init without --style or --agent --list-styles prints each preset's layers 1`] = `
+exports[`inwards init --style X --scaffold on a fresh uv project vertical-slices: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 11,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/bootstrap.py",
+    "src/my_app/features/__init__.py",
+    "src/my_app/features/orders/__init__.py",
+    "src/my_app/features/orders/api.py",
+    "src/my_app/features/orders/cli.py",
+    "src/my_app/features/orders/in_memory_orders.py",
+    "src/my_app/features/orders/order.py",
+    "src/my_app/features/orders/place_order.py",
+    "src/my_app/features/orders/repository.py",
+    "src/my_app/shared/__init__.py",
+    "tests/test_place_order.py",
+  ],
+  "stdout": 
+"inwards init: wrote the vertical-slices preset to pyproject.toml and 11 example files.
+
+src/my_app/  (vertical-slices)
+├── bootstrap.py  bootstrap: may import every other layer
+├── features/     features: may import shared
+└── shared/       shared: imports no other layer
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m my_app.bootstrap book 2
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "vertical-slices" (inwards init --style vertical-slices, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# Not enforced by this preset: code only one slice uses may still move into shared, where every slice can reach it.
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "shared", modules = ["my_app.shared"] },        # the shared kernel: code every slice may use
+  { name = "features", modules = ["my_app.features"] },    # one package per slice, each a context
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },  # composition root: wires the adapters into the use cases
+]
+
+# What every slice has in common: other code may import only its api module.
+[tool.inwards.templates.slice]
+public = ["api"]
+
+# Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
+# Add an entry like this for every slice; one without an entry is not kept apart.
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["my_app.features.orders"]
+template = "slice"
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: the layers and the composition root only; anything else is an error, since no layer would hold it.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["shared/", "features/", "bootstrap.py"]
+allow = ["__main__.py", "_version.py"]
+
+# my_app.features: slice packages only; a module here would belong to no slice.
+[[tool.inwards.shape]]
+packages = ["my_app.features"]
+allow = ["*/"]
+
+# my_app.features.*: every slice has its public api module.
+[[tool.inwards.shape]]
+packages = ["my_app.features.*"]
+require = ["api"]
+"
+,
+}
+`;
+
+exports[`inwards init --style X --scaffold on a fresh uv project bounded-contexts: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 12,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/bootstrap.py",
+    "src/my_app/orders/__init__.py",
+    "src/my_app/orders/api.py",
+    "src/my_app/orders/application/__init__.py",
+    "src/my_app/orders/application/place_order.py",
+    "src/my_app/orders/application/ports.py",
+    "src/my_app/orders/domain/__init__.py",
+    "src/my_app/orders/domain/order.py",
+    "src/my_app/orders/infrastructure/__init__.py",
+    "src/my_app/orders/infrastructure/cli.py",
+    "src/my_app/orders/infrastructure/in_memory_orders.py",
+    "tests/test_place_order.py",
+  ],
+  "stdout": 
+"inwards init: wrote the bounded-contexts preset to pyproject.toml and 12 example files.
+
+src/my_app/  (bounded-contexts)
+├── */
+│   ├── api.py           context.api: may import context.domain, context.application, context.infrastructure
+│   ├── application/     context.application: may import context.domain
+│   ├── domain/          context.domain: imports no other layer
+│   └── infrastructure/  context.infrastructure: may import context.domain, context.application
+└── bootstrap.py         bootstrap: may import every other layer
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv run python -m my_app.bootstrap book 2
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "bounded-contexts" (inwards init --style bounded-contexts, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# An entry with a template becomes one layer per role, inside each package it matches.
+# Not enforced by this preset: a context's api may re-export anything, its domain entities included.
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "context", modules = ["my_app.*"], template = "context" },  # every bounded context, layered by the context template
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },              # composition root: wires the adapters into the use cases
+]
+
+# The layers inside every context, innermost first, and the one module other code may import.
+[tool.inwards.templates.context]
+roles = ["domain", "application", "infrastructure", "api"]
+public = ["api"]
+
+# Each context package is a context: it imports another only when its depends-on names it, and then only its api.
+# Add an entry like this for every context package; one without an entry is not kept apart.
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["my_app.orders"]
+template = "context"
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: context packages and the composition root only; a module here would belong to no layer.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["bootstrap.py"]
+allow = ["*/", "__main__.py", "_version.py"]
+
+# my_app.*: the context's four layers; anything else is a warning, since no layer would hold it.
+[[tool.inwards.shape]]
+packages = ["my_app.*"]
+require = ["domain/", "application/", "infrastructure/", "api"]
+allow = []
+extra = "warning"
+"
+,
+}
+`;
+
+exports[`inwards init --style X --scaffold on a fresh uv project django: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 8,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/orders/__init__.py",
+    "src/my_app/orders/models.py",
+    "src/my_app/orders/services.py",
+    "src/my_app/orders/urls.py",
+    "src/my_app/orders/views.py",
+    "src/my_app/settings.py",
+    "src/my_app/urls.py",
+  ],
+  "stdout": 
+"inwards init: wrote the django preset to pyproject.toml and 7 example files.
+
+src/my_app/  (django)  project: may import every other layer
+└── */
+    ├── models.py    app.models: imports no other layer
+    ├── services.py  app.services: may import app.models
+    ├── urls.py      app.urls: may import app.models, app.services, app.views
+    └── views.py     app.views: may import app.models, app.services
+
+inwards check: 0 violations, 0 warnings.
+
+Try the example: uv add django && uv run django-admin check --settings my_app.settings
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "django" (inwards init --style django, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# An entry with a template becomes one layer per role, inside each package it matches.
+# Not enforced by this preset: a view may use the models directly instead of going through the services.
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "app", modules = ["my_app.*"], template = "django-app", deny-libraries = [] },  # every Django app, layered by the django-app template; models import django.db
+  { name = "project", modules = ["my_app"] },                                              # settings, the root URLconf, and app modules outside the roles (admin, apps)
+]
+
+# The layers inside every app, innermost first, and the module other apps may import.
+[tool.inwards.templates.django-app]
+roles = ["models", "services", "views", "urls"]
+public = ["services"]
+
+[tool.inwards.rules]
+# Apps may use each other's services without declaring it; INW003 keeps them to services.
+ignore = ["INW002"]
+
+# Each app is a context: other apps and the project may import only its services.
+# Add an entry like this for every app; one without an entry is not kept apart.
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["my_app.orders"]
+template = "django-app"
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: apps, settings and the URLconf only; anything else is an error.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["settings.py", "urls.py"]
+allow = ["*/", "asgi.py", "wsgi.py", "__main__.py", "_version.py"]
+
+# my_app.*: the app's roles and what startapp writes; anything else is a warning.
+[[tool.inwards.shape]]
+packages = ["my_app.*"]
+require = ["models", "services", "views", "urls"]
+allow = ["admin", "apps", "migrations/", "tests"]
+extra = "warning"
+"
+,
+}
+`;
+
+exports[`inwards init without --style or --agent --list-styles prints each preset's layers and shapes 1`] = `
 "layered: N-tier: presentation calls services, services call persistence
   1. domain        shop.domain        entities shared by every layer
   2. persistence   shop.persistence   repositories and their Protocols
@@ -182,6 +468,8 @@ exports[`inwards init without --style or --agent --list-styles prints each prese
   4. presentation  shop.presentation  CLI or HTTP handlers
   5. bootstrap     shop.bootstrap     composition root: wires the adapters into the use cases
   Gap: presentation may call persistence without going through services (open layers).
+  Shapes, with --scaffold:
+    shop  requires domain/, persistence/, services/, presentation/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it
 
 clean: entities at the centre, use cases around them, frameworks outside
   1. domain          shop.domain          entities and business rules, no I/O
@@ -190,13 +478,56 @@ clean: entities at the centre, use cases around them, frameworks outside
   4. presentation    shop.presentation    CLI or HTTP handlers
   5. bootstrap       shop.bootstrap       composition root: wires the adapters into the use cases
   Gap: presentation may import infrastructure; leave the wiring to bootstrap.
+  Shapes, with --scaffold:
+    shop              requires domain/, application/, infrastructure/, presentation/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it
+    shop.application  requires ports/, use_cases/: ports and use cases; anything else is a warning
 
 hexagonal: ports and adapters: the application talks to the world only through ports
   1. domain       shop.domain             entities and business rules, no I/O
   2. application  shop.application        use cases and the ports they need
   3. outbound     shop.adapters.outbound  driven adapters: implement ports
-  4. inbound      shop.adapters.inbound   driving adapters: call use cases
-  5. bootstrap    shop.bootstrap          composition root: wires the adapters into the use cases
-  Gap: inbound adapters may import outbound ones; leave the wiring to bootstrap.
+  3. inbound      shop.adapters.inbound   driving adapters: call use cases
+  4. bootstrap    shop.bootstrap          composition root: wires the adapters into the use cases
+  Gap: an inbound adapter may call a port directly instead of a use case.
+  Shapes, with --scaffold:
+    shop              requires domain/, application/, adapters/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it
+    shop.application  requires ports/, use_cases/: ports and use cases; anything else is a warning
+    shop.adapters     requires inbound/, outbound/: the inbound and outbound layers only; anything else is an error, since no layer would hold it
+
+vertical-slices: one package per feature, independent of each other, on a shared kernel
+  1. shared     shop.shared     the shared kernel: code every slice may use
+  2. features   shop.features   one package per slice, each a context
+  3. bootstrap  shop.bootstrap  composition root: wires the adapters into the use cases
+  Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
+  Gap: code only one slice uses may still move into shared, where every slice can reach it.
+  Shapes, with --scaffold:
+    shop             requires shared/, features/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it
+    shop.features    allows */: slice packages only; a module here would belong to no slice
+    shop.features.*  requires api: every slice has its public api module
+
+bounded-contexts: one package per bounded context, each layered inside, crossing only through its api
+  1. context.domain          shop.*.domain          entities and business rules, no I/O
+  2. context.application     shop.*.application     use cases and the ports they need
+  3. context.infrastructure  shop.*.infrastructure  adapters: implement ports, drive use cases
+  4. context.api             shop.*.api             the context's public module
+  5. bootstrap               shop.bootstrap         composition root: wires the adapters into the use cases
+  Each context package is a context: it imports another only when its depends-on names it, and then only its api.
+  Gap: a context's api may re-export anything, its domain entities included.
+  Shapes, with --scaffold:
+    shop    requires bootstrap.py; allows */, __main__.py, _version.py: context packages and the composition root only; a module here would belong to no layer
+    shop.*  requires domain/, application/, infrastructure/, api: the context's four layers; anything else is a warning, since no layer would hold it
+
+django: Django apps: models, services, views and urls in each, apps crossing only through services
+  1. app.models    shop.*.models    the app's models
+  2. app.services  shop.*.services  business operations: the app's public module
+  3. app.views     shop.*.views     turn requests into service calls
+  4. app.urls      shop.*.urls      the app's URL patterns
+  5. project       shop             settings, the root URLconf, and app modules outside the roles (admin, apps)
+  Each app is a context: other apps and the project may import only its services.
+  Turns off INW002. Apps may use each other's services without declaring it; INW003 keeps them to services.
+  Gap: a view may use the models directly instead of going through the services.
+  Shapes, with --scaffold:
+    shop    requires settings.py, urls.py; allows */, asgi.py, wsgi.py, __main__.py, _version.py: apps, settings and the URLconf only; anything else is an error
+    shop.*  requires models, services, views, urls; allows admin, apps, migrations/, tests: the app's roles and what startapp writes; anything else is a warning
 "
 `;

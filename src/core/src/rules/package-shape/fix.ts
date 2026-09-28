@@ -1,10 +1,10 @@
 /**
  * @file Wording for INW007 and INW008. Messages name the member and the package
  * only, never the allowed list, so a baseline entry survives a change to
- * `allow`. The fix steps list the allowed members and name the member the
- * code most likely belongs in: a built-in synonym, a suffix match, or the
- * closest name within an edit distance of 2 (1 for names of 3 to 5
- * characters, 0 below that, so `db.py` isn't sent to `di.py`).
+ * `allow`. The fix steps list the allowed members, then the shape's `hints`,
+ * and name the member the code most likely belongs in: a built-in synonym, a
+ * suffix match, or the closest name within an edit distance of 2 (1 for
+ * names of 3 to 5 characters, 0 below that, so `db.py` isn't sent to `di.py`).
  */
 
 import type { NameRule, ShapeSpec } from "../../config/shape.ts";
@@ -83,6 +83,7 @@ export function shapeFinding(
   const steps = [
     ...(target === undefined ? [] : [`Move the code into ${dir}${target} and delete ${member}.`]),
     ...(shape.allow === undefined ? [] : [`Package "${pkg}" may hold: ${allowed.join(", ")}.`]),
+    ...(shape.hints ?? []),
     ASK,
   ];
   return {

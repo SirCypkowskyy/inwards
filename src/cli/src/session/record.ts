@@ -5,15 +5,30 @@
  *
  * Two files per session in `.inwards/state/`:
  *
- * - `<id>.start.json`: HEAD, every `[tool.inwards]` table in the project and a
- *   content-hash manifest. Written once, at startup or /clear, to a temporary
- *   file that is then renamed, so a reader never sees half of it.
+ * - `<id>.start.json`: HEAD, every `[tool.inwards]` table in the project, a
+ *   content-hash manifest, the symlinks in layer packages and the top-level
+ *   modules under each config root. Written once,
+ *   at startup or /clear, to a temporary file that is then renamed, so a
+ *   reader never sees half of it.
  * - `<id>.jsonl`: one small event per line (edits, resumes). Hooks run in
  *   parallel, so nothing rewrites it; each hook appends one short line.
+ * - `<id>.content.json`: copies of the Python files git can't give back as
+ *   they were at start (`start-copies.ts`, #157), written like the start
+ *   file, before it, and pruned with it. Absent when there are none.
  *
  * A session without its start file is unknown, and callers fail closed. A
  * resume or compact never writes a start, and a start is never overwritten,
  * so deleting `.inwards/` mid-session can't be undone by the next SessionStart.
+ *
+ * The start witness (#88): a copy of `<id>.start.json` kept outside the
+ * project, in `<state home>/inwards/sessions/<project hash>/`. Bash can delete
+ * `.inwards/state` and pipe a made-up SessionStart into the hook, which would
+ * record a new start from the loosened project. A SessionStart for a session
+ * that already has a witness is a replay: it puts the witnessed start back
+ * and logs the replay, and the readers prefer the witness over the project's
+ * copy and say when the two disagree. The witness lives where the agent's
+ * Bash can still write, so it catches a replay, not an agent that also
+ * deletes or forges the witness; chapter 4 of the docs says what is left.
  *
  * Limits: the symlink checks happen before each open, and Node has no openat,
  * so a process of the same user that swaps `.inwards` in between can still
@@ -22,42 +37,47 @@
  * The PreToolUse guard (#23) keeps the agent's own tools away from `.inwards/`.
  */
 import { join } from "node:path";
-import type { Diagnostic, InwardsConfig } from "@inwards/core";
+import type { Diagnostic } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { baselineHashes } from "../project/baseline.ts";
-import { projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
+import {
+  projectConfigs,
+  projectLinks,
+  projectManifest,
+  projectPath,
+  projectTopLevel,
+} from "../project/snapshot.ts";
+import type { SessionStart } from "./contracts.ts";
 import { fingerprint } from "./fingerprint.ts";
+import { copiesName, startCopier } from "./start-copies.ts";
+import {
+  readStart,
+  type StartRecord,
+  touchWitness,
+  trustedStart,
+  witnessPath,
+  writeWitness,
+} from "./start-record.ts";
 
 /** What recording and reading a session touches. */
-export type SessionIo = Pick<Platform, "probe" | "read" | "walk" | "git" | "clock" | "state">;
+export type SessionIo = Pick<
+  Platform,
+  "probe" | "read" | "walk" | "git" | "clock" | "state" | "runtime"
+>;
 
 /** Session ids come from the agent's payload, so only a safe file name is accepted. */
 const SESSION_ID = /^[\w-]{1,128}$/u;
 /** SessionStart sources that begin a session; `resume` and `compact` continue one. */
 const NEW_SESSION = new Set(["startup", "clear"]);
 
-/** What a session started from. */
-export interface SessionStart {
-  at: string;
-  /** `git rev-parse HEAD` at session start, or null outside a git repo. */
-  head: string | null;
-  /** Every `[tool.inwards]` table in the project, by project-relative pyproject.toml path. */
-  configs: Record<string, InwardsConfig>;
-  /** pyproject.toml files whose `[tool.inwards]` was already invalid (absent in older state files). */
-  invalid?: string[];
-  /** Project-relative path of every Python file in the project, to its SHA-256. */
-  manifest: Record<string, string>;
-  /** Each config's inwards-baseline.json SHA-256, by config path (absent in older state files). */
-  baselines?: Record<string, string>;
-}
-
 /** One line of the session log. */
 type SessionEvent =
   | { t: "edit"; at: string; file: string; fingerprints: string[] }
   | { t: "resume"; at: string; source: string }
   | { t: "stop"; at: string; fresh: boolean }
-  | { t: "pass"; at: string };
+  | { t: "pass"; at: string }
+  | { t: "replay"; at: string; source: string };
 
 /** The session as the Stop gate and escalation see it. */
 export interface SessionState {
@@ -68,6 +88,10 @@ export interface SessionState {
   seen: Map<string, number>;
   /** How many times in a row the Stop gate has blocked, since the last turn start or clean pass. */
   stops: number;
+  /** How the start record compares with its witness outside the project. */
+  record: StartRecord;
+  /** A SessionStart for a new session came after the session had started, e.g. piped in through Bash. */
+  replayed: boolean;
 }
 
 /**
@@ -81,17 +105,29 @@ export function isSessionId(id: unknown): id is string {
 }
 
 /**
- * Handles SessionStart. A new session (startup, /clear) records its start and
- * prunes old sessions; a resume or compact only logs that it happened.
- * Projects without any `[tool.inwards]` get no state at all.
+ * Handles SessionStart. A new session (startup, /clear) records its start,
+ * with copies of the files git can't give back, and a witness of it outside
+ * the project, and prunes old sessions; a resume or compact only logs that it
+ * happened. A new-session start for a session that already has a witness is
+ * a replay: the witnessed start is put back and the replay logged.
+ * Projects without any `[tool.inwards]` get no state at all. The witness is
+ * best effort: a state directory that can't be written (a read-only home in
+ * a container or sandbox) leaves the session without one, and the Stop gate
+ * then falls back to the committed config.
  *
  * @param io - reads the project, runs git, tells the time and writes the state.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @param source - the payload's `source`: startup, resume, clear or compact.
- * @throws when the state can't be written or the project can't be read.
+ * @returns a note for the user when the witness couldn't be written, else undefined.
+ * @throws when the project's state can't be written or the project can't be read.
  */
-export function recordStart(io: SessionIo, project: string, id: string, source: string): void {
+export function recordStart(
+  io: SessionIo,
+  project: string,
+  id: string,
+  source: string,
+): string | undefined {
   const startFile = join(io.state.statePath(project), `${id}.start.json`);
   if (!NEW_SESSION.has(source)) {
     // Only a session that already has state is continued. This never creates
@@ -99,19 +135,31 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
     if (io.probe.exists(io.state.statePath(project))) {
       append(io, project, id, { t: "resume", at: io.clock.now(), source });
     }
-    return;
+    touchWitness(io, project, id);
+    return undefined;
   }
   if (io.probe.exists(startFile)) {
-    return; // a start is written once; a repeated startup can't reset the baseline
+    return undefined; // a start is written once; a repeated startup can't reset the baseline
+  }
+  const witnessed = readStart(io, witnessPath(io.runtime, project, id));
+  if (witnessed !== undefined) {
+    // The session started before, so its start file was deleted: keep the original.
+    io.state.publish(io.state.stateDir(project), `${id}.start.json`, JSON.stringify(witnessed));
+    append(io, project, id, { t: "replay", at: io.clock.now(), source });
+    return undefined;
   }
   const { valid: configs, invalid } = projectConfigs(io, project);
   if (Object.keys(configs).length === 0) {
-    return;
+    return undefined;
   }
-  const manifest = projectManifest(io, project, configs);
   const head = io.git.run(project, ["rev-parse", "HEAD"])?.trim() ?? null;
+  const copier = startCopier(io, project, head);
+  const manifest = projectManifest(io, project, configs, copier.add);
   const dir = io.state.stateDir(project);
   io.state.prune(dir, id);
+  if (Object.keys(copier.copies).length > 0) {
+    io.state.publish(dir, copiesName(id), JSON.stringify(copier.copies));
+  }
   const baselines = baselineHashes(io, project, Object.keys(configs));
   const start: SessionStart = {
     at: io.clock.now(),
@@ -120,8 +168,18 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
     invalid,
     manifest,
     baselines,
+    links: projectLinks(io, project, configs),
+    topLevel: projectTopLevel(io, project, configs),
   };
-  io.state.publish(dir, `${id}.start.json`, JSON.stringify(start));
+  const text = JSON.stringify(start);
+  io.state.publish(dir, `${id}.start.json`, text);
+  try {
+    writeWitness(io, project, id, text);
+    return undefined;
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    return `Inwards couldn't keep a copy of this session's start outside the project (${why}), so the Stop gate trusts .inwards/state only while [tool.inwards] is the committed one. Set XDG_STATE_HOME to a writable directory to keep the copy.`;
+  }
 }
 
 /**
@@ -188,46 +246,55 @@ export function recordPass(
 /**
  * Reads only a session's start record, which is cheaper than the whole log.
  *
- * @param io - reads the state.
+ * @param io - reads the state and the witness.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
- * @returns the start record, or undefined when missing or unreadable.
+ * @returns the start record (the witness when there is one), or undefined
+ *   when both are missing or unreadable.
  */
 export function readSessionStart(
-  io: Pick<SessionIo, "read" | "state">,
+  io: Pick<SessionIo, "read" | "state" | "runtime">,
   project: string,
   id: string,
 ): SessionStart | undefined {
-  return readStart(io, join(io.state.statePath(project), `${id}.start.json`));
+  return trustedStart(io, project, id)?.start;
 }
 
 /**
- * Reads a session's state.
- * Returns undefined when the start file is missing or unreadable, so callers
- * can fail closed: a session whose history is gone can't prove it is clean.
- * Torn or foreign log lines are skipped.
+ * Reads a session's state, with the witness as its start when there is one.
+ * Returns undefined when the start file and the witness are both missing or
+ * unreadable, so callers can fail closed: a session whose history is gone
+ * can't prove it is clean. Torn or foreign log lines are skipped.
  *
- * @param io - reads the state.
+ * @param io - reads the state and the witness.
  * @param project - the real project root.
  * @param id - a session id that passed `isSessionId`.
  * @returns the session state, or undefined without a recorded start.
  */
 export function readSession(
-  io: Pick<SessionIo, "read" | "state">,
+  io: Pick<SessionIo, "read" | "state" | "runtime">,
   project: string,
   id: string,
 ): SessionState | undefined {
-  const start = readStart(io, join(io.state.statePath(project), `${id}.start.json`));
-  if (start === undefined) {
+  const trusted = trustedStart(io, project, id);
+  if (trusted === undefined) {
     return undefined;
   }
+  const { start, record } = trusted;
   let log = "";
   try {
     log = io.read.text(join(io.state.statePath(project), `${id}.jsonl`));
   } catch {
     // no edits yet
   }
-  const state: SessionState = { start, edited: [], seen: new Map(), stops: 0 };
+  const state: SessionState = {
+    start,
+    edited: [],
+    seen: new Map(),
+    stops: 0,
+    record,
+    replayed: false,
+  };
   for (const line of log.split("\n")) {
     const event = parseEvent(line);
     if (event !== undefined) {
@@ -248,6 +315,8 @@ function tally(state: SessionState, event: SessionEvent): void {
     state.stops = event.fresh ? 1 : state.stops + 1;
   } else if (event.t === "pass") {
     state.stops = 0;
+  } else if (event.t === "replay") {
+    state.replayed = true;
   } else if (event.t === "edit") {
     if (!state.edited.includes(event.file)) {
       state.edited.push(event.file);
@@ -256,31 +325,6 @@ function tally(state: SessionState, event: SessionEvent): void {
       state.seen.set(print, (state.seen.get(print) ?? 0) + 1);
     }
   }
-}
-
-/**
- * Reads and shape-checks a start file.
- *
- * @param io - reads the file.
- * @param path - the `<id>.start.json` path.
- * @returns the start record, or undefined when missing or malformed.
- */
-function readStart(io: Pick<SessionIo, "read">, path: string): SessionStart | undefined {
-  try {
-    const value: unknown = JSON.parse(io.read.text(path));
-    if (
-      isRecord(value) &&
-      isRecord(value["configs"]) &&
-      isRecord(value["manifest"]) &&
-      (typeof value["head"] === "string" || value["head"] === null)
-    ) {
-      // biome-ignore lint/nursery/noUnsafeTypeAssertion: configs, manifest and head checked above; only recordStart writes this file.
-      return value as unknown as SessionStart;
-    }
-  } catch {
-    // missing or unreadable: unknown session
-  }
-  return undefined;
 }
 
 /**
@@ -300,6 +344,9 @@ function parseEvent(line: string): SessionEvent | undefined {
     }
     if (isRecord(value) && value["t"] === "pass") {
       return { t: "pass", at: String(value["at"]) };
+    }
+    if (isRecord(value) && value["t"] === "replay") {
+      return { t: "replay", at: String(value["at"]), source: String(value["source"]) };
     }
     if (
       isRecord(value) &&

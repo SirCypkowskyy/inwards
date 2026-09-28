@@ -1,0 +1,13 @@
+[importlinter]
+root_packages=
+    high
+    medium
+    low
+
+[importlinter:contract:my-layers-contract]
+name = My three-tier layers contract (multiple root packages)
+type = layers
+layers =
+    high
+    medium
+    low

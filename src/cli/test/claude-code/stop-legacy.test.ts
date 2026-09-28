@@ -16,9 +16,9 @@ const ORDER = "shop/domain/order.py";
 const PLACE = "shop/application/place_order.py";
 
 /**
- * Whether this git has `--no-lazy-fetch` (2.44+). Without it the hooks can't
- * read a file's start content safely, so every old violation blocks: tests
- * that expect one excused are skipped (`test.skipIf`) where it is missing.
+ * Whether this git has `--no-lazy-fetch` (2.44+). Without it the hooks never
+ * read a blob, and every file's start content comes from the copy
+ * SessionStart kept (#157).
  */
 const NO_LAZY_FETCH = Bun.spawnSync(["git", "--no-lazy-fetch", "version"]).exitCode === 0;
 
@@ -140,7 +140,7 @@ const SECOND_COPY: [string, string] = [
   "from shop.infrastructure.sql_orders import SqlOrderRepository\nfrom dataclasses",
 ];
 
-describe.skipIf(!NO_LAZY_FETCH)("violations a file had at session start are excused", () => {
+describe("violations a file had at session start are excused", () => {
   for (const [fixture, file, task] of TASKS) {
     test(`${fixture}: the task's edit and the Stop pass, the old violation is context`, () => {
       const root = seeded(fixture);
@@ -211,22 +211,6 @@ describe("violations the hooks still block, and what they never run", () => {
     expect(stderr).toContain("shop.api.http");
   });
 
-  test("a file uncommitted at session start has no known start content, so it blocks as before", () => {
-    const root = session({}, (dir) => put(dir, "shop/domain/order.py", "X = 1\n"));
-    put(root, ORDER, "import shop.infrastructure.db\n");
-    // A new session sees the uncommitted violation at its start.
-    inwards(["hook", "claude-code"], {
-      cwd: root,
-      stdin: payload("session-start", root, { session_id: "dirty", source: "startup" }),
-    });
-    put(root, ORDER, "import shop.infrastructure.db\nX = 2\n");
-    const run = inwards(["hook", "claude-code"], {
-      cwd: root,
-      stdin: payload("stop", root, { session_id: "dirty" }),
-    });
-    expect(run.code).toBe(2);
-  });
-
   test("a smudge filter or fsmonitor the agent planted in git's config never runs", () => {
     const root = seeded("seeded-function-import");
     const marker = join(root, "MARKER");
@@ -241,10 +225,10 @@ describe("violations the hooks still block, and what they never run", () => {
     // The planted commands are live: git reads the config, so a pass isn't a broken fixture.
     const planted = Bun.spawnSync(["git", "config", "--get", "filter.pwn.smudge"], { cwd: root });
     expect(planted.stdout.toString()).toContain("echo pwned");
-    // Excused where the start blob can be read safely, blocked (the fallback) where it can't.
-    const code = NO_LAZY_FETCH ? 0 : 2;
-    expect(agentEdits(root, ORDER, EUROS).code).toBe(code);
-    expect(stop(root).code).toBe(code);
+    // Excused: from the start blob where git can read it safely, else from
+    // the copy SessionStart kept (#157), since git before 2.44 can't.
+    expect(agentEdits(root, ORDER, EUROS).code).toBe(0);
+    expect(stop(root).code).toBe(0);
     expect(existsSync(marker)).toBe(false);
   });
 
@@ -268,9 +252,12 @@ describe("violations the hooks still block, and what they never run", () => {
         git(root, "config", key ?? "", value ?? "");
       }
       const started = performance.now();
-      // No start content is provable any more, so the old violation blocks, as for an uncommitted file.
-      expect(agentEdits(root, ORDER, EUROS).code).toBe(2);
-      expect(stop(root).code).toBe(2);
+      // Git had the file at start, so SessionStart kept no copy, and the blob
+      // is gone: the old violation blocks. Git before 2.44 can't be read
+      // safely at all, so there the file has a copy and is excused.
+      const code = NO_LAZY_FETCH ? 2 : 0;
+      expect(agentEdits(root, ORDER, EUROS).code).toBe(code);
+      expect(stop(root).code).toBe(code);
       expect(performance.now() - started).toBeLessThan(8000);
       expect(existsSync(marker)).toBe(false);
     }, 30_000);
@@ -278,9 +265,10 @@ describe("violations the hooks still block, and what they never run", () => {
 });
 
 describe.if(!NO_LAZY_FETCH)("git before 2.44, without --no-lazy-fetch", () => {
-  test("on git before 2.44 an old violation blocks, the safe fallback", () => {
+  test("git is never read, and the start content comes from SessionStart's copy", () => {
     const root = seeded("seeded-function-import");
-    expect(agentEdits(root, ORDER, EUROS).code).toBe(2);
-    expect(stop(root).code).toBe(2);
+    expect(existsSync(join(root, ".inwards/state", `${ID}.content.json`))).toBe(true);
+    expect(agentEdits(root, ORDER, EUROS).code).toBe(0);
+    expect(stop(root).code).toBe(0);
   });
 });

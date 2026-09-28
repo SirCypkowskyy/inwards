@@ -60,7 +60,12 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
     return 0;
   }
   try {
-    const { report, rejected, old, blocking } = await checkEdit(deps, target, start, configPath);
+    const { report, rejected, old, blocking } = await checkEdit(
+      deps,
+      { ...target, id: isSessionId(id) ? id : undefined },
+      start,
+      configPath,
+    );
     // Old errors aren't the agent's, so `inwards stats` must not count them as introduced.
     deps.runlog.noteRun(
       target.project,
@@ -101,6 +106,7 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
  * @param target.cwd - the payload's cwd, which report paths are relative to.
  * @param target.project - the real project root.
  * @param target.written - each checked file's path exactly as the agent wrote it.
+ * @param target.id - the session id, which names SessionStart's copies; undefined when invalid.
  * @param start - the session's start record, if it has one.
  * @param configPath - the config to check the file with.
  * @returns the report as if rejected suppressions weren't there, the rejected
@@ -109,17 +115,23 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
  */
 async function checkEdit(
   deps: Pick<HookDeps, "io" | "check">,
-  target: { file: string; cwd: string; project: string; written: Map<string, string> },
+  target: {
+    file: string;
+    cwd: string;
+    project: string;
+    written: Map<string, string>;
+    id: string | undefined;
+  },
   start: Start | undefined,
   configPath: string,
 ): Promise<{ report: Report; rejected: Diagnostic[]; old: Diagnostic[]; blocking: Diagnostic[] }> {
-  const lookups = createStartLookups({ ...deps.io, check: deps.check }, target.project);
+  const lookups = createStartLookups({ ...deps.io, check: deps.check }, target);
   const check = { configPath, base: target.cwd, baseline: true, written: target.written };
   const { report, rejected } = await agentSuppressions(
     lookups,
     start,
     check,
-    await deps.check(configPath, [target.file], target.cwd, { required: true }),
+    await deps.check(configPath, [target.file], target.cwd, { required: true, edit: true }),
   );
   const existed = lookups.identity.existedAtStart(target.project, start, check, target.file);
   const errors = report.diagnostics.filter(
@@ -204,8 +216,8 @@ function reply(
  * @param diagnostics - this run's blocking errors.
  * @returns the limit, and whether every error in the run reached it; undefined when none did.
  */
-function escalationOf(
-  io: Pick<Platform, "probe" | "read" | "state">,
+export function escalationOf(
+  io: Pick<Platform, "probe" | "read" | "state" | "runtime">,
   { project, id }: { project: string; id: unknown },
   configPath: string,
   diagnostics: readonly Diagnostic[],
@@ -233,7 +245,7 @@ function escalationOf(
  * @param start - the session's start record, if it has one.
  * @returns the config path, or undefined without one.
  */
-function sessionConfig(
+export function sessionConfig(
   io: Pick<Platform, "probe" | "read">,
   dir: string,
   project: string,
@@ -264,7 +276,7 @@ function sessionConfig(
  * @param file - the edited file.
  * @param diagnostics - the errors the check blocked on (context-only findings are left out).
  */
-function rememberEdit(
+export function rememberEdit(
   io: Pick<Platform, "probe" | "clock" | "state">,
   { project, id }: { project: string; id: unknown },
   file: string,

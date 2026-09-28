@@ -16,8 +16,7 @@ import type {
   SourceFile,
   Suppressed,
 } from "../contracts/records.ts";
-import { type ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
-import { topLevelBindings } from "../python/bindings.ts";
+import type { ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import {
   createPythonParser,
   type GrammarBinaries,
@@ -36,11 +35,17 @@ import { checkPublicApi } from "../rules/public-api-only.ts";
 import { checkLibraries } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
-import { checkUnassignedImports, unassignedWarning } from "../rules/unassigned-module/imports.ts";
+import {
+  checkUnassignedImports,
+  indexEvidence,
+  unassignedWarning,
+} from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import { Extractor } from "./extraction.ts";
+import { fastApiFindings, withFastApi } from "./fastapi.ts";
+import { moduleIndex } from "./module-index.ts";
 import { type Checked, type Confirmed, keptOnce, ordered, type Scan } from "./stages.ts";
 
 export type { Checked } from "./stages.ts";
@@ -131,13 +136,17 @@ export class Engine {
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
+   * FAPI001 and FAPI002 run only when on and the text mentions FastAPI.
+   *
    * @param file - the source file as read by the adapter.
    * @param project - the project's module index (see `index`).
    * @returns the violations found, empty when the file is clean.
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    const { kept } = this.suppressIn(src, this.confirm(src, this.scan(src, project), project));
+    const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
+    const confirmed = withFastApi(this.confirm(src, this.scan(src, project), project), src, wired);
+    const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
     return applyRules(kept, this.config.rules);
   }
 
@@ -151,7 +160,7 @@ export class Engine {
   private scan(src: SourceFile, project: ProjectIndex): Scan {
     const layered = this.layered(src);
     if (!(layered || this.config.contexts)) {
-      const warning = unassignedWarning(src, this.config);
+      const warning = unassignedWarning(src, this.config, indexEvidence(project));
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
     const unreadable = checkEncoding(src);
@@ -257,7 +266,7 @@ export class Engine {
       ...checkPublicApi(file, imports, project, { contexts, defer: this.defersToInw002() }),
     ];
     if (!this.layered(file)) {
-      const warning = unassignedWarning(file, this.config);
+      const warning = unassignedWarning(file, this.config, indexEvidence(project));
       return warning ? [warning, ...across] : across;
     }
     // INW001's fix deletes an outward import; "create the module" would contradict it.
@@ -266,7 +275,7 @@ export class Engine {
       file,
       imports.filter((ref) => !outward.has(ref)),
       project,
-      this.config.generated,
+      this.config,
     );
     const resolved = imports.filter((ref) => ref.target !== "");
     const existing = resolved.filter((ref) => !unknown.missing.has(ref));
@@ -276,7 +285,10 @@ export class Engine {
         ownerOf: project.ownerOf,
         workspace: this.workspace,
       }),
-      ...checkUnassignedImports(file, existing, layers, project.ownerOf),
+      ...checkUnassignedImports(file, existing, layers, {
+        ownerOf: project.ownerOf,
+        evidence: indexEvidence(project),
+      }),
       ...unknown.found,
       ...across,
     ];
@@ -316,7 +328,10 @@ export class Engine {
             ownerOf: project.ownerOf,
             workspace: this.workspace,
           }),
-          ...checkUnassignedImports(file, readable, layers, project.ownerOf),
+          ...checkUnassignedImports(file, readable, layers, {
+            ownerOf: project.ownerOf,
+            evidence: indexEvidence(project),
+          }),
         );
       }
       return { ...ordered(file, found, comments), imports: [...imports, ...readable] };
@@ -335,21 +350,7 @@ export class Engine {
    * @returns a lazy index that lists and reads only when a rule asks.
    */
   index(files: ProjectFiles): ProjectIndex {
-    return new ProjectIndex(
-      files,
-      (file) => {
-        const src = { ...file, text: normalizeSource(file.text) };
-        return this.extractor.skeleton(src) ?? this.extractor.full(src).imports;
-      },
-      (file) => {
-        const tree = parsePython(this.parser, normalizeSource(file.text));
-        try {
-          return topLevelBindings(tree, file.path.endsWith(".pyi"));
-        } finally {
-          tree.delete(); // WASM memory is not garbage collected
-        }
-      },
-    );
+    return moduleIndex(files, this.extractor, this.parser);
   }
 
   /**
@@ -392,15 +393,17 @@ export class Engine {
    * @param project - the project's module index (see `index`).
    * @param accepted - accepted copies by baseline key, when a baseline applies.
    * @param options - `whole: true` when the files are the whole project, which
-   *   adds the import cycles among them (INW004, `engine/cycles.ts`).
+   *   adds the import cycles among them (INW004, `engine/cycles.ts`); `edit: true`
+   *   for a per-edit check, where FAPI003 reports one-file findings only.
    * @param options.whole - true for a whole-project run.
+   * @param options.edit - true for a per-edit check.
    * @returns the violations, as `checkFiles` returns them, and the suppressed findings.
    */
   check(
     files: Iterable<SourceFile>,
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
-    { whole = false }: { whole?: boolean } = {},
+    { whole = false, edit = false }: { whole?: boolean; edit?: boolean } = {},
   ): Checked {
     const { rules } = this.config;
     const scanned = [...files].map((file) => {
@@ -420,6 +423,8 @@ export class Engine {
     const suppressed: Suppressed[] = [];
     const warned = new Set<string>();
     const collected: Collected[] = [];
+    const sources = scanned.map(({ src }) => src);
+    const wired = fastApiFindings(this.parser, project, sources, { config: this.config, edit });
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
       const confirmed = this.confirm(src, scan, project, skip);
@@ -427,9 +432,9 @@ export class Engine {
       if (imports !== undefined) {
         collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
       }
-      const own = this.suppressIn(src, confirmed);
-      suppressed.push(...own.suppressed);
-      all.push(...keptOnce(own.kept, warned));
+      const own = this.suppressIn(src, withFastApi(confirmed, src, wired));
+      suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
+      all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }
     if (whole) {
       all.push(

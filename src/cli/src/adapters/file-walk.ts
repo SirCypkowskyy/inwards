@@ -1,7 +1,8 @@
 /**
  * @file Walking a project tree for its files, behind the `FileWalker` contract.
  * The rules (skips, symlinks, cycles, layer packages walked in full) are
- * described on `collectPythonFiles`.
+ * described on `collectPythonFiles`; `collectLinks` lists the symlinks in a
+ * layer package, following only those that stay in the root, for INW006 (#83, #84).
  */
 import { type Dirent, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
@@ -213,8 +214,87 @@ function isPythonFile(name: string): boolean {
   return name.endsWith(".py") || name.endsWith(".pyi");
 }
 
+/**
+ * Lists the symlinks below a directory that Python could import through: to
+ * a directory, or to a `.py` or `.pyi` file. Each is listed by the path it is
+ * reached through, since Python names the code behind it that way.
+ *
+ * A link to a directory inside `top` (the real config root) is followed as
+ * well, so a chain such as `shop/domain/a -> ../misc` plus
+ * `shop/misc/y -> ../infrastructure` shows up as `shop/domain/a/y`. A link
+ * out of `top` is listed and never followed, so a link to `/` costs one entry
+ * and no walk. Only a real cycle stops the walk, detected on the chain of
+ * real directories above the current one. Only hidden entries are skipped:
+ * the directories are layer packages, where a `node_modules` or virtualenv
+ * name hides nothing.
+ *
+ * @param dir - the directory to walk; unreadable ones give nothing.
+ * @param top - the real directory whose links are followed.
+ * @param chain - the real paths of the directories above, a cycle guard updated in place.
+ * @param out - the links found so far, written in place.
+ * @returns `out`, each link as reached with its real target; dangling links are left out.
+ */
+function collectLinks(
+  dir: string,
+  top: string,
+  chain: Set<string> = new Set<string>(),
+  out: { path: string; target: string }[] = [],
+): { path: string; target: string }[] {
+  const real = realOrUndefined(dir);
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out; // unreadable, or not a directory
+  }
+  if (real === undefined || chain.has(real)) {
+    return out;
+  }
+  chain.add(real);
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.name.startsWith(".")) {
+      continue;
+    }
+    if (entry.isSymbolicLink()) {
+      linkEntry(full, top, chain, out);
+    } else if (entry.isDirectory()) {
+      collectLinks(full, top, chain, out);
+    }
+  }
+  chain.delete(real);
+  return out;
+}
+
+/**
+ * Records one symlink if Python could import through it, and walks on
+ * through a link to a directory that stays inside `top`.
+ *
+ * @param link - the symlink, as reached.
+ * @param top - the real directory whose links are followed.
+ * @param chain - the real paths of the directories above, a cycle guard.
+ * @param out - the links found so far, written in place.
+ */
+function linkEntry(
+  link: string,
+  top: string,
+  chain: Set<string>,
+  out: { path: string; target: string }[],
+): void {
+  const kind = linkTargetKind(link);
+  const target = realOrUndefined(link);
+  if (target === undefined || !(kind === "dir" || (kind === "file" && isPythonFile(link)))) {
+    return; // dangling, or nothing Python imports
+  }
+  out.push({ path: link, target });
+  if (kind === "dir" && isWithin(top, target)) {
+    collectLinks(link, top, chain, out);
+  }
+}
+
 /** The walk behind the `FileWalker` contract. */
 export const nodeFileWalker: FileWalker = {
   pythonFiles: collectPythonFiles,
   files: collectFiles,
+  links: (dir: string, top: string) => collectLinks(dir, top),
 };

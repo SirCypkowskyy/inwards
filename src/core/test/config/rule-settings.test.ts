@@ -98,7 +98,7 @@ describe("[tool.inwards.rules] parsing", () => {
     ["select = []", "at least one rule code"],
     ['severity = { INW001 = "info" }', 'severity.INW001 must be "error" or "warning"'],
     ['severity = ["INW001"]', "must be a table"],
-    ['extend-select = ["INW001"]', "Unknown key tool.inwards.rules.extend-select"],
+    ['extend-select = ["INW000"]', "can't list INW000"],
   ])("%s is a config error", (rules, message) => {
     expect(() => withRules(rules)).toThrow(message);
   });

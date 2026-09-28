@@ -12,12 +12,12 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle | hold logic a test would want to call |
-| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`) | import `adapters/` |
-| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings`, and `protocol` (shared by all of them) | read the environment or the filesystem itself |
+| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `import-config`), and `check-runs` for a check over several configs | import `adapters/` |
+| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings`, and `protocol` (shared by all of them) | read the environment or the filesystem itself |
 | `session/` | the session record, start identity and start content, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
-| `project/` | running a check, the baseline, config discovery, project snapshots | own a filesystem walk (that is `adapters/file-walk.ts`) |
+| `project/` | running a check, the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots | own a filesystem walk (that is `adapters/file-walk.ts`) |
 | `runlog/` | the run log, reading it back, stats, `--export` | keep notes in a module global |
-| `init/` | `inwards init`: agent wiring, `--style`, the scaffold plan, the report, presets | write files itself (`InitFiles` does) |
+| `init/` | `inwards init`: agent wiring, `--style`, the scaffold plan, the report, presets, the architecture brief (`--brief`, `inwards context`), import-linter contracts as `[tool.inwards]` (`import-linter/`, for `inwards import-config`) | write files itself (`InitFiles` does) |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
 | `platform/` | the contracts for everything outside the process, and `print()` | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
@@ -108,8 +108,10 @@ A module-level `Map` or array that grows at run time is a bug.
   never feed their output into an identity check, or symlink aliases can
   borrow another file's suppressions and excuses again.
 - **Start content comes from git without running anything the agent set up.**
-  Only `cat-file blob` with `--no-lazy-fetch`, never `--filters` or
-  `--textconv`, and `adapters/git.ts` turns off fsmonitor and hooks.
+  Only `cat-file blob` and `ls-tree`, both with `--no-lazy-fetch`, never
+  `--filters` or `--textconv`, and `adapters/git.ts` turns off fsmonitor and
+  hooks. SessionStart's copies of dirty files (`session/start-copies.ts`) are
+  trusted only when their SHA-256 matches the start manifest.
 - **Escalation ordering is policy.** PostToolUse computes escalation before
   recording the edit, old and context findings don't count, and Stop counts
   fresh and continuing turns differently. Don't hide it in a wrapper.

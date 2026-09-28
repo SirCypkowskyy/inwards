@@ -1,0 +1,10 @@
+[project]
+name = "acme-api"
+version = "0.1.0"
+
+[tool.inwards]
+root = "src"
+layers = [
+  { name = "plugins", modules = ["acme.plugins"] },
+  { name = "handlers", modules = ["acme.api.handlers"] },
+]

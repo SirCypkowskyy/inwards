@@ -9,7 +9,8 @@ import { dirname, join } from "node:path";
 import { isInside } from "../paths/lexical.ts";
 import type { PathProbe } from "../platform/contracts.ts";
 import type { Change } from "./contracts.ts";
-import { type Style, scaffoldFiles } from "./styles.ts";
+import { scaffoldFiles } from "./example.ts";
+import type { Style } from "./styles.ts";
 
 /** The scaffold's files to create, and the paths that stop it. */
 interface ScaffoldPlan {

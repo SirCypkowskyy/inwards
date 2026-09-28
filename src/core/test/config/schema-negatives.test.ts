@@ -19,6 +19,17 @@ function withExtra(extra: string): string {
 }
 
 /**
+ * Builds a config with one FAPI options table.
+ *
+ * @param table - the rule's name.
+ * @param body - the table's body, TOML.
+ * @returns the config text.
+ */
+function fapi(table: string, body: string): string {
+  return withExtra(`[tool.inwards.rules.${table}]\n${body}\n`);
+}
+
+/**
  * Builds a config whose only layer is the given inline table.
  *
  * @param layer - the layer's TOML inline table.
@@ -50,6 +61,7 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ["an ignore that isn't a list", withExtra('ignore = "tests"\n')],
     ["layers that aren't an array", '[tool.inwards]\nlayers = "domain"\n'],
     ["a generated that isn't a list", withExtra('generated = "*_pb2"\n')],
+    ["a namespace-packages that isn't a list", withExtra('namespace-packages = "acme"\n')],
     ["rules that aren't a table", withExtra('rules = ["INW001"]\n')],
     ["a select that isn't a list", withExtra('[tool.inwards.rules]\nselect = "INW001"\n')],
     ["a context that isn't a table", withExtra("contexts = [3]\n")],
@@ -83,6 +95,69 @@ describe("structural mistakes fail both the schema and the parser", () => {
     // INW000 can't be turned off or re-levelled.
     ["INW000 in ignore", withExtra('[tool.inwards.rules]\nignore = ["INW000"]\n')],
     ["INW000 in severity", withExtra('[tool.inwards.rules]\nseverity = { INW000 = "warning" }\n')],
+    ["INW000 in extend-select", withExtra('[tool.inwards.rules]\nextend-select = ["INW000"]\n')],
+    [
+      "an options table for INW000",
+      withExtra('[tool.inwards.rules.unsupported-encoding]\nmodules = ["shop"]\n'),
+    ],
+    // Rule options (#181).
+    [
+      "an unknown code in extend-select",
+      withExtra('[tool.inwards.rules]\nextend-select = ["INW999"]\n'),
+    ],
+    [
+      "an extend-select that isn't a list",
+      withExtra('[tool.inwards.rules]\nextend-select = "INW001"\n'),
+    ],
+    [
+      "an unknown key in an options table",
+      withExtra("[tool.inwards.rules.layer-dependency]\nmax-statements = 8\n"),
+    ],
+    [
+      "an options table that isn't a table",
+      withExtra("[tool.inwards.rules]\nlayer-dependency = true\n"),
+    ],
+    [
+      "a rule code as an options table",
+      withExtra('[tool.inwards.rules.INW001]\nmodules = ["shop"]\n'),
+    ],
+    ["an empty modules list", withExtra("[tool.inwards.rules.layer-dependency]\nmodules = []\n")],
+    ["another rule's option", fapi("endpoint-metadata", "max-depth = 1")],
+    ["a require-summary mode", fapi("endpoint-metadata", "require-summary = true")],
+    ["an unknown method", fapi("endpoint-metadata", 'require-status-code = ["fetch"]')],
+    ["a repeated field", fapi("endpoint-metadata", 'require-response-fields = ["model", "model"]')],
+    ["a string require-tags", fapi("endpoint-metadata", 'require-tags = "yes"')],
+    ["a negative max-depth", fapi("undocumented-error-response", "max-depth = -1")],
+    ["a max-depth above 8", fapi("undocumented-error-response", "max-depth = 9")],
+    ["an unknown codes range", fapi("undocumented-error-response", 'codes = "5xx"')],
+    ["an unknown explicit-422", fapi("undocumented-error-response", 'explicit-422 = "warn"')],
+    ["a numeric flag", fapi("undocumented-error-response", "report-direct-raises = 1")],
+    [
+      "a modules selector that doesn't start with a package",
+      withExtra('[tool.inwards.rules.layer-dependency]\nmodules = ["*.api"]\n'),
+    ],
+    // FAPI003's own options (#184).
+    [
+      "an entrypoint without a name",
+      withExtra('[tool.inwards.rules.router-wiring]\nentrypoints = ["app.main"]\n'),
+    ],
+    ["empty entrypoints", withExtra("[tool.inwards.rules.router-wiring]\nentrypoints = []\n")],
+    [
+      "an unknown unresolved-includes",
+      withExtra('[tool.inwards.rules.router-wiring]\nunresolved-includes = "error"\n'),
+    ],
+    [
+      "a check-order that isn't a boolean",
+      withExtra('[tool.inwards.rules.router-wiring]\ncheck-order = "yes"\n'),
+    ],
+    [
+      "an allow-unmounted selector that doesn't start with a package",
+      withExtra('[tool.inwards.rules.router-wiring]\nallow-unmounted = ["*.experimental"]\n'),
+    ],
+    [
+      "a router-wiring key in another rule's table",
+      withExtra('[tool.inwards.rules.layer-dependency]\nentrypoints = ["app.main:app"]\n'),
+    ],
     // Empty strings and repeats.
     ["an empty layer name", withLayer('{ name = "", modules = ["shop"] }')],
     ["an empty layer module", withLayer('{ name = "d", modules = [""] }')],
@@ -131,6 +206,8 @@ describe("structural mistakes fail both the schema and the parser", () => {
       withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nallow = ["x[]"]\n'),
     ],
     ["a wildcard-only generated pattern", withExtra('generated = ["*"]\n')],
+    ["a wildcard in namespace-packages", withExtra('namespace-packages = ["acme.*"]\n')],
+    ["an empty namespace package", withExtra('namespace-packages = [""]\n')],
     [
       "a wildcard in a context",
       withExtra('[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.*"]\n'),
@@ -145,6 +222,29 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ],
     ["an empty selector segment", withExtra('[[tool.inwards.shape]]\npackages = ["shop..x"]\n')],
     [
+      "a layer selector with no leading package",
+      withLayer('{ name = "d", modules = ["*.domain"] }'),
+    ],
+    ["a layer selector that is only **", withLayer('{ name = "d", modules = ["**"] }')],
+    [
+      "a partial wildcard in a layer selector",
+      withLayer('{ name = "d", modules = ["shop.dom*"] }'),
+    ],
+    ["a ? in a layer selector", withLayer('{ name = "d", modules = ["shop.*?"] }')],
+    ["a bracket in a layer selector", withLayer('{ name = "d", modules = ["shop.[ab].*"] }')],
+    ["an empty layer selector segment", withLayer('{ name = "d", modules = ["shop..*"] }')],
+    ["a path in a layer selector", withLayer('{ name = "d", modules = ["shop/*/domain"] }')],
+    ["*** in a layer selector", withLayer('{ name = "d", modules = ["shop.***"] }')],
+    [
+      "a digit-led segment in a layer selector",
+      withLayer('{ name = "d", modules = ["shop.*.1abc"] }'),
+    ],
+    ["punctuation in a layer selector", withLayer('{ name = "d", modules = ["shop.*.a+b"] }')],
+    [
+      "a digit-led first segment in a layer selector",
+      withLayer('{ name = "d", modules = ["1shop.*"] }'),
+    ],
+    [
       "a distribution name as a library",
       withLayer('{ name = "d", modules = ["shop"], deny-libraries = ["python-dateutil"] }'),
     ],
@@ -155,6 +255,20 @@ describe("structural mistakes fail both the schema and the parser", () => {
 
   test("INW000 may still be selected", () => {
     const text = withExtra('[tool.inwards.rules]\nselect = ["INW000", "INW001"]\n');
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("layer selectors and lenient literal entries pass both", () => {
+    const text = withLayer(
+      '{ name = "d", modules = ["shop.*.domain", "shop.**", "shop.**.domain.**", "shop.domain"] }, { name = "e", modules = [] }',
+    );
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("extend-select and an options table pass both", () => {
+    const text = withExtra(
+      '[tool.inwards.rules]\nextend-select = ["INW001"]\n[tool.inwards.rules.pure-domain]\nmodules = ["shop.domain", "shop.*.api", "shop.**"]\n',
+    );
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 

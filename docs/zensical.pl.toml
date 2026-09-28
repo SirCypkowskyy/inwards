@@ -43,6 +43,7 @@ nav = [
     { "GitHub Actions" = "guides/ci.md" },
     { "Kształt pakietu" = "guides/package-shape.md" },
     { "Biblioteki w warstwach" = "guides/libraries.md" },
+    { "Migracja z import-linter" = "guides/import-linter.md" },
     { "Design partnerzy" = "guides/design-partners.md" },
   ] },
   { "Reguły" = [
@@ -59,6 +60,9 @@ nav = [
     { "INW009 suppression-comment" = "rules/INW009.md" },
     { "INW010 unknown-first-party" = "rules/INW010.md" },
     { "INW011 dynamic-import" = "rules/INW011.md" },
+    { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
+    { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
+    { "FAPI003 router-wiring" = "rules/FAPI003.md" },
   ] },
   { "1. Wprowadzenie" = "01-Introduction.md" },
   { "2. Kontekst biznesowy" = "02-Business-Context.md" },

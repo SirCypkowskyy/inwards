@@ -1,29 +1,15 @@
 /**
- * @file Reads constant values out of Python syntax nodes: string, bytes and integer
- * literals, and the arguments of a call. INW011 uses these to find the module
- * name a loader is given, as Python would compute it before the call runs.
+ * @file Reads constant values out of Python syntax nodes: string and bytes
+ * literals, constant string expressions built from them (folded in
+ * `folding.ts`), and the arguments of a call. INW011 uses these to find the module name a loader is given, as
+ * Python would compute it before the call runs. Names are read only through a
+ * caller-supplied table of constants; this module doesn't decide which names
+ * are constant.
  */
 import type { Node } from "web-tree-sitter";
-
-/**
- * Lists a node's named children, without comments.
- *
- * @param node - any node.
- * @returns the named children that are not comments.
- */
-export function namedChildren(node: Node): Node[] {
-  return node.namedChildren.flatMap((c) => (c && c.type !== "comment" ? [c] : []));
-}
-
-/**
- * Spells an identifier the way Python does: NFKC-normalised.
- *
- * @param node - a name as tree-sitter parsed it (an `identifier` node).
- * @returns the identifier's text in NFKC form, as Python compares names.
- */
-export function identifierName(node: Node): string {
-  return node.text.normalize("NFKC");
-}
+import { joined, type Literal, methodValue, operatorValue, subscriptValue } from "./folding.ts";
+import { identifierName, keywordOf, namedChildren } from "./nodes.ts";
+import { formatted } from "./string-ops.ts";
 
 /**
  * Finds a call argument by position or keyword.
@@ -92,58 +78,39 @@ export function hasSplat(call: Node): boolean {
     : false;
 }
 
-/**
- * Reads the name of a keyword argument.
- *
- * @param arg - a `keyword_argument` node.
- * @returns the keyword, or "" when the node has none.
- */
-function keywordOf(arg: Node): string {
-  const name = arg.childForFieldName("name");
-  return name ? identifierName(name) : "";
-}
+/** Names whose value is a known constant, e.g. a module-level `TARGET = "..."`. */
+export type Constants = ReadonlyMap<string, Literal>;
+
+const NO_CONSTANTS: Constants = new Map();
 
 /**
- * Reads an integer literal such as `2`, `0x1` or `1_0`.
- *
- * @param node - an expression node.
- * @returns the value, or null when the node is not an integer literal.
- */
-export function integerLiteral(node: Node): number | null {
-  if (node.type !== "integer") {
-    return null;
-  }
-  const value = Number(node.text.replaceAll("_", ""));
-  return Number.isSafeInteger(value) ? value : null;
-}
-
-/** A decoded string or bytes literal. */
-interface Literal {
-  value: string;
-  /** True for `b"..."`; `value` then holds one character per byte. */
-  bytes: boolean;
-}
-
-/**
- * Reads a `str` literal, the form a module name must take.
+ * Reads a `str` constant, the form a module name must take.
  *
  * @param node - an expression node, or null.
+ * @param constants - names with known values; none by default.
  * @returns the string's value, or null when it is not a constant `str`.
  */
-export function literalString(node: Node | null): string | null {
-  const literal = node ? literalValue(node) : null;
+export function literalString(
+  node: Node | null,
+  constants: Constants = NO_CONSTANTS,
+): string | null {
+  const literal = node ? constantValue(node, constants) : null;
   return literal && !literal.bytes ? literal.value : null;
 }
 
 /**
- * Reads the literal source of `exec`, `eval` or `compile`: `str`, or bytes read as UTF-8.
+ * Reads the constant source of `exec`, `eval` or `compile`: `str`, or bytes read as UTF-8.
  * The caller must still honour a coding declaration in bytes, as CPython does.
  *
  * @param node - the source argument, or null.
+ * @param constants - names with known values; none by default.
  * @returns the source text and whether it came from bytes, or null when it is not a constant.
  */
-export function literalSource(node: Node | null): { text: string; bytes: boolean } | null {
-  const literal = node ? literalValue(node) : null;
+export function literalSource(
+  node: Node | null,
+  constants: Constants = NO_CONSTANTS,
+): { text: string; bytes: boolean } | null {
+  const literal = node ? constantValue(node, constants) : null;
   if (!literal) {
     return null;
   }
@@ -156,46 +123,49 @@ export function literalSource(node: Node | null): { text: string; bytes: boolean
 
 /**
  * Decodes a constant string expression: a literal, implicit concatenation,
- * `+` between constants, and parentheses.
+ * parentheses, a name in `constants`, `+`, `%` with `%s`, `*` by an integer
+ * literal, `sep.join([...])`, `template.format(...)`, and slicing or indexing
+ * by integer literals. Each step is linear in the node's size, bounded by the
+ * length cap in `string-ops.ts`.
  *
  * @param node - an expression node.
+ * @param constants - names with known values.
  * @returns the value, or null for anything that is not a constant string.
  */
-function literalValue(node: Node): Literal | null {
+export function constantValue(node: Node, constants: Constants): Literal | null {
+  /**
+   * Reads a sub-expression with the same constants.
+   *
+   * @param inner - the sub-expression.
+   * @returns its value, or null when it isn't constant.
+   */
+  function fold(inner: Node): Literal | null {
+    return constantValue(inner, constants);
+  }
   switch (node.type) {
     case "parenthesized_expression": {
       const [inner, ...more] = namedChildren(node);
-      return inner && more.length === 0 ? literalValue(inner) : null;
+      return inner && more.length === 0 ? constantValue(inner, constants) : null;
     }
+    case "identifier":
+      return constants.get(identifierName(node)) ?? null;
     case "string":
-      return stringPart(node);
+      return stringPart(node, constants);
     case "concatenated_string":
       return joined(
-        namedChildren(node).map((part) => (part.type === "string" ? stringPart(part) : null)),
+        namedChildren(node).map((part) =>
+          part.type === "string" ? stringPart(part, constants) : null,
+        ),
       );
-    case "binary_operator": {
-      const left = node.childForFieldName("left");
-      const right = node.childForFieldName("right");
-      const plus = node.childForFieldName("operator")?.type === "+";
-      return plus && left && right ? joined([literalValue(left), literalValue(right)]) : null;
-    }
+    case "binary_operator":
+      return operatorValue(node, fold);
+    case "call":
+      return methodValue(node, fold);
+    case "subscript":
+      return subscriptValue(node, fold);
     default:
       return null;
   }
-}
-
-/**
- * Joins constant parts into one value, as Python's concatenation does.
- *
- * @param parts - the decoded parts, null where a part is not constant.
- * @returns the joined value, or null when a part is missing or str is mixed with bytes.
- */
-function joined(parts: readonly (Literal | null)[]): Literal | null {
-  const [first] = parts;
-  if (!first || parts.some((part) => part === null || part.bytes !== first.bytes)) {
-    return null; // not all constant, or str mixed with bytes
-  }
-  return { value: parts.map((part) => part?.value ?? "").join(""), bytes: first.bytes };
 }
 
 const STRING_START = /^(?<prefix>[A-Za-z]*)(?:'''|"""|'|")$/u;
@@ -203,13 +173,14 @@ const STRING_START = /^(?<prefix>[A-Za-z]*)(?:'''|"""|'|")$/u;
 /**
  * Decodes one string literal token, with its prefix (`r`, `b`, `f`, `u`).
  * An f-string counts when each replacement field is itself a constant `str`
- * with no conversion or format spec (`f"shop.{'infrastructure'}"`); a
- * t-string is never a `str`.
+ * (`f"shop.{'infrastructure'}"`), with at most a `!s` conversion and a `str`
+ * format spec; a t-string is never a `str`.
  *
  * @param node - a `string` node.
+ * @param constants - names with known values.
  * @returns the value, or null when the string is not constant.
  */
-function stringPart(node: Node): Literal | null {
+function stringPart(node: Node, constants: Constants): Literal | null {
   const start = node.firstChild;
   const end = node.lastChild;
   const prefix = STRING_START.exec(start?.text ?? "")?.groups?.["prefix"]?.toLowerCase();
@@ -227,7 +198,7 @@ function stringPart(node: Node): Literal | null {
       continue;
     }
     const text = textPiece(node, from, field.startIndex, prefix);
-    const value = fieldValue(field);
+    const value = fieldValue(field, constants);
     if (text === null || value === null) {
       return null;
     }
@@ -258,15 +229,39 @@ function textPiece(node: Node, from: number, to: number, prefix: string): string
 
 /**
  * Reads a replacement field whose expression is a constant `str`.
+ * `!s` changes nothing on a `str`, and a format spec is applied when it is a
+ * plain `str` spec; `!r`, `!a`, `=` and a spec with nested fields are not read.
  *
  * @param field - an `interpolation` node.
- * @returns the value, or null when the field is computed, converted or formatted.
+ * @param constants - names with known values.
+ * @returns the value, or null when the field is computed or can't be folded.
  */
-function fieldValue(field: Node): string | null {
-  // `{`, the expression, `}`: anything else is `!r`, `:spec` or `=`.
-  const [open, expression, close, ...rest] = field.children;
-  const plain = open?.type === "{" && close?.type === "}" && rest.length === 0;
-  return plain && expression ? literalString(expression) : null;
+function fieldValue(field: Node, constants: Constants): string | null {
+  const [open, expression, ...rest] = field.children;
+  let value = open?.type === "{" && expression ? literalString(expression, constants) : null;
+  for (const part of rest) {
+    value = value === null || part === null ? null : fieldPart(value, part);
+  }
+  return value;
+}
+
+/**
+ * Applies one part of a replacement field after its expression.
+ *
+ * @param value - the field's value so far.
+ * @param part - `}`, a `type_conversion` or a `format_specifier` node.
+ * @returns the value after the part, or null for `!r`, `!a`, `=` or a spec that can't be read.
+ */
+function fieldPart(value: string, part: Node): string | null {
+  if (part.type === "}" || (part.type === "type_conversion" && part.text === "!s")) {
+    return value;
+  }
+  if (part.type !== "format_specifier") {
+    return null; // `!r`, `!a` or `=`
+  }
+  const nested = part.children.some((c) => c?.type === "format_expression");
+  const spec = part.text.slice(1);
+  return nested || spec.includes("\\") ? null : formatted(value, spec);
 }
 
 const ESCAPE =

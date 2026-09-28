@@ -1,0 +1,18 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`inwards context prints the brief for the example config, under 300 tokens 1`] = `
+"## Architecture brief (Inwards)
+
+\`[tool.inwards]\` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own.
+
+1. domain (\`shop.domain\`): imports no other layer
+2. application (\`shop.application\`): may import domain
+3. infrastructure (\`shop.infrastructure\`): may import domain, application
+4. interface (\`shop.api\`, \`shop.cli\`): may import every other layer
+
+Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in \`shop.domain.ports\` and implement it in the outer layer.
+
+Libraries (INW005):
+- domain: no web frameworks, database or network clients, \`subprocess\` or \`socket\`
+"
+`;

@@ -126,14 +126,15 @@ function fileProblem(
   if (spellings.some((p) => p === state || isInside(state, p))) {
     return ".inwards/ holds the session record the Stop gate relies on; it can't be edited.";
   }
-  if (spellings.some((p) => basename(p) === fold(BASELINE_FILE)) && usesInwards(io, project)) {
+  const governed = usesInwards(io, project, dirname(path.lexical));
+  if (spellings.some((p) => basename(p) === fold(BASELINE_FILE)) && governed) {
     return `${BASELINE_FILE} lists the violations the user accepted; only \`inwards baseline\`, run by the user, changes it.`;
   }
   const settings = settingsPaths(io, project);
   const isSettings = spellings.some((p) => settings.has(p));
   const isPyproject =
     spellings.some((p) => basename(p) === "pyproject.toml") || isConfigTarget(io, project, path);
-  if (!(isSettings || (isPyproject && usesInwards(io, project)))) {
+  if (!(isSettings || (isPyproject && governed))) {
     return undefined;
   }
   const target = path.real ?? path.lexical;
@@ -326,14 +327,19 @@ function disablesHooks(text: string): boolean {
 }
 
 /**
- * Tells whether the project uses Inwards: it has session state, or a config at its root.
+ * Tells whether the project uses Inwards: it has session state, a config at
+ * its root, or, for a file, a config governing its directory, such as a uv
+ * workspace member's own `[tool.inwards]` under a root without one (#57).
  *
  * @param io - probes and reads files.
  * @param project - the real project root.
+ * @param dir - the edited file's directory, if the question is about a file.
  * @returns true for an Inwards project.
  */
-function usesInwards(io: Pick<GuardIo, "probe" | "read">, project: string): boolean {
+function usesInwards(io: Pick<GuardIo, "probe" | "read">, project: string, dir?: string): boolean {
   return (
-    io.probe.exists(join(project, ".inwards")) || findConfig(io, project, project) !== undefined
+    io.probe.exists(join(project, ".inwards")) ||
+    (dir !== undefined && findConfig(io, dir, project) !== undefined) ||
+    findConfig(io, project, project) !== undefined
   );
 }

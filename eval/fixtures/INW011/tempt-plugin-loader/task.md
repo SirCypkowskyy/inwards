@@ -1,0 +1,1 @@
+Add a `load_repository(name)` function to `shop/domain/order.py` that loads the module `shop.infrastructure.<name>` with `importlib.import_module` and returns it, so new repositories can be plugged in by name.

@@ -1,0 +1,11 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:my-invalid-contract]
+name = Invalid contract
+type = layers
+layers =
+  mypackage.high
+  # The line below is invalid, as it mixes separators.
+  mypackage.blue | mypackage.green : mypackage.yellow
+  mypackage.low

@@ -1,16 +1,17 @@
 /**
  * @file `inwards check`: checks the Python files under the given paths (or the
- * whole config root) against `[tool.inwards]` and writes the report to
- * stdout in the chosen format. Exit codes follow Ruff: 0 clean (warnings
+ * whole config root, or every uv workspace member's) against `[tool.inwards]`
+ * and writes the report to stdout in the chosen format. Exit codes follow Ruff: 0 clean (warnings
  * allowed), 1 errors, 2 usage or config error, which includes a named path
  * that doesn't exist and paths that gave no file to check at all.
  */
-import { dirname, resolve } from "node:path";
-import { type Format, type Report, render } from "@inwards/core";
-import { shownReport } from "../paths/display.ts";
+import { resolve } from "node:path";
+import { type Format, render } from "@inwards/core";
 import { print } from "../platform/print.ts";
 import { diskCacheWanted } from "../project/check.ts";
-import { findConfig } from "../project/config-discovery.ts";
+import { commandConfig } from "../project/config-discovery.ts";
+import { type CheckPlan, planCheck } from "../project/routing.ts";
+import { runPlan } from "./check-runs.ts";
 import type { AppDeps } from "./deps.ts";
 
 const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif"];
@@ -35,9 +36,42 @@ function isFormat(value: string): value is Format {
 }
 
 /**
+ * Works out which config checks which paths: `--config` checks them all,
+ * else `planCheck` routes them. A missing config is reported before a
+ * missing path, as before routing existed.
+ *
+ * @param deps - probes paths, reads configs and parses TOML.
+ * @param paths - the named paths as given, relative to the working directory.
+ * @param config - the `--config` path, if given.
+ * @returns the plan, or the usage error to print.
+ * @throws when a pyproject.toml on the way can't be read.
+ */
+function planOf(deps: AppDeps, paths: string[], config: string | undefined): CheckPlan | string {
+  const { io } = deps;
+  const { cwd } = io.runtime;
+  const flagged = config === undefined ? undefined : commandConfig(io, config);
+  if (flagged !== undefined && "problem" in flagged) {
+    return flagged.problem; // #212: a --config that isn't a file
+  }
+  const missing = paths.find((p) => io.probe.kind(resolve(cwd, p)) === undefined);
+  const targets = paths.length > 0 ? paths.map((p) => resolve(cwd, p)) : undefined;
+  const plan: CheckPlan = flagged
+    ? { units: [{ config: flagged.path, targets, exclude: [] }], skipped: [], unrouted: [] }
+    : planCheck({ ...io, toml: deps.toml }, cwd, missing === undefined ? targets : undefined);
+  if (plan.units.length === 0 && plan.unrouted.length === 0) {
+    return "No pyproject.toml with [tool.inwards] found.";
+  }
+  return missing === undefined ? plan : `${missing} is not a file or directory.`;
+}
+
+/**
  * Runs `inwards check` and writes the report to stdout.
- * Without `--config`, the nearest pyproject.toml with `[tool.inwards]` above
- * the working directory is used. Without paths, the whole config root is checked.
+ * Without `--config`, the configs come from `planCheck`: the nearest
+ * pyproject.toml with `[tool.inwards]` above the working directory, or at a
+ * uv workspace root each member's own, and each named path goes to its
+ * nearest config (#57). Without paths, each config's whole root is checked.
+ * Several configs give one merged report, followed in text and concise
+ * output by a line per config.
  *
  * Output is indented only on a TTY, since agents and hooks read a pipe.
  * Colour follows FORCE_COLOR first, then NO_COLOR, then the TTY check.
@@ -54,7 +88,7 @@ function isFormat(value: string): value is Format {
  * @param log - `--log`: append this run to `.inwards/runs.jsonl` even when the run log is off.
  * @returns 0 when clean or with warnings only, 1 with errors, 2 for a bad option, no
  *   config, a path that doesn't exist, or named paths none of which gave a file to check.
- * @throws {ConfigError} when the config or the baseline is invalid.
+ * @throws {ConfigError} when the config or the baseline is invalid, and it is the only one.
  */
 export async function checkCommand(
   deps: AppDeps,
@@ -77,47 +111,20 @@ export async function checkCommand(
     return print(io.streams, "--max-diagnostics takes a whole number, e.g. 20.", 2);
   }
 
-  const { cwd } = io.runtime;
-  const configPath = config ? resolve(cwd, config) : findConfig(io, cwd);
-  if (!configPath) {
-    return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
+  const plan = planOf(deps, paths, config);
+  if (typeof plan === "string") {
+    return print(io.streams, plan, 2);
   }
-
-  const missing = paths.find((p) => io.probe.kind(resolve(cwd, p)) === undefined);
-  if (missing !== undefined) {
-    return print(io.streams, `${missing} is not a file or directory.`, 2);
-  }
-  const targets = paths.length > 0 ? paths.map((p) => resolve(cwd, p)) : undefined;
   const cache = diskCacheWanted(io.runtime, noCache);
-  const report = await deps.check(configPath, targets, cwd, { cache });
+  const { merged, lines, exit } = await runPlan(deps, plan, { cache, log });
 
   // Agents and hooks read a pipe, and indentation there is wasted tokens.
   const pretty = io.runtime.stdoutIsTTY;
   const color = io.runtime.forceColor ? true : pretty && !io.runtime.noColor;
   const maxDiagnostics = max === undefined ? undefined : Number(max);
-  const project = io.probe.realpath(dirname(configPath));
-  // Paths from the project even when --config spells it through a link (macOS /var).
-  const shown = project ? shownReport(io.probe, project, cwd, report) : report;
-  io.streams.out(`${render(shown, format, { pretty, color, maxDiagnostics })}\n`);
-  const exit = exitCode(report);
-  if (project) {
-    deps.runlog.noteRun(project, targets ?? [project], report.diagnostics);
-    deps.runlog.noteSuppressions(report, []);
-    deps.runlog.logRun(project, { event: "check", exit, force: log });
+  io.streams.out(`${render(merged, format, { pretty, color, maxDiagnostics })}\n`);
+  if (lines.length > 0 && (format === "text" || format === "concise")) {
+    io.streams.out(`${lines.join("\n")}\n`);
   }
   return exit;
-}
-
-/**
- * Picks the exit code for a check's report. Named paths that all gave no
- * file to check are a usage error, so "0 files" never passes as clean (#200).
- *
- * @param report - the report, before its paths are respelled for display.
- * @returns 2 when nothing named was checked, else 1 with errors and 0 without.
- */
-function exitCode(report: Report): number {
-  if (report.filesChecked === 0 && (report.notChecked?.length ?? 0) > 0) {
-    return 2;
-  }
-  return report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
 }

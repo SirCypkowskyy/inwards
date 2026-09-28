@@ -53,9 +53,10 @@ export interface RunLog {
    */
   noteSuppressions: (report: Pick<Report, "suppressed">, rejected: readonly Diagnostic[]) => void;
   /**
-   * Appends one run to the log, if it is on. Best effort: nothing in here,
-   * not even deciding whether the log is on, can change what the hook or
-   * check returns.
+   * Appends one run to the log, if it is on, and forgets what was noted, so
+   * the next line (another config of the same `check`, #57) starts empty.
+   * Best effort: nothing in here, not even deciding whether the log is on,
+   * can change what the hook or check returns.
    *
    * @param project - the real project root.
    * @param run - the event, the hook payload, the exit code; `force` for `check --log`.
@@ -63,10 +64,17 @@ export interface RunLog {
    * @param run.input - the hook payload, if there is one.
    * @param run.exit - the exit code the run returns.
    * @param run.force - `check --log`: log even when the run log is off.
+   * @param run.durationMs - how long this run took; the whole invocation's time by default.
    */
   logRun: (
     project: string,
-    run: { event: string; input?: Record<string, unknown>; exit: number; force?: boolean },
+    run: {
+      event: string;
+      input?: Record<string, unknown>;
+      exit: number;
+      force?: boolean;
+      durationMs?: number;
+    },
   ) => void;
 }
 
@@ -94,7 +102,13 @@ export function createRunLog(io: RunLogIo): RunLog {
     },
     logRun(
       project: string,
-      run: { event: string; input?: Record<string, unknown>; exit: number; force?: boolean },
+      run: {
+        event: string;
+        input?: Record<string, unknown>;
+        exit: number;
+        force?: boolean;
+        durationMs?: number;
+      },
     ): void {
       try {
         if (!runLogEnabled(io, project, run.force === true)) {
@@ -118,11 +132,13 @@ export function createRunLog(io: RunLogIo): RunLog {
           suppressed: noted.suppressed,
           rejected: noted.rejected.map(fingerprint),
           exit: run.exit,
-          durationMs: Math.round(io.clock.elapsed() * 10) / 10,
+          durationMs: Math.round((run.durationMs ?? io.clock.elapsed()) * 10) / 10,
         };
         io.state.appendLine(path, `${JSON.stringify(line)}\n`);
       } catch {
         // best effort, see above
+      } finally {
+        Object.assign(noted, { files: [], diagnostics: [], suppressed: 0, rejected: [] });
       }
     },
   };

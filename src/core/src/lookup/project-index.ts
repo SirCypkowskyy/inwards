@@ -28,6 +28,18 @@ type ImportReader = (file: SourceFile) => readonly ImportRef[];
 /** Reads the names a file binds at its top level; the engine supplies it too. */
 type BindingReader = (file: SourceFile) => ReadonlySet<string>;
 
+/**
+ * Where a module path stands in a pruned search of the tree (`holdsMatch`):
+ * the pattern matches it, could match something below it, or can't.
+ */
+export type TreeStep = "match" | "descend" | "prune";
+
+/** One directory's entries, as `listDir` gives them. */
+type Entries = ReturnType<ListDir>;
+
+/** A Python source or stub file name, with its stem. */
+const PYTHON_FILE = /^(?<stem>.+)\.pyi?$/u;
+
 /** A listed Python file, before its text is read. */
 type Listed = Omit<SourceFile, "text">;
 
@@ -36,8 +48,8 @@ type Listed = Omit<SourceFile, "text">;
  * relative to the config root, with forward slashes. The CLI and the language
  * server list with the same walk rules (hidden entries, node_modules,
  * __pycache__ and virtualenvs skipped; symlinks followed inside the root),
- * except that the CLI skips nothing but hidden entries inside a layer's
- * top-level package. `ownerOf` probes, so it agrees in both.
+ * and both skip nothing but hidden entries inside a layer's top-level
+ * package (`layerPackages`). `ownerOf` probes, so it agrees in both.
  */
 export interface ProjectFiles {
   /** Tells what is at a path; `ownerOf` probes through it, one path at a time. */
@@ -48,13 +60,21 @@ export interface ProjectFiles {
   read: (path: string) => string;
   /** Lists one directory: INW010 reads the package a missing module would live in. */
   listDir: ListDir;
+  /**
+   * Tells what is at a path relative to the other directories Python merges
+   * namespace packages from (another uv workspace member's import root, the
+   * project virtualenv's site-packages), so INW010 doesn't report a module
+   * another portion holds. None by default.
+   */
+  portions?: PathKind;
 }
 
 /**
  * A project's first-party modules, answered on demand.
  *
  * - `ownerOf` probes the file system (see `probeLookup`), each path at most
- *   once, and never walks the tree. It follows Python, not the
+ *   once, and never walks the tree; a compiled or sourceless module
+ *   (`.so`, `.pyd`, `.pyc`, `.pyx`) is found in its package's listing. It follows Python, not the
  *   listing, and so does `importersOf`, which resolves owners through it: it
  *   can return a name missing from `modules`, such as a namespace package (a
  *   directory without `__init__.py`), a module under a virtualenv or
@@ -91,6 +111,11 @@ export class ProjectIndex {
   private readonly texts = new Map<string, string>();
   private readonly importers = new Map<string, ReadonlySet<string>>();
   private readonly extended = new Map<string, boolean>();
+  /** Finds a module in the other portions of namespace packages, when the adapter gave any. */
+  private readonly portions: ModuleLookup | undefined;
+  private readonly dirs = new Map<string, Entries>();
+  private readonly pythonBelow = new Map<string, boolean>();
+  private readonly held = new Map<string, boolean>();
 
   /**
    * Wraps an adapter's file system. Nothing is listed or read yet.
@@ -104,16 +129,24 @@ export class ProjectIndex {
     this.readImports = readImports;
     this.readBindings = readBindings;
     this.listDir = source.listDir;
+    this.portions = source.portions ? probeLookup(source.portions) : undefined;
     // Imports share prefixes, so each path is probed once: INW010 asks for every import.
     // A long-lived adapter must rebuild the index when a path that could be a module is
     // created or deleted; the language server does, or builds one per check without file events.
     const kinds = new Map<string, ReturnType<PathKind>>();
+    /**
+     * Lists a directory once, for the compiled modules the probe looks for.
+     *
+     * @param dir - a directory relative to the config root, `""` for the root.
+     * @returns its entries, or undefined when it isn't a readable directory.
+     */
+    const listed = (dir: string): Entries => this.entries(dir);
     const lookup = probeLookup((rel: string): ReturnType<PathKind> => {
       if (!kinds.has(rel)) {
         kinds.set(rel, source.kind(rel));
       }
       return kinds.get(rel);
-    });
+    }, listed);
     // Several rules, and the import graph, ask about the same targets.
     const owners = new Map<string, string | undefined>();
     this.ownerOf = (target: string): string | undefined => {
@@ -189,6 +222,141 @@ export class ProjectIndex {
   }
 
   /**
+   * Tells whether a module missing under the config root belongs to another
+   * portion of its namespace package (PEP 420). Its owner here must be an
+   * implicit namespace package all the way down (no `__init__.py` or
+   * `__init__.pyi` from the top-level package on), since Python merges only
+   * those from every directory that has them. Then the module counts when
+   * the adapter's `portions` probe finds it (another uv workspace member,
+   * the project's virtualenv), or when the owner is one of the `shared`
+   * namespace packages the config lists: a name directly inside it that
+   * isn't here comes from an installed distribution. A missing module deeper
+   * down, inside a subpackage that is here, still needs a portion to hold it.
+   *
+   * @param module - the dotted module that isn't under the config root.
+   * @param owner - its longest existing prefix here, a package.
+   * @param shared - the namespace packages the config says installed distributions add to.
+   * @returns true when another portion holds, or may hold, the module.
+   */
+  inOtherPortion(module: string, owner: string, shared: readonly string[] = []): boolean {
+    const { portions } = this;
+    if (portions === undefined && !shared.includes(owner)) {
+      return false;
+    }
+    const parts = owner.split(".");
+    const namespace = parts.every((_, i) => {
+      const dir = parts.slice(0, i + 1).join("/");
+      return (
+        this.source.kind(dir) === "dir" &&
+        this.source.kind(`${dir}/__init__.py`) === undefined &&
+        this.source.kind(`${dir}/__init__.pyi`) === undefined
+      );
+    });
+    return namespace && (shared.includes(owner) || portions?.(module) === module);
+  }
+
+  /**
+   * Tells whether the project has a module at or below a package that a
+   * pattern matches: a path the pattern matches exactly (`step` says
+   * "match") that is a module file or a directory holding Python code, with
+   * everything below it. INW006 asks it whether a package holds a selector's
+   * layer (`shop` holds `shop.*.domain` only when some `shop/<x>/domain`
+   * holds code).
+   *
+   * It lists only the directories `step` lets it descend into, each once,
+   * and never the whole tree; hidden entries are skipped, and a symlinked
+   * directory is not followed (`listDir` reports it as no directory).
+   *
+   * @param pkg - a dotted package name; the search starts there.
+   * @param key - names the pattern, for the cache: the same key must mean the same `step`.
+   * @param step - where a module path, split on dots, stands against the pattern.
+   * @returns true when some module at or below `pkg` matches.
+   */
+  holdsMatch(pkg: string, key: string, step: (segments: readonly string[]) => TreeStep): boolean {
+    const cacheKey = `${key}\u0000${pkg}`;
+    let found = this.held.get(cacheKey);
+    if (found === undefined) {
+      const segments = pkg.split(".");
+      const base = segments.join("/");
+      const here = step(segments);
+      const file = [".py", ".pyi"].some((ext) => this.source.kind(`${base}${ext}`) === "file");
+      found =
+        here === "match"
+          ? file || this.holdsPython(base)
+          : here === "descend" && this.searchBelow(segments, step);
+      this.held.set(cacheKey, found);
+    }
+    return found;
+  }
+
+  /**
+   * Searches below a directory the pattern descends into (see `holdsMatch`).
+   *
+   * @param segments - the directory as a module path.
+   * @param step - where a module path stands against the pattern.
+   * @returns true when a matching module lies below it.
+   */
+  private searchBelow(
+    segments: readonly string[],
+    step: (segments: readonly string[]) => TreeStep,
+  ): boolean {
+    const dir = segments.join("/");
+    return (this.entries(dir) ?? []).some((entry) => {
+      const stem = entry.dir ? entry.name : PYTHON_FILE.exec(entry.name)?.groups?.["stem"];
+      if (stem === undefined || stem === "__init__" || entry.name.startsWith(".")) {
+        return false; // `__init__` is the directory itself, which didn't match
+      }
+      const path = [...segments, stem];
+      const where = step(path);
+      if (!entry.dir) {
+        return where === "match";
+      }
+      if (where === "match") {
+        return this.holdsPython(`${dir}/${entry.name}`);
+      }
+      return where === "descend" && this.searchBelow(path, step);
+    });
+  }
+
+  /**
+   * Tells whether a directory holds a Python file at any depth, hidden entries aside.
+   *
+   * @param dir - a directory relative to the config root.
+   * @returns true when some `.py` or `.pyi` file lies below it.
+   */
+  private holdsPython(dir: string): boolean {
+    let found = this.pythonBelow.get(dir);
+    if (found === undefined) {
+      found = (this.entries(dir) ?? []).some(
+        (entry) =>
+          !entry.name.startsWith(".") &&
+          (entry.dir ? this.holdsPython(`${dir}/${entry.name}`) : PYTHON_FILE.test(entry.name)),
+      );
+      this.pythonBelow.set(dir, found);
+    }
+    return found;
+  }
+
+  /**
+   * Lists a directory through the adapter, once.
+   *
+   * @param dir - a directory relative to the config root.
+   * @returns its entries, or undefined when it isn't a directory or can't be read.
+   */
+  private entries(dir: string): Entries {
+    if (!this.dirs.has(dir)) {
+      let entries: Entries;
+      try {
+        entries = this.source.listDir(dir);
+      } catch {
+        // Unreadable: no evidence from here, so INW006 reports more, never less.
+      }
+      this.dirs.set(dir, entries);
+    }
+    return this.dirs.get(dir);
+  }
+
+  /**
    * Tells whether a module binds a name at its top level (a `def`, a
    * `class`, an assignment with a value, or an import, under its `as` name),
    * so other code can import the name from it: INW003's fix names the public
@@ -210,6 +378,20 @@ export class ProjectIndex {
       this.bindings.set(file.path, names);
     }
     return names.has(name);
+  }
+
+  /**
+   * Reads a module's source through the adapter, once: `a/b.py`, else
+   * `a/b/__init__.py`, else their stubs. The FastAPI model reads the files a
+   * name leads to with it, so names resolve across files without importing
+   * anything.
+   *
+   * @param module - a dotted module name.
+   * @returns the file with its text as read, or undefined when no file holds the module.
+   */
+  sourceOf(module: string): SourceFile | undefined {
+    const file = this.fileOf(module);
+    return file === undefined ? undefined : { ...file, text: this.text(file) };
   }
 
   /**

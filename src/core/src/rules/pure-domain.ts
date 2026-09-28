@@ -9,7 +9,7 @@
  * third-party otherwise. The longest matching entry decides, `allow` on a
  * tie; with no match, a third-party import passes only when the layer sets
  * no `allow-libraries`, and stdlib always passes. The innermost of two or
- * more layers denies `DEFAULT_DENY` unless it sets `deny-libraries`, and
+ * more layers (every sibling of the lowest rank) denies `DEFAULT_DENY` unless it sets `deny-libraries`, and
  * `extend-deny-libraries` adds to whichever of the two applies (#155). On
  * any other layer without `deny-libraries` it adds to an empty list.
  *
@@ -18,12 +18,12 @@
  * and its fix points at another package rather than at a port (#203). The
  * check itself is the same; `allow-libraries` covers both.
  */
-import type { LayerSpec } from "../config/parse.ts";
+import type { LayerSpec } from "../config/layers.ts";
 import type { Diagnostic, Fix, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ModuleLookup } from "../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../meta/registry.ts";
 import { STDLIB } from "../python/stdlib.ts";
-import { layerIndexOf } from "./shared/layer-ownership.ts";
+import { layerIndexOf, portHome, rankOf } from "./shared/layer-ownership.ts";
 
 /** Frameworks, database and network clients, and stdlib I/O: what the domain gets by default. */
 const DEFAULT_DENY: readonly string[] = [
@@ -90,7 +90,7 @@ function longest(entries: readonly string[], target: string): string | undefined
  */
 function denial(layers: readonly LayerSpec[], i: number, target: string): string | undefined {
   const layer = layers[i];
-  const inner = i === 0 && layers.length > 1;
+  const inner = rankOf(layers, i) === 0 && layers.length > 1;
   const base = layer?.denyLibraries ?? (inner ? DEFAULT_DENY : []);
   const deny = longest([...base, ...(layer?.extendDenyLibraries ?? [])], target);
   const allow = longest(layer?.allowLibraries ?? [], target);
@@ -152,7 +152,9 @@ export function checkLibraries(
         diagnostic(RULES.INW005, file, {
           span: ref,
           message: `Layer "${source.name}" imports "${ref.target}" from ${member ? "workspace package" : "library"} "${top}", which "${source.name}" may not use.`,
-          fix: member ? workspaceFix(source, ref, entry) : fixFor(source, owners, ref, entry),
+          fix: member
+            ? workspaceFix(source, ref, entry)
+            : fixFor(source, owners, ref, { entry, home: portHome(file, layers) }),
         }),
       );
     }
@@ -212,14 +214,16 @@ function workspaceFix(source: LayerSpec, ref: ImportRef, entry: string): Fix {
  * @param source - the layer that made the import.
  * @param owners - the outer layers allowed to use the library.
  * @param ref - the offending import.
- * @param entry - the deny entry that matched, or the top-level package outside `allow-libraries`.
+ * @param why - what matched and where the port goes.
+ * @param why.entry - the deny entry that matched, or the top-level package outside `allow-libraries`.
+ * @param why.home - the importing file's matched prefix, worded by `portHome`.
  * @returns the summary and numbered steps of the fix.
  */
 function fixFor(
   source: LayerSpec,
   owners: readonly LayerSpec[],
   ref: ImportRef,
-  entry: string,
+  { entry, home }: { entry: string; home: string },
 ): Fix {
   const remove = removeStep(ref);
   const ask = askStep(source, entry);
@@ -229,13 +233,12 @@ function fixFor(
       steps: [remove, ask],
     };
   }
-  const home = source.modules[0] ?? source.name;
   const allowed = owners.map((layer) => `"${layer.name}"`).join(", ");
   return {
     summary: `Use "${entry}" in an outer layer, behind a port owned by "${source.name}".`,
     steps: [
       remove,
-      `Declare a typing.Protocol in \`${home}\` (for example \`${home}.ports\`) that describes only what this module needs from "${entry}".`,
+      `Declare a typing.Protocol in ${home} that describes only what this module needs from "${entry}".`,
       "Type this module against that Protocol and receive the implementation through a constructor or function parameter.",
       `Implement the Protocol with "${entry}" in the outer layer that holds adapters (allowed: ${allowed}), and wire it in the outermost layer (the composition root).`,
       ask,

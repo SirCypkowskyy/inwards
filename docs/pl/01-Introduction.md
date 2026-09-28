@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 8d67bb777dd4256ef6c8c19c5f02354ba17702b61a16845cde59bb3bcafd093d
+source_hash: 20c9d43550cf83d172afd948357b2916c61f4aa758d079dd4f964e2c61b8dc14
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -138,7 +138,7 @@ Wyciszenie bez powodu, z nieznanym kodem albo w złej postaci niczego nie ukrywa
 
 ## Czym Inwards nie jest { #what-inwards-is-not }
 
-To nie jest linter ogólnego przeznaczenia, narzędzie do sprawdzania typów ani formatter. Nadal używaj Ruffa i ty. Inwards zajmuje się wyłącznie strukturą zależności między twoimi własnymi modułami i zakłada, że wiesz już, jakiej architektury chcesz. Nie wymyśli jej za ciebie.
+To nie jest linter ogólnego przeznaczenia, narzędzie do sprawdzania typów ani formatter. Nadal używaj Ruffa i ty. Domyślnie Inwards zajmuje się wyłącznie strukturą zależności między twoimi własnymi modułami (rodziny reguł opt-in, takie jak [FastAPI](rules/index.md#fastapi), idą dalej, [ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) i zakłada, że wiesz już, jakiej architektury chcesz. Nie wymyśli jej za ciebie.
 
 ## Jak zorganizowana jest ta dokumentacja { #how-these-docs-are-organised }
 
@@ -158,6 +158,6 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 !!! info "Stan"
     Pre-alpha.
     Osiem reguł działa od początku do końca w CLI, w silniku i w serwerze VS Code: INW001 (kierunek warstw), INW011 (importy dynamiczne), INW005 ([biblioteki w warstwach](guides/libraries.md): domyślnie żadnych frameworków ani operacji wejścia-wyjścia w domenie), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW010 (importy własnych modułów, które nie istnieją), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
-    `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
+    `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Każde wydanie to GitHub Release z plikami binarnymi dla sześciu platform, pięcioma wheelami platformowymi i plikiem `.vsix`. Jak dotąd jedynym wydaniem jest wersja przedpremierowa v0.1.0-rc.1.
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.

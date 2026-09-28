@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/02-Business-Context.md
-source_hash: 5858b82f437d9e0e4535f4086c8e8efddb3915cc8c695e831c910a7f37cb76df
+source_hash: c9cc78261067375ec9f17d2209ba7a96cd8d98f3ae9f93a24bcad8c83b084ebe
 ---
 
 # :material-chart-timeline-variant: Kontekst biznesowy { #business-context }
@@ -280,7 +280,7 @@ flowchart LR
 | UC4 | Zobacz naruszenia w edytorze | Programista pisze kod | Podkreślenie z tym samym komunikatem i kodem co w CLI | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace |
 | UC5 | Zablokuj pull request | CI uruchamia `inwards check --format sarif` | Nieudane sprawdzenie oraz adnotacje w pull requeście i w GitHub code scanning | :white_check_mark: [szablon workflow](guides/ci.md) i adnotacje w pull requestach, sprawdzone w praktyce (dogfooding) na `examples/broken-app`; :material-progress-clock: code scanning, gdy repozytorium stanie się publiczne |
 | UC6 | Wdróż w starszym kodzie | Architekt uruchamia `inwards baseline` | Istniejące naruszenia zostają zapisane, a sprawdzenie oblewają tylko nowe | :white_check_mark: |
-| UC7 | Poinstruuj agenta z góry | `inwards context` zapisuje podsumowanie do `AGENTS.md` / `CLAUDE.md` | Agent zna warstwy, zanim napisze pierwszy import | :material-progress-clock: [#58](https://github.com/SirCypkowskyy/inwards/issues/58). Dziś `init --agent agents-md` tylko każe agentowi uruchomić sprawdzenie |
+| UC7 | Poinstruuj agenta z góry | `inwards context --write` albo `inwards init --brief` zapisuje podsumowanie do `AGENTS.md` (który `CLAUDE.md` może zaimportować) | Agent zna warstwy, zanim napisze pierwszy import | :white_check_mark: opcjonalnie, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |
 
 ## Źródła { #sources }
 

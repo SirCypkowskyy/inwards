@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: 203b23b8919c9d896a3b5d3bc93a54bc420c51478ae0daf883d31b502616cbc6
+source_hash: 51337e08055254b7541c20b1298f95a97a89fffad102a0a4f9922f4e401d855c
 ---
 
 # Kształt pakietu { #package-shape }
@@ -125,6 +125,25 @@ only-in = ["tests", "tests.**"]
 
 Obie konfiguracje są fixture'ami testów (`src/cli/test/support/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z krokami naprawy pokazanymi wyżej.
 
+## Szablony { #templates }
+
+Gdy każda domena ma ten sam kształt, tę samą kolejność importów między swoimi modułami i te same moduły publiczne, [szablon](configuration.md#templates) mówi to raz: `template = "<nazwa>"` we wpisie kształtu dostarcza `allow`, `require`, `forbid`, `extra` i `hints`, a ten sam szablon może się rozwinąć w warstwy dla ról i w listę `public` kontekstu każdej domeny. `hints` dodaje wskazówki projektu do kroków naprawy INW007. Dokumentacja konfiguracji pokazuje fastapi-best-practices jako jeden szablon.
+
+## Kształty z presetu { #shapes-from-a-preset }
+
+`inwards init --style NAME --scaffold` zapisuje kształty dopasowane do przykładowego pakietu. W `layered`, `clean`, `hexagonal` i `vertical-slices` sam pakiet zawiera tylko swoje pakiety warstw, `bootstrap.py`, `__main__.py` i `_version.py` (który zapisują hatch-vcs i setuptools-scm), a `adapters/` w `hexagonal` zawiera tylko `inbound/` i `outbound/`; każdy inny element jest tam błędem, bo nie należałby do żadnej warstwy. W `clean` i `hexagonal` `application/` musi zawierać `ports/` i `use_cases/`, a każdy inny element jest tam ostrzeżeniem. Pakiety warstw nie mają kształtu, więc rosną swobodnie. [Instalacja](install.md#a-new-project-start-from-a-preset) wymienia presety; `inwards init --list-styles` wypisuje ich kształty.
+
+Presety z kontekstami nadają kształt także swoim pakietom kontekstów, przez selektor `*`, więc nowy pakiet jest objęty od chwili, gdy powstanie:
+
+| Preset | Pakiet | Kształt |
+|---|---|---|
+| `vertical-slices` | `app.features` | tylko pakiety wycinków (`allow = ["*/"]`) |
+| `vertical-slices` | `app.features.*` | wymaga `api`; dopuszcza każdy inny element |
+| `bounded-contexts` | `app` | pakiety kontekstów, `bootstrap.py`, `__main__.py`, `_version.py` |
+| `bounded-contexts` | `app.*` | wymaga `domain/`, `application/`, `infrastructure/`, `api`; wszystko inne jest ostrzeżeniem |
+| `django` | `app` | wymaga `settings.py` i `urls.py`; dopuszcza aplikacje, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |
+| `django` | `app.*` | wymaga `models`, `services`, `views`, `urls`; dopuszcza `admin`, `apps`, `migrations/`, `tests`; wszystko inne jest ostrzeżeniem |
+
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 
-Kształt pakietu nie obejmuje jeszcze nazwanych szablonów, warstw ról i `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), odrzucania zapisu (Write), zanim plik powstanie ([#96](https://github.com/SirCypkowskyy/inwards/issues/96)), plików innych niż Python oraz tego, co plik zawiera.
+Kształt pakietu nie obejmuje jeszcze presetu `inwards init --style fastapi` ([#93](https://github.com/SirCypkowskyy/inwards/issues/93)), plików innych niż Python oraz tego, co plik zawiera.

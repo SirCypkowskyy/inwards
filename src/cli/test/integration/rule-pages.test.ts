@@ -1,7 +1,8 @@
 /**
  * @file The rule documentation pages (docs/chapters/rules, docs/pl/rules) agree
  * with the rule registry. Every rule has a page in both languages with the full
- * front matter, and every diagnostic's link points at its page.
+ * front matter, every diagnostic's link points at its page, and the index
+ * marks the opt-in rules.
  */
 import { expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -96,4 +97,18 @@ test.each(pages(SITES.pl))("pl/rules/%s carries the English page's metadata", (p
     ...pl
   } = frontMatter(join(SITES.pl, page));
   expect(pl).toEqual(en);
+});
+
+// #181: the rule index's Default column says "opt-in" for exactly the rules
+// the registry turns off by default.
+test.each(Object.entries(SITES))("the rule index marks opt-in rules (%s)", (_site, dir) => {
+  const index = readFileSync(join(dir, "index.md"), "utf8");
+  for (const rule of registered) {
+    const row = index.split("\n").find((line) => line.startsWith(`| [${rule.code}]`));
+    const cells = row?.split("|").map((cell) => cell.trim()) ?? [];
+    expect([rule.code, cells[4]?.startsWith("opt-in")]).toEqual([
+      rule.code,
+      rule.default === "off",
+    ]);
+  }
 });

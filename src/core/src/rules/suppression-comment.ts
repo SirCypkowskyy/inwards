@@ -216,7 +216,8 @@ function commentFindings(
     ];
   }
   const unused = codes.filter(
-    (code) => !used.has(`${span.line}\u0000${code}`) && ruleLevel(code, rules) !== "off",
+    (code) =>
+      !used.has(`${span.line}\u0000${code}`) && ruleLevel(code, rules, file.module) !== "off",
   );
   if (unused.length === 0) {
     return [];

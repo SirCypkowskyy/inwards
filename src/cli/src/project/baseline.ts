@@ -128,11 +128,8 @@ function dormantEntries(
   configPath: string,
   rules: RuleSettings | undefined,
 ): Entry[] {
-  if (rules === undefined) {
-    return [];
-  }
   try {
-    return (readEntries(io, baselinePath(configPath)) ?? []).filter((e) => dormant(e.code, rules));
+    return (readEntries(io, baselinePath(configPath)) ?? []).filter((e) => dormant(e, rules));
   } catch {
     return [];
   }
@@ -210,22 +207,28 @@ export function readBaseline(
     return undefined;
   }
   const accepted = new Map<string, number>();
-  for (const e of entries.filter((entry) => !dormant(entry.code, rules))) {
+  for (const e of entries.filter((entry) => !dormant(entry, rules))) {
     accepted.set(baselineKey(e), (accepted.get(baselineKey(e)) ?? 0) + e.count);
   }
   return accepted;
 }
 
 /**
- * Tells whether a rule's baseline entries are dormant: the rule reports no
- * errors, being off or turned down to a warning.
+ * Tells whether a baseline entry is dormant: its rule reports no errors in
+ * its module, being off (an opt-in rule nobody turned on, or one whose
+ * `modules` leaves the module out) or turned down to a warning.
  *
- * @param code - the entry's rule code.
+ * @param entry - the entry; its code and module are read.
+ * @param entry.code - the entry's rule code.
+ * @param entry.module - the module the entry is in.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns true when the entry can't match anything now.
  */
-function dormant(code: string, rules: RuleSettings | undefined): boolean {
-  const level = ruleLevel(code, rules);
+function dormant(
+  { code, module }: Pick<Entry, "code" | "module">,
+  rules: RuleSettings | undefined,
+): boolean {
+  const level = ruleLevel(code, rules, module);
   return level === "off" || level === "warning";
 }
 

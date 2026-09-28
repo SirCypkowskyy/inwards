@@ -1,0 +1,16 @@
+[importlinter]
+root_package = mypackage
+include_external_packages = True
+
+[importlinter:contract:my-forbidden-contract]
+name = My forbidden contract (internal and external packages)
+type = forbidden
+source_modules =
+  mypackage.one
+  mypackage.two
+forbidden_modules =
+  mypackage.three
+  django
+  requests
+ignore_imports =
+  mypackage.one.green -> sqlalchemy

@@ -9,7 +9,9 @@
  * every file whose content hash differs from the SessionStart manifest. The
  * manifest walks layer packages without skipping anything, so a commit,
  * `git update-index --assume-unchanged`, a gitignored or untracked file, or a
- * pyvenv.cfg disguise inside a layer all show up as changed. In a changed
+ * pyvenv.cfg disguise inside a layer all show up as changed. The symlinks in
+ * layer packages are recorded too, so a link made during the session out of
+ * the config root or into another layer blocks (#83, #84). In a changed
  * file, only violations it didn't have at session start block; the old ones
  * go along as context when the gate blocks for something else (`session/old-errors.ts`).
  * Under `agent-suppressions = "deny"`, the default, an inline suppression
@@ -18,7 +20,11 @@
  * The gate also fails closed when it can't trust the session: no start
  * record, a `[tool.inwards]` table that differs from the start snapshot (a
  * `sed -i` through Bash), a changed file governed by a config that didn't
- * exist at start, or Claude Code settings that dropped the Inwards hooks. It
+ * exist at start, or Claude Code settings that dropped the Inwards hooks.
+ * The start record itself is checked against its witness outside the project
+ * (#88): a replayed SessionStart, a record deleted or rewritten during the
+ * session, or a record without a witness whose config isn't the committed one
+ * all block (`session/record.ts`, `session/committed-config.ts`). It
  * blocks a turn at most `escalate-after` times (default 3); the last block
  * tells the agent to ask the user, and the Stop after it lets the turn end
  * with the unresolved violations shown to the user (see `escalation.ts`).
@@ -29,8 +35,14 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { changedBaselines } from "../project/baseline.ts";
-import { projectConfigs, projectManifest } from "../project/snapshot.ts";
+import {
+  projectConfigs,
+  projectLinks,
+  projectManifest,
+  projectTopLevel,
+} from "../project/snapshot.ts";
 import { rejectedNote } from "../session/agent-suppressions.ts";
+import { uncommittedConfigs } from "../session/committed-config.ts";
 import { fingerprint } from "../session/fingerprint.ts";
 import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";
 import { createStartLookups } from "../session/lookups.ts";
@@ -42,7 +54,8 @@ import {
   recordStop,
   type SessionState,
 } from "../session/record.ts";
-import { changedFiles, checkChanged } from "./changed-files.ts";
+import { touchWitness } from "../session/start-record.ts";
+import { changedFiles, checkChanged, freshImporters, newTopLevel } from "./changed-files.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { hookProblem } from "./hook-host.ts";
 import { type HookDeps, hookProject } from "./protocol.ts";
@@ -93,17 +106,9 @@ async function gate(
   const { valid: configs, found } = projectConfigs(io, project);
   const state = isSessionId(id) ? readSession(io, project, id) : undefined;
   if (!(isSessionId(id) && state)) {
-    if (Object.keys(configs).length === 0 || active) {
-      return 0; // not an Inwards project, or the last safety valve after a block
-    }
-    return block(
-      io,
-      [
-        "Inwards has no record of how this session started (.inwards/state is missing), so it can't tell what you changed. Run `inwards check`, fix what it reports, and ask the user to review before finishing.",
-      ],
-      undefined,
-    );
+    return Object.keys(configs).length === 0 ? 0 : unknownSession(io, project, id, active);
   }
+  touchWitness(io, project, id); // a running session's witness never ages out
   const { baselines } = state.start;
   const edited =
     baselines === undefined
@@ -112,7 +117,7 @@ async function gate(
   const problems = trustProblems(io, project, state, { configs, edited });
   const { report, old, rejected, strangers, governing, changed } = await review(
     deps,
-    project,
+    { project, id },
     state,
     { configs, found, edited },
   );
@@ -136,16 +141,45 @@ async function gate(
 }
 
 /**
+ * Answers a Stop in an Inwards project that has neither a start record nor
+ * its witness: block once, then let the turn end with the reason shown to the
+ * user, since there is nothing to compare with.
+ *
+ * @param io - writes the output and the unresolved record.
+ * @param project - the real project root.
+ * @param id - the payload's session id, which may not be a usable one.
+ * @param active - `stop_hook_active`: this turn was already kept going by a Stop hook.
+ * @returns 2 to block, 0 to let the turn end.
+ */
+function unknownSession(io: Platform, project: string, id: unknown, active: boolean): number {
+  const missing =
+    "Inwards has no record of how this session started (.inwards/state is missing), so it can't tell what you changed.";
+  if (active) {
+    // The last safety valve after a block: the turn ends, but the user hears why.
+    return isSessionId(id)
+      ? yieldTurn(io, project, id, { problems: [missing], diagnostics: [] })
+      : 0;
+  }
+  const fix =
+    "Run `inwards check`, fix what it reports, and ask the user to review before finishing.";
+  return block(io, [`${missing} ${fix}`], undefined);
+}
+
+/**
  * Checks what the session changed, with one set of start lookups for this
  * invocation: the changed files against their session-start configs (or the
  * whole project, for `stop-gate = "project"`), plus the layout comparison
- * with the session start. Shape findings on files that predate the session
+ * with the session start. Files that mention a top-level package new this
+ * session count as changed, since it can turn their old imports into
+ * first-party ones (#86). Shape findings on files that predate the session
  * are legacy, like old violations. A baseline changed during the session
  * can't be trusted, so none is applied, and project mode falls back to the
  * changed files.
  *
  * @param deps - the platform and the check runner.
- * @param project - the real project root.
+ * @param session - the real project root and the session id.
+ * @param session.project - the real project root.
+ * @param session.id - the session id, which names SessionStart's copies.
  * @param state - the session state.
  * @param now - the valid configs now, where each was found, and the baselines
  *   that changed during the session.
@@ -158,7 +192,7 @@ async function gate(
  */
 async function review(
   deps: HookDeps,
-  project: string,
+  { project, id }: { project: string; id: string },
   state: SessionState,
   {
     configs,
@@ -172,12 +206,19 @@ async function review(
 ): Promise<Awaited<ReturnType<typeof checkChanged>> & { changed: string[] }> {
   const { io } = deps;
   const manifest = projectManifest(io, project, configs);
-  const lookups = createStartLookups({ ...io, check: deps.check }, project);
-  const changed = changedFiles(io, lookups, state, manifest);
+  const lookups = createStartLookups({ ...io, check: deps.check }, { project, id });
+  const fresh = newTopLevel(project, configs, {
+    before: state.start.topLevel,
+    now: projectTopLevel(io, project, configs),
+  });
+  const edits = changedFiles(io, lookups, state, manifest);
+  // Not in `edits`, so byte for byte what they were at start: their own start content.
+  const unchanged = freshImporters(io, project, fresh, manifest).filter((f) => !edits.includes(f));
+  const changed = [...edits, ...unchanged];
   const checked = await checkChanged(
     lookups,
     changed,
-    { start: state.start, now: configs, found },
+    { start: state.start, now: configs, found, fresh, unchanged: new Set(unchanged) },
     edited.length === 0,
   );
   const texts = Object.fromEntries(
@@ -186,8 +227,8 @@ async function review(
   const layout = newLayoutErrors(
     project,
     { valid: configs, texts },
-    state.start.manifest,
-    manifest,
+    { before: state.start.manifest, now: manifest },
+    { before: state.start.links, now: projectLinks(io, project, configs), probe: io.probe },
   );
   checked.report.diagnostics = [
     ...layout,
@@ -270,11 +311,12 @@ function errorsOf(report: Report): Diagnostic[] {
 }
 
 /**
- * Lists what makes the session untrustworthy regardless of the code: a
- * changed `[tool.inwards]` or baseline, or Claude Code settings without the
- * Inwards hooks.
+ * Lists what makes the session untrustworthy regardless of the code: a start
+ * record that doesn't hold up (`recordProblems`), a changed `[tool.inwards]`
+ * or baseline, or Claude Code settings without the Inwards hooks.
  *
- * @param io - reads the Claude Code settings or the OpenCode plugin, and knows which agent runs the hook.
+ * @param io - reads the Claude Code settings or the OpenCode plugin, knows
+ *   which agent runs the hook, and runs git for the committed configs.
  * @param project - the real project root.
  * @param state - the session state.
  * @param now - the valid configs now, and the baselines that changed during the session.
@@ -283,12 +325,12 @@ function errorsOf(report: Report): Diagnostic[] {
  * @returns the problems, one sentence each.
  */
 function trustProblems(
-  io: Pick<Platform, "read" | "runtime" | "probe">,
+  io: Pick<Platform, "read" | "runtime" | "probe" | "git">,
   project: string,
   state: SessionState,
   { configs, edited }: { configs: Record<string, InwardsConfig>; edited: readonly string[] },
 ): string[] {
-  const problems: string[] = [];
+  const problems = recordProblems(io, project, state);
   if (JSON.stringify(configs) !== JSON.stringify(state.start.configs)) {
     problems.push(
       "[tool.inwards] changed during this session. Put it back as it was; if the layers really must change, ask the user to do it.",
@@ -304,6 +346,51 @@ function trustProblems(
     problems.push(hooks);
   }
   return problems;
+}
+
+/**
+ * Says what is wrong with the start record itself (#88). The agent's Bash
+ * can delete `.inwards/state` and pipe a SessionStart into the hook, which
+ * would record a new start from a loosened project. The witness outside the
+ * project catches that: the replay, or a record deleted or rewritten, is
+ * reported, and the witness is the start. A record without a witness (a
+ * session from before #88, or a witness deleted too) is trusted only when its
+ * configs are the ones committed at its start HEAD, so a user's own
+ * uncommitted config edit made before a witnessed session never blocks.
+ *
+ * @param io - runs git for the committed configs.
+ * @param project - the real project root.
+ * @param state - the session state.
+ * @returns the problems, one sentence each.
+ */
+function recordProblems(io: Pick<Platform, "git">, project: string, state: SessionState): string[] {
+  const ask = "Tell the user, and ask them to review what this session changed.";
+  const found: string[] = [];
+  if (state.replayed) {
+    found.push(
+      `A SessionStart for this session arrived after it had started (piped into \`inwards hook\` by hand?), so Inwards kept the original start record. ${ask}`,
+    );
+  }
+  if (state.record === "deleted" || state.record === "replaced") {
+    const what = state.record === "deleted" ? "is missing from" : "was rewritten in";
+    found.push(
+      `This session's start record ${what} .inwards/state, so Inwards checked against the copy it keeps outside the project. ${ask}`,
+    );
+  }
+  if (state.record === "unwitnessed") {
+    const none = "Inwards has no copy of this session's start record outside the project";
+    const { uncommitted, unverifiable } = uncommittedConfigs(io.git, project, state.start);
+    if (unverifiable) {
+      found.push(
+        `${none}, and this git (older than 2.44) can't read the committed [tool.inwards] here without risking a fetch (a partial clone, or a git config Inwards couldn't read), so the record can't be checked. Upgrading git to 2.44 or newer, or a writable XDG_STATE_HOME so sessions keep a copy, clears this. ${ask}`,
+      );
+    } else if (uncommitted.length > 0) {
+      found.push(
+        `${none}, and [tool.inwards] in ${uncommitted.join(", ")} was not the committed one when the record was made, so the record can't be trusted. If the user changed it before the session, they can commit it and start a new session (the check compares with the commit the session started from). ${ask}`,
+      );
+    }
+  }
+  return found;
 }
 
 /**

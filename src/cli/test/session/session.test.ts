@@ -7,6 +7,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   realpathSync,
@@ -91,10 +92,12 @@ describe("session state", () => {
   test("edits and the fingerprints of their violations are recorded", () => {
     const root = project({
       "pyproject.toml": LAYERS,
-      "shop/domain/order.py": "import shop.infrastructure.db\n",
+      "shop/domain/order.py": "X = 1\n",
       "shop/domain/clean.py": "X = 1\n",
     });
     start(root);
+    // Written after the start: a violation there at start would be old, not recorded.
+    writeFileSync(join(root, "shop/domain/order.py"), "import shop.infrastructure.db\n");
     expect(hook(root, edit(root, "shop/domain/order.py")).code).toBe(2);
     expect(hook(root, edit(root, "shop/domain/order.py")).code).toBe(2);
     expect(hook(root, edit(root, "shop/domain/clean.py")).code).toBe(0);
@@ -106,11 +109,14 @@ describe("session state", () => {
   test("20 parallel hooks leave a log with every fingerprint", async () => {
     const files: Record<string, string> = { "pyproject.toml": LAYERS };
     for (let i = 0; i < 20; i += 1) {
-      files[`shop/domain/f${i}.py`] = `import shop.infrastructure.m${i}\n`;
+      files[`shop/domain/f${i}.py`] = "";
       files[`shop/infrastructure/m${i}.py`] = "";
     }
     const root = project(files);
     start(root);
+    for (let i = 0; i < 20; i += 1) {
+      writeFileSync(join(root, `shop/domain/f${i}.py`), `import shop.infrastructure.m${i}\n`);
+    }
     const runs = Array.from({ length: 20 }, (_, i) =>
       inwardsAsync(["hook", "claude-code"], {
         cwd: root,
@@ -136,7 +142,9 @@ describe("session state", () => {
     hook(root, edit(root, "shop/domain/order.py"));
     start(root, ID, "compact");
     start(root, ID, "resume");
-    expect(readSession(IO, realpathSync(root), ID)).toBeUndefined();
+    expect(existsSync(join(root, ".inwards/state", `${ID}.start.json`))).toBe(false);
+    // Only the witness outside the project is left, and the reader says so (#88).
+    expect(readSession(IO, realpathSync(root), ID)?.record).toBe("deleted");
   });
 
   test("a resume keeps the original start", () => {
@@ -174,14 +182,18 @@ describe("session state", () => {
     for (let i = 0; i < 55; i += 1) {
       writeFileSync(join(dir, `old-${i}.jsonl`), "");
     }
-    writeFileSync(join(dir, "ancient.start.json"), "{}");
     const eightDaysAgo = (Date.now() - 8 * 86_400_000) / 1000;
-    utimesSync(join(dir, "ancient.start.json"), eightDaysAgo, eightDaysAgo);
+    for (const name of ["ancient.start.json", "ancient.content.json"]) {
+      writeFileSync(join(dir, name), "{}");
+      utimesSync(join(dir, name), eightDaysAgo, eightDaysAgo);
+    }
     start(root, "newest");
     const left = readdirSync(dir);
     expect(left.filter((n) => n.startsWith("old-")).length).toBe(49);
     expect(left).not.toContain("ancient.start.json");
+    expect(left).not.toContain("ancient.content.json"); // the copies go with their session
     expect(left).toContain("newest.start.json");
+    expect(left).toContain("newest.content.json"); // outside git, every file gets a copy
   });
 
   test("edited paths stay project-relative when the payload names a symlinked path (macOS /var)", () => {

@@ -1,16 +1,25 @@
 /**
  * @file What a project looks like right now, as the session start and the Stop gate
- * compare it: every `[tool.inwards]` table, and a content hash per Python
- * file. Paths are project-relative with forward slashes: real paths for
+ * compare it: every `[tool.inwards]` table, a content hash per Python
+ * file, the symlinks in layer packages, and the top-level modules under each
+ * config root. Paths are project-relative with forward slashes: real paths for
  * configs, the paths as walked for the manifest. The filesystem comes in
  * through the injected probe, reader and walker.
  */
 import { createHash } from "node:crypto";
-import { join, relative } from "node:path";
-import { ConfigError, declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";
+import { dirname, join, relative, resolve } from "node:path";
+import {
+  ConfigError,
+  declaresInwards,
+  type InwardsConfig,
+  type ListDir,
+  parseConfig,
+  topLevelModules,
+} from "@inwards/core";
 import { posix } from "../paths/lexical.ts";
 import type { FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 import { layerDirs } from "./check.ts";
+import { layerLinks } from "./links.ts";
 
 /** What taking a snapshot reads. */
 export interface SnapshotIo {
@@ -117,6 +126,8 @@ function openDirs(
  * @param io - walks the project and reads each file's bytes.
  * @param project - the real project root.
  * @param configs - the project's configs, from `projectConfigs`.
+ * @param onFile - sees each file's path, absolute path and bytes as they are
+ *   hashed, so SessionStart can keep copies without reading the files twice.
  * @returns SHA-256 hex digests, by project-relative path.
  * @throws when a file can't be read.
  */
@@ -124,16 +135,82 @@ export function projectManifest(
   io: SnapshotIo,
   project: string,
   configs: Record<string, InwardsConfig>,
+  onFile?: (rel: string, file: string, bytes: Uint8Array) => void,
 ): Record<string, string> {
   const manifest: Record<string, string> = {};
   for (const file of io.walk.pythonFiles([project], openDirs(io, project, configs))) {
     // Keyed by the path as walked, not the real one: a file reached through a
     // symlink into a layer is that layer's module under that name.
-    manifest[posix(relative(project, file))] = createHash("sha256")
-      .update(io.read.bytes(file))
-      .digest("hex");
+    const rel = posix(relative(project, file));
+    const bytes = io.read.bytes(file);
+    manifest[rel] = createHash("sha256").update(bytes).digest("hex");
+    onFile?.(rel, file, bytes);
   }
   return manifest;
+}
+
+/**
+ * Lists the symlinks in every config's layer packages (`layerLinks`), so the
+ * Stop gate can tell a link made during the session from one that was there
+ * at the start. The manifest can't: a link out of the project adds no file
+ * to it (#83).
+ *
+ * @param io - resolves real paths and lists links.
+ * @param project - the real project root.
+ * @param configs - the project's configs, from `projectConfigs`.
+ * @returns each link's real target, both project-relative with forward
+ *   slashes (a target outside the project starts with `..`), by link path.
+ */
+export function projectLinks(
+  io: Pick<SnapshotIo, "probe" | "walk">,
+  project: string,
+  configs: Record<string, InwardsConfig>,
+): Record<string, string> {
+  const links: Record<string, string> = {};
+  for (const [path, config] of Object.entries(configs)) {
+    for (const link of layerLinks(io, join(project, path), config)) {
+      links[posix(relative(project, link.path))] = posix(relative(project, link.target));
+    }
+  }
+  return links;
+}
+
+/**
+ * Lists the top-level first-party modules under every config's root, by the
+ * module probe's rules (`topLevelModules`): nothing is skipped, and compiled
+ * modules and packages count, so the Stop gate sees a package that appears
+ * during the session even where the manifest walk doesn't look (#86). A
+ * symlinked directory counts when it leads to a directory.
+ *
+ * @param io - lists directories and tells what a symlink leads to.
+ * @param io.read - lists a directory's entries.
+ * @param io.probe - tells whether a symlinked entry leads to a directory.
+ * @param project - the real project root.
+ * @param configs - the project's configs, by project-relative path.
+ * @returns the names by project-relative config path.
+ */
+export function projectTopLevel(
+  io: { read: Pick<FileReader, "list">; probe: Pick<PathProbe, "kind"> },
+  project: string,
+  configs: Record<string, InwardsConfig>,
+): Record<string, string[]> {
+  return Object.fromEntries(
+    Object.entries(configs).map(([rel, config]) => {
+      const root = resolve(dirname(join(project, rel)), config.root);
+      /**
+       * Lists a directory under the root, a symlink to a directory counting as one.
+       *
+       * @param dir - relative to the root, `""` for the root.
+       * @returns its entries, or undefined when it can't be listed.
+       */
+      const list: ListDir = (dir: string) =>
+        io.read.list(join(root, dir))?.map((e) => ({
+          name: e.name,
+          dir: e.dir || (!e.file && io.probe.kind(join(root, dir, e.name)) === "dir"),
+        }));
+      return [rel, topLevelModules(list)];
+    }),
+  );
 }
 
 /**

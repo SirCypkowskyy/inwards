@@ -16,7 +16,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Docs built with Zensical, served by Cloudflare Workers | :material-swap-horizontal: Hosting superseded by 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :white_check_mark: Accepted |
 | [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted, deployed from `develop` since 019 |
-| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted |
+| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted, symlinks in layers that hide code reported since [#83](https://github.com/SirCypkowskyy/inwards/issues/83) and [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
 | [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :white_check_mark: Accepted |
 | [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted, unreadable targets reported since 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :material-swap-horizontal: Branching model superseded by 019 |
@@ -36,6 +36,11 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
+| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Layer selectors anchored in a top-level package, with slice-aware session checks | :white_check_mark: Accepted |
+| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
+| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Package templates expand into config a user could write by hand | :white_check_mark: Accepted |
+| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :white_check_mark: Accepted |
+| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -265,6 +270,16 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 **Alternatives.** *Real paths only*: renames symlinked files and hides layers. *Lexical paths only*: lets a symlink reach outside the project. *No symlink support*: packages linked into a project would go unchecked without any warning.
 
+**Amendment · 2026-09-28 · [#83](https://github.com/SirCypkowskyy/inwards/issues/83), [#84](https://github.com/SirCypkowskyy/inwards/issues/84).** Two links hid code from the rules. `ln -s /outside/dir shop/domain/ext` gives an importable `shop.domain.ext.leak` that the walker never reads, as decided above. `ln -s ../infrastructure shop/domain/infra_alias` gives `shop.domain.infra_alias.db`, infrastructure code that INW001 takes for domain code by its name, so `from shop.domain.infra_alias import db` passes.
+
+- **A symlink inside a layer is an INW006 error at the link** when its real target lies outside the config root, in another layer, or above the layers (the package that holds them, or the root). A link within its layer passes, and so does a link into code outside every layer: that code is checked under the link's name. A link above the layers that could hold layer code (`shop/payments` under `shop.*.domain`) is an error when it leaves the root, unless its name isn't a Python identifier (`static-assets`). A target that contains the real directory of a layer package that is itself a link (`packages` with `shop -> packages/shop`) holds layers too. Links to a directory or to a `.py` or `.pyi` file count; dangling links don't.
+- **The walk lists links by the path Python imports them through.** It covers every layer's top-level package (`layerPackages`, [ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)) and the package itself when it is a link, so a root of links to uv workspace members names each link. It follows links that stay in the root (cycle guarded) and never those that leave it, so a chain through code outside every layer (`shop/domain/a -> ../misc` plus `shop/misc/y -> ../infrastructure`) shows up as `shop/domain/a/y`. A target under a layer package that is itself a link in the root (`shop -> packages/shop`) is named by the package (`shop.infrastructure`), not its real path. The engine gets root-relative names and decides.
+- **The session start records the links**, link path to real target. At Stop, a finding that is new since the start (a new link, or one pointing elsewhere) blocks, and `[tool.inwards.rules]` doesn't apply, as for a layer moved away ([ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)). A link that was there at the start doesn't block, like an old violation in an untouched file. A start record without links, from an older version, makes every such link new.
+
+*Consequences:* the code behind a link out of the root is still never read; the finding says it is there. A directory of data files linked into a layer package from outside the root is reported too. The language server and `inwards check` with path arguments don't report links, as they don't report dead prefixes.
+
+*Alternatives:* *resolve each import to the file Python loads and take the layer from every name that file has*: exact for #84, but every import would need a real-path probe through a new engine port, and it does nothing for #83. *Check the target read-only*: would read files outside the project, which the decision above rules out. *Report every link in a layer*: flags aliases within a layer, which ADR-013 supports on purpose.
+
 ## ADR-014: Report files whose declared encoding can hide imports
 
 **Status:** Accepted · 2026-09-25
@@ -291,16 +306,16 @@ Each record states the decision, the context it was made in, what it costs us, a
 - A string-literal target of `importlib.import_module`, `__import__` (also as `builtins.__import__` and `importlib.__import__`) or `runpy.run_module`, and every import inside literal `exec`, `eval` or `compile` source, is checked like an import. The literal source is parsed with the same grammar, and its imports (dynamic ones too) are reported at the call.
 - It is reported as its own rule, INW011 `dynamic-import`, not as INW001. The fix names the loader as the problem: delete the call and use a port, because rebuilding the name at runtime or moving it to another loader only hides the dependency.
 - Loaders are recognised through import aliases (`from importlib import import_module as im`, `import builtins as b`, `from importlib import *`), plain assignments (`load = importlib.import_module`), `getattr(m, "name")`, `m["name"]`, `m.__dict__["name"]`, `vars(m)["name"]` and `__import__("importlib")`. Scopes are ignored, and `exec`, `eval`, `compile` and `__import__` always count as the builtins, so resolution can add findings but not drop one. The accepted cost is a false positive: after `from re import compile`, `compile("from shop.infrastructure import x")` is reported.
-- Bindings not listed above are not followed, so a loader reached through them is missed: walrus, tuple assignment, class and instance attributes, `functools.partial`, names bound inside `exec`, and builtins reached through objects (`print.__self__`). Other loading APIs (`pkgutil.resolve_name`, `importlib.util.find_spec` with `exec_module`, `SourceFileLoader`) are not read either. [#79](https://github.com/SirCypkowskyy/inwards/issues/79) tracks all of them.
-- A target is a constant string: literals, implicit concatenation, `+` between constants, and f-strings whose fields are constant strings.
+- Bindings not listed above are not followed. [#79](https://github.com/SirCypkowskyy/inwards/issues/79) added the walrus, tuple, starred and chained assignment, class and instance attributes, `functools.partial`, names bound inside a literal `exec`, and builtins reached through `__self__`, `__globals__`, `globals()` and `sys.modules`, and the loading APIs `pkgutil.resolve_name`, `importlib.util.find_spec`, `spec_from_file_location` and `SourceFileLoader`. Chapter 3 lists what is still missed.
+- A target is a constant string: literals, implicit concatenation, `+` between constants, and f-strings whose fields are constant strings. [#79](https://github.com/SirCypkowskyy/inwards/issues/79) added `%` with `%s`, `*`, `str.join`, `str.format`, slicing, `!s` and string format specs, and module-level names bound once to a constant in a file with no `exec`, `eval`, namespace writer or wildcard import.
 - Bytes passed to `exec` or `compile` are decoded as CPython does. A PEP 263 declaration counts, and a codec Inwards can't read (the INW000 rules, [ADR-014](#adr-014-report-files-whose-declared-encoding-can-hide-imports)) gets an INW011 diagnostic saying the source can't be checked, in any layer. A `str` source ignores the declaration, as in CPython.
 - Relative targets resolve as at runtime: `import_module(".x", package=...)` with a literal package, `__package__` or `__name__`, and `__import__` with a literal `level` against the file's package.
-- Before the prescan, a text check looks for the names every loading call must spell: `importlib`, `runpy`, `builtins`, `__import__`, or `exec`, `eval` or `compile` not preceded by a dot, on NFKC-normalised text. A file in a layer that matches skips the skeleton and gets the full parse. `prescan-diff` checks the hint on both corpora: a dynamic import in a file the hint rejects is a miss.
+- Before the prescan, a text check looks for the names every loading call must spell: `importlib`, `runpy`, `pkgutil`, `builtins`, `__import__`, `__self__`, or `exec`, `eval` or `compile` not preceded by a dot, on NFKC-normalised text. A file in a layer that matches skips the skeleton and gets the full parse. `prescan-diff` checks the hint on both corpora: a dynamic import in a file the hint rejects is a miss.
 
 **Consequences.**
 
 - :material-plus-circle-outline: The common dynamic dodges are reported with a fix aimed at them. Tests cover each call form and alias.
-- :material-minus-circle-outline: INW011 is not complete. The unfollowed bindings and loading APIs above, and computed targets, are false negatives until [#79](https://github.com/SirCypkowskyy/inwards/issues/79) and [#46](https://github.com/SirCypkowskyy/inwards/issues/46) land.
+- :material-minus-circle-outline: INW011 is not complete. The routes chapter 3 lists as known gaps are false negatives; computed targets are reported as unverifiable in inner layers ([ADR-026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)).
 - :material-plus-circle-outline: The hint sends 209 of 1,921 CPython 3.14 stdlib files to the full parse, and only files in a layer pay for it. `re.compile` does not trigger it.
 - :material-minus-circle-outline: Computed targets (`import_module(name)`, f-strings with fields), a relative `import_module` without a readable package, and literals with a `\N{...}` escape are not read. Computed targets need a separate decision, flagging every non-literal loader call in an inner layer ([#46](https://github.com/SirCypkowskyy/inwards/issues/46)).
 - :material-minus-circle-outline: `prescan-diff` now parses every file it can't rule out, so the generated corpus (65,262 files) takes about 4 s instead of 1 s.
@@ -637,8 +652,8 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 
 - :material-plus-circle-outline: The variable-name dodge is reported, through every alias ADR-015 follows. Tests cover each loader, the aliases, f-strings, variables, `\N{...}` literals, arguments behind `*args` and `**kwargs`, a relative `import_module` with an unknown package, and every rebinding of `exec`, `eval` or `compile` that doesn't shadow the builtin at the call. The loader hint needs no change, and `prescan-diff` still misses nothing.
 - :material-minus-circle-outline: Legitimate runtime loaders in inner layers are reported. On the real-repo corpus (5 repositories, 6,543 files) the change adds 4 findings, each an `import_module(path)` that loads a configured class or plugin: one in python-ddd's `seedwork.application`, three in saleor (`saleor.core.telemetry`, `saleor.plugins`, `saleor.schedulers`). Their teams would move each loader outward or baseline it.
-- :material-minus-circle-outline: Constant targets that aren't literals (a module-level `TARGET = "..."`, `str.format`, `%`, f-string conversions such as `{'shop'!s}`) are now reported as unverifiable instead of passing. Folding them, and so reporting them exactly, is [#79](https://github.com/SirCypkowskyy/inwards/issues/79).
-- :material-minus-circle-outline: The rebinding exemption misses the builtin passed in as an argument: `def run(exec, c): return exec(c)` called as `run(exec, code)` is not reported, since the parameter shadows the builtin inside `run`. It also misses the builtin reached through an object without naming a loader or a namespace writer, such as `exec = operator.attrgetter("exec")(print.__self__)`, one of the routes [#79](https://github.com/SirCypkowskyy/inwards/issues/79) tracks. Being conservative, it reports some calls that are not the builtin: a comprehension variable (`[eval(m) for eval in evaluators]`), a method name used inside its own class body, a `match` capture, any binding under `if` or `try` or made through `global` even when it does run before the call, and every rebinding in a file that touches a namespace writer or has a wildcard import.
+- :material-minus-circle-outline: Constant targets that aren't literals (a module-level `TARGET = "..."`, `str.format`, `%`, f-string conversions such as `{'shop'!s}`) were reported as unverifiable instead of passing. [#79](https://github.com/SirCypkowskyy/inwards/issues/79) folds them, so they are now reported exactly; a name that may be rebound stays unverifiable.
+- :material-minus-circle-outline: The rebinding exemption misses the builtin passed in as an argument: `def run(exec, c): return exec(c)` called as `run(exec, code)` is not reported, since the parameter shadows the builtin inside `run`. It also misses a builtin reached through an object that names neither a loader, `__self__`, `__globals__` nor a namespace writer. Since [#79](https://github.com/SirCypkowskyy/inwards/issues/79), `print.__self__` counts as the `builtins` module, so `exec = operator.attrgetter("exec")(print.__self__)` turns the exemption off. Being conservative, it reports some calls that are not the builtin: a comprehension variable (`[eval(m) for eval in evaluators]`), a method name used inside its own class body, a `match` capture, any binding under `if` or `try` or made through `global` even when it does run before the call, and every rebinding in a file that touches a namespace writer or has a wildcard import.
 - :material-minus-circle-outline: The report is about direction only. In the outermost layer an unverifiable call can still reach first-party code outside every layer (INW006) without a report, and a `compile` code object run by something other than `exec` or `eval` (`types.FunctionType`) is missed.
 
 **Alternatives.** *Report in every layer, the outermost too*: flags composition roots and plugin registries, where a runtime loader is the right design. *Warning instead of error*: passes the hook and the Stop gate, so the agent's dodge would still land. *Resolve known prefixes* (`f"shop.plugins.{name}"` can only reach `shop.plugins`): fewer reports where the prefix sits in an inner layer, but more code for a case the corpus doesn't have yet; a later issue can add it if real projects need it. *Flag every loader call in an inner layer, literal or not* (an ADR-015 alternative): reports `import_module("json")` too.
@@ -676,6 +691,18 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 
 **Alternatives.** *Top-level `select` and `ignore`, as in Ruff:* familiar, but `ignore` is taken, and telling `INW001` from a module named `tests` by its shape is a guess. *One key per rule, `INW001 = "off"`, as in ESLint:* compact, but it can't say "only these rules". *Code prefixes:* see above. *Filtering in each adapter:* four call sites (the check, the Stop gate's layout check, two in the language server) that could drift apart.
 
+**Amendment, 2026-09-28: opt-in rules and options tables ([#181](https://github.com/SirCypkowskyy/inwards/issues/181)).** The next rules (the thin-endpoint rule, the FastAPI family) judge handler content against thresholds a team picks, so they must start off and take options. `select` can't turn one rule on without turning the rest off, and #98's `[[tool.inwards.rules]]` can't live next to the `rules` table in TOML.
+
+- **Default on or off.** Each registry entry has `default: "on"` or `"off"`. Every rule so far is `"on"`, so no existing config changes. A rule that is off reports only when `select` or the new `extend-select` lists it.
+- **`extend-select`** (Ruff's name) turns rules on next to `select`, or next to the defaults when `select` is absent. `ignore` still wins over both. Its codes are validated like the others, and it can't list INW000.
+- **Options tables.** A rule's options go in `[tool.inwards.rules.<rule-name>]`, keyed by the kebab-case name, so they can't clash with the four list and table keys. Every rule takes `modules`, a list of entries in the grammar of `layers[].modules` ([ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)): a prefix such as `shop.domain` covers that package and everything below it, and a selector such as `shop.*.api` uses wildcards. The rule reports only in the modules they match, and a finding in `pyproject.toml` itself isn't scoped. A rule with options of its own adds its keys; an unknown key or a wrong type is a config error that names the key. INW000 can't have a table, for the reason above. Tables come out sorted by name, so reordering them changes nothing.
+- **A table turns nothing on.** A table for a rule that is off is a warning located at the table in `pyproject.toml`, under that rule's code, not an error, so a team can stage options before turning a rule on. The warning isn't filtered by the table, since the rule it names is off.
+- **SARIF** lists an opt-in rule in `rules[]` with `defaultConfiguration.enabled = false`, so the output stays one list. Rules that are on keep their entry as before.
+- **Baseline.** An entry for a rule that is off in its module (opt-in and not selected, or scoped away by `modules`) is dormant, like an ignored rule's.
+- **Guarded.** The new keys are inside `[tool.inwards]`, so the config guard denies an agent edit of them and the Stop gate fails a change made through Bash. Tests pin both.
+
+The issue asked for the shape selectors of #95, but there `shop.domain` matches one package and nothing below it, which is the wrong default for scoping a rule; the layer grammar says the same thing a layer does. `inwards check` has no rule listing, so "opt-in" shows in the Default column of the docs rule index only.
+
 ## ADR-028: Inline suppressions need a reason, and an agent can't add one by default
 
 **Status:** Accepted · 2026-09-26 · [#50](https://github.com/SirCypkowskyy/inwards/issues/50)
@@ -697,7 +724,7 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-plus-circle-outline: One accepted import no longer needs a baseline or a rule turned off, and every such exception carries its reason in the code, next to the import.
 - :material-plus-circle-outline: An agent can't silence a violation with a comment unless the owner opts in, and a rejected attempt shows up in `inwards stats`.
 - :material-plus-circle-outline: Adding the feature changes nothing for existing projects: no file has a suppression yet, and the new key is optional.
-- :material-minus-circle-outline: Under `"deny"`, a suppression in a file that was uncommitted or untracked at session start, or in any file of a project outside git, counts as new once the agent edits that file, because the hooks can't prove its start content ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). A file the agent leaves alone keeps its suppressions. The owner commits a suppression before handing the file to an agent.
+- :material-minus-circle-outline: Under `"deny"`, a suppression in a file that was uncommitted or untracked at session start, or in any file of a project outside git, counts as new once the agent edits that file, because the hooks can't prove its start content ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). Since [#157](https://github.com/SirCypkowskyy/inwards/issues/157) this holds only for such a file too large for the hooks to keep a copy of at session start (over 512 KiB, or past 4 MiB of such files). A file the agent leaves alone keeps its suppressions. The owner commits a suppression before handing such a file to an agent.
 - :material-minus-circle-outline: Moving a suppression between two imports that give the same finding (the same target twice in one module) isn't noticed. It hides nothing new.
 - :material-minus-circle-outline: Renaming or moving a file with a suppression makes the suppression new, since the new path has no start content. So does reaching a file through any symlink inside the project, even one that existed at session start.
 - :material-minus-circle-outline: A reason can't contain `"`, and nothing checks that it says anything useful. Review does.
@@ -870,3 +897,166 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *An `inwards hook opencode` entry point that reads OpenCode's shapes:* the translation would move into the tested CLI, but it would add a second payload contract for a plugin API that is still changing. The translation is small; it can move later.
 - *A plugin that reimplements the checks in JavaScript:* no process per event, but two implementations of every rule and of the guard.
 - *Blocking the end of a turn through `chat.message` or permissions:* neither runs when a turn ends; `session.idle` is the only point, and it comes after the turn.
+
+## ADR-034: Layer selectors anchored in a top-level package, with slice-aware session checks
+
+**Status:** Accepted · 2026-09-28 · [#191](https://github.com/SirCypkowskyy/inwards/issues/191)
+
+**Context.** Vertical slices repeat the same layers in every slice: `shop.orders.domain`, `shop.billing.domain`, and so on. Listing every slice's package in every layer works, but it is long, and a new slice that nobody adds to the config is simply unchecked. Shapes already take selectors in the grammar of [ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces). Layers are harder: ownership decides every rule, INW006 reasons about the packages above the layers, the Stop gate compares sessions by prefix, and three directory walks (the CLI's, the session manifest's and the language server's) decide which code exists at all.
+
+**Decision.**
+
+- **Recognition and compatibility.** An entry with a `*` anywhere is a selector and is validated strictly: its segments are `*` (one segment), `**` (one or more) or identifiers. Partial wildcards, `?`, brackets, empty segments and path separators are config errors. Every entry without a `*` is a literal prefix with the lenient validation it always had, including legacy malformed names, and an empty `modules` list stays valid.
+- **A selector starts with a literal top-level package** (`shop.*.domain`, not `*.domain`). That package anchors the directory walks, which open it in full as they already open a literal prefix's top-level package, and INW006's search for evidence. A selector without a literal first segment is a config error; a project with several top-level packages lists one selector per package.
+- **Matching.** A selector owns every module equal to one of its complete matches, and their descendants. Matching is dynamic programming over segments, O(selector × module) per call, not the recursive matcher of shapes, since it runs for every import. Shapes keep their own matching and first-match precedence.
+- **Precedence, in order:** the deepest last literal segment of the match, then the deeper match, then more literal segments, then the earlier layer. The first criterion lets a literal subtree (`shop.orders.domain`) win over a broad `shop.**` that matches deeper. For literal entries alone the order reduces to the longest prefix, so existing configs keep their owners. [The configuration reference](guides/configuration.md#selectors) has the truth table.
+- **Fix steps name the importing module's own matched prefix**, never the raw selector or another slice, and suggest `<prefix>.ports` only when that prefix is a package. With several literal prefixes in a layer the wording changes on purpose: the fix used to name the layer's first prefix.
+- **INW006 needs evidence for selectors.** A package holds a selector's layer only when the project has a module below it that the selector matches. The module index answers this by listing only the directories the selector allows, never the whole tree, and caches the answer. Literal entries keep the textual rule. Imports into a genuine container package stay errors.
+- **Sessions check slices.** A selector is dead when it matches no module, whatever the precedence. In a session, it is also checked per slice, a slice being a matched module's prefix up to the selector's last literal segment: `shop.orders.domain` for `shop.*.domain`, `shop.orders.infra` for `shop.*.infra.*`, `shop` for `shop.**`. A slice that held modules at session start and holds none now is an error, like a literal prefix that stopped matching. Moves of layer code out of every layer are caught module by module, as before. Config findings point at the selector's text.
+- **Renaming or deleting a slice needs the user**, as it does with literal prefixes: `git mv shop/orders shop/sales`, moving a slice deeper under `shop.**.domain`, and deleting a slice whose only module is its `__init__.py` all block the Stop gate.
+- **One helper names the packages to walk.** `layerPackages` gives each entry's top-level package; the CLI walk, the session manifest and the language server's listing and file-event filter all open those directories, so the editor indexes the same modules as the CLI. A config reload rebuilds all of it.
+
+**Consequences.**
+
+- :material-plus-circle-outline: One entry per layer covers every slice, and a new slice is checked the moment it exists.
+- :material-plus-circle-outline: Existing configs keep their owners and their messages, except the fix wording for layers with several literal prefixes.
+- :material-plus-circle-outline: The language server no longer skips `node_modules` or virtualenv directories inside a layer's package, which closes a gap with the CLI that predates selectors.
+- :material-minus-circle-outline: Slices can't come and go during a session without the user. Naming slices up to the last literal segment keeps routine edits (deleting or renaming a module inside a slice that keeps others) from blocking, but emptying a slice blocks even when it was a deliberate deletion: a move into a directory the walk skips looks exactly like one.
+- :material-minus-circle-outline: A selector can't start with a wildcard, so a project with several top-level packages writes one selector per package.
+- :material-minus-circle-outline: The evidence search doesn't follow symlinked directories. A slice reachable only through a link doesn't make its parent a container, so INW006 reports more there, never less.
+- :material-minus-circle-outline: Contexts ([ADR-030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes)) still take literal prefixes only.
+
+**Alternatives.**
+
+- *Rank by matched depth alone:* simple, but `shop.**` would take `shop.orders.domain.order` away from a literal `shop.orders.domain` layer, which is never what the user meant.
+- *First matching entry wins, as for shapes:* makes the order of the layers decide ownership as well as direction.
+- *Name each slice by its full matched prefix:* under `shop.**` every file becomes its own slice, and deleting or renaming any module blocks the Stop gate.
+- *Treat deleting a slice as allowed and only moves as errors:* the manifest can't tell a deletion from a move into `node_modules` or a virtualenv at the root, which the walks skip.
+- *Leading wildcards (`*.domain`) with a walk of the whole tree:* the walks would have to open every top-level directory, virtualenvs included, to be safe.
+
+## ADR-035: `inwards check` follows uv workspace members, each with its own config
+
+**Status:** Accepted · 2026-09-28 · [#57](https://github.com/SirCypkowskyy/inwards/issues/57)
+
+**Context.** A config has one `root`, and module names are paths below it. A uv workspace puts each member's package under its own `src/` (qv-lite: 7 members, `src/packages/core/src/qv_core`), so a config at the workspace root names the package `packages.core.src.qv_core` while other members import `qv_core`, and those imports pass as third-party ([#201](https://github.com/SirCypkowskyy/inwards/issues/201)). What worked was one `[tool.inwards]` per member and a shell loop of `inwards check --config <member>/pyproject.toml`. The hooks already pick the nearest config per file and pin every config at session start. [ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) decided that monorepos follow uv workspaces. Members also share implicit namespace packages (`acme.core` in one member, `acme.api` in another), which Python merges from both.
+
+**Decision.**
+
+- **Members come from uv, configs stay per member.** `inwards check` without `--config` reads `[tool.uv.workspace]` (`members` less `exclude`, `*` inside a segment) from the nearest workspace root at or above the working directory. Run where members with `[tool.inwards]` lie below it, it checks each against its own config and baseline; the nearest config at or below the workspace root checks the rest with those member directories left out, and a member nested in another is left to its own config. A member without `[tool.inwards]` is listed as not checked unless the root's config checks it. There is no new config key and no `--workspace` flag.
+- **Named paths go to their nearest config.** Each path is checked against the nearest config above it, and a directory that holds configured members against theirs too. The workspace is looked for from each path, not from the working directory, so the plan doesn't depend on where the command runs. `--config` keeps its meaning: one config for everything.
+- **One report.** The reports merge into one: one JSON or SARIF document, paths relative to the working directory, counts summed. Text and concise output end with a line per config. The exit code is the worst one; an invalid member config is exit 2, and the other members are still checked. "Nothing checked" (#200) is judged once, on the merged report. With `--log`, each config writes its own line, with only its own findings and duration.
+- **Namespace packages look in the other members.** Relative imports already resolved by name as Python does. What was wrong was existence: INW010 reported a module missing from this member that another member's portion of the namespace package holds. The CLI now gives the engine a `portions` probe of the other members' import roots (`src/`, else the member directory) through `ProjectFiles`, and INW010 passes a missing module when its package here is a namespace package from the top-level package down and a portion holds it.
+- **The hooks keep what they had,** with one addition: the config guard also protects a member's `[tool.inwards]` and baseline when neither session state nor a root config exists yet.
+
+**Consequences.**
+
+- :material-plus-circle-outline: qv-lite's loop becomes `inwards check` at the workspace root, and the list of members stays in the one place uv reads.
+- :material-plus-circle-outline: A root config and member configs can live together without checking a file twice, and #201's warning still fires for a member that has no config of its own.
+- :material-minus-circle-outline: Only uv workspaces are discovered. A monorepo without `[tool.uv.workspace]` still needs named paths or a run per config.
+- :material-minus-circle-outline: `inwards baseline` still takes one config per run, and the language server still reads one config (its first-workspace-folder limit is tracked separately) and doesn't look in other members for namespace portions.
+- :material-minus-circle-outline: A member's import root is guessed (`src/`, else the member directory), not read from its `root`, and a portion outside the workspace (an installed distribution) is still reported ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)).
+
+**Alternatives.**
+
+- *Several roots in one config* (`roots = [...]`): one layer map for all members, but the member list would repeat what uv already has, and layers usually differ per member.
+- *A walk for every nested `pyproject.toml` with `[tool.inwards]`:* covers non-uv monorepos, but costs a tree walk per run and has no notion of which directories belong together.
+- *A `--workspace` flag:* explicit, but running at the workspace root already says it, and the old behaviour there (one config indexing members by path) was the false green #201 warns about.
+- *Skipping INW010 under every namespace package:* simpler, but a hallucinated module in a namespace package would pass silently in every project that omits `__init__.py`.
+
+## ADR-036: Package templates expand into config a user could write by hand
+
+**Status:** Accepted · 2026-09-28 · [#97](https://github.com/SirCypkowskyy/inwards/issues/97)
+
+**Context.** fastapi-best-practices gives every domain the same modules, the same import order between them (router, then dependencies, then service, then models and schemas, then constants) and the same few modules other domains may use. Shapes ([ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)), layer selectors ([ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)) and contexts ([ADR-030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes)) could each say part of it, but only by repeating the list of modules in three tables. The issue also asked for independent siblings (`models | schemas`), which the layer order couldn't express: a layer could always import every layer listed before it, so one of two siblings could import the other.
+
+**Decision.**
+
+- **A template is a named table**, `[tool.inwards.templates.<name>]`, with `roles` (innermost first, `a | b` for siblings), `public`, the shape keys `allow`, `require`, `forbid` and `extra`, and `hints`. `template = "<name>"` works on a layer entry (the roles become layers inside the entry's modules), a shape entry (the template supplies the member keys, and a key the entry sets wins) and a context (the template's `public` names, under each of the context's modules, join its `public`).
+- **Templates expand into config a user could write by hand, once, in the parser.** The parsed config holds no trace of them, so no rule, the baseline, the brief and the editor need to know templates exist, and a template can always be replaced by its expansion. Every template key therefore has a hand-written form, which is why two keys were added outside templates: `hints` on shape entries, and sibling layers as a nested array in `layers`.
+- **Siblings are a rank.** A layer carries a rank when the config has siblings; layers of one rank may not import each other, and a layer may import every layer of a lower rank. INW001 and INW011 treat an import of a same-rank sibling as outward and say `from sibling layer`; the allowed direction joins siblings with `|`; INW005 gives every lowest-rank sibling the default deny list. A config without siblings gets no ranks, so its parsed form and every message stay as they were.
+- **Role layers are named `<entry>.<role>`** and own `<module>.<role>` for each of the entry's modules, with the entry's library lists. The entry itself becomes no layer: a module in it that no role covers is outside every layer, as INW006 reports.
+- **Errors name what the user wrote**: the entry's `template` key for an unknown template or one that lacks the roles or `public` the place needs, and the template's own key for a bad role, pattern or hint. A problem only the expansion shows (a role layer's name or prefix already taken) names the expanded layer.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The fastapi-best-practices layout is one template and three short uses of it, and a new domain is covered the moment it exists. The test fixture holds the template and its hand-written equivalent, and they give the same diagnostics.
+- :material-plus-circle-outline: Sibling layers work without templates too, which import-linter's `a | b` needed; `inwards import-config` still maps `|` to one layer plus contexts, and could move to nested arrays.
+- :material-minus-circle-outline: Messages and the brief name role layers by their expanded names, `domain.service`, and the allowed direction of a large template is long.
+- :material-minus-circle-outline: A role no package has makes an empty layer, which INW006 reports as an error, so optional members belong in `allow`, not in `roles`.
+- :material-minus-circle-outline: Config findings for expanded selectors, such as a dead role layer, point at line 1 of `pyproject.toml`: the expanded text isn't in the file.
+- :material-minus-circle-outline: Contexts still take literal prefixes, so each domain needs its own context entry; the template only saves its `public` list.
+
+**Alternatives.**
+
+- *Templates as their own concept in the rules:* the rules would need to resolve roles per package at check time, and a template could say things no hand-written config can, which makes it harder to reason about and to migrate away from.
+- *Siblings as contexts, the way `inwards import-config` maps `|`:* contexts take literal prefixes, so they can't cover `src.*.models`, and a sibling context nested in a domain context would take its modules out of the domain's context.
+- *Ordering the siblings instead* (`models` before `schemas`): `schemas -> models` would fail, but `models -> schemas` would pass, which is not what `|` means.
+- *A `rank` key on each layer:* more flexible, but easy to get wrong; a nested array keeps the order visible in the list itself.
+
+## ADR-037: Framework rule families, opt-in, with their own prefix
+
+**Status:** Accepted · 2026-09-28 · [#186](https://github.com/SirCypkowskyy/inwards/issues/186)
+
+**Context.** Chapter 1 says Inwards only reasons about the dependency structure between your own modules. [#98](https://github.com/SirCypkowskyy/inwards/issues/98) already plans content rules scoped to a layer's role. FastAPI is the next step: some of what goes wrong in a FastAPI project is architectural and needs a project-wide view that a per-file linter can't have. An `APIRouter` nothing includes, error codes the OpenAPI schema doesn't declare, and exception handlers registered in another file all span files. Ruff already has FastAPI rules (`FAST001` to `FAST003`, `FAST004` in review) and flake8-fastapi has `CF` codes, both one file at a time. Opt-in rules and per-rule options exist since [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)'s #181 amendment.
+
+**Decision.**
+
+- **Framework rules come in families with their own prefix.** FastAPI rules are `FAPI` plus three digits. `INW` codes stay for architecture rules that hold in any Python project; a `FAPI` code says at once that the advice is about the framework. `FAST` is Ruff's and `CF` flake8-fastapi's, so reusing either would give one code two meanings in the same repository. A later family (`DJ` for Django, say) takes its own prefix, without renumbering anything. Codes are exact everywhere, so `select`, `ignore`, suppressions and SARIF need no change.
+- **Every family rule is opt-in** (`default: "off"`): it reports only when `extend-select` or `select` lists it, and takes options in `[tool.inwards.rules.<rule-name>]`. A project that doesn't use the framework pays nothing, not even a parse: the shared model reads a file only when its text mentions the framework.
+- **Don't duplicate Ruff.** A family rule never reports what Ruff's rules for that framework (`FAST`) or flake8-async (`ASYNC`) already report. Where Ruff covers the single-file case, the Inwards rule covers only what needs other files.
+- **One shared model per family.** The FAPI rules read one model of apps, routers, path operations, wiring and exception handlers (`rules/fastapi/`), built statically from the source and resolved across files through `ProjectIndex`. The application is never imported or run ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **Registered codes may ship before their checks.** FAPI001 to FAPI003 are registered with their pages now and report nothing until [#183](https://github.com/SirCypkowskyy/inwards/issues/183) and [#184](https://github.com/SirCypkowskyy/inwards/issues/184); their pages say so. Codes planned later (FAPI004 for the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike, FAPI005 to FAPI009 for #224 to #228) are listed in the rules index but not registered, so they stay config errors until they ship.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A team turns the family on rule by rule, and a finding's code says whether it is architecture or framework advice.
+- :material-plus-circle-outline: The model is written once; each FAPI rule is a query over it.
+- :material-minus-circle-outline: Chapter 1's "only the dependency structure" no longer holds for opt-in families; the default rule set still does.
+- :material-minus-circle-outline: A registered code with no checks yet is accepted by `extend-select` and does nothing, which a user may not expect; the page's banner is the only signal.
+- :material-minus-circle-outline: Static resolution misses dynamic wiring (routers found by `importlib`, factories); each rule has to say how it degrades.
+
+**Alternatives.**
+
+- *FastAPI rules as `INW` codes:* one namespace, but a team couldn't turn the framework advice on or off as a unit, and the codes would mix two kinds of rule.
+- *Reuse Ruff's `FAST` prefix:* familiar, but `FAST002` would mean two different rules in one repository.
+- *On by default in projects that import FastAPI:* less configuration, but new errors would appear on an upgrade in every FastAPI project.
+- *Contribute the checks to Ruff:* Ruff lints one file at a time, and these checks need the project-wide view.
+
+**Amendment, 2026-09-28: findings that need the whole project ([#184](https://github.com/SirCypkowskyy/inwards/issues/184)).** FAPI003 is the first family rule whose findings need every file: a router is unmounted only if no app anywhere includes it.
+
+- **Suppressible, unlike INW004.** Each FAPI003 finding sits on a line of its own (the `APIRouter(...)` call, the `include_router` call that closes a cycle), so a suppression there names one decision. INW004 can't be suppressed because its comment would sit on one import of many.
+- **Checked files only, against the whole graph.** A partial run (a path argument, the Stop gate) builds the app and router graph from every FastAPI file of the project, and reports only in the files it checks. The Stop gate therefore reports a router the session created or changed, and a router already unmounted at session start is an old error.
+- **The per-edit hook and the editor report one-file findings only.** Creating a router and wiring it into the app are two edits. They still build the graph when a file suppresses FAPI003, so the suppression counts as used instead of turning into an INW009 warning, then drop what it found.
+
+## ADR-038: A witness of the session start outside the project, against a replayed SessionStart
+
+**Status:** Accepted · 2026-09-28 · [#88](https://github.com/SirCypkowskyy/inwards/issues/88)
+
+**Context.** The Stop gate trusts `.inwards/state/<id>.start.json`: the configs, HEAD and file hashes the session started from. The config guard keeps the agent's file tools away from it, but Bash reaches it in ways no pattern sees. The #23 review showed a full bypass: loosen `[tool.inwards]` with `sed`, `d=.inw; rm -rf ${d}ards/state`, then pipe a `SessionStart` payload with `source: startup` and the same session id into `I=inwards; $I hook claude-code`. The hook records a new start from the loosened project, and Stop passes. A partial replay (delete only `<id>.start.json`) worked too, and since #157 it also records copies of the agent's own edits. The same Bash can remove the Stop hook from `settings.local.json`; Claude Code reloads hooks at once, so that session's gate never runs. Every piece of state Inwards keeps is writable by the agent's user, so no local record is tamper-proof. The goal is to make these edits show up at Stop, without blocking a user who changed `[tool.inwards]` before the session and hasn't committed it.
+
+**Decision.**
+
+- **A witness outside the project.** SessionStart writes the same start record a second time, to `$XDG_STATE_HOME/inwards/sessions/<hash of the project path>/<id>.start.json` (`~/.local/state` without the variable), pruned by age only (a week). A count cap would let a flood of made-up sessions, started through the hook, evict the real session's witness before a replay, so there is none, and resume, compact and every Stop touch the witness, so a running session's never ages out. The platform gets `Runtime.stateHome` and `StateFiles.outsideDir`.
+- **A replay keeps the original.** A `startup` or `clear` SessionStart for a session whose start file is gone but whose witness exists is a replay: the witness is put back as the start file and a `replay` event goes into the session log. Resume and compact are unchanged: they never create a start.
+- **Readers prefer the witness.** `readSession` and `readSessionStart` use the witness when there is one, and say how the project's record compares: kept, deleted, rewritten, or unwitnessed. The per-edit hooks therefore use the original start too.
+- **Stop reports what doesn't hold.** A logged replay, a deleted record and a rewritten record each block with their own message, on top of what the comparison with the original start finds (a changed config, new violations). They escalate like any other block, so the last Stop shows the user the list.
+- **The committed config only where there is no witness.** A record without a witness (a session from an older Inwards, a witness deleted, or a state directory that couldn't be written) is trusted only when each of its configs is the one at its start HEAD, read with `git --no-lazy-fetch cat-file blob`, never `git show`, which could run the agent's filters. A witnessed session never makes this comparison, so a user's uncommitted config edit made before the session passes.
+- **A missing Stop hook is reported by the next SessionStart.** When some layer still holds Inwards hooks but none holds the Stop hook, SessionStart tells the user in a `systemMessage` and the model in `additionalContext`. The Stop gate of the session that removed it can't run, so it can't report it.
+- **No record at all still yields to the user.** When there is neither a start file nor a witness, the last Stop now ends the turn with a `systemMessage` instead of quietly.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The replay in #88, and the partial one from #157, fail the Stop gate with a message that names the replay, and the changed config is reported against the original start.
+- :material-plus-circle-outline: A user's own config edit before a session, `/clear`, resume and compaction behave as before.
+- :material-minus-circle-outline: The witness is a speed bump. An agent that also deletes or forges `~/.local/state/inwards/sessions/...` before replaying gets a fresh baseline. The docs name the other layers: `permissions.deny`, CODEOWNERS and `inwards check` in CI.
+- :material-minus-circle-outline: A Stop hook removed mid-session switches that session's gate off; the warning comes one session later, and only if SessionStart still runs.
+- :material-minus-circle-outline: Inwards now writes outside the project, under the user's state directory. Writing the witness is best effort: when the state directory can't be written (a read-only home in a CI container or an agent sandbox), SessionStart still succeeds, tells the user once, and the session falls back to the committed-config comparison.
+- :material-minus-circle-outline: Git older than 2.44 has no `--no-lazy-fetch`. Outside a partial clone nothing can be fetched, so the committed config is read without the flag. In a partial clone (`extensions.partialClone`, or a remote with `promisor` or `partialclonefilter`) it isn't read, and an unwitnessed record blocks with a message that says the config couldn't be checked and that a newer git or a writable state directory clears it.
+- :material-minus-circle-outline: A flood of made-up sessions only adds small witness files, which age out after a week.
+
+**Alternatives.**
+
+- *Always compare the start config with the committed one:* catches the replay without a witness, but blocks every session that starts with an uncommitted config change, which is how users edit layers.
+- *Read Claude Code's transcript and refuse a start recorded after the session's first tool use:* the Stop payload's `transcript_path` comes from Claude Code, but the transcript format isn't a public contract, the file can be large, it is just as writable by the agent, and OpenCode has none.
+- *A PreToolUse marker outside the project on the first tool call:* the same Bash command that deletes the state can delete the marker before it replays.
+- *Sign the start record:* the key would sit where the agent's user can read it.

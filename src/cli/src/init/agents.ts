@@ -1,5 +1,5 @@
 /**
- * @file `inwards init --agent claude|opencode|aider|agents-md [--launcher CMD] [--dry-run]`:
+ * @file `inwards init --agent claude|opencode|aider|agents-md [--launcher CMD] [--brief] [--dry-run]`:
  * wires Inwards into a coding agent. Every change is computed first as
  * (file, before, after), so `--dry-run` can print it and a second run finds nothing to do. Anything init
  * can't edit safely stops it with exit 2 instead of being rewritten.
@@ -10,11 +10,13 @@ import { isInwardsHook } from "../claude-code/settings.ts";
 import { isRecord } from "../json/guards.ts";
 import { print } from "../platform/print.ts";
 import { findConfig } from "../project/config-discovery.ts";
+import { withBrief } from "./brief.ts";
 import type { Agent, Change, InitContext } from "./contracts.ts";
 import { lineDiff } from "./diff.ts";
 import { gitignore } from "./gitignore.ts";
 import { type Exec, inwardsExec, launcherWords, shellQuoter, warnIfCached } from "./launcher.ts";
 import { opencodePlugin } from "./opencode.ts";
+import { readIfThere, upsertSection } from "./section.ts";
 
 /**
  * Claude Code hook events Inwards handles, with the tool matcher each needs.
@@ -49,16 +51,17 @@ const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\][ \t]*(?:#
  * Files go next to that pyproject.toml, even when init runs in a subdirectory.
  *
  * @param ctx - the platform and init's writer.
- * @param agent - which agent to wire up.
- * @param launcher - `--launcher`, the command that starts Inwards in the project (`uv run`).
+ * @param wiring - what to set up.
+ * @param wiring.agent - which agent to wire up; undefined for `--brief` alone.
+ * @param wiring.launcher - `--launcher`, the command that starts Inwards in the project (`uv run`).
+ * @param wiring.brief - `--brief`: also write the architecture brief into AGENTS.md.
  * @param dryRun - print the changes instead of writing them.
  * @returns 0 on success, 2 without a config, with a bad `--launcher`, or with a file init can't edit safely.
  * @throws {ConfigError} when the config is invalid; when a file can't be read or written.
  */
 export function initCommand(
   ctx: InitContext,
-  agent: Agent,
-  launcher: string | undefined,
+  wiring: { agent: Agent | undefined; launcher: string | undefined; brief: boolean },
   dryRun: boolean,
 ): number {
   const { streams } = ctx.io;
@@ -67,7 +70,13 @@ export function initCommand(
     return print(streams, "inwards init: no pyproject.toml with [tool.inwards] here or above.", 2);
   }
   const pinned = pinDefaults(ctx, configPath);
-  const changes = agentChanges(ctx, { agent, launcher }, dirname(configPath));
+  const { agent, launcher } = wiring;
+  const wired =
+    agent === undefined ? [] : agentChanges(ctx, { agent, launcher }, dirname(configPath));
+  const changes =
+    typeof wired === "string" || !wiring.brief
+      ? wired
+      : withBrief(ctx.io, wired, { path: configPath, text: pinned.after });
   if (typeof changes === "string") {
     return print(streams, `inwards init: ${changes}`, 2);
   }
@@ -279,7 +288,7 @@ function safeParse(text: string): ReturnType<typeof parseConfig> | undefined {
  * @returns the change, or an error message.
  */
 function claudeSettings(ctx: InitContext, path: string, start: Exec | string): Change | string {
-  const before = readIfThere(ctx, path);
+  const before = readIfThere(ctx.io, path);
   let settings: unknown;
   try {
     settings = before === undefined ? {} : JSON.parse(before);
@@ -361,8 +370,7 @@ function agentsSection(
   path: string,
   launcher: string | undefined,
 ): Change | string {
-  const before = readIfThere(ctx, path);
-  const text = before ?? "";
+  const before = readIfThere(ctx.io, path);
   const section = [
     SECTION_BEGIN,
     "## Architecture check (Inwards)",
@@ -375,41 +383,6 @@ function agentsSection(
     "Don't edit `[tool.inwards]` to make the check pass; ask the user instead.",
     SECTION_END,
   ].join("\n");
-  const begins = text.split(SECTION_BEGIN).length - 1;
-  const ends = text.split(SECTION_END).length - 1;
-  if (begins === 0 && ends === 0) {
-    return { path, before, after: `${text}${separator(text)}${section}\n` };
-  }
-  const start = text.indexOf(SECTION_BEGIN);
-  const end = text.indexOf(SECTION_END, start);
-  if (begins !== 1 || ends !== 1 || end === -1) {
-    return `${path} has unmatched ${SECTION_BEGIN} / ${SECTION_END} markers; fix them by hand`;
-  }
-  const after = `${text.slice(0, start)}${section}${text.slice(end + SECTION_END.length)}`;
-  return { path, before, after };
-}
-
-/**
- * Picks what goes between existing text and an appended section: one blank line.
- *
- * @param text - the file's current text.
- * @returns "", "\n" or "\n\n", so the result has exactly one blank line between them.
- */
-function separator(text: string): string {
-  if (text === "" || text.endsWith("\n\n")) {
-    return "";
-  }
-  return text.endsWith("\n") ? "\n" : "\n\n";
-}
-
-/**
- * Reads a file init may edit, when it is there.
- *
- * @param ctx - probes and reads the file.
- * @param path - the file.
- * @returns its text, or undefined when nothing is there.
- * @throws when it exists but can't be read.
- */
-function readIfThere(ctx: InitContext, path: string): string | undefined {
-  return ctx.io.probe.exists(path) ? ctx.io.read.text(path) : undefined;
+  const result = upsertSection(before ?? "", { begin: SECTION_BEGIN, end: SECTION_END }, section);
+  return "error" in result ? `${path} has ${result.error}` : { path, before, after: result.after };
 }

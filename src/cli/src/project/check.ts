@@ -6,14 +6,17 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkLinks,
   checkNestedProjects,
   checkPrefixes,
   checkRequired,
+  checkRuleOptions,
   checkSelectors,
   type Diagnostic,
   Engine,
   type InwardsConfig,
   type ListDir,
+  layerPackages,
   membersFrom,
   moduleNameFor,
   type PathKind,
@@ -28,9 +31,11 @@ import {
 } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
+import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { workspacePackages } from "./workspace.ts";
+import { layerLinks, linksUnder } from "./links.ts";
+import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
@@ -45,6 +50,8 @@ interface Project {
   realRoot: string;
   /** The layer package directories (as written and real), walked without skips. */
   layerDirs: string[];
+  /** Probes the other uv workspace members' import roots and the project's site-packages, for namespace package portions. */
+  portions: ((rel: string) => ReturnType<PathKind>) | undefined;
 }
 
 /**
@@ -68,12 +75,19 @@ export function diskCacheWanted(
  * @param io - reads the config, loads the grammars and opens the extraction cache.
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param cache - true to give the engine the disk cache, when `io` has one.
+ * @param parsed - the config to use instead of the one in `configPath`, whose
+ *   text still places findings about the config itself.
  * @returns the engine and the config root, as written and resolved.
  * @throws {ConfigError} when the config is invalid.
  */
-async function openProject(io: ProjectIo, configPath: string, cache = false): Promise<Project> {
+async function openProject(
+  io: ProjectIo,
+  configPath: string,
+  cache = false,
+  parsed?: InwardsConfig,
+): Promise<Project> {
   const configText = io.read.text(configPath);
-  const config = parseConfig(configText);
+  const config = parsed ?? parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
   const wasm = await io.grammars();
   const dir = dirname(configPath);
@@ -87,14 +101,16 @@ async function openProject(io: ProjectIo, configPath: string, cache = false): Pr
     lexicalRoot,
     realRoot: io.probe.realpath(lexicalRoot) ?? lexicalRoot,
     layerDirs: layerDirs(io.probe, configPath, config),
+    portions: otherPortions(io, dir),
   };
 }
 
 /**
- * Finds the top-level package directory of every layer prefix, e.g.
- * `<root>/shop` for `shop.domain`. The file walk skips nothing inside them,
- * so a virtualenv marker or a node_modules name can't hide layer code, nor
- * code moved out of a layer next to it.
+ * Finds the top-level package directory of every layer entry, e.g.
+ * `<root>/shop` for `shop.domain` or `shop.*.domain` (`layerPackages`). The
+ * file walk skips nothing inside them, so a virtualenv marker or a
+ * node_modules name can't hide layer code, nor code moved out of a layer
+ * next to it.
  *
  * @param probe - resolves real paths.
  * @param configPath - absolute path of the pyproject.toml.
@@ -107,15 +123,13 @@ export function layerDirs(
   config: InwardsConfig,
 ): string[] {
   const root = resolve(dirname(configPath), config.root);
-  return config.layers
-    .flatMap((layer) => layer.modules)
-    .flatMap((prefix) => {
-      // The whole top-level package: code moved from shop/domain to a
-      // disguised shop/core must still be seen.
-      const dir = join(root, prefix.split(".")[0] ?? prefix);
-      const real = probe.realpath(dir);
-      return real === undefined ? [] : [...new Set([dir, real])];
-    });
+  return layerPackages(config).flatMap((pkg) => {
+    // The whole top-level package: code moved from shop/domain to a
+    // disguised shop/core must still be seen.
+    const dir = join(root, pkg);
+    const real = probe.realpath(dir);
+    return real === undefined ? [] : [...new Set([dir, real])];
+  });
 }
 
 /**
@@ -131,6 +145,7 @@ export function layerDirs(
  * @param what.targets - absolute files or directories; undefined means the config root.
  * @param what.base - directory that report paths are made relative to.
  * @param what.texts - content to check instead of what is on disk, by absolute path.
+ * @param what.exclude - directories whose files another config checks (uv workspace members).
  * @returns the source files, with forward-slash paths on every OS, and the
  *   walked paths that gave at least one of them.
  */
@@ -141,10 +156,12 @@ function loadSources(
     targets,
     base,
     texts,
+    exclude,
   }: {
     targets: string[] | undefined;
     base: string;
     texts: ReadonlyMap<string, string> | undefined;
+    exclude: readonly string[];
   },
 ): { files: SourceFile[]; loaded: string[] } {
   const { lexicalRoot, realRoot } = project;
@@ -153,8 +170,8 @@ function loadSources(
   const seen = new Set<string>();
   for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
     const names = moduleNames(io.probe, abs, lexicalRoot, realRoot);
-    if (names.length === 0) {
-      continue; // outside the root: not read at all
+    if (names.length === 0 || exclude.some((dir) => atOrInside(dir, abs))) {
+      continue; // outside the root, or a workspace member's own config checks it: not read at all
     }
     loaded.push(abs);
     const text = texts?.get(abs) ?? io.read.text(abs);
@@ -221,7 +238,9 @@ function notCheckedOf(
 /**
  * Gives the engine the project's files under the config root, for its module
  * index. Nothing is touched until the engine asks; the listing uses the same
- * walk as `inwards check`, and `listDir` reads one directory (INW010).
+ * walk as `inwards check`, and `listDir` reads one directory (INW010), as
+ * `portions` does the other uv workspace members' import roots and the
+ * project virtualenv's site-packages.
  *
  * @param io - probes, walks and reads the project.
  * @param project - the loaded project.
@@ -235,6 +254,7 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
       io.walk.pythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
     read: (rel: string): string => io.read.text(join(root, rel)),
     listDir: (rel: string): ReturnType<ListDir> => io.read.list(join(root, rel)),
+    ...(project.portions ? { portions: project.portions } : {}),
   };
 }
 
@@ -242,7 +262,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * Loads the config and engine, then checks the Python files under the targets.
  * A whole-project run (no targets) also checks the layer prefixes and shape
  * selectors against the modules found (INW006, INW007), warns about nested
- * projects such as uv workspace members (INW006), every shaped
+ * projects such as uv workspace members (INW006), reports symlinks in layers
+ * that hide code from the rules (INW006, `checkLinks`), every shaped
  * package's required members (INW008) and the import cycles among the
  * checked files (INW004). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
@@ -261,9 +282,17 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * @param options.base - directory that report paths are made relative to.
  * @param options.baseline - false to report violations the baseline accepts.
  * @param options.required - true to add INW008 for the targets' packages.
+ * @param options.edit - true for a per-edit check (the PostToolUse hook): FAPI003
+ *   keeps only what one file shows, and leaves unmounted routers to the Stop gate.
  * @param options.texts - content to check instead of a file's, by absolute path.
  * @param options.cache - true to read and fill the extraction cache on disk
  *   (`inwards check` and `inwards baseline`); the hooks never pass it (#56).
+ * @param options.config - the config to check with instead of the one in
+ *   `configPath` (the Stop gate's session-start config, after the agent changed it).
+ * @param options.exclude - directories whose files are left out because their own
+ *   config checks them: the uv workspace members under a workspace root's config (#57).
+ * @param options.absent - top-level module names the index treats as missing: those
+ *   new since the session start, for the Stop gate's check of a file as it was then (#86).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -275,26 +304,37 @@ export async function runCheck(
     base,
     baseline = true,
     required = false,
+    edit = false,
     texts,
     cache = false,
+    config,
+    exclude = [],
+    absent = [],
   }: {
     base: string;
     baseline?: boolean | undefined;
     required?: boolean | undefined;
+    edit?: boolean | undefined;
     texts?: ReadonlyMap<string, string> | undefined;
     cache?: boolean | undefined;
+    config?: InwardsConfig | undefined;
+    exclude?: readonly string[] | undefined;
+    absent?: readonly string[] | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
-  const project = await openProject(io, configPath, cache);
-  const { files, loaded } = loadSources(io, project, { targets, base, texts });
+  const project = await openProject(io, configPath, cache, config);
+  const { files, loaded } = loadSources(io, project, { targets, base, texts, exclude });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
-  const listing = projectFiles(io, project);
+  const listing = hideTopLevel(projectFiles(io, project), absent);
   const index = project.engine.index(listing);
   // A whole-project run also looks for import cycles (INW004), which one file can't show.
   const whole = targets === undefined;
-  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, { whole });
+  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, {
+    whole,
+    edit,
+  });
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -304,7 +344,18 @@ export async function runCheck(
     diagnostics.unshift(
       ...checkPrefixes(project.config, modules, pyproject),
       ...checkSelectors(project.config, packages, pyproject),
+      ...checkRuleOptions(project.config.rules, pyproject),
       ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
+      ...checkLinks(project.config, {
+        links: linksUnder(
+          io.probe,
+          layerLinks(io, project.configPath, project.config),
+          project.lexicalRoot,
+          project.config,
+        ),
+        modules,
+        shownRoot,
+      }),
     );
     diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
   } else if (required) {

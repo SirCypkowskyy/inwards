@@ -1,0 +1,50 @@
+[project]
+name = "fastapi-best-practices"
+version = "0.1.0"
+
+[tool.inwards]
+layers = [
+  { name = "core", modules = ["src.config", "src.database", "src.exceptions", "src.models"], deny-libraries = ["fastapi"] },
+  [
+    { name = "domain.constants", modules = ["src.*.constants"] },
+    { name = "domain.config", modules = ["src.*.config"] },
+  ],
+  [
+    { name = "domain.exceptions", modules = ["src.*.exceptions"] },
+    { name = "domain.utils", modules = ["src.*.utils"] },
+  ],
+  [
+    { name = "domain.models", modules = ["src.*.models"] },
+    { name = "domain.schemas", modules = ["src.*.schemas"] },
+  ],
+  { name = "domain.service", modules = ["src.*.service"] },
+  { name = "domain.dependencies", modules = ["src.*.dependencies"] },
+  { name = "domain.router", modules = ["src.*.router"] },
+  { name = "app", modules = ["src.main"] },
+]
+
+[[tool.inwards.shape]]
+packages = ["src.*"]
+allow = [
+  "constants", "config", "exceptions", "utils", "models", "schemas",
+  "service", "dependencies", "router",
+]
+require = ["__init__", "router", "service"]
+hints = ["Other domains may import this one's router, service, dependencies, schemas, constants and exceptions, never its models, config or utils."]
+
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["src.orders"]
+public = [
+  "src.orders.router", "src.orders.service", "src.orders.dependencies", "src.orders.schemas",
+  "src.orders.constants", "src.orders.exceptions",
+]
+depends-on = ["users"]
+
+[[tool.inwards.contexts]]
+name = "users"
+modules = ["src.users"]
+public = [
+  "src.users.router", "src.users.service", "src.users.dependencies", "src.users.schemas",
+  "src.users.constants", "src.users.exceptions",
+]

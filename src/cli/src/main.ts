@@ -13,8 +13,10 @@ import { compose } from "./adapters/compose.ts";
 import { processStreams } from "./adapters/stdio.ts";
 import { baselineCommand } from "./commands/baseline.ts";
 import { checkCommand } from "./commands/check.ts";
+import { contextCommand } from "./commands/context.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
+import { importConfigCommand } from "./commands/import-config.ts";
 import { statsCommand } from "./commands/stats.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import { initMain } from "./init/style.ts";
@@ -25,10 +27,14 @@ const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
                      [--config pyproject.toml] [--log] [--no-cache]
+                     (PATHS: those files only; whole-project checks such as dead layer
+                     prefixes, import cycles and symlinks in layers run without PATHS)
        inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
        inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
        inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
-                    (--list-styles: the presets)
+                    (--list-styles: the presets; --brief: also the architecture brief in AGENTS.md)
+       inwards context [--config pyproject.toml] [--write]   (the architecture brief; --write: into AGENTS.md)
+       inwards import-config [FILE] [--write]   (import-linter contracts as [tool.inwards]; --write: into pyproject.toml)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -66,6 +72,8 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       package: { type: "string" },
       "list-styles": { type: "boolean" },
       launcher: { type: "string" },
+      brief: { type: "boolean" },
+      write: { type: "boolean" },
     },
   });
 
@@ -83,21 +91,29 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
 }
 
 /** The commands besides `check`. */
-type SetupCommand = "hook" | "init" | "baseline" | "stats";
-const SETUP_COMMANDS: readonly string[] = ["hook", "init", "baseline", "stats"];
+type SetupCommand = "hook" | "init" | "baseline" | "stats" | "context" | "import-config";
+const SETUP_COMMANDS: readonly string[] = [
+  "hook",
+  "init",
+  "baseline",
+  "stats",
+  "context",
+  "import-config",
+];
 
 /**
  * Tells whether a positional names one of the commands besides `check`.
  *
  * @param command - the first positional.
- * @returns true for hook, init, baseline or stats.
+ * @returns true for hook, init, baseline, stats, context or import-config.
  */
 function isSetupCommand(command: string | undefined): command is SetupCommand {
   return command !== undefined && SETUP_COMMANDS.includes(command);
 }
 
 /**
- * Runs the commands besides `check`: the hook, `init`, `baseline` and `stats`.
+ * Runs the commands besides `check`: the hook, `init`, `baseline`, `stats`, `context`
+ * and `import-config`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -105,11 +121,12 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param values - the parsed options.
  * @param values.agent - `--agent`, for init (so are the other InitFlags).
  * @param values."dry-run" - `--dry-run`, for init.
- * @param values.config - `--config`, for baseline (stats refuses it).
+ * @param values.config - `--config`, for baseline and context (stats refuses it).
  * @param values."no-cache" - `--no-cache`, for baseline.
  * @param values.format - `--format`, for stats.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
+ * @param values.write - `--write`, for context and import-config.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -122,31 +139,66 @@ async function setupCommand(
     format?: string | undefined;
     export?: string | undefined;
     redact?: boolean | undefined;
+    write?: boolean | undefined;
   },
 ): Promise<number> {
   const { streams } = deps.io;
   if (command === "stats") {
-    if (values.config !== undefined) {
-      return print(
-        streams,
-        "inwards stats reads every run log in a project: pass the project directory, not --config.",
-        2,
-      );
-    }
-    return paths.length <= 1
-      ? statsCommand(deps, values.format ?? "text", paths[0], values)
-      : print(streams, USAGE, 2);
+    return statsMain(deps, paths, values);
   }
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(deps, USAGE)
       : print(streams, USAGE, 2);
   }
+  if (command === "context") {
+    return paths.length === 0
+      ? contextCommand(deps, values.config, values.write === true)
+      : print(streams, USAGE, 2);
+  }
+  if (command === "import-config") {
+    return importConfigCommand(deps, paths, values, USAGE);
+  }
   if (command === "init") {
     return await initMain(deps, paths, values, USAGE);
   }
   return paths.length === 0
     ? await baselineCommand(deps, values.config, values["no-cache"] === true)
+    : print(streams, USAGE, 2);
+}
+
+/**
+ * Runs `inwards stats [DIR]`, which refuses `--config`: it reads every run log in a project.
+ *
+ * @param deps - this invocation's dependencies.
+ * @param paths - the positionals after `stats`: at most the project directory.
+ * @param values - the parsed options.
+ * @param values.config - `--config`, refused.
+ * @param values.format - `--format`: text or json.
+ * @param values.export - `--export FILE`.
+ * @param values.redact - `--redact`, for the export.
+ * @returns the exit code; 2 for unexpected arguments.
+ */
+function statsMain(
+  deps: AppDeps,
+  paths: string[],
+  values: {
+    config?: string | undefined;
+    format?: string | undefined;
+    export?: string | undefined;
+    redact?: boolean | undefined;
+  },
+): number {
+  const { streams } = deps.io;
+  if (values.config !== undefined) {
+    return print(
+      streams,
+      "inwards stats reads every run log in a project: pass the project directory, not --config.",
+      2,
+    );
+  }
+  return paths.length <= 1
+    ? statsCommand(deps, values.format ?? "text", paths[0], values)
     : print(streams, USAGE, 2);
 }
 

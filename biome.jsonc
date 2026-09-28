@@ -142,6 +142,12 @@
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     },
     {
+      // The HTTP status table (`http.HTTPStatus` member names to codes) is data:
+      // naming each number would only repeat the member name next to it.
+      "includes": ["src/core/src/rules/fastapi/status.ts"],
+      "linter": { "rules": { "style": { "noMagicNumbers": "off" } } }
+    },
+    {
       // Browser-only docs assets (Zensical extra_javascript): no process.stdout
       // exists in a browser, so a console warning is the only way to surface a
       // degraded state (e.g. a blocked CDN request) to someone debugging.

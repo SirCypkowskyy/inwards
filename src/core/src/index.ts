@@ -8,14 +8,13 @@ export { baselineKey, stableMessage } from "./baseline/accepted.ts";
 export type { ContextSpec } from "./config/contexts.ts";
 export { CONFIG_DEFAULTS } from "./config/defaults.ts";
 export type { AgentSuppressions } from "./config/hook-keys.ts";
+export type { LayerSpec } from "./config/layers.ts";
+export { declaresInwards, type InwardsConfig, inwardsTable, parseConfig } from "./config/parse.ts";
 export {
-  declaresInwards,
-  type InwardsConfig,
-  inwardsTable,
-  type LayerSpec,
-  parseConfig,
-} from "./config/parse.ts";
-export { type RuleSettings, ruleLevel } from "./config/rule-settings.ts";
+  checkRuleOptions,
+  type RuleSettings,
+  ruleLevel,
+} from "./config/rule-settings.ts";
 export type { NameRule, ShapeSpec } from "./config/shape.ts";
 export { ConfigError } from "./config/toml.ts";
 export type {
@@ -33,7 +32,7 @@ export type {
 } from "./contracts/records.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";
-export type { PathKind } from "./lookup/module-lookup.ts";
+export { type PathKind, topLevelModules } from "./lookup/module-lookup.ts";
 export type { ProjectFiles, ProjectIndex } from "./lookup/project-index.ts";
 export { DOCS_BASE, VERSION } from "./meta/product.ts";
 export { RULES } from "./meta/registry.ts";
@@ -50,9 +49,10 @@ export {
   probeMembers,
   rootPathOf,
 } from "./rules/package-shape/shape.ts";
-export { layerIndexOf } from "./rules/shared/layer-ownership.ts";
+export { layerIndexOf, layerPackages } from "./rules/shared/layer-ownership.ts";
 export {
   checkMoves,
   checkNestedProjects,
   checkPrefixes,
 } from "./rules/unassigned-module/layout.ts";
+export { checkLinks, type LayerLink } from "./rules/unassigned-module/links.ts";
