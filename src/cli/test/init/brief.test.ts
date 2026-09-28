@@ -110,6 +110,7 @@ ignore = ["INW005"]
         root: "src",
         version: "0.1.0",
         ignore: [],
+        shapes: false,
         eol: "\n",
       });
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: 203b23b8919c9d896a3b5d3bc93a54bc420c51478ae0daf883d31b502616cbc6
+source_hash: ec3caa8d39e44eb5bc38aa1474ad3866d0b95a9efa050c9bba61ea161b06a96a
 ---
 
 # Kształt pakietu { #package-shape }
@@ -125,6 +125,10 @@ only-in = ["tests", "tests.**"]
 
 Obie konfiguracje są fixture'ami testów (`src/cli/test/support/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z krokami naprawy pokazanymi wyżej.
 
+## Kształty z presetu { #shapes-from-a-preset }
+
+`inwards init --style layered|clean|hexagonal --scaffold` zapisuje kształty dopasowane do przykładowego pakietu. Sam pakiet zawiera tylko swoje pakiety warstw, `bootstrap.py` i `__main__.py`, a `adapters/` w `hexagonal` zawiera tylko `inbound/` i `outbound/`; każdy inny element jest tam błędem, bo nie należałby do żadnej warstwy. W `clean` i `hexagonal` `application/` musi zawierać `ports/` i `use_cases/`, a każdy inny element jest tam ostrzeżeniem. Pakiety warstw nie mają kształtu, więc rosną swobodnie. [Instalacja](install.md#a-new-project-start-from-a-preset) je wymienia; `inwards init --list-styles` je wypisuje.
+
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 
-Kształt pakietu nie obejmuje jeszcze nazwanych szablonów, warstw ról i `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), odrzucania zapisu (Write), zanim plik powstanie ([#96](https://github.com/SirCypkowskyy/inwards/issues/96)), plików innych niż Python oraz tego, co plik zawiera.
+Kształt pakietu nie obejmuje jeszcze nazwanych szablonów, warstw ról i `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), plików innych niż Python oraz tego, co plik zawiera.

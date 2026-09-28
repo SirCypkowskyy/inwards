@@ -176,7 +176,7 @@ async function styleCommand(
     );
   }
   const root = sourceRoot({ ...ctx.io, toml: ctx.init.toml }, project, target.pkg, target.text);
-  const config = withTable(target, style, target.pkg, root);
+  const config = withTable(target, style, { pkg: target.pkg, root, shapes: plan.scaffold });
   if (typeof config === "string") {
     return print(ctx.io.streams, `inwards init: ${config}`, 2);
   }
@@ -268,15 +268,21 @@ async function commit(
  *
  * @param target - the pyproject.toml.
  * @param style - the preset.
- * @param pkg - the import package.
- * @param root - the config root.
+ * @param opts - the import package, the config root, and whether to add the shapes.
+ * @param opts.pkg - the import package.
+ * @param opts.root - the config root.
+ * @param opts.shapes - add the preset's shapes, which fit only the scaffold's packages.
  * @returns the change, or an error message.
  */
-function withTable(target: Target, style: Style, pkg: string, root: string): Change | string {
+function withTable(
+  target: Target,
+  style: Style,
+  { pkg, root, shapes }: { pkg: string; root: string; shapes: boolean },
+): Change | string {
   const { path, text } = target;
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const version = VERSION.replace(PRERELEASE, "");
-  const table = configTable(style, { pkg, root, version, ignore: DEFAULT_IGNORE, eol });
+  const table = configTable(style, { pkg, root, version, ignore: DEFAULT_IGNORE, shapes, eol });
   const after = `${text}${separator(text, eol)}${table}`;
   const want = style.layers.map((layer) => `${layer.name}=${pkg}.${layer.module}`).join(" ");
   let got = "";

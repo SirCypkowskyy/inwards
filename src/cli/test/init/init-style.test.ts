@@ -96,6 +96,8 @@ describe("inwards init --style", () => {
     const root = project(UV_PROJECT);
     const run = init(root, "--style", "clean");
     expect(run.code).toBe(0);
+    // The shapes describe the scaffold's packages, so they come only with it.
+    expect(readFileSync(join(root, "pyproject.toml"), "utf8")).not.toContain("shape");
     expect(run.stdout).toContain("domain/          domain: imports no other layer (missing)");
     // A missing module is drawn the way the scaffold would create it.
     expect(run.stdout).toContain(
@@ -190,7 +192,7 @@ describe("inwards init without --style or --agent", () => {
     expect(tree(root)).toEqual(tree(project(UV_PROJECT)));
   });
 
-  test("--list-styles prints each preset's layers", () => {
+  test("--list-styles prints each preset's layers and shapes", () => {
     const run = init(process.cwd(), "--list-styles", "--package", "shop");
     expect(run.code).toBe(0);
     expect(run.stdout).toMatchSnapshot();

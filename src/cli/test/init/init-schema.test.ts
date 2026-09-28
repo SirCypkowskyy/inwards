@@ -34,6 +34,7 @@ test.each([...STYLE_NAMES])("the %s preset's config validates and parses", (name
     root: "src",
     version: VERSION,
     ignore: ["tests", "migrations"],
+    shapes: true,
     eol: "\n",
   });
   expect(() => parseConfig(table)).not.toThrow();
