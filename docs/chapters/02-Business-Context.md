@@ -275,7 +275,7 @@ flowchart LR
 | UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace |
 | UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations on the pull request and in GitHub code scanning | :white_check_mark: [workflow template](guides/ci.md) and pull-request annotations, dogfooded on `examples/broken-app`; :material-progress-clock: code scanning once the repository is public |
 | UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :white_check_mark: |
-| UC7 | Brief the agent up front | `inwards context` writes a summary into `AGENTS.md` / `CLAUDE.md` | The agent knows the layers before it writes the first import | :material-progress-clock: [#58](https://github.com/SirCypkowskyy/inwards/issues/58). Today `init --agent agents-md` only tells the agent to run the check |
+| UC7 | Brief the agent up front | `inwards context --write` or `inwards init --brief` writes a summary into `AGENTS.md` (which `CLAUDE.md` can import) | The agent knows the layers before it writes the first import | :white_check_mark: opt-in, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |
 
 ## Sources
 

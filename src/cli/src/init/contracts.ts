@@ -41,6 +41,8 @@ export interface InitFlags {
   scaffold?: boolean | undefined;
   package?: string | undefined;
   launcher?: string | undefined;
+  /** `--brief`: also write the architecture brief into AGENTS.md (#58). */
+  brief?: boolean | undefined;
   "list-styles"?: boolean | undefined;
   "dry-run"?: boolean | undefined;
 }

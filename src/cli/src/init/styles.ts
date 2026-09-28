@@ -115,18 +115,19 @@ export function isStyle(value: string | undefined): value is StyleName {
 }
 
 /**
- * Lists what each layer may import, innermost first, as the annotated tree shows it.
+ * Says what one layer may import, innermost first, as the annotated tree and
+ * the architecture brief show it.
  *
- * @param style - the preset.
- * @param index - the layer's position in `style.layers`.
+ * @param names - the layer names, innermost first.
+ * @param index - the layer's position in `names`.
  * @returns e.g. `may import domain, application`, `imports no other layer`, or for the outermost `may import every other layer`.
  */
-function allowedImports(style: Style, index: number): string {
-  const inner = style.layers.slice(0, index).map((layer) => layer.name);
+export function allowedImports(names: readonly string[], index: number): string {
+  const inner = names.slice(0, index);
   if (inner.length === 0) {
     return "imports no other layer";
   }
-  return index === style.layers.length - 1
+  return index === names.length - 1
     ? "may import every other layer"
     : `may import ${inner.join(", ")}`;
 }
@@ -211,7 +212,10 @@ function layerNote(style: Style, index: number | undefined, exists: boolean): st
   if (layer === undefined || index === undefined) {
     return "";
   }
-  return `${layer.name}: ${allowedImports(style, index)}${exists ? "" : ` ${MISSING}`}`;
+  return `${layer.name}: ${allowedImports(
+    style.layers.map((l) => l.name),
+    index,
+  )}${exists ? "" : ` ${MISSING}`}`;
 }
 
 /**

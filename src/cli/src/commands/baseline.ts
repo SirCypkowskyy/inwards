@@ -4,12 +4,11 @@
  * every error to `inwards-baseline.json` next to the config, replacing the
  * old one (see `project/baseline.ts` for what the file holds).
  */
-import { resolve } from "node:path";
 import { parseConfig } from "@inwards/core";
 import { print } from "../platform/print.ts";
 import { BASELINE_FILE, writeBaseline } from "../project/baseline.ts";
 import { diskCacheWanted } from "../project/check.ts";
-import { findConfig } from "../project/config-discovery.ts";
+import { commandConfig } from "../project/config-discovery.ts";
 import type { AppDeps } from "./deps.ts";
 
 /**
@@ -28,7 +27,7 @@ export async function baselineCommand(
   noCache = false,
 ): Promise<number> {
   const { io } = deps;
-  const configPath = config ? resolve(io.runtime.cwd, config) : findConfig(io, io.runtime.cwd);
+  const configPath = commandConfig(io, config);
   if (!configPath) {
     return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
   }

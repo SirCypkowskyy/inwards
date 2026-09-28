@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: f087df8c1ea27b6e0db664d20d35cb5996307b94b24169cecea4ff05128b8144
+source_hash: 0356ba81f1703a0bf9f1987ec3482e6d896f228592fd9256869b80ca028fa169
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -179,7 +179,7 @@ Co zapisuje `--style` i kiedy się zatrzymuje:
 - **Tabela:** warstwy, `root` (`src` dla układu src, w przeciwnym razie `.`), `required-version`, domyślna lista `ignore` i komentarz z nazwą presetu i wersją Inwards. Pakiet pochodzi z `[project].name`, znormalizowanego tak jak robi to uv (`my-app` staje się `my_app`), albo z `--package`; słowo kluczowe Pythona nie może nim być. Uruchomiony w podkatalogu projektu, init używa najbliższego `pyproject.toml` powyżej i mówi, którego. Zanim pakiet powstanie, `root` to `src`, gdy backendem budowania jest uv_build albo gdy `src/` zawiera już kod w Pythonie.
 - **Nigdy nie nadpisuje warstw.** Jeśli `[tool.inwards]` już istnieje, init kończy się kodem 2 i niczego nie zapisuje. Bez `pyproject.toml` kończy się kodem 2 i proponuje `uv init --package`.
 - **`--scaffold`** zapisuje encję, port (`typing.Protocol`), przypadek użycia, adapter implementujący port, adapter sterujący z wiersza poleceń, korzeń kompozycji i jeden test w `tests/`. Nigdy niczego nie zastępuje: jeśli na drodze stoi plik albo dowiązanie symboliczne, albo katalog prowadzi przez dowiązanie poza projekt, init kończy się kodem 2, wypisuje ścieżki i niczego nie zapisuje. Istniejący `__init__.py`, taki jak ten tworzony przez uv, zostaje bez zmian. Najpierw zapisywane są pliki, a `pyproject.toml` na końcu; jeśli zapis się nie uda, init usuwa to, co utworzył, więc to samo polecenie można uruchomić ponownie.
-- **`--dry-run`** wypisuje każdą zmianę jako diff i niczego nie zapisuje. **`--agent`** łączy się z `--style`: `inwards init --style clean --agent claude` zapisuje warstwy i hooki Claude Code w jednym uruchomieniu.
+- **`--dry-run`** wypisuje każdą zmianę jako diff i niczego nie zapisuje. **`--agent`** łączy się z `--style`: `inwards init --style clean --agent claude` zapisuje warstwy i hooki Claude Code w jednym uruchomieniu. **`--brief`** zapisuje też do `AGENTS.md` [opis architektury](agents-md.md#the-architecture-brief-opt-in), podając preset i miejsce na jego porty.
 - Po zapisie init uruchamia sprawdzenie w tym samym procesie i wypisuje powyższe drzewo. Bez `--scaffold` każdy pakiet warstwy jest oznaczony `(missing)` i nie przechodzi sprawdzenia, dopóki nie będzie miał modułu.
 
 W terminalu `inwards init` bez `--style` i bez `--agent` zadaje pytania: o styl (podświetlony pokazuje swoje warstwy), o to, czy dodać scaffold, i o to, którego agenta podłączyć. Na koniec wypisuje to samo polecenie z flagami. Bez terminala (stdin albo stdout nie jest TTY albo ustawiono `CI`) nigdy nie czeka na dane: od razu kończy się kodem 2 i wypisuje flagi oraz style. Agenci uruchamiają init właśnie w ten sposób.

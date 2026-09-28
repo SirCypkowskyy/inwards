@@ -11,7 +11,7 @@ Design partners run Inwards on real projects with their AI agents and tell us wh
 
 1. **Install** Inwards as a dev dependency ([install guide](install.md)) and write `[tool.inwards]` with your layers.
 2. **Accept what is there today:** `inwards baseline`, then commit `inwards-baseline.json`. Existing violations stop failing; new ones still do ([install guide](install.md#on-an-existing-codebase)).
-3. **Wire in your agent:** `inwards init --agent claude` ([Claude Code](claude-code.md)), `inwards init --agent opencode` ([OpenCode](opencode.md)), or [Aider](aider.md), or [AGENTS.md](agents-md.md) for other agents.
+3. **Wire in your agent:** `inwards init --agent claude` ([Claude Code](claude-code.md)), `inwards init --agent opencode` ([OpenCode](opencode.md)), or [Aider](aider.md), or [AGENTS.md](agents-md.md) for other agents. Leave out `--brief` unless we agreed to test the [architecture brief](agents-md.md#the-architecture-brief-opt-in); if you add it later, tell us the date, so we compare the runs before and after it separately.
 4. **Turn the run log on:** `run-log = true` in the root `[tool.inwards]`, or `INWARDS_RUN_LOG=1` in the environment your agent runs in ([run log](../08-Run-Log.md#turning-it-on)).
 5. **Before each agent session's first change**, run `inwards check --format json --log`. It records the violations that were already there, so they don't count as the agent's.
 6. **Work as usual.** Don't change how you prompt the agent for our sake.
