@@ -210,14 +210,14 @@ layers = [
 
 Without `--config`, `inwards check` picks the configs like this:
 
-- **At the workspace root** (or any directory that holds members), it checks every member below it that has `[tool.inwards]`, each against its own config and its own baseline. A config at the workspace root itself checks the rest of the tree, with those members' directories left out, so no file is checked twice. A member without `[tool.inwards]` is listed as not checked. A config above the workspace root belongs to another project and isn't used.
+- **At the workspace root** (or any directory that holds members), it checks every member below it that has `[tool.inwards]`, each against its own config and its own baseline. A config at the workspace root itself checks the rest of the tree, with those members' directories left out, and a member nested in another member is left to its own config, so no file is checked twice. A member without `[tool.inwards]` is listed as not checked, unless the root's config checks it. A config above the workspace root belongs to another project and isn't used.
 - **Inside a member**, it uses the nearest config, as it does outside a workspace.
-- **With paths**, each path goes to the nearest config above it, and a directory that holds configured members goes to each of theirs too. `inwards check packages/api/src packages/core/src/acme/core/domain/order.py` checks the first against `packages/api`'s config and the second against `packages/core`'s. A path with no config above it is reported as not checked.
+- **With paths**, each path goes to the nearest config above it, and a directory that holds configured members goes to each of theirs too. `inwards check packages/api/src packages/core/src/acme/core/domain/order.py` checks the first against `packages/api`'s config and the second against `packages/core`'s. The workspace is looked for from each path, so the answer doesn't depend on where you run the command, and members under a named directory that no config checks are listed as not checked. A path with no config above it is reported as not checked.
 - **`--config`** checks every path against that one config, as before.
 
 Members come from `members` less `exclude`, with `*` matching inside one path segment (`packages/*`, `libs/acme_*`); `**`, `?` and character classes match nothing.
 
-The output is one report: JSON and SARIF are one document, and paths are relative to the working directory. Text and concise output end with a line per config. The exit code is the worst of the configs': 1 when any member has an error, 2 when a member's config is invalid (the other members are still checked and reported). The [fixture the tests use](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/workspace), checked from its root:
+The output is one report: JSON and SARIF are one document, and paths are relative to the working directory. Text and concise output end with a line per config. The exit code is the worst of the configs': 1 when any member has an error, 2 when a member's config is invalid (the other members are still checked and reported), and 2 when no named path gave a file to check. With `--log`, each config gets its own line in its own run log. The [fixture the tests use](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/workspace), checked from its root:
 
 ```text
 warning: packages/tools has no [tool.inwards] table, so it was not checked.

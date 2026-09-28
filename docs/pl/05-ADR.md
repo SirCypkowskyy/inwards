@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: dfa7f418ac428922411b7fb19850f6bf70d78b3f252c85ea7417609e28a2f6cd
+source_hash: 6e48d829de1025da535e5ac7fdbbb47e9a2672e9606ab5c8455b429f3bbc0736
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -885,9 +885,9 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 
 **Decyzja.**
 
-- **Członkowie pochodzą z uv, konfiguracje zostają przy członkach.** `inwards check` bez `--config` czyta `[tool.uv.workspace]` (`members` minus `exclude`, `*` wewnątrz segmentu) z najbliższego katalogu głównego workspace'u w katalogu roboczym lub nad nim. Uruchomiony tam, gdzie poniżej leżą członkowie z `[tool.inwards]`, sprawdza każdego z nich jego własną konfiguracją i baseline'em; najbliższa konfiguracja w katalogu głównym workspace'u lub poniżej sprawdza resztę z pominięciem katalogów tych członków. Członek bez `[tool.inwards]` trafia na listę niesprawdzonych. Nie ma nowego klucza konfiguracji ani flagi `--workspace`.
-- **Wskazane ścieżki trafiają do najbliższej konfiguracji.** Każda ścieżka jest sprawdzana najbliższą konfiguracją nad nią, a katalog zawierający członków z konfiguracją także ich konfiguracjami. `--config` znaczy to, co dotąd: jedna konfiguracja dla wszystkiego.
-- **Jeden raport.** Raporty łączą się w jeden: jeden dokument JSON albo SARIF, ścieżki względne wobec katalogu roboczego, liczniki zsumowane. Wyjście text i concise kończy się wierszem na każdą konfigurację. Kod wyjścia to najgorszy z kodów; niepoprawna konfiguracja członka daje kod 2, a pozostali członkowie są nadal sprawdzani.
+- **Członkowie pochodzą z uv, konfiguracje zostają przy członkach.** `inwards check` bez `--config` czyta `[tool.uv.workspace]` (`members` minus `exclude`, `*` wewnątrz segmentu) z najbliższego katalogu głównego workspace'u w katalogu roboczym lub nad nim. Uruchomiony tam, gdzie poniżej leżą członkowie z `[tool.inwards]`, sprawdza każdego z nich jego własną konfiguracją i baseline'em; najbliższa konfiguracja w katalogu głównym workspace'u lub poniżej sprawdza resztę z pominięciem katalogów tych członków, a członek zagnieżdżony w innym zostaje swojej własnej konfiguracji. Członek bez `[tool.inwards]` trafia na listę niesprawdzonych, chyba że sprawdza go konfiguracja katalogu głównego. Nie ma nowego klucza konfiguracji ani flagi `--workspace`.
+- **Wskazane ścieżki trafiają do najbliższej konfiguracji.** Każda ścieżka jest sprawdzana najbliższą konfiguracją nad nią, a katalog zawierający członków z konfiguracją także ich konfiguracjami. Workspace jest szukany od każdej ścieżki, a nie od katalogu roboczego, więc plan nie zależy od miejsca uruchomienia. `--config` znaczy to, co dotąd: jedna konfiguracja dla wszystkiego.
+- **Jeden raport.** Raporty łączą się w jeden: jeden dokument JSON albo SARIF, ścieżki względne wobec katalogu roboczego, liczniki zsumowane. Wyjście text i concise kończy się wierszem na każdą konfigurację. Kod wyjścia to najgorszy z kodów; niepoprawna konfiguracja członka daje kod 2, a pozostali członkowie są nadal sprawdzani. "Nic nie sprawdzono" (#200) jest oceniane raz, na połączonym raporcie. Z `--log` każda konfiguracja zapisuje własny wiersz, tylko z własnymi znaleziskami i czasem.
 - **Pakiety przestrzeni nazw zaglądają do innych członków.** Importy względne już wcześniej były rozwiązywane po nazwie tak jak w Pythonie. Błędne było istnienie: INW010 zgłaszał moduł, którego brakuje w tym członku, a który ma część pakietu przestrzeni nazw u innego członka. CLI daje teraz silnikowi przez `ProjectFiles` sondę `portions` katalogów importu pozostałych członków (`src/`, a bez niego katalog członka), a INW010 przepuszcza brakujący moduł, gdy jego pakiet jest tu pakietem przestrzeni nazw od pakietu najwyższego poziomu w dół i ma go któraś z części.
 - **Hooki zachowują to, co miały,** z jednym dodatkiem: strażnik konfiguracji chroni `[tool.inwards]` i baseline członka także wtedy, gdy nie istnieje jeszcze ani stan sesji, ani konfiguracja w katalogu głównym.
 

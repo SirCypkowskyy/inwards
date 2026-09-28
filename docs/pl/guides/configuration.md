@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: fb5de2a86bd2ed83edeac066fceec43244ef3080a5c963c120751f2ec5b38413
+source_hash: 4ae579ea5e2858d3efa8845955ee4425ec514f8a06a8a8b5031ac71b17c33fdd
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -215,14 +215,14 @@ layers = [
 
 Bez `--config` `inwards check` wybiera konfiguracje tak:
 
-- **W katalogu głównym workspace'u** (albo w dowolnym katalogu, który zawiera członków) sprawdza każdego członka poniżej, który ma `[tool.inwards]`, jego własną konfiguracją i jego własnym baseline'em. Konfiguracja w samym katalogu głównym workspace'u sprawdza resztę drzewa z pominięciem katalogów tych członków, więc żaden plik nie jest sprawdzany dwa razy. Członek bez `[tool.inwards]` trafia na listę niesprawdzonych. Konfiguracja powyżej katalogu głównego workspace'u należy do innego projektu i nie jest używana.
+- **W katalogu głównym workspace'u** (albo w dowolnym katalogu, który zawiera członków) sprawdza każdego członka poniżej, który ma `[tool.inwards]`, jego własną konfiguracją i jego własnym baseline'em. Konfiguracja w samym katalogu głównym workspace'u sprawdza resztę drzewa z pominięciem katalogów tych członków, a członek zagnieżdżony w innym członku zostaje swojej własnej konfiguracji, więc żaden plik nie jest sprawdzany dwa razy. Członek bez `[tool.inwards]` trafia na listę niesprawdzonych, chyba że sprawdza go konfiguracja katalogu głównego. Konfiguracja powyżej katalogu głównego workspace'u należy do innego projektu i nie jest używana.
 - **Wewnątrz członka** używa najbliższej konfiguracji, tak jak poza workspace'em.
-- **Ze ścieżkami** każda ścieżka trafia do najbliższej konfiguracji nad nią, a katalog zawierający członków z konfiguracją trafia też do każdej z ich konfiguracji. `inwards check packages/api/src packages/core/src/acme/core/domain/order.py` sprawdza pierwszą ścieżkę konfiguracją `packages/api`, a drugą konfiguracją `packages/core`. Ścieżka bez konfiguracji nad nią jest zgłaszana jako niesprawdzona.
+- **Ze ścieżkami** każda ścieżka trafia do najbliższej konfiguracji nad nią, a katalog zawierający członków z konfiguracją trafia też do każdej z ich konfiguracji. `inwards check packages/api/src packages/core/src/acme/core/domain/order.py` sprawdza pierwszą ścieżkę konfiguracją `packages/api`, a drugą konfiguracją `packages/core`. Workspace jest szukany od każdej ścieżki, więc wynik nie zależy od tego, gdzie uruchomisz polecenie, a członkowie pod wskazanym katalogiem, których nie sprawdza żadna konfiguracja, trafiają na listę niesprawdzonych. Ścieżka bez konfiguracji nad nią jest zgłaszana jako niesprawdzona.
 - **`--config`** sprawdza każdą ścieżkę tą jedną konfiguracją, jak dotąd.
 
 Członkowie to `members` minus `exclude`, a `*` pasuje wewnątrz jednego segmentu ścieżki (`packages/*`, `libs/acme_*`); `**`, `?` i klasy znaków nie pasują do niczego.
 
-Wynikiem jest jeden raport: JSON i SARIF to jeden dokument, a ścieżki są względne wobec katalogu roboczego. Wyjście text i concise kończy się wierszem na każdą konfigurację. Kod wyjścia to najgorszy z kodów konfiguracji: 1, gdy którykolwiek członek ma błąd, 2, gdy konfiguracja członka jest niepoprawna (pozostali członkowie są nadal sprawdzani i raportowani). [Fixture używany w testach](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/workspace), sprawdzony z katalogu głównego:
+Wynikiem jest jeden raport: JSON i SARIF to jeden dokument, a ścieżki są względne wobec katalogu roboczego. Wyjście text i concise kończy się wierszem na każdą konfigurację. Kod wyjścia to najgorszy z kodów konfiguracji: 1, gdy którykolwiek członek ma błąd, 2, gdy konfiguracja członka jest niepoprawna (pozostali członkowie są nadal sprawdzani i raportowani), i 2, gdy żadna wskazana ścieżka nie dała pliku do sprawdzenia. Z `--log` każda konfiguracja dostaje własny wiersz we własnym logu uruchomień. [Fixture używany w testach](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/workspace), sprawdzony z katalogu głównego:
 
 ```text
 warning: packages/tools has no [tool.inwards] table, so it was not checked.
