@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: e580d2e7e8786a4a80ea6717decef51b20de822cf4f78935bf312cd5f2a49af9
+source_hash: cbe54e01a79ec3df6673ecc038969b600734a7cb925f018b855589e069d30ab0
 ---
 
 # Kształt pakietu { #package-shape }
@@ -125,10 +125,14 @@ only-in = ["tests", "tests.**"]
 
 Obie konfiguracje są fixture'ami testów (`src/cli/test/support/fixtures/shapes/`): każda przechodzi `inwards check` z zerową liczbą wyników, a testy podkładają `helpers.py`, `services/x.py` i `test_x.py`, żeby sprawdzić, że każdy z nich oblewa sprawdzenie z krokami naprawy pokazanymi wyżej.
 
+## Szablony { #templates }
+
+Gdy każda domena ma ten sam kształt, tę samą kolejność importów między swoimi modułami i te same moduły publiczne, [szablon](configuration.md#templates) mówi to raz: `template = "<nazwa>"` we wpisie kształtu dostarcza `allow`, `require`, `forbid`, `extra` i `hints`, a ten sam szablon może się rozwinąć w warstwy dla ról i w listę `public` kontekstu każdej domeny. `hints` dodaje wskazówki projektu do kroków naprawy INW007. Dokumentacja konfiguracji pokazuje fastapi-best-practices jako jeden szablon.
+
 ## Kształty z presetu { #shapes-from-a-preset }
 
 `inwards init --style layered|clean|hexagonal --scaffold` zapisuje kształty dopasowane do przykładowego pakietu. Sam pakiet zawiera tylko swoje pakiety warstw, `bootstrap.py`, `__main__.py` i `_version.py` (który zapisują hatch-vcs i setuptools-scm), a `adapters/` w `hexagonal` zawiera tylko `inbound/` i `outbound/`; każdy inny element jest tam błędem, bo nie należałby do żadnej warstwy. W `clean` i `hexagonal` `application/` musi zawierać `ports/` i `use_cases/`, a każdy inny element jest tam ostrzeżeniem. Pakiety warstw nie mają kształtu, więc rosną swobodnie. [Instalacja](install.md#a-new-project-start-from-a-preset) je wymienia; `inwards init --list-styles` je wypisuje.
 
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 
-Kształt pakietu nie obejmuje jeszcze nazwanych szablonów, warstw ról i `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), plików innych niż Python oraz tego, co plik zawiera.
+Kształt pakietu nie obejmuje jeszcze presetu `inwards init --style fastapi` ([#93](https://github.com/SirCypkowskyy/inwards/issues/93)), plików innych niż Python oraz tego, co plik zawiera.

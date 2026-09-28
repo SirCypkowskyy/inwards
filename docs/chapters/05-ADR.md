@@ -38,6 +38,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
 | [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Layer selectors anchored in a top-level package, with slice-aware session checks | :white_check_mark: Accepted |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
+| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Package templates expand into config a user could write by hand | :white_check_mark: Accepted |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
@@ -950,6 +951,36 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 - *A walk for every nested `pyproject.toml` with `[tool.inwards]`:* covers non-uv monorepos, but costs a tree walk per run and has no notion of which directories belong together.
 - *A `--workspace` flag:* explicit, but running at the workspace root already says it, and the old behaviour there (one config indexing members by path) was the false green #201 warns about.
 - *Skipping INW010 under every namespace package:* simpler, but a hallucinated module in a namespace package would pass silently in every project that omits `__init__.py`.
+
+## ADR-036: Package templates expand into config a user could write by hand
+
+**Status:** Accepted · 2026-09-28 · [#97](https://github.com/SirCypkowskyy/inwards/issues/97)
+
+**Context.** fastapi-best-practices gives every domain the same modules, the same import order between them (router, then dependencies, then service, then models and schemas, then constants) and the same few modules other domains may use. Shapes ([ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)), layer selectors ([ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)) and contexts ([ADR-030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes)) could each say part of it, but only by repeating the list of modules in three tables. The issue also asked for independent siblings (`models | schemas`), which the layer order couldn't express: a layer could always import every layer listed before it, so one of two siblings could import the other.
+
+**Decision.**
+
+- **A template is a named table**, `[tool.inwards.templates.<name>]`, with `roles` (innermost first, `a | b` for siblings), `public`, the shape keys `allow`, `require`, `forbid` and `extra`, and `hints`. `template = "<name>"` works on a layer entry (the roles become layers inside the entry's modules), a shape entry (the template supplies the member keys, and a key the entry sets wins) and a context (the template's `public` names, under each of the context's modules, join its `public`).
+- **Templates expand into config a user could write by hand, once, in the parser.** The parsed config holds no trace of them, so no rule, the baseline, the brief and the editor need to know templates exist, and a template can always be replaced by its expansion. Every template key therefore has a hand-written form, which is why two keys were added outside templates: `hints` on shape entries, and sibling layers as a nested array in `layers`.
+- **Siblings are a rank.** A layer carries a rank when the config has siblings; layers of one rank may not import each other, and a layer may import every layer of a lower rank. INW001 and INW011 treat an import of a same-rank sibling as outward and say `from sibling layer`; the allowed direction joins siblings with `|`; INW005 gives every lowest-rank sibling the default deny list. A config without siblings gets no ranks, so its parsed form and every message stay as they were.
+- **Role layers are named `<entry>.<role>`** and own `<module>.<role>` for each of the entry's modules, with the entry's library lists. The entry itself becomes no layer: a module in it that no role covers is outside every layer, as INW006 reports.
+- **Errors name what the user wrote**: the entry's `template` key for an unknown template or one that lacks the roles or `public` the place needs, and the template's own key for a bad role, pattern or hint. A problem only the expansion shows (a role layer's name or prefix already taken) names the expanded layer.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The fastapi-best-practices layout is one template and three short uses of it, and a new domain is covered the moment it exists. The test fixture holds the template and its hand-written equivalent, and they give the same diagnostics.
+- :material-plus-circle-outline: Sibling layers work without templates too, which import-linter's `a | b` needed; `inwards import-config` still maps `|` to one layer plus contexts, and could move to nested arrays.
+- :material-minus-circle-outline: Messages and the brief name role layers by their expanded names, `domain.service`, and the allowed direction of a large template is long.
+- :material-minus-circle-outline: A role no package has makes an empty layer, which INW006 reports as an error, so optional members belong in `allow`, not in `roles`.
+- :material-minus-circle-outline: Config findings for expanded selectors, such as a dead role layer, point at line 1 of `pyproject.toml`: the expanded text isn't in the file.
+- :material-minus-circle-outline: Contexts still take literal prefixes, so each domain needs its own context entry; the template only saves its `public` list.
+
+**Alternatives.**
+
+- *Templates as their own concept in the rules:* the rules would need to resolve roles per package at check time, and a template could say things no hand-written config can, which makes it harder to reason about and to migrate away from.
+- *Siblings as contexts, the way `inwards import-config` maps `|`:* contexts take literal prefixes, so they can't cover `src.*.models`, and a sibling context nested in a domain context would take its modules out of the domain's context.
+- *Ordering the siblings instead* (`models` before `schemas`): `schemas -> models` would fail, but `models -> schemas` would pass, which is not what `|` means.
+- *A `rank` key on each layer:* more flexible, but easy to get wrong; a nested array keeps the order visible in the list itself.
 
 ## ADR-037: Framework rule families, opt-in, with their own prefix
 

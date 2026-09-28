@@ -97,6 +97,15 @@ describe("fastapi-best-practices with one template", () => {
   });
 });
 
+test("the configuration guide shows the fixture's config as it is", () => {
+  const guide = readFileSync(
+    join(import.meta.dir, "../../../../docs/chapters/guides/configuration.md"),
+    "utf8",
+  );
+  const toml = fixture()["pyproject.toml"] ?? "";
+  expect(guide).toContain(toml.slice(toml.indexOf("[tool.inwards]")).trim());
+});
+
 describe("the template expands to the hand-written config", () => {
   test("both parse to the same config", () => {
     const files = fixture();
