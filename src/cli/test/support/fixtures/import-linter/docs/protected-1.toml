@@ -1,0 +1,14 @@
+[tool.importlinter]
+root_package = "mypackage"
+
+[[tool.importlinter.contracts]]
+name = "Simple protected contract"
+type = "protected"
+protected_modules = [
+    "mypackage.protected",
+    "mypackage.also_protected",
+]
+allowed_importers = [
+    "mypackage.allowed",
+    "mypackage.also_allowed",
+]

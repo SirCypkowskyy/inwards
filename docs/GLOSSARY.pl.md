@@ -60,6 +60,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | workflow (GitHub Actions) | workflow | |
 | wheel | wheel (wheela, wheele) | the Python package format |
 | heredoc | heredoc (heredoca, heredoki) | a shell `<<'EOF'` block |
+| wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
 | Rule codes | INW000, INW001, ... INW011 | |
@@ -99,6 +100,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | corpus | korpus |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
+| contract (import-linter) | kontrakt |
 | config error | błąd konfiguracji |
 | confirming parse | parsowanie potwierdzające |
 | dead prefix | martwy prefiks |
@@ -142,6 +144,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | library; third-party library; standard library | biblioteka; biblioteka zewnętrzna; biblioteka standardowa |
 | inner, outer layer; innermost, outermost | warstwa wewnętrzna, zewnętrzna; najbardziej wewnętrzna, najbardziej zewnętrzna |
 | maintainer | opiekun projektu |
+| sibling (module, package; import-linter's layers) | moduł sąsiedni, sąsiedni pakiet |
 | cache (uv's, bunx's) | pamięć podręczna (uv, bunx) |
 | dev dependency | zależność deweloperska |
 | member (of a package) | element (pakietu) |

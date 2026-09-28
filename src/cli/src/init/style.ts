@@ -305,7 +305,7 @@ function withTable(
  * @param eol - its line ending.
  * @returns "", one line ending or two.
  */
-function separator(text: string, eol: string): string {
+export function separator(text: string, eol: string): string {
   if (text === "" || text.endsWith(`${eol}${eol}`)) {
     return "";
   }

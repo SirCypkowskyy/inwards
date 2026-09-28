@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 85746c6061eff6c42095bb3bbc4bdb10f7f3280134451d53013f4147346a7b1b
+source_hash: 47a076f0ff50b3576b6c1d03a9c872c3cc1e89884b69fa92d11a86fbbc1d5f0d
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -209,6 +209,10 @@ inwards check
 ```
 
 `All clear` z kodem wyjścia 0 oznacza, że każdy import wskazuje do środka. Przy kodzie wyjścia 1 polecenie wypisuje każde naruszenie z ponumerowanymi krokami naprawy, a kod wyjścia 2 to błąd użycia albo konfiguracji.
+
+### Przejście z import-linter { #coming-from-import-linter }
+
+`inwards import-config` zamienia kontrakty z `.importlinter`, `setup.cfg` albo `[tool.importlinter]` na `[tool.inwards]`, a `--write` dopisuje tabelę do `pyproject.toml`. Każdy kontrakt, którego nie dało się przenieść, trafia do raportu razem z powodem. Mapowanie opisuje [Migracja z import-linter](import-linter.md).
 
 ### Istniejący kod { #on-an-existing-codebase }
 

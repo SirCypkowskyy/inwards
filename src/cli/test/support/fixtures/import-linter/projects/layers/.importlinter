@@ -1,0 +1,11 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:layers]
+name = Layers with siblings
+type = layers
+layers =
+    mypackage.high
+    mypackage.blue | mypackage.green
+    mypackage.yellow : mypackage.purple
+    mypackage.low

@@ -1,0 +1,20 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:my-contract]
+name = Minimal acyclic siblings contract
+type = acyclic_siblings
+ancestors = mypackage
+
+[importlinter:contract:my-contract-2]
+name = Acyclic siblings contract with more options
+type = acyclic_siblings
+ancestors =
+    mypackage.foo
+    mypackage.bar.*
+depth = 5
+skip_descendants =
+    mypackage.foo.purple
+    mypackage.foo.**.orange
+ignore_imports =
+    mypackage.foo.blue.one -> mypackage.foo.green.two

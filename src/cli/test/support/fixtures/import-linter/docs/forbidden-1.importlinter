@@ -1,0 +1,39 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:my-forbidden-contract]
+name = My forbidden contract (internal packages only)
+type = forbidden
+source_modules =
+  mypackage.one
+  mypackage.two
+  mypackage.three.blue
+forbidden_modules =
+  mypackage.four
+  mypackage.five.green
+ignore_imports =
+  mypackage.one.green -> mypackage.utils
+  mypackage.two -> mypackage.four
+
+[importlinter:contract:forbidden-siblings]
+# This contract prevents mypackage.one from importing
+# anything from its siblings.
+name = Forbidden descendants contract
+type = forbidden
+source_modules =
+  mypackage.one
+forbidden_modules =
+  mypackage.*
+
+[importlinter:contract:forbidden-descendants]
+# This contract prevents mypackage.one from importing
+# anything from its descendants.
+# Note as_packages must be false, otherwise this contract would have no effect
+# due to the rules around overlapping modules.
+name = Forbidden descendants contract
+type = forbidden
+source_modules =
+  mypackage.one
+forbidden_modules =
+  mypackage.one.**
+as_packages = false

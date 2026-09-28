@@ -1,0 +1,15 @@
+[tool.importlinter]
+root_package = "mypackage"
+
+[[tool.importlinter.contracts]]
+name = "My independence contract"
+type = "independence"
+modules = [
+    "mypackage.foo",
+    "mypackage.bar",
+    "mypackage.baz",
+]
+ignore_imports = [
+    "mypackage.bar.green -> mypackage.utils",
+    "mypackage.baz.blue -> mypackage.foo.purple",
+]
