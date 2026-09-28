@@ -1,0 +1,42 @@
+[project]
+name = "fastapi-best-practices"
+version = "0.1.0"
+
+[tool.inwards]
+layers = [
+  { name = "core", modules = ["src.config", "src.database", "src.exceptions", "src.models"], deny-libraries = ["fastapi"] },
+  { name = "domain", modules = ["src.*"], template = "fastapi-domain" },
+  { name = "app", modules = ["src.main"] },
+]
+
+# One template says what every domain package looks like, how its modules
+# import each other (innermost first; "a | b" are siblings that may not import
+# each other), and which modules other domains may import.
+[tool.inwards.templates.fastapi-domain]
+roles = [
+  "constants | config",
+  "exceptions | utils",
+  "models | schemas",
+  "service",
+  "dependencies",
+  "router",
+]
+public = ["router", "service", "dependencies", "schemas", "constants", "exceptions"]
+allow = []
+require = ["__init__", "router", "service"]
+hints = ["Other domains may import this one's router, service, dependencies, schemas, constants and exceptions, never its models, config or utils."]
+
+[[tool.inwards.shape]]
+packages = ["src.*"]
+template = "fastapi-domain"
+
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["src.orders"]
+depends-on = ["users"]
+template = "fastapi-domain"
+
+[[tool.inwards.contexts]]
+name = "users"
+modules = ["src.users"]
+template = "fastapi-domain"
