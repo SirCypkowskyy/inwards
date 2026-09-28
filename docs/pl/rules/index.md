@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: c3d1c9edbc81fce6ed668cf3f36922be5949f1c81a5fe310d849de7b986abf4c
+source_hash: 525984ee584ea65ef036efbab294e6efb44e83cc07df599b8174dcbb6cf83423
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -32,6 +32,7 @@ Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikac
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu (rzucony bezpośrednio, w funkcji pomocniczej albo zależności, albo przez handler wyjątków aplikacji) niezadeklarowany w `responses=` | opt-in, błąd | tak |
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
 | [FAPI005](FAPI005.md) | `route-shadowing` | Operacja ścieżki, która nigdy się nie wykona, bo wcześniejsza trasa z tą samą metodą pasuje do jej ścieżki (`/users/{user_id}` przed `/users/me`) albo ma tę samą ścieżkę, na jednym routerze albo między routerami na pełnej ścieżce | opt-in, błąd | tak |
+| [FAPI008](FAPI008.md) | `duplicate-operation-id` | Operacja ścieżki, której jawne `operation_id` ma już inna operacja tej samej aplikacji, między routerami i plikami | opt-in, błąd | tak |
 
 Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
 
@@ -40,7 +41,6 @@ Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (niez
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
 | FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planowana |
 | FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planowana |
-| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planowana |
 | FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |
 
 [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia każdą regułę razem z resztą projektu.

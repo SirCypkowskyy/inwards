@@ -27,6 +27,7 @@ The `FAPI` family checks FastAPI applications across files: which router the app
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | A path operation that can produce an error status code (raised directly, in a helper or dependency, or through an app's exception handler) its `responses=` doesn't declare | opt-in, error | yes |
 | [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` with routes that no app includes, routers that include each other in a cycle, or an `include_router` above the included router's routes | opt-in, error | yes |
 | [FAPI005](FAPI005.md) | `route-shadowing` | A path operation that never runs, because an earlier route with the same method matches its path (`/users/{user_id}` before `/users/me`) or has the same path, on one router or across routers on the full path | opt-in, error | yes |
+| [FAPI008](FAPI008.md) | `duplicate-operation-id` | A path operation whose explicit `operation_id` another operation of the same app already has, across routers and files | opt-in, error | yes |
 
 Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
 
@@ -35,7 +36,6 @@ Codes reserved for later FastAPI rules, not registered yet (an unknown code is s
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
 | FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planned |
 | FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planned |
-| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planned |
 | FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
 
 The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.

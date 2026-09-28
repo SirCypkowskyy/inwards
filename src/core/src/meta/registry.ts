@@ -48,7 +48,8 @@ type RuleCode =
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
-  | "FAPI005";
+  | "FAPI005"
+  | "FAPI008";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -197,6 +198,14 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "No FastAPI path operation is unreachable behind an earlier route with the same method that matches its path.",
     docs: page("FAPI005"),
+  },
+  FAPI008: {
+    code: "FAPI008",
+    name: "duplicate-operation-id",
+    severity: "error",
+    default: "off",
+    summary: "No two path operations one FastAPI app serves share an explicit operation_id.",
+    docs: page("FAPI008"),
   },
 };
 

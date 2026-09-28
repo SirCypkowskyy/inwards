@@ -360,8 +360,9 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | FAPI002 | `undocumented-error-response` | Opt-in. A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare: raised or returned in the endpoint, in same-file or imported helpers and dependencies up to `max-depth` calls, or from a first-party exception an app handler maps to a code. Declarations on the decorator, the router, the inclusions above it and the app count; anything Inwards can't read keeps it quiet | :white_check_mark: |
 | FAPI003 | `router-wiring` | Opt-in. An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | :white_check_mark: |
 | FAPI005 | `route-shadowing` | Opt-in. A path operation that never runs, because an earlier route with the same method matches its path or has the same path. Routes on one router in one file are compared on their own paths, also in the per-edit hook; every app's routes are compared on their full paths (`rules/fastapi/routes.ts` walks the graph and joins literal prefixes) in full and partial runs. A non-literal path or prefix skips the route | :white_check_mark: |
+| FAPI008 | `duplicate-operation-id` | Opt-in. Two path operations one app serves with the same literal `operation_id`, found by walking each app's routes through the graph; ids FastAPI generates, non-literal ids and routes out of the schema don't count, and two apps never clash. Full and partial runs only | :white_check_mark: |
 
-The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go. FAPI006 to FAPI009 are planned ([rules index](rules/index.md#fastapi)).
+The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go. FAPI006, FAPI007 and FAPI009 are planned ([rules index](rules/index.md#fastapi)).
 
 ## Code map
 
@@ -403,7 +404,7 @@ src/
 │   │   │                                #   (FAPI001), undocumented-error-response.ts with
 │   │   │                                #   error-codes.ts and placement.ts (FAPI002), routes.ts
 │   │   │                                #   (each app's routes in match order), route-shadowing.ts
-│   │   │                                #   (FAPI005)
+│   │   │                                #   (FAPI005), duplicate-operation-id.ts (FAPI008)
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on

@@ -1,6 +1,6 @@
 /**
  * @file The FastAPI rule family's registration (#186, ADR-036): FAPI001 to
- * FAPI003 and FAPI005 are registered opt-in, SARIF lists them as disabled,
+ * FAPI003, FAPI005 and FAPI008 are registered opt-in, SARIF lists them as disabled,
  * `extend-select` turns one on, an inline suppression names them like any
  * INW code, and an unknown FAPI code is a config error and an INW009 error.
  * A suppression is checked against a finding built here; the rules' own
@@ -19,7 +19,7 @@ layers = [
   { name = "api", modules = ["shop.api"] },
 ]
 `;
-const FAPI = ["FAPI001", "FAPI002", "FAPI003", "FAPI005"];
+const FAPI = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI008"];
 const REASON = 'reason="documented in the gateway"';
 
 /**
@@ -56,6 +56,7 @@ describe("the FAPI codes", () => {
       "undocumented-error-response",
       "router-wiring",
       "route-shadowing",
+      "duplicate-operation-id",
     ]);
   });
 

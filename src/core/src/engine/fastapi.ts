@@ -9,7 +9,7 @@
  * mention FastAPI is never parsed for them, and neither is one INW000 refuses.
  *
  * A per-edit check (the PostToolUse hook, the editor) keeps only the one-file
- * findings of the rules that also read the graph (FAPI003, FAPI005): wiring a
+ * findings of the rules that read the graph (FAPI003, FAPI005; FAPI008 has none): wiring a
  * new router into the app is a second edit, so the graph's findings wait for
  * the Stop gate. A graph check still runs when a checked file suppresses its
  * code, so the suppression counts as used; the findings it would have
@@ -23,6 +23,7 @@ import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
+import { checkOperationIds } from "../rules/fastapi/duplicate-operation-id.ts";
 import { FastApiModel } from "../rules/fastapi/model.ts";
 import { FastApiProject } from "../rules/fastapi/project.ts";
 import { checkFileShadowing, checkGraphShadowing } from "../rules/fastapi/route-shadowing.ts";
@@ -82,8 +83,10 @@ export function fastApiFindings(
   { config, edit }: { config: InwardsConfig; edit: boolean },
 ): FastApiFound {
   const { rules } = config;
-  const on = new Set(["FAPI003", "FAPI005"].filter((code) => ruleLevel(code, rules) !== "off"));
-  if (!(on.has("FAPI003") || on.has("FAPI005") || endpointRulesOn(rules))) {
+  const on = new Set(
+    ["FAPI003", "FAPI005", "FAPI008"].filter((code) => ruleLevel(code, rules) !== "off"),
+  );
+  if (!(on.size > 0 || endpointRulesOn(rules))) {
     return NONE;
   }
   const model = new FastApiModel(parser, project);
@@ -128,6 +131,11 @@ export function fastApiFindings(
         code: "FAPI005",
         needed: routed,
         run: () => checkGraphShadowing(appRoutesOnce(), checked),
+      },
+      {
+        code: "FAPI008",
+        needed: routed,
+        run: () => checkOperationIds(appRoutesOnce(), checked),
       },
     ];
     const extra = graphChecks
