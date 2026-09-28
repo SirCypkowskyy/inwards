@@ -27,10 +27,11 @@ export async function baselineCommand(
   noCache = false,
 ): Promise<number> {
   const { io } = deps;
-  const configPath = commandConfig(io, config);
-  if (!configPath) {
-    return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
+  const found = commandConfig(io, config);
+  if ("problem" in found) {
+    return print(io.streams, found.problem, 2);
   }
+  const configPath = found.path;
   const report = await deps.check(configPath, undefined, io.runtime.cwd, {
     baseline: false,
     cache: diskCacheWanted(io.runtime, noCache),

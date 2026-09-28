@@ -10,7 +10,7 @@ import { type Format, type Report, render } from "@inwards/core";
 import { shownReport } from "../paths/display.ts";
 import { print } from "../platform/print.ts";
 import { diskCacheWanted } from "../project/check.ts";
-import { findConfig } from "../project/config-discovery.ts";
+import { commandConfig } from "../project/config-discovery.ts";
 import type { AppDeps } from "./deps.ts";
 
 const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif"];
@@ -78,10 +78,11 @@ export async function checkCommand(
   }
 
   const { cwd } = io.runtime;
-  const configPath = config ? resolve(cwd, config) : findConfig(io, cwd);
-  if (!configPath) {
-    return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
+  const found = commandConfig(io, config);
+  if ("problem" in found) {
+    return print(io.streams, found.problem, 2);
   }
+  const configPath = found.path;
 
   const missing = paths.find((p) => io.probe.kind(resolve(cwd, p)) === undefined);
   if (missing !== undefined) {
