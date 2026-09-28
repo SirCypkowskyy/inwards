@@ -1,7 +1,10 @@
 /**
- * @file Finds the uv workspace a project belongs to and the top-level import
+ * @file Finds the uv workspace a project belongs to, its member directories
+ * (for `inwards check` at a workspace root, #57) and the top-level import
  * packages of its members, so INW005 can call an import of a sibling member a
- * "workspace package" rather than a library (#203). It reads through the
+ * "workspace package" rather than a library (#203), and a probe of the other
+ * members' import roots, so INW010 sees the portions of a namespace package
+ * that live there. It reads through the
  * injected `ProjectIo` and parses TOML with the function it is given; it
  * decides nothing about which imports are allowed.
  *
@@ -10,6 +13,8 @@
  */
 import { dirname, join } from "node:path";
 import { isRecord } from "../json/guards.ts";
+import { isInside } from "../paths/lexical.ts";
+import type { PathKind } from "../platform/contracts.ts";
 import type { ProjectIo } from "./contracts.ts";
 
 /** What the discovery reads: files, directory listings, path kinds and TOML. */
@@ -30,18 +35,65 @@ const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u;
  */
 export function workspacePackages(io: WorkspaceIo, configDir: string): Set<string> {
   try {
-    const found = workspaceRoot(io, configDir);
-    if (found === undefined) {
-      return new Set();
-    }
-    const exclude = found.exclude.flatMap((glob) => expand(io, found.dir, glob));
-    const members = found.members
-      .flatMap((glob) => expand(io, found.dir, glob))
-      .filter((dir) => !exclude.includes(dir));
+    const members = workspaceMembers(io, configDir)?.members ?? [];
     return new Set(members.flatMap((dir) => memberPackages(io, dir)));
   } catch {
     return new Set();
   }
+}
+
+/**
+ * Probes the import roots of the other members of the nearest uv workspace
+ * (`src/` when a member has one, else the member itself), for the portions
+ * of a namespace package that live there (INW010, #57). The member that
+ * holds the config is left out. Like `workspacePackages`, anything that
+ * can't be read gives no probe rather than failing the check.
+ *
+ * @param io - reads the pyproject.toml files and tells what a path is.
+ * @param configDir - absolute directory of the config's pyproject.toml.
+ * @returns what is at a forward-slash path under the first root that has it, or
+ *   undefined outside a workspace or without other members.
+ */
+export function otherPortions(
+  io: WorkspaceIo,
+  configDir: string,
+): ((rel: string) => PathKind) | undefined {
+  try {
+    const roots = (workspaceMembers(io, configDir)?.members ?? [])
+      .filter((dir) => !(dir === configDir || isInside(dir, configDir)))
+      .map((dir) => (io.probe.kind(join(dir, "src")) === "dir" ? join(dir, "src") : dir));
+    if (roots.length === 0) {
+      return undefined;
+    }
+    return (rel: string): PathKind =>
+      roots.map((root) => io.probe.kind(join(root, rel))).find((kind) => kind !== undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Finds the nearest uv workspace at or above a directory and expands its
+ * member globs, less its `exclude` globs.
+ *
+ * @param io - reads the pyproject.toml files and lists directories.
+ * @param start - the directory to start from.
+ * @returns the workspace root and its member directories, or undefined outside a workspace.
+ * @throws when a pyproject.toml on the way can't be read.
+ */
+export function workspaceMembers(
+  io: WorkspaceIo,
+  start: string,
+): { dir: string; members: string[] } | undefined {
+  const found = workspaceRoot(io, start);
+  if (found === undefined) {
+    return undefined;
+  }
+  const exclude = found.exclude.flatMap((glob) => expand(io, found.dir, glob));
+  const members = found.members
+    .flatMap((glob) => expand(io, found.dir, glob))
+    .filter((dir) => !exclude.includes(dir));
+  return { dir: found.dir, members: [...new Set(members)].sort() };
 }
 
 /**

@@ -137,7 +137,9 @@ layers = [{ name = "core", modules = ["packages.core.src.core"] }]
         "indexed as packages.core.src.core, so an import of core",
       );
       expect(found[1]?.message).toContain("src/services/app");
-      expect(found[0]?.fix?.steps[0]).toContain("--config src/packages/core/pyproject.toml");
+      expect(found[0]?.fix?.steps[0]).toContain(
+        "Give src/packages/core/pyproject.toml its own [tool.inwards]",
+      );
     });
 
     test("a src folder without a pyproject.toml, or at the root, stays quiet", () => {

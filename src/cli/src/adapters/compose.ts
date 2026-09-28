@@ -82,5 +82,6 @@ export function compose(): AppDeps {
       entry: resolve(import.meta.dir, "../main.ts"),
       toml: parseToml,
     },
+    toml: parseToml,
   };
 }
