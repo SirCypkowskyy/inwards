@@ -210,7 +210,7 @@ Which rules report and how loudly:
 - `extend-select`: these rules report too, next to `select` or the rules that are on by default. It turns [opt-in rules](../rules/index.md#opt-in-rules) on.
 - `ignore`: these rules don't report. It wins over `select` and `extend-select`.
 - `severity`: a table of rule code to `"error"` or `"warning"`.
-- `<rule-name>`: a table of that rule's options, such as `[tool.inwards.rules.pure-domain]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a layer's `modules`, which limits the rule to the modules they match. The table doesn't turn the rule on, and a table for a rule that is off gets a warning.
+- `<rule-name>`: a table of that rule's options, such as `[tool.inwards.rules.pure-domain]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a layer's `modules`, which limits the rule to the modules they match. [FAPI003](../rules/FAPI003.md#configuration) takes `entrypoints`, `allow-unmounted`, `unresolved-includes` and `check-order` as well; any other rule refuses them. The table doesn't turn the rule on, and a table for a rule that is off gets a warning.
 
 INW000 can't be ignored, re-levelled or given options. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
 

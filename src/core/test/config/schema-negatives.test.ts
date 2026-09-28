@@ -115,6 +115,28 @@ describe("structural mistakes fail both the schema and the parser", () => {
       "a modules selector that doesn't start with a package",
       withExtra('[tool.inwards.rules.layer-dependency]\nmodules = ["*.api"]\n'),
     ],
+    // FAPI003's own options (#184).
+    [
+      "an entrypoint without a name",
+      withExtra('[tool.inwards.rules.router-wiring]\nentrypoints = ["app.main"]\n'),
+    ],
+    ["empty entrypoints", withExtra("[tool.inwards.rules.router-wiring]\nentrypoints = []\n")],
+    [
+      "an unknown unresolved-includes",
+      withExtra('[tool.inwards.rules.router-wiring]\nunresolved-includes = "error"\n'),
+    ],
+    [
+      "a check-order that isn't a boolean",
+      withExtra('[tool.inwards.rules.router-wiring]\ncheck-order = "yes"\n'),
+    ],
+    [
+      "an allow-unmounted selector that doesn't start with a package",
+      withExtra('[tool.inwards.rules.router-wiring]\nallow-unmounted = ["*.experimental"]\n'),
+    ],
+    [
+      "a router-wiring key in another rule's table",
+      withExtra('[tool.inwards.rules.layer-dependency]\nentrypoints = ["app.main:app"]\n'),
+    ],
     // Empty strings and repeats.
     ["an empty layer name", withLayer('{ name = "", modules = ["shop"] }')],
     ["an empty layer module", withLayer('{ name = "d", modules = [""] }')],

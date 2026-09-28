@@ -1020,3 +1020,9 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 - *Reuse Ruff's `FAST` prefix:* familiar, but `FAST002` would mean two different rules in one repository.
 - *On by default in projects that import FastAPI:* less configuration, but new errors would appear on an upgrade in every FastAPI project.
 - *Contribute the checks to Ruff:* Ruff lints one file at a time, and these checks need the project-wide view.
+
+**Amendment, 2026-09-28: findings that need the whole project ([#184](https://github.com/SirCypkowskyy/inwards/issues/184)).** FAPI003 is the first family rule whose findings need every file: a router is unmounted only if no app anywhere includes it.
+
+- **Suppressible, unlike INW004.** Each FAPI003 finding sits on a line of its own (the `APIRouter(...)` call, the `include_router` call that closes a cycle), so a suppression there names one decision. INW004 can't be suppressed because its comment would sit on one import of many.
+- **Checked files only, against the whole graph.** A partial run (a path argument, the Stop gate) builds the app and router graph from every FastAPI file of the project, and reports only in the files it checks. The Stop gate therefore reports a router the session created or changed, and a router already unmounted at session start is an old error.
+- **The per-edit hook and the editor report one-file findings only.** Creating a router and wiring it into the app are two edits. They still build the graph when a file suppresses FAPI003, so the suppression counts as used instead of turning into an INW009 warning, then drop what it found.

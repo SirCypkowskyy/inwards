@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 0123bbe2c04af94ce1fa0f4bef403cf0fce456cb6438e3517f2b5f9db8e35a98
+source_hash: 1a4258e69ec2a80d3d515a7a6833ae44e152bc7af149ffd089cd0407ba6dc740
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1025,3 +1025,9 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - *Użycie prefiksu `FAST` Ruffa:* znajomy, ale `FAST002` znaczyłby dwie różne reguły w jednym repozytorium.
 - *Domyślnie włączone w projektach, które importują FastAPI:* mniej konfiguracji, ale po aktualizacji w każdym projekcie FastAPI pojawiłyby się nowe błędy.
 - *Przekazanie sprawdzeń do Ruffa:* Ruff sprawdza plik po pliku, a te sprawdzenia potrzebują widoku całego projektu.
+
+**Poprawka, 2026-09-28: diagnostyki, które potrzebują całego projektu ([#184](https://github.com/SirCypkowskyy/inwards/issues/184)).** FAPI003 to pierwsza reguła z rodziny, której diagnostyki potrzebują wszystkich plików: router jest niepodpięty tylko wtedy, gdy żadna aplikacja w projekcie go nie dołącza.
+
+- **Da się ją wyciszyć, w przeciwieństwie do INW004.** Każda diagnostyka FAPI003 ma własną linię (wywołanie `APIRouter(...)`, wywołanie `include_router`, które zamyka cykl), więc wyciszenie w niej dotyczy jednej decyzji. INW004 nie da się wyciszyć, bo komentarz stałby przy jednym z wielu importów.
+- **Tylko sprawdzane pliki, względem całego grafu.** Częściowe sprawdzenie (ścieżka w argumencie, Stop gate) buduje graf aplikacji i routerów ze wszystkich plików FastAPI w projekcie i zgłasza tylko w plikach, które sprawdza. Stop gate zgłasza więc router, który sesja utworzyła lub zmieniła, a router niepodpięty już na starcie sesji jest starym błędem.
+- **Hook edycji i edytor zgłaszają tylko diagnostyki z jednego pliku.** Utworzenie routera i podpięcie go do aplikacji to dwie edycje. Graf budują jednak wtedy, gdy plik wycisza FAPI003, żeby wyciszenie liczyło się jako użyte, a nie zamieniało w ostrzeżenie INW009, a potem odrzucają to, co znalazły.

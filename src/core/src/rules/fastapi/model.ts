@@ -102,7 +102,9 @@ export class FastApiModel {
    * Finds what a qualified name (a record's `receiver`, `target` or
    * `handler`) refers to. Its module comes from `ProjectIndex.ownerOf`, and a
    * name that module imports from elsewhere (a re-export in `__init__.py`) is
-   * followed to its own module, up to `MAX_HOPS` times.
+   * followed to its own module, up to `MAX_HOPS` times. A file the model
+   * already holds is read as it holds it, never re-read from the index, so
+   * the nodes `fileModel` handed out stay valid.
    *
    * @param qualified - a qualified name, e.g. `app.routers.users.router`.
    * @returns the app, router or module-level function, or null for a name
@@ -118,7 +120,9 @@ export class FastApiModel {
       if (src === undefined || head === "") {
         return null;
       }
-      const parsed = this.parse({ ...src, text: normalizeSource(src.text) });
+      // A file the check already handed in keeps its text (e.g. as it was at session start).
+      const parsed =
+        this.parsed.get(src.path) ?? this.parse({ ...src, text: normalizeSource(src.text) });
       const found = rest.length === 0 ? definitionIn(parsed, src, head) : null;
       const next = parsed.names.get(head);
       if (found !== null || next === undefined) {

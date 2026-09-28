@@ -97,7 +97,7 @@ export function extract(root: Node, context: Context): FastApiFile {
  * Records one call if it is a path operation decorator, an inclusion, a
  * mount or a handler registration. It counts only on a receiver that is one
  * of the file's objects or an imported name, so `session.mount(...)` on a
- * local HTTP session doesn't.
+ * local HTTP session doesn't; `include_router` counts on any named receiver.
  *
  * @param call - a `call` node.
  * @param context - the file, its qualifier and its functions.
@@ -108,11 +108,10 @@ function record(call: Node, context: Context, found: Found): void {
   const object = fn?.type === "attribute" ? fn.childForFieldName("object") : null;
   const attribute = fn?.childForFieldName("attribute");
   const app = object ? context.qualify(object) : null;
-  const imported = app !== null && !app.startsWith(`${context.file.module}.`);
-  if (!attribute || app === null || !(found.own.has(app) || imported)) {
+  const method = attribute ? identifierName(attribute) : "";
+  if (!(attribute && app !== null && counts(app, method, context, found))) {
     return;
   }
-  const method = identifierName(attribute);
   const decorated = decoratedFunction(call);
   const exception = argumentAt(call, 0, "exc_class_or_status_code");
   if (decorated && (METHODS.has(method) || method === "api_route")) {
@@ -129,6 +128,23 @@ function record(call: Node, context: Context, found: Found): void {
   } else if (method === "include_router" || method === "mount") {
     found.wiring.push(wiringOf(call, method, app, context.qualify));
   }
+}
+
+/**
+ * Tells whether a call on a receiver counts: on one of the file's objects or
+ * an imported name, and `include_router` on any name, since it is FastAPI's
+ * own (a `register(app)` function's parameter, which FAPI003 treats as an
+ * unknown receiver).
+ *
+ * @param app - the receiver's qualified name.
+ * @param method - the called attribute.
+ * @param context - the file.
+ * @param found - the records so far, with the file's own objects.
+ * @returns true when the call is recorded.
+ */
+function counts(app: string, method: string, context: Context, found: Found): boolean {
+  const imported = !app.startsWith(`${context.file.module}.`);
+  return found.own.has(app) || imported || method === "include_router";
 }
 
 /**
@@ -233,5 +249,31 @@ function wiringOf(call: Node, method: string, receiver: string, qualify: Qualify
     receiver,
     target: target ? qualify(target) : null,
     path: path ? valueFrom(path, qualify) : null,
+    loopTargets: target ? loopItems(target, qualify) : [],
   };
+}
+
+/**
+ * Reads the items of the list or tuple literal a `for` loop binds a name to,
+ * when that loop encloses the name's use: `for r in [a.router, b.router]:`.
+ *
+ * @param target - the argument node, e.g. the identifier `r`.
+ * @param qualify - qualifies a name through the file's imports.
+ * @returns each item's qualified name, null for one that isn't a name; empty
+ *   when the argument isn't such a loop variable.
+ */
+function loopItems(target: Node, qualify: Qualify): (string | null)[] {
+  if (target.type !== "identifier") {
+    return [];
+  }
+  const name = identifierName(target);
+  for (let at = target.parent; at !== null; at = at.parent) {
+    const left = at.type === "for_statement" ? at.childForFieldName("left") : null;
+    const right = at.childForFieldName("right");
+    if (left?.type === "identifier" && identifierName(left) === name) {
+      const literal = right?.type === "list" || right?.type === "tuple";
+      return literal ? namedChildren(right).map((item) => qualify(item)) : [];
+    }
+  }
+  return [];
 }

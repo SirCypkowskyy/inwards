@@ -131,7 +131,7 @@ async function checkEdit(
     lookups,
     start,
     check,
-    await deps.check(configPath, [target.file], target.cwd, { required: true }),
+    await deps.check(configPath, [target.file], target.cwd, { required: true, edit: true }),
   );
   const existed = lookups.identity.existedAtStart(target.project, start, check, target.file);
   const errors = report.diagnostics.filter(
