@@ -54,6 +54,8 @@ export interface UnresolvedInclude {
 /** The graph while it is built: what was found and resolved so far, and how to resolve. */
 interface Building {
   readonly nodes: Map<string, { object: FastApiObject; file: FastApiFile; ops: PathOperation[] }>;
+  /** The file each path operation is declared in. */
+  readonly declared: Map<PathOperation, FastApiFile>;
   readonly edges: GraphEdge[];
   readonly unresolved: UnresolvedInclude[];
   /** Each qualified name looked up so far, and the node it names or null. */
@@ -75,6 +77,7 @@ export class WiringGraph {
   readonly unresolved: readonly UnresolvedInclude[];
   private readonly out = new Map<string, GraphEdge[]>();
   private readonly in = new Map<string, GraphEdge[]>();
+  private readonly declared: ReadonlyMap<PathOperation, FastApiFile>;
 
   /**
    * Stores the parts and indexes the edges by both ends.
@@ -82,15 +85,18 @@ export class WiringGraph {
    * @param nodes - apps and routers by qualified name.
    * @param edges - the resolved calls.
    * @param unresolved - the inclusions that couldn't be followed.
+   * @param declared - the file each path operation of a node is declared in.
    */
   private constructor(
     nodes: ReadonlyMap<string, GraphNode>,
     edges: readonly GraphEdge[],
     unresolved: readonly UnresolvedInclude[],
+    declared: ReadonlyMap<PathOperation, FastApiFile>,
   ) {
     this.nodes = nodes;
     this.edges = edges;
     this.unresolved = unresolved;
+    this.declared = declared;
     for (const edge of edges) {
       if (edge.from !== null) {
         this.out.set(edge.from, [...(this.out.get(edge.from) ?? []), edge]);
@@ -123,6 +129,7 @@ export class WiringGraph {
       edges: [],
       unresolved: [],
       named: new Map(),
+      declared: new Map(),
       model,
       ownerOf,
     };
@@ -134,6 +141,7 @@ export class WiringGraph {
     for (const file of sorted) {
       for (const op of file.operations) {
         building.nodes.get(nameOf(building, op.receiver) ?? "")?.ops.push(op);
+        building.declared.set(op, file);
       }
       for (const wiring of file.wiring) {
         addWiring(building, wiring, file);
@@ -146,7 +154,18 @@ export class WiringGraph {
         { object, file, operations: ops },
       ]),
     );
-    return new WiringGraph(nodes, edges, unresolved);
+    return new WiringGraph(nodes, edges, unresolved, building.declared);
+  }
+
+  /**
+   * Finds the file a node's path operation is declared in, which may not be
+   * the file that builds the node (`@app.get` in a module that imports `app`).
+   *
+   * @param op - one of a node's `operations`.
+   * @returns its file, or undefined for an operation the graph wasn't built from.
+   */
+  fileOf(op: PathOperation): FastApiFile | undefined {
+    return this.declared.get(op);
   }
 
   /**

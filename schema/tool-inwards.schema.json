@@ -183,7 +183,8 @@
         "INW011",
         "FAPI001",
         "FAPI002",
-        "FAPI003"
+        "FAPI003",
+        "FAPI005"
       ]
     },
     "layer": {
@@ -441,6 +442,9 @@
         },
         "router-wiring": {
           "$ref": "#/definitions/routerWiringOptions"
+        },
+        "route-shadowing": {
+          "$ref": "#/definitions/ruleOptions"
         }
       }
     },

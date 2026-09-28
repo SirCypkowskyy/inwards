@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 4661b988821e7b94ca9fabfeb45a187cb39d96822a5c4c81137d3778d0ed7e75
+source_hash: f71ec90b0eb85d5079a07f16822cb798992e48b17e3a21a52ff687d1ed75c34a
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -364,8 +364,9 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI w schemacie bez metadanych OpenAPI, których wymaga projekt: podsumowania albo docstringu, modelu odpowiedzi, jawnego kodu statusu dla `POST` i `DELETE`, pola `description` w każdym wpisie `responses=`, a opcjonalnie tagów i `operation_id`. Jedna diagnostyka na endpoint, na dekoratorze | :white_check_mark: |
 | FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI: rzucony albo zwrócony w endpoincie, w funkcjach pomocniczych i zależnościach z tego samego pliku albo importowanych, do `max-depth` wywołań, albo z własnego wyjątku, który handler aplikacji zamienia na kod. Liczą się deklaracje na dekoratorze, routerze, dołączeniach nad nim i aplikacji; wszystko, czego Inwards nie umie odczytać, ucisza regułę | :white_check_mark: |
 | FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :white_check_mark: |
+| FAPI005 | `route-shadowing` | Opt-in. Operacja ścieżki, która nigdy się nie wykona, bo wcześniejsza trasa z tą samą metodą pasuje do jej ścieżki albo ma tę samą ścieżkę. Trasy na jednym routerze w jednym pliku są porównywane po własnych ścieżkach, także w hooku edycji; trasy każdej aplikacji są porównywane po pełnych ścieżkach (`rules/fastapi/routes.ts` przechodzi graf i łączy prefiksy będące literałami) w pełnych i częściowych przebiegach. Ścieżka albo prefiks niebędący literałem wyłącza trasę z porównania | :white_check_mark: |
 
-Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI005–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
+Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI006–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
 
 ## Mapa kodu { #code-map }
 
@@ -405,10 +406,12 @@ src/
 │   │   │                                #   handlers, resolved across files), graph.ts (app and router
 │   │   │                                #   graph), router-wiring.ts (FAPI003), endpoint-metadata.ts
 │   │   │                                #   (FAPI001), undocumented-error-response.ts with
-│   │   │                                #   error-codes.ts and placement.ts (FAPI002)
+│   │   │                                #   error-codes.ts and placement.ts (FAPI002), routes.ts
+│   │   │                                #   (each app's routes in match order), route-shadowing.ts
+│   │   │                                #   (FAPI005)
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
-│   │   │                  #   router-wiring.ts runs FAPI003 when it is on
+│   │   │                  #   fastapi.ts runs the FAPI rules that are on
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts

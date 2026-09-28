@@ -47,7 +47,8 @@ type RuleCode =
   | "INW011"
   | "FAPI001"
   | "FAPI002"
-  | "FAPI003";
+  | "FAPI003"
+  | "FAPI005";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -187,6 +188,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Every APIRouter with routes is included in an app, and no routers include each other in a cycle.",
     docs: page("FAPI003"),
+  },
+  FAPI005: {
+    code: "FAPI005",
+    name: "route-shadowing",
+    severity: "error",
+    default: "off",
+    summary:
+      "No FastAPI path operation is unreachable behind an earlier route with the same method that matches its path.",
+    docs: page("FAPI005"),
   },
 };
 
