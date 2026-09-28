@@ -336,9 +336,10 @@ export async function runCheck(
       ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
       ...checkLinks(project.config, {
         links: linksUnder(
+          io.probe,
           layerLinks(io, project.configPath, project.config),
           project.lexicalRoot,
-          project.realRoot,
+          project.config,
         ),
         modules,
         shownRoot,

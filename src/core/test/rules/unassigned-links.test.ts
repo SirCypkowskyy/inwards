@@ -18,6 +18,18 @@ layers = [
 const MODULES = new Set(["shop.domain.order", "shop.infrastructure.db", "vendor.ext.leak"]);
 
 /**
+ * Builds a link as the adapter reports it.
+ *
+ * @param path - where the link is, relative to the config root.
+ * @param target - its target, root-relative, or undefined outside the root.
+ * @param real - its real target; by default the target, or an outside directory.
+ * @returns the link record `checkLinks` takes.
+ */
+function link(path: string, target: string | undefined, real = target ?? "/outside"): LayerLink {
+  return { path, target, real };
+}
+
+/**
  * Checks links against the two-layer config, outside a session.
  *
  * @param links - the links, root-relative.
@@ -30,7 +42,7 @@ function messages(...links: LayerLink[]): string[] {
 describe("INW006 symlinks in layers", () => {
   test("a link out of the root hides code: an error at the link (#83)", () => {
     const [d, ...rest] = checkLinks(CONFIG, {
-      links: [{ path: "shop/domain/ext", target: undefined }],
+      links: [link("shop/domain/ext", undefined)],
       modules: MODULES,
       shownRoot: "src",
     });
@@ -51,7 +63,7 @@ describe("INW006 symlinks in layers", () => {
     ["the package above the layers", "shop/domain/up", "shop", '"shop"'],
     ["the root", "shop/domain/top", "", "the config root"],
   ])("a link into %s crosses layers under the domain's name (#84)", (_, path, target, named) => {
-    const [message, ...rest] = messages({ path, target });
+    const [message, ...rest] = messages(link(path, target));
     expect(rest).toEqual([]);
     expect(message).toContain(`symlink to ${named}`);
   });
@@ -61,13 +73,13 @@ describe("INW006 symlinks in layers", () => {
     ["into code outside every layer (checked under the link's name)", "shop/domain/sub", "vendor"],
     ["outside every layer", "shop/misc", "shop/infrastructure"],
   ])("a link %s is fine", (_, path, target) => {
-    expect(messages({ path, target })).toEqual([]);
+    expect(messages(link(path, target))).toEqual([]);
   });
 
   test("[tool.inwards.rules] applies outside a session, not in one", () => {
     const off = { ...CONFIG, rules: { ignore: ["INW006"] } };
     const now = {
-      links: [{ path: "shop/domain/ext", target: undefined }],
+      links: [link("shop/domain/ext", undefined)],
       modules: MODULES,
       shownRoot: "",
     };
@@ -76,11 +88,51 @@ describe("INW006 symlinks in layers", () => {
   });
 
   test("in a session, only links new since the start are reported, a retargeted one included", () => {
-    const ext = { path: "shop/domain/ext", target: undefined };
-    const alias = { path: "shop/domain/alias", target: "shop/domain/real" };
+    const ext = link("shop/domain/ext", undefined);
+    const alias = link("shop/domain/alias", "shop/domain/real");
     const start = { links: [ext, alias], modules: MODULES, shownRoot: "" };
     expect(checkLinks(CONFIG, start, start)).toEqual([]);
-    const moved = { ...start, links: [ext, { ...alias, target: "shop/infrastructure" }] };
+    const moved = { ...start, links: [ext, link("shop/domain/alias", "shop/infrastructure")] };
     expect(checkLinks(CONFIG, moved, start).map((d) => d.file)).toEqual(["shop/domain/alias"]);
+  });
+
+  test("in a session, a link moved from one outside directory to another is new", () => {
+    const start = {
+      links: [link("shop/domain/ext", undefined, "/a")],
+      modules: MODULES,
+      shownRoot: "",
+    };
+    const moved = { ...start, links: [link("shop/domain/ext", undefined, "/b")] };
+    expect(checkLinks(CONFIG, moved, start)).toHaveLength(1);
+  });
+
+  test("a link above the layers is reported only when it leaves the root", () => {
+    const slices = parseConfig(`[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.*.domain"] },
+  { name = "infrastructure", modules = ["shop.*.infrastructure"] },
+]
+`);
+    /**
+     * Builds the links of a project with one link above the layers, `shop/payments`.
+     *
+     * @param target - where it points, root-relative, or undefined outside the root.
+     * @returns the tree to check.
+     */
+    function tree(target: string | undefined): Parameters<typeof checkLinks>[1] {
+      return {
+        links: [link("shop/payments", target)],
+        modules: new Set(["shop.orders.domain.order"]),
+        shownRoot: "",
+      };
+    }
+    const [d, ...rest] = checkLinks(slices, tree(undefined));
+    expect(rest).toEqual([]);
+    expect(d?.message).toContain('"shop.payments", where layer entries can match,');
+    // In the root, the walk names the code behind it by the link, which the layers own.
+    expect(checkLinks(slices, tree("shop/orders"))).toEqual([]);
+    expect(checkLinks(slices, { ...tree(undefined), links: [link("tools/x", undefined)] })).toEqual(
+      [],
+    );
   });
 });

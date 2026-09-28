@@ -69,7 +69,7 @@ test("lists the importable links below a directory without following them", () =
   symlinkSync(join(root, "gone"), join(root, "domain/dangling"));
   symlinkSync(outside, join(root, "domain/.hidden"));
   const found = nodeFileWalker
-    .links(root)
+    .links(root, realpathSync(root))
     .map(({ path, target }) => [relative(root, path).split(sep).join("/"), target])
     .sort();
   expect(found).toEqual([

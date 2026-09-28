@@ -90,17 +90,16 @@ export function newLayoutErrors(
     const emptied = checkPrefixes(config, isSet, file, wasSet).filter(
       (d) => d.severity === "error" && !atStart.has(d.message),
     );
-    const realRoot = links.probe.realpath(root) ?? root;
     const shownRoot = posix(relative(project, root));
     const linked = checkLinks(
       config,
       {
-        links: linksUnder(absolute(project, links.now), root, realRoot),
+        links: linksUnder(links.probe, absolute(project, links.now), root, config),
         modules: isSet,
         shownRoot,
       },
       {
-        links: linksUnder(absolute(project, links.before ?? {}), root, realRoot),
+        links: linksUnder(links.probe, absolute(project, links.before ?? {}), root, config),
         modules: wasSet,
         shownRoot,
       },

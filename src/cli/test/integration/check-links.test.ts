@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { inwards, LAYERS, project } from "../support/run.ts";
+import { inwards, LAYERS, project, SLICES } from "../support/run.ts";
 import { tempDir } from "../support/temp.ts";
 
 const WINDOWS = process.platform === "win32";
@@ -99,5 +99,48 @@ describe.skipIf(WINDOWS)("inwards check: symlinks in layers", () => {
     const report: { diagnostics: { file: string; message: string }[] } = JSON.parse(stdout);
     const link = report.diagnostics.find((d) => d.file === "pyroot/core");
     expect(link?.message).toStartWith('pyroot/core is a symlink out of root "pyroot"');
+  });
+
+  test("a chain through code outside every layer is followed (review P2-1)", () => {
+    const root = project({
+      "pyproject.toml": LAYERS,
+      "shop/domain/order.py": "from shop.domain.a.y import db\n",
+      "shop/misc/__init__.py": "",
+      "shop/infrastructure/db.py": "X = 1\n",
+      "lib/__init__.py": "",
+    });
+    symlinkSync("../misc", join(root, "shop/domain/a"), "dir");
+    symlinkSync("../infrastructure", join(root, "shop/misc/y"), "dir");
+    symlinkSync("../../lib", join(root, "shop/domain/b"), "dir");
+    symlinkSync(outsideLeak(), join(root, "lib/ext"), "dir");
+    expect(check(root).found).toEqual([
+      { code: "INW006", file: "shop/domain/a/y" },
+      { code: "INW006", file: "shop/domain/b/ext" },
+    ]);
+  });
+
+  test("a target under a linked layer package is named as Python imports it (review P2-2)", () => {
+    // Not LAYERS itself: project() would add a real shop/infrastructure.
+    const root = project({
+      "pyproject.toml": `${LAYERS}\n`,
+      "packages/shop/domain/order.py": "from shop.domain.alias import db\n",
+      "packages/shop/infrastructure/db.py": "X = 1\n",
+    });
+    symlinkSync("packages/shop", join(root, "shop"), "dir");
+    symlinkSync("../infrastructure", join(root, "packages/shop/domain/alias"), "dir");
+    expect(check(root).found).toEqual([{ code: "INW006", file: "shop/domain/alias" }]);
+  });
+
+  test("a new slice linked out of the root is reported (review P2-3)", () => {
+    const outside = tempDir("inwards-outside-");
+    mkdirSync(join(outside, "domain"));
+    writeFileSync(join(outside, "domain/svc.py"), "import shop.orders.infrastructure.db\n");
+    const root = project({
+      "pyproject.toml": SLICES,
+      "shop/orders/domain/order.py": "X = 1\n",
+      "shop/orders/infrastructure/db.py": "X = 1\n",
+    });
+    symlinkSync(outside, join(root, "shop/payments"), "dir");
+    expect(check(root).found).toEqual([{ code: "INW006", file: "shop/payments" }]);
   });
 });
