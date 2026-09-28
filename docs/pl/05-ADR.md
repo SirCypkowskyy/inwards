@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 668f88d50844c162cc462efc19a98784e2c1d1c3f0c4b5286f0c583141499d3e
+source_hash: dfa7f418ac428922411b7fb19850f6bf70d78b3f252c85ea7417609e28a2f6cd
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -41,6 +41,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :white_check_mark: Przyjęty |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :white_check_mark: Przyjęty |
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :white_check_mark: Przyjęty |
+| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -875,3 +876,32 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Punkt wejścia `inwards hook opencode`, który czyta kształty OpenCode:* tłumaczenie przeszłoby do przetestowanego CLI, ale dodałoby drugi kontrakt ładunków dla API pluginów, które wciąż się zmienia. Tłumaczenie jest małe; może się przenieść później.
 - *Plugin, który implementuje sprawdzenia na nowo w JavaScripcie:* bez procesu na każde zdarzenie, ale z dwiema implementacjami każdej reguły i strażnika.
 - *Blokowanie końca tury przez `chat.message` albo uprawnienia:* żadne z nich nie działa przy końcu tury; `session.idle` to jedyny punkt, a przychodzi po turze.
+
+## ADR-035: `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją { #adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config }
+
+**Stan:** Przyjęty · 2026-09-28 · [#57](https://github.com/SirCypkowskyy/inwards/issues/57)
+
+**Kontekst.** Konfiguracja ma jeden `root`, a nazwy modułów to ścieżki poniżej niego. Workspace uv trzyma pakiet każdego członka w jego własnym `src/` (qv-lite: 7 członków, `src/packages/core/src/qv_core`), więc konfiguracja w katalogu głównym workspace'u nazywa pakiet `packages.core.src.qv_core`, podczas gdy inni członkowie importują `qv_core`, i te importy przechodzą jako importy bibliotek zewnętrznych ([#201](https://github.com/SirCypkowskyy/inwards/issues/201)). Działało jedno `[tool.inwards]` na członka i pętla w powłoce z `inwards check --config <member>/pyproject.toml`. Hooki już wybierają najbliższą konfigurację dla każdego pliku i zapisują każdą konfigurację na starcie sesji. [ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) postanowił, że monorepo idzie za workspace'ami uv. Członkowie współdzielą też niejawne pakiety przestrzeni nazw (`acme.core` w jednym członku, `acme.api` w innym), które Python scala z obu.
+
+**Decyzja.**
+
+- **Członkowie pochodzą z uv, konfiguracje zostają przy członkach.** `inwards check` bez `--config` czyta `[tool.uv.workspace]` (`members` minus `exclude`, `*` wewnątrz segmentu) z najbliższego katalogu głównego workspace'u w katalogu roboczym lub nad nim. Uruchomiony tam, gdzie poniżej leżą członkowie z `[tool.inwards]`, sprawdza każdego z nich jego własną konfiguracją i baseline'em; najbliższa konfiguracja w katalogu głównym workspace'u lub poniżej sprawdza resztę z pominięciem katalogów tych członków. Członek bez `[tool.inwards]` trafia na listę niesprawdzonych. Nie ma nowego klucza konfiguracji ani flagi `--workspace`.
+- **Wskazane ścieżki trafiają do najbliższej konfiguracji.** Każda ścieżka jest sprawdzana najbliższą konfiguracją nad nią, a katalog zawierający członków z konfiguracją także ich konfiguracjami. `--config` znaczy to, co dotąd: jedna konfiguracja dla wszystkiego.
+- **Jeden raport.** Raporty łączą się w jeden: jeden dokument JSON albo SARIF, ścieżki względne wobec katalogu roboczego, liczniki zsumowane. Wyjście text i concise kończy się wierszem na każdą konfigurację. Kod wyjścia to najgorszy z kodów; niepoprawna konfiguracja członka daje kod 2, a pozostali członkowie są nadal sprawdzani.
+- **Pakiety przestrzeni nazw zaglądają do innych członków.** Importy względne już wcześniej były rozwiązywane po nazwie tak jak w Pythonie. Błędne było istnienie: INW010 zgłaszał moduł, którego brakuje w tym członku, a który ma część pakietu przestrzeni nazw u innego członka. CLI daje teraz silnikowi przez `ProjectFiles` sondę `portions` katalogów importu pozostałych członków (`src/`, a bez niego katalog członka), a INW010 przepuszcza brakujący moduł, gdy jego pakiet jest tu pakietem przestrzeni nazw od pakietu najwyższego poziomu w dół i ma go któraś z części.
+- **Hooki zachowują to, co miały,** z jednym dodatkiem: strażnik konfiguracji chroni `[tool.inwards]` i baseline członka także wtedy, gdy nie istnieje jeszcze ani stan sesji, ani konfiguracja w katalogu głównym.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Pętla z qv-lite staje się jednym `inwards check` w katalogu głównym workspace'u, a lista członków zostaje w jednym miejscu, które czyta uv.
+- :material-plus-circle-outline: Konfiguracja w katalogu głównym i konfiguracje członków mogą współistnieć bez sprawdzania pliku dwa razy, a ostrzeżenie z #201 nadal pojawia się dla członka bez własnej konfiguracji.
+- :material-minus-circle-outline: Wykrywane są tylko workspace'y uv. Monorepo bez `[tool.uv.workspace]` nadal potrzebuje wskazanych ścieżek albo osobnego uruchomienia na konfigurację.
+- :material-minus-circle-outline: `inwards baseline` nadal bierze jedną konfigurację na uruchomienie, a serwer języka nadal czyta jedną konfigurację (jego ograniczenie do pierwszego folderu obszaru roboczego jest śledzone osobno) i nie szuka części pakietów przestrzeni nazw u innych członków.
+- :material-minus-circle-outline: Katalog importu członka jest zgadywany (`src/`, a bez niego katalog członka), a nie czytany z jego `root`, a część pakietu spoza workspace'u (zainstalowana dystrybucja) jest nadal zgłaszana ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)).
+
+**Alternatywy.**
+
+- *Kilka katalogów głównych w jednej konfiguracji* (`roots = [...]`): jedna mapa warstw dla wszystkich członków, ale lista członków powtarzałaby to, co uv już ma, a warstwy zwykle różnią się między członkami.
+- *Przeszukiwanie drzewa w poszukiwaniu każdego zagnieżdżonego `pyproject.toml` z `[tool.inwards]`:* obejmuje monorepo bez uv, ale kosztuje przejście drzewa przy każdym uruchomieniu i nie wie, które katalogi należą do siebie.
+- *Flaga `--workspace`:* jawna, ale uruchomienie w katalogu głównym workspace'u już to mówi, a dawne zachowanie w tym miejscu (jedna konfiguracja indeksująca członków po ścieżce) było fałszywą zielenią, przed którą ostrzega #201.
+- *Pomijanie INW010 pod każdym pakietem przestrzeni nazw:* prostsze, ale zmyślony moduł w pakiecie przestrzeni nazw przechodziłby po cichu w każdym projekcie bez `__init__.py`.

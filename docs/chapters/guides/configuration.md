@@ -1,6 +1,6 @@
 # Configuration reference { #configuration-reference }
 
-Inwards reads the `[tool.inwards]` table of the nearest `pyproject.toml`, walking up from the working directory, or the file `--config` names. This page lists every key: its type, its default, and an example. Chapter 1 shows [a whole config](../01-Introduction.md#what-inwards-does); [ADR-005](../05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml) says why it lives in `pyproject.toml`.
+Inwards reads the `[tool.inwards]` table of the nearest `pyproject.toml`, walking up from the working directory, or the file `--config` names. At a uv workspace root it reads each member's own table instead ([Monorepos and uv workspaces](#monorepos)). This page lists every key: its type, its default, and an example. Chapter 1 shows [a whole config](../01-Introduction.md#what-inwards-does); [ADR-005](../05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml) says why it lives in `pyproject.toml`.
 
 A complete config needs only `layers`:
 
@@ -48,7 +48,7 @@ Type: string. Default: `"."`.
 
 The directory, relative to `pyproject.toml`, that module names are computed from. With `root = "src"`, `src/shop/domain/order.py` is the module `shop.domain.order`.
 
-One config has one root. In a uv workspace whose members each have their own `src/` (`src/packages/core/src/core`), a config at the workspace root names that package `packages.core.src.core`, and other members' `import core` passes as a third-party import. `inwards check` warns about each such member ([INW006](../rules/INW006.md)); give each member its own `[tool.inwards]` and check it with `--config <member>/pyproject.toml` until [#57](https://github.com/SirCypkowskyy/inwards/issues/57) lands.
+One config has one root. In a uv workspace whose members each have their own `src/` (`src/packages/core/src/core`), give each member its own `[tool.inwards]`: `inwards check` at the workspace root then checks every member with its own config ([Monorepos and uv workspaces](#monorepos)). A single config at the workspace root would name that package `packages.core.src.core`, and other members' `import core` would pass as a third-party import, so `inwards check` warns about each member it indexes that way ([INW006](../rules/INW006.md)).
 
 ### `layers` { #layers }
 
@@ -184,3 +184,48 @@ Which import cycles [INW004](../rules/INW004.md) reports on whole-project runs: 
 [tool.inwards]
 cycles = ["modules", "contexts"]
 ```
+
+## Monorepos and uv workspaces { #monorepos }
+
+Inwards follows [uv workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/): the member list lives in `[tool.uv.workspace]` at the workspace root, and each member keeps its own `[tool.inwards]` in its own `pyproject.toml`. There is no Inwards key for it ([ADR-035](../05-ADR.md#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config)).
+
+```toml
+# pyproject.toml at the workspace root
+[tool.uv.workspace]
+members = ["packages/*"]
+```
+
+```toml
+# packages/core/pyproject.toml
+[project]
+name = "acme-core"
+
+[tool.inwards]
+root = "src"
+layers = [
+  { name = "domain", modules = ["acme.core.domain"] },
+  { name = "services", modules = ["acme.core.services"] },
+]
+```
+
+Without `--config`, `inwards check` picks the configs like this:
+
+- **At the workspace root** (or any directory that holds members), it checks every member below it that has `[tool.inwards]`, each against its own config and its own baseline. A config at the workspace root itself checks the rest of the tree, with those members' directories left out, so no file is checked twice. A member without `[tool.inwards]` is listed as not checked. A config above the workspace root belongs to another project and isn't used.
+- **Inside a member**, it uses the nearest config, as it does outside a workspace.
+- **With paths**, each path goes to the nearest config above it, and a directory that holds configured members goes to each of theirs too. `inwards check packages/api/src packages/core/src/acme/core/domain/order.py` checks the first against `packages/api`'s config and the second against `packages/core`'s. A path with no config above it is reported as not checked.
+- **`--config`** checks every path against that one config, as before.
+
+Members come from `members` less `exclude`, with `*` matching inside one path segment (`packages/*`, `libs/acme_*`); `**`, `?` and character classes match nothing.
+
+The output is one report: JSON and SARIF are one document, and paths are relative to the working directory. Text and concise output end with a line per config. The exit code is the worst of the configs': 1 when any member has an error, 2 when a member's config is invalid (the other members are still checked and reported). The [fixture the tests use](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/workspace), checked from its root:
+
+```text
+warning: packages/tools has no [tool.inwards] table, so it was not checked.
+All clear: 6 files, 0 violations (114.8 ms).
+packages/api/pyproject.toml: 2 files, 0 violations, 0 warnings
+packages/core/pyproject.toml: 4 files, 0 violations, 0 warnings
+```
+
+Members often share an implicit namespace package: `packages/core/src/acme/core` and `packages/api/src/acme/api`, with no `acme/__init__.py`. Python merges `acme` from both members, and Inwards names the modules the same way, so a relative import such as `from ..core import model` means `acme.core.model` in either member. When a module under such a package is missing from the member being checked, [INW010](../rules/INW010.md) looks for it in the other members (their `src/`, else the member directory) before reporting it.
+
+The Claude Code hooks need nothing more: each edited file is checked against the nearest config recorded at session start, the Stop gate checks each changed file against its own member's config, and the config guard protects every member's `[tool.inwards]` and baseline. `inwards baseline` still takes one config per run: `inwards baseline --config packages/core/pyproject.toml`.

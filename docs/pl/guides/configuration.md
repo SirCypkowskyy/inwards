@@ -1,11 +1,11 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: bd93f7a3ddcc33011a425df36a96eaa9656def22772cf9d98e7621c9ab3556a3
+source_hash: fb5de2a86bd2ed83edeac066fceec43244ef3080a5c963c120751f2ec5b38413
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
 
-Inwards czyta tabelę `[tool.inwards]` z najbliższego pliku `pyproject.toml`, idąc w górę od katalogu roboczego, albo z pliku wskazanego przez `--config`. Ta strona wymienia każdy klucz: jego typ, wartość domyślną i przykład. Rozdział 1 pokazuje [całą konfigurację](../01-Introduction.md#what-inwards-does); [ADR-005](../05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml) wyjaśnia, dlaczego mieszka ona w `pyproject.toml`.
+Inwards czyta tabelę `[tool.inwards]` z najbliższego pliku `pyproject.toml`, idąc w górę od katalogu roboczego, albo z pliku wskazanego przez `--config`. W katalogu głównym workspace'u uv czyta zamiast tego własną tabelę każdego członka ([Monorepo i workspace'y uv](#monorepos)). Ta strona wymienia każdy klucz: jego typ, wartość domyślną i przykład. Rozdział 1 pokazuje [całą konfigurację](../01-Introduction.md#what-inwards-does); [ADR-005](../05-ADR.md#adr-005-configuration-lives-in-pyprojecttoml) wyjaśnia, dlaczego mieszka ona w `pyproject.toml`.
 
 Pełna konfiguracja potrzebuje tylko `layers`:
 
@@ -53,7 +53,7 @@ Typ: tekst. Domyślnie: `"."`.
 
 Katalog, względem `pyproject.toml`, od którego liczone są nazwy modułów. Przy `root = "src"` plik `src/shop/domain/order.py` to moduł `shop.domain.order`.
 
-Jedna konfiguracja ma jeden root. W workspace'ie uv, którego członkowie mają własne `src/` (`src/packages/core/src/core`), konfiguracja w katalogu głównym workspace'u nazywa ten pakiet `packages.core.src.core`, a `import core` w innych członkach przechodzi jako import biblioteki zewnętrznej. `inwards check` ostrzega o każdym takim członku ([INW006](../rules/INW006.md)); daj każdemu członkowi własne `[tool.inwards]` i sprawdzaj go przez `--config <member>/pyproject.toml`, dopóki nie wejdzie [#57](https://github.com/SirCypkowskyy/inwards/issues/57).
+Jedna konfiguracja ma jeden root. W workspace'ie uv, którego członkowie mają własne `src/` (`src/packages/core/src/core`), daj każdemu członkowi własne `[tool.inwards]`: `inwards check` w katalogu głównym workspace'u sprawdzi wtedy każdego członka jego własną konfiguracją ([Monorepo i workspace'y uv](#monorepos)). Pojedyncza konfiguracja w katalogu głównym workspace'u nazwałaby ten pakiet `packages.core.src.core`, a `import core` w innych członkach przeszedłby jako import biblioteki zewnętrznej, więc `inwards check` ostrzega o każdym członku zindeksowanym w ten sposób ([INW006](../rules/INW006.md)).
 
 ### `layers` { #layers }
 
@@ -189,3 +189,48 @@ Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu ca
 [tool.inwards]
 cycles = ["modules", "contexts"]
 ```
+
+## Monorepo i workspace'y uv { #monorepos }
+
+Inwards idzie za [workspace'ami uv](https://docs.astral.sh/uv/concepts/projects/workspaces/): lista członków mieszka w `[tool.uv.workspace]` w katalogu głównym workspace'u, a każdy członek ma własne `[tool.inwards]` we własnym `pyproject.toml`. Inwards nie ma do tego własnego klucza ([ADR-035](../05-ADR.md#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config)).
+
+```toml
+# pyproject.toml w katalogu głównym workspace'u
+[tool.uv.workspace]
+members = ["packages/*"]
+```
+
+```toml
+# packages/core/pyproject.toml
+[project]
+name = "acme-core"
+
+[tool.inwards]
+root = "src"
+layers = [
+  { name = "domain", modules = ["acme.core.domain"] },
+  { name = "services", modules = ["acme.core.services"] },
+]
+```
+
+Bez `--config` `inwards check` wybiera konfiguracje tak:
+
+- **W katalogu głównym workspace'u** (albo w dowolnym katalogu, który zawiera członków) sprawdza każdego członka poniżej, który ma `[tool.inwards]`, jego własną konfiguracją i jego własnym baseline'em. Konfiguracja w samym katalogu głównym workspace'u sprawdza resztę drzewa z pominięciem katalogów tych członków, więc żaden plik nie jest sprawdzany dwa razy. Członek bez `[tool.inwards]` trafia na listę niesprawdzonych. Konfiguracja powyżej katalogu głównego workspace'u należy do innego projektu i nie jest używana.
+- **Wewnątrz członka** używa najbliższej konfiguracji, tak jak poza workspace'em.
+- **Ze ścieżkami** każda ścieżka trafia do najbliższej konfiguracji nad nią, a katalog zawierający członków z konfiguracją trafia też do każdej z ich konfiguracji. `inwards check packages/api/src packages/core/src/acme/core/domain/order.py` sprawdza pierwszą ścieżkę konfiguracją `packages/api`, a drugą konfiguracją `packages/core`. Ścieżka bez konfiguracji nad nią jest zgłaszana jako niesprawdzona.
+- **`--config`** sprawdza każdą ścieżkę tą jedną konfiguracją, jak dotąd.
+
+Członkowie to `members` minus `exclude`, a `*` pasuje wewnątrz jednego segmentu ścieżki (`packages/*`, `libs/acme_*`); `**`, `?` i klasy znaków nie pasują do niczego.
+
+Wynikiem jest jeden raport: JSON i SARIF to jeden dokument, a ścieżki są względne wobec katalogu roboczego. Wyjście text i concise kończy się wierszem na każdą konfigurację. Kod wyjścia to najgorszy z kodów konfiguracji: 1, gdy którykolwiek członek ma błąd, 2, gdy konfiguracja członka jest niepoprawna (pozostali członkowie są nadal sprawdzani i raportowani). [Fixture używany w testach](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/workspace), sprawdzony z katalogu głównego:
+
+```text
+warning: packages/tools has no [tool.inwards] table, so it was not checked.
+All clear: 6 files, 0 violations (114.8 ms).
+packages/api/pyproject.toml: 2 files, 0 violations, 0 warnings
+packages/core/pyproject.toml: 4 files, 0 violations, 0 warnings
+```
+
+Członkowie często współdzielą niejawny pakiet przestrzeni nazw: `packages/core/src/acme/core` i `packages/api/src/acme/api`, bez `acme/__init__.py`. Python scala `acme` z obu członków, a Inwards nazywa moduły tak samo, więc import względny taki jak `from ..core import model` oznacza `acme.core.model` w każdym z nich. Gdy modułu pod takim pakietem brakuje w sprawdzanym członku, [INW010](../rules/INW010.md) szuka go u pozostałych członków (w ich `src/`, a bez niego w katalogu członka), zanim go zgłosi.
+
+Hooki Claude Code nie potrzebują niczego więcej: każdy edytowany plik jest sprawdzany najbliższą konfiguracją zapisaną na starcie sesji, Stop gate sprawdza każdy zmieniony plik konfiguracją jego członka, a strażnik konfiguracji chroni `[tool.inwards]` i baseline każdego członka. `inwards baseline` nadal bierze jedną konfigurację na uruchomienie: `inwards baseline --config packages/core/pyproject.toml`.

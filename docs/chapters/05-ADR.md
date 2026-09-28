@@ -36,6 +36,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
+| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -870,3 +871,32 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *An `inwards hook opencode` entry point that reads OpenCode's shapes:* the translation would move into the tested CLI, but it would add a second payload contract for a plugin API that is still changing. The translation is small; it can move later.
 - *A plugin that reimplements the checks in JavaScript:* no process per event, but two implementations of every rule and of the guard.
 - *Blocking the end of a turn through `chat.message` or permissions:* neither runs when a turn ends; `session.idle` is the only point, and it comes after the turn.
+
+## ADR-035: `inwards check` follows uv workspace members, each with its own config
+
+**Status:** Accepted · 2026-09-28 · [#57](https://github.com/SirCypkowskyy/inwards/issues/57)
+
+**Context.** A config has one `root`, and module names are paths below it. A uv workspace puts each member's package under its own `src/` (qv-lite: 7 members, `src/packages/core/src/qv_core`), so a config at the workspace root names the package `packages.core.src.qv_core` while other members import `qv_core`, and those imports pass as third-party ([#201](https://github.com/SirCypkowskyy/inwards/issues/201)). What worked was one `[tool.inwards]` per member and a shell loop of `inwards check --config <member>/pyproject.toml`. The hooks already pick the nearest config per file and pin every config at session start. [ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) decided that monorepos follow uv workspaces. Members also share implicit namespace packages (`acme.core` in one member, `acme.api` in another), which Python merges from both.
+
+**Decision.**
+
+- **Members come from uv, configs stay per member.** `inwards check` without `--config` reads `[tool.uv.workspace]` (`members` less `exclude`, `*` inside a segment) from the nearest workspace root at or above the working directory. Run where members with `[tool.inwards]` lie below it, it checks each against its own config and baseline; the nearest config at or below the workspace root checks the rest with those member directories left out. A member without `[tool.inwards]` is listed as not checked. There is no new config key and no `--workspace` flag.
+- **Named paths go to their nearest config.** Each path is checked against the nearest config above it, and a directory that holds configured members against theirs too. `--config` keeps its meaning: one config for everything.
+- **One report.** The reports merge into one: one JSON or SARIF document, paths relative to the working directory, counts summed. Text and concise output end with a line per config. The exit code is the worst one; an invalid member config is exit 2, and the other members are still checked.
+- **Namespace packages look in the other members.** Relative imports already resolved by name as Python does. What was wrong was existence: INW010 reported a module missing from this member that another member's portion of the namespace package holds. The CLI now gives the engine a `portions` probe of the other members' import roots (`src/`, else the member directory) through `ProjectFiles`, and INW010 passes a missing module when its package here is a namespace package from the top-level package down and a portion holds it.
+- **The hooks keep what they had,** with one addition: the config guard also protects a member's `[tool.inwards]` and baseline when neither session state nor a root config exists yet.
+
+**Consequences.**
+
+- :material-plus-circle-outline: qv-lite's loop becomes `inwards check` at the workspace root, and the list of members stays in the one place uv reads.
+- :material-plus-circle-outline: A root config and member configs can live together without checking a file twice, and #201's warning still fires for a member that has no config of its own.
+- :material-minus-circle-outline: Only uv workspaces are discovered. A monorepo without `[tool.uv.workspace]` still needs named paths or a run per config.
+- :material-minus-circle-outline: `inwards baseline` still takes one config per run, and the language server still reads one config (its first-workspace-folder limit is tracked separately) and doesn't look in other members for namespace portions.
+- :material-minus-circle-outline: A member's import root is guessed (`src/`, else the member directory), not read from its `root`, and a portion outside the workspace (an installed distribution) is still reported ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)).
+
+**Alternatives.**
+
+- *Several roots in one config* (`roots = [...]`): one layer map for all members, but the member list would repeat what uv already has, and layers usually differ per member.
+- *A walk for every nested `pyproject.toml` with `[tool.inwards]`:* covers non-uv monorepos, but costs a tree walk per run and has no notion of which directories belong together.
+- *A `--workspace` flag:* explicit, but running at the workspace root already says it, and the old behaviour there (one config indexing members by path) was the false green #201 warns about.
+- *Skipping INW010 under every namespace package:* simpler, but a hallucinated module in a namespace package would pass silently in every project that omits `__init__.py`.
