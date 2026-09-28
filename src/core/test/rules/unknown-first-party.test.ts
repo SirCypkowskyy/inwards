@@ -233,6 +233,64 @@ describe("INW010 unknown-first-party", () => {
     expect(found.filter((d) => d.code === "INW010")).toEqual([]);
   });
 
+  describe("implicit namespace packages split across uv workspace members (#57)", () => {
+    // `shop` and `shop/domain` have no __init__.py here; another member holds `shop/domain/pricing.py`.
+    const here = new Map<string, "file" | "dir">([
+      ["shop", "dir"],
+      ["shop/domain", "dir"],
+      ["shop/domain/service.py", "file"],
+    ]);
+    const other = new Map<string, "file" | "dir">([
+      ["shop", "dir"],
+      ["shop/domain", "dir"],
+      ["shop/domain/pricing.py", "file"],
+    ]);
+
+    /**
+     * Checks a domain module against a disk and, optionally, another portion.
+     *
+     * @param src - Python source of `shop/domain/service.py`.
+     * @param disk - what is under the config root.
+     * @param portions - what the other member's import root holds, if any.
+     * @returns the modules INW010 reports as missing.
+     */
+    function missing(
+      src: string,
+      disk: ReadonlyMap<string, "file" | "dir">,
+      portions?: ReadonlyMap<string, "file" | "dir">,
+    ): string[] {
+      const project = engine.index({
+        kind: (rel: string): "file" | "dir" | undefined => disk.get(rel),
+        list: (): string[] => [],
+        read: (): string => "",
+        listDir: (): undefined => undefined,
+        ...(portions ? { portions: (rel: string) => portions.get(rel) } : {}),
+      });
+      return engine
+        .checkFile(file("shop/domain/service.py", src), project)
+        .filter((d) => d.code === "INW010")
+        .map((d) => d.message.split(" ")[0] ?? "");
+    }
+
+    test("a relative import of a module another portion holds passes", () => {
+      expect(missing("from .pricing import Discount\n", here, other)).toEqual([]);
+      expect(missing("from ..domain.pricing import Discount\n", here, other)).toEqual([]);
+      expect(missing("import shop.domain.pricing\n", here, other)).toEqual([]);
+    });
+
+    test("a module no portion holds is still reported", () => {
+      expect(missing("from .pricing import Discount\n", here)).toEqual(['"shop.domain.pricing"']);
+      expect(missing("from .taxes import Tax\n", here, other)).toEqual(['"shop.domain.taxes"']);
+    });
+
+    test("a regular package doesn't merge with other portions", () => {
+      const regular = new Map([...here, ["shop/domain/__init__.py", "file" as const]]);
+      expect(missing("from .pricing import Discount\n", regular, other)).toEqual([
+        '"shop.domain.pricing"',
+      ]);
+    });
+  });
+
   test("imports in functions and behind try/except ImportError are checked too", () => {
     const src = [
       "def f():",

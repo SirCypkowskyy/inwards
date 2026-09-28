@@ -42,6 +42,8 @@ interface Unknown {
  * that climbs above the top-level package (an empty target, see `ImportRef`)
  * is always flagged: Python raises on it. A missing module that a
  * `generated` pattern covers passes, and so reaches INW006 like one that exists.
+ * So does one under an implicit namespace package that another portion of
+ * it holds, such as another uv workspace member's `src` (#57).
  *
  * @param file - the file the imports come from.
  * @param imports - its static imports.
@@ -67,7 +69,8 @@ export function checkUnknownImports(
       owner !== undefined &&
       owner !== module &&
       !project.extendsPath(owner) &&
-      !isGenerated(module, generated)
+      !isGenerated(module, generated) &&
+      !project.inOtherPortion(module, owner)
     ) {
       finding = absent(file, ref, owner, project);
     }
