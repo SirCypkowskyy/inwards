@@ -48,8 +48,8 @@ type Listed = Omit<SourceFile, "text">;
  * relative to the config root, with forward slashes. The CLI and the language
  * server list with the same walk rules (hidden entries, node_modules,
  * __pycache__ and virtualenvs skipped; symlinks followed inside the root),
- * except that the CLI skips nothing but hidden entries inside a layer's
- * top-level package. `ownerOf` probes, so it agrees in both.
+ * and both skip nothing but hidden entries inside a layer's top-level
+ * package (`layerPackages`). `ownerOf` probes, so it agrees in both.
  */
 export interface ProjectFiles {
   /** Tells what is at a path; `ownerOf` probes through it, one path at a time. */
@@ -326,11 +326,17 @@ export class ProjectIndex {
    * Lists a directory through the adapter, once.
    *
    * @param dir - a directory relative to the config root.
-   * @returns its entries, or undefined when it isn't a directory.
+   * @returns its entries, or undefined when it isn't a directory or can't be read.
    */
   private entries(dir: string): Entries {
     if (!this.dirs.has(dir)) {
-      this.dirs.set(dir, this.source.listDir(dir));
+      let entries: Entries;
+      try {
+        entries = this.source.listDir(dir);
+      } catch {
+        // Unreadable: no evidence from here, so INW006 reports more, never less.
+      }
+      this.dirs.set(dir, entries);
     }
     return this.dirs.get(dir);
   }
