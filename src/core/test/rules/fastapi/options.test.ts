@@ -1,11 +1,12 @@
 /**
- * @file The options tables of FAPI001 and FAPI002 (#183): each rule takes its
+ * @file The options tables of FAPI001, FAPI002 (#183) and FAPI009 (#228): each rule takes its
  * own keys next to `modules`, validated per rule, so a key of one rule is an
  * error in the other's table, and a bad value names its key. Sorted keys keep
  * the parsed config stable for the Stop gate's comparison.
  */
 import { describe, expect, test } from "bun:test";
 import { ConfigError, parseConfig } from "../../../src/index.ts";
+import { parserError, schemaErrors } from "../../support/config-schema.ts";
 
 const LAYERS = '[tool.inwards]\nlayers = [{ name = "app", modules = ["app"] }]\n';
 
@@ -98,5 +99,16 @@ describe("FAPI options tables", () => {
     ],
   ])("[%s] %s is an error naming the key", (table, body, message) => {
     expect(parsed(table, body)).toStartWith(message);
+  });
+
+  test("FAPI009's check-defaults is a boolean in both the schema and the parser", () => {
+    const table = `${LAYERS}\n[tool.inwards.rules.depends-called]\n`;
+    expect(parserError(`${table}check-defaults = "yes"\n`)).toContain("check-defaults");
+    expect(schemaErrors(`${table}check-defaults = "yes"\n`)).not.toEqual([]);
+    const ok = `${table}check-defaults = true\n`;
+    expect([parserError(ok), schemaErrors(ok)]).toEqual([undefined, []]);
+    expect(parsed("depends-called", "check-order = true")).toStartWith(
+      "Unknown key tool.inwards.rules.depends-called.check-order.",
+    );
   });
 });

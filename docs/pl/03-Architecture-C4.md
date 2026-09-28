@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 4661b988821e7b94ca9fabfeb45a187cb39d96822a5c4c81137d3778d0ed7e75
+source_hash: fdab6b8a32b2113295384b917e06bce20164b3e05e7514cff52c307528a7ae67
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -364,8 +364,11 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI w schemacie bez metadanych OpenAPI, których wymaga projekt: podsumowania albo docstringu, modelu odpowiedzi, jawnego kodu statusu dla `POST` i `DELETE`, pola `description` w każdym wpisie `responses=`, a opcjonalnie tagów i `operation_id`. Jedna diagnostyka na endpoint, na dekoratorze | :white_check_mark: |
 | FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI: rzucony albo zwrócony w endpoincie, w funkcjach pomocniczych i zależnościach z tego samego pliku albo importowanych, do `max-depth` wywołań, albo z własnego wyjątku, który handler aplikacji zamienia na kod. Liczą się deklaracje na dekoratorze, routerze, dołączeniach nad nim i aplikacji; wszystko, czego Inwards nie umie odczytać, ucisza regułę | :white_check_mark: |
 | FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :white_check_mark: |
+| FAPI006 | `lifespan-events` | Opt-in. Handler startu albo zamknięcia zarejestrowany przez przestarzałe API zdarzeń (`on_event`, `add_event_handler`, `on_startup=`, `on_shutdown=`): sam daje ostrzeżenie, a błąd na handlerze, gdy jego aplikacja, rozwiązana między plikami, ustawia `lifespan=`, bo FastAPI wtedy go nie uruchamia | :white_check_mark: |
+| FAPI007 | `yield-dependency-swallows` | Opt-in. `except` wokół `yield` zależności z `yield` (funkcji-generatora bez dekoratora, z jednym `yield` poza pętlą), który może się skończyć bez `raise`, więc wyjątek endpointu zamienia się w niezalogowane 500. Na poziomie funkcji, w dowolnym pliku | :white_check_mark: |
+| FAPI009 | `depends-called` | Opt-in. `Depends(f(...))` albo `Security(f(...))`, gdzie `f`, rozwiązana w pliku albo o jeden krok przez indeks, jest generatorem, korutyną albo zwraca tylko zwykłe wartości; fabryka zwracająca funkcję przechodzi. Wartości domyślne parametrów zostają dla `B008` Ruffa, chyba że włączono `check-defaults` | :white_check_mark: |
 
-Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI005–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
+Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI006, FAPI007 i FAPI009 czytają funkcje i wywołania samego sprawdzanego pliku, więc parsują go, gdy jego tekst przejdzie ich własny wstępny filtr (`on_event`, `yield` przed `except`, `Depends`), niezależnie od tego, czy wspomina FastAPI. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI005 i FAPI008 są planowane ([indeks reguł](rules/index.md#fastapi)).
 
 ## Mapa kodu { #code-map }
 
@@ -405,7 +408,10 @@ src/
 │   │   │                                #   handlers, resolved across files), graph.ts (app and router
 │   │   │                                #   graph), router-wiring.ts (FAPI003), endpoint-metadata.ts
 │   │   │                                #   (FAPI001), undocumented-error-response.ts with
-│   │   │                                #   error-codes.ts and placement.ts (FAPI002)
+│   │   │                                #   error-codes.ts and placement.ts (FAPI002),
+│   │   │                                #   lifespan-events.ts (FAPI006),
+│   │   │                                #   yield-dependency-swallows.ts (FAPI007),
+│   │   │                                #   depends-called.ts (FAPI009), run by code-checks.ts
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   router-wiring.ts runs FAPI003 when it is on

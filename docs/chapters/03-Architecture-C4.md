@@ -359,8 +359,11 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | FAPI001 | `endpoint-metadata` | Opt-in. A FastAPI path operation in the schema without the OpenAPI metadata the project requires: a summary or docstring, a response model, an explicit status code on `POST` and `DELETE`, a `description` in each `responses=` entry, and optionally tags and `operation_id`. One finding per endpoint, on the decorator | :white_check_mark: |
 | FAPI002 | `undocumented-error-response` | Opt-in. A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare: raised or returned in the endpoint, in same-file or imported helpers and dependencies up to `max-depth` calls, or from a first-party exception an app handler maps to a code. Declarations on the decorator, the router, the inclusions above it and the app count; anything Inwards can't read keeps it quiet | :white_check_mark: |
 | FAPI003 | `router-wiring` | Opt-in. An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | :white_check_mark: |
+| FAPI006 | `lifespan-events` | Opt-in. A startup or shutdown handler registered through the deprecated events API (`on_event`, `add_event_handler`, `on_startup=`, `on_shutdown=`): a warning alone, an error on the handler when its app, resolved across files, sets `lifespan=`, since FastAPI then never runs it | :white_check_mark: |
+| FAPI007 | `yield-dependency-swallows` | Opt-in. An `except` around the `yield` of a dependency with `yield` (an undecorated generator with one `yield`, outside a loop) that can end without raising, so the endpoint's exception becomes an unlogged 500. Per function, in any file | :white_check_mark: |
+| FAPI009 | `depends-called` | Opt-in. `Depends(f(...))` or `Security(f(...))` where `f`, resolved in the file or one hop through the index, is a generator, a coroutine or returns only plain values; a factory that returns a function passes. Parameter defaults are left to Ruff's `B008` unless `check-defaults` is on | :white_check_mark: |
 
-The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go. FAPI005 to FAPI009 are planned ([rules index](rules/index.md#fastapi)).
+The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI006, FAPI007 and FAPI009 read a checked file's own functions and calls, so they parse it when its text passes their own pre-filter (`on_event`, `yield` before `except`, `Depends`), whether it mentions FastAPI or not. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go. FAPI005 and FAPI008 are planned ([rules index](rules/index.md#fastapi)).
 
 ## Code map
 
@@ -400,7 +403,10 @@ src/
 │   │   │                                #   handlers, resolved across files), graph.ts (app and router
 │   │   │                                #   graph), router-wiring.ts (FAPI003), endpoint-metadata.ts
 │   │   │                                #   (FAPI001), undocumented-error-response.ts with
-│   │   │                                #   error-codes.ts and placement.ts (FAPI002)
+│   │   │                                #   error-codes.ts and placement.ts (FAPI002),
+│   │   │                                #   lifespan-events.ts (FAPI006),
+│   │   │                                #   yield-dependency-swallows.ts (FAPI007),
+│   │   │                                #   depends-called.ts (FAPI009), run by code-checks.ts
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   router-wiring.ts runs FAPI003 when it is on

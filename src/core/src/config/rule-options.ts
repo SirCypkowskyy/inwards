@@ -185,6 +185,7 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "unresolved-includes": oneOf(["warn", "silent"]),
     "check-order": boolean,
   },
+  "depends-called": { "check-defaults": boolean },
 };
 
 /**

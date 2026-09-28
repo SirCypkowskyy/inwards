@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3d501592b863f842d40c66e78cd12a3d5682c50fd45c4018f0eef7cb9a92e6cf
+source_hash: f48ab91fc637b4beaec833205b2af91a719974de4d02dc63eb41793cbbdd0b0f
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1032,6 +1032,12 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - **Da się ją wyciszyć, w przeciwieństwie do INW004.** Każda diagnostyka FAPI003 ma własną linię (wywołanie `APIRouter(...)`, wywołanie `include_router`, które zamyka cykl), więc wyciszenie w niej dotyczy jednej decyzji. INW004 nie da się wyciszyć, bo komentarz stałby przy jednym z wielu importów.
 - **Tylko sprawdzane pliki, względem całego grafu.** Częściowe sprawdzenie (ścieżka w argumencie, Stop gate) buduje graf aplikacji i routerów ze wszystkich plików FastAPI w projekcie i zgłasza tylko w plikach, które sprawdza. Stop gate zgłasza więc router, który sesja utworzyła lub zmieniła, a router niepodpięty już na starcie sesji jest starym błędem.
 - **Hook edycji i edytor zgłaszają tylko diagnostyki z jednego pliku.** Utworzenie routera i podpięcie go do aplikacji to dwie edycje. Graf budują jednak wtedy, gdy plik wycisza FAPI003, żeby wyciszenie liczyło się jako użyte, a nie zamieniało w ostrzeżenie INW009, a potem odrzucają to, co znalazły.
+
+**Poprawka, 2026-09-28: reguły, które czytają kod samego pliku ([#225](https://github.com/SirCypkowskyy/inwards/issues/225), [#226](https://github.com/SirCypkowskyy/inwards/issues/226), [#228](https://github.com/SirCypkowskyy/inwards/issues/228)).** FAPI006, FAPI007 i FAPI009 patrzą na funkcje i wywołania, a nie na rekordy modelu.
+
+- **Własny wstępny filtr tekstu.** Zależność z `yield` zwykle mieszka w `db.py`, który nigdy nie wspomina FastAPI, więc te reguły parsują sprawdzany plik, gdy jego tekst przejdzie ich własny filtr (`on_event`, `yield` przed `except`, `Depends`), a gdy są wyłączone, nie parsują niczego.
+- **"Nie duplikuj Ruffa" obejmuje flake8-bugbear.** `B008` już zgłasza `Depends(get_db())` w wartości domyślnej parametru, więc FAPI009 czyta tylko metadane `Annotated[...]` i inne argumenty, chyba że włączono jej opcję `check-defaults`.
+- **Jeden kod, dwa poziomy.** FAPI006 ostrzega o przestarzałym handlerze zdarzenia i daje błąd, gdy `lifespan=` sprawia, że FastAPI go pomija, tak jak INW006 przy samotnym martwym prefiksie: to ten sam błąd, raz z widocznym kosztem.
 
 ## ADR-038: Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart { #adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart }
 

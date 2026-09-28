@@ -60,6 +60,7 @@ nav = [
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },
     { "FAPI006 lifespan-events" = "rules/FAPI006.md" },
     { "FAPI007 yield-dependency-swallows" = "rules/FAPI007.md" },
+    { "FAPI009 depends-called" = "rules/FAPI009.md" },
   ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },

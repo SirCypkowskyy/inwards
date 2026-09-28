@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 559cbc82b6ccc70df2a9cac006774e0198efdb64b80e365e720e2810fc8cf372
+source_hash: c10b3a93bbe9472535a525402c0a04b8654394aa2da404043519d08d7c9d0ae8
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -33,6 +33,7 @@ Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikac
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
 | [FAPI006](FAPI006.md) | `lifespan-events` | Handler startu albo zamknięcia zarejestrowany przez przestarzałe API zdarzeń albo obok `lifespan=`, przez które FastAPI go pomija | opt-in, błąd, same przestarzałe zdarzenia dają ostrzeżenie | tak |
 | [FAPI007](FAPI007.md) | `yield-dependency-swallows` | `except` wokół `yield` zależności, który może się skończyć bez `raise`, więc połyka to, co rzucił endpoint | opt-in, błąd | tak |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: wywołanie funkcji-generatora, korutyny albo funkcji zwracającej zwykłą wartość tam, gdzie FastAPI chce samej zależności | opt-in, błąd | tak |
 
 Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
 
@@ -41,7 +42,6 @@ Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (niez
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
 | FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planowana |
 | FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planowana |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |
 
 [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia każdą regułę razem z resztą projektu.
 
@@ -65,7 +65,7 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 
 Reguła, która w kolumnie Default ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone; opt-in są reguły, które oceniają kod według progów wybranych przez zespół, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
 
-Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
+Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration), [FAPI009](FAPI009.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
 
 <!-- config: fragment -->
 

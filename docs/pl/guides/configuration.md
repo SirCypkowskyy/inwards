@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: be720fcfc85b774ca55ff5d5f5bf2b1b2755b2c1c73bf9536015243ab57300b0
+source_hash: d0f969aeb51533ad834327809f5ca449a788378b84d5eb48e0b5ba33a6f0f0a6
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -215,7 +215,7 @@ Które reguły zgłaszają i jak głośno:
 - `extend-select`: te reguły też zgłaszają, obok `select` albo reguł domyślnie włączonych. Włącza [reguły opt-in](../rules/index.md#opt-in-rules).
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
-- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
+- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration), [`router-wiring`](../rules/FAPI003.md#configuration) i [`depends-called`](../rules/FAPI009.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
 

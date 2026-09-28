@@ -28,6 +28,7 @@ The `FAPI` family checks FastAPI applications across files: which router the app
 | [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` with routes that no app includes, routers that include each other in a cycle, or an `include_router` above the included router's routes | opt-in, error | yes |
 | [FAPI006](FAPI006.md) | `lifespan-events` | A startup or shutdown handler registered through the deprecated events API, or next to a `lifespan=` that makes FastAPI ignore it | opt-in, error, deprecated events alone warn | yes |
 | [FAPI007](FAPI007.md) | `yield-dependency-swallows` | An `except` around a dependency's `yield` that can end without raising, so it swallows what the endpoint raised | opt-in, error | yes |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: a call to a generator, coroutine or plain-value function passed where FastAPI wants the dependency itself | opt-in, error | yes |
 
 Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
 
@@ -36,7 +37,6 @@ Codes reserved for later FastAPI rules, not registered yet (an unknown code is s
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
 | FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planned |
 | FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planned |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
 
 The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.
 
@@ -60,7 +60,7 @@ Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `
 
 A rule whose Default column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default; the opt-in ones are the rules that judge code against thresholds a team picks, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
 
-A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
+A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration), [FAPI009](FAPI009.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
 
 <!-- config: fragment -->
 

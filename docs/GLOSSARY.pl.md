@@ -169,6 +169,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | path operation (FastAPI) | operacja ścieżki |
 | include a router (`include_router`) | dołączać router, dołączenie |
 | unmounted router (FAPI003) | niepodpięty router |
+| dependency (FastAPI, `Depends`), dependency with `yield` | zależność, zależność z `yield` |
+| lifespan (FastAPI, `lifespan=`) | lifespan |
+| startup / shutdown handler (FastAPI events) | handler startu / zamknięcia |
+| generator function, coroutine | funkcja-generator, korutyna |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |

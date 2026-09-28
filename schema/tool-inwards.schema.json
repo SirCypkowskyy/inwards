@@ -185,7 +185,8 @@
         "FAPI002",
         "FAPI003",
         "FAPI006",
-        "FAPI007"
+        "FAPI007",
+        "FAPI009"
       ]
     },
     "layer": {
@@ -449,6 +450,9 @@
         },
         "yield-dependency-swallows": {
           "$ref": "#/definitions/ruleOptions"
+        },
+        "depends-called": {
+          "$ref": "#/definitions/dependsCalledOptions"
         }
       }
     },
@@ -625,6 +629,29 @@
           "description": "Project advice added to the INW007 fix steps.",
           "markdownDescription": "Project advice added to the INW007 fix steps.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#templates)",
           "$ref": "#/definitions/hints"
+        }
+      }
+    },
+    "dependsCalledOptions": {
+      "description": "FAPI009 depends-called's options, [tool.inwards.rules.depends-called]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "FAPI009 depends-called's options, [tool.inwards.rules.depends-called]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI009/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "description": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.",
+          "markdownDescription": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "check-defaults": {
+          "description": "Also report Depends(f()) in a parameter default, which Ruff's B008 already reports.",
+          "markdownDescription": "Also report Depends(f()) in a parameter default, which Ruff's B008 already reports.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI009/)",
+          "type": "boolean",
+          "default": false
         }
       }
     },

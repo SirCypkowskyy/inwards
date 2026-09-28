@@ -1028,6 +1028,12 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 - **Checked files only, against the whole graph.** A partial run (a path argument, the Stop gate) builds the app and router graph from every FastAPI file of the project, and reports only in the files it checks. The Stop gate therefore reports a router the session created or changed, and a router already unmounted at session start is an old error.
 - **The per-edit hook and the editor report one-file findings only.** Creating a router and wiring it into the app are two edits. They still build the graph when a file suppresses FAPI003, so the suppression counts as used instead of turning into an INW009 warning, then drop what it found.
 
+**Amendment, 2026-09-28: rules that read a file's own code ([#225](https://github.com/SirCypkowskyy/inwards/issues/225), [#226](https://github.com/SirCypkowskyy/inwards/issues/226), [#228](https://github.com/SirCypkowskyy/inwards/issues/228)).** FAPI006, FAPI007 and FAPI009 look at functions and calls, not at the model's records.
+
+- **Their own text pre-filter.** A yield dependency usually lives in a `db.py` that never mentions FastAPI, so these rules parse a checked file when its text passes their own filter (`on_event`, `yield` before `except`, `Depends`), and nothing at all while they are off.
+- **"Don't duplicate Ruff" covers flake8-bugbear.** `B008` already reports `Depends(get_db())` in a parameter default, so FAPI009 reads only `Annotated[...]` metadata and other arguments unless its `check-defaults` option is on.
+- **One code, two severities.** FAPI006 warns about a deprecated event handler and errs when a `lifespan=` makes FastAPI ignore it, like INW006's lone dead prefix: both are the same mistake, one with a visible cost.
+
 ## ADR-038: A witness of the session start outside the project, against a replayed SessionStart
 
 **Status:** Accepted · 2026-09-28 · [#88](https://github.com/SirCypkowskyy/inwards/issues/88)

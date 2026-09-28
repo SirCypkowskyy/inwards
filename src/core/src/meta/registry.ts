@@ -49,7 +49,8 @@ type RuleCode =
   | "FAPI002"
   | "FAPI003"
   | "FAPI006"
-  | "FAPI007";
+  | "FAPI007"
+  | "FAPI009";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -206,6 +207,14 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     default: "off",
     summary: "A dependency with yield re-raises what it catches around its yield.",
     docs: page("FAPI007"),
+  },
+  FAPI009: {
+    code: "FAPI009",
+    name: "depends-called",
+    severity: "error",
+    default: "off",
+    summary: "Depends() and Security() get the dependency itself, not the result of calling it.",
+    docs: page("FAPI009"),
   },
 };
 
