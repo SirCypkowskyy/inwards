@@ -137,4 +137,5 @@ test("a dynamic import counts as an evasion outside the outermost layer only", (
   expect(judge(added("shop/api/plugins.py"))).toBe(false);
   expect(judge(added("shop/domain/order.py"))).toBe(true);
   expect(judge(`${added("shop/api/plugins.py")}${added("shop/domain/order.py")}`)).toBe(true);
+  expect(judge(added(".opencode/plugins.disabled/inwards.js"))).toBe(false);
 });

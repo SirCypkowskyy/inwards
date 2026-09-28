@@ -85,6 +85,7 @@ test("summariseOpencode counts steps, cost and each kind of refusal, and reads t
 
 test("summariseOpencode reports an error when no step ran or the last one failed", () => {
   expect(summariseOpencode(JSON.stringify(USER)).isError).toBe(true);
-  const broken = [USER, step(0, [], { name: "APIError", data: { message: "rate limited" } })];
-  expect(summariseOpencode(broken.map((m) => JSON.stringify(m)).join("\n")).isError).toBe(true);
+  const broken = [USER, step(0, [], { name: "APIError", data: { message: "usage limit" } })];
+  const summary = summariseOpencode(broken.map((m) => JSON.stringify(m)).join("\n"));
+  expect([summary.isError, summary.finalMessage]).toEqual([true, "APIError: usage limit"]);
 });

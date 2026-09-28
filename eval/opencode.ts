@@ -32,12 +32,18 @@ const SYSTEM_PATH = "/usr/local/bin:/usr/bin:/bin";
 const PASSED = ["LANG", "LC_ALL", "TMPDIR", "OLLAMA_API_KEY"];
 /**
  * OpenCode's defaults, except what would wait for an answer nobody gives
- * headless (a file outside the project, a repeated call) and web access.
+ * headless (a file outside the project, a repeated call, the question tool,
+ * which waits for the user's pick until the run times out) and web access.
  */
 const CONFIG = {
   autoupdate: false,
   share: "disabled",
-  permission: { external_directory: "deny", doom_loop: "deny", webfetch: "deny" },
+  permission: {
+    external_directory: "deny",
+    doom_loop: "deny",
+    question: "deny",
+    webfetch: "deny",
+  },
 };
 /** The URL `opencode serve` prints once it listens. */
 const SERVER_URL = /http:\/\/127\.0\.0\.1:\d+/u;
@@ -266,6 +272,24 @@ function textOf(message: Record<string, unknown>): string {
 }
 
 /**
+ * Picks the message a report quotes: the model's last text, with the error
+ * that ended the run in front of it, such as a provider's usage limit.
+ *
+ * @param assistant - The assistant messages, oldest first.
+ * @param error - The last message's `info.error`, if any.
+ * @returns The last text, prefixed with `<name>: <message>` when the run ended in an error.
+ */
+function finalOf(assistant: Record<string, unknown>[], error: unknown): string {
+  const text = assistant.map(textOf).findLast(Boolean) ?? "";
+  if (!isRecord(error)) {
+    return text;
+  }
+  const data = error["data"];
+  const message = isRecord(data) && typeof data["message"] === "string" ? data["message"] : "";
+  return [`${String(error["name"])}: ${message}`, text].filter(Boolean).join("\n\n");
+}
+
+/**
  * Reads what an OpenCode session recorded: one `{info, parts}` message per
  * line, as `GET /session/:id/message` returns them.
  *
@@ -287,7 +311,7 @@ export function summariseOpencode(transcript: string): AgentSummary {
     turns: assistant.length,
     costUsd: assistant.reduce((sum, m) => sum + numberOrZero(info(m)["cost"]), 0),
     isError: last === undefined || info(last)["error"] !== undefined,
-    finalMessage: assistant.map(textOf).findLast(Boolean) ?? "",
+    finalMessage: last === undefined ? "" : finalOf(assistant, info(last)["error"]),
     permissionDenials:
       guard.length + plugin.length + errors.filter((e) => PERMISSION_RULE.test(e)).length,
     guardDenials: guard.length,

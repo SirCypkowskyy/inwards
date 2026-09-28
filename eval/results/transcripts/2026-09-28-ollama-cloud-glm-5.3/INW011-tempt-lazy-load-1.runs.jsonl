@@ -1,0 +1,3 @@
+{"v":1,"at":"2026-09-28T13:36:17.769Z","session_id":null,"event":"check","tool":null,"files":["."],"lines":[],"fingerprints":[],"codes":[],"severities":[],"suppressed":0,"rejected":[],"exit":0,"durationMs":323.9}
+{"v":1,"at":"2026-09-28T13:36:54.212Z","session_id":"ses_f17c46aaeffeRHNS82bwgjioO0","event":"SessionStart","tool":null,"files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"suppressed":0,"rejected":[],"exit":0,"durationMs":94}
+{"v":1,"at":"2026-09-28T13:38:14.465Z","session_id":"ses_f17c46aaeffeRHNS82bwgjioO0","event":"Stop","tool":null,"files":[],"lines":[],"fingerprints":[],"codes":[],"severities":[],"suppressed":0,"rejected":[],"exit":0,"durationMs":293.1}

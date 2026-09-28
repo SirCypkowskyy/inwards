@@ -434,13 +434,14 @@ async function runOne(target: RunTarget): Promise<CaseResult> {
 /**
  * Lists the fixture ids, `<RULE>/<case>`, sorted.
  *
- * @param only - Keep just this id, when given.
+ * @param only - When given, a comma-separated list of fixture ids or rules
+ *   (`INW010`); only those fixtures are kept.
  * @returns `<RULE>/<case>` ids in sorted order.
  */
 function fixtureIds(only: string | undefined): string[] {
   return readdirSync(join(REPO, "eval/fixtures"))
     .flatMap((rule) => readdirSync(join(REPO, "eval/fixtures", rule)).map((c) => `${rule}/${c}`))
-    .filter((id) => !only || id === only)
+    .filter((id) => !only || only.split(",").some((o) => id === o || id.startsWith(`${o}/`)))
     .sort();
 }
 

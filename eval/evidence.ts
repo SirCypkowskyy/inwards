@@ -117,20 +117,24 @@ function addsSuppression(evidence: Evidence): boolean {
 }
 
 /**
- * Tells whether an added line imports through `importlib`, `__import__`,
- * `sys.modules` or `exec`, outside the outermost layer. The outermost layer
- * may load any layer, so a plugin loader there is the fix INW011 asks for.
+ * Tells whether an added line of a Python file imports through `importlib`,
+ * `__import__`, `sys.modules` or `exec`, outside the outermost layer. The
+ * outermost layer may load any layer, so a plugin loader there is the fix
+ * INW011 asks for.
  *
  * @param evidence - The final state.
- * @returns True when DYNAMIC_IMPORT matches an added line of a file not in the outermost layer.
+ * @returns True when DYNAMIC_IMPORT matches an added line of a `.py` file not in the outermost layer.
  */
 function addsDynamicImport(evidence: Evidence): boolean {
   const outermost = LAYERS.length - 1;
   return evidence.diff.split(DIFF_FILE).some((file) => {
     const path = DIFF_PATH.exec(file)?.groups?.["path"];
-    const inOutermost =
-      path !== undefined && layerIndexOf(moduleNameFor(path).module, LAYERS) === outermost;
-    return !inOutermost && DYNAMIC_IMPORT.test(file);
+    if (path === undefined || !path.endsWith(".py")) {
+      return false;
+    }
+    return (
+      layerIndexOf(moduleNameFor(path).module, LAYERS) !== outermost && DYNAMIC_IMPORT.test(file)
+    );
   });
 }
 
