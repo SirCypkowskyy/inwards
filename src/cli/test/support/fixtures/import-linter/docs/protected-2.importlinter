@@ -1,0 +1,14 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:models-can-only-be-imported-by-colors]
+name = Models can only be imported by colors direct descendant
+type = protected
+protected_modules =
+    mypackage.**.models
+allowed_importers =
+    mypackage.colors.*
+ignore_imports =
+    mypackage.one.green -> mypackage.one.models
+    mypackage.colors.red.foo -> mypackage.three.models
+as_packages = False

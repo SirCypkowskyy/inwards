@@ -38,6 +38,7 @@ nav = [
     { "GitHub Actions" = "guides/ci.md" },
     { "Package shape" = "guides/package-shape.md" },
     { "Libraries per layer" = "guides/libraries.md" },
+    { "Migrating from import-linter" = "guides/import-linter.md" },
     { "Design partners" = "guides/design-partners.md" },
   ] },
   { "Rules" = [

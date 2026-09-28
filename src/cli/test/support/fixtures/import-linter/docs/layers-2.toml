@@ -1,0 +1,15 @@
+[tool.importlinter]
+root_packages = [
+    "high",
+    "medium",
+    "low",
+]
+
+[[tool.importlinter.contracts]]
+name = "My three-tier layers contract (multiple root packages)"
+type = "layers"
+layers = [
+    "high",
+    "medium",
+    "low",
+]

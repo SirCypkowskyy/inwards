@@ -1,0 +1,11 @@
+[tool.importlinter]
+root_package = "mypackage"
+
+[[tool.importlinter.contracts]]
+name = "My layers contract"
+type = "layers"
+layers = [
+    "mypackage.high",
+    "mypackage.medium",
+    "mypackage.low",
+]

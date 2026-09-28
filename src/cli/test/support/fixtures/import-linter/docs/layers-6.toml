@@ -1,0 +1,11 @@
+[tool.importlinter]
+root_package = "mypackage"
+
+[[tool.importlinter.contracts]]
+name = "Contract with sibling modules (independent)"
+type = "layers"
+layers = [
+    "mypackage.high",
+    "mypackage.blue | mypackage.green | mypackage.yellow",
+    "mypackage.low",
+]

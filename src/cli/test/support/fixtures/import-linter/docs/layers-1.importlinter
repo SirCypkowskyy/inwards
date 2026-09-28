@@ -1,0 +1,10 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:my-layers-contract]
+name = My layers contract
+type = layers
+layers =
+    mypackage.high
+    mypackage.medium
+    mypackage.low

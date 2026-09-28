@@ -1,0 +1,9 @@
+[tool.importlinter]
+root_package = "mypackage"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Boto can only be imported by mypackage.allowed"
+type = "protected"
+protected_modules = ["boto"]
+allowed_importers = ["mypackage.allowed"]

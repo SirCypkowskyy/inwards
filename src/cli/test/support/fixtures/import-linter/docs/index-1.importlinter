@@ -1,0 +1,13 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:no-legacy-colors]
+name = Colors should not use the legacy numbers API
+type = forbidden
+source_modules =
+    mypackage.colors
+forbidden_modules =
+    mypackage.legacy.numbers
+broken_contract_guidance =
+    Use mypackage.numbers instead - it's the supported top-level interface.
+    Migration guide: https://docs.example.com/numbers-migration

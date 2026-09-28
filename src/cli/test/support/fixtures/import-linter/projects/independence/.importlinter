@@ -1,0 +1,12 @@
+[importlinter]
+root_package = mypackage
+
+[importlinter:contract:independent]
+name = Features are independent
+type = independence
+modules =
+    mypackage.foo
+    mypackage.bar
+    mypackage.baz
+ignore_imports =
+    mypackage.baz.blue -> mypackage.foo.purple

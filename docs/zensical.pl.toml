@@ -43,6 +43,7 @@ nav = [
     { "GitHub Actions" = "guides/ci.md" },
     { "Kształt pakietu" = "guides/package-shape.md" },
     { "Biblioteki w warstwach" = "guides/libraries.md" },
+    { "Migracja z import-linter" = "guides/import-linter.md" },
     { "Design partnerzy" = "guides/design-partners.md" },
   ] },
   { "Reguły" = [

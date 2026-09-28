@@ -205,6 +205,10 @@ inwards check
 
 `All clear` with exit code 0 means every import points inward. Exit code 1 lists each violation with numbered fix steps, and exit code 2 is a usage or config error.
 
+### Coming from import-linter
+
+`inwards import-config` converts the contracts in `.importlinter`, `setup.cfg` or `[tool.importlinter]` into `[tool.inwards]`, and `--write` appends the table to `pyproject.toml`. It reports each contract it couldn't carry over, with the reason. [Migrating from import-linter](import-linter.md) has the mapping.
+
 ### On an existing codebase
 
 A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:

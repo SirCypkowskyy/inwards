@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: f10489dfb257fefc495eac540e871b5af151da1c2607fb0cfa15996a38d520ad
+source_hash: 703269743c6f56353a55df6235cd068483504d6fbf4c6e4458f88802eeb6ccc3
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -190,7 +190,7 @@ Zrzuty ekranu w tej dokumentacji pochodzą ze `scripts/screenshots.py`, który n
 | Ryzyko | Prawdopodobieństwo | Wpływ | Środki zaradcze |
 |---|:-:|:-:|---|
 | Astral dodaje kontrakty warstw do ty albo Ruffa | Średnie | Wysoki | Konkurować integracją z agentami i jakością poprawek, na których Astral się nie skupia. Utrzymywać format reguł na tyle prosty, żeby dało się go wyeksportować |
-| import-linter dodaje wyjście JSON i hooki dla agentów | Średnie | Średni | Utrzymać przewagę w opóźnieniu, samodzielnym pliku binarnym i poprawkach dla każdego naruszenia. Zaoferować import kontraktów z `.importlinter` |
+| import-linter dodaje wyjście JSON i hooki dla agentów | Średnie | Średni | Utrzymać przewagę w opóźnieniu, samodzielnym pliku binarnym i poprawkach dla każdego naruszenia. Utrzymać przejście na jedno polecenie: `inwards import-config` przenosi kontrakty import-linter ([przewodnik](guides/import-linter.md)) |
 | Prawdziwe repozytoria przekraczają 100 ms p95 | Wydarzyło się: plik z polara z 4482 liniami i naruszeniami trwał 125 do 280 ms przed kompilacją do bajtkodu, a lokalnie 90 ms p95 po niej ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Wysoki | Najpierw stały proces, potem prescan w WASM napisany w Ruście albo Zigu (plan awaryjny z ADR-001) |
 | Prescan pomija import w jakimś nietypowym pliku | Niskie | Wysoki | Test różnicowy w CI na bibliotece standardowej, co noc na pięciu prawdziwych serwisach; poszerzać ten korpus o repozytoria design partnerów |
 | Agenci edytują `[tool.inwards]`, żeby przejść sprawdzenie | Wysokie bez zabezpieczenia | Wysoki | Config guard w PreToolUse, porównanie konfiguracji w Stop gate, reguły `permissions.deny` z `init`, CODEOWNERS ([rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash wciąż może ominąć config guard i zapis sesji ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
