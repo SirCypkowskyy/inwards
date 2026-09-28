@@ -118,7 +118,9 @@ export function holdsLayer(
 
 /**
  * Tells whether a module is covered by an `ignore` entry: the entry's segments
- * appear as consecutive whole segments of the module name.
+ * appear as consecutive whole segments of the module name, anywhere in it,
+ * or at its start when the entry begins with `/` (`/tests` covers `tests.x`
+ * but not `shop.tests.x`, #86).
  *
  * @param module - a dotted module name.
  * @param ignore - the configured `ignore` entries.
@@ -126,7 +128,9 @@ export function holdsLayer(
  */
 function isIgnored(module: string, ignore: readonly string[]): boolean {
   const name = `.${module}.`;
-  return ignore.some((entry) => name.includes(`.${entry}.`));
+  return ignore.some((entry) =>
+    entry.startsWith("/") ? name.startsWith(`.${entry.slice(1)}.`) : name.includes(`.${entry}.`),
+  );
 }
 
 /**

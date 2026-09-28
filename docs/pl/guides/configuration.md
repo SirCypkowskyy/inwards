@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: be720fcfc85b774ca55ff5d5f5bf2b1b2755b2c1c73bf9536015243ab57300b0
+source_hash: c3aac2c48c3aae8d09cb93b20a87e3ff62639ac195da1918d9cbd559d4893f85
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -146,13 +146,13 @@ Najstarsza wersja Inwards, która może sprawdzać projekt. Starszy program koń
 
 Typ: lista nazw modułów. Domyślnie: brak.
 
-Moduły pominięte w ostrzeżeniu INW006 o kodzie poza wszystkimi warstwami, na przykład `tests` albo `migrations`. Wpis dopasowuje całe segmenty nazwy w dowolnym miejscu nazwy modułu: `migrations` obejmuje `shop.orders.migrations.0001_initial`. Importy z warstwy do tych modułów nadal są sprawdzane.
+Moduły pominięte w ostrzeżeniu INW006 o kodzie poza wszystkimi warstwami, na przykład `tests` albo `migrations`. Wpis dopasowuje całe segmenty nazwy w dowolnym miejscu nazwy modułu: `migrations` obejmuje `shop.orders.migrations.0001_initial`, a `tests` obejmuje `shop.tests` tak samo jak `tests` najwyższego poziomu. Wpis zaczynający się od `/` pasuje tylko na początku nazwy: `/tests` obejmuje `tests.test_order`, ale nie `shop.tests.test_order`, które nadal dostaje ostrzeżenie. `inwards init` zapisuje domyślne wpisy bez `/`. Importy z warstwy do pominiętych modułów nadal są sprawdzane.
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
-ignore = ["tests", "scripts", "migrations", "conftest"]
+ignore = ["/tests", "scripts", "migrations", "conftest"]
 ```
 
 ### `generated` { #generated }

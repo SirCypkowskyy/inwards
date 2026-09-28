@@ -6,6 +6,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { type PathKind, parseConfig } from "../../src/index.ts";
+import { unassignedWarning } from "../../src/rules/unassigned-module/imports.ts";
 import { checkNestedProjects, checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
 import { check, engine, file, indexOn, OWNERS, PROJECT } from "../support/helpers.ts";
 
@@ -71,6 +72,19 @@ describe("INW006 unassigned-module", () => {
     ["a package that only holds layers", "shop/__init__.py"],
   ])("%s gets no warning", (_, path) => {
     expect(check(file(path, "import os\n"))).toEqual([]);
+  });
+
+  test("an ignore entry starting with / covers top-level modules only (#86)", () => {
+    const config = parseConfig(`[tool.inwards]
+ignore = ["/tests", "migrations"]
+layers = [{ name = "domain", modules = ["shop.domain"] }]
+`);
+    const warned = [
+      "tests/test_order.py",
+      "shop/tests/test_order.py",
+      "shop/migrations/m1.py",
+    ].filter((path) => unassignedWarning(file(path, ""), config, () => false) !== undefined);
+    expect(warned).toEqual(["shop/tests/test_order.py"]);
   });
 
   test("checkFiles warns once per package", () => {
