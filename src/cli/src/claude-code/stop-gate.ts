@@ -368,11 +368,11 @@ function recordProblems(io: Pick<Platform, "git">, project: string, state: Sessi
     const { uncommitted, unverifiable } = uncommittedConfigs(io.git, project, state.start);
     if (unverifiable) {
       found.push(
-        `${none}, and this git (older than 2.44, in a partial clone) can't read the committed [tool.inwards] without fetching, so the record can't be checked. Upgrading git to 2.44 or newer, or a writable XDG_STATE_HOME so sessions keep a copy, clears this. ${ask}`,
+        `${none}, and this git (older than 2.44) can't read the committed [tool.inwards] here without risking a fetch (a partial clone, or a git config Inwards couldn't read), so the record can't be checked. Upgrading git to 2.44 or newer, or a writable XDG_STATE_HOME so sessions keep a copy, clears this. ${ask}`,
       );
     } else if (uncommitted.length > 0) {
       found.push(
-        `${none}, and [tool.inwards] in ${uncommitted.join(", ")} was not the committed one when the record was made, so the record can't be trusted. If the user changed it before the session, committing it clears this. ${ask}`,
+        `${none}, and [tool.inwards] in ${uncommitted.join(", ")} was not the committed one when the record was made, so the record can't be trusted. If the user changed it before the session, they can commit it and start a new session (the check compares with the commit the session started from). ${ask}`,
       );
     }
   }

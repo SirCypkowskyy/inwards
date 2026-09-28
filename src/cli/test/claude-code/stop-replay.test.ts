@@ -216,7 +216,7 @@ printf '%s' "$P" | $I hook claude-code`,
       stdin: payload("stop", root, { session_id: "partial" }),
     });
     // git 2.44 and later read the blob with --no-lazy-fetch, partial clone or not.
-    const unverifiable = "can't read the committed [tool.inwards] without fetching";
+    const unverifiable = "can't read the committed [tool.inwards] here without risking a fetch";
     expect(run.code).toBe(NO_LAZY_FETCH ? 0 : 2);
     expect(run.stderr.includes(unverifiable)).toBe(!NO_LAZY_FETCH);
     expect(run.stderr).not.toContain("was not the committed one");

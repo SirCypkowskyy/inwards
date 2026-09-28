@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: 278d1cfe7bbc6f4cd1ff654deff28c627a4ff7db1cbe7612ac57dd48e5c01917
+source_hash: 8308b8a5ae38e6702795461c092555c9b8a20f80ae74d58ed937465efc84be98
 ---
 
 # Claude Code { #claude-code }
@@ -50,8 +50,8 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 | „The Inwards Stop hook is missing …” na starcie sesji | Hook Stop zniknął z ustawień, a pozostałe hooki Inwards zostały. Taki ślad zostawia agent, który edytuje `settings.local.json` przez Bash. Claude Code od razu przeładowuje hooki, więc do końca tamtej sesji Stop gate się nie uruchamiał. Uruchom ponownie `inwards init --agent claude` i przejrzyj, co tamta sesja zmieniła. |
 | „A SessionStart for this session arrived after it had started” albo „start record … is missing from” / „was rewritten in .inwards/state” | Zapis sesji w `.inwards/state` został usunięty albo przepisany, albo ktoś ręcznie przekazał SessionStart do `inwards hook`, jak może to zrobić Bash agenta, żeby wyzerować punkt odniesienia Stop gate. Inwards sprawdził zmiany względem kopii zapisu startu, którą trzyma w `$XDG_STATE_HOME/inwards/sessions/` (domyślnie `~/.local/state/inwards/sessions/`). Przejrzyj zmiany z sesji; następna sesja zaczyna się czysto. |
 | „Inwards couldn't keep a copy of this session's start outside the project” na starcie sesji | Katalogu stanu (`$XDG_STATE_HOME`, a bez niego `~/.local/state`) nie da się zapisać, na przykład gdy katalog domowy jest tylko do odczytu. Sesja działa normalnie, ale Stop gate ufa wtedy `.inwards/state` tylko dopóki `[tool.inwards]` jest tym zatwierdzonym. Wskaż w `XDG_STATE_HOME` katalog z prawem zapisu. |
-| „Inwards has no copy of this session's start record outside the project” | Sesję zaczęła starsza wersja Inwards albo kopię usunięto lub nie dało się jej zapisać, a `[tool.inwards]` na starcie sesji nie było tym zatwierdzonym. Jeśli zmieniłeś je sam, zatwierdź zmianę; jeśli kopii nie dało się zapisać, zadbaj też o `XDG_STATE_HOME` z prawem zapisu. |
-| „... this git (older than 2.44, in a partial clone) can't read the committed [tool.inwards] ...” | Jak wyżej, ale w częściowym klonie git starszy niż 2.44 mógłby przy odczycie zatwierdzonej konfiguracji coś pobrać, więc Inwards jej nie czyta. Zaktualizuj gita do 2.44 lub nowszego albo wskaż w `XDG_STATE_HOME` katalog z prawem zapisu, żeby sesje zachowywały kopię. |
+| „Inwards has no copy of this session's start record outside the project” | Sesję zaczęła starsza wersja Inwards albo kopię usunięto lub nie dało się jej zapisać, a `[tool.inwards]` na starcie sesji nie było tym zatwierdzonym. Jeśli zmieniłeś je sam, zatwierdź zmianę i zacznij nową sesję (sprawdzenie porównuje z commitem, od którego sesja się zaczęła); jeśli kopii nie dało się zapisać, zadbaj też o `XDG_STATE_HOME` z prawem zapisu. |
+| „... this git (older than 2.44) can't read the committed [tool.inwards] here ...” | Jak wyżej, ale git starszy niż 2.44 mógłby w częściowym klonie coś pobrać przy odczycie zatwierdzonej konfiguracji (albo Inwards nie mógł odczytać konfiguracji gita, żeby to wykluczyć), więc Inwards jej nie czyta. Zaktualizuj gita do 2.44 lub nowszego albo wskaż w `XDG_STATE_HOME` katalog z prawem zapisu, żeby sesje zachowywały kopię. |
 | „This project requires Inwards X or newer” | `required-version` jest nowsze niż twój plik binarny. Zainstaluj nowsze wydanie. |
 | `config error: Unknown key tool.inwards.…` | Literówka w `[tool.inwards]`. Komunikat podaje klucz i wypisuje znane klucze. |
 | Claude mówi, że edycja `pyproject.toml` została odrzucona | Edycja dotknęła `[tool.inwards]`. To config guard. Jeśli naprawdę chcesz zmienić warstwy, zrób to sam. |
