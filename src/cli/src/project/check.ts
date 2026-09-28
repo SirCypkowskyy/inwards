@@ -118,7 +118,8 @@ export function layerDirs(
 /**
  * Reads the Python files under the targets, once per module name they have.
  * Files outside the config root are dropped: they have no module name in the
- * project. A file reached through an alias and through its real path gets one
+ * project, and `notCheckedOf` tells the user about a named path that lost all
+ * of them. A file reached through an alias and through its real path gets one
  * entry per distinct (module, real file), so it is never reported twice.
  *
  * @param io - walks the targets and reads the files.
@@ -127,7 +128,8 @@ export function layerDirs(
  * @param what.targets - absolute files or directories; undefined means the config root.
  * @param what.base - directory that report paths are made relative to.
  * @param what.texts - content to check instead of what is on disk, by absolute path.
- * @returns the source files, with forward-slash paths on every OS.
+ * @returns the source files, with forward-slash paths on every OS, and the
+ *   walked paths that gave at least one of them.
  */
 function loadSources(
   io: ProjectIo,
@@ -141,14 +143,20 @@ function loadSources(
     base: string;
     texts: ReadonlyMap<string, string> | undefined;
   },
-): SourceFile[] {
+): { files: SourceFile[]; loaded: string[] } {
   const { lexicalRoot, realRoot } = project;
   const files: SourceFile[] = [];
+  const loaded: string[] = [];
   const seen = new Set<string>();
   for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
+    const names = moduleNames(io.probe, abs, lexicalRoot, realRoot);
+    if (names.length === 0) {
+      continue; // outside the root: not read at all
+    }
+    loaded.push(abs);
     const text = texts?.get(abs) ?? io.read.text(abs);
     const real = io.probe.realpath(abs) ?? abs;
-    for (const { rel, shown } of moduleNames(io.probe, abs, lexicalRoot, realRoot)) {
+    for (const { rel, shown } of names) {
       const named = moduleNameFor(rel);
       // Keyed on the real file too: order.py and order.pyi are one module, two files.
       const key = `${named.module}\u0000${real}`;
@@ -158,7 +166,53 @@ function loadSources(
       }
     }
   }
-  return files;
+  return { files, loaded };
+}
+
+/**
+ * Tells whether a path is a directory or lies below it, by the text alone.
+ *
+ * @param dir - the directory.
+ * @param path - the path to test.
+ * @returns true when `path` is `dir` or inside it.
+ */
+function atOrInside(dir: string, path: string): boolean {
+  return path === dir || isInside(dir, path);
+}
+
+/**
+ * Lists the named paths that gave no file to check, each with the line that
+ * says why: outside the config root (#200), or holding no Python file. A
+ * directory that holds the root, such as `.`, counts as checked when any file
+ * under the root came from it.
+ *
+ * @param probe - resolves real paths.
+ * @param project - the loaded project.
+ * @param base - directory the reported paths are made relative to.
+ * @param walked - what was named, and what gave files.
+ * @param walked.targets - the absolute paths named on the command line.
+ * @param walked.loaded - the walked paths that gave at least one source file.
+ * @returns one entry per target that gave nothing, in the order named.
+ */
+function notCheckedOf(
+  probe: Pick<PathProbe, "realpath">,
+  project: Project,
+  base: string,
+  { targets, loaded }: { targets: readonly string[]; loaded: readonly string[] },
+): { path: string; message: string }[] {
+  return targets
+    .filter((target) => !loaded.some((abs) => atOrInside(target, abs)))
+    .map((target) => {
+      const path = posix(relative(base, target)) || ".";
+      const real = probe.realpath(target);
+      const inRoot =
+        atOrInside(project.lexicalRoot, target) ||
+        (real !== undefined && atOrInside(project.realRoot, real));
+      const message = inRoot
+        ? `${path} has no Python files to check.`
+        : `${path} is outside root "${project.config.root}" and was not checked.`;
+      return { path, message };
+    });
 }
 
 /**
@@ -189,7 +243,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * checked files (INW004). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
  * Errors the config's baseline accepts are left out, unless `baseline` is
- * false; findings inline comments suppress go in `suppressed`. The duration
+ * false; findings inline comments suppress go in `suppressed`, and a target
+ * that gave no file to check goes in `notChecked` (#200). The duration
  * covers config, grammar loading, reading and checking.
  *
  * @param io - reads, walks and probes the project, loads the grammars, and times the run.
@@ -228,7 +283,7 @@ export async function runCheck(
 ): Promise<Report> {
   const started = io.clock.elapsed();
   const project = await openProject(io, configPath, cache);
-  const files = loadSources(io, project, { targets, base, texts });
+  const { files, loaded } = loadSources(io, project, { targets, base, texts });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
   const index = project.engine.index(projectFiles(io, project));
@@ -249,10 +304,13 @@ export async function runCheck(
   } else if (required) {
     diagnostics.push(...requiredAround(io, project, files, shownRoot));
   }
+  const notChecked =
+    targets === undefined ? [] : notCheckedOf(io.probe, project, base, { targets, loaded });
   const report = {
     diagnostics,
     suppressed,
     filesChecked: files.length,
+    ...(notChecked.length === 0 ? {} : { notChecked }),
     durationMs: io.clock.elapsed() - started,
   };
   return accepted ? applyBaseline(accepted, report, targets === undefined) : report;

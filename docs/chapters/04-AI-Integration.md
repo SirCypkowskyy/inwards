@@ -166,6 +166,8 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
 `--max-diagnostics N` prints at most N diagnostics, errors before warnings, and says what it left out. Text and `concise` add a line such as `Not shown: 3 violations, 1 warning.`; JSON adds `summary.omitted`. The summary counts and the exit code still cover every diagnostic. SARIF refuses the flag, because code scanning should see every finding.
 
+`inwards check PATHS...` checks only the Python files under `root`. A named path that gives no file to check, because it lies outside `root` or holds no Python file, gets a line such as `warning: tools/x.py is outside root "src" and was not checked.` JSON lists these in a top-level `notChecked` array of `path` and `message`, and SARIF puts them in `invocations[0].toolExecutionNotifications` at level `warning`. The other paths are still checked. If none of the named paths gave a file, the summary line reads `Nothing checked: 0 files` instead of `All clear` and the exit code is 2.
+
 ### Writing diagnostics for a model
 
 Every diagnostic follows the same five rules. They're design assumptions about what makes an agent fix the problem rather than hide it, and the "fixed within one retry" metric in [chapter 2](02-Business-Context.md#business-hypothesis) is how we'll find out whether they hold.
@@ -186,7 +188,7 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 
 ### Exit codes
 
-`0` clean · `1` violations · `2` usage or config error. For Claude Code, the hook turns violations into exit 2, the "please fix" signal, and uses exit 1 for what only the user should see: an unreadable payload, an internal error, or a Stop gate that fails again after blocking once with its own error. A config error also goes to the model with exit 2, because an agent that broke the config needs to hear about it.
+`0` clean · `1` violations · `2` usage or config error. For `inwards check PATHS...`, a path that doesn't exist, or paths that all lie outside `root`, are usage errors. For Claude Code, the hook turns violations into exit 2, the "please fix" signal, and uses exit 1 for what only the user should see: an unreadable payload, an internal error, or a Stop gate that fails again after blocking once with its own error. A config error also goes to the model with exit 2, because an agent that broke the config needs to hear about it.
 
 ### When the agent can't fix it
 
