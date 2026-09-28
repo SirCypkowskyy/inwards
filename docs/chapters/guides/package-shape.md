@@ -126,7 +126,18 @@ When every domain has the same shape, the same import order between its modules 
 
 ## Shapes from a preset
 
-`inwards init --style layered|clean|hexagonal --scaffold` writes shapes that fit its example package. The package itself holds only its layer packages, `bootstrap.py`, `__main__.py` and `_version.py` (which hatch-vcs and setuptools-scm write), and `adapters/` in `hexagonal` holds only `inbound/` and `outbound/`; any other member there is an error, because no layer would hold it. In `clean` and `hexagonal`, `application/` must hold `ports/` and `use_cases/`, and any other member there is a warning. The layer packages have no shape, so they grow freely. [Install](install.md#a-new-project-start-from-a-preset) lists them; `inwards init --list-styles` prints them.
+`inwards init --style NAME --scaffold` writes shapes that fit its example package. In `layered`, `clean`, `hexagonal` and `vertical-slices`, the package itself holds only its layer packages, `bootstrap.py`, `__main__.py` and `_version.py` (which hatch-vcs and setuptools-scm write), and `adapters/` in `hexagonal` holds only `inbound/` and `outbound/`; any other member there is an error, because no layer would hold it. In `clean` and `hexagonal`, `application/` must hold `ports/` and `use_cases/`, and any other member there is a warning. The layer packages have no shape, so they grow freely. [Install](install.md#a-new-project-start-from-a-preset) lists the presets; `inwards init --list-styles` prints their shapes.
+
+The presets with contexts also shape their context packages, through a `*` selector, so a new one is covered the moment it exists:
+
+| Preset | Package | Shape |
+|---|---|---|
+| `vertical-slices` | `app.features` | slice packages only (`allow = ["*/"]`) |
+| `vertical-slices` | `app.features.*` | requires `api`; allows any other member |
+| `bounded-contexts` | `app` | context packages, `bootstrap.py`, `__main__.py`, `_version.py` |
+| `bounded-contexts` | `app.*` | requires `domain/`, `application/`, `infrastructure/`, `api`; anything else is a warning |
+| `django` | `app` | requires `settings.py` and `urls.py`; allows apps, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |
+| `django` | `app.*` | requires `models`, `services`, `views`, `urls`; allows `admin`, `apps`, `migrations/`, `tests`; anything else is a warning |
 
 ## Not covered yet
 

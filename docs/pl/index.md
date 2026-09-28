@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: 53472d10db160ad97d08463beb66b2107c0c6549a4dd7c3947139da700171bad
+source_hash: c178d81bfaddf37f128d4ce684e95e3399a1da4a1b0ab569a19d5848f16f8cba
 hide:
   - navigation
 ---
@@ -121,6 +121,6 @@ Deklarujesz swoje warstwy w `pyproject.toml`. `inwards check` zgłasza błąd, g
 !!! info "Stan projektu"
     Pre-alpha.
     Dwanaście reguł działa od początku do końca w CLI i w silniku, a wszystkie poza INW004 także w serwerze VS Code: INW001 (kierunek warstw), INW011 (importy dynamiczne), INW002 (zależności między [kontekstami ograniczonymi](guides/configuration.md#contexts) tylko zadeklarowane), INW003 (inny kod importuje tylko publiczne moduły kontekstu), INW004 (cykle importów, przy sprawdzaniu całego projektu), INW005 ([biblioteki w warstwach](guides/libraries.md): domyślnie żadnych frameworków ani operacji wejścia-wyjścia w domenie), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW010 (importy własnych modułów, które nie istnieją), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane), INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy) oraz INW009 (wyciszenia w linii, `# inwards: ignore[CODE] reason="..."`, które są niepoprawne albo nieużyte).
-    `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika; `--agent opencode` zapisuje plugin, który robi to samo w OpenCode. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
+    `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika; `--agent opencode` zapisuje plugin, który robi to samo w OpenCode. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Każde wydanie to GitHub Release z plikami binarnymi dla sześciu platform, pięcioma wheelami platformowymi dla `uv add` i plikiem `.vsix`. Jak dotąd jedynym wydaniem jest wersja przedpremierowa v0.1.0-rc.1.
     CI testuje każdy pull request na Linuksie, a na macOS i Windows – przed każdym wydaniem. Elementy oznaczone :material-progress-clock: są zaplanowane.

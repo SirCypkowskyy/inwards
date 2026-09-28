@@ -2,7 +2,7 @@
  * @file The package shapes (INW007, INW008) the `inwards init --style` presets
  * write with `--scaffold`, and their text in the config table and in
  * `--list-styles`. Each shape fits the scaffold's packages; no I/O, and which
- * preset uses which shape is `styles.ts`'s business.
+ * preset uses which shape is `presets.ts`'s business.
  */
 
 /**
@@ -15,7 +15,8 @@ export interface StyleShape {
   /** Dotted package below the project package; "" is the package itself. */
   package: string;
   require: readonly string[];
-  allow: readonly string[];
+  /** Undefined writes no `allow`: any member may sit beside the required ones. */
+  allow: readonly string[] | undefined;
   extra: "error" | "warning";
   /** What the shape keeps in place, for the table's comment and `--list-styles`. */
   why: string;
@@ -64,9 +65,25 @@ export const ADAPTERS: StyleShape = {
 export function describeShapes(shapes: readonly StyleShape[], pkg: string): string[] {
   const width = Math.max(...shapes.map((shape) => shapePackage(pkg, shape).length));
   return shapes.map((shape) => {
-    const allow = shape.allow.length === 0 ? "" : `; allows ${shape.allow.join(", ")}`;
-    return `    ${shapePackage(pkg, shape).padEnd(width)}  requires ${shape.require.join(", ")}${allow}: ${shape.why}`;
+    const terms = [
+      shape.require.length === 0 ? "" : `requires ${shape.require.join(", ")}`,
+      shape.allow === undefined || shape.allow.length === 0
+        ? ""
+        : `allows ${shape.allow.join(", ")}`,
+    ].filter((term) => term !== "");
+    return `    ${shapePackage(pkg, shape).padEnd(width)}  ${terms.join("; ")}: ${shape.why}`;
   });
+}
+
+/**
+ * Names a module below the project package in full.
+ *
+ * @param pkg - the project's import package.
+ * @param module - a dotted module below it; "" is the package itself.
+ * @returns e.g. `my_app.application`.
+ */
+export function fullModule(pkg: string, module: string): string {
+  return module === "" ? pkg : `${pkg}.${module}`;
 }
 
 /**
@@ -77,7 +94,7 @@ export function describeShapes(shapes: readonly StyleShape[], pkg: string): stri
  * @returns the dotted package, e.g. `my_app.application`.
  */
 function shapePackage(pkg: string, shape: StyleShape): string {
-  return shape.package === "" ? pkg : `${pkg}.${shape.package}`;
+  return fullModule(pkg, shape.package);
 }
 
 /**
@@ -86,7 +103,7 @@ function shapePackage(pkg: string, shape: StyleShape): string {
  * @param values - the strings.
  * @returns e.g. `["ports/", "use_cases/"]`.
  */
-function array(values: readonly string[]): string {
+export function tomlArray(values: readonly string[]): string {
   return `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;
 }
 
@@ -104,9 +121,9 @@ export function shapeLines(shapes: readonly StyleShape[], pkg: string): string[]
     ...(i === 0 ? ["# Package shapes (INW007, INW008) for the scaffold's packages."] : []),
     `# ${shapePackage(pkg, shape)}: ${shape.why}.`,
     "[[tool.inwards.shape]]",
-    `packages = ${array([shapePackage(pkg, shape)])}`,
-    `require = ${array(shape.require)}`,
-    `allow = ${array(shape.allow)}`,
+    `packages = ${tomlArray([shapePackage(pkg, shape)])}`,
+    ...(shape.require.length === 0 ? [] : [`require = ${tomlArray(shape.require)}`]),
+    ...(shape.allow === undefined ? [] : [`allow = ${tomlArray(shape.allow)}`]),
     ...(shape.extra === "warning" ? ['extra = "warning"'] : []),
   ]);
 }

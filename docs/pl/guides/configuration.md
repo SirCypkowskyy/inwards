@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 9f202d536d4aa98fbc3c5b6777f909141f8684ad60542b1453a436724d649d22
+source_hash: 4f5a310b22056578da498ff98641917b9a2cdf661e8c485ba567874e3e705820
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -134,7 +134,7 @@ layers = [
 ]
 ```
 
-Tutaj `app.schemas` może importować `app.constants`, ale nie `app.models`, a `app.service` może importować oba. Dozwolony kierunek w komunikatach brzmi `constants <- models | schemas <- service`. Gdy najbardziej wewnętrzne miejsce zajmują warstwy sąsiednie, każda z nich dostaje domyślną listę zakazów INW005. Warstwa sąsiednia nie może wskazywać szablonu, a grupa z jedną warstwą to błąd konfiguracji.
+Tutaj `app.schemas` może importować `app.constants`, ale nie `app.models`, a `app.service` może importować oba. Dozwolony kierunek w komunikatach brzmi `constants <- models | schemas <- service`. Gdy najbardziej wewnętrzne miejsce zajmują warstwy sąsiednie, każda z nich dostaje domyślną listę zakazów INW005. Warstwa sąsiednia nie może wskazywać szablonu, a grupa z jedną warstwą to błąd konfiguracji. `inwards init --style hexagonal` zapisuje swoje adaptery inbound i outbound jako jedną grupę warstw sąsiednich ([Instalacja](install.md#a-new-project-start-from-a-preset)).
 
 ### `required-version` { #required-version }
 
@@ -338,7 +338,7 @@ Szablony są rozwijane przy wczytywaniu konfiguracji, zanim cokolwiek innego zos
 - **W modułach wpisu z szablonem używaj `*`, nie `**`.** `src.*` daje `src.*.models`, które pasuje tylko do `models` samej domeny, więc `src/orders/service/models.py` zostaje w roli `service`. Przy `src.**` wzorzec `src.**.models` pasuje też do tego pliku, który przechodzi wtedy do roli `models`, bo wygrywa najgłębszy ostatni dosłowny segment ([Selektory](#selectors)).
 - **Błędy konfiguracji nazywają wpis albo klucz szablonu**: `tool.inwards.layers[1].template` dla nieznanego szablonu albo takiego bez ról, `tool.inwards.templates.fastapi-domain.roles[2]` dla błędnej roli. Problem, który widać dopiero po rozwinięciu, na przykład zajęta już nazwa warstwy roli, nazywa rozwiniętą warstwę.
 
-Szablon, z którego nikt nie korzysta, jest dozwolony. [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
+Szablon, z którego nikt nie korzysta, jest dozwolony. Trzy presety zapisują szablon i konteksty za ciebie: `inwards init --style vertical-slices`, `bounded-contexts` i `django` ([Instalacja](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
 
 ### `cycles` { #cycles }
 

@@ -20,17 +20,12 @@ import {
   isAgent,
   type Target,
 } from "./contracts.ts";
+import { STYLES } from "./presets.ts";
 import { report, type Setup } from "./report.ts";
 import { planScaffold } from "./scaffold.ts";
-import {
-  configTable,
-  describeStyles,
-  isStyle,
-  STYLE_NAMES,
-  STYLES,
-  type Style,
-  type StyleName,
-} from "./styles.ts";
+import { fullModule } from "./shapes.ts";
+import { configTable, describeStyles } from "./style-text.ts";
+import { expandLayers, isStyle, STYLE_NAMES, type Style, type StyleName } from "./styles.ts";
 import { findTarget, noPackage, shown, sourceRoot } from "./target.ts";
 
 const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--brief] [--dry-run]
@@ -176,7 +171,7 @@ async function styleCommand(
     );
   }
   const root = sourceRoot({ ...ctx.io, toml: ctx.init.toml }, project, target.pkg, target.text);
-  const config = withTable(target, style, { pkg: target.pkg, root, shapes: plan.scaffold });
+  const config = withTable(target, style, { pkg: target.pkg, root, scaffold: plan.scaffold });
   if (typeof config === "string") {
     return print(ctx.io.streams, `inwards init: ${config}`, 2);
   }
@@ -264,27 +259,29 @@ async function commit(
 /**
  * Appends the preset's table to pyproject.toml, one blank line after the
  * rest, in the file's own line endings. The result must parse to exactly the
- * preset's layers; otherwise (a `tool` inline table, say) init stops.
+ * preset's layers, templates expanded; otherwise (a `tool` inline table, say) init stops.
  *
  * @param target - the pyproject.toml.
  * @param style - the preset.
- * @param opts - the import package, the config root, and whether to add the shapes.
+ * @param opts - the import package, the config root, and whether the scaffold is written.
  * @param opts.pkg - the import package.
  * @param opts.root - the config root.
- * @param opts.shapes - add the preset's shapes, which fit only the scaffold's packages.
+ * @param opts.scaffold - add the preset's shapes and contexts, which fit only the scaffold's packages.
  * @returns the change, or an error message.
  */
 function withTable(
   target: Target,
   style: Style,
-  { pkg, root, shapes }: { pkg: string; root: string; shapes: boolean },
+  { pkg, root, scaffold }: { pkg: string; root: string; scaffold: boolean },
 ): Change | string {
   const { path, text } = target;
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const version = VERSION.replace(PRERELEASE, "");
-  const table = configTable(style, { pkg, root, version, ignore: DEFAULT_IGNORE, shapes, eol });
+  const table = configTable(style, { pkg, root, version, ignore: DEFAULT_IGNORE, scaffold, eol });
   const after = `${text}${separator(text, eol)}${table}`;
-  const want = style.layers.map((layer) => `${layer.name}=${pkg}.${layer.module}`).join(" ");
+  const want = expandLayers(style)
+    .map((layer) => `${layer.name}=${fullModule(pkg, layer.module)}`)
+    .join(" ");
   let got = "";
   try {
     got = parseConfig(after)

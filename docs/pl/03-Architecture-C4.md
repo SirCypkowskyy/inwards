@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 3cb0e8183d933db42c25327ab8fd4e039fede11ad10342060a3e09d472bde662
+source_hash: ef5166b4cfd19df2cc8b98a9804f8f7316b67b6227680dcb5d7c233147537cb5
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -224,7 +224,7 @@ Pozostałe polecenia korzystają z tych samych elementów:
 
 - `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia shape guard i config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
 - `inwards init --agent claude|opencode|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
-- `inwards init --style layered|clean|hexagonal [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet z pasującymi do niego kształtami pakietów) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
+- `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet z pasującymi do niego kształtami pakietów) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
 ## Wdrożenie i dystrybucja { #deployment-and-distribution }
 

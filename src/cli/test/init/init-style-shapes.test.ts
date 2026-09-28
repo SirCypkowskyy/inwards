@@ -53,6 +53,16 @@ function preWrite(root: string, rel: string): string | undefined {
   return denied(pre(root, "Write", { file_path: rel, content: "X = 1\n" }));
 }
 
+/** Where each preset grows normally: a new module inside a layer. */
+const GROWTH: Readonly<Record<(typeof STYLES)[number], string>> = {
+  layered: "src/my_app/domain/customer.py",
+  clean: "src/my_app/domain/customer.py",
+  hexagonal: "src/my_app/domain/customer.py",
+  "vertical-slices": "src/my_app/features/orders/customer.py",
+  "bounded-contexts": "src/my_app/orders/domain/customer.py",
+  django: "src/my_app/orders/admin.py",
+};
+
 describe("inwards init --style X --scaffold writes package shapes", () => {
   test.each([...STYLES])(
     "%s: a module beside the layers fails with INW007, one inside a layer passes",
@@ -60,7 +70,7 @@ describe("inwards init --style X --scaffold writes package shapes", () => {
       const root = project(UV_PROJECT);
       expect(init(root, "--style", style, "--scaffold").code).toBe(0);
       expect(shapeFindings(root)).toEqual({ code: 0, findings: [] });
-      plant(root, "src/my_app/domain/customer.py"); // normal growth: a new entity
+      plant(root, GROWTH[style]); // normal growth: a new entity
       plant(root, "src/my_app/_version.py"); // written by hatch-vcs or setuptools-scm
       plant(root, "src/my_app/__main__.py");
       expect(shapeFindings(root)).toEqual({ code: 0, findings: [] });
@@ -80,6 +90,13 @@ describe("inwards init --style X --scaffold writes package shapes", () => {
       "src/my_app/adapters/http/__init__.py",
       "INW007 error src/my_app/adapters/http/__init__.py",
     ],
+    [
+      "vertical-slices",
+      "src/my_app/features/helpers.py",
+      "INW007 error src/my_app/features/helpers.py",
+    ],
+    ["bounded-contexts", "src/my_app/orders/utils.py", "INW007 warning src/my_app/orders/utils.py"],
+    ["django", "src/my_app/orders/forms.py", "INW007 warning src/my_app/orders/forms.py"],
   ])("%s: planting %s reports %s", (style, rel, finding) => {
     const root = project(UV_PROJECT);
     expect(init(root, "--style", style, "--scaffold").code).toBe(0);
@@ -101,6 +118,21 @@ describe("inwards init --style X --scaffold writes package shapes", () => {
       '"helpers.py" is not an allowed member',
     );
     expect(preWrite(root, "src/my_app/adapters/http.py")).toContain('"http.py" is not an allowed');
+  });
+
+  test.each([
+    [
+      "vertical-slices",
+      "src/my_app/features/orders/api.py",
+      "src/my_app/features/orders/__init__.py",
+    ],
+    ["bounded-contexts", "src/my_app/orders/api.py", "src/my_app/orders/__init__.py"],
+    ["django", "src/my_app/orders/services.py", "src/my_app/orders/__init__.py"],
+  ])("%s: removing %s fails with INW008", (style, rel, where) => {
+    const root = project(UV_PROJECT);
+    expect(init(root, "--style", style, "--scaffold").code).toBe(0);
+    rmSync(join(root, rel));
+    expect(shapeFindings(root).findings).toContain(`INW008 error ${where}`);
   });
 
   test("removing a layer package fails with INW008", () => {
