@@ -1,6 +1,6 @@
 {
   "name": "@inwards/core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Runtime-agnostic Inwards engine: parse Python with tree-sitter, apply architecture rules, report.",
