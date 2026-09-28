@@ -339,6 +339,7 @@ function disablesHooks(text: string): boolean {
 function usesInwards(io: Pick<GuardIo, "probe" | "read">, project: string, dir?: string): boolean {
   return (
     io.probe.exists(join(project, ".inwards")) ||
-    findConfig(io, dir ?? project, project) !== undefined
+    (dir !== undefined && findConfig(io, dir, project) !== undefined) ||
+    findConfig(io, project, project) !== undefined
   );
 }
