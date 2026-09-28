@@ -15,9 +15,10 @@ import type { Node, Parser, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { importedNames, normalizeSource, parsePython } from "../../python/parser.ts";
+import { type ModuleDefinitions, moduleDefinitions } from "./definitions.ts";
 import { extract, moduleFunctions } from "./extract.ts";
 import type { FastApiFile, FastApiObject } from "./records.ts";
-import { qualifierFor } from "./values.ts";
+import { type Qualify, qualifierFor } from "./values.ts";
 
 /** The text pre-filter: a file that spells none of these holds no FastAPI object or wiring. */
 const MENTIONS = /fastapi|FastAPI|APIRouter|include_router|exception_handler/u;
@@ -25,10 +26,19 @@ const MENTIONS = /fastapi|FastAPI|APIRouter|include_router|exception_handler/u;
 /** How many re-exports `resolve` follows before it gives up (a re-export cycle ends here). */
 const MAX_HOPS = 8;
 
-/** What a qualified name resolves to: an app or router, or a module-level function. */
+/**
+ * What a qualified name resolves to: an app or router, or a module-level
+ * function, class or constant (`NAME = value`, whose `node` is the value).
+ * `qualify` qualifies names in the definition's own file.
+ */
 export type Definition =
   | { readonly kind: "object"; readonly file: FastApiFile; readonly object: FastApiObject }
-  | { readonly kind: "function"; readonly file: SourceFile; readonly node: Node };
+  | {
+      readonly kind: "function" | "class" | "constant";
+      readonly file: SourceFile;
+      readonly node: Node;
+      readonly qualify: Qualify;
+    };
 
 /** One parsed file, kept until `dispose()`. */
 interface Parsed {
@@ -38,6 +48,9 @@ interface Parsed {
   readonly names: ReadonlyMap<string, string>;
   /** Module-level functions by name. */
   readonly functions: ReadonlyMap<string, Node>;
+  /** Module-level classes and constants by name. */
+  readonly definitions: ModuleDefinitions;
+  readonly qualify: Qualify;
   /** Null when the text doesn't pass the pre-filter. */
   readonly model: FastApiFile | null;
 }
@@ -62,6 +75,8 @@ export class FastApiModel {
   private readonly parser: Parser;
   private readonly project: ProjectIndex;
   private readonly parsed = new Map<string, Parsed>();
+  /** Paths whose text came from `fileModel`, the adapter's view, which a disk read must not replace. */
+  private readonly pinned = new Set<string>();
 
   /**
    * Wraps a parser and a project index. Nothing is read or parsed yet.
@@ -77,25 +92,44 @@ export class FastApiModel {
   /**
    * Reads one file's FastAPI records. A file that fails the pre-filter isn't
    * parsed. A new text for the same path replaces the cached parse and frees
-   * the old one, whose nodes are then invalid.
+   * the old one, whose nodes are then invalid. That text then wins over the
+   * one the project index reads for the same path, so an unsaved editor
+   * buffer isn't swapped for the file on disk while a rule walks it.
    *
    * @param file - the source file, as the adapter read it.
    * @returns the file's records, or null when its text doesn't mention FastAPI.
    */
   fileModel(file: SourceFile): FastApiFile | null {
     const text = normalizeSource(file.text);
-    return MENTIONS.test(text) ? this.parse({ ...file, text }).model : null;
+    if (!MENTIONS.test(text)) {
+      return null;
+    }
+    const { model } = this.parse({ ...file, text }, true);
+    this.pinned.add(file.path);
+    return model;
   }
 
   /**
-   * Reads a first-party module's records through the project index.
+   * Reads a first-party module's records through the project index. A text
+   * `fileModel` was given for the same path wins over the one on disk.
    *
    * @param module - a dotted module name.
    * @returns its records, or null when no file holds it or it doesn't mention FastAPI.
    */
   moduleModel(module: string): FastApiFile | null {
     const src = this.project.sourceOf(module);
-    return src === undefined ? null : this.fileModel(src);
+    const text = src === undefined ? "" : normalizeSource(src.text);
+    return src !== undefined && MENTIONS.test(text) ? this.parse({ ...src, text }).model : null;
+  }
+
+  /**
+   * Gives the name qualifier of a file the model has read.
+   *
+   * @param file - records the model returned.
+   * @returns what qualifies a name node in that file, or null when it isn't parsed.
+   */
+  qualifierOf(file: FastApiFile): Qualify | null {
+    return this.parsed.get(file.path)?.qualify ?? null;
   }
 
   /**
@@ -139,17 +173,20 @@ export class FastApiModel {
       tree.delete(); // WASM memory is not garbage collected
     }
     this.parsed.clear();
+    this.pinned.clear();
   }
 
   /**
    * Parses a file once per text, and reads its records when it passes the pre-filter.
    *
    * @param file - the source file, with normalised text.
+   * @param own - true when the text is the adapter's own (`fileModel`); a
+   *   project read then never replaces it.
    * @returns the cached parse.
    */
-  private parse(file: SourceFile): Parsed {
+  private parse(file: SourceFile, own = false): Parsed {
     const cached = this.parsed.get(file.path);
-    if (cached?.text === file.text) {
+    if (cached && (cached.text === file.text || (!own && this.pinned.has(file.path)))) {
       return cached;
     }
     cached?.tree.delete();
@@ -160,25 +197,36 @@ export class FastApiModel {
     const model = MENTIONS.test(file.text)
       ? extract(tree.rootNode, { file, qualify, functions })
       : null;
-    const parsed = { text: file.text, tree, names, functions, model };
+    const definitions = moduleDefinitions(tree.rootNode);
+    const parsed = { text: file.text, tree, names, functions, definitions, qualify, model };
     this.parsed.set(file.path, parsed);
     return parsed;
   }
 }
 
 /**
- * Looks a name up among one file's objects and module-level functions.
+ * Looks a name up among one file's objects and module-level functions,
+ * classes and constants, in that order.
  *
  * @param parsed - the file's parse.
  * @param src - the file.
  * @param local - the name as bound in the file.
- * @returns the definition, or null when the file defines no such object or function.
+ * @returns the definition, or null when the file defines no such name.
  */
 function definitionIn(parsed: Parsed, src: SourceFile, local: string): Definition | null {
   const object = parsed.model?.objects.find((o) => o.local === local);
   if (parsed.model && object) {
     return { kind: "object", file: parsed.model, object };
   }
-  const node = parsed.functions.get(local);
-  return node ? { kind: "function", file: src, node } : null;
+  const { functions, definitions, qualify } = parsed;
+  const fn = functions.get(local);
+  const cls = definitions.classes.get(local);
+  const constant = definitions.constants.get(local);
+  if (fn) {
+    return { kind: "function", file: src, node: fn, qualify };
+  }
+  if (cls) {
+    return { kind: "class", file: src, node: cls, qualify };
+  }
+  return constant ? { kind: "constant", file: src, node: constant, qualify } : null;
 }

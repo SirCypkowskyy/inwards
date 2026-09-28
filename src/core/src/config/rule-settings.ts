@@ -16,26 +16,20 @@
 
 import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";
 import { diagnostic, RULES, ruleFor } from "../meta/registry.ts";
-import { isSelector, matchEntry, selectorProblem } from "./layer-selector.ts";
+import { matchEntry } from "./layer-selector.ts";
+import { type OptionValue, optionKeys, parseOptions } from "./rule-options.ts";
 import { type ConfigFile, spanOfRuleTable } from "./source-span.ts";
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
-/** One rule's options table, `[tool.inwards.rules.<rule-name>]`, as parsed. */
+/**
+ * One rule's options table, `[tool.inwards.rules.<rule-name>]`, as parsed:
+ * values by TOML key, checked against the rule's spec in `rule-options.ts`.
+ * Every rule takes `modules`: entries in the grammar of `layers[].modules`
+ * (ADR-034), a prefix such as `shop.domain` or a selector such as
+ * `shop.*.api`, and the rule then reports only in the modules they match.
+ */
 export interface RuleOptions {
-  /**
-   * Module entries in the grammar of `layers[].modules` (ADR-034): a prefix
-   * such as `shop.domain` or a selector such as `shop.*.api`. The rule
-   * reports only in the modules they match.
-   */
-  modules?: string[];
-  /** FAPI003 (`router-wiring`): the apps that count as roots, as `module:name`. */
-  entrypoints?: string[];
-  /** FAPI003: routers that may stay unmounted, as module prefixes or selectors of their qualified name. */
-  allowUnmounted?: string[];
-  /** FAPI003: what an `include_router` Inwards can't resolve does to unmounted findings. */
-  unresolvedIncludes?: "warn" | "silent";
-  /** FAPI003: false to skip "included before its routes". */
-  checkOrder?: boolean;
+  readonly [key: string]: OptionValue | undefined;
 }
 
 /**
@@ -61,20 +55,6 @@ export const RULE_KEYS: ReadonlySet<string> = new Set([
   "ignore",
   "severity",
 ]);
-/** Keys every rule's options table may hold. */
-export const OPTION_KEYS: ReadonlySet<string> = new Set(["modules"]);
-/** Keys only one rule's options table may hold, by rule name, on top of `OPTION_KEYS`. */
-export const RULE_OPTION_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
-  "router-wiring": new Set([
-    "entrypoints",
-    "allow-unmounted",
-    "unresolved-includes",
-    "check-order",
-  ]),
-};
-/** An entrypoint: a dotted module, a colon, and a name, e.g. `app.main:app`. */
-const ENTRYPOINT =
-  /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*:[\p{XID_Start}_]\p{XID_Continue}*$/u;
 const SEVERITIES: readonly string[] = ["error", "warning"] satisfies Severity[];
 /** Always reports at its own severity, see the module comment. */
 const FIXED = "INW000";
@@ -131,7 +111,7 @@ export function parseRules(value: unknown): { rules?: RuleSettings } {
  * @param table - the raw `rules` table, keys already checked.
  * @returns options by rule name, or undefined when there are none.
  * @throws {ConfigError} for a table that isn't one, an unknown key in it
- *   (named), a bad `modules`, or a table for INW000.
+ *   (named), a bad `modules` or other option (named), or a table for INW000.
  */
 function optionTables(table: Record<string, unknown>): Record<string, RuleOptions> | undefined {
   const names = Object.keys(table)
@@ -154,83 +134,10 @@ function optionTables(table: Record<string, unknown>): Record<string, RuleOption
         `${where} must be a table of the rule's options, such as { modules = ["shop.api.*"] }.`,
       );
     }
-    rejectUnknownKeys(raw, new Set([...OPTION_KEYS, ...(RULE_OPTION_KEYS[name] ?? [])]), where);
-    options[name] = {
-      ...(raw["modules"] === undefined
-        ? {}
-        : { modules: moduleEntries(raw["modules"], `${where}.modules`) }),
-      ...routerWiringOptions(raw, where),
-    };
+    rejectUnknownKeys(raw, optionKeys(name), where);
+    options[name] = parseOptions(name, raw, where);
   }
   return options;
-}
-
-/**
- * Validates the options only FAPI003's table (`router-wiring`) may hold;
- * `rejectUnknownKeys` already refused them in any other table.
- *
- * @param raw - the raw options table.
- * @param where - the table's dotted path, for messages.
- * @returns the options that are set.
- * @throws {ConfigError} for an entrypoint that isn't `module:name`, a bad
- *   `allow-unmounted` entry, an `unresolved-includes` other than "warn" or
- *   "silent", or a `check-order` that isn't a boolean.
- */
-function routerWiringOptions(raw: Record<string, unknown>, where: string): RuleOptions {
-  const {
-    entrypoints,
-    "allow-unmounted": allow,
-    "unresolved-includes": unresolved,
-    "check-order": order,
-  } = raw;
-  const list: unknown[] = Array.isArray(entrypoints) ? entrypoints : [];
-  const points = list.filter((e): e is string => typeof e === "string" && ENTRYPOINT.test(e));
-  if (entrypoints !== undefined && !(points.length > 0 && points.length === list.length)) {
-    throw new ConfigError(
-      `${where}.entrypoints must be a non-empty list of "module:name" entries, such as ["app.main:app"].`,
-    );
-  }
-  if (unresolved !== undefined && unresolved !== "warn" && unresolved !== "silent") {
-    throw new ConfigError(`${where}.unresolved-includes must be "warn" or "silent".`);
-  }
-  if (order !== undefined && typeof order !== "boolean") {
-    throw new ConfigError(`${where}.check-order must be true or false.`);
-  }
-  return {
-    ...(entrypoints === undefined ? {} : { entrypoints: points }),
-    ...(allow === undefined
-      ? {}
-      : { allowUnmounted: moduleEntries(allow, `${where}.allow-unmounted`) }),
-    ...(unresolved === undefined ? {} : { unresolvedIncludes: unresolved }),
-    ...(order === undefined ? {} : { checkOrder: order }),
-  };
-}
-
-/**
- * Validates an options table's `modules`: a non-empty list of module
- * prefixes or selectors, checked like `layers[].modules`.
- *
- * @param value - the raw list.
- * @param where - the key's dotted path, for messages.
- * @returns the entries as written.
- * @throws {ConfigError} naming the first bad entry, or when the list is empty or not a list of strings.
- */
-function moduleEntries(value: unknown, where: string): string[] {
-  if (!(Array.isArray(value) && value.length > 0 && value.every((e) => typeof e === "string"))) {
-    throw new ConfigError(
-      `${where} must be a non-empty list of module prefixes or selectors, such as ["shop.domain", "shop.*.api"].`,
-    );
-  }
-  for (const entry of value) {
-    let problem = isSelector(entry) ? selectorProblem(entry) : undefined;
-    if (!(isSelector(entry) || isDottedName(entry))) {
-      problem = "it isn't a dotted module name";
-    }
-    if (problem !== undefined) {
-      throw new ConfigError(`${where}: "${entry}" is not a module prefix or selector: ${problem}.`);
-    }
-  }
-  return value;
 }
 
 /**
@@ -342,7 +249,8 @@ export function ruleLevel(
   const { select, extendSelect = [], ignore = [], severity = {}, options = {} } = rules ?? {};
   const rule = ruleFor(code);
   const chosen = select === undefined ? rule?.default !== "off" : select.includes(code);
-  const scope = rule === undefined ? undefined : options[rule.name]?.modules;
+  const modules = rule === undefined ? undefined : options[rule.name]?.["modules"];
+  const scope = typeof modules === "object" ? modules : undefined;
   const inScope =
     scope === undefined ||
     module === "" ||

@@ -16,10 +16,10 @@ describe("[tool.inwards.rules.router-wiring]", () => {
       `${Layer}\n[tool.inwards.rules.router-wiring]\nentrypoints = ["app.main:app"]\nallow-unmounted = ["app.*.experimental"]\nunresolved-includes = "silent"\ncheck-order = false\n`,
     );
     expect(rules?.options?.["router-wiring"]).toEqual({
+      "allow-unmounted": ["app.*.experimental"],
+      "check-order": false,
       entrypoints: ["app.main:app"],
-      allowUnmounted: ["app.*.experimental"],
-      unresolvedIncludes: "silent",
-      checkOrder: false,
+      "unresolved-includes": "silent",
     });
   });
 
@@ -30,7 +30,7 @@ describe("[tool.inwards.rules.router-wiring]", () => {
       'entrypoints must be a non-empty list of "module:name" entries',
     ],
     ['allow-unmounted = ["*.x"]', "it must start with a package name"],
-    ['unresolved-includes = "error"', 'unresolved-includes must be "warn" or "silent"'],
+    ['unresolved-includes = "error"', 'unresolved-includes must be one of "warn", "silent"'],
     ["check-order = 1", "check-order must be true or false"],
   ])("%s is a config error naming the key", (body, message) => {
     const text = `${Layer}\n[tool.inwards.rules.router-wiring]\n${body}\n`;

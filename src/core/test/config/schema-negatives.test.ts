@@ -19,6 +19,17 @@ function withExtra(extra: string): string {
 }
 
 /**
+ * Builds a config with one FAPI options table.
+ *
+ * @param table - the rule's name.
+ * @param body - the table's body, TOML.
+ * @returns the config text.
+ */
+function fapi(table: string, body: string): string {
+  return withExtra(`[tool.inwards.rules.${table}]\n${body}\n`);
+}
+
+/**
  * Builds a config whose only layer is the given inline table.
  *
  * @param layer - the layer's TOML inline table.
@@ -111,6 +122,16 @@ describe("structural mistakes fail both the schema and the parser", () => {
       withExtra('[tool.inwards.rules.INW001]\nmodules = ["shop"]\n'),
     ],
     ["an empty modules list", withExtra("[tool.inwards.rules.layer-dependency]\nmodules = []\n")],
+    ["another rule's option", fapi("endpoint-metadata", "max-depth = 1")],
+    ["a require-summary mode", fapi("endpoint-metadata", "require-summary = true")],
+    ["an unknown method", fapi("endpoint-metadata", 'require-status-code = ["fetch"]')],
+    ["a repeated field", fapi("endpoint-metadata", 'require-response-fields = ["model", "model"]')],
+    ["a string require-tags", fapi("endpoint-metadata", 'require-tags = "yes"')],
+    ["a negative max-depth", fapi("undocumented-error-response", "max-depth = -1")],
+    ["a max-depth above 8", fapi("undocumented-error-response", "max-depth = 9")],
+    ["an unknown codes range", fapi("undocumented-error-response", 'codes = "5xx"')],
+    ["an unknown explicit-422", fapi("undocumented-error-response", 'explicit-422 = "warn"')],
+    ["a numeric flag", fapi("undocumented-error-response", "report-direct-raises = 1")],
     [
       "a modules selector that doesn't start with a package",
       withExtra('[tool.inwards.rules.layer-dependency]\nmodules = ["*.api"]\n'),

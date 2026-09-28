@@ -199,6 +199,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | string (Python) | napis |
 | suppression, inline suppression (`# inwards: ignore[...]`) | wyciszenie, wyciszenie w linii |
 | reason (of a suppression) | powód |
+| path operation (FastAPI) | operacja ścieżki |
+| exception handler (FastAPI) | handler wyjątków |
+| helper (function) | funkcja pomocnicza |
+| inclusion (`include_router`) | dołączenie |
 | finding | diagnostyka (as for diagnostic) |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |

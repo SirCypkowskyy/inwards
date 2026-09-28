@@ -44,8 +44,8 @@ import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import { Extractor } from "./extraction.ts";
+import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
-import { routerWiring, withWiring } from "./router-wiring.ts";
 import { type Checked, type Confirmed, keptOnce, ordered, type Scan } from "./stages.ts";
 
 export type { Checked } from "./stages.ts";
@@ -136,14 +136,16 @@ export class Engine {
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
+   * FAPI001 and FAPI002 run only when on and the text mentions FastAPI.
+   *
    * @param file - the source file as read by the adapter.
    * @param project - the project's module index (see `index`).
    * @returns the violations found, empty when the file is clean.
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    const wired = routerWiring(this.parser, project, [src], { config: this.config, edit: true });
-    const confirmed = withWiring(this.confirm(src, this.scan(src, project), project), src, wired);
+    const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
+    const confirmed = withFastApi(this.confirm(src, this.scan(src, project), project), src, wired);
     const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
     return applyRules(kept, this.config.rules);
   }
@@ -422,7 +424,7 @@ export class Engine {
     const warned = new Set<string>();
     const collected: Collected[] = [];
     const sources = scanned.map(({ src }) => src);
-    const wired = routerWiring(this.parser, project, sources, { config: this.config, edit });
+    const wired = fastApiFindings(this.parser, project, sources, { config: this.config, edit });
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
       const confirmed = this.confirm(src, scan, project, skip);
@@ -430,7 +432,7 @@ export class Engine {
       if (imports !== undefined) {
         collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
       }
-      const own = this.suppressIn(src, withWiring(confirmed, src, wired));
+      const own = this.suppressIn(src, withFastApi(confirmed, src, wired));
       suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
       all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }
