@@ -527,7 +527,7 @@ async function runAll(plan: {
   const { ids, runs, model, only, inwards, agent } = plan;
 
   // `ollama-cloud/glm-5.3` names a file as `ollama-cloud-glm-5.3`.
-  const name = `${model}${only ? `-${only}` : ""}`.replaceAll(/[/:]/gu, "-");
+  const name = `${model}${only ? `-${only}` : ""}`.replaceAll(/[/:,]/gu, "-");
   const stamp = `${today()}-${name}`;
   const out = join(REPO, "eval/results", stamp);
   const transcripts = join(REPO, "eval/results/transcripts", stamp);
