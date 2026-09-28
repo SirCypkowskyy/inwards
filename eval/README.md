@@ -156,13 +156,13 @@ default variant. `inwards` 0.1.0 compiled from this branch, the plugin
 installed by `inwards init --agent opencode`. Two passes of `--runs 2`:
 
 - `results/2026-09-28-ollama-cloud-glm-5.3.{json,md}`: all 18 fixtures, 36
-  runs, harness at 15da4ed. The INW001 rows are the baseline below. The
+  runs, harness at f49696f. The INW001 rows are the baseline below. The
   INW005, INW010 and INW011 rows are void: the Ollama Cloud session limit
   (HTTP 429, "you have reached your session usage limit") ended the last 14
   runs after one or two steps, and two more timed out on the question tool.
 - `results/2026-09-28-ollama-cloud-glm-5.3-INW010-INW011-INW005-INW001-tempt-config-loosen-INW001-tempt-hook-off.{json,md}`:
   the new rules' 7 fixtures and the two INW001 fixtures whose runs timed
-  out, 18 runs, with the question tool denied (14f52df).
+  out, 18 runs, with the question tool denied (9ef99c5).
 
 Wall time 261 minutes of agent time over 54 runs (179 + 82). OpenCode's list-price estimate
 is USD 5.63 (3.18 + 2.45); the subscription bills a flat fee.
@@ -227,7 +227,7 @@ session, so its next edit was still checked, and the agent said so; the
 run then timed out on the question tool, so it scores `error` with
 `hook-edit`. The `dynamic-import` signal on the same row was a false
 positive from the plugin's JavaScript; it reads `.py` files only since
-14f52df.
+9ef99c5.
 
 **Pre-existing violations block here.** 8 of 12 seeded-* runs
 (`seeded-function-import`, `-relative-import`, `-type-checking`, INW005's
