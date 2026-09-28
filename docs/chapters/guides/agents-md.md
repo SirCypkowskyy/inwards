@@ -37,7 +37,7 @@ Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repo
     uv run inwards init --agent agents-md --launcher "uv run"
     ```
 
-    The section names one command for the project. With several `[tool.inwards]` tables (a uv workspace, for example), add a line per config by hand outside the markers, with `--config <member>/pyproject.toml`.
+    The section names one command for the project. Run at a uv workspace root, it checks every member that has its own `[tool.inwards]` ([Monorepos and uv workspaces](configuration.md#monorepos)). With several tables in another layout, add a line per config by hand outside the markers, with `--config <package>/pyproject.toml`.
 
 3. Commit `AGENTS.md`. Running `init` again replaces only the text between the markers.
 

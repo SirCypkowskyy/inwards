@@ -30,7 +30,7 @@ import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { workspacePackages } from "./workspace.ts";
+import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
@@ -45,6 +45,8 @@ interface Project {
   realRoot: string;
   /** The layer package directories (as written and real), walked without skips. */
   layerDirs: string[];
+  /** Probes the other uv workspace members' import roots, for namespace package portions. */
+  portions: ((rel: string) => ReturnType<PathKind>) | undefined;
 }
 
 /**
@@ -94,6 +96,7 @@ async function openProject(
     lexicalRoot,
     realRoot: io.probe.realpath(lexicalRoot) ?? lexicalRoot,
     layerDirs: layerDirs(io.probe, configPath, config),
+    portions: otherPortions(io, dir),
   };
 }
 
@@ -138,6 +141,7 @@ export function layerDirs(
  * @param what.targets - absolute files or directories; undefined means the config root.
  * @param what.base - directory that report paths are made relative to.
  * @param what.texts - content to check instead of what is on disk, by absolute path.
+ * @param what.exclude - directories whose files another config checks (uv workspace members).
  * @returns the source files, with forward-slash paths on every OS, and the
  *   walked paths that gave at least one of them.
  */
@@ -148,10 +152,12 @@ function loadSources(
     targets,
     base,
     texts,
+    exclude,
   }: {
     targets: string[] | undefined;
     base: string;
     texts: ReadonlyMap<string, string> | undefined;
+    exclude: readonly string[];
   },
 ): { files: SourceFile[]; loaded: string[] } {
   const { lexicalRoot, realRoot } = project;
@@ -160,8 +166,8 @@ function loadSources(
   const seen = new Set<string>();
   for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
     const names = moduleNames(io.probe, abs, lexicalRoot, realRoot);
-    if (names.length === 0) {
-      continue; // outside the root: not read at all
+    if (names.length === 0 || exclude.some((dir) => atOrInside(dir, abs))) {
+      continue; // outside the root, or a workspace member's own config checks it: not read at all
     }
     loaded.push(abs);
     const text = texts?.get(abs) ?? io.read.text(abs);
@@ -228,7 +234,8 @@ function notCheckedOf(
 /**
  * Gives the engine the project's files under the config root, for its module
  * index. Nothing is touched until the engine asks; the listing uses the same
- * walk as `inwards check`, and `listDir` reads one directory (INW010).
+ * walk as `inwards check`, and `listDir` reads one directory (INW010), as
+ * `portions` does the other uv workspace members' import roots.
  *
  * @param io - probes, walks and reads the project.
  * @param project - the loaded project.
@@ -242,6 +249,7 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
       io.walk.pythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
     read: (rel: string): string => io.read.text(join(root, rel)),
     listDir: (rel: string): ReturnType<ListDir> => io.read.list(join(root, rel)),
+    ...(project.portions ? { portions: project.portions } : {}),
   };
 }
 
@@ -273,6 +281,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  *   (`inwards check` and `inwards baseline`); the hooks never pass it (#56).
  * @param options.config - the config to check with instead of the one in
  *   `configPath` (the Stop gate's session-start config, after the agent changed it).
+ * @param options.exclude - directories whose files are left out because their own
+ *   config checks them: the uv workspace members under a workspace root's config (#57).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -287,6 +297,7 @@ export async function runCheck(
     texts,
     cache = false,
     config,
+    exclude = [],
   }: {
     base: string;
     baseline?: boolean | undefined;
@@ -294,11 +305,12 @@ export async function runCheck(
     texts?: ReadonlyMap<string, string> | undefined;
     cache?: boolean | undefined;
     config?: InwardsConfig | undefined;
+    exclude?: readonly string[] | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
   const project = await openProject(io, configPath, cache, config);
-  const { files, loaded } = loadSources(io, project, { targets, base, texts });
+  const { files, loaded } = loadSources(io, project, { targets, base, texts, exclude });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
   const listing = projectFiles(io, project);

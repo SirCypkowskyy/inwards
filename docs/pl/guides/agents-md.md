@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: e26108fe540abbbace4573199f95e2257743dbef18732b2e30ff606d12c74c31
+source_hash: ded1e1833656974992f5e6aa6a35eb7190bdd7883ed596aceb5df60e6783a2cb
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -42,7 +42,7 @@ Wielu agentów kodujących czyta instrukcje projektu z pliku [`AGENTS.md`](https
     uv run inwards init --agent agents-md --launcher "uv run"
     ```
 
-    Sekcja podaje jedno polecenie dla projektu. Przy kilku tabelach `[tool.inwards]` (na przykład w workspace uv) dopisz ręcznie, poza znacznikami, po linii na konfigurację, z `--config <member>/pyproject.toml`.
+    Sekcja podaje jedno polecenie dla projektu. Uruchomione w katalogu głównym workspace'u uv, sprawdza każdego członka, który ma własne `[tool.inwards]` ([Monorepo i workspace'y uv](configuration.md#monorepos)). Przy kilku tabelach w innym układzie dopisz ręcznie, poza znacznikami, po linii na konfigurację, z `--config <package>/pyproject.toml`.
 
 3. Zacommituj `AGENTS.md`. Ponowne uruchomienie `init` zastępuje tylko tekst między znacznikami.
 

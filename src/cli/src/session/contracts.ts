@@ -38,7 +38,8 @@ export interface Check {
  * @param base - the directory report paths are relative to.
  * @param options - whether the baseline applies, file contents to check instead
  *   of the disk's, whether the extraction cache on disk may be used (never by a
- *   hook), and a config to use instead of the one in `configPath`.
+ *   hook), a config to use instead of the one in `configPath`, and the
+ *   directories another config checks (`exclude`, uv workspace members).
  * @returns the report.
  */
 export type CheckRunner = (
@@ -51,5 +52,6 @@ export type CheckRunner = (
     texts?: ReadonlyMap<string, string>;
     cache?: boolean;
     config?: InwardsConfig | undefined;
+    exclude?: readonly string[];
   },
 ) => Promise<Report>;

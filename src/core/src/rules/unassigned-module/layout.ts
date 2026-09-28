@@ -87,7 +87,8 @@ function prefixFindings(
  * (`packages/core/src/core`). Its package is indexed as `packages.core.src.core`,
  * but other code imports it as `core`, which matches no module and so passes
  * as a third-party import: a layer violation between members goes unseen.
- * Until one config can name several roots (#57), each member needs its own.
+ * Each member needs its own config; `inwards check` at the workspace root
+ * then checks it with that config and leaves its files out of this one (#57).
  *
  * @param config - the config, for its root and `[tool.inwards.rules]`.
  * @param file - the pyproject.toml, to point at `root`.
@@ -132,8 +133,8 @@ export function checkNestedProjects(
         fix: {
           summary: `Check ${shown} with its own [tool.inwards].`,
           steps: [
-            `Give ${shown}/pyproject.toml its own [tool.inwards] and run \`inwards check --config ${shown}/pyproject.toml\`, once per workspace member.`,
-            "One config can't cover several source roots yet (#57). Don't edit [tool.inwards] yourself; tell the user.",
+            `Give ${shown}/pyproject.toml its own [tool.inwards]; \`inwards check\` at the workspace root then checks it with that config.`,
+            "Don't edit [tool.inwards] yourself; tell the user.",
           ],
         },
       });

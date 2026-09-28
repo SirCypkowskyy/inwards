@@ -224,6 +224,8 @@ layers = [
   expect(stdout).toContain(
     "src/packages/core is a nested project with its own pyproject.toml: its code is indexed as packages.core.src.core",
   );
-  expect(stdout).toContain("inwards check --config src/services/app/pyproject.toml");
+  expect(stdout).toContain(
+    "Give src/services/app/pyproject.toml its own [tool.inwards]; `inwards check` at the workspace root then checks it with that config.",
+  );
   expect(stdout).toContain(" 3 files, 0 violations, 2 warnings ");
 });

@@ -1,0 +1,11 @@
+[project]
+name = "acme-core"
+version = "0.1.0"
+
+[tool.inwards]
+root = "src"
+layers = [
+  { name = "plugins", modules = ["acme.plugins"] },
+  { name = "domain", modules = ["acme.core.domain"] },
+  { name = "services", modules = ["acme.core.services"] },
+]

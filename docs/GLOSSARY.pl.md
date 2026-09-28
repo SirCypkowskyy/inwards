@@ -152,6 +152,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | phase in (rules) | wprowadzać stopniowo (reguły) |
 | picker (`init` on a terminal) | kreator |
 | namespace package | pakiet przestrzeni nazw |
+| portion (of a namespace package, PEP 420) | część (pakietu przestrzeni nazw) |
 | module index | indeks modułów |
 | package shape | kształt pakietu |
 | port | port |

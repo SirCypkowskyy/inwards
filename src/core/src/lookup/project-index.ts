@@ -48,6 +48,12 @@ export interface ProjectFiles {
   read: (path: string) => string;
   /** Lists one directory: INW010 reads the package a missing module would live in. */
   listDir: ListDir;
+  /**
+   * Tells what is at a path relative to the other directories Python merges
+   * namespace packages from (another uv workspace member's import root), so
+   * INW010 doesn't report a module another portion holds. None by default.
+   */
+  portions?: PathKind;
 }
 
 /**
@@ -91,6 +97,8 @@ export class ProjectIndex {
   private readonly texts = new Map<string, string>();
   private readonly importers = new Map<string, ReadonlySet<string>>();
   private readonly extended = new Map<string, boolean>();
+  /** Finds a module in the other portions of namespace packages, when the adapter gave any. */
+  private readonly portions: ModuleLookup | undefined;
 
   /**
    * Wraps an adapter's file system. Nothing is listed or read yet.
@@ -104,6 +112,7 @@ export class ProjectIndex {
     this.readImports = readImports;
     this.readBindings = readBindings;
     this.listDir = source.listDir;
+    this.portions = source.portions ? probeLookup(source.portions) : undefined;
     // Imports share prefixes, so each path is probed once: INW010 asks for every import.
     // A long-lived adapter must rebuild the index when a path that could be a module is
     // created or deleted; the language server does, or builds one per check without file events.
@@ -186,6 +195,34 @@ export class ProjectIndex {
       }
       return found;
     });
+  }
+
+  /**
+   * Tells whether a module missing under the config root exists in another
+   * portion of its namespace package (PEP 420): its owner here is an
+   * implicit namespace package all the way down (no `__init__.py` or
+   * `__init__.pyi` from the top-level package on), and the adapter's
+   * `portions` probe finds the module, e.g. in another uv workspace member.
+   * Python merges such a package from every directory that has it.
+   *
+   * @param module - the dotted module that isn't under the config root.
+   * @param owner - its longest existing prefix here, a package.
+   * @returns true when another portion holds the module.
+   */
+  inOtherPortion(module: string, owner: string): boolean {
+    if (this.portions === undefined) {
+      return false;
+    }
+    const parts = owner.split(".");
+    const namespace = parts.every((_, i) => {
+      const dir = parts.slice(0, i + 1).join("/");
+      return (
+        this.source.kind(dir) === "dir" &&
+        this.source.kind(`${dir}/__init__.py`) === undefined &&
+        this.source.kind(`${dir}/__init__.pyi`) === undefined
+      );
+    });
+    return namespace && this.portions(module) === module;
   }
 
   /**
