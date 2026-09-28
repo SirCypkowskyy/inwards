@@ -1,6 +1,6 @@
 /**
  * @file Parses `[tool.inwards]` from pyproject.toml into an `InwardsConfig`: the
- * layers, `ignore`, `generated`, the per-rule settings, shapes and names, and
+ * layers, `ignore`, `generated`, `namespace-packages`, the per-rule settings, shapes and names, and
  * the hook settings (`escalate-after`, `run-log`, `stop-gate`,
  * `agent-suppressions`). Unknown keys and wrong types throw `ConfigError`, so
  * a typo fails loudly instead of quietly turning a rule off.
@@ -69,6 +69,14 @@ export interface InwardsConfig {
    */
   generated?: string[];
   /**
+   * Implicit namespace packages that installed distributions add to
+   * (`namespace-packages`), such as `acme.platform` when `acme-platform-auth`
+   * provides `acme/platform/auth/`. INW010 doesn't report a module directly
+   * inside one that isn't under the config root; a missing module inside a
+   * subpackage that is here is still reported. Absent when not set.
+   */
+  namespacePackages?: string[];
+  /**
    * How many attempts at the same violation before the hooks stop blocking
    * and tell the agent to ask the user (`escalate-after`, default 3).
    */
@@ -118,6 +126,7 @@ export const TABLE_KEYS: ReadonlySet<string> = new Set([
   "required-version",
   "ignore",
   "generated",
+  "namespace-packages",
   "escalate-after",
   "run-log",
   "stop-gate",
@@ -222,6 +231,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     layers: parsed,
     ...optionalKeys(raw),
     ...parseGenerated(raw["generated"]),
+    ...namespacePackagesKey(raw["namespace-packages"]),
     ...stopGateKey(raw["stop-gate"]),
     ...parseShapeKeys(raw),
     ...parseRules(raw["rules"]),
@@ -230,6 +240,26 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...parseCycles(raw["cycles"]),
   };
   return config;
+}
+
+/**
+ * Validates `namespace-packages`: dotted package names, no wildcards, since
+ * each one opens a package to modules Inwards can't see.
+ *
+ * @param value - the raw `namespace-packages` value, if any.
+ * @returns `{ namespacePackages }` when it is set, else nothing.
+ * @throws {ConfigError} when it isn't a list of dotted names.
+ */
+function namespacePackagesKey(value: unknown): Pick<InwardsConfig, "namespacePackages"> {
+  if (value === undefined) {
+    return {};
+  }
+  if (!(isModuleList(value) && value.every((entry) => isDottedName(entry)))) {
+    throw new ConfigError(
+      'tool.inwards.namespace-packages must be a list of package names such as "acme.platform": no globs.',
+    );
+  }
+  return { namespacePackages: value };
 }
 
 /**

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 78b09fb538834e23812aaef1325a1db89ea26515a083854cf24f31947e583b40
+source_hash: 87d24abb98dce46efdb2b294a07c90beca6ce6439a3102657ff2b73c67cbd0be
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -149,6 +149,19 @@ Moduły zapisywane przez krok budowania, które INW010 traktuje jako istniejące
 generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 ```
 
+### `namespace-packages` { #namespace-packages }
+
+Typ: lista nazw pakietów. Domyślnie: brak.
+
+Niejawne pakiety przestrzeni nazw (bez `__init__.py`), do których dokładają moduły zainstalowane dystrybucje. Przy `namespace-packages = ["acme.platform"]` [INW010](../rules/INW010.md) nie zgłasza `import acme.platform.auth.tokens`, gdy projekt ma tylko `acme/platform/billing/`: nazwa leżąca bezpośrednio w `acme.platform`, której nie ma w projekcie, pochodzi z dystrybucji. Zmyślony `acme.platform.billing.pricing` jest nadal zgłaszany, bo `billing` jest w projekcie. Takie moduły Inwards sam znajduje w `.venv` projektu; klucz jest dla uruchomień bez niego, na przykład w CI przed `uv sync` ([Pakiety przestrzeni nazw współdzielone z zainstalowanymi dystrybucjami](../rules/INW010.md#installed-namespace-packages)).
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+namespace-packages = ["acme.platform"]
+```
+
 ### `escalate-after` { #escalate-after }
 
 Typ: liczba całkowita, co najmniej 1. Domyślnie: `3`.
@@ -283,6 +296,6 @@ packages/api/pyproject.toml: 2 files, 0 violations, 0 warnings
 packages/core/pyproject.toml: 4 files, 0 violations, 0 warnings
 ```
 
-Członkowie często współdzielą niejawny pakiet przestrzeni nazw: `packages/core/src/acme/core` i `packages/api/src/acme/api`, bez `acme/__init__.py`. Python scala `acme` z obu członków, a Inwards nazywa moduły tak samo, więc import względny taki jak `from ..core import model` oznacza `acme.core.model` w każdym z nich. Gdy modułu pod takim pakietem brakuje w sprawdzanym członku, [INW010](../rules/INW010.md) szuka go u pozostałych członków (w ich `src/`, a bez niego w katalogu członka), zanim go zgłosi.
+Członkowie często współdzielą niejawny pakiet przestrzeni nazw: `packages/core/src/acme/core` i `packages/api/src/acme/api`, bez `acme/__init__.py`. Python scala `acme` z obu członków, a Inwards nazywa moduły tak samo, więc import względny taki jak `from ..core import model` oznacza `acme.core.model` w każdym z nich. Gdy modułu pod takim pakietem brakuje w sprawdzanym członku, [INW010](../rules/INW010.md) szuka go u pozostałych członków (w ich `src/`, a bez niego w katalogu członka) i w `.venv` workspace'u, zanim go zgłosi.
 
 Hooki Claude Code nie potrzebują niczego więcej: każdy edytowany plik jest sprawdzany najbliższą konfiguracją zapisaną na starcie sesji, Stop gate sprawdza każdy zmieniony plik konfiguracją jego członka, a strażnik konfiguracji chroni `[tool.inwards]` i baseline każdego członka. `inwards baseline` nadal bierze jedną konfigurację na uruchomienie: `inwards baseline --config packages/core/pyproject.toml`.

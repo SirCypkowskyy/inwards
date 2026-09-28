@@ -50,6 +50,7 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ["an ignore that isn't a list", withExtra('ignore = "tests"\n')],
     ["layers that aren't an array", '[tool.inwards]\nlayers = "domain"\n'],
     ["a generated that isn't a list", withExtra('generated = "*_pb2"\n')],
+    ["a namespace-packages that isn't a list", withExtra('namespace-packages = "acme"\n')],
     ["rules that aren't a table", withExtra('rules = ["INW001"]\n')],
     ["a select that isn't a list", withExtra('[tool.inwards.rules]\nselect = "INW001"\n')],
     ["a context that isn't a table", withExtra("contexts = [3]\n")],
@@ -131,6 +132,8 @@ describe("structural mistakes fail both the schema and the parser", () => {
       withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nallow = ["x[]"]\n'),
     ],
     ["a wildcard-only generated pattern", withExtra('generated = ["*"]\n')],
+    ["a wildcard in namespace-packages", withExtra('namespace-packages = ["acme.*"]\n')],
+    ["an empty namespace package", withExtra('namespace-packages = [""]\n')],
     [
       "a wildcard in a context",
       withExtra('[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.*"]\n'),

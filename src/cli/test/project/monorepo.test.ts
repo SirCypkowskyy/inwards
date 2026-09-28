@@ -135,6 +135,17 @@ describe("inwards check at a uv workspace root (#57)", () => {
     });
   });
 
+  test("a portion installed in the workspace root's .venv counts too (#161)", () => {
+    const root = workspace();
+    rmSync(join(root, "packages/core/src/acme/plugins/registry.py"));
+    const site = join(root, ".venv/lib/python3.12/site-packages/acme/plugins");
+    mkdirSync(site, { recursive: true });
+    writeFileSync(join(site, "registry.py"), "");
+    // Core's plugins layer is empty now (INW006); api's import of the registry must pass.
+    const { report } = checkJson(root);
+    expect(report.diagnostics.filter((d) => d.code === "INW010")).toEqual([]);
+  });
+
   test("inside a member only that member is checked", () => {
     const { code, stdout } = inwards(["check", "--format", "concise"], {
       cwd: join(workspace(), "packages/api"),

@@ -144,6 +144,19 @@ Modules a build step writes, which INW010 treats as existing when they aren't on
 generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 ```
 
+### `namespace-packages` { #namespace-packages }
+
+Type: list of package names. Default: none.
+
+Implicit namespace packages (no `__init__.py`) that installed distributions add to. With `namespace-packages = ["acme.platform"]`, [INW010](../rules/INW010.md) doesn't report `import acme.platform.auth.tokens` when the project has only `acme/platform/billing/`: a name directly inside `acme.platform` that isn't in the project comes from a distribution. A made-up `acme.platform.billing.pricing` is still reported, since `billing` is in the project. Inwards finds such modules in the project's `.venv` on its own; the key is for runs without one, such as CI before `uv sync` ([Namespace packages shared with installed distributions](../rules/INW010.md#installed-namespace-packages)).
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+namespace-packages = ["acme.platform"]
+```
+
 ### `escalate-after` { #escalate-after }
 
 Type: whole number, at least 1. Default: `3`.
@@ -278,6 +291,6 @@ packages/api/pyproject.toml: 2 files, 0 violations, 0 warnings
 packages/core/pyproject.toml: 4 files, 0 violations, 0 warnings
 ```
 
-Members often share an implicit namespace package: `packages/core/src/acme/core` and `packages/api/src/acme/api`, with no `acme/__init__.py`. Python merges `acme` from both members, and Inwards names the modules the same way, so a relative import such as `from ..core import model` means `acme.core.model` in either member. When a module under such a package is missing from the member being checked, [INW010](../rules/INW010.md) looks for it in the other members (their `src/`, else the member directory) before reporting it.
+Members often share an implicit namespace package: `packages/core/src/acme/core` and `packages/api/src/acme/api`, with no `acme/__init__.py`. Python merges `acme` from both members, and Inwards names the modules the same way, so a relative import such as `from ..core import model` means `acme.core.model` in either member. When a module under such a package is missing from the member being checked, [INW010](../rules/INW010.md) looks for it in the other members (their `src/`, else the member directory) and in the workspace's `.venv` before reporting it.
 
 The Claude Code hooks need nothing more: each edited file is checked against the nearest config recorded at session start, the Stop gate checks each changed file against its own member's config, and the config guard protects every member's `[tool.inwards]` and baseline. `inwards baseline` still takes one config per run: `inwards baseline --config packages/core/pyproject.toml`.

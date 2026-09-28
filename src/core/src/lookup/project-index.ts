@@ -62,8 +62,9 @@ export interface ProjectFiles {
   listDir: ListDir;
   /**
    * Tells what is at a path relative to the other directories Python merges
-   * namespace packages from (another uv workspace member's import root), so
-   * INW010 doesn't report a module another portion holds. None by default.
+   * namespace packages from (another uv workspace member's import root, the
+   * project virtualenv's site-packages), so INW010 doesn't report a module
+   * another portion holds. None by default.
    */
   portions?: PathKind;
 }
@@ -213,19 +214,25 @@ export class ProjectIndex {
   }
 
   /**
-   * Tells whether a module missing under the config root exists in another
-   * portion of its namespace package (PEP 420): its owner here is an
+   * Tells whether a module missing under the config root belongs to another
+   * portion of its namespace package (PEP 420). Its owner here must be an
    * implicit namespace package all the way down (no `__init__.py` or
-   * `__init__.pyi` from the top-level package on), and the adapter's
-   * `portions` probe finds the module, e.g. in another uv workspace member.
-   * Python merges such a package from every directory that has it.
+   * `__init__.pyi` from the top-level package on), since Python merges only
+   * those from every directory that has them. Then the module counts when
+   * the adapter's `portions` probe finds it (another uv workspace member,
+   * the project's virtualenv), or when the owner is one of the `shared`
+   * namespace packages the config lists: a name directly inside it that
+   * isn't here comes from an installed distribution. A missing module deeper
+   * down, inside a subpackage that is here, still needs a portion to hold it.
    *
    * @param module - the dotted module that isn't under the config root.
    * @param owner - its longest existing prefix here, a package.
-   * @returns true when another portion holds the module.
+   * @param shared - the namespace packages the config says installed distributions add to.
+   * @returns true when another portion holds, or may hold, the module.
    */
-  inOtherPortion(module: string, owner: string): boolean {
-    if (this.portions === undefined) {
+  inOtherPortion(module: string, owner: string, shared: readonly string[] = []): boolean {
+    const { portions } = this;
+    if (portions === undefined && !shared.includes(owner)) {
       return false;
     }
     const parts = owner.split(".");
@@ -237,7 +244,7 @@ export class ProjectIndex {
         this.source.kind(`${dir}/__init__.pyi`) === undefined
       );
     });
-    return namespace && this.portions(module) === module;
+    return namespace && (shared.includes(owner) || portions?.(module) === module);
   }
 
   /**

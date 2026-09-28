@@ -120,4 +120,13 @@ describe("config integrity (INW006)", () => {
   test("ignore is absent unless set", () => {
     expect(parseConfig(`[tool.inwards]\nlayers = [${layer}]\n`).ignore).toBeUndefined();
   });
+
+  test("namespace-packages is read when set and absent otherwise", () => {
+    const text = `[tool.inwards]\nnamespace-packages = ["acme.platform"]\nlayers = [${layer}]\n`;
+    expect(parseConfig(text).namespacePackages).toEqual(["acme.platform"]);
+    expect(parseConfig(`[tool.inwards]\nlayers = [${layer}]\n`).namespacePackages).toBeUndefined();
+    expect(() =>
+      parseConfig(`[tool.inwards]\nnamespace-packages = ["acme-platform"]\nlayers = [${layer}]\n`),
+    ).toThrow("tool.inwards.namespace-packages");
+  });
 });
