@@ -7,7 +7,11 @@
 import { describe, expect, test } from "bun:test";
 import { type PathKind, parseConfig } from "../../src/index.ts";
 import { unassignedWarning } from "../../src/rules/unassigned-module/imports.ts";
-import { checkNestedProjects, checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
+import {
+  checkMoves,
+  checkNestedProjects,
+  checkPrefixes,
+} from "../../src/rules/unassigned-module/layout.ts";
 import { check, engine, file, indexOn, OWNERS, PROJECT } from "../support/helpers.ts";
 
 /**
@@ -19,6 +23,20 @@ import { check, engine, file, indexOn, OWNERS, PROJECT } from "../support/helper
 function hasPyproject(...dirs: string[]): PathKind {
   return (rel: string): ReturnType<PathKind> =>
     dirs.some((dir) => rel === `${dir}/pyproject.toml`) ? "file" : undefined;
+}
+
+/**
+ * Moves `shop.domain.pricing` to a new top-level module in a module-to-hash map.
+ *
+ * @param before - the modules and their content hashes at session start.
+ * @param name - the new top-level module.
+ * @param hash - its content hash now.
+ * @returns the modules now.
+ */
+function movedTo(before: Map<string, string>, name: string, hash: string): Map<string, string> {
+  const now = new Map(before);
+  now.delete("shop.domain.pricing");
+  return now.set(name, hash);
 }
 
 /** Reads the unassigned package an INW006 import finding names. */
@@ -157,6 +175,22 @@ layers = [
     expect(rest).toEqual([]);
     expect(d).toMatchObject({ severity: "error", file: "pyproject.toml" });
     expect(d?.message).toContain("matched modules when the session started");
+  });
+
+  test("a move to a new top-level module is caught by name or content, not by similarity (#86)", () => {
+    const before = new Map([
+      ["shop.domain.order", "h-order"],
+      ["shop.domain.pricing", "h-pricing"],
+      ["shop.infra.db", "h-db"],
+    ]);
+    expect(
+      checkMoves(config, before, movedTo(before, "pricing", "h-edited"), pyproject),
+    ).toHaveLength(1);
+    expect(
+      checkMoves(config, before, movedTo(before, "rates", "h-pricing"), pyproject),
+    ).toHaveLength(1);
+    // Renamed and edited: documented as not caught; a layer importing it gets INW006.
+    expect(checkMoves(config, before, movedTo(before, "rates", "h-edited"), pyproject)).toEqual([]);
   });
 
   describe("nested projects", () => {

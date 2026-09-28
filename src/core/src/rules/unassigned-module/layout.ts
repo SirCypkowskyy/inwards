@@ -249,7 +249,8 @@ const EMPTY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852
  * a package that holds layers (`shop/core` next to `shop/domain`, whatever it
  * is called now) or elsewhere with the same file name or the same (non-empty)
  * content. A renamed and edited move to a new top-level module is not caught;
- * any layer importing it still gets an INW006 error. An empty `__init__.py` left
+ * any layer importing it still gets an INW006 error. Similarity-based rename
+ * detection was left out on purpose (#86, the INW006 page says why). An empty `__init__.py` left
  * behind keeps the prefix alive, so `checkPrefixes` alone doesn't see such a
  * move. `ignore` doesn't exempt the new module: tooling doesn't come from a layer.
  *
