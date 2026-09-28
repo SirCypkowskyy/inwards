@@ -26,7 +26,7 @@ import { isModuleList, type LayerSpec, parseLayers } from "./layers.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
 import { parseTemplates, withContextTemplates, withShapeTemplates } from "./templates.ts";
-import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 export interface InwardsConfig {
   /** Directory, relative to the config file, that module names are computed from. */

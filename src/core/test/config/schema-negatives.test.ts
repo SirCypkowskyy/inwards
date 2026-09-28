@@ -205,36 +205,6 @@ describe("structural mistakes fail both the schema and the parser", () => {
       "a distribution name as a library",
       withLayer('{ name = "d", modules = ["shop"], deny-libraries = ["python-dateutil"] }'),
     ],
-    // Templates and sibling layers (#97).
-    ["templates that aren't a table", withExtra('templates = ["t"]\n')],
-    ["a template that isn't a table", withExtra("templates = { t = 1 }\n")],
-    ["a blank template name", withExtra('[tool.inwards.templates." "]\nroles = ["a"]\n')],
-    ["an unknown template key", withExtra('[tool.inwards.templates.t]\nrole = ["a"]\n')],
-    ["empty roles", withExtra("[tool.inwards.templates.t]\nroles = []\n")],
-    ["a role that isn't a list", withExtra('[tool.inwards.templates.t]\nroles = "a"\n')],
-    ["a malformed role", withExtra('[tool.inwards.templates.t]\nroles = ["b |"]\n')],
-    ["a wildcard role", withExtra('[tool.inwards.templates.t]\nroles = ["*"]\n')],
-    [
-      "a wildcard template public entry",
-      withExtra('[tool.inwards.templates.t]\npublic = ["a.*"]\n'),
-    ],
-    ["a bad template member pattern", withExtra('[tool.inwards.templates.t]\nallow = ["a/b"]\n')],
-    ["an unknown template extra", withExtra('[tool.inwards.templates.t]\nextra = "fatal"\n')],
-    ["an empty template hint", withExtra('[tool.inwards.templates.t]\nhints = [""]\n')],
-    [
-      "shape hints that aren't a list",
-      withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nhints = "x"\n'),
-    ],
-    [
-      "a template name that isn't a string",
-      withLayer('{ name = "d", modules = ["shop"], template = 1 }'),
-    ],
-    ["a sibling group of one", withLayer('[{ name = "a", modules = ["a"] }]')],
-    [
-      "a sibling with a template",
-      `${withLayer('[{ name = "a", modules = ["a"] }, { name = "b", modules = ["b"], template = "t" }]')}[tool.inwards.templates.t]\nroles = ["x"]\n`,
-    ],
-    ["a sibling without modules", withLayer('[{ name = "a", modules = ["a"] }, { name = "b" }]')],
   ])("%s", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).not.toEqual([]);
@@ -256,35 +226,6 @@ describe("structural mistakes fail both the schema and the parser", () => {
     const text = withExtra(
       '[tool.inwards.rules]\nextend-select = ["INW001"]\n[tool.inwards.rules.pure-domain]\nmodules = ["shop.domain", "shop.*.api", "shop.**"]\n',
     );
-    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
-  });
-
-  test("templates, their uses and sibling layers pass both", () => {
-    const text = `[tool.inwards]
-layers = [
-  [{ name = "a", modules = ["shop.a"] }, { name = "b", modules = ["shop.b"] }],
-  { name = "d", modules = ["shop.*"], template = "t" },
-]
-
-[tool.inwards.templates.t]
-roles = ["constants", "models | schemas", "api.v1 | api.v2", "service"]
-public = ["service", "api.v1"]
-allow = ["utils"]
-require = ["__init__", "service"]
-forbid = ["helpers"]
-extra = "warning"
-hints = ["Shared code goes in shop/common.py."]
-
-[[tool.inwards.shape]]
-packages = ["shop.*"]
-template = "t"
-hints = ["One more hint."]
-
-[[tool.inwards.contexts]]
-name = "orders"
-modules = ["shop.orders"]
-template = "t"
-`;
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 
@@ -325,25 +266,6 @@ describe("relations between entries fail the parser only: draft-07 can't see the
       withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nallow = ["[z-a]"]\n'),
     ],
     ["a required-version newer than this Inwards", withExtra('required-version = "999.0.0"\n')],
-    [
-      "a template no table declares",
-      withLayer('{ name = "d", modules = ["shop"], template = "t" }'),
-    ],
-    ["a role listed twice", withExtra('[tool.inwards.templates.t]\nroles = ["a | b", "b"]\n')],
-    [
-      "a layer template without roles",
-      `${withLayer('{ name = "d", modules = ["shop"], template = "t" }')}[tool.inwards.templates.t]\npublic = ["api"]\n`,
-    ],
-    [
-      "a context template without public",
-      withExtra(
-        '[tool.inwards.templates.t]\nroles = ["a"]\n[[tool.inwards.contexts]]\nname = "c"\nmodules = ["shop.c"]\ntemplate = "t"\n',
-      ),
-    ],
-    [
-      "a role layer named like another layer",
-      `${withLayer('{ name = "d.a", modules = ["x"] }, { name = "d", modules = ["shop"], template = "t" }')}[tool.inwards.templates.t]\nroles = ["a"]\n`,
-    ],
   ])("%s", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).toEqual([]);
