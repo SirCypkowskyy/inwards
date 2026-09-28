@@ -1,5 +1,5 @@
 /**
- * @file `--config` that doesn't name a file (#212): every command that takes
+ * @file `--config` that doesn't name a file (#212). Every command that takes
  * the flag answers with one line and exit 2 instead of a stack trace, and
  * writes nothing.
  */
