@@ -1,6 +1,6 @@
 /**
  * @file `inwards init`: the setup wizard's entry point. It sorts out the flags
- * (`--list-styles`, `--style`, `--agent`, `--scaffold`, `--package`), asks
+ * (`--list-styles`, `--style`, `--agent`, `--scaffold`, `--package`, `--brief`), asks
  * with the picker on a terminal when nothing was chosen, then writes a
  * preset's `[tool.inwards]`, the example scaffold and an agent's wiring, and
  * prints the annotated tree with a check's result. Everything it touches
@@ -10,6 +10,7 @@ import { dirname } from "node:path";
 import { parseConfig, VERSION } from "@inwards/core";
 import { print } from "../platform/print.ts";
 import { agentChanges, apply, DEFAULT_IGNORE, initCommand, PRERELEASE } from "./agents.ts";
+import { withBrief } from "./brief.ts";
 import {
   AGENTS,
   type Change,
@@ -32,14 +33,15 @@ import {
 } from "./styles.ts";
 import { findTarget, noPackage, shown, sourceRoot } from "./target.ts";
 
-const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--dry-run]
-  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--dry-run]    (the project already has [tool.inwards])
+const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--brief] [--dry-run]
+  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--brief] [--dry-run]    (the project already has [tool.inwards])
+  inwards init --brief [--dry-run]    (only the architecture brief in AGENTS.md)
   inwards init --list-styles`;
 
 /**
  * Runs `inwards init` with whatever flags were given: `--list-styles`, the
- * picker (no `--style` and no `--agent`, on a terminal), `--style` with or
- * without `--agent`, or `--agent` alone exactly as before.
+ * picker (no `--style`, `--agent` or `--brief`, on a terminal), `--style` with or
+ * without `--agent`, `--agent` alone exactly as before, or `--brief` alone.
  *
  * @param ctx - the platform, the check runner and init's writer and picker.
  * @param paths - positionals after `init`; there must be none.
@@ -71,10 +73,11 @@ export async function initMain(
     );
   }
   const { agent, style } = flags;
+  const brief = flags.brief === true;
   if (style === undefined && agent !== undefined) {
     return flags.scaffold === true || flags.package !== undefined
       ? print(ctx.io.streams, "inwards init: --scaffold and --package need --style.", 2)
-      : initCommand(ctx, agent, flags.launcher, dryRun);
+      : initCommand(ctx, { agent, launcher: flags.launcher, brief }, dryRun);
   }
   if (style !== undefined) {
     return await styleCommand(
@@ -83,6 +86,9 @@ export async function initMain(
       flags,
       dryRun,
     );
+  }
+  if (brief) {
+    return initCommand(ctx, { agent: undefined, launcher: undefined, brief }, dryRun);
   }
   return await interactive(ctx, flags, dryRun);
 }
@@ -120,7 +126,9 @@ async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean):
     return 2;
   }
   if (plan.style === undefined) {
-    return plan.agent === undefined ? 0 : initCommand(ctx, plan.agent, flags.launcher, dryRun);
+    return plan.agent === undefined
+      ? 0
+      : initCommand(ctx, { agent: plan.agent, launcher: flags.launcher, brief: false }, dryRun);
   }
   return await styleCommand(ctx, { ...plan, style: plan.style }, flags, dryRun);
 }
@@ -182,10 +190,14 @@ async function styleCommand(
       2,
     );
   }
-  const wiring =
+  const wired =
     plan.agent === undefined
       ? []
       : agentChanges(ctx, { agent: plan.agent, launcher: flags.launcher }, project);
+  const wiring =
+    typeof wired === "string" || flags.brief !== true
+      ? wired
+      : withBrief(ctx.io, wired, { path: target.path, text: config.after });
   if (typeof wiring === "string") {
     return print(ctx.io.streams, `inwards init: ${wiring}`, 2);
   }
@@ -241,7 +253,7 @@ async function commit(
       const reason = err instanceof Error ? err.message : String(err);
       return print(
         ctx.io.streams,
-        `inwards init: the layers are written, but wiring ${plan.agent} failed (${reason}); fix that and run \`inwards init --agent ${plan.agent}\`.`,
+        `inwards init: the layers are written, but wiring ${plan.agent ?? "the brief"} failed (${reason}); fix that and run \`inwards init ${plan.agent === undefined ? "--brief" : `--agent ${plan.agent}`}\`.`,
         2,
       );
     }

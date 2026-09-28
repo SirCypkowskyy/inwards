@@ -9,7 +9,30 @@
 import { dirname, resolve } from "node:path";
 import { declaresInwards } from "@inwards/core";
 import { isInside } from "../paths/lexical.ts";
-import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
+
+/**
+ * Picks the config a command works on: `--config`, resolved against the
+ * cwd, or else the nearest one above the cwd.
+ *
+ * @param io - resolves real paths, reads candidates and knows the cwd.
+ * @param io.probe - resolves real paths.
+ * @param io.read - reads a candidate's text.
+ * @param io.runtime - the cwd.
+ * @param flag - the `--config` value, if given.
+ * @returns the config path, or undefined when there is no flag and no config above.
+ * @throws when a candidate can't be read.
+ */
+export function commandConfig(
+  io: {
+    probe: Pick<PathProbe, "realpath">;
+    read: Pick<FileReader, "text">;
+    runtime: Pick<Runtime, "cwd">;
+  },
+  flag: string | undefined,
+): string | undefined {
+  return flag ? resolve(io.runtime.cwd, flag) : findConfig(io, io.runtime.cwd);
+}
 
 /**
  * Finds the nearest pyproject.toml that configures Inwards, walking up from

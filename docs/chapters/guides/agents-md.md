@@ -41,6 +41,47 @@ Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repo
 
 3. Commit `AGENTS.md`. Running `init` again replaces only the text between the markers.
 
+## The architecture brief (opt-in)
+
+The section above tells the agent to check its work after the fact. The brief tells it the architecture before it writes the first import: fixing a violation costs a retry, avoiding one costs nothing. It is off by default, so a team can compare runs with and without it; the run log's violation rate would otherwise mix the two.
+
+`inwards context` prints the brief for the nearest `[tool.inwards]`:
+
+<!-- e2e -->
+
+```sh
+inwards context
+```
+
+It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005) and the contexts with their public modules and dependencies (INW002, INW003). Rules turned off in `[tool.inwards.rules]` are left out. For the repository's example config (`examples/clean-app`) it is 678 characters, about 170 tokens; a test keeps the example and every preset under 300 (at four characters per token). With the markers `--write` adds, it reads:
+
+```markdown
+<!-- inwards-brief:begin -->
+## Architecture brief (Inwards)
+
+`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own.
+
+1. domain (`shop.domain`): imports no other layer
+2. application (`shop.application`): may import domain
+3. infrastructure (`shop.infrastructure`): may import domain, application
+4. interface (`shop.api`, `shop.cli`): may import every other layer
+
+Ports: when an inner layer needs something from an outer one, declare a `typing.Protocol` in `shop.domain.ports` and implement it in the outer layer.
+
+Libraries (INW005):
+- domain: no web frameworks, database or network clients, `subprocess` or `socket`
+<!-- inwards-brief:end -->
+```
+
+Ports are the `ports` package or module directly inside a layer's module on disk (`shop/domain/ports.py` here). For a config `inwards init --style` wrote, the brief also names the preset and its ports module (`app.application.ports` for clean and hexagonal) before `--scaffold` creates it; it finds the preset by the comment init put in the table, so deleting that comment drops the name.
+
+To keep it in `AGENTS.md`, between its own markers next to the check section:
+
+- `inwards context --write` adds the section, or replaces the text between `<!-- inwards-brief:begin -->` and `<!-- inwards-brief:end -->` in place. Run it again after changing `[tool.inwards]`; it says "up to date" when nothing changed.
+- `inwards init --agent agents-md --brief` writes both sections in one run. `--brief` works with every `--agent`, with `--style`, and alone (`inwards init --brief`).
+
+The brief always goes to `AGENTS.md`, never `CLAUDE.md`: one file serves every agent, and a repository that keeps `CLAUDE.md` as the single line `@AGENTS.md` (as this one does) gives Claude Code the same text. If your `CLAUDE.md` has no such line, add it, or Claude Code won't see the brief.
+
 ## Check it works
 
 - Run `inwards check --format json` yourself. A `violations` count of 0 in the summary means the project is clean.
@@ -51,7 +92,7 @@ Many coding agents read [`AGENTS.md`](https://agents.md) at the root of the repo
 | Symptom | Cause and fix |
 |---|---|
 | The agent never runs the check | This is an instruction, not a hook, so the agent may skip it. Use an agent with hooks (such as [Claude Code](claude-code.md)) or run `inwards check` in CI. |
-| `init` stops with "unmatched markers" | `AGENTS.md` doesn't have exactly one `inwards:begin` and one `inwards:end` marker. Fix or remove them by hand, then run `init` again. |
+| `init` stops with "unmatched markers" | `AGENTS.md` doesn't have exactly one `inwards:begin` and one `inwards:end` marker (or, for the brief, one `inwards-brief:begin` and one `inwards-brief:end`). Fix or remove them by hand, then run `init` again. |
 | `inwards: command not found` in the agent's shell | The agent's environment doesn't see the binary. Put it on `PATH` there, or, when Inwards is a uv dev dependency, run `init` again with `--launcher "uv run"`. (Editing the command inside the markers works until the next `init`, which puts the section back.) |
 
 For a hard stop, run `inwards check` in CI: exit code 1 fails the job. The [GitHub Actions guide](ci.md) has a workflow that also annotates the pull request and uploads SARIF to code scanning.

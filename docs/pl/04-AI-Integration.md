@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: e7e9ded8ffe0a6e9625de5125c68a2ac84d763303fc7a65583c4cf509da4c933
+source_hash: b74f2f06a68869d96e71a95def04dbd88f0e0ff4df245ef29eb96aebcec4908b
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -237,12 +237,12 @@ Odmowa dociera do modelu jako powód odrzucenia wywołania i każe mu zapytać u
 
 Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing import DiscountPolicy`, gdzie `pricing` nie istnieje. Bez sprawdzenia wychodzi to na jaw jako `ImportError` w czasie testów, o ile jakiś test obejmuje ten plik. INW010 oznacza taki import w tym samym uruchomieniu hooka, zanim powstanie jakikolwiek test: silnik pyta system plików, czy `shop.domain.pricing` istnieje, a kroki naprawy wymieniają trzy najbliższe nazwą moduły z `shop.domain`, więc chybiona nazwa, taka jak `shop.domain.prices`, jest o jedną edycję od poprawnej. `from shop.domain import pricing` przechodzi, bo `pricing` może być nazwą zdefiniowaną w `shop/domain/__init__.py` ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). Na korpusie prawdziwych repozytoriów reguła znalazła w saleor cztery zepsute importy, wśród nich import `saleor.translation.models` pod `TYPE_CHECKING`, który nie istnieje (klasa jest w `saleor.core.utils.translations`), oraz dwa importy względne, które wychodzą ponad pakiet najwyższego poziomu.
 
-## Instruowanie agenta, zanim zacznie pisać (planowane) { #briefing-the-agent-before-it-writes-planned }
+## Instruowanie agenta, zanim zacznie pisać { #briefing-the-agent-before-it-writes }
 
-Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. Dwie planowane funkcje przesuwają Inwards wcześniej w pętli:
+Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. Dwie funkcje przesuwają Inwards wcześniej w pętli:
 
-- **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) wypisuje zwięzłą mapę warstw, tego, co każda z nich może importować, i tego, gdzie leżą porty. Ma być wklejana albo generowana do `CLAUDE.md` / `AGENTS.md`.
-- **`inwards mcp`** ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)) udostępnia Inwards jako serwer MCP z narzędziami takimi jak `check_files`, `explain_rule` i `where_should_this_go`. To ostatnie przyjmuje opis („SQL repository for orders”) i odpowiada warstwą i ścieżką modułu z konfiguracji.
+- **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) wypisuje mapę warstw, tego, co każda z nich może importować, tego, gdzie leżą porty, oraz reguły bibliotek i kontekstów, w mniej niż 300 tokenach. `inwards context --write` albo `inwards init --brief` utrzymuje ją w oznaczonej sekcji `AGENTS.md`. Jest opcjonalna, żeby design partnerzy mogli porównać przebiegi z nią i bez niej ([opis architektury](guides/agents-md.md#the-architecture-brief-opt-in)).
+- **`inwards mcp`** (planowane, [#65](https://github.com/SirCypkowskyy/inwards/issues/65)) udostępnia Inwards jako serwer MCP z narzędziami takimi jak `check_files`, `explain_rule` i `where_should_this_go`. To ostatnie przyjmuje opis („SQL repository for orders”) i odpowiada warstwą i ścieżką modułu z konfiguracji.
 
 ```mermaid
 flowchart LR

@@ -232,12 +232,12 @@ A denial reaches the model as the reason for the refused call and tells it to as
 
 Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy`, where `pricing` doesn't exist. Without a check, that surfaces as an `ImportError` at test time, if a test covers the file. INW010 flags it in the same hook run, before any test is written: the engine asks the file system whether `shop.domain.pricing` exists, and the fix steps list the three closest modules in `shop.domain`, so a near miss such as `shop.domain.prices` is one edit away. `from shop.domain import pricing` passes, because `pricing` could be a name defined in `shop/domain/__init__.py` ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)). On the real-repo corpus the rule found four broken imports in saleor, among them a `TYPE_CHECKING` import of `saleor.translation.models`, which doesn't exist (the class lives in `saleor.core.utils.translations`), and two relative imports that climb above the top-level package.
 
-## Briefing the agent before it writes (planned)
+## Briefing the agent before it writes
 
-Fixing a violation costs a retry. Avoiding it costs nothing. Two planned features move Inwards earlier in the loop:
+Fixing a violation costs a retry. Avoiding it costs nothing. Two features move Inwards earlier in the loop:
 
-- **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) prints a compact map of the layers, what each one may import, and where ports live. It's meant to be pasted or generated into `CLAUDE.md` / `AGENTS.md`.
-- **`inwards mcp`** ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)) exposes Inwards as an MCP server with tools such as `check_files`, `explain_rule` and `where_should_this_go`. That last one takes a description ("SQL repository for orders") and answers with a layer and module path from the config.
+- **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) prints a map of the layers, what each one may import, where ports live, and the library and context rules, in under 300 tokens. `inwards context --write` or `inwards init --brief` keeps it in a marked section of `AGENTS.md`. It is opt-in, so design partners can compare runs with and without it ([the brief](guides/agents-md.md#the-architecture-brief-opt-in)).
+- **`inwards mcp`** (planned, [#65](https://github.com/SirCypkowskyy/inwards/issues/65)) exposes Inwards as an MCP server with tools such as `check_files`, `explain_rule` and `where_should_this_go`. That last one takes a description ("SQL repository for orders") and answers with a layer and module path from the config.
 
 ```mermaid
 flowchart LR

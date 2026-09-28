@@ -13,6 +13,7 @@ import { compose } from "./adapters/compose.ts";
 import { processStreams } from "./adapters/stdio.ts";
 import { baselineCommand } from "./commands/baseline.ts";
 import { checkCommand } from "./commands/check.ts";
+import { contextCommand } from "./commands/context.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { statsCommand } from "./commands/stats.ts";
@@ -28,7 +29,8 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
        inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
        inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
        inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
-                    (--list-styles: the presets)
+                    (--list-styles: the presets; --brief: also the architecture brief in AGENTS.md)
+       inwards context [--config pyproject.toml] [--write]   (the architecture brief; --write: into AGENTS.md)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -66,6 +68,8 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       package: { type: "string" },
       "list-styles": { type: "boolean" },
       launcher: { type: "string" },
+      brief: { type: "boolean" },
+      write: { type: "boolean" },
     },
   });
 
@@ -83,21 +87,21 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
 }
 
 /** The commands besides `check`. */
-type SetupCommand = "hook" | "init" | "baseline" | "stats";
-const SETUP_COMMANDS: readonly string[] = ["hook", "init", "baseline", "stats"];
+type SetupCommand = "hook" | "init" | "baseline" | "stats" | "context";
+const SETUP_COMMANDS: readonly string[] = ["hook", "init", "baseline", "stats", "context"];
 
 /**
  * Tells whether a positional names one of the commands besides `check`.
  *
  * @param command - the first positional.
- * @returns true for hook, init, baseline or stats.
+ * @returns true for hook, init, baseline, stats or context.
  */
 function isSetupCommand(command: string | undefined): command is SetupCommand {
   return command !== undefined && SETUP_COMMANDS.includes(command);
 }
 
 /**
- * Runs the commands besides `check`: the hook, `init`, `baseline` and `stats`.
+ * Runs the commands besides `check`: the hook, `init`, `baseline`, `stats` and `context`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -105,11 +109,12 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param values - the parsed options.
  * @param values.agent - `--agent`, for init (so are the other InitFlags).
  * @param values."dry-run" - `--dry-run`, for init.
- * @param values.config - `--config`, for baseline (stats refuses it).
+ * @param values.config - `--config`, for baseline and context (stats refuses it).
  * @param values."no-cache" - `--no-cache`, for baseline.
  * @param values.format - `--format`, for stats.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
+ * @param values.write - `--write`, for context.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -122,6 +127,7 @@ async function setupCommand(
     format?: string | undefined;
     export?: string | undefined;
     redact?: boolean | undefined;
+    write?: boolean | undefined;
   },
 ): Promise<number> {
   const { streams } = deps.io;
@@ -140,6 +146,11 @@ async function setupCommand(
   if (command === "hook") {
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(deps, USAGE)
+      : print(streams, USAGE, 2);
+  }
+  if (command === "context") {
+    return paths.length === 0
+      ? contextCommand(deps, values.config, values.write === true)
       : print(streams, USAGE, 2);
   }
   if (command === "init") {
