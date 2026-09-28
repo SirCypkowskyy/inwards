@@ -6,10 +6,16 @@
  * session start and suppressions the agent added are sorted out here, with
  * the invocation's start lookups. A config the agent changed checks with its
  * session-start version.
+ *
+ * A top-level package that appeared during the session can turn an old
+ * import, such as `import requests` in a layer, into first-party code
+ * (#86). The files that mention its name are checked too, and their
+ * session-start check doesn't see the package, so what it changed is new.
  */
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import type { Diagnostic, InwardsConfig, Report } from "@inwards/core";
 import { CONFIG_DEFAULTS } from "@inwards/core";
+import { isInside, posix } from "../paths/lexical.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import { projectPath } from "../project/snapshot.ts";
@@ -19,6 +25,13 @@ import { oldErrors } from "../session/old-errors.ts";
 import type { SessionState } from "../session/record.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
+/** A config root and the top-level module names that appeared under it this session. */
+interface Fresh {
+  root: string;
+  names: string[];
+}
+/** Text outside printable ASCII, which Python NFKC-normalises in identifiers. */
+const NON_ASCII = /[^ -~\t\n\r\f]/u;
 
 /**
  * Collects the Python files this session changed: the edits the hook saw,
@@ -54,6 +67,106 @@ export function changedFiles(
 }
 
 /**
+ * Names the top-level modules and packages that appeared under each
+ * config's root during the session: the first segment of a Python file's
+ * path under the root, without `.py` or `.pyi`, that no start file had.
+ *
+ * @param project - the real project root.
+ * @param configs - the valid configs now, by project-relative path.
+ * @param manifests - project-relative Python path to content hash, at start and now.
+ * @param manifests.before - the session-start manifest.
+ * @param manifests.now - the manifest now.
+ * @returns each config root and its new top-level names, by project-relative
+ *   config path; configs without any are left out.
+ */
+export function newTopLevel(
+  project: string,
+  configs: Record<string, InwardsConfig>,
+  { before, now }: { before: Record<string, string>; now: Record<string, string> },
+): Record<string, Fresh> {
+  const fresh: Record<string, Fresh> = {};
+  for (const [rel, config] of Object.entries(configs)) {
+    const root = resolve(dirname(join(project, rel)), config.root);
+    const was = topLevel(project, root, before);
+    const names = [...topLevel(project, root, now)].filter((name) => !was.has(name));
+    if (names.length > 0) {
+      fresh[rel] = { root, names };
+    }
+  }
+  return fresh;
+}
+
+/**
+ * Lists the top-level module names of the manifest's files under a root.
+ *
+ * @param project - the real project root.
+ * @param root - the config root.
+ * @param manifest - project-relative Python path to content hash.
+ * @returns each first path segment under the root, without a Python suffix.
+ */
+function topLevel(project: string, root: string, manifest: Record<string, string>): Set<string> {
+  const names = new Set<string>();
+  for (const path of Object.keys(manifest)) {
+    const abs = join(project, path);
+    if (isInside(root, abs)) {
+      const first = posix(relative(root, abs)).split("/")[0] ?? "";
+      names.add(first.replace(PYTHON_FILE, ""));
+    }
+  }
+  return names;
+}
+
+/**
+ * Finds the files that may import a top-level name new this session: every
+ * Python file under that config's root whose text, NFKC-normalised when it
+ * isn't ASCII, mentions the name. A file that can't be read is included, so
+ * the check reports on it. It reads every file under such a root, but only
+ * in a session that added a top-level package.
+ *
+ * @param io - reads the files.
+ * @param project - the real project root.
+ * @param fresh - each config's root and new top-level names, from `newTopLevel`.
+ * @param manifest - the content hashes now.
+ * @returns absolute paths of the files that mention a new name.
+ */
+export function freshImporters(
+  io: Pick<Platform, "read">,
+  project: string,
+  fresh: Record<string, Fresh>,
+  manifest: Record<string, string>,
+): string[] {
+  const found: string[] = [];
+  for (const { root, names } of Object.values(fresh)) {
+    for (const path of Object.keys(manifest)) {
+      const abs = join(project, path);
+      if (isInside(root, abs) && mentionsAny(io, abs, names)) {
+        found.push(abs);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Tells whether a file's text mentions any of some names.
+ *
+ * @param io - reads the file.
+ * @param file - the absolute file.
+ * @param names - the words to look for.
+ * @returns true when a name appears, or the file can't be read.
+ */
+function mentionsAny(io: Pick<Platform, "read">, file: string, names: readonly string[]): boolean {
+  let text: string;
+  try {
+    text = io.read.text(file);
+  } catch {
+    return true; // unreadable: let the check say why
+  }
+  const plain = NON_ASCII.test(text) ? text.normalize("NFKC") : text;
+  return names.some((name) => plain.includes(name));
+}
+
+/**
  * Checks changed files, each against its own config. A file whose config
  * didn't exist at session start is not checked with it: a new nested
  * pyproject.toml with a permissive table would otherwise waive the layers.
@@ -66,7 +179,8 @@ export function changedFiles(
  * A config that changed during the session checks with its session-start
  * version, so the report shows what the change would hide, such as a
  * violation of a rule it now ignores (#164); the change itself fails the
- * gate in `stop-gate.ts`.
+ * gate in `stop-gate.ts`. A top-level package new this session is hidden
+ * from the session-start check of old errors, as it wasn't there then.
  *
  * @param lookups - this invocation's start lookups, with the project and the check runner.
  * @param files - absolute changed files.
@@ -74,6 +188,7 @@ export function changedFiles(
  * @param configs.start - the session start.
  * @param configs.now - the valid configs now.
  * @param configs.found - where each valid config was found now.
+ * @param configs.fresh - the top-level names new this session by config, from `newTopLevel`.
  * @param baseline - false to report violations the baselines accept.
  * @returns the merged report without the errors the changed files already had
  *   at session start, those errors (never in a whole-project check), the
@@ -88,10 +203,12 @@ export async function checkChanged(
     start,
     now,
     found,
+    fresh = {},
   }: {
     start: SessionState["start"];
     now: Record<string, InwardsConfig>;
     found: Record<string, string[]>;
+    fresh?: Record<string, Fresh>;
   },
   baseline: boolean,
 ): Promise<{
@@ -131,6 +248,7 @@ export async function checkChanged(
         base: project,
         baseline,
         config: startIfChanged(start.configs, now, rel),
+        absent: fresh[rel]?.names,
       };
       const { report, rejected } = await agentSuppressions(
         lookups,

@@ -1,6 +1,7 @@
 /**
  * @file The Stop gate against edits made around the hooks: Bash writes,
- * disguised directories, new nested configs, FIFOs and similar tricks. Each
+ * disguised directories, new nested configs, a new top-level package that
+ * shadows an old import, FIFOs and similar tricks. Each
  * must still be caught, and a failing gate blocks once and then lets the turn
  * end.
  */
@@ -113,6 +114,15 @@ describe("Stop gate: edits made around the hooks", () => {
     const { code, stderr } = stop(root);
     expect(code).toBe(2);
     expect(stderr).toContain("which didn't exist when the session started");
+  });
+
+  test("a new top-level package that shadows an old third-party import blocks (#86)", () => {
+    const root = session({ "shop/domain/order.py": "import requests\n" });
+    expect(stop(root).code).toBe(0);
+    put(root, "requests/__init__.py", "import shop.infrastructure.db\n");
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain('Layer \\"domain\\" imports \\"requests\\"');
   });
 
   test("a FIFO named like a module doesn't hang the gate", () => {

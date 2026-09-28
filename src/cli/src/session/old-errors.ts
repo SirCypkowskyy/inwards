@@ -69,6 +69,7 @@ export async function atStart(
     baseline: check.baseline,
     texts,
     config: check.config,
+    absent: check.absent,
   });
 }
 

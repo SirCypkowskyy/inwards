@@ -35,6 +35,8 @@ export interface Check {
   baseline: boolean;
   /** The config to check with instead of the one in `configPath`, as `CheckRunner` takes it. */
   config?: InwardsConfig | undefined;
+  /** Top-level names new this session, which the session-start check must not see. */
+  absent?: readonly string[] | undefined;
   /**
    * The path the agent wrote for a checked file, when the hook had to resolve
    * a `..` to find it: absolute checked file to the payload's cwd joined with
@@ -54,7 +56,8 @@ export interface Check {
  *   (`edit`, the PostToolUse hook), file contents to check instead
  *   of the disk's, whether the extraction cache on disk may be used (never by a
  *   hook), a config to use instead of the one in `configPath`, and the
- *   directories another config checks (`exclude`, uv workspace members).
+ *   directories another config checks (`exclude`, uv workspace members), and
+ *   top-level names to treat as missing (`absent`, for a session-start check).
  * @returns the report.
  */
 export type CheckRunner = (
@@ -69,5 +72,6 @@ export type CheckRunner = (
     cache?: boolean;
     config?: InwardsConfig | undefined;
     exclude?: readonly string[];
+    absent?: readonly string[] | undefined;
   },
 ) => Promise<Report>;
