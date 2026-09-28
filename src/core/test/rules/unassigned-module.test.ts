@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { type PathKind, parseConfig } from "../../src/index.ts";
 import { checkNestedProjects, checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
-import { check, engine, file, OWNERS, PROJECT } from "../support/helpers.ts";
+import { check, engine, file, indexOn, OWNERS, PROJECT } from "../support/helpers.ts";
 
 /**
  * Builds a path probe that sees a pyproject.toml in the given directories only.
@@ -19,6 +19,9 @@ function hasPyproject(...dirs: string[]): PathKind {
   return (rel: string): ReturnType<PathKind> =>
     dirs.some((dir) => rel === `${dir}/pyproject.toml`) ? "file" : undefined;
 }
+
+/** Reads the unassigned package an INW006 import finding names. */
+const CHECKS_WHAT = /checks what "(?<pkg>[^"]+)"/u;
 
 describe("INW006 unassigned-module", () => {
   test("a layer importing first-party code outside every layer is an error", () => {
@@ -73,6 +76,37 @@ describe("INW006 unassigned-module", () => {
   test("checkFiles warns once per package", () => {
     const files = [file("shop/persistence/a.py", ""), file("shop/persistence/b.py", "")];
     expect(engine.checkFiles(files, PROJECT)).toHaveLength(1);
+  });
+
+  test("a compiled or sourceless module is first-party code outside every layer (#86)", () => {
+    const disk = new Map<string, "file" | "dir">([
+      ["shop", "dir"],
+      ["shop/__init__.py", "file"],
+      ["shop/domain", "dir"],
+      ["shop/domain/order.py", "file"],
+      ["shop/persistence.cpython-313-x86_64-linux-gnu.so", "file"],
+      ["shop/cache.pyc", "file"],
+      ["speedups.cp313-win_amd64.pyd", "file"],
+      ["native", "dir"],
+      ["native/__init__.abi3.so", "file"],
+    ]);
+    const project = indexOn(disk);
+    const owners = [
+      "from shop import persistence\n",
+      "import shop.cache\n",
+      "import speedups\n",
+      "from native import fast\n",
+    ].map((src) => {
+      const found = engine.checkFile(file("shop/domain/order.py", src), project);
+      return found.map((d) => `${d.code} ${CHECKS_WHAT.exec(d.message)?.groups?.["pkg"]}`);
+    });
+    expect(owners).toEqual([
+      ["INW006 shop.persistence"],
+      ["INW006 shop.cache"],
+      ["INW006 speedups"],
+      ["INW006 native"],
+    ]);
+    expect(project.ownerOf("shop.persistence.Repo")).toBe("shop.persistence");
   });
 
   test("the index owns a namespace package it doesn't list", () => {

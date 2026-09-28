@@ -4,9 +4,10 @@
  * DiscountPolicy` with no `pricing`), and a relative import that climbs above
  * the top-level package. Existence is decided by probing the disk
  * (`ProjectIndex.ownerOf`), never by the module listing, which misses
- * namespace packages and differs between adapters. The package the missing
- * module would live in is read once (`ProjectIndex.listDir`): it holds any
- * compiled extension of that name, and the names the fix suggests. A module
+ * namespace packages and differs between adapters; the probe counts a
+ * compiled extension or bytecode file as the module. The package the missing
+ * module would live in is read once (`ProjectIndex.listDir`) for the names
+ * the fix suggests. A module
  * a build step writes (`generated`) passes even when it isn't on disk, since
  * a fresh checkout lacks it.
  */
@@ -20,8 +21,6 @@ import { distance } from "./shared/edit-distance.ts";
 
 /** How many real modules the fix suggests. */
 const SUGGESTIONS = 3;
-/** What follows a module's name in a file Python imports without a `.py`: an extension (`.so`, `.cpython-313-x86_64-linux-gnu.so`, `.pyd`), Cython source, or bytecode. */
-const OTHER_MODULE = /^(?:\.[\w-]+)?\.(?:so|pyd)$|^\.(?:pyx|pyc)$/u;
 /** A Python source or stub file name, and its module name. */
 const SOURCE = /^(?<name>[^.]+)\.pyi?$/u;
 
@@ -120,34 +119,25 @@ function climbing(file: SourceFile, ref: ImportRef): Diagnostic {
 }
 
 /**
- * Words an import of a first-party module that doesn't exist, unless the
- * owner package holds a compiled extension or other importable file of that name.
+ * Words an import of a first-party module that doesn't exist. A compiled
+ * extension or other importable file of that name already counts as the
+ * module (`ownerOf` finds it), so it never gets here.
  *
  * @param file - the importing file.
  * @param ref - the import.
  * @param owner - the longest existing prefix of its module part, which is shorter.
  * @param project - the module index.
- * @returns the error, or undefined when the module exists after all.
+ * @returns the error.
  */
 function absent(
   file: SourceFile,
   ref: ImportRef,
   owner: string,
   project: ProjectIndex,
-): Diagnostic | undefined {
+): Diagnostic {
   const module = ref.from ?? ref.target;
   const missing = module.slice(owner.length + 1).split(".")[0] ?? module;
   const entries = project.listDir(owner.replaceAll(".", "/")) ?? [];
-  if (
-    entries.some(
-      (e) =>
-        !e.dir &&
-        e.name.startsWith(`${missing}.`) &&
-        OTHER_MODULE.test(e.name.slice(missing.length)),
-    )
-  ) {
-    return undefined;
-  }
   const near = suggestions(file, project, { owner, missing, entries });
   return diagnostic(RULES.INW010, file, {
     span: ref,
