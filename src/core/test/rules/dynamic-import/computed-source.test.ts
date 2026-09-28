@@ -46,7 +46,7 @@ describe("INW011: computed targets in an inner layer are unverifiable", () => {
     ["exec(variable)", "exec(code)\n"],
     ["eval(variable)", "eval(expr)\n"],
     ["exec(f-string with a field)", 'exec(f"import {mod}")\n'],
-    ["exec(f-string field with a conversion)", "exec(f\"import shop.{'infrastructure'!s}.db\")\n"],
+    ["exec(f-string field with !r)", "exec(f\"import shop.{'infrastructure'!r}.db\")\n"],
     ["exec of a code object compiled from a variable", 'exec(compile(src, "<x>", "exec"))\n'],
     [
       "a computed import_module inside a literal exec source",

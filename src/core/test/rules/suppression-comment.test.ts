@@ -101,7 +101,7 @@ describe("a valid suppression", () => {
   });
 
   test("covers a dynamic import whose target can't be read (INW011)", () => {
-    const text = "import importlib\nname = 'x'\nimportlib.import_module(name)\n";
+    const text = "import importlib\nname = input()\nimportlib.import_module(name)\n";
     expect(run(text).found).toEqual(["3:INW011:error"]);
     const hidden = text.replace("(name)\n", `(name)  # inwards: ignore[INW011] ${REASON}\n`);
     expect(run(hidden)).toEqual({ found: [], hidden: ["3:INW011:legacy, tracked in #12"] });

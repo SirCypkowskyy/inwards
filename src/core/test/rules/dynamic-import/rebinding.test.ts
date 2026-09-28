@@ -39,9 +39,9 @@ describe("INW011: a user-defined exec or eval is not a builtin with a computed s
     expect(found("def run(exec, c):\n    return exec(c)\nrun(exec, code)\n")).toEqual([]);
   });
 
-  test("known gap (#79): the builtin reached through an object", () => {
+  test("the builtin reached through an object keeps the call unverifiable", () => {
     const src = 'import operator\nexec = operator.attrgetter("exec")(print.__self__)\nexec(code)\n';
-    expect(found(src)).toEqual([]);
+    expect(unverifiable(src)).toEqual(["unverifiable"]);
   });
 });
 

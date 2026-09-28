@@ -16,21 +16,23 @@
  */
 import type { Node } from "web-tree-sitter";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { argumentAt, identifierName, literalSource, namedChildren } from "../../python/literals.ts";
-import { type Bindings, importBindings, qualify } from "./callees.ts";
-import { COMPUTED, type Loaded } from "./loader-targets.ts";
+import { argumentAt, literalSource } from "../../python/literals.ts";
+import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { type Bindings, holdsLoader, qualify } from "./callees.ts";
+import { importBindings } from "./import-bindings.ts";
+import { COMPUTED, type Loaded, type LoaderCall, loaderArgument } from "./loader-targets.ts";
 
 /**
  * Lists what a source-running call with a non-literal source loads.
  *
- * @param call - the `exec`, `eval` or `compile` call.
+ * @param loader - the `exec`, `eval` or `compile` call (or a `partial` of one).
  * @param via - the loader's name: `exec`, `eval` or `compile`.
  * @param bindings - what names mean in the calling module.
  * @param ownerOf - finds first-party modules, whose imports may re-export the builtin.
  * @returns `COMPUTED`, or nothing when the call is not an unverifiable load.
  */
 export function computedSource(
-  call: Node,
+  loader: LoaderCall,
   via: string,
   bindings: Bindings,
   ownerOf: ModuleLookup,
@@ -38,6 +40,7 @@ export function computedSource(
   if (via === "compile") {
     return [];
   }
+  const call = loader.node;
   const fn = call.childForFieldName("function");
   if (
     fn?.type === "identifier" &&
@@ -46,7 +49,7 @@ export function computedSource(
   ) {
     return [];
   }
-  const source = argumentAt(call, 0, "source");
+  const source = loaderArgument(loader, 0, "source");
   const compiler = source?.type === "call" ? source.childForFieldName("function") : null;
   const trusted =
     source &&
@@ -147,7 +150,7 @@ function rebound(call: Node, name: string, bindings: Bindings, ownerOf: ModuleLo
  * @param root - the module node.
  * @returns true for a namespace writer (see `NAMESPACE_WRITERS`), `sys.modules` or a wildcard import.
  */
-function rewritesNamespace(root: Node): boolean {
+export function rewritesNamespace(root: Node): boolean {
   return root
     .descendantsOfType(["identifier", "wildcard_import"])
     .some((n) => n !== null && (n.type === "wildcard_import" || writesNamespace(n)));
@@ -346,7 +349,7 @@ function mentionsLoader(value: Node | null, bindings: Bindings): boolean {
     value,
     ...value.descendantsOfType(["identifier", "attribute", "call", "subscript"]),
   ];
-  return parts.some((n) => n !== null && qualify(n, bindings).length > 0);
+  return parts.some((n) => n !== null && qualify(n, bindings).some(holdsLoader));
 }
 
 /**
