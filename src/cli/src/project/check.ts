@@ -30,6 +30,7 @@ import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
+import { workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
@@ -77,8 +78,9 @@ async function openProject(io: ProjectIo, configPath: string, cache = false): Pr
   const wasm = await io.grammars();
   const dir = dirname(configPath);
   const store = cache ? io.extractionCache?.(io.probe.realpath(dir) ?? dir, wasm) : undefined;
+  const options = { workspacePackages: workspacePackages(io, dir) };
   return {
-    engine: await Engine.create(wasm, config, store ? { cache: store } : {}),
+    engine: await Engine.create(wasm, config, store ? { ...options, cache: store } : options),
     config,
     configPath,
     configText,
