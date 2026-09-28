@@ -68,6 +68,7 @@ export async function atStart(
   return await lookups.check(check.configPath, [...texts.keys()], check.base, {
     baseline: check.baseline,
     texts,
+    config: check.config,
   });
 }
 

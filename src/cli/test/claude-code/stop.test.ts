@@ -65,6 +65,29 @@ describe("Stop gate", () => {
     expect(stderr).toContain("[tool.inwards] changed");
   });
 
+  for (const rules of ['ignore = ["INW001"]', 'severity = { INW001 = "warning" }']) {
+    test(`a Bash edit that sets ${rules} still lists the violation it hides`, () => {
+      const root = session();
+      const toml = readFileSync(join(root, "pyproject.toml"), "utf8");
+      put(root, "pyproject.toml", `${toml}\n[tool.inwards.rules]\n${rules}\n`);
+      agentWrites(root, "shop/domain/order.py", LEAK);
+      const { code, stderr } = stop(root);
+      expect(code).toBe(2);
+      expect(stderr).toContain("[tool.inwards] changed");
+      expect(stderr).toContain('"code":"INW001","rule":"layer-dependency","severity":"error"');
+      expect(stderr).toContain("shop/domain/order.py");
+    });
+  }
+
+  test("an unchanged config checks with the config on disk, as before", () => {
+    const root = session();
+    agentWrites(root, "shop/domain/order.py", LEAK);
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).not.toContain("[tool.inwards] changed");
+    expect(stderr).toContain('"code":"INW001"');
+  });
+
   test("disableAllHooks in settings.local.json fails the gate", () => {
     const root = session();
     const path = join(root, ".claude/settings.local.json");
