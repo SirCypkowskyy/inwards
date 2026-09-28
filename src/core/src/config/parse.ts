@@ -17,13 +17,18 @@ import {
   type StopGate,
   stopGateKey,
 } from "./hook-keys.ts";
+import { isSelector, selectorProblem } from "./layer-selector.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 export interface LayerSpec {
   name: string;
-  /** Module prefixes that belong to the layer. `shop.domain` matches `shop.domain.order`. */
+  /**
+   * Module prefixes and selectors that belong to the layer. `shop.domain`
+   * matches `shop.domain.order`; `shop.*.domain` matches
+   * `shop.orders.domain.order` (ADR-034).
+   */
   modules: string[];
   /** Libraries the layer may import (`allow-libraries`); set, any other third-party one is denied (INW005). */
   allowLibraries?: string[];
@@ -179,7 +184,8 @@ export function inwardsTable(pyprojectText: string): unknown {
  *
  * `root` defaults to `.` and has backslashes turned into slashes. Layer names
  * must be unique and non-empty; each layer needs a list of non-empty module
- * prefixes, and no prefix may belong to two layers. Unknown keys are errors,
+ * prefixes or selectors, a selector must be well formed, and no entry may
+ * belong to two layers. Unknown keys are errors,
  * since a mistyped key would silently change nothing. The TOML parser's own
  * error is kept as `cause`.
  *
@@ -264,7 +270,7 @@ function optionalKeys(
  * @param i - its index, for messages.
  * @param seen - layer names so far, updated in place.
  * @returns the validated layer, with its optional library lists.
- * @throws {ConfigError} for unknown keys, a missing or repeated name, or bad modules or libraries.
+ * @throws {ConfigError} for unknown keys, a missing or repeated name, a malformed selector, or bad modules or libraries.
  */
 function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
   if (isRecord(layer)) {
@@ -281,6 +287,14 @@ function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
   if (!isModuleList(modules)) {
     throw new ConfigError(`tool.inwards.layers[${i}].modules must be a list of module names.`);
   }
+  modules.forEach((entry, k) => {
+    const problem = isSelector(entry) ? selectorProblem(entry) : undefined;
+    if (problem !== undefined) {
+      throw new ConfigError(
+        `tool.inwards.layers[${i}].modules[${k}]: "${entry}" is not a valid selector: ${problem}. A selector's segments are package names, * (one segment) or ** (one or more), and it starts with a package name, such as "shop.*.domain".`,
+      );
+    }
+  });
   const allow = libraryList(layer, i, "allow-libraries");
   const deny = libraryList(layer, i, "deny-libraries");
   const extend = libraryList(layer, i, "extend-deny-libraries");

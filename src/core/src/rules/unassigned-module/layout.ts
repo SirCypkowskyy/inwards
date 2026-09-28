@@ -10,15 +10,22 @@
  * moved out of every layer) is the Stop gate's defence against moving a layer
  * away, not a rule a team phases in, so like INW000 the table can't turn it
  * off (ADR-027).
+ *
+ * A selector (`shop.*.domain`) is dead when it matches no module, whatever
+ * the precedence. In a session it is also checked slice by slice, a slice
+ * being a module's prefix up to the selector's last literal segment
+ * (`shop.orders.domain`), so emptying one slice while another keeps the
+ * selector alive is still caught (ADR-034).
  */
-import type { InwardsConfig } from "../../config/parse.ts";
+import { isSelector, matchEntry } from "../../config/layer-selector.ts";
+import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
 import { applyRules } from "../../config/rule-settings.ts";
 import { type ConfigFile, spanOf } from "../../config/source-span.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import type { PathKind } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { layerIndexOf } from "../shared/layer-ownership.ts";
-import { holdsLayer, unassignedPackage } from "./imports.ts";
+import { layerMembership } from "../shared/layer-ownership.ts";
+import { holdsLayer, moduleEvidence, unassignedPackage } from "./imports.ts";
 
 /**
  * Checks the layer prefixes against the modules that exist. A prefix that
@@ -58,27 +65,110 @@ function prefixFindings(
   file: ConfigFile,
   before: ReadonlySet<string> | undefined,
 ): Diagnostic[] {
-  const found: Diagnostic[] = [];
-  const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
-  for (const layer of config.layers) {
+  return config.layers.flatMap((layer) => {
     const dead = layer.modules.filter((prefix) => !matchesAny(prefix, modules));
-    for (const prefix of dead) {
-      const vanished = before !== undefined && matchesAny(prefix, before);
-      const whole = dead.length === layer.modules.length;
-      const message = vanished
-        ? `"${prefix}" (layer "${layer.name}") matched modules when the session started and matches none now.`
-        : `"${prefix}" (layer "${layer.name}") matches no module${whole ? `, so layer "${layer.name}" is empty` : ""}.`;
-      found.push(
-        diagnostic(RULES.INW006, source, {
-          span: spanOf(file.text, prefix),
-          severity: vanished || whole ? "error" : "warning",
-          message,
-          fix: prefixFix(prefix, vanished),
-        }),
-      );
+    return [
+      ...deadEntries(layer, dead, file, before),
+      ...(before === undefined ? [] : emptiedSlices(layer, { modules, before, dead }, file)),
+    ];
+  });
+}
+
+/**
+ * Reports a layer's entries that match no module: a warning for one dead
+ * entry, an error when the whole layer is empty or the entry matched at
+ * session start.
+ *
+ * @param layer - the layer the entries belong to.
+ * @param dead - its entries that match nothing now.
+ * @param file - the pyproject.toml, to point at each entry.
+ * @param before - the modules at session start, when a session is being checked.
+ * @returns one finding per dead entry.
+ */
+function deadEntries(
+  layer: LayerSpec,
+  dead: readonly string[],
+  file: ConfigFile,
+  before: ReadonlySet<string> | undefined,
+): Diagnostic[] {
+  const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
+  return dead.map((prefix) => {
+    const vanished = before !== undefined && matchesAny(prefix, before);
+    const whole = dead.length === layer.modules.length;
+    const message = vanished
+      ? `"${prefix}" (layer "${layer.name}") matched modules when the session started and matches none now.`
+      : `"${prefix}" (layer "${layer.name}") matches no module${whole ? `, so layer "${layer.name}" is empty` : ""}.`;
+    return diagnostic(RULES.INW006, source, {
+      span: spanOf(file.text, prefix),
+      severity: vanished || whole ? "error" : "warning",
+      message,
+      fix: prefixFix(prefix, vanished),
+    });
+  });
+}
+
+/**
+ * Finds the slices of a layer's selectors that held modules at session start
+ * and hold none now (no module is the slice or lies under it), while the selector itself still matches elsewhere:
+ * `shop.billing.domain` moved away under `shop.*.domain`, with
+ * `shop.orders.domain` still there. Deleting or renaming a slice needs the
+ * user, as removing a literal entry's package does: a move into a directory
+ * the walk skips looks exactly like a deletion.
+ *
+ * @param layer - the layer whose selectors are compared.
+ * @param sets - the module sets.
+ * @param sets.modules - every first-party module now.
+ * @param sets.before - the modules at session start.
+ * @param sets.dead - the layer's entries that match nothing now, already reported.
+ * @param file - the pyproject.toml, to point at each selector.
+ * @returns one error per emptied slice.
+ */
+function emptiedSlices(
+  layer: LayerSpec,
+  {
+    modules,
+    before,
+    dead,
+  }: { modules: ReadonlySet<string>; before: ReadonlySet<string>; dead: readonly string[] },
+  file: ConfigFile,
+): Diagnostic[] {
+  const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
+  return layer.modules
+    .filter((entry) => isSelector(entry) && !dead.includes(entry))
+    .flatMap((entry) =>
+      // A slice lives on while any module is it or lies under it, matched or
+      // not: `shop.orders.infra/__init__.py` keeps `shop.*.infra.*`'s slice.
+      [...slicesOf(entry, before)]
+        .filter((slice) => !matchesAny(slice, modules))
+        .map((slice) =>
+          diagnostic(RULES.INW006, source, {
+            span: spanOf(file.text, entry),
+            message: `"${slice}" (matched by "${entry}", layer "${layer.name}") held modules when the session started and holds none now.`,
+            fix: prefixFix(slice, true),
+          }),
+        ),
+    );
+}
+
+/**
+ * Names the slices a selector matches: each matched module's prefix up to the
+ * selector's last literal segment. `shop.**` has the one slice `shop`, so
+ * routine edits under it never empty a slice; `shop.*.infra.*` has
+ * `shop.orders.infra`, not one slice per module.
+ *
+ * @param selector - a layer selector.
+ * @param modules - module names.
+ * @returns the slices, as dotted names.
+ */
+function slicesOf(selector: string, modules: ReadonlySet<string>): Set<string> {
+  const slices = new Set<string>();
+  for (const module of modules) {
+    const match = matchEntry(selector, module);
+    if (match !== undefined) {
+      slices.add(module.split(".").slice(0, match.lastLiteral).join("."));
     }
   }
-  return found;
+  return slices;
 }
 
 /**
@@ -169,27 +259,34 @@ export function checkMoves(
   file: ConfigFile,
 ): Diagnostic[] {
   const { layers } = config;
+  const evidence = moduleEvidence(now.keys());
   const appeared = [...now].filter(
     ([m]) =>
       !before.has(m) &&
-      layerIndexOf(m, layers) === -1 &&
-      unassignedPackage(m, layers) !== undefined,
+      layerMembership(m, layers) === undefined &&
+      unassignedPackage(m, layers, evidence) !== undefined,
   );
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
   return layers.flatMap((layer, i) => {
-    const lost = [...before].filter(([m]) => !now.has(m) && layerIndexOf(m, layers) === i);
+    const lost = [...before].filter(
+      ([m]) => !now.has(m) && layerMembership(m, layers)?.index === i,
+    );
     const moved = appeared.filter(
       ([m, hash]) =>
         lost.length > 0 &&
-        (holdsLayer(m.split(".")[0] ?? m, layers) || lost.some((l) => sameFile(l, [m, hash]))),
+        (holdsLayer(m.split(".")[0] ?? m, layers, evidence) ||
+          lost.some((l) => sameFile(l, [m, hash]))),
     );
-    if (moved.length === 0) {
+    const [first] = lost;
+    if (moved.length === 0 || first === undefined) {
       return [];
     }
     const names = moved.map(([m]) => m).join(", ");
+    // The entry the first lost module belonged to: the selector text, for a selector.
+    const entry = layerMembership(first[0], layers)?.entry ?? layer.name;
     return [
       diagnostic(RULES.INW006, source, {
-        span: spanOf(file.text, layer.modules[0] ?? layer.name),
+        span: spanOf(file.text, entry),
         message: `${names} moved out of layer "${layer.name}" to outside every layer, where nothing checks it.`,
         fix: {
           summary: "Move the code back into its layer, or ask the user.",
@@ -228,13 +325,16 @@ function lastSegment(module: string): string {
 }
 
 /**
- * Tells whether a layer prefix matches any module.
+ * Tells whether a layer entry matches any module, whatever the precedence.
  *
- * @param prefix - a layer prefix.
+ * @param prefix - a layer prefix or selector.
  * @param modules - module names.
- * @returns true when a module equals the prefix or lies inside it.
+ * @returns true when a module equals the prefix or lies inside it, or the selector matches one.
  */
 function matchesAny(prefix: string, modules: ReadonlySet<string>): boolean {
+  if (isSelector(prefix)) {
+    return [...modules].some((module) => matchEntry(prefix, module) !== undefined);
+  }
   if (modules.has(prefix)) {
     return true;
   }

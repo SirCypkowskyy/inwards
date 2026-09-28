@@ -161,8 +161,9 @@ function presetOf(text: string): Style | undefined {
 
 /**
  * Finds where ports live: a `ports` package or module directly inside a
- * layer's module on disk, and the preset's ports module when the preset's
- * layer is still configured (so it is named before `--scaffold` creates it).
+ * layer's literal module on disk, and the preset's ports module when the
+ * preset's layer is still configured (so it is named before `--scaffold`
+ * creates it). Layer selectors aren't probed.
  *
  * @param probe - tells what is on disk.
  * @param project - the directory of pyproject.toml.
@@ -177,7 +178,9 @@ function portModules(
   style: Style | undefined,
 ): string[] {
   const found = new Set<string>();
-  for (const module of config.layers.flatMap((layer) => layer.modules)) {
+  // A selector (`shop.*.domain`) names no one directory to probe; its layer gets the generic hint.
+  const literal = config.layers.flatMap((layer) => layer.modules).filter((m) => !m.includes("*"));
+  for (const module of literal) {
     const base = join(project, config.root, ...module.split("."), "ports");
     if (probe.kind(base) === "dir" || probe.kind(`${base}.py`) === "file") {
       found.add(`${module}.ports`);
@@ -196,14 +199,17 @@ function portModules(
  *
  * @param style - the preset `init --style` wrote.
  * @param config - the parsed config.
- * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured.
+ * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured or has only selectors.
  */
 function presetPorts(style: Style, config: InwardsConfig): string | undefined {
   const parent = style.example.port.split(".").slice(0, -1).join(".");
   const owner = style.layers.find(
     (layer) => parent === layer.module || parent.startsWith(`${layer.module}.`),
   );
-  const module = config.layers.find((layer) => layer.name === owner?.name)?.modules[0];
+  // The layer's first literal prefix: a selector (`app.*.application`) names no one module.
+  const module = config.layers
+    .find((layer) => layer.name === owner?.name)
+    ?.modules.find((m) => !m.includes("*"));
   return owner === undefined || module === undefined
     ? undefined
     : `${module}${parent.slice(owner.module.length)}`;

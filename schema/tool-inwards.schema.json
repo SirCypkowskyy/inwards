@@ -123,6 +123,17 @@
       "type": "string",
       "pattern": "^(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+)(\\.(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+))*$"
     },
+    "layerEntry": {
+      "description": "A layer entry: a module prefix such as shop.domain, or, with a *, a selector whose segments are identifiers, * (one segment) or ** (one or more), starting with a package name, such as shop.*.domain. Inwards also checks non-ASCII identifiers exactly.",
+      "type": "string",
+      "minLength": 1,
+      "anyOf": [
+        { "pattern": "^[^*]+$" },
+        {
+          "pattern": "^[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*(\\.(\\*\\*?|[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*))+$"
+        }
+      ]
+    },
     "memberPattern": {
       "description": "A member pattern: a name or fnmatch glob (*, ?, [seq], [!seq]), optionally ending in .py or /. Inwards also rejects a reversed range such as [z-a].",
       "type": "string",
@@ -163,12 +174,11 @@
           "minLength": 1
         },
         "modules": {
-          "description": "Module prefixes that belong to the layer: shop.domain owns shop.domain.order.",
-          "markdownDescription": "Module prefixes that belong to the layer: shop.domain owns shop.domain.order.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
+          "description": "Module prefixes and selectors that belong to the layer: shop.domain owns shop.domain.order, shop.*.domain owns shop.orders.domain.order.",
+          "markdownDescription": "Module prefixes and selectors that belong to the layer: shop.domain owns shop.domain.order, shop.*.domain owns shop.orders.domain.order.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#layers)",
           "type": "array",
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/definitions/layerEntry"
           }
         },
         "allow-libraries": {

@@ -50,7 +50,7 @@ export {
   probeMembers,
   rootPathOf,
 } from "./rules/package-shape/shape.ts";
-export { layerIndexOf } from "./rules/shared/layer-ownership.ts";
+export { layerIndexOf, layerPackages } from "./rules/shared/layer-ownership.ts";
 export {
   checkMoves,
   checkNestedProjects,

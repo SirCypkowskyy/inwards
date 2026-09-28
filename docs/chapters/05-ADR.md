@@ -36,6 +36,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
+| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Layer selectors anchored in a top-level package, with slice-aware session checks | :white_check_mark: Accepted |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
@@ -871,6 +872,42 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *An `inwards hook opencode` entry point that reads OpenCode's shapes:* the translation would move into the tested CLI, but it would add a second payload contract for a plugin API that is still changing. The translation is small; it can move later.
 - *A plugin that reimplements the checks in JavaScript:* no process per event, but two implementations of every rule and of the guard.
 - *Blocking the end of a turn through `chat.message` or permissions:* neither runs when a turn ends; `session.idle` is the only point, and it comes after the turn.
+
+## ADR-034: Layer selectors anchored in a top-level package, with slice-aware session checks
+
+**Status:** Accepted · 2026-09-28 · [#191](https://github.com/SirCypkowskyy/inwards/issues/191)
+
+**Context.** Vertical slices repeat the same layers in every slice: `shop.orders.domain`, `shop.billing.domain`, and so on. Listing every slice's package in every layer works, but it is long, and a new slice that nobody adds to the config is simply unchecked. Shapes already take selectors in the grammar of [ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces). Layers are harder: ownership decides every rule, INW006 reasons about the packages above the layers, the Stop gate compares sessions by prefix, and three directory walks (the CLI's, the session manifest's and the language server's) decide which code exists at all.
+
+**Decision.**
+
+- **Recognition and compatibility.** An entry with a `*` anywhere is a selector and is validated strictly: its segments are `*` (one segment), `**` (one or more) or identifiers. Partial wildcards, `?`, brackets, empty segments and path separators are config errors. Every entry without a `*` is a literal prefix with the lenient validation it always had, including legacy malformed names, and an empty `modules` list stays valid.
+- **A selector starts with a literal top-level package** (`shop.*.domain`, not `*.domain`). That package anchors the directory walks, which open it in full as they already open a literal prefix's top-level package, and INW006's search for evidence. A selector without a literal first segment is a config error; a project with several top-level packages lists one selector per package.
+- **Matching.** A selector owns every module equal to one of its complete matches, and their descendants. Matching is dynamic programming over segments, O(selector × module) per call, not the recursive matcher of shapes, since it runs for every import. Shapes keep their own matching and first-match precedence.
+- **Precedence, in order:** the deepest last literal segment of the match, then the deeper match, then more literal segments, then the earlier layer. The first criterion lets a literal subtree (`shop.orders.domain`) win over a broad `shop.**` that matches deeper. For literal entries alone the order reduces to the longest prefix, so existing configs keep their owners. [The configuration reference](guides/configuration.md#selectors) has the truth table.
+- **Fix steps name the importing module's own matched prefix**, never the raw selector or another slice, and suggest `<prefix>.ports` only when that prefix is a package. With several literal prefixes in a layer the wording changes on purpose: the fix used to name the layer's first prefix.
+- **INW006 needs evidence for selectors.** A package holds a selector's layer only when the project has a module below it that the selector matches. The module index answers this by listing only the directories the selector allows, never the whole tree, and caches the answer. Literal entries keep the textual rule. Imports into a genuine container package stay errors.
+- **Sessions check slices.** A selector is dead when it matches no module, whatever the precedence. In a session, it is also checked per slice, a slice being a matched module's prefix up to the selector's last literal segment: `shop.orders.domain` for `shop.*.domain`, `shop.orders.infra` for `shop.*.infra.*`, `shop` for `shop.**`. A slice that held modules at session start and holds none now is an error, like a literal prefix that stopped matching. Moves of layer code out of every layer are caught module by module, as before. Config findings point at the selector's text.
+- **Renaming or deleting a slice needs the user**, as it does with literal prefixes: `git mv shop/orders shop/sales`, moving a slice deeper under `shop.**.domain`, and deleting a slice whose only module is its `__init__.py` all block the Stop gate.
+- **One helper names the packages to walk.** `layerPackages` gives each entry's top-level package; the CLI walk, the session manifest and the language server's listing and file-event filter all open those directories, so the editor indexes the same modules as the CLI. A config reload rebuilds all of it.
+
+**Consequences.**
+
+- :material-plus-circle-outline: One entry per layer covers every slice, and a new slice is checked the moment it exists.
+- :material-plus-circle-outline: Existing configs keep their owners and their messages, except the fix wording for layers with several literal prefixes.
+- :material-plus-circle-outline: The language server no longer skips `node_modules` or virtualenv directories inside a layer's package, which closes a gap with the CLI that predates selectors.
+- :material-minus-circle-outline: Slices can't come and go during a session without the user. Naming slices up to the last literal segment keeps routine edits (deleting or renaming a module inside a slice that keeps others) from blocking, but emptying a slice blocks even when it was a deliberate deletion: a move into a directory the walk skips looks exactly like one.
+- :material-minus-circle-outline: A selector can't start with a wildcard, so a project with several top-level packages writes one selector per package.
+- :material-minus-circle-outline: The evidence search doesn't follow symlinked directories. A slice reachable only through a link doesn't make its parent a container, so INW006 reports more there, never less.
+- :material-minus-circle-outline: Contexts ([ADR-030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes)) still take literal prefixes only.
+
+**Alternatives.**
+
+- *Rank by matched depth alone:* simple, but `shop.**` would take `shop.orders.domain.order` away from a literal `shop.orders.domain` layer, which is never what the user meant.
+- *First matching entry wins, as for shapes:* makes the order of the layers decide ownership as well as direction.
+- *Name each slice by its full matched prefix:* under `shop.**` every file becomes its own slice, and deleting or renaming any module blocks the Stop gate.
+- *Treat deleting a slice as allowed and only moves as errors:* the manifest can't tell a deletion from a move into `node_modules` or a virtualenv at the root, which the walks skip.
+- *Leading wildcards (`*.domain`) with a walk of the whole tree:* the walks would have to open every top-level directory, virtualenvs included, to be safe.
 
 ## ADR-035: `inwards check` follows uv workspace members, each with its own config
 

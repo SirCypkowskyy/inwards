@@ -9,6 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseConfig } from "@inwards/core";
+import { nodePlatform } from "../../src/adapters/compose.ts";
 import { architectureBrief, briefFor } from "../../src/init/brief.ts";
 import { configTable, STYLE_NAMES, STYLES } from "../../src/init/styles.ts";
 import { inwards, LAYERS, project, type RunResult } from "../support/run.ts";
@@ -94,6 +95,19 @@ modules = ["shop.orders"]
     expect(brief).toContain("- orders (`shop.orders`): nothing public; no dependencies");
   });
 
+  test("lists layer selectors as written and probes no path for them", () => {
+    const text = `[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.*.domain"] },
+  { name = "infrastructure", modules = ["shop.**"] },
+]
+`;
+    const root = project({ "pyproject.toml": text, "shop/*/domain/ports.py": "" });
+    const brief = briefFor(nodePlatform(), join(root, "pyproject.toml"), text);
+    expect(brief).toContain("1. domain (`shop.*.domain`): imports no other layer");
+    expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
+  });
+
   test("leaves out the rules that are turned off", () => {
     const config = parseConfig(`${LAYERS}[tool.inwards.rules]
 ignore = ["INW005"]
@@ -120,6 +134,23 @@ ignore = ["INW005"]
       expect(tokens(brief)).toBeLessThan(300);
     },
   );
+});
+
+test("a preset whose ports layer became a selector names no ports module", () => {
+  const style = STYLES["clean"];
+  const table = configTable(style, {
+    pkg: "app",
+    root: "src",
+    version: "0.1.0",
+    ignore: [],
+    shapes: false,
+    eol: "\n",
+  });
+  const text = table.replace('"app.application"', '"app.*.application"');
+  expect(text).toContain('"app.*.application"');
+  const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
+  expect(brief).not.toContain("ports`");
+  expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
 });
 
 describe("inwards context", () => {

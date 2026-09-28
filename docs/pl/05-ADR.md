@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 6e48d829de1025da535e5ac7fdbbb47e9a2672e9606ab5c8455b429f3bbc0736
+source_hash: 403bd9618284efe6c79ca31f44ba7031a0239bd2fe5a020b3a18c298223d169f
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -41,6 +41,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :white_check_mark: Przyjęty |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :white_check_mark: Przyjęty |
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :white_check_mark: Przyjęty |
+| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji | :white_check_mark: Przyjęty |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
@@ -876,6 +877,42 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Punkt wejścia `inwards hook opencode`, który czyta kształty OpenCode:* tłumaczenie przeszłoby do przetestowanego CLI, ale dodałoby drugi kontrakt ładunków dla API pluginów, które wciąż się zmienia. Tłumaczenie jest małe; może się przenieść później.
 - *Plugin, który implementuje sprawdzenia na nowo w JavaScripcie:* bez procesu na każde zdarzenie, ale z dwiema implementacjami każdej reguły i strażnika.
 - *Blokowanie końca tury przez `chat.message` albo uprawnienia:* żadne z nich nie działa przy końcu tury; `session.idle` to jedyny punkt, a przychodzi po turze.
+
+## ADR-034: Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji { #adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks }
+
+**Stan:** Przyjęty · 2026-09-28 · [#191](https://github.com/SirCypkowskyy/inwards/issues/191)
+
+**Kontekst.** Pionowe wycinki powtarzają te same warstwy w każdym wycinku: `shop.orders.domain`, `shop.billing.domain` i tak dalej. Wymienienie pakietu każdego wycinka w każdej warstwie działa, ale jest długie, a nowy wycinek, którego nikt nie dopisze do konfiguracji, po prostu nie jest sprawdzany. Kształty już przyjmują selektory w gramatyce z [ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces). Warstwy są trudniejsze: przynależność decyduje o każdej regule, INW006 rozumuje o pakietach nad warstwami, Stop gate porównuje sesje po prefiksach, a trzy przejścia po katalogach (CLI, manifestu sesji i serwera języka) decydują, jaki kod w ogóle istnieje.
+
+**Decyzja.**
+
+- **Rozpoznawanie i zgodność.** Wpis z `*` w dowolnym miejscu to selektor i jest sprawdzany ściśle: jego segmenty to `*` (jeden segment), `**` (jeden lub więcej) albo identyfikatory. Częściowe gwiazdki, `?`, nawiasy kwadratowe, puste segmenty i separatory ścieżek to błędy konfiguracji. Każdy wpis bez `*` to dosłowny prefiks z tak łagodnym sprawdzaniem jak dotąd, łącznie ze starymi niepoprawnymi nazwami, a pusta lista `modules` pozostaje dozwolona.
+- **Selektor zaczyna się od dosłownego pakietu najwyższego poziomu** (`shop.*.domain`, nie `*.domain`). Ten pakiet kotwiczy przejścia po katalogach, które otwierają go w całości, tak jak już otwierają pakiet najwyższego poziomu dosłownego prefiksu, oraz szukanie dowodu przez INW006. Selektor bez dosłownego pierwszego segmentu to błąd konfiguracji; projekt z kilkoma pakietami najwyższego poziomu wymienia jeden selektor na pakiet.
+- **Dopasowanie.** Selektor obejmuje każdy moduł równy jednemu z jego pełnych dopasowań oraz ich potomków. Dopasowanie to programowanie dynamiczne po segmentach, O(selektor × moduł) na wywołanie, a nie rekurencyjne dopasowanie kształtów, bo działa dla każdego importu. Kształty zachowują własne dopasowanie i pierwszeństwo pierwszego pasującego wpisu.
+- **Pierwszeństwo, w tej kolejności:** najgłębszy ostatni dosłowny segment dopasowania, potem głębsze dopasowanie, potem więcej dosłownych segmentów, potem wcześniejsza warstwa. Pierwsze kryterium pozwala dosłownemu poddrzewu (`shop.orders.domain`) wygrać z szerokim `shop.**`, który pasuje głębiej. Dla samych dosłownych wpisów ta kolejność sprowadza się do najdłuższego prefiksu, więc istniejące konfiguracje zachowują właścicieli. [Dokumentacja konfiguracji](guides/configuration.md#selectors) ma tabelę prawdy.
+- **Kroki naprawy nazywają dopasowany prefiks importującego modułu**, nigdy surowy selektor ani inny wycinek, i podpowiadają `<prefiks>.ports` tylko wtedy, gdy ten prefiks jest pakietem. Przy kilku dosłownych prefiksach w warstwie treść zmienia się celowo: naprawa nazywała dotąd pierwszy prefiks warstwy.
+- **INW006 potrzebuje dowodu dla selektorów.** Pakiet zawiera warstwę selektora tylko wtedy, gdy projekt ma pod nim moduł, do którego selektor pasuje. Indeks modułów odpowiada na to, listując tylko katalogi, na które selektor pozwala, nigdy całe drzewo, i zapamiętuje odpowiedź. Dosłowne wpisy zachowują regułę tekstową. Importy prawdziwego pakietu-kontenera pozostają błędami.
+- **Sesje sprawdzają wycinki.** Selektor jest martwy, gdy nie pasuje do żadnego modułu, niezależnie od pierwszeństwa. W sesji jest też sprawdzany wycinek po wycinku, gdzie wycinek to prefiks dopasowanego modułu aż do ostatniego dosłownego segmentu selektora: `shop.orders.domain` dla `shop.*.domain`, `shop.orders.infra` dla `shop.*.infra.*`, `shop` dla `shop.**`. Wycinek, który na starcie sesji miał moduły, a teraz nie ma żadnego, to błąd, jak dosłowny prefiks, który przestał pasować. Przeniesienia kodu warstwy poza wszystkie warstwy są wykrywane moduł po module, jak dotąd. Diagnostyki konfiguracji wskazują tekst selektora.
+- **Zmiana nazwy albo usunięcie wycinka wymaga użytkownika**, tak jak przy dosłownych prefiksach: `git mv shop/orders shop/sales`, przeniesienie wycinka głębiej pod `shop.**.domain` i usunięcie wycinka, którego jedynym modułem jest `__init__.py`, zatrzymują Stop gate.
+- **Jedna funkcja pomocnicza nazywa pakiety do przejścia.** `layerPackages` podaje pakiet najwyższego poziomu każdego wpisu; przejście CLI, manifest sesji oraz listowanie i filtr zdarzeń plików serwera języka otwierają te katalogi, więc edytor indeksuje te same moduły co CLI. Przeładowanie konfiguracji buduje to wszystko od nowa.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jeden wpis na warstwę obejmuje każdy wycinek, a nowy wycinek jest sprawdzany od chwili, gdy powstanie.
+- :material-plus-circle-outline: Istniejące konfiguracje zachowują właścicieli i komunikaty, poza treścią naprawy dla warstw z kilkoma dosłownymi prefiksami.
+- :material-plus-circle-outline: Serwer języka nie pomija już katalogów `node_modules` ani środowisk wirtualnych wewnątrz pakietu warstwy, co zamyka lukę względem CLI starszą niż selektory.
+- :material-minus-circle-outline: Wycinki nie mogą pojawiać się i znikać w trakcie sesji bez użytkownika. Nazywanie wycinków do ostatniego dosłownego segmentu sprawia, że zwykłe edycje (usunięcie albo zmiana nazwy modułu w wycinku, który zachowuje inne) nie blokują, ale opróżnienie wycinka blokuje nawet przy zamierzonym usunięciu: przeniesienie do katalogu, który przejście pomija, wygląda dokładnie tak samo.
+- :material-minus-circle-outline: Selektor nie może zaczynać się od gwiazdki, więc projekt z kilkoma pakietami najwyższego poziomu pisze jeden selektor na pakiet.
+- :material-minus-circle-outline: Szukanie dowodu nie wchodzi w katalogi będące dowiązaniami symbolicznymi. Wycinek osiągalny tylko przez dowiązanie nie czyni swojego rodzica kontenerem, więc INW006 zgłasza tam więcej, nigdy mniej.
+- :material-minus-circle-outline: Konteksty ([ADR-030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes)) nadal przyjmują tylko dosłowne prefiksy.
+
+**Alternatywy.**
+
+- *Ranking tylko po głębokości dopasowania:* prosty, ale `shop.**` odebrałby `shop.orders.domain.order` warstwie z dosłownym `shop.orders.domain`, a tego użytkownik nigdy nie ma na myśli.
+- *Wygrywa pierwszy pasujący wpis, jak w kształtach:* kolejność warstw decydowałaby wtedy o przynależności, a nie tylko o kierunku.
+- *Nazywanie wycinka pełnym dopasowanym prefiksem:* pod `shop.**` każdy plik staje się osobnym wycinkiem, a usunięcie albo zmiana nazwy dowolnego modułu zatrzymuje Stop gate.
+- *Dopuszczenie usunięcia wycinka i traktowanie jako błędu tylko przeniesień:* manifest nie odróżni usunięcia od przeniesienia do `node_modules` albo środowiska wirtualnego w katalogu głównym, które przejścia pomijają.
+- *Gwiazdki na początku (`*.domain`) z przejściem całego drzewa:* przejścia musiałyby dla bezpieczeństwa otwierać każdy katalog najwyższego poziomu, łącznie ze środowiskami wirtualnymi.
 
 ## ADR-035: `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją { #adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config }
 

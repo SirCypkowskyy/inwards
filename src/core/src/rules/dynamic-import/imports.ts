@@ -43,6 +43,7 @@ import {
   allowedDirection,
   layerIndexOf,
   outwardImports,
+  portHome,
   portSteps,
 } from "../shared/layer-ownership.ts";
 import { builtinBindings } from "./callees.ts";
@@ -165,7 +166,7 @@ export function checkDynamicImports(
         summary: `Remove the dynamic import and depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
         steps: [
           `Delete \`${ref.statement}\`. A dynamic import is still a dependency: building the module name at runtime or moving it to another loader hides it instead of removing it.`,
-          ...portSteps(source, target, ref),
+          ...portSteps(file, layers, target, ref),
         ],
       },
     });
@@ -181,7 +182,9 @@ export function checkDynamicImports(
     if (why?.kind === "encoding") {
       return [unreadableSource(file, ref, why.encoding)];
     }
-    return why?.kind === "computed" && inner ? [unverifiableTarget(file, ref, own, outermost)] : [];
+    return why?.kind === "computed" && inner
+      ? [unverifiableTarget(file, ref, { source: own, outermost, home: portHome(file, layers) })]
+      : [];
   });
   return [...outward, ...unreadable];
 }
@@ -191,17 +194,17 @@ export function checkDynamicImports(
  *
  * @param file - the calling file.
  * @param ref - the call.
- * @param source - the layer the file belongs to, not the outermost.
- * @param outermost - the outermost layer, where the loader may live.
+ * @param where - the layers involved and where the port goes.
+ * @param where.source - the layer the file belongs to, not the outermost.
+ * @param where.outermost - the outermost layer, where the loader may live.
+ * @param where.home - the file's matched prefix, worded by `portHome`.
  * @returns the INW011 diagnostic.
  */
 function unverifiableTarget(
   file: SourceFile,
   ref: DynamicImportRef,
-  source: LayerSpec,
-  outermost: LayerSpec,
+  { source, outermost, home }: { source: LayerSpec; outermost: LayerSpec; home: string },
 ): Diagnostic {
-  const home = source.modules[0] ?? source.name;
   const message =
     `Layer "${source.name}" makes a dynamic import (${ref.via}) with an argument Inwards can't read, ` +
     "such as a variable, an f-string field or *args, so Inwards can't verify that it points toward inner layers.";
@@ -213,7 +216,7 @@ function unverifiableTarget(
       steps: [
         `If the module is fixed, replace \`${ref.statement}\` with an import statement, or pass the loader only string literals (no variables, f-string fields, \\N{...} escapes or *args) so Inwards can check it.`,
         `If the module is chosen at runtime (plugins, settings), move the loader to the outermost layer "${outermost.name}" (the composition root) and pass what it loads into this module as a parameter.`,
-        `Type that parameter against a typing.Protocol declared in \`${home}\` (for example \`${home}.ports\`).`,
+        `Type that parameter against a typing.Protocol declared in ${home}.`,
       ],
     },
   });
