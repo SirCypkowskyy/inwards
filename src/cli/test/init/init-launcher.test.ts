@@ -175,3 +175,10 @@ test("the Stop gate counts a launcher hook only behind a tool runner", () => {
   expect(holdsInwardsHooks(settings(`${cd}echo inwards hook claude-code`))).toBe(false);
   expect(holdsInwardsHooks(settings("./fake inwards hook claude-code"))).toBe(false);
 });
+
+test("--launcher with --agent opencode is refused and writes nothing", () => {
+  const root = project({ "pyproject.toml": LAYERS });
+  const result = init(root, "--agent", "opencode", "--launcher", "uv run");
+  expect([result.code, result.stderr]).toEqual([2, expect.stringContaining("--agent opencode")]);
+  expect(read(root, "pyproject.toml")).toBe(LAYERS);
+});
