@@ -26,6 +26,8 @@ const TAGGED =
 // Any spelling of the marker, so a near miss fails instead of silently not running.
 const MARKER = /<!--\s*e2e\s*-->/gu;
 const TITLE = /title="(?<file>[^"]+)"/u;
+// A rule's own page, such as rules/INW001.md or rules/FAPI002.md.
+const RULE_PAGE = /^rules\/[A-Z]+\d{3}\.md$/u;
 
 /** One tagged fence, with the list item's indent already removed. */
 interface Fence {
@@ -130,13 +132,17 @@ test("guides tag at least one runnable snippet", () => {
   expect(guides.map((g) => script(readFileSync(join(CHAPTERS, g), "utf8"))).join("")).not.toBe("");
 });
 
-test.each(guides.filter((g) => g.startsWith("rules/INW")))(
-  "%s shows a flagged example with its documented output",
-  (page) => {
-    const tagged = fences(readFileSync(join(CHAPTERS, page), "utf8"));
-    expect(tagged.some((fence, i) => fence.lang === "sh" && isOutput(tagged[i + 1]))).toBe(true);
-  },
+// Every rule page that ships a check; a registered rule whose check is still
+// planned (`status: planned`) has nothing to show yet.
+const shipped = guides.filter(
+  (g) =>
+    RULE_PAGE.test(g) && !readFileSync(join(CHAPTERS, g), "utf8").includes("\nstatus: planned\n"),
 );
+
+test.each(shipped)("%s shows a flagged example with its documented output", (page) => {
+  const tagged = fences(readFileSync(join(CHAPTERS, page), "utf8"));
+  expect(tagged.some((fence, i) => fence.lang === "sh" && isOutput(tagged[i + 1]))).toBe(true);
+});
 
 test.each(guides)("every e2e marker in %s tags a fence", (guide) => {
   const markdown = readFileSync(join(CHAPTERS, guide), "utf8");

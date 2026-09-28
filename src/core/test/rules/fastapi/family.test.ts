@@ -3,8 +3,8 @@
  * FAPI003 are registered opt-in, SARIF lists them as disabled,
  * `extend-select` turns one on, an inline suppression names them like any
  * INW code, and an unknown FAPI code is a config error and an INW009 error.
- * The rules report nothing yet (#183, #184), so a suppression is checked
- * against a finding built here.
+ * A suppression is checked against a finding built here; the rules' own
+ * suppression tests live next to their checks (#183).
  */
 import { describe, expect, test } from "bun:test";
 import { ruleLevel } from "../../../src/config/rule-settings.ts";

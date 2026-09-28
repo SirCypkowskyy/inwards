@@ -338,10 +338,10 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "endpoint-metadata": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/endpointMetadataOptions"
         },
         "undocumented-error-response": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/undocumentedErrorResponseOptions"
         },
         "router-wiring": {
           "$ref": "#/definitions/routerWiringOptions"
@@ -530,6 +530,144 @@
           "description": "Project advice added to the INW007 fix steps.",
           "markdownDescription": "Project advice added to the INW007 fix steps.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#templates)",
           "$ref": "#/definitions/hints"
+        }
+      }
+    },
+    "endpointMetadataOptions": {
+      "description": "FAPI001 endpoint-metadata's options, [tool.inwards.rules.endpoint-metadata]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "FAPI001 endpoint-metadata's options, [tool.inwards.rules.endpoint-metadata]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "description": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.",
+          "markdownDescription": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "require-summary": {
+          "description": "Require summary= or a docstring (\"summary-or-docstring\"), summary= itself (\"summary\"), or nothing (false).",
+          "markdownDescription": "Require summary= or a docstring (\"summary-or-docstring\"), summary= itself (\"summary\"), or nothing (false).\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+          "enum": [
+            "summary-or-docstring",
+            "summary",
+            false
+          ],
+          "default": "summary-or-docstring"
+        },
+        "require-response-model": {
+          "description": "Require response_model= or a return annotation FastAPI can use; a status_code=204 route is exempt.",
+          "markdownDescription": "Require response_model= or a return annotation FastAPI can use; a status_code=204 route is exempt.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+          "type": "boolean",
+          "default": true
+        },
+        "require-status-code": {
+          "description": "HTTP methods whose path operations must set status_code= explicitly.",
+          "markdownDescription": "HTTP methods whose path operations must set status_code= explicitly.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "get",
+              "post",
+              "put",
+              "delete",
+              "patch",
+              "options",
+              "head",
+              "trace"
+            ]
+          },
+          "default": [
+            "post",
+            "delete"
+          ]
+        },
+        "require-response-fields": {
+          "description": "Keys every entry in responses= must have.",
+          "markdownDescription": "Keys every entry in responses= must have.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "description",
+              "model",
+              "content"
+            ]
+          },
+          "default": [
+            "description"
+          ]
+        },
+        "require-tags": {
+          "description": "Require tags= on the path operation, or on a router or include_router above it.",
+          "markdownDescription": "Require tags= on the path operation, or on a router or include_router above it.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+          "type": "boolean",
+          "default": false
+        },
+        "require-operation-id": {
+          "description": "Require an explicit operation_id=.",
+          "markdownDescription": "Require an explicit operation_id=.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI001/)",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "undocumentedErrorResponseOptions": {
+      "description": "FAPI002 undocumented-error-response's options, [tool.inwards.rules.undocumented-error-response]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "FAPI002 undocumented-error-response's options, [tool.inwards.rules.undocumented-error-response]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI002/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "description": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.",
+          "markdownDescription": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "codes": {
+          "description": "Which error codes must be declared: 4xx only, or 4xx and 5xx.",
+          "markdownDescription": "Which error codes must be declared: 4xx only, or 4xx and 5xx.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI002/)",
+          "enum": [
+            "4xx",
+            "4xx-5xx"
+          ],
+          "default": "4xx"
+        },
+        "max-depth": {
+          "description": "How many calls deep FAPI002 follows helpers and dependencies; 0 reads the endpoint's own body only.",
+          "markdownDescription": "How many calls deep FAPI002 follows helpers and dependencies; 0 reads the endpoint's own body only.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI002/)",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8,
+          "default": 2
+        },
+        "report-direct-raises": {
+          "description": "Report codes raised with HTTPException in the endpoint's own body; false leaves them to Ruff FAST004.",
+          "markdownDescription": "Report codes raised with HTTPException in the endpoint's own body; false leaves them to Ruff FAST004.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI002/)",
+          "type": "boolean",
+          "default": true
+        },
+        "handled-counts-as-documented": {
+          "description": "Count a code that only comes from a custom exception with a registered handler as documented.",
+          "markdownDescription": "Count a code that only comes from a custom exception with a registered handler as documented.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI002/)",
+          "type": "boolean",
+          "default": false
+        },
+        "explicit-422": {
+          "description": "\"ignore\": a 422 counts as documented when the operation takes parameters, since FastAPI documents it; \"report\": it must be declared.",
+          "markdownDescription": "\"ignore\": a 422 counts as documented when the operation takes parameters, since FastAPI documents it; \"report\": it must be declared.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/FAPI002/)",
+          "enum": [
+            "ignore",
+            "report"
+          ],
+          "default": "ignore"
         }
       }
     },

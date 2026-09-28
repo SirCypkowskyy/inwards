@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: ceaf83754a1509d1d760e4aa7719a48f09d99f15d86efeb8c35197a6700e86aa
+source_hash: f94ae8e8fc4d504d026677f15b766b0c9c0f44b9770cfd87e9740fc36a30c17f
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -24,12 +24,12 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 
 ## Reguły FastAPI { #fastapi }
 
-Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa. FAPI003 już zgłasza. FAPI001 i FAPI002 są zarejestrowane, więc konfiguracja, wyciszenia i SARIF akceptują ich kody, ale ich sprawdzenia trafią w [#183](https://github.com/SirCypkowskyy/inwards/issues/183); do tego czasu niczego nie zgłaszają.
+Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa.
 
 | Kod | Nazwa | Co zgłasza | Domyślnie | Wyciszenie w linii |
 |---|---|---|---|---|
 | [FAPI001](FAPI001.md) | `endpoint-metadata` | Operacja ścieżki bez metadanych OpenAPI, których wymaga projekt (podsumowanie, model odpowiedzi, kod statusu) | opt-in, błąd | tak |
-| [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu niezadeklarowany w `responses=` | opt-in, błąd | tak |
+| [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu (rzucony bezpośrednio, w funkcji pomocniczej albo zależności, albo przez handler wyjątków aplikacji) niezadeklarowany w `responses=` | opt-in, błąd | tak |
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
 
 Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
@@ -65,7 +65,7 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 
 Reguła, która w kolumnie Default ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone; opt-in są reguły, które oceniają kod według progów wybranych przez zespół, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
 
-Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
+Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
 
 <!-- config: fragment -->
 

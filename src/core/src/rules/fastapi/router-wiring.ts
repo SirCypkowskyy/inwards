@@ -16,6 +16,7 @@ import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES, type RuleMeta } from "../../meta/registry.ts";
 import type { GraphEdge, GraphNode, WiringGraph } from "./graph.ts";
+import { list, optionalList } from "./options.ts";
 import type { FastApiFile, Wiring } from "./records.ts";
 
 const RULE: RuleMeta = RULES.FAPI003;
@@ -40,7 +41,7 @@ export function checkFileWiring(
     const self = wiring.kind === "include" && wiring.target === wiring.receiver;
     return [
       ...(self ? [selfInclusion(wiring, src)] : []),
-      ...(options.checkOrder === false ? [] : includedEarly(file, wiring, src)),
+      ...(options["check-order"] === false ? [] : includedEarly(file, wiring, src)),
     ];
   });
   return found.sort((a, b) => a.line - b.line || a.column - b.column);
@@ -102,12 +103,12 @@ function unmounted(
   options: RuleOptions,
 ): Diagnostic[] {
   const [unknown] = graph.unresolved;
-  if (unknown !== undefined && options.unresolvedIncludes === "silent") {
+  if (unknown !== undefined && options["unresolved-includes"] === "silent") {
     return [];
   }
-  const roots = rootsOf(graph, options.entrypoints);
+  const roots = rootsOf(graph, optionalList(options, "entrypoints"));
   const reached = graph.reachable(roots);
-  const allowed = options.allowUnmounted ?? [];
+  const allowed = list(options, "allow-unmounted", []);
   const caveat = unknown
     ? ` Inwards can't follow the include_router call at ${where(unknown.file, unknown.wiring.node)}, so that call may include it.`
     : "";
