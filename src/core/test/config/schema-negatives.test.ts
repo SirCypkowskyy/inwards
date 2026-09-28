@@ -159,6 +159,15 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ["a path in a layer selector", withLayer('{ name = "d", modules = ["shop/*/domain"] }')],
     ["*** in a layer selector", withLayer('{ name = "d", modules = ["shop.***"] }')],
     [
+      "a digit-led segment in a layer selector",
+      withLayer('{ name = "d", modules = ["shop.*.1abc"] }'),
+    ],
+    ["punctuation in a layer selector", withLayer('{ name = "d", modules = ["shop.*.a+b"] }')],
+    [
+      "a digit-led first segment in a layer selector",
+      withLayer('{ name = "d", modules = ["1shop.*"] }'),
+    ],
+    [
       "a distribution name as a library",
       withLayer('{ name = "d", modules = ["shop"], deny-libraries = ["python-dateutil"] }'),
     ],

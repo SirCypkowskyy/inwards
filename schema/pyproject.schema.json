@@ -26,7 +26,7 @@
       "pattern": "^(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+)(\\.(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+))*$"
     },
     "layerEntry": {
-      "description": "A layer entry: a module prefix such as shop.domain, or, with a *, a selector whose segments are names, * (one segment) or ** (one or more), starting with a package name, such as shop.*.domain.",
+      "description": "A layer entry: a module prefix such as shop.domain, or, with a *, a selector whose segments are identifiers, * (one segment) or ** (one or more), starting with a package name, such as shop.*.domain. Inwards also checks non-ASCII identifiers exactly.",
       "type": "string",
       "minLength": 1,
       "anyOf": [
@@ -34,7 +34,7 @@
           "pattern": "^[^*]+$"
         },
         {
-          "pattern": "^[^.\\s*?\\[\\]/\\\\-]+(\\.(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+))+$"
+          "pattern": "^[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*(\\.(\\*\\*?|[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*))+$"
         }
       ]
     },

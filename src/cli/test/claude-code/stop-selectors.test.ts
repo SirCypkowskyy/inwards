@@ -166,6 +166,30 @@ const SCENARIOS: Scenario[] = [
     (root: string): void => rmSync(join(root, "shop/orders/infra/old.py")),
     0,
   ],
+  [
+    "every module under a shop.*.infra.* slice deleted, its __init__.py kept",
+    "leaves",
+    (root: string): void => {
+      rmSync(join(root, "shop/orders/infra/db.py"));
+      rmSync(join(root, "shop/orders/infra/old.py"));
+    },
+    0,
+  ],
+  [
+    "a shop.*.infra.* slice's only child renamed, its __init__.py kept",
+    "leaves",
+    (root: string): void => {
+      rmSync(join(root, "shop/orders/infra/old.py"));
+      git(root, "mv", "shop/orders/infra/db.py", "shop/orders/infra/store.py");
+    },
+    0,
+  ],
+  [
+    "a slice's domain module deleted, its __init__.py kept",
+    "slices",
+    (root: string): void => rmSync(join(root, "shop/billing/domain/invoice.py")),
+    0,
+  ],
 ];
 
 describe("Stop gate: selectors and literal configs agree", () => {

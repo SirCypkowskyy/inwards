@@ -109,7 +109,7 @@ function deadEntries(
 
 /**
  * Finds the slices of a layer's selectors that held modules at session start
- * and hold none now, while the selector itself still matches elsewhere:
+ * and hold none now (no module is the slice or lies under it), while the selector itself still matches elsewhere:
  * `shop.billing.domain` moved away under `shop.*.domain`, with
  * `shop.orders.domain` still there. Deleting or renaming a slice needs the
  * user, as removing a literal entry's package does: a move into a directory
@@ -135,18 +135,19 @@ function emptiedSlices(
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
   return layer.modules
     .filter((entry) => isSelector(entry) && !dead.includes(entry))
-    .flatMap((entry) => {
-      const now = slicesOf(entry, modules);
-      return [...slicesOf(entry, before)]
-        .filter((slice) => !now.has(slice))
+    .flatMap((entry) =>
+      // A slice lives on while any module is it or lies under it, matched or
+      // not: `shop.orders.infra/__init__.py` keeps `shop.*.infra.*`'s slice.
+      [...slicesOf(entry, before)]
+        .filter((slice) => !matchesAny(slice, modules))
         .map((slice) =>
           diagnostic(RULES.INW006, source, {
             span: spanOf(file.text, entry),
             message: `"${slice}" (matched by "${entry}", layer "${layer.name}") held modules when the session started and holds none now.`,
             fix: prefixFix(slice, true),
           }),
-        );
-    });
+        ),
+    );
 }
 
 /**

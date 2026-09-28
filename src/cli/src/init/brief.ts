@@ -199,14 +199,17 @@ function portModules(
  *
  * @param style - the preset `init --style` wrote.
  * @param config - the parsed config.
- * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured.
+ * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured or has only selectors.
  */
 function presetPorts(style: Style, config: InwardsConfig): string | undefined {
   const parent = style.example.port.split(".").slice(0, -1).join(".");
   const owner = style.layers.find(
     (layer) => parent === layer.module || parent.startsWith(`${layer.module}.`),
   );
-  const module = config.layers.find((layer) => layer.name === owner?.name)?.modules[0];
+  // The layer's first literal prefix: a selector (`app.*.application`) names no one module.
+  const module = config.layers
+    .find((layer) => layer.name === owner?.name)
+    ?.modules.find((m) => !m.includes("*"));
   return owner === undefined || module === undefined
     ? undefined
     : `${module}${parent.slice(owner.module.length)}`;

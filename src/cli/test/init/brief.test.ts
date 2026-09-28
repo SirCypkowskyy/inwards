@@ -136,6 +136,22 @@ ignore = ["INW005"]
   );
 });
 
+test("a preset whose ports layer became a selector names no ports module", () => {
+  const style = STYLES["clean"];
+  const table = configTable(style, {
+    pkg: "app",
+    root: "src",
+    version: "0.1.0",
+    ignore: [],
+    eol: "\n",
+  });
+  const text = table.replace('"app.application"', '"app.*.application"');
+  expect(text).toContain('"app.*.application"');
+  const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
+  expect(brief).not.toContain("ports`");
+  expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
+});
+
 describe("inwards context", () => {
   test("prints the brief for the example config, under 300 tokens", () => {
     const out = run(REPO, "context");
