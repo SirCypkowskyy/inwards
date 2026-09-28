@@ -14,6 +14,7 @@ export const STYLE_NAMES = [
   "vertical-slices",
   "bounded-contexts",
   "django",
+  "fastapi",
 ] as const;
 export type StyleName = (typeof STYLE_NAMES)[number];
 
@@ -38,6 +39,8 @@ interface StyleRole {
   name: string;
   role: string;
   file?: true;
+  /** Shares the previous role's place, written as `"a | b"`: siblings may not import each other. */
+  sibling?: true;
 }
 
 /** A `[tool.inwards.templates.<name>]` a preset writes. */
@@ -74,6 +77,15 @@ export interface ExampleModules {
   api?: string;
 }
 
+/** Opt-in rules a preset turns on as warnings, with the options tables they need. */
+export interface StyleOptIn {
+  codes: readonly string[];
+  /** The comment above `extend-select`. */
+  why: string;
+  /** `[tool.inwards.rules.<rule>]` tables, each with a comment and its `key = value` lines. */
+  options: readonly { rule: string; why: string; lines: readonly string[] }[];
+}
+
 /** A preset: a one-line summary, its config, the example's modules, its shapes, and the import it can't forbid. */
 export interface Style {
   name: StyleName;
@@ -83,8 +95,12 @@ export interface Style {
   contexts: StyleContexts | undefined;
   /** Rules the preset turns off, and why, for `[tool.inwards.rules]`. */
   ignoreRules: { codes: readonly string[]; why: string } | undefined;
-  /** The order example's modules, or undefined for the Django app example (`django.ts`). */
-  example: ExampleModules | undefined;
+  /** Opt-in rules it turns on, as warnings. */
+  optIn: StyleOptIn | undefined;
+  /** The order example's modules, or a function writing a framework's example (`django.ts`, `fastapi.ts`) below the package. */
+  example: ExampleModules | ((pkg: string) => Map<string, string>);
+  /** Config for another tool that init prints but never writes, given the package's path, e.g. `src/app`. */
+  companion: ((base: string) => string) | undefined;
   /** What to run to try the scaffold, for the package given. */
   tryIt: (pkg: string) => string;
   shapes: readonly StyleShape[];
@@ -119,6 +135,21 @@ export function runBootstrap(pkg: string): string {
 }
 
 /**
+ * Writes the comment above a context preset's entries: what the context
+ * rules keep each package to, and that every package needs its own entry.
+ *
+ * @param what - what each package is, e.g. `slice`.
+ * @param rule - the sentence saying what the rules keep it to.
+ * @returns the comment's lines.
+ */
+export function contextsWhy(what: string, rule: string): string[] {
+  return [
+    rule,
+    `Add an entry like this for every ${what}; one without an entry is not kept apart.`,
+  ];
+}
+
+/**
  * Tells whether a string names a preset.
  *
  * @param value - what was passed to `--style`, if anything.
@@ -147,7 +178,7 @@ export function expandLayers(style: Style): ExpandedLayer[] {
       continue;
     }
     for (const role of template.roles) {
-      rank += 1;
+      rank += role.sibling === true ? 0 : 1;
       out.push({
         name: `${layer.name}.${role.name}`,
         module: layer.module === "" ? role.name : `${layer.module}.${role.name}`,

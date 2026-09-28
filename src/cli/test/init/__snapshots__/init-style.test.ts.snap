@@ -460,6 +460,119 @@ extra = "warning"
 }
 `;
 
+exports[`inwards init --style X --scaffold on a fresh uv project fastapi: exit 0, then check reports 0 violations and 0 warnings 1`] = `
+{
+  "check": {
+    "filesChecked": 15,
+    "violations": 0,
+    "warnings": 0,
+  },
+  "created": [
+    "src/my_app/config.py",
+    "src/my_app/exceptions.py",
+    "src/my_app/main.py",
+    "src/my_app/models.py",
+    "src/my_app/posts/__init__.py",
+    "src/my_app/posts/config.py",
+    "src/my_app/posts/constants.py",
+    "src/my_app/posts/dependencies.py",
+    "src/my_app/posts/exceptions.py",
+    "src/my_app/posts/models.py",
+    "src/my_app/posts/router.py",
+    "src/my_app/posts/schemas.py",
+    "src/my_app/posts/service.py",
+    "src/my_app/posts/utils.py",
+  ],
+  "stdout": 
+"inwards init: wrote the fastapi preset to pyproject.toml and 14 example files.
+
+src/my_app/  (fastapi)  kernel: imports no other layer
+├── */
+│   ├── config.py        domain.config: may import kernel; not its siblings domain.constants, domain.exceptions
+│   ├── constants.py     domain.constants: may import kernel; not its siblings domain.exceptions, domain.config
+│   ├── dependencies.py  domain.dependencies: may import kernel, domain.constants, domain.exceptions, domain.config, domain.models, domain.schemas, domain.utils, domain.service
+│   ├── exceptions.py    domain.exceptions: may import kernel; not its siblings domain.constants, domain.config
+│   ├── models.py        domain.models: may import kernel, domain.constants, domain.exceptions, domain.config; not its sibling domain.schemas
+│   ├── router.py        domain.router: may import kernel, domain.constants, domain.exceptions, domain.config, domain.models, domain.schemas, domain.utils, domain.service, domain.dependencies
+│   ├── schemas.py       domain.schemas: may import kernel, domain.constants, domain.exceptions, domain.config; not its sibling domain.models
+│   ├── service.py       domain.service: may import kernel, domain.constants, domain.exceptions, domain.config, domain.models, domain.schemas, domain.utils
+│   └── utils.py         domain.utils: may import kernel, domain.constants, domain.exceptions, domain.config, domain.models, domain.schemas
+└── main.py              main: may import every other layer
+
+inwards check: 0 violations, 0 warnings.
+
+Ruff checks what one file shows. Add this to pyproject.toml to go with the preset (init doesn't change your Ruff config):
+
+[tool.ruff.lint]
+extend-select = ["ASYNC", "FAST", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pydantic.BaseModel".msg = "Subclass CustomModel from src/my_app/models.py instead."
+"pydantic_settings.BaseSettings".msg = "Subclass BaseSettings only in a config.py module."
+
+[tool.ruff.lint.per-file-ignores]
+"src/my_app/models.py" = ["TID251"]
+"**/config.py" = ["TID251"]
+
+Try the example: uv add fastapi uvicorn pydantic-settings && uv run uvicorn my_app.main:app
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
+"
+,
+  "table": 
+"[tool.inwards]
+# Preset "fastapi" (inwards init --style fastapi, Inwards <VERSION>).
+# Layers are listed innermost first: each may import itself and the layers above it.
+# An entry with a template becomes one layer per role, inside each package it matches.
+# Not enforced by this preset: a router may use the models directly instead of going through the service.
+root = "src"
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest"]
+layers = [
+  { name = "kernel", modules = ["my_app"], deny-libraries = [] },            # the shared modules: settings, the base model, exceptions, the database
+  { name = "domain", modules = ["my_app.*"], template = "fastapi-domain" },  # every domain package, layered by the fastapi-domain template
+  { name = "main", modules = ["my_app.main"] },                              # the app: includes each domain's router
+]
+
+# The layers inside every domain, innermost first ("a | b" are siblings), and the modules other code may import; main.py includes each router.
+[tool.inwards.templates.fastapi-domain]
+roles = ["constants | exceptions | config", "models | schemas", "utils", "service", "dependencies", "router"]
+public = ["router", "service", "schemas", "dependencies", "constants", "exceptions"]
+
+[tool.inwards.rules]
+# Domains may use each other's public modules without declaring it; INW003 keeps them to those.
+ignore = ["INW002"]
+# The FastAPI rules, as warnings to start with: make them errors once the project is clean.
+extend-select = ["FAPI001", "FAPI002", "FAPI003"]
+severity = { FAPI001 = "warning", FAPI002 = "warning", FAPI003 = "warning" }
+
+# Leave raises in the endpoint itself to Ruff's FAST004.
+[tool.inwards.rules.undocumented-error-response]
+report-direct-raises = false
+
+# Each domain is a context: other domains and main.py may import only its public modules.
+# Add an entry like this for every domain; one without an entry is not kept apart.
+[[tool.inwards.contexts]]
+name = "posts"
+modules = ["my_app.posts"]
+template = "fastapi-domain"
+
+# Package shapes (INW007, INW008) for the scaffold's packages.
+# my_app: domain packages, the kernel's shared modules and the app only; anything else is an error.
+[[tool.inwards.shape]]
+packages = ["my_app"]
+require = ["main.py"]
+allow = ["*/", "config.py", "database.py", "exceptions.py", "models.py", "pagination.py", "__main__.py", "_version.py"]
+
+# my_app.*: the domain's roles only; any other module would fall to the kernel layer.
+[[tool.inwards.shape]]
+packages = ["my_app.*"]
+require = ["__init__", "router", "service"]
+allow = ["constants", "exceptions", "config", "models", "schemas", "utils", "dependencies"]
+"
+,
+}
+`;
+
 exports[`inwards init without --style or --agent --list-styles prints each preset's layers and shapes 1`] = `
 "layered: N-tier: presentation calls services, services call persistence
   1. domain        shop.domain        entities shared by every layer
@@ -529,5 +642,25 @@ django: Django apps: models, services, views and urls in each, apps crossing onl
   Shapes, with --scaffold:
     shop    requires settings.py, urls.py; allows */, asgi.py, wsgi.py, __main__.py, _version.py: apps, settings and the URLconf only; anything else is an error
     shop.*  requires models, services, views, urls; allows admin, apps, migrations/, tests: the app's roles and what startapp writes; anything else is a warning
+
+fastapi: fastapi-best-practices: one package per domain on a kernel of shared modules, with the FastAPI rules on
+  1. kernel               shop                 the shared modules: settings, the base model, exceptions, the database
+  2. domain.constants     shop.*.constants     the domain's constants and error codes
+  2. domain.exceptions    shop.*.exceptions    the domain's errors
+  2. domain.config        shop.*.config        the domain's settings
+  3. domain.models        shop.*.models        the stored records
+  3. domain.schemas       shop.*.schemas       what the endpoints take and return
+  4. domain.utils         shop.*.utils         helpers with no business logic
+  5. domain.service       shop.*.service       business logic
+  6. domain.dependencies  shop.*.dependencies  checks the endpoints share
+  7. domain.router        shop.*.router        the endpoints
+  8. main                 shop.main            the app: includes each domain's router
+  Each domain is a context: other domains and main.py may import only its public modules.
+  Turns off INW002. Domains may use each other's public modules without declaring it; INW003 keeps them to those.
+  Turns on FAPI001, FAPI002, FAPI003 as warnings.
+  Gap: a router may use the models directly instead of going through the service.
+  Shapes, with --scaffold:
+    shop    requires main.py; allows */, config.py, database.py, exceptions.py, models.py, pagination.py, __main__.py, _version.py: domain packages, the kernel's shared modules and the app only; anything else is an error
+    shop.*  requires __init__, router, service; allows constants, exceptions, config, models, schemas, utils, dependencies: the domain's roles only; any other module would fall to the kernel layer
 "
 `;

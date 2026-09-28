@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: 51337e08055254b7541c20b1298f95a97a89fffad102a0a4f9922f4e401d855c
+source_hash: e6d7be566cdd1c3549fe84aa8b70e3a87852a75300cde2241cb7c72fba2fae17
 ---
 
 # Kształt pakietu { #package-shape }
@@ -143,7 +143,9 @@ Presety z kontekstami nadają kształt także swoim pakietom kontekstów, przez 
 | `bounded-contexts` | `app.*` | wymaga `domain/`, `application/`, `infrastructure/`, `api`; wszystko inne jest ostrzeżeniem |
 | `django` | `app` | wymaga `settings.py` i `urls.py`; dopuszcza aplikacje, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |
 | `django` | `app.*` | wymaga `models`, `services`, `views`, `urls`; dopuszcza `admin`, `apps`, `migrations/`, `tests`; wszystko inne jest ostrzeżeniem |
+| `fastapi` | `app` | wymaga `main.py`; dopuszcza domeny, `config.py`, `database.py`, `exceptions.py`, `models.py`, `pagination.py`, `__main__.py`, `_version.py` |
+| `fastapi` | `app.*` | wymaga `__init__`, `router`, `service`; dopuszcza pozostałe role szablonu `fastapi-domain`; wszystko inne jest błędem |
 
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 
-Kształt pakietu nie obejmuje jeszcze presetu `inwards init --style fastapi` ([#93](https://github.com/SirCypkowskyy/inwards/issues/93)), plików innych niż Python oraz tego, co plik zawiera.
+Kształt pakietu nie obejmuje jeszcze plików innych niż Python ani tego, co plik zawiera.

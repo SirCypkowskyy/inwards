@@ -60,6 +60,7 @@ const PRESET_PORTS: Readonly<Record<(typeof STYLE_NAMES)[number], string>> = {
   // Their layers are selectors, which name no one module.
   "bounded-contexts": "the inner layer",
   django: "the inner layer",
+  fastapi: "the inner layer",
 };
 
 /** A probe that finds nothing on disk. */
@@ -165,7 +166,8 @@ ignore = ["INW005"]
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
       expect(brief).toContain(`(the ${name} preset)`);
       expect(brief).toContain(`declare a \`typing.Protocol\` in ${PRESET_PORTS[name]}`);
-      expect(tokens(brief)).toBeLessThan(300);
+      // fastapi has eleven layers, nine of them the template's roles, each listing what it may import.
+      expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
     },
   );
 });

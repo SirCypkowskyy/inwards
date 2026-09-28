@@ -34,7 +34,7 @@ build-backend = "uv_build"
 
 const LINEAR_STYLES = ["layered", "clean", "hexagonal"] as const;
 /** The presets that declare contexts (INW002, INW003). */
-export const CONTEXT_STYLES = ["vertical-slices", "bounded-contexts", "django"] as const;
+export const CONTEXT_STYLES = ["vertical-slices", "bounded-contexts", "django", "fastapi"] as const;
 export const STYLES: readonly [...typeof LINEAR_STYLES, ...typeof CONTEXT_STYLES] = [
   ...LINEAR_STYLES,
   ...CONTEXT_STYLES,

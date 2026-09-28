@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: c3aac2c48c3aae8d09cb93b20a87e3ff62639ac195da1918d9cbd559d4893f85
+source_hash: 2a62d10c7cba81435035fb73104391110f7ec1acb8e29bd765b5125eaedf0201
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -338,7 +338,7 @@ Szablony są rozwijane przy wczytywaniu konfiguracji, zanim cokolwiek innego zos
 - **W modułach wpisu z szablonem używaj `*`, nie `**`.** `src.*` daje `src.*.models`, które pasuje tylko do `models` samej domeny, więc `src/orders/service/models.py` zostaje w roli `service`. Przy `src.**` wzorzec `src.**.models` pasuje też do tego pliku, który przechodzi wtedy do roli `models`, bo wygrywa najgłębszy ostatni dosłowny segment ([Selektory](#selectors)).
 - **Błędy konfiguracji nazywają wpis albo klucz szablonu**: `tool.inwards.layers[1].template` dla nieznanego szablonu albo takiego bez ról, `tool.inwards.templates.fastapi-domain.roles[2]` dla błędnej roli. Problem, który widać dopiero po rozwinięciu, na przykład zajęta już nazwa warstwy roli, nazywa rozwiniętą warstwę.
 
-Szablon, z którego nikt nie korzysta, jest dozwolony. Trzy presety zapisują szablon i konteksty za ciebie: `inwards init --style vertical-slices`, `bounded-contexts` i `django` ([Instalacja](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
+Szablon, z którego nikt nie korzysta, jest dozwolony. Cztery presety zapisują szablon i konteksty za ciebie: `inwards init --style vertical-slices`, `bounded-contexts`, `django` i `fastapi`, ten ostatni jako szablon fastapi-best-practices z przykładu powyżej ([Instalacja](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
 
 ### `cycles` { #cycles }
 

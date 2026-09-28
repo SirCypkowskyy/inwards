@@ -1,35 +1,28 @@
 /**
- * @file The six architecture presets behind `inwards init --style`: layered,
+ * @file The seven architecture presets behind `inwards init --style`: layered,
  * clean and hexagonal, which are layers only, and vertical-slices,
- * bounded-contexts and django, which add templates and contexts. Each names
- * the one import its config can't forbid (its `gap`). Pure data; what a
- * preset is lives in `styles.ts`.
+ * bounded-contexts, django and fastapi, which add templates and contexts
+ * (fastapi, which also turns on the FastAPI rules, is `fastapi-preset.ts`'s).
+ * Each names the one import its config can't forbid (its `gap`). Pure data;
+ * what a preset is lives in `styles.ts`.
  */
+import { djangoModules } from "./django.ts";
+import { FASTAPI } from "./fastapi-preset.ts";
 import { ADAPTERS, topShape, USE_CASES } from "./shapes.ts";
-import { BOOTSTRAP, runBootstrap, type Style, type StyleName } from "./styles.ts";
+import { BOOTSTRAP, contextsWhy, runBootstrap, type Style, type StyleName } from "./styles.ts";
 
 /** The fields the linear presets share: no templates, contexts or rules. */
-const LINEAR: Pick<Style, "templates" | "contexts" | "ignoreRules" | "tryIt"> = {
+const LINEAR: Pick<
+  Style,
+  "templates" | "contexts" | "ignoreRules" | "optIn" | "companion" | "tryIt"
+> = {
   templates: [],
   contexts: undefined,
   ignoreRules: undefined,
+  optIn: undefined,
+  companion: undefined,
   tryIt: runBootstrap,
 };
-
-/**
- * Writes the comment above a context preset's entries: what the context
- * rules keep each package to, and that every package needs its own entry.
- *
- * @param what - what each package is, e.g. `slice`.
- * @param rule - the sentence saying what the rules keep it to.
- * @returns the comment's lines.
- */
-function contextsWhy(what: string, rule: string): string[] {
-  return [
-    rule,
-    `Add an entry like this for every ${what}; one without an entry is not kept apart.`,
-  ];
-}
 
 export const STYLES: Readonly<Record<StyleName, Style>> = {
   layered: {
@@ -129,6 +122,8 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
       names: ["orders"],
     },
     ignoreRules: undefined,
+    optIn: undefined,
+    companion: undefined,
     example: {
       entity: "features.orders.order",
       port: "features.orders.repository",
@@ -193,6 +188,8 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
       names: ["orders"],
     },
     ignoreRules: undefined,
+    optIn: undefined,
+    companion: undefined,
     example: {
       entity: "orders.domain.order",
       port: "orders.application.ports",
@@ -265,7 +262,9 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
       codes: ["INW002"],
       why: "Apps may use each other's services without declaring it; INW003 keeps them to services.",
     },
-    example: undefined,
+    optIn: undefined,
+    companion: undefined,
+    example: djangoModules,
     tryIt: (pkg: string): string =>
       `uv add django && uv run django-admin check --settings ${pkg}.settings`,
     shapes: [
@@ -286,4 +285,5 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
     ],
     gap: "a view may use the models directly instead of going through the services",
   },
+  fastapi: FASTAPI,
 };

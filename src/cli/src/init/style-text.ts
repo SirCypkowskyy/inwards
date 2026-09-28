@@ -1,7 +1,7 @@
 /**
  * @file The text a preset turns into: the `[tool.inwards]` table
  * `inwards init --style` writes (layers with sibling groups and templates,
- * the templates, the rules it turns off, its contexts and, with `--scaffold`,
+ * the templates, the rules it turns off or on, its contexts and, with `--scaffold`,
  * its shapes), the `--list-styles` listing, and the annotated tree init and
  * the picker draw. Pure: what is on disk comes in through a callback.
  */
@@ -129,6 +129,9 @@ export function describeStyles(pkg: string): string {
       ...rows,
       ...(style.contexts === undefined ? [] : [`  ${style.contexts.why[0] ?? ""}`]),
       ...(rules === undefined ? [] : [`  Turns off ${rules.codes.join(", ")}. ${rules.why}`]),
+      ...(style.optIn === undefined
+        ? []
+        : [`  Turns on ${style.optIn.codes.join(", ")} as warnings.`]),
       `  Gap: ${style.gap}.`,
       "  Shapes, with --scaffold:",
       ...describeShapes(style.shapes, pkg),
@@ -193,14 +196,11 @@ function extraLines(style: Style, pkg: string, scaffold: boolean): string[] {
   for (const template of style.templates) {
     lines.push("", `# ${template.why}`, `[tool.inwards.templates.${template.name}]`);
     if (template.roles.length > 0) {
-      lines.push(`roles = ${array(template.roles.map((role) => role.name))}`);
+      lines.push(`roles = ${array(roleRanks(template.roles))}`);
     }
     lines.push(`public = ${array(template.public)}`);
   }
-  if (style.ignoreRules !== undefined) {
-    const { codes, why } = style.ignoreRules;
-    lines.push("", "[tool.inwards.rules]", `# ${why}`, `ignore = ${array(codes)}`);
-  }
+  lines.push(...rulesLines(style));
   const { contexts } = style;
   if (contexts !== undefined) {
     lines.push("", ...contexts.why.map((line) => `# ${line}`));
@@ -214,6 +214,52 @@ function extraLines(style: Style, pkg: string, scaffold: boolean): string[] {
         `${mark}template = ${JSON.stringify(contexts.template)}`,
       );
     }
+  }
+  return lines;
+}
+
+/**
+ * Writes a template's roles one rank each, siblings joined as `"a | b"`.
+ *
+ * @param roles - the roles innermost first.
+ * @returns e.g. `["constants | config", "models"]`.
+ */
+function roleRanks(roles: readonly { name: string; sibling?: true }[]): string[] {
+  const ranks: string[] = [];
+  for (const role of roles) {
+    const last = ranks.length - 1;
+    if (role.sibling === true && last >= 0) {
+      ranks[last] = `${ranks[last] ?? ""} | ${role.name}`;
+    } else {
+      ranks.push(role.name);
+    }
+  }
+  return ranks;
+}
+
+/**
+ * Writes `[tool.inwards.rules]`: the rules the preset turns off, the opt-in
+ * rules it turns on as warnings, and their options tables.
+ *
+ * @param style - the preset.
+ * @returns the lines, after a blank line, or none when the preset sets no rules.
+ */
+function rulesLines(style: Style): string[] {
+  const { ignoreRules: off, optIn: on } = style;
+  if (off === undefined && on === undefined) {
+    return [];
+  }
+  const lines = ["", "[tool.inwards.rules]"];
+  if (off !== undefined) {
+    lines.push(`# ${off.why}`, `ignore = ${array(off.codes)}`);
+  }
+  if (on === undefined) {
+    return lines;
+  }
+  const severity = on.codes.map((code) => `${code} = "warning"`).join(", ");
+  lines.push(`# ${on.why}`, `extend-select = ${array(on.codes)}`, `severity = { ${severity} }`);
+  for (const table of on.options) {
+    lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...table.lines);
   }
   return lines;
 }
