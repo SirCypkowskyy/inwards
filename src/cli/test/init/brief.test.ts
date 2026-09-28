@@ -11,7 +11,9 @@ import { join, resolve } from "node:path";
 import { parseConfig } from "@inwards/core";
 import { nodePlatform } from "../../src/adapters/compose.ts";
 import { architectureBrief, briefFor } from "../../src/init/brief.ts";
-import { configTable, STYLE_NAMES, STYLES } from "../../src/init/styles.ts";
+import { STYLES } from "../../src/init/presets.ts";
+import { configTable } from "../../src/init/style-text.ts";
+import { STYLE_NAMES } from "../../src/init/styles.ts";
 import { inwards, LAYERS, project, type RunResult } from "../support/run.ts";
 
 const REPO = resolve(import.meta.dir, "../../../..");
@@ -48,6 +50,17 @@ function run(root: string, ...args: string[]): RunResult {
 function agentsMd(root: string): string {
   return readFileSync(join(root, "AGENTS.md"), "utf8");
 }
+
+/** Where each preset's brief says ports go, before anything is on disk. */
+const PRESET_PORTS: Readonly<Record<(typeof STYLE_NAMES)[number], string>> = {
+  layered: "`app.persistence`",
+  clean: "`app.application.ports`",
+  hexagonal: "`app.application.ports`",
+  "vertical-slices": "`app.features.orders`",
+  // Their layers are selectors, which name no one module.
+  "bounded-contexts": "the inner layer",
+  django: "the inner layer",
+};
 
 /** A probe that finds nothing on disk. */
 const NOTHING = {
@@ -126,7 +139,7 @@ roles = ["models | schemas", "service"]
       "1. d.models (`app.*.models`): imports no other layer; not its sibling d.schemas",
     );
     expect(brief).toContain("3. d.service (`app.*.service`): may import d.models, d.schemas");
-    expect(brief).toContain("4. main (`app.main`): may import d.models, d.schemas, d.service");
+    expect(brief).toContain("4. main (`app.main`): may import every other layer");
     expect(brief).toContain("- d.schemas: no web frameworks");
   });
 
@@ -146,13 +159,12 @@ ignore = ["INW005"]
         root: "src",
         version: "0.1.0",
         ignore: [],
-        shapes: false,
+        scaffold: false,
         eol: "\n",
       });
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
       expect(brief).toContain(`(the ${name} preset)`);
-      const ports = name === "layered" ? "app.persistence" : "app.application.ports";
-      expect(brief).toContain(`declare a \`typing.Protocol\` in \`${ports}\``);
+      expect(brief).toContain(`declare a \`typing.Protocol\` in ${PRESET_PORTS[name]}`);
       expect(tokens(brief)).toBeLessThan(300);
     },
   );
@@ -165,7 +177,7 @@ test("a preset whose ports layer became a selector names no ports module", () =>
     root: "src",
     version: "0.1.0",
     ignore: [],
-    shapes: false,
+    scaffold: false,
     eol: "\n",
   });
   const text = table.replace('"app.application"', '"app.*.application"');

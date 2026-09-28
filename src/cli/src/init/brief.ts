@@ -11,13 +11,14 @@ import { dirname, join } from "node:path";
 import { type InwardsConfig, type LayerSpec, parseConfig, ruleLevel } from "@inwards/core";
 import type { FileReader, PathProbe } from "../platform/contracts.ts";
 import type { Change } from "./contracts.ts";
+import { STYLES } from "./presets.ts";
 import { readIfThere, upsertSection } from "./section.ts";
-import { allowedImports, isStyle, STYLES, type Style } from "./styles.ts";
+import { allowedImports, expandLayers, isStyle, type Style } from "./styles.ts";
 
 /** The markers around the brief in AGENTS.md, apart from the check section's. */
 const BRIEF_MARKERS = { begin: "<!-- inwards-brief:begin -->", end: "<!-- inwards-brief:end -->" };
 /** The comment `init --style` writes into `[tool.inwards]`, naming the preset. */
-const PRESET_COMMENT = /^# Preset "(?<name>[a-z]+)" \(inwards init --style /mu;
+const PRESET_COMMENT = /^# Preset "(?<name>[a-z-]+)" \(inwards init --style /mu;
 
 /** What building a brief reads: whether a module is on disk, and AGENTS.md. */
 export interface BriefIo {
@@ -43,7 +44,6 @@ interface BriefInput {
  */
 export function architectureBrief(input: BriefInput): string {
   const { config, style, ports } = input;
-  const names = config.layers.map((layer) => layer.name);
   const preset = style === undefined ? "" : ` (the ${style.name} preset)`;
   const where = ports.length === 0 ? "the inner layer" : ports.map(code).join(" or ");
   const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
@@ -55,7 +55,7 @@ export function architectureBrief(input: BriefInput): string {
     "",
     ...config.layers.map(
       (layer, i) =>
-        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${layerImports(config.layers, i, names)}`,
+        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${allowedImports(config.layers, i)}`,
     ),
     "",
     `Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in ${where} and implement it in the outer layer.`,
@@ -63,30 +63,6 @@ export function architectureBrief(input: BriefInput): string {
     ...contextSection(config),
   ];
   return lines.join("\n");
-}
-
-/**
- * Says what one layer may import. Without sibling layers that is every layer
- * listed before it; with them (ADR-036), every layer of a lower rank, and the
- * layer's siblings are named as off limits.
- *
- * @param layers - the configured layers, innermost first.
- * @param i - the layer's index.
- * @param names - the layer names, innermost first.
- * @returns e.g. `may import domain; not its sibling schemas`.
- */
-function layerImports(layers: readonly LayerSpec[], i: number, names: readonly string[]): string {
-  const rank = layers[i]?.rank;
-  if (rank === undefined) {
-    return allowedImports(names, i);
-  }
-  const inner = layers.filter((layer) => (layer.rank ?? 0) < rank).map((layer) => layer.name);
-  const siblings = layers.filter((layer, k) => k !== i && layer.rank === rank);
-  const base = inner.length === 0 ? "imports no other layer" : `may import ${inner.join(", ")}`;
-  const plural = siblings.length > 1 ? "siblings" : "sibling";
-  return siblings.length === 0
-    ? base
-    : `${base}; not its ${plural} ${siblings.map((layer) => layer.name).join(", ")}`;
 }
 
 /**
@@ -142,9 +118,13 @@ function contextSection(config: InwardsConfig): string[] {
   if (config.contexts === undefined || off) {
     return [];
   }
+  const header =
+    ruleLevel("INW002", config.rules) === "off"
+      ? "Contexts (INW003): import only another context's public modules."
+      : "Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.";
   return [
     "",
-    "Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.",
+    header,
     ...config.contexts.map((ctx) => {
       const pub = ctx.public.length === 0 ? "nothing public" : `public ${list(ctx.public)}`;
       const deps =
@@ -228,8 +208,11 @@ function portModules(
  * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured or has only selectors.
  */
 function presetPorts(style: Style, config: InwardsConfig): string | undefined {
+  if (style.example === undefined) {
+    return undefined;
+  }
   const parent = style.example.port.split(".").slice(0, -1).join(".");
-  const owner = style.layers.find(
+  const owner = expandLayers(style).find(
     (layer) => parent === layer.module || parent.startsWith(`${layer.module}.`),
   );
   // The layer's first literal prefix: a selector (`app.*.application`) names no one module.

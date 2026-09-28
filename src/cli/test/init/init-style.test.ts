@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import {
+  CONTEXT_STYLES,
   checkSummary,
   init,
   STYLES,
@@ -43,15 +44,18 @@ describe("inwards init --style X --scaffold on a fresh uv project", () => {
     expect(files["src/my_app/__init__.py"]).toBe(UV_PROJECT["src/my_app/__init__.py"]);
   });
 
-  test("running it twice changes nothing: the second run exits 2 and writes nothing", () => {
-    const root = project(UV_PROJECT);
-    expect(init(root, "--style", "hexagonal", "--scaffold").code).toBe(0);
-    const before = tree(root);
-    const again = init(root, "--style", "hexagonal", "--scaffold");
-    expect(again.code).toBe(2);
-    expect(again.stderr).toContain("already has [tool.inwards]");
-    expect(tree(root)).toEqual(before);
-  });
+  test.each(["hexagonal", ...CONTEXT_STYLES])(
+    "%s: running it twice changes nothing: the second run exits 2 and writes nothing",
+    (style) => {
+      const root = project(UV_PROJECT);
+      expect(init(root, "--style", style, "--scaffold").code).toBe(0);
+      const before = tree(root);
+      const again = init(root, "--style", style, "--scaffold");
+      expect(again.code).toBe(2);
+      expect(again.stderr).toContain("already has [tool.inwards]");
+      expect(tree(root)).toEqual(before);
+    },
+  );
 
   test("an existing [tool.inwards] makes it exit 2 without writing anything", () => {
     const root = project({ "pyproject.toml": LAYERS });
@@ -105,6 +109,19 @@ describe("inwards init --style", () => {
     );
     expect(Object.keys(tree(root)).sort()).toEqual(Object.keys(UV_PROJECT).sort());
   });
+
+  test.each([...CONTEXT_STYLES])(
+    "%s without --scaffold writes the table only, its contexts commented out as an example",
+    (style) => {
+      const root = project(UV_PROJECT);
+      const run = init(root, "--style", style);
+      expect(run.code).toBe(0);
+      const text = readFileSync(join(root, "pyproject.toml"), "utf8");
+      expect(text).toContain('# [[tool.inwards.contexts]]\n# name = "orders"\n');
+      expect(text).not.toContain("shape");
+      expect(Object.keys(tree(root)).sort()).toEqual(Object.keys(UV_PROJECT).sort());
+    },
+  );
 
   test("--dry-run prints every change as a diff and writes nothing", () => {
     const root = project(UV_PROJECT);
@@ -188,7 +205,7 @@ describe("inwards init without --style or --agent", () => {
     for (const style of STYLES) {
       expect(run.stderr).toContain(`${style}: `);
     }
-    expect(run.stderr).toContain("--style layered|clean|hexagonal");
+    expect(run.stderr).toContain(`--style ${STYLES.join("|")}`);
     expect(tree(root)).toEqual(tree(project(UV_PROJECT)));
   });
 

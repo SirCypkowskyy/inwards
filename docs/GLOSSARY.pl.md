@@ -188,6 +188,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | session state | stan sesji |
 | session baseline (the start snapshot, not the file) | punkt odniesienia, migawka startowa |
 | severity | poziom (błąd, ostrzeżenie) |
+| shared kernel (the `shared` layer of `vertical-slices`) | wspólne jądro |
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
 | snapshot | migawka |
 | spike | eksperyment |

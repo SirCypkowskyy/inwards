@@ -1,14 +1,17 @@
 /**
- * @file Every config `inwards init --style` writes validates against the JSON
- * Schema for `[tool.inwards]` (#51) and parses. A preset that drifted from the
- * schema would give users a config their editor flags on day one.
+ * @file Every config `inwards init --style` writes, with and without
+ * `--scaffold`, validates against the JSON Schema for `[tool.inwards]` (#51)
+ * and parses. A preset that drifted from the schema would give users a
+ * config their editor flags on day one.
  */
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseConfig, VERSION } from "@inwards/core";
 import Ajv from "ajv";
-import { configTable, STYLE_NAMES, STYLES } from "../../src/init/styles.ts";
+import { STYLES } from "../../src/init/presets.ts";
+import { configTable } from "../../src/init/style-text.ts";
+import { STYLE_NAMES } from "../../src/init/styles.ts";
 
 const REPO = resolve(import.meta.dir, "../../../..");
 const ajv = new Ajv({ allErrors: true, strict: true });
@@ -28,13 +31,15 @@ function inwardsTable(doc: unknown): unknown {
   return typeof tool === "object" && tool !== null ? Reflect.get(tool, "inwards") : undefined;
 }
 
-test.each([...STYLE_NAMES])("the %s preset's config validates and parses", (name) => {
+test.each(
+  STYLE_NAMES.flatMap((name) => [true, false].map((scaffold) => [name, scaffold] as const)),
+)("the %s preset's config validates and parses (scaffold: %p)", (name, scaffold) => {
   const table = configTable(STYLES[name], {
     pkg: "my_app",
     root: "src",
     version: VERSION,
     ignore: ["tests", "migrations"],
-    shapes: true,
+    scaffold,
     eol: "\n",
   });
   expect(() => parseConfig(table)).not.toThrow();

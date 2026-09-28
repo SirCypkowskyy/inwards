@@ -1,16 +1,20 @@
 /**
  * @file The example package `inwards init --style --scaffold` writes: an entity,
  * a port, a use case, an adapter, a driving adapter, the composition root and
- * one test, placed where the preset says. It only builds file texts; planning
- * where they land safely is `scaffold.ts`'s job, and writing them is `InitFiles`'s.
+ * one test, placed where the preset says, with a public `api` module in front
+ * of them for the context presets (the Django app comes from `django.ts`). It
+ * only builds file texts; planning where they land safely is `scaffold.ts`'s
+ * job, and writing them is `InitFiles`'s.
  */
-import type { ExampleModules, Style } from "./styles.ts";
+import { djangoModules } from "./django.ts";
+import { type ExampleModules, expandLayers, type Style } from "./styles.ts";
 
 /** Docstrings for packages the scaffold creates that are not a layer themselves. */
 const PACKAGE_DOCS: Readonly<Record<string, string>> = {
   adapters: "Adapters: the code that connects the application to the outside world.",
   ports: "Ports: what the application needs from the outside, as typing.Protocol classes.",
   use_cases: "Use cases: what the application does, written against ports.",
+  orders: "Orders: placing and storing orders, kept apart from the rest of the code.",
 };
 
 /**
@@ -25,22 +29,50 @@ const PACKAGE_DOCS: Readonly<Record<string, string>> = {
  */
 export function scaffoldFiles(style: Style, pkg: string, root: string): Map<string, string> {
   const base = [...(root === "." ? [] : root.split("/")), ...pkg.split(".")].join("/");
-  const files = new Map<string, string>();
-  const layerDocs = new Map(
-    style.layers.map((layer) => [layer.module, `The ${layer.name} layer: ${layer.role}.`]),
-  );
-  for (const [module, text] of exampleModules(style.example, pkg)) {
-    const parts = module.split(".");
-    for (let end = 0; end < parts.length; end += 1) {
-      const dir = parts.slice(0, end).join(".");
-      const doc = layerDocs.get(dir) ?? PACKAGE_DOCS[parts[end - 1] ?? ""];
-      const path = end === 0 ? `${base}/__init__.py` : `${pathOf(base, dir)}/__init__.py`;
-      files.set(path, doc === undefined ? "" : `"""${doc}"""\n`);
+  const layers = expandLayers(style);
+  const modules =
+    style.example === undefined ? djangoModules(pkg) : exampleModules(style.example, pkg);
+  // Every package on the way to a module, and each layer package the example leaves empty.
+  const dirs = [
+    ...[...modules.keys()].map((module) => module.split(".").slice(0, -1)),
+    ...layers.filter((l) => !(l.file || l.module.includes("*"))).map((l) => l.module.split(".")),
+  ];
+  const packages = new Set([""]);
+  for (const parts of dirs) {
+    for (let end = 1; end <= parts.length; end += 1) {
+      packages.add(parts.slice(0, end).join("."));
     }
+  }
+  const files = new Map<string, string>();
+  for (const dir of [...packages].sort()) {
+    const layer = layers.find((l) => matches(l.module, dir));
+    const doc =
+      layer === undefined
+        ? PACKAGE_DOCS[dir.split(".").at(-1) ?? ""]
+        : `The ${layer.name} layer: ${layer.role}.`;
+    const path = dir === "" ? `${base}/__init__.py` : `${pathOf(base, dir)}/__init__.py`;
+    files.set(path, doc === undefined ? "" : `"""${doc}"""\n`);
+  }
+  for (const [module, text] of modules) {
     files.set(`${pathOf(base, module)}.py`, text);
   }
-  files.set("tests/test_place_order.py", exampleTest(style.example, pkg));
+  if (style.example !== undefined) {
+    files.set("tests/test_place_order.py", exampleTest(style.example, pkg));
+  }
   return files;
+}
+
+/**
+ * Tells whether a module fills a layer's module pattern, where `*` stands for one segment.
+ *
+ * @param pattern - a layer's dotted module below the package, e.g. `*.domain`.
+ * @param module - a dotted module below the package.
+ * @returns true when every segment is equal or matched by `*`.
+ */
+function matches(pattern: string, module: string): boolean {
+  const want = pattern.split(".");
+  const got = module.split(".");
+  return want.length === got.length && want.every((part, i) => part === "*" || part === got[i]);
 }
 
 /**
@@ -65,6 +97,58 @@ function imports(...lines: string[]): string {
 }
 
 /**
+ * Writes the imports of code outside the example's context: through its
+ * public `api` module when it has one, else straight from each module.
+ *
+ * @param m - where each part of the example lives.
+ * @param pkg - the package.
+ * @param names - the names to import, keyed by the module that defines them.
+ * @returns the import lines, sorted by module, one per module.
+ */
+function outsideImports(
+  m: ExampleModules,
+  pkg: string,
+  names: readonly (readonly [string, string])[],
+): string {
+  const byModule = new Map<string, string[]>();
+  for (const [module, name] of names) {
+    const from = m.api ?? module;
+    byModule.set(from, [...(byModule.get(from) ?? []), name]);
+  }
+  return imports(
+    ...[...byModule].map(
+      ([module, list]) => `from ${pkg}.${module} import ${list.sort().join(", ")}`,
+    ),
+  );
+}
+
+/**
+ * Writes the public module of the example's context: it re-exports what the
+ * composition root needs, so code outside imports nothing else (INW003).
+ *
+ * @param m - where each part of the example lives, `api` included.
+ * @param pkg - the package.
+ * @returns the module text.
+ */
+function apiModule(m: ExampleModules, pkg: string): string {
+  return `"""The public module of this package: code outside it imports only this (INW003).
+
+It re-exports what the composition root needs, so the modules behind it can change freely.
+"""
+
+from __future__ import annotations
+
+${imports(
+  `from ${pkg}.${m.adapter} import InMemoryOrderRepository`,
+  `from ${pkg}.${m.driving} import run`,
+  `from ${pkg}.${m.useCase} import PlaceOrder`,
+)}
+
+__all__ = ["InMemoryOrderRepository", "PlaceOrder", "run"]
+`;
+}
+
+/**
  * Writes the example's Python modules: an entity, a port, a use case, an
  * adapter implementing the port, a driving adapter and the composition root.
  *
@@ -74,7 +158,7 @@ function imports(...lines: string[]): string {
  */
 function exampleModules(m: ExampleModules, pkg: string): Map<string, string> {
   const future = "from __future__ import annotations\n";
-  return new Map([
+  const modules = new Map([
     [
       m.entity,
       `"""Order, an entity: business data and rules, with no I/O and no framework."""
@@ -196,11 +280,11 @@ Run it with \`python -m ${pkg}.${m.bootstrap} book 2\`.
 ${future}
 import sys
 
-${imports(
-  `from ${pkg}.${m.adapter} import InMemoryOrderRepository`,
-  `from ${pkg}.${m.driving} import run`,
-  `from ${pkg}.${m.useCase} import PlaceOrder`,
-)}
+${outsideImports(m, pkg, [
+  [m.adapter, "InMemoryOrderRepository"],
+  [m.driving, "run"],
+  [m.useCase, "PlaceOrder"],
+])}
 
 
 def main() -> int:
@@ -213,6 +297,10 @@ if __name__ == "__main__":
 `,
     ],
   ]);
+  if (m.api !== undefined) {
+    modules.set(m.api, apiModule(m, pkg));
+  }
+  return modules;
 }
 
 /**
@@ -227,10 +315,10 @@ function exampleTest(m: ExampleModules, pkg: string): string {
 
 from __future__ import annotations
 
-${imports(
-  `from ${pkg}.${m.adapter} import InMemoryOrderRepository`,
-  `from ${pkg}.${m.useCase} import PlaceOrder`,
-)}
+${outsideImports(m, pkg, [
+  [m.adapter, "InMemoryOrderRepository"],
+  [m.useCase, "PlaceOrder"],
+])}
 
 
 def test_place_order_stores_the_order() -> None:

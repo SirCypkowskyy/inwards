@@ -10,7 +10,8 @@ import { posix } from "../paths/lexical.ts";
 import type { PathProbe } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { AGENTS, type InitContext, type InitPlan } from "./contracts.ts";
-import { drawTree, MISSING, type Style } from "./styles.ts";
+import { drawTree, MISSING } from "./style-text.ts";
+import type { Style } from "./styles.ts";
 
 /** A project init has just configured: its pyproject.toml, the preset, the package and the config root. */
 export interface Setup {
@@ -46,9 +47,8 @@ export async function report(ctx: InitContext, setup: Setup, plan: InitPlan): Pr
     `\ninwards check: ${plural(errors, "violation")}, ${plural(warnings, "warning")}.${more}`,
     0,
   );
-  const bootstrap = `${pkg}.${style.example.bootstrap}`;
   const next = [
-    plan.scaffold ? `Try the example: uv run python -m ${bootstrap} book 2` : "",
+    plan.scaffold ? `Try the example: ${style.tryIt(pkg)}` : "",
     plan.agent === undefined ? `Wire an agent: inwards init --agent ${AGENTS.join("|")}` : "",
   ].filter((line) => line !== "");
   if (next.length > 0) {
