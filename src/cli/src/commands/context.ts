@@ -21,10 +21,11 @@ import type { AppDeps } from "./deps.ts";
  */
 export function contextCommand(deps: AppDeps, config: string | undefined, write: boolean): number {
   const { io } = deps;
-  const configPath = commandConfig(io, config);
-  if (!configPath) {
-    return print(io.streams, "No pyproject.toml with [tool.inwards] found.", 2);
+  const found = commandConfig(io, config);
+  if ("problem" in found) {
+    return print(io.streams, found.problem, 2);
   }
+  const configPath = found.path;
   const text = io.read.text(configPath);
   if (!write) {
     return print(io.streams, briefFor(io, configPath, text), 0);

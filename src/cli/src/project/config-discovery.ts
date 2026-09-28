@@ -13,25 +13,33 @@ import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
 
 /**
  * Picks the config a command works on: `--config`, resolved against the
- * cwd, or else the nearest one above the cwd.
+ * cwd, or else the nearest one above the cwd. A `--config` that isn't a file
+ * is a usage error rather than a crash on the first read (#212).
  *
- * @param io - resolves real paths, reads candidates and knows the cwd.
- * @param io.probe - resolves real paths.
+ * @param io - probes and resolves paths, reads candidates and knows the cwd.
+ * @param io.probe - tells what a path is and resolves real paths.
  * @param io.read - reads a candidate's text.
  * @param io.runtime - the cwd.
  * @param flag - the `--config` value, if given.
- * @returns the config path, or undefined when there is no flag and no config above.
+ * @returns the config path, or the line to print with exit 2 when there is none.
  * @throws when a candidate can't be read.
  */
 export function commandConfig(
   io: {
-    probe: Pick<PathProbe, "realpath">;
+    probe: Pick<PathProbe, "kind" | "realpath">;
     read: Pick<FileReader, "text">;
     runtime: Pick<Runtime, "cwd">;
   },
   flag: string | undefined,
-): string | undefined {
-  return flag ? resolve(io.runtime.cwd, flag) : findConfig(io, io.runtime.cwd);
+): { path: string } | { problem: string } {
+  if (flag) {
+    const path = resolve(io.runtime.cwd, flag);
+    return io.probe.kind(path) === "file"
+      ? { path }
+      : { problem: `--config ${flag}: no such file.` };
+  }
+  const path = findConfig(io, io.runtime.cwd);
+  return path ? { path } : { problem: "No pyproject.toml with [tool.inwards] found." };
 }
 
 /**
