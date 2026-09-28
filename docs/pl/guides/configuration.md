@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 4ae579ea5e2858d3efa8845955ee4425ec514f8a06a8a8b5031ac71b17c33fdd
+source_hash: 78b09fb538834e23812aaef1325a1db89ea26515a083854cf24f31947e583b40
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
