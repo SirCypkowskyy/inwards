@@ -7,6 +7,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   realpathSync,
@@ -141,7 +142,9 @@ describe("session state", () => {
     hook(root, edit(root, "shop/domain/order.py"));
     start(root, ID, "compact");
     start(root, ID, "resume");
-    expect(readSession(IO, realpathSync(root), ID)).toBeUndefined();
+    expect(existsSync(join(root, ".inwards/state", `${ID}.start.json`))).toBe(false);
+    // Only the witness outside the project is left, and the reader says so (#88).
+    expect(readSession(IO, realpathSync(root), ID)?.record).toBe("deleted");
   });
 
   test("a resume keeps the original start", () => {

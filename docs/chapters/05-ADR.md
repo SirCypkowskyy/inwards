@@ -40,6 +40,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
 | [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Package templates expand into config a user could write by hand | :white_check_mark: Accepted |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :white_check_mark: Accepted |
+| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1026,3 +1027,36 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 - **Suppressible, unlike INW004.** Each FAPI003 finding sits on a line of its own (the `APIRouter(...)` call, the `include_router` call that closes a cycle), so a suppression there names one decision. INW004 can't be suppressed because its comment would sit on one import of many.
 - **Checked files only, against the whole graph.** A partial run (a path argument, the Stop gate) builds the app and router graph from every FastAPI file of the project, and reports only in the files it checks. The Stop gate therefore reports a router the session created or changed, and a router already unmounted at session start is an old error.
 - **The per-edit hook and the editor report one-file findings only.** Creating a router and wiring it into the app are two edits. They still build the graph when a file suppresses FAPI003, so the suppression counts as used instead of turning into an INW009 warning, then drop what it found.
+
+## ADR-038: A witness of the session start outside the project, against a replayed SessionStart
+
+**Status:** Accepted · 2026-09-28 · [#88](https://github.com/SirCypkowskyy/inwards/issues/88)
+
+**Context.** The Stop gate trusts `.inwards/state/<id>.start.json`: the configs, HEAD and file hashes the session started from. The config guard keeps the agent's file tools away from it, but Bash reaches it in ways no pattern sees. The #23 review showed a full bypass: loosen `[tool.inwards]` with `sed`, `d=.inw; rm -rf ${d}ards/state`, then pipe a `SessionStart` payload with `source: startup` and the same session id into `I=inwards; $I hook claude-code`. The hook records a new start from the loosened project, and Stop passes. A partial replay (delete only `<id>.start.json`) worked too, and since #157 it also records copies of the agent's own edits. The same Bash can remove the Stop hook from `settings.local.json`; Claude Code reloads hooks at once, so that session's gate never runs. Every piece of state Inwards keeps is writable by the agent's user, so no local record is tamper-proof. The goal is to make these edits show up at Stop, without blocking a user who changed `[tool.inwards]` before the session and hasn't committed it.
+
+**Decision.**
+
+- **A witness outside the project.** SessionStart writes the same start record a second time, to `$XDG_STATE_HOME/inwards/sessions/<hash of the project path>/<id>.start.json` (`~/.local/state` without the variable), pruned by age only (a week). A count cap would let a flood of made-up sessions, started through the hook, evict the real session's witness before a replay, so there is none, and resume, compact and every Stop touch the witness, so a running session's never ages out. The platform gets `Runtime.stateHome` and `StateFiles.outsideDir`.
+- **A replay keeps the original.** A `startup` or `clear` SessionStart for a session whose start file is gone but whose witness exists is a replay: the witness is put back as the start file and a `replay` event goes into the session log. Resume and compact are unchanged: they never create a start.
+- **Readers prefer the witness.** `readSession` and `readSessionStart` use the witness when there is one, and say how the project's record compares: kept, deleted, rewritten, or unwitnessed. The per-edit hooks therefore use the original start too.
+- **Stop reports what doesn't hold.** A logged replay, a deleted record and a rewritten record each block with their own message, on top of what the comparison with the original start finds (a changed config, new violations). They escalate like any other block, so the last Stop shows the user the list.
+- **The committed config only where there is no witness.** A record without a witness (a session from an older Inwards, a witness deleted, or a state directory that couldn't be written) is trusted only when each of its configs is the one at its start HEAD, read with `git --no-lazy-fetch cat-file blob`, never `git show`, which could run the agent's filters. A witnessed session never makes this comparison, so a user's uncommitted config edit made before the session passes.
+- **A missing Stop hook is reported by the next SessionStart.** When some layer still holds Inwards hooks but none holds the Stop hook, SessionStart tells the user in a `systemMessage` and the model in `additionalContext`. The Stop gate of the session that removed it can't run, so it can't report it.
+- **No record at all still yields to the user.** When there is neither a start file nor a witness, the last Stop now ends the turn with a `systemMessage` instead of quietly.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The replay in #88, and the partial one from #157, fail the Stop gate with a message that names the replay, and the changed config is reported against the original start.
+- :material-plus-circle-outline: A user's own config edit before a session, `/clear`, resume and compaction behave as before.
+- :material-minus-circle-outline: The witness is a speed bump. An agent that also deletes or forges `~/.local/state/inwards/sessions/...` before replaying gets a fresh baseline. The docs name the other layers: `permissions.deny`, CODEOWNERS and `inwards check` in CI.
+- :material-minus-circle-outline: A Stop hook removed mid-session switches that session's gate off; the warning comes one session later, and only if SessionStart still runs.
+- :material-minus-circle-outline: Inwards now writes outside the project, under the user's state directory. Writing the witness is best effort: when the state directory can't be written (a read-only home in a CI container or an agent sandbox), SessionStart still succeeds, tells the user once, and the session falls back to the committed-config comparison.
+- :material-minus-circle-outline: Git older than 2.44 has no `--no-lazy-fetch`. Outside a partial clone nothing can be fetched, so the committed config is read without the flag. In a partial clone (`extensions.partialClone`, or a remote with `promisor` or `partialclonefilter`) it isn't read, and an unwitnessed record blocks with a message that says the config couldn't be checked and that a newer git or a writable state directory clears it.
+- :material-minus-circle-outline: A flood of made-up sessions only adds small witness files, which age out after a week.
+
+**Alternatives.**
+
+- *Always compare the start config with the committed one:* catches the replay without a witness, but blocks every session that starts with an uncommitted config change, which is how users edit layers.
+- *Read Claude Code's transcript and refuse a start recorded after the session's first tool use:* the Stop payload's `transcript_path` comes from Claude Code, but the transcript format isn't a public contract, the file can be large, it is just as writable by the agent, and OpenCode has none.
+- *A PreToolUse marker outside the project on the first tool call:* the same Bash command that deletes the state can delete the marker before it replays.
+- *Sign the start record:* the key would sit where the agent's user can read it.

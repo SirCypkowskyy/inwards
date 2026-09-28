@@ -14,6 +14,20 @@ export interface Start {
   configs: Record<string, InwardsConfig>;
 }
 
+/** What a session started from, as its start record holds it. */
+export interface SessionStart extends Start {
+  at: string;
+  /** pyproject.toml files whose `[tool.inwards]` was already invalid (absent in older state files). */
+  invalid?: string[];
+  /** Each config's inwards-baseline.json SHA-256, by config path (absent in older state files). */
+  baselines?: Record<string, string>;
+  /**
+   * The symlinks in layer packages: project-relative link path to its real
+   * target (absent in older state files, where every link counts as new).
+   */
+  links?: Record<string, string>;
+}
+
 /** How a report was made: its config, the base of its paths, and whether the baseline applied. */
 export interface Check {
   configPath: string;

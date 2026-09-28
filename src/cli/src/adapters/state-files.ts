@@ -4,6 +4,8 @@
  * level is a symlink and that the directory really lives in the project; log
  * files are opened with O_NOFOLLOW where the OS has it; pruning removes only
  * regular files. See `session/record.ts` for the limits of these checks.
+ * The one exception is the session start witness (#88), which `outsideDir`
+ * places under the user's state directory, outside the project.
  * Implements the `StateFiles` contract (`nodeStateFiles`).
  */
 import {
@@ -16,6 +18,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  utimesSync,
   writeFileSync,
   writeSync,
 } from "node:fs";
@@ -83,8 +86,9 @@ function existsAsNonFile(path: string): boolean {
  *
  * @param dir - the state directory, already checked to be inside the project.
  * @param current - the id of the session that is starting.
+ * @param byCount - false skips the MAX_SESSIONS cap and prunes by age alone.
  */
-function prune(dir: string, current: string): void {
+function prune(dir: string, current: string, byCount = true): void {
   const now = Date.now();
   const sessions = new Map<string, { paths: string[]; mtime: number }>();
   for (const name of readdirSync(dir)) {
@@ -105,7 +109,7 @@ function prune(dir: string, current: string): void {
   // The current session counts towards the cap, so keep one fewer of the others.
   const byAge = [...sessions.values()].sort((a, b) => b.mtime - a.mtime);
   byAge.forEach((session, i) => {
-    if (i >= MAX_SESSIONS - 1 || now - session.mtime > MAX_AGE_MS) {
+    if ((byCount && i >= MAX_SESSIONS - 1) || now - session.mtime > MAX_AGE_MS) {
       for (const path of session.paths) {
         rmSync(path, { force: true });
       }
@@ -156,6 +160,22 @@ function existsAsNonDirectory(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Creates a directory outside the project for Inwards' own state, parents
+ * included, with owner-only permissions on the ones it creates.
+ *
+ * @param dir - the directory, absolute.
+ * @returns the directory.
+ * @throws {Error} when it can't be created, or a symlink or file sits at the path.
+ */
+function outsideDir(dir: string): string {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (existsAsNonDirectory(dir)) {
+    throw new Error(`${dir} is a symlink or not a directory`);
+  }
+  return dir;
 }
 
 /**
@@ -211,6 +231,7 @@ export const nodeStateFiles: StateFiles = {
   statePath,
   stateDir,
   existingStateDir,
+  outsideDir,
   appendLine,
   publish,
   remove(path: string): void {
@@ -223,4 +244,8 @@ export const nodeStateFiles: StateFiles = {
     }
   },
   prune,
+  touch(path: string): void {
+    const now = new Date();
+    utimesSync(path, now, now);
+  },
 };
