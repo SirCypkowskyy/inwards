@@ -1,9 +1,9 @@
 /**
  * @file Git behind the `Git` contract. The hooks run git in a project whose
  * `.git/config` the agent can write, so only plumbing that runs no filters,
- * hooks or pagers may go through here (`rev-parse`, `cat-file blob`), and
- * every call switches off the two config commands such plumbing could still
- * reach (fsmonitor and hooksPath).
+ * hooks or pagers may go through here (`rev-parse`, `cat-file blob`,
+ * `ls-tree`), and every call switches off the two config commands such
+ * plumbing could still reach (fsmonitor and hooksPath).
  */
 import { spawnSync } from "node:child_process";
 import type { Git } from "../platform/contracts.ts";

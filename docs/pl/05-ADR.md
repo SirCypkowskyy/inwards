@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 6b81d395530c3db0b7292ca4eb3e980969f861bdbde8d3441e73f17693684d69
+source_hash: fd838550743b8ae89de2df20c8e589207bb2dad2e07178c7f95f227f8094d597
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -716,7 +716,7 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - :material-plus-circle-outline: Jeden zaakceptowany import nie wymaga już baseline'u ani wyłączenia reguły, a każdy taki wyjątek ma swój powód w kodzie, obok importu.
 - :material-plus-circle-outline: Agent nie może uciszyć naruszenia komentarzem, dopóki właściciel na to nie pozwoli, a odrzuconą próbę widać w `inwards stats`.
 - :material-plus-circle-outline: Dodanie tej funkcji nie zmienia niczego w istniejących projektach: żaden plik nie ma jeszcze wyciszenia, a nowy klucz jest opcjonalny.
-- :material-minus-circle-outline: Przy `"deny"` wyciszenie w pliku, który na starcie sesji był niezacommitowany albo nieśledzony, albo w dowolnym pliku projektu poza git, liczy się jako nowe, gdy tylko agent ten plik zedytuje, bo hooki nie mogą udowodnić jego zawartości na starcie ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). Plik, którego agent nie rusza, zachowuje swoje wyciszenia. Właściciel commituje wyciszenie, zanim przekaże plik agentowi.
+- :material-minus-circle-outline: Przy `"deny"` wyciszenie w pliku, który na starcie sesji był niezacommitowany albo nieśledzony, albo w dowolnym pliku projektu poza git, liczy się jako nowe, gdy tylko agent ten plik zedytuje, bo hooki nie mogą udowodnić jego zawartości na starcie ([#134](https://github.com/SirCypkowskyy/inwards/issues/134)). Od [#157](https://github.com/SirCypkowskyy/inwards/issues/157) dotyczy to tylko takiego pliku, który jest zbyt duży, żeby hooki zachowały jego kopię na starcie sesji (ponad 512 KiB albo ponad limit 4 MiB takich plików). Plik, którego agent nie rusza, zachowuje swoje wyciszenia. Właściciel commituje wyciszenie, zanim przekaże taki plik agentowi.
 - :material-minus-circle-outline: Przeniesienie wyciszenia między dwoma importami, które dają tę samą diagnostykę (ten sam cel dwa razy w jednym module), przechodzi niezauważone. Nie ukrywa niczego nowego.
 - :material-minus-circle-outline: Zmiana nazwy albo przeniesienie pliku z wyciszeniem sprawia, że wyciszenie jest nowe, bo nowa ścieżka nie ma zawartości ze startu. Tak samo jest z plikiem osiąganym przez dowolne dowiązanie symboliczne wewnątrz projektu, nawet takie, które istniało na starcie sesji.
 - :material-minus-circle-outline: Powód nie może zawierać `"`, a nic nie sprawdza, czy mówi cokolwiek sensownego. To zadanie przeglądu kodu.

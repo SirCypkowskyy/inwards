@@ -117,6 +117,8 @@ function openDirs(
  * @param io - walks the project and reads each file's bytes.
  * @param project - the real project root.
  * @param configs - the project's configs, from `projectConfigs`.
+ * @param onFile - sees each file's path, absolute path and bytes as they are
+ *   hashed, so SessionStart can keep copies without reading the files twice.
  * @returns SHA-256 hex digests, by project-relative path.
  * @throws when a file can't be read.
  */
@@ -124,14 +126,16 @@ export function projectManifest(
   io: SnapshotIo,
   project: string,
   configs: Record<string, InwardsConfig>,
+  onFile?: (rel: string, file: string, bytes: Uint8Array) => void,
 ): Record<string, string> {
   const manifest: Record<string, string> = {};
   for (const file of io.walk.pythonFiles([project], openDirs(io, project, configs))) {
     // Keyed by the path as walked, not the real one: a file reached through a
     // symlink into a layer is that layer's module under that name.
-    manifest[posix(relative(project, file))] = createHash("sha256")
-      .update(io.read.bytes(file))
-      .digest("hex");
+    const rel = posix(relative(project, file));
+    const bytes = io.read.bytes(file);
+    manifest[rel] = createHash("sha256").update(bytes).digest("hex");
+    onFile?.(rel, file, bytes);
   }
   return manifest;
 }

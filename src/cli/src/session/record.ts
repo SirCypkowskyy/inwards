@@ -10,6 +10,9 @@
  *   file that is then renamed, so a reader never sees half of it.
  * - `<id>.jsonl`: one small event per line (edits, resumes). Hooks run in
  *   parallel, so nothing rewrites it; each hook appends one short line.
+ * - `<id>.content.json`: copies of the Python files git can't give back as
+ *   they were at start (`start-copies.ts`, #157), written like the start
+ *   file, before it, and pruned with it. Absent when there are none.
  *
  * A session without its start file is unknown, and callers fail closed. A
  * resume or compact never writes a start, and a start is never overwritten,
@@ -28,6 +31,7 @@ import type { Platform } from "../platform/contracts.ts";
 import { baselineHashes } from "../project/baseline.ts";
 import { projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
 import { fingerprint } from "./fingerprint.ts";
+import { copiesName, startCopier } from "./start-copies.ts";
 
 /** What recording and reading a session touches. */
 export type SessionIo = Pick<Platform, "probe" | "read" | "walk" | "git" | "clock" | "state">;
@@ -81,8 +85,9 @@ export function isSessionId(id: unknown): id is string {
 }
 
 /**
- * Handles SessionStart. A new session (startup, /clear) records its start and
- * prunes old sessions; a resume or compact only logs that it happened.
+ * Handles SessionStart. A new session (startup, /clear) records its start,
+ * with copies of the files git can't give back, and prunes old sessions; a
+ * resume or compact only logs that it happened.
  * Projects without any `[tool.inwards]` get no state at all.
  *
  * @param io - reads the project, runs git, tells the time and writes the state.
@@ -108,10 +113,14 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
   if (Object.keys(configs).length === 0) {
     return;
   }
-  const manifest = projectManifest(io, project, configs);
   const head = io.git.run(project, ["rev-parse", "HEAD"])?.trim() ?? null;
+  const copier = startCopier(io, project, head);
+  const manifest = projectManifest(io, project, configs, copier.add);
   const dir = io.state.stateDir(project);
   io.state.prune(dir, id);
+  if (Object.keys(copier.copies).length > 0) {
+    io.state.publish(dir, copiesName(id), JSON.stringify(copier.copies));
+  }
   const baselines = baselineHashes(io, project, Object.keys(configs));
   const start: SessionStart = {
     at: io.clock.now(),
