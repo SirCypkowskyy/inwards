@@ -88,6 +88,25 @@ describe("fastapi-best-practices with one template", () => {
     ]);
   });
 
+  test("a role no package has is reported at the entry that carries the template", () => {
+    const files = Object.fromEntries(
+      Object.entries(fixture()).filter(([rel]) => !rel.endsWith("/utils.py")),
+    );
+    const [dead, ...rest] = check(project(files)).diagnostics;
+    expect(rest).toEqual([]);
+    expect(dead).toMatchObject({
+      code: "INW006",
+      file: "pyproject.toml",
+      line: 8,
+      column: 33,
+      message:
+        '"src.*.utils" (layer "domain.utils") matches no module, so layer "domain.utils" is empty.',
+    });
+    expect(dead?.fix.summary).toBe(
+      'Ask the user to fix or remove role "utils" of the template on "src.*" in [tool.inwards].',
+    );
+  });
+
   test("the template's hints reach the INW007 fix steps", () => {
     const root = planted({ "src/orders/helpers.py": "" });
     const shape = check(root).diagnostics.find((d) => d.code === "INW007");

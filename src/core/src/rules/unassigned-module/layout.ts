@@ -21,7 +21,13 @@ import { isSelector, matchEntry } from "../../config/layer-selector.ts";
 import type { LayerSpec } from "../../config/layers.ts";
 import type { InwardsConfig } from "../../config/parse.ts";
 import { applyRules } from "../../config/rule-settings.ts";
-import { type ConfigFile, spanOf } from "../../config/source-span.ts";
+import {
+  type ConfigFile,
+  entrySpan,
+  spanOf,
+  type TemplateRole,
+  templateRole,
+} from "../../config/source-span.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import type { PathKind } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
@@ -100,10 +106,10 @@ function deadEntries(
       ? `"${prefix}" (layer "${layer.name}") matched modules when the session started and matches none now.`
       : `"${prefix}" (layer "${layer.name}") matches no module${whole ? `, so layer "${layer.name}" is empty` : ""}.`;
     return diagnostic(RULES.INW006, source, {
-      span: spanOf(file.text, prefix),
+      span: entrySpan(file.text, prefix),
       severity: vanished || whole ? "error" : "warning",
       message,
-      fix: prefixFix(prefix, vanished),
+      fix: prefixFix(prefix, vanished, templateRole(file.text, prefix)),
     });
   });
 }
@@ -143,7 +149,7 @@ function emptiedSlices(
         .filter((slice) => !matchesAny(slice, modules))
         .map((slice) =>
           diagnostic(RULES.INW006, source, {
-            span: spanOf(file.text, entry),
+            span: entrySpan(file.text, entry),
             message: `"${slice}" (matched by "${entry}", layer "${layer.name}") held modules when the session started and holds none now.`,
             fix: prefixFix(slice, true),
           }),
@@ -287,7 +293,7 @@ export function checkMoves(
     const entry = layerMembership(first[0], layers)?.entry ?? layer.name;
     return [
       diagnostic(RULES.INW006, source, {
-        span: spanOf(file.text, entry),
+        span: entrySpan(file.text, entry),
         message: `${names} moved out of layer "${layer.name}" to outside every layer, where nothing checks it.`,
         fix: {
           summary: "Move the code back into its layer, or ask the user.",
@@ -353,15 +359,25 @@ function matchesAny(prefix: string, modules: ReadonlySet<string>): boolean {
  *
  * @param prefix - the prefix that matches nothing.
  * @param vanished - true when it matched at session start.
- * @returns a summary and steps: restore the package, or fix or drop the prefix.
+ * @param origin - the template role the prefix was expanded from, when it isn't written out.
+ * @returns a summary and steps: restore the package, or fix or drop the prefix or the template role.
  */
-function prefixFix(prefix: string, vanished: boolean): Diagnostic["fix"] {
+function prefixFix(prefix: string, vanished: boolean, origin?: TemplateRole): Diagnostic["fix"] {
   if (vanished) {
     return {
       summary: `Move the modules back under "${prefix}".`,
       steps: [
         `Undo the move or rename that emptied "${prefix}"; code outside every layer is not checked.`,
         "If the package really must move, ask the user to update [tool.inwards]. Don't edit it yourself.",
+      ],
+    };
+  }
+  if (origin !== undefined) {
+    return {
+      summary: `Ask the user to fix or remove role "${origin.role}" of the template on "${origin.base}" in [tool.inwards].`,
+      steps: [
+        `No package under "${origin.base}" has a "${origin.role}" module, so the template's role "${origin.role}" is an empty layer. If only some packages have it, it belongs in the template's allow, not its roles.`,
+        "Don't edit [tool.inwards] yourself; tell the user.",
       ],
     };
   }

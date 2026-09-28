@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 311368e2aeddbef23422a4ab2fb3d70532b059bc35ada24198870a453affda4d
+source_hash: 9f202d536d4aa98fbc3c5b6777f909141f8684ad60542b1453a436724d649d22
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -334,7 +334,8 @@ W przykładzie wpis `domain` staje się dziewięcioma warstwami, od `domain.cons
 Szablony są rozwijane przy wczytywaniu konfiguracji, zanim cokolwiek innego zostanie sprawdzone, więc reguły, baseline, opis architektury i edytor widzą tylko wynik, który konfiguracja mogłaby też wypisać ręcznie. [Fixture testowy](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/templates/fastapi) zawiera tę konfigurację i jej ręczny odpowiednik, a testy sprawdzają, że dają tę samą konfigurację i te same diagnostyki. W praktyce:
 
 - **Komunikaty nazywają warstwy ról**, na przykład `Layer "domain.service" imports "src.orders.router" from outer layer "domain.router"`.
-- **Rola, której nie ma żaden pakiet, to pusta warstwa.** Warstwa roli, do której nie pasuje żaden moduł, dostaje błąd INW006 o pustej warstwie jak każda inna warstwa, więc wymieniaj tylko role, które może mieć każdy pakiet danego rodzaju; opcjonalne mogą trafić do `allow`.
+- **Rola, której nie ma żaden pakiet, to pusta warstwa.** Warstwa roli, do której nie pasuje żaden moduł, dostaje błąd INW006 o pustej warstwie jak każda inna warstwa, więc wymieniaj tylko role, które może mieć każdy pakiet danego rodzaju; opcjonalne mogą trafić do `allow`. Błąd wskazuje wpis, który niesie szablon, i nazywa rolę.
+- **W modułach wpisu z szablonem używaj `*`, nie `**`.** `src.*` daje `src.*.models`, które pasuje tylko do `models` samej domeny, więc `src/orders/service/models.py` zostaje w roli `service`. Przy `src.**` wzorzec `src.**.models` pasuje też do tego pliku, który przechodzi wtedy do roli `models`, bo wygrywa najgłębszy ostatni dosłowny segment ([Selektory](#selectors)).
 - **Błędy konfiguracji nazywają wpis albo klucz szablonu**: `tool.inwards.layers[1].template` dla nieznanego szablonu albo takiego bez ról, `tool.inwards.templates.fastapi-domain.roles[2]` dla błędnej roli. Problem, który widać dopiero po rozwinięciu, na przykład zajęta już nazwa warstwy roli, nazywa rozwiniętą warstwę.
 
 Szablon, z którego nikt nie korzysta, jest dozwolony. [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.

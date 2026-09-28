@@ -46,10 +46,12 @@ export function architectureBrief(input: BriefInput): string {
   const names = config.layers.map((layer) => layer.name);
   const preset = style === undefined ? "" : ` (the ${style.name} preset)`;
   const where = ports.length === 0 ? "the inner layer" : ports.map(code).join(" or ");
+  const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
+  const siblings = hasSiblings ? ", nor a sibling of your own layer" : "";
   const lines = [
     "## Architecture brief (Inwards)",
     "",
-    `\`[tool.inwards]\` in pyproject.toml enforces these layers${preset}, innermost first. Imports point inwards: never import a layer listed after your own.`,
+    `\`[tool.inwards]\` in pyproject.toml enforces these layers${preset}, innermost first. Imports point inwards: never import a layer listed after your own${siblings}.`,
     "",
     ...config.layers.map(
       (layer, i) =>

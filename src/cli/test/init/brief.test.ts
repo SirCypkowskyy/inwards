@@ -120,6 +120,9 @@ roles = ["models | schemas", "service"]
 `);
     const brief = architectureBrief({ config, style: undefined, ports: [] });
     expect(brief).toContain(
+      "never import a layer listed after your own, nor a sibling of your own layer.",
+    );
+    expect(brief).toContain(
       "1. d.models (`app.*.models`): imports no other layer; not its sibling d.schemas",
     );
     expect(brief).toContain("3. d.service (`app.*.service`): may import d.models, d.schemas");
