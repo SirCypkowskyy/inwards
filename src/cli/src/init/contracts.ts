@@ -40,6 +40,7 @@ export interface InitFlags {
   style?: string | undefined;
   scaffold?: boolean | undefined;
   package?: string | undefined;
+  launcher?: string | undefined;
   "list-styles"?: boolean | undefined;
   "dry-run"?: boolean | undefined;
 }

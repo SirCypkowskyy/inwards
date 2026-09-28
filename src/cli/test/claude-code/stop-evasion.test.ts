@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
+import { inwards } from "../support/run.ts";
 import { agentWrites, git, LEAK, put, session, stop } from "../support/stop-helpers.ts";
 
 describe("Stop gate: edits made around the hooks", () => {
@@ -156,6 +157,19 @@ describe("Stop gate: edits made around the hooks", () => {
     const hook = JSON.stringify({ type: "command", ...entry });
     writeFileSync(path, `{"hooks":{"SessionStart":[{"hooks":[${hook}]}]}}`);
     expect(stop(root).stderr).toContain("SessionStart");
+  });
+
+  test("hooks init wrote with --launcher count as the Inwards hooks", () => {
+    const root = session();
+    expect(inwards(["init", "--agent", "claude", "--launcher", "uv run"], { cwd: root }).code).toBe(
+      0,
+    );
+    const text = readFileSync(join(root, ".claude/settings.local.json"), "utf8");
+    expect(text).toContain("uv run inwards hook claude-code");
+    expect(text).not.toContain('"args"');
+    const { code, stderr } = stop(root);
+    expect(stderr).not.toContain("missing");
+    expect(code).toBe(0);
   });
 
   test("a PostToolUse matcher that no longer covers the edit tools fails the gate", () => {

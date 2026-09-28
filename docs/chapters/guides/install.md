@@ -66,6 +66,8 @@ uvx inwards --version   # one-off, no project
 
 Until then, `inwards` on PyPI is a 0.0.0 name placeholder: `--version` says the linter isn't released yet and every other command exits 2. Use the wheels from a GitHub release below. Releases reach PyPI through [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); the first one comes with a later milestone, not with v0.1.0-rc.1.
 
+To wire an agent in such a project, pass `--launcher "uv run"` to `init` (`uv run inwards init --agent claude --launcher "uv run"`): the hooks and the `AGENTS.md` section then say `uv run inwards` and hold no path. Without it, `init` records the path of the binary it runs as, which in a project is inside `.venv` and differs per worktree, and under `uvx` is in uv's cache, which `init` warns about.
+
 `uv add --dev inwards` takes the newest full release and skips pre-releases. To try a pre-release that is on PyPI, ask for it: `uv add --dev "inwards>=0.2.0rc1"`.
 
 ### From a GitHub release
