@@ -24,12 +24,20 @@ export interface DraftContext {
   dependsOn: string[];
 }
 
+/** Libraries a `forbidden` contract keeps out of modules that aren't whole layers (INW005's `deny`). */
+export interface DraftDeny {
+  modules: string[];
+  libraries: string[];
+}
+
 /** The `[tool.inwards]` table the conversion arrived at. */
 export interface Draft {
   layers: DraftLayer[];
   contexts: DraftContext[];
   /** Modules left out of INW006's warning (`exhaustive_ignores`). */
   ignore: string[];
+  /** `[tool.inwards.rules.pure-domain].deny`, in contract order. */
+  deny: DraftDeny[];
 }
 
 /** What happened to one contract. */
@@ -53,6 +61,7 @@ export interface State {
   shape: string | undefined;
   pairs: Pair[];
   ignore: string[];
+  deny: DraftDeny[];
 }
 
 /** A dotted Python module name, with no wildcards. */

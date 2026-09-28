@@ -157,12 +157,18 @@ describe("mapping forbidden and independence", () => {
     expect(outcomes[1]?.status).toBe("mapped");
   });
 
-  test("an external target is reported when the sources are not whole layers", () => {
-    const { outcomes } = converted(
-      `${ROOT}[importlinter:contract:f]\nname = F\ntype = forbidden\nsource_modules = mypackage.one\nforbidden_modules = django\n`,
+  test("an external target becomes a prefix deny when the sources are not whole layers (#219)", () => {
+    const { toml, outcomes } = converted(
+      `${ROOT}[importlinter:contract:f]\nname = F\ntype = forbidden\nsource_modules =\n  mypackage.one\n  mypackage.two.x\nforbidden_modules =\n  django\n  mypackage.three\n`,
     );
-    expect(outcomes[0]?.status).toBe("skipped");
-    expect(outcomes[0]?.reasons[0]).toContain('"mypackage.one" is not a module of a layer');
+    expect(outcomes[0]).toMatchObject({ status: "mapped", reasons: [] });
+    expect(toml).toContain(
+      '[tool.inwards.rules.pure-domain]\ndeny = [\n  { modules = ["mypackage.one", "mypackage.two.x"], libraries = ["django"] },\n]\n',
+    );
+    expect(parseConfig(toml).rules?.options?.["pure-domain"]?.["deny"]).toEqual([
+      { modules: ["mypackage.one", "mypackage.two.x"], libraries: ["django"] },
+    ]);
+    expect(parseConfig(toml).layers[0]?.extendDenyLibraries).toBeUndefined();
   });
 
   test.each([

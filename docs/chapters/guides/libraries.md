@@ -50,6 +50,23 @@ Frameworks and servers: `django`, `fastapi`, `flask`, `litestar`, `starlette`, `
 
 Pure standard-library modules stay allowed: `dataclasses`, `typing`, `datetime`, `decimal`, `enum`, `urllib.parse`, `http.HTTPStatus`. So do `os` and `pathlib`; add them to `extend-deny-libraries` if your domain must not touch the file system either.
 
+### Deny a library to part of a layer { #prefix-deny }
+
+The three keys apply to a whole layer. To keep a library out of one package inside a layer, or out of a package no layer owns, list it in `deny` under INW005's options table:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+layers = [{ name = "mypackage", modules = ["mypackage"] }]
+
+[tool.inwards.rules.pure-domain]
+deny = [
+  { modules = ["mypackage.one"], libraries = ["django"] },
+  { modules = ["mypackage.*.jobs"], libraries = ["celery", "http.client"] },
+]
+```
+
+`mypackage.one.views` may not import `django`, and `mypackage.two` still may. `modules` takes prefixes and selectors as a layer's `modules` does; `libraries` takes import names as `deny-libraries` does, standard library included. An entry applies whether or not a layer owns the module, and the layer's `allow-libraries` doesn't undo it: it is the narrower rule. When the layer's own lists deny the import too, the layer's message is reported, once, so adding an entry doesn't change existing baseline keys. `inwards import-config` writes this table for an import-linter `forbidden` contract whose `source_modules` aren't whole layers.
+
 ## What the agent sees
 
 The message names the layer, the import and the library's top-level package, never the lists, so a [baseline](install.md#on-an-existing-codebase) entry survives a change to them. The fix names the entry that denied the import, whichever list it comes from (`http.client` for `from http.client import HTTPConnection`; the top-level package when the import is outside `allow-libraries`), the port to introduce, and every outer layer allowed to use the library. The agent picks the one that holds adapters: in a hexagonal layout that isn't always the next layer out.
@@ -65,6 +82,13 @@ shop/domain/order.py:3:28: INW005 Layer "domain" imports "sqlalchemy.orm.Session
 ```
 
 When no outer layer may use the library either, the fix keeps steps 1 and 5 and tells the agent to ask the user where the library belongs.
+
+An import a [`deny` entry](#prefix-deny) forbids names the module and the prefix the entry matched, and its fix puts the port in that prefix and the implementation outside it:
+
+```text
+mypackage/one/views.py:1:8: INW005 Module "mypackage.one.views" imports "django.db" from library "django", which [tool.inwards.rules.pure-domain] denies to "mypackage.one".
+  fix: "mypackage.one" may not use "django" ([tool.inwards.rules.pure-domain].deny): use it outside "mypackage.one", behind a port "mypackage.one" owns.
+```
 
 ## Not covered yet
 

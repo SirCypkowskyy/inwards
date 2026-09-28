@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/import-linter.md
-source_hash: 5df98d98c9c13ad34b0a01c0a2974b771aeeab14875d145134d0ca24fe36785c
+source_hash: 91595619ad77c620d4e6eddbaced875a26a594ece04fe5483bfd5f8fd2283fcf
 ---
 
 # Migracja z import-linter { #migrating-from-import-linter }
@@ -109,7 +109,7 @@ Inwards also runs rules import-linter doesn't have (INW006 for code outside ever
 | `exhaustive_ignores` | `ignore`, po jednym wpisie na kontener | INW006 |
 | `independence` | po jednym kontekście na moduł, żaden nie zależy od innego | INW002 |
 | `forbidden`, własne moduły w `forbidden_modules` | po jednym kontekście na moduł źródłowy i zakazany; `depends-on` każdego źródła pomija to, czego nie wolno mu importować | INW002 |
-| `forbidden`, zewnętrzne moduły w `forbidden_modules` | `extend-deny-libraries` na warstwach, które obejmują dokładnie moduły źródłowe | INW005 |
+| `forbidden`, zewnętrzne moduły w `forbidden_modules` | `extend-deny-libraries` na warstwach, które obejmują dokładnie moduły źródłowe; w przeciwnym razie wpis `deny` w `[tool.inwards.rules.pure-domain]` dla modułów źródłowych | INW005 |
 | `root_package`, `root_packages` | bez kontraktu warstw: jedna warstwa z pakietami głównymi; decydują też, które zakazane moduły są zewnętrzne | |
 
 Zakazana para obejmuje wszystko poniżej obu swoich końców, tak jak pakiety w import-linter: gdy `shop.a` nie może importować `shop.c`, kontekst zadeklarowany wewnątrz `shop.a` też nie może. Każdy wygenerowany kontekst jest w całości publiczny (`public` to jego własny moduł), więc [INW003](../rules/INW003.md) nie zgłasza niczego ponad to, a `cycles = []` sprawia, że [INW004](../rules/INW004.md) nie zgłasza cykli między nowymi kontekstami, których import-linter nie sprawdzał.
@@ -125,7 +125,6 @@ Każdy z tych przypadków trafia do raportu razem ze swoim kontraktem i nigdy ni
 - **`as_packages = false`.** Nazwa modułu w Inwards zawsze obejmuje wszystko poniżej niej.
 - **Kontrakty `protected`.** Inwards ogranicza to, co kontekst udostępnia innym (`public`, [INW003](../rules/INW003.md)), a nie to, które moduły mogą go importować.
 - **Kontrakty `acyclic_siblings`.** [INW004](../rules/INW004.md) zgłasza cykle między modułami albo między kontekstami, nie między sąsiednimi pakietami; jeśli to wystarczy, ustaw ręcznie `cycles = ["modules", "contexts"]`.
-- **Zakazany moduł zewnętrzny, gdy moduły źródłowe nie są całymi warstwami.** INW005 przypina listy bibliotek do warstw. Gdy `source_modules` to nie dokładnie moduły jednej lub kilku warstw, część dotycząca bibliotek trafia do raportu, a część z własnymi modułami i tak się przenosi.
 - **Własne typy kontraktów** oraz linia warstwy, która miesza `|` i `:` (import-linter też ją odrzuca).
 - **`broken_contract_guidance`.** Inwards pisze własne kroki naprawy dla każdego naruszenia.
 

@@ -8,7 +8,13 @@
  * through the platform's probe and reader and never writes a file itself.
  */
 import { dirname, join } from "node:path";
-import { type InwardsConfig, type LayerSpec, parseConfig, ruleLevel } from "@inwards/core";
+import {
+  type InwardsConfig,
+  type LayerSpec,
+  libraryDenies,
+  parseConfig,
+  ruleLevel,
+} from "@inwards/core";
 import type { FileReader, PathProbe } from "../platform/contracts.ts";
 import type { Change } from "./contracts.ts";
 import { STYLES } from "./presets.ts";
@@ -71,6 +77,7 @@ export function architectureBrief(input: BriefInput): string {
  *
  * @param config - the parsed config.
  * @returns the lines, with a blank line first, or none when INW005 is off or nothing applies.
+ *   Layers come first, then the prefix denies of `[tool.inwards.rules.pure-domain].deny`.
  */
 function librarySection(config: InwardsConfig): string[] {
   if (ruleLevel("INW005", config.rules) === "off") {
@@ -80,6 +87,9 @@ function librarySection(config: InwardsConfig): string[] {
     const rule = libraryRule(layer, (layer.rank ?? i) === 0 && config.layers.length > 1);
     return rule === undefined ? [] : [`- ${layer.name}: ${rule}`];
   });
+  for (const { modules, libraries } of libraryDenies(config.rules?.options?.["pure-domain"])) {
+    rules.push(`- ${list(modules)}: not ${list(libraries)}`);
+  }
   return rules.length === 0 ? [] : ["", "Libraries (INW005):", ...rules];
 }
 
