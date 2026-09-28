@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: d09885b1010944101e73dec960c138d34681ebcc065d7dec3ab0df6478691cb2
+source_hash: f10489dfb257fefc495eac540e871b5af151da1c2607fb0cfa15996a38d520ad
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -26,7 +26,7 @@ Uszeregowane. Gdy dwa cele są w konflikcie, wygrywa wyższy.
 
 | Pozycja | Cel | Scenariusz | Miara |
 |---|---|---|---|
-| 1 | :material-shield-check: **Żadnych fałszywie negatywnych wyników** | Agent chowa zabroniony import w funkcji, pod `TYPE_CHECKING`, przez ścieżkę względną albo import pakietu | Każda forma jest zgłaszana, w tym `shop . infrastructure` ze spacjami, ukośnik wsteczny w nazwie, identyfikatory NFKC i aliasy warstwy przez dowiązania symboliczne. Importy dynamiczne ze stałymi celami (`importlib.import_module`, `__import__`, `exec`) są zgłaszane jako INW011, a wyliczane cele w warstwach wewnętrznych jako niesprawdzalne INW011. Znane luki: loadery osiągane przez operator morsa, przypisanie krotek, atrybuty, `functools.partial` albo inne API ładujące ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). Testy jednostkowe i test różnicowy prescanu (0 przeoczeń na 69 762 wygenerowanych plikach i 1921 plikach biblioteki standardowej, łącznie z importami dynamicznymi, a co noc na 6543 plikach z pięciu serwisów open source) |
+| 1 | :material-shield-check: **Żadnych fałszywie negatywnych wyników** | Agent chowa zabroniony import w funkcji, pod `TYPE_CHECKING`, przez ścieżkę względną albo import pakietu | Każda forma jest zgłaszana, w tym `shop . infrastructure` ze spacjami, ukośnik wsteczny w nazwie, identyfikatory NFKC i aliasy warstwy przez dowiązania symboliczne. Importy dynamiczne ze stałymi celami (`importlib.import_module`, `__import__`, `exec`) są zgłaszane jako INW011, a wyliczane cele w warstwach wewnętrznych jako niesprawdzalne INW011. Loadery są śledzone przez aliasy, przypisania, atrybuty, `functools.partial` i nazwy związane wewnątrz `exec`, a stałe cele są zwijane; znane luki wymienia rozdział 3. Testy jednostkowe i test różnicowy prescanu (0 przeoczeń na 92 448 wygenerowanych plikach i 1921 plikach biblioteki standardowej, łącznie z importami dynamicznymi, a co noc na 6543 plikach z pięciu serwisów open source) |
 | 2 | :material-lightning-bolt: **Opóźnienie w pętli agenta** | Hook sprawdza jeden edytowany plik | p95 < 100 ms czasu rzeczywistego, łącznie ze startem procesu |
 | 3 | :material-robot-outline: **Wyniki, na podstawie których agent może działać** | Agent dostaje INW001 | Naprawia naruszenie w ramach jednej ponownej próby w ≥ 80 % przypadków (mierzone z design partnerami, zobacz [rozdział 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministyczność** | To samo repozytorium, ta sama konfiguracja, dwa uruchomienia | Identyczne diagnostyki w identycznej kolejności. Zmieniają się tylko pola czasu w podsumowaniu (`durationMs`) |
