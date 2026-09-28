@@ -161,8 +161,9 @@ function presetOf(text: string): Style | undefined {
 
 /**
  * Finds where ports live: a `ports` package or module directly inside a
- * layer's module on disk, and the preset's ports module when the preset's
- * layer is still configured (so it is named before `--scaffold` creates it).
+ * layer's literal module on disk, and the preset's ports module when the
+ * preset's layer is still configured (so it is named before `--scaffold`
+ * creates it). Layer selectors aren't probed.
  *
  * @param probe - tells what is on disk.
  * @param project - the directory of pyproject.toml.
@@ -177,7 +178,9 @@ function portModules(
   style: Style | undefined,
 ): string[] {
   const found = new Set<string>();
-  for (const module of config.layers.flatMap((layer) => layer.modules)) {
+  // A selector (`shop.*.domain`) names no one directory to probe; its layer gets the generic hint.
+  const literal = config.layers.flatMap((layer) => layer.modules).filter((m) => !m.includes("*"));
+  for (const module of literal) {
     const base = join(project, config.root, ...module.split("."), "ports");
     if (probe.kind(base) === "dir" || probe.kind(`${base}.py`) === "file") {
       found.add(`${module}.ports`);
