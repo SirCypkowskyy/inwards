@@ -105,15 +105,17 @@ export function checkNestedProjects(
   const nested = new Map<string, Set<string>>();
   for (const module of modules) {
     const parts = module.split(".");
-    const src = parts.indexOf("src");
-    // A package right under a `src` below the root; `src` at the root itself is a single project.
-    if (src < 1 || src + 1 >= parts.length) {
-      continue;
+    // A package right under a `src` below the root, at any depth (`src.packages.core.src.core`
+    // with root "."); a `src` at the root itself is a single project.
+    for (let src = 1; src + 1 < parts.length; src += 1) {
+      if (parts[src] !== "src") {
+        continue;
+      }
+      const dir = parts.slice(0, src).join("/");
+      const packages = nested.get(dir) ?? new Set<string>();
+      packages.add(parts.slice(0, src + 2).join("."));
+      nested.set(dir, packages);
     }
-    const dir = parts.slice(0, src).join("/");
-    const packages = nested.get(dir) ?? new Set<string>();
-    packages.add(parts.slice(0, src + 2).join("."));
-    nested.set(dir, packages);
   }
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
   const found = [...nested]

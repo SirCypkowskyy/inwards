@@ -151,6 +151,15 @@ layers = [{ name = "core", modules = ["packages.core.src.core"] }]
       ).toEqual([]);
     });
 
+    test("with the root at the workspace, a member under a top-level src/ is still found", () => {
+      const deep = new Set(["src.packages.core.src.core.leak", "src.shop"]);
+      const kind = hasPyproject("src/packages/core");
+      const found = checkNestedProjects(members, toml, { modules: deep, kind, shownRoot: "" });
+      expect(found.map((d) => d.message)).toEqual([
+        expect.stringContaining("src/packages/core is a nested project"),
+      ]);
+    });
+
     test("[tool.inwards.rules] can turn it off", () => {
       const off = parseConfig(`${workspace}
 [tool.inwards.rules]

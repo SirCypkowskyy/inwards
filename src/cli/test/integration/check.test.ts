@@ -199,6 +199,8 @@ test("a named path that doesn't exist is a usage error", () => {
   expect(code).toBe(2);
   expect(stdout).toBe("");
   expect(stderr).toBe("nope.py is not a file or directory.\n");
+});
+
 test("a uv workspace checked from its root warns about each member, not All clear alone", () => {
   const root = project({
     "pyproject.toml": `[tool.uv.workspace]
