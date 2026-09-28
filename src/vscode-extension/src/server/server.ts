@@ -6,7 +6,7 @@
  * events. Its state lives as long as the server; reloads are serialized.
  */
 import { readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -34,13 +34,12 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { type ConfigProblem, configDiagnostics, problemOf, readConfig } from "./config-file.ts";
 import { type Pass, passFor, stronger } from "./file-events.ts";
 import { memoryCache } from "./memory-cache.ts";
-import { mayHoldModule, projectFiles, workspaceDiagnostics } from "./workspace.ts";
+import { mayHoldModule, type ProjectView, projectView, workspaceDiagnostics } from "./workspace.ts";
 
-/** A valid config and what the server built from it. */
-interface State {
+/** A valid config and what the server built from it; a reload replaces all of it. */
+interface State extends ProjectView {
   engine: Engine;
   config: InwardsConfig;
-  root: string;
   index: ProjectIndex;
 }
 
@@ -131,7 +130,7 @@ function check(document: TextDocument): void {
       text: document.getText(),
       ...moduleNameFor(relative(state.root, path)),
     },
-    watching ? state.index : state.engine.index(projectFiles(state.root)),
+    watching ? state.index : state.engine.index(state.files),
   );
   opened.set(path, { uri: document.uri, found });
   publish(path);
@@ -153,7 +152,7 @@ documents.onDidSave(({ document }) => {
   const path = fileURLToPath(document.uri);
   if (!watching && path === configPath) {
     enqueue(reload);
-  } else if (!watching && state?.config.contexts && mayHoldModule(state.root, path)) {
+  } else if (!watching && state?.config.contexts && state.holds(state.root, path)) {
     enqueue(reindex);
   }
 });
@@ -178,7 +177,8 @@ connection.onInitialized(() => {
 connection.onDidChangeWatchedFiles(({ changes }) => {
   const events = changes.map((change) => ({ type: change.type, path: fileURLToPath(change.uri) }));
   const contexts = state?.config.contexts !== undefined;
-  const pass = passFor(events, { configPath, root: state?.root, contexts, mayHoldModule });
+  const holds = state?.holds ?? mayHoldModule;
+  const pass = passFor(events, { configPath, root: state?.root, contexts, mayHoldModule: holds });
   if (pass === undefined) {
     return; // .git, caches, virtualenvs, docs: nothing a module lookup reads
   }
@@ -270,8 +270,8 @@ async function load(): Promise<State | undefined> {
     config,
     { cache: extractions },
   );
-  const root = resolve(dirname(configPath), config.root);
-  return { engine, config, root, index: engine.index(projectFiles(root)) };
+  const view = projectView(configPath, config);
+  return { engine, config, ...view, index: engine.index(view.files) };
 }
 
 /**
@@ -283,7 +283,7 @@ function refresh(): void {
   const before = workspace;
   workspace = new Map();
   if (state) {
-    state.index = state.engine.index(projectFiles(state.root));
+    state.index = state.engine.index(state.files);
     workspace = workspaceDiagnostics(state.config, state.root);
   }
   for (const document of documents.all()) {
@@ -304,7 +304,7 @@ function refresh(): void {
  */
 function reindex(): void {
   if (state) {
-    state.index = state.engine.index(projectFiles(state.root));
+    state.index = state.engine.index(state.files);
   }
   for (const document of documents.all()) {
     check(document);

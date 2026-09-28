@@ -14,6 +14,7 @@ import {
   Engine,
   type InwardsConfig,
   type ListDir,
+  layerPackages,
   membersFrom,
   moduleNameFor,
   type PathKind,
@@ -101,10 +102,11 @@ async function openProject(
 }
 
 /**
- * Finds the top-level package directory of every layer prefix, e.g.
- * `<root>/shop` for `shop.domain`. The file walk skips nothing inside them,
- * so a virtualenv marker or a node_modules name can't hide layer code, nor
- * code moved out of a layer next to it.
+ * Finds the top-level package directory of every layer entry, e.g.
+ * `<root>/shop` for `shop.domain` or `shop.*.domain` (`layerPackages`). The
+ * file walk skips nothing inside them, so a virtualenv marker or a
+ * node_modules name can't hide layer code, nor code moved out of a layer
+ * next to it.
  *
  * @param probe - resolves real paths.
  * @param configPath - absolute path of the pyproject.toml.
@@ -117,15 +119,13 @@ export function layerDirs(
   config: InwardsConfig,
 ): string[] {
   const root = resolve(dirname(configPath), config.root);
-  return config.layers
-    .flatMap((layer) => layer.modules)
-    .flatMap((prefix) => {
-      // The whole top-level package: code moved from shop/domain to a
-      // disguised shop/core must still be seen.
-      const dir = join(root, prefix.split(".")[0] ?? prefix);
-      const real = probe.realpath(dir);
-      return real === undefined ? [] : [...new Set([dir, real])];
-    });
+  return layerPackages(config).flatMap((pkg) => {
+    // The whole top-level package: code moved from shop/domain to a
+    // disguised shop/core must still be seen.
+    const dir = join(root, pkg);
+    const real = probe.realpath(dir);
+    return real === undefined ? [] : [...new Set([dir, real])];
+  });
 }
 
 /**

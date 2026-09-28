@@ -200,6 +200,27 @@ describe("inwards init --agent claude", () => {
   });
 });
 
+describe("inwards init on an existing config", () => {
+  test("keeps layer selectors and contexts as written, and --style never rewrites them", () => {
+    const table = `[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.*.domain"] },
+  { name = "infrastructure", modules = ["shop.**"] },
+]
+
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["shop.orders"]
+`;
+    const root = project({ "pyproject.toml": table, "shop/orders/domain/order.py": "" });
+    expect(init(root, "--agent", "claude").code).toBe(0);
+    const after = read(root, "pyproject.toml");
+    expect(after).toContain(table.slice(table.indexOf("layers =")));
+    expect(init(root, "--style", "clean").code).not.toBe(0);
+    expect(read(root, "pyproject.toml")).toBe(after);
+  });
+});
+
 describe("other agents", () => {
   test("agents-md adds a marked section once and keeps the rest", () => {
     const root = project({ "pyproject.toml": LAYERS, "AGENTS.md": "# Rules\n\nBe nice.\n" });
