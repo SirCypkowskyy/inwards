@@ -143,6 +143,7 @@ test("a preset whose ports layer became a selector names no ports module", () =>
     root: "src",
     version: "0.1.0",
     ignore: [],
+    shapes: false,
     eol: "\n",
   });
   const text = table.replace('"app.application"', '"app.*.application"');
