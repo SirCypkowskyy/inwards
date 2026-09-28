@@ -6,6 +6,7 @@
  * tool cache. It writes no files; the agent modules use what it returns.
  */
 import { basename } from "node:path";
+import { LAUNCHER } from "../claude-code/settings.ts";
 import { print } from "../platform/print.ts";
 import type { InitContext } from "./contracts.ts";
 
@@ -40,7 +41,9 @@ export function inwardsExec(ctx: InitContext): Exec {
 
 /**
  * Checks `--launcher` and splits it into words. It goes into shell commands
- * unquoted, so each word may hold only letters, digits and `_ . : @ = + / -`.
+ * unquoted, so each word may hold only letters, digits and `_ . : @ = + / -`,
+ * and it must be a tool runner the Stop gate recognises (`uv run`,
+ * `poetry run`, `uvx --from inwards`), or the gate would report the hooks missing.
  *
  * @param launcher - what was passed to `--launcher`.
  * @returns the words, or an error message.
@@ -49,7 +52,9 @@ export function launcherWords(launcher: string): string[] | string {
   const words = launcher.trim().split(WHITESPACE);
   const bad = words.find((word) => !LAUNCHER_WORD.test(word));
   if (bad === undefined) {
-    return words;
+    return LAUNCHER.test(words.join(" "))
+      ? words
+      : `--launcher must be a tool runner such as "uv run", "poetry run", "pdm run" or "uvx --from inwards", and ${JSON.stringify(launcher.trim())} isn't one`;
   }
   return bad === ""
     ? `--launcher needs a command, e.g. --launcher "uv run"`

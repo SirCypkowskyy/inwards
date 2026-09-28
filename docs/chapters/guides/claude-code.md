@@ -25,7 +25,7 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
     uv run inwards init --agent claude --launcher "uv run"
     ```
 
-    Each hook then runs `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code` in the shell, from the project root, so it uses the project's own environment in every worktree and on every machine. `--launcher` takes plain words only (letters, digits and `_ . : @ = + / -`), because it goes into a shell command unquoted.
+    Each hook then runs `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code` in the shell, from the project root, so it uses the project's own environment in every worktree and on every machine. `--launcher` takes a tool runner (`uv`, `uvx`, `poetry`, `pdm`, `hatch`, `pipx`, `rye`, `pixi`, `bunx`, `npx` or `python`) with its subcommand and options, in plain words only (letters, digits and `_ . : @ = + / -`), because it goes into a shell command unquoted. The Stop gate counts only such hooks as Inwards' own, so `echo inwards hook claude-code` can't stand in for one.
 
 3. Start a new Claude Code session in the project (or run `/clear`). Hooks installed mid-session still work, but the Stop gate needs the session start it records.
 

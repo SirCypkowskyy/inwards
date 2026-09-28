@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import process from "node:process";
+import { holdsInwardsHooks } from "../../src/claude-code/settings.ts";
 import { CMD, inwards, LAYERS, payload, project, type RunResult } from "../support/run.ts";
 import { git } from "../support/stop-helpers.ts";
 
@@ -77,15 +78,17 @@ describe("inwards init --launcher", () => {
       return; // the launcher here is a POSIX shell script
     }
     const main = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
-    // A launcher committed to the repo, standing in for `uv run`: it drops the
-    // word `inwards` and starts this build, and only resolves from the project root.
+    // A stand-in for uv on PATH: `uv run inwards …` starts this build, and only
+    // from a directory with a pyproject.toml, as uv finds the project.
+    const bin = project({});
     const quoted = CMD.map((word) => `'${word}'`).join(" ");
-    writeFileSync(join(main, "run-inwards"), `#!/bin/sh\nshift\nexec ${quoted} "$@"\n`);
-    chmodSync(join(main, "run-inwards"), 0o755);
+    const uv = `#!/bin/sh\n[ "$1" = run ] && [ -f pyproject.toml ] || exit 9\nshift 2\nexec ${quoted} "$@"\n`;
+    writeFileSync(join(bin, "uv"), uv);
+    chmodSync(join(bin, "uv"), 0o755);
     git(main, "init", "-q");
     git(main, "add", "-A");
     git(main, "commit", "-qm", "start");
-    expect(init(main, "--agent", "claude", "--launcher", "./run-inwards").code).toBe(0);
+    expect(init(main, "--agent", "claude", "--launcher", "uv run").code).toBe(0);
     const other = `${main}-other`;
     git(main, "worktree", "add", "-q", other);
     mkdirSync(join(other, ".claude"));
@@ -96,7 +99,7 @@ describe("inwards init --launcher", () => {
     const p = Bun.spawnSync(["sh", "-c", command], {
       cwd: project({}), // Claude Code may run hooks from anywhere in the session
       stdin: new TextEncoder().encode(payload("post-write-order", other)),
-      env: { CLAUDE_PROJECT_DIR: other, PATH: "/usr/bin:/bin" },
+      env: { CLAUDE_PROJECT_DIR: other, PATH: `${bin}:/usr/bin:/bin` },
     });
     expect(p.stderr.toString()).toContain("INW001");
     expect(p.exitCode).toBe(2);
@@ -118,6 +121,8 @@ describe("inwards init --launcher", () => {
     ["uv run; rm -rf ~", '"run;"'],
     ['uv run "$(id)"', "isn't one"],
     ["", "needs a command"],
+    ["./run-inwards", "tool runner"],
+    ["echo", "tool runner"],
   ])("a launcher of %j is refused with exit 2 and nothing written", (launcher, message) => {
     const root = project({ "pyproject.toml": LAYERS });
     const { code, stderr } = init(root, "--agent", "claude", "--launcher", launcher);
@@ -148,4 +153,25 @@ describe("inwards init --launcher", () => {
     expect(warned).toContain('--launcher "uv run"');
     expect(run("--agent", "claude", "--launcher", "uv run", "--dry-run")).not.toContain("warning");
   });
+});
+
+test("the Stop gate counts a launcher hook only behind a tool runner", () => {
+  /**
+   * Settings text with one PreToolUse hook.
+   *
+   * @param command - the hook's shell command.
+   * @returns the settings.json text.
+   */
+  function settings(command: string): string {
+    const group = [{ hooks: [{ type: "command", command }] }];
+    // biome-ignore lint/style/useNamingConvention: Claude Code's own key.
+    return JSON.stringify({ hooks: { PreToolUse: group } });
+  }
+  const cd = 'cd "$CLAUDE_PROJECT_DIR" && ';
+  expect(holdsInwardsHooks(settings(`${cd}uv run inwards hook claude-code`))).toBe(true);
+  expect(holdsInwardsHooks(settings("uvx --from inwards==0.4.0 inwards hook claude-code"))).toBe(
+    true,
+  );
+  expect(holdsInwardsHooks(settings(`${cd}echo inwards hook claude-code`))).toBe(false);
+  expect(holdsInwardsHooks(settings("./fake inwards hook claude-code"))).toBe(false);
 });

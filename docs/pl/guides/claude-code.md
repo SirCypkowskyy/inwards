@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: 1260e00d028204493fe777fd65e8b9bc6dd94e127975978ba7d89aefb94af530
+source_hash: e0f9c1e9aa3099198a275cad31ef89405d4ff5e108ad00e73a3ea279754cca13
 ---
 
 # Claude Code { #claude-code }
@@ -30,7 +30,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
     uv run inwards init --agent claude --launcher "uv run"
     ```
 
-    Każdy hook uruchamia wtedy w powłoce `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`, z katalogu głównego projektu, więc korzysta z własnego środowiska projektu w każdym worktree i na każdej maszynie. `--launcher` przyjmuje tylko zwykłe słowa (litery, cyfry i `_ . : @ = + / -`), bo trafia do polecenia powłoki bez cudzysłowów.
+    Każdy hook uruchamia wtedy w powłoce `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`, z katalogu głównego projektu, więc korzysta z własnego środowiska projektu w każdym worktree i na każdej maszynie. `--launcher` przyjmuje narzędzie uruchamiające (`uv`, `uvx`, `poetry`, `pdm`, `hatch`, `pipx`, `rye`, `pixi`, `bunx`, `npx` albo `python`) z podkomendą i opcjami, i to tylko jako zwykłe słowa (litery, cyfry i `_ . : @ = + / -`), bo trafia do polecenia powłoki bez cudzysłowów. Bramka Stop uznaje za hooki Inwards tylko takie polecenia, więc `echo inwards hook claude-code` nie może ich zastąpić.
 
 3. Rozpocznij nową sesję Claude Code w projekcie (albo uruchom `/clear`). Hooki zainstalowane w trakcie sesji też działają, ale Stop gate potrzebuje zapisu początku sesji.
 
