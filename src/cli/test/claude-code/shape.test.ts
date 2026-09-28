@@ -1,11 +1,11 @@
 /**
  * @file Package shape (INW007/INW008) in the example configs and the hooks. The
- * guide shows the fixtures' configs verbatim, and a Write that creates a
- * disallowed file blocks while an edit of a file that predates the session
- * doesn't.
+ * guide shows the fixtures' configs verbatim, a Write that creates a
+ * disallowed file is denied at PreToolUse and blocks at PostToolUse, and an
+ * edit of a file that predates the session doesn't.
  */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
@@ -99,6 +99,81 @@ test("a renamed service.old.py is an unexpected member, and service is still mis
     ["INW007", "app/orders/service.old.py"],
     ["INW008", "app/orders/__init__.py"],
   ]);
+});
+
+/**
+ * Sends a PreToolUse Write for one file in the test session.
+ *
+ * @param root - the project directory.
+ * @param rel - the file, relative to the project.
+ * @returns the denial's reason, or undefined when the Write may go ahead.
+ * @throws {Error} when the hook fails or prints anything but a denial.
+ */
+function preWrite(root: string, rel: string): string | undefined {
+  const stdin = payload("pre-write-order", root, {
+    session_id: ID,
+    tool_input: { file_path: join(root, rel), content: "X = 1\n" },
+  });
+  const { code, stdout } = inwards(["hook", "claude-code"], { cwd: root, stdin });
+  if (code === 0 && stdout === "") {
+    return undefined;
+  }
+  const { hookSpecificOutput } = JSON.parse(stdout);
+  if (code !== 0 || hookSpecificOutput.permissionDecision !== "deny") {
+    throw new Error(`expected a denial, got exit ${code}: ${stdout}`);
+  }
+  return hookSpecificOutput.permissionDecisionReason;
+}
+
+describe("package shape: PreToolUse (#96)", () => {
+  test("a Write of a new disallowed file is denied with the INW007 fix; an allowed name passes", () => {
+    const root = session(fixture("fastapi"));
+    const reason = preWrite(root, "app/orders/helpers.py");
+    expect(reason).toStartWith("inwards: app/orders/helpers.py was not created.");
+    expect(reason).toContain(
+      'INW007 "helpers.py" is not an allowed member of package "app.orders".',
+    );
+    expect(reason).toContain("Move the code into app/orders/utils.py");
+    expect(existsSync(join(root, "app/orders/helpers.py"))).toBe(false);
+    expect(preWrite(root, "app/orders/utils.py")).toBeUndefined();
+    expect(preWrite(root, "app/orders/test_x.py")).toContain('Move "test_x.py" under tests/.');
+  });
+
+  test("an existing file, a warning-only shape and a broken config let the Write through", () => {
+    const root = session({ ...fixture("fastapi"), "app/orders/helpers.py": "" });
+    expect(preWrite(root, "app/orders/helpers.py")).toBeUndefined();
+    const lenient = readFileSync(join(root, "pyproject.toml"), "utf8").replace(
+      'require = ["__init__", "router", "service"]',
+      'require = ["__init__", "router", "service"]\nextra = "warning"',
+    );
+    const warned = project({ ...fixture("fastapi"), "pyproject.toml": lenient });
+    expect(preWrite(warned, "app/orders/misc.py")).toBeUndefined();
+    const broken = project({ ...fixture("fastapi"), "pyproject.toml": "[tool.inwards\n" });
+    expect(preWrite(broken, "app/orders/misc.py")).toBeUndefined();
+  });
+
+  test("the third identical denial escalates to the user", () => {
+    const root = session(fixture("fastapi"));
+    const reasons = [1, 2, 3, 4].map(() => preWrite(root, "app/orders/helpers.py"));
+    expect(reasons.map((r) => r?.includes("survived 3 attempts"))).toEqual([
+      false,
+      false,
+      true,
+      false,
+    ]);
+    expect(reasons[2]).toStartWith("inwards: These violations survived 3 attempts.");
+    expect(stop(root).code).toBe(0); // nothing was created
+  });
+
+  test("denials count with the fingerprint of the INW007 they prevent", () => {
+    const root = session(fixture("fastapi"));
+    expect(preWrite(root, "app/orders/helpers.py")).toBeDefined();
+    expect(preWrite(root, "app/orders/helpers.py")).toBeDefined();
+    put(root, "app/orders/helpers.py", "X = 1\n"); // e.g. through Bash
+    const written = posted(root, "write", "app/orders/helpers.py");
+    expect(written.code).toBe(0);
+    expect(written.stdout).toContain("survived 3 attempts");
+  });
 });
 
 describe("package shape: hooks", () => {

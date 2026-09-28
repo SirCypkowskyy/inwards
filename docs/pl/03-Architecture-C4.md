@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: d5a157b422a377de6809453ce8456f99ba9813a7f00249144c3943461e78cbf4
+source_hash: 61f409b24b3b98d4f313fc01c2db264e3a8e28e37e3a3b4ad80fe0353c447c0c
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -222,7 +222,7 @@ Kody wyjścia są takie jak w Ruffie: `0` czysto (ostrzeżenia dozwolone), `1` z
 
 Pozostałe polecenia korzystają z tych samych elementów:
 
-- `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
+- `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia shape guard i config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
 - `inwards init --agent claude|opencode|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
 - `inwards init --style layered|clean|hexagonal [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -406,7 +406,7 @@ src/
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
 │   │   ├── commands/      # check, baseline, stats, hook: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
-│   │   │                  #   guard (Bash reader, edit simulation), PostToolUse, the Stop gate
+│   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
 │   │   ├── session/       # the session record, start identity and content, old errors,
 │   │   │                  #   agent suppressions, layout changes against the session start

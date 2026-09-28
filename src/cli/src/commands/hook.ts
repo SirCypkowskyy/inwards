@@ -10,8 +10,9 @@ import { print } from "../platform/print.ts";
 
 /**
  * Runs the Claude Code hook for one event: SessionStart records the session,
- * PreToolUse denies edits to the rules (`config-guard.ts`), PostToolUse checks
- * the file the agent just wrote, and Stop runs the gate over everything the
+ * PreToolUse denies edits to the rules (`config-guard.ts`) and new files the
+ * package shape forbids (`shape-guard.ts`), PostToolUse checks the file the
+ * agent just wrote, and Stop runs the gate over everything the
  * session changed (`stop-gate.ts`).
  * Exit 2 puts stderr in front of the model, so violations and config errors go
  * there. Exit 1 reaches only the user: a bad payload or a bug in Inwards is not

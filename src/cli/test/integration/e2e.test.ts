@@ -1,7 +1,8 @@
 /**
  * @file The compiled binary end to end against the recorded Claude Code hook
  * payloads in `support/fixtures/claude-code`. The exit codes and output are
- * pinned in a snapshot, and garbage on stdin is a clean exit 1.
+ * pinned in a snapshot, and garbage on stdin is a clean exit 1. A PreToolUse
+ * Write of a Python file the package shape forbids is denied (#96).
  */
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
@@ -75,6 +76,44 @@ test.each([
   expect(
     run(broken, ["hook", "claude-code"], payload("post-write-order", broken)),
   ).toMatchSnapshot();
+});
+
+test("PreToolUse denies a Write of a new app/orders/helpers.py and passes utils.py", () => {
+  const shaped = project({
+    "pyproject.toml": `[tool.inwards]
+layers = [{ name = "app", modules = ["app"] }]
+
+[[tool.inwards.shape]]
+packages = ["app.*"]
+allow = ["router", "service", "utils"]
+`,
+    "app/__init__.py": "",
+    "app/orders/__init__.py": "",
+    "app/orders/service.py": "",
+  });
+  /**
+   * Sends the recorded PreToolUse Write, pointed at one file of the project.
+   *
+   * @param rel - the file to write, relative to the project.
+   * @returns the hook's exit code and output.
+   */
+  function write(rel: string): RunResult {
+    const stdin = payload("pre-write-order", shaped, {
+      tool_input: { file_path: join(shaped, rel) },
+    });
+    return run(shaped, ["hook", "claude-code"], stdin);
+  }
+  expect(write("app/orders/helpers.py")).toMatchInlineSnapshot(`
+    {
+      "code": 0,
+      "stderr": "",
+      "stdout": 
+    "{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"inwards: app/orders/helpers.py was not created.\\nINW007 \\"helpers.py\\" is not an allowed member of package \\"app.orders\\". Move the code in \\"helpers.py\\" into utils.py. Move the code into app/orders/utils.py and delete helpers.py. Package \\"app.orders\\" may hold: router, service, utils. Don't edit [tool.inwards] yourself. If the package really needs this member, ask the user to change its [[tool.inwards.shape]]."}}
+    "
+    ,
+    }
+  `);
+  expect(write("app/orders/utils.py")).toEqual({ code: 0, stdout: "", stderr: "" });
 });
 
 test("hook with garbage on stdin", () => {
