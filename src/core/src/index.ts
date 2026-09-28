@@ -10,6 +10,7 @@ export { CONFIG_DEFAULTS } from "./config/defaults.ts";
 export type { AgentSuppressions } from "./config/hook-keys.ts";
 export type { LayerSpec } from "./config/layers.ts";
 export { declaresInwards, type InwardsConfig, inwardsTable, parseConfig } from "./config/parse.ts";
+export { libraryDenies } from "./config/rule-options.ts";
 export {
   checkRuleOptions,
   type RuleSettings,

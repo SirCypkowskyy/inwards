@@ -65,6 +65,13 @@ export function renderToml(draft: Draft, opts: { source: string; root: string })
       `depends-on = ${array(context.dependsOn)}`,
     );
   }
+  if (draft.deny.length > 0) {
+    lines.push("", "[tool.inwards.rules.pure-domain]", "deny = [");
+    for (const { modules, libraries } of draft.deny) {
+      lines.push(`  { modules = ${array(modules)}, libraries = ${array(libraries)} },`);
+    }
+    lines.push("]");
+  }
   return `${lines.join("\n")}\n`;
 }
 

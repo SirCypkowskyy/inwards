@@ -143,6 +143,15 @@ roles = ["models | schemas", "service"]
     expect(brief).toContain("- d.schemas: no web frameworks");
   });
 
+  test("lists INW005's prefix denies after the layers (#219)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules.pure-domain]
+deny = [{ modules = ["shop.domain.pricing", "shop.*.jobs"], libraries = ["numpy", "celery"] }]
+`);
+    expect(architectureBrief({ config, style: undefined, ports: [] })).toContain(
+      "- `shop.domain.pricing`, `shop.*.jobs`: not `numpy`, `celery`",
+    );
+  });
+
   test("leaves out the rules that are turned off", () => {
     const config = parseConfig(`${LAYERS}[tool.inwards.rules]
 ignore = ["INW005"]

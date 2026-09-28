@@ -17,7 +17,7 @@
 import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";
 import { diagnostic, RULES, ruleFor } from "../meta/registry.ts";
 import { matchEntry } from "./layer-selector.ts";
-import { type OptionValue, optionKeys, parseOptions } from "./rule-options.ts";
+import { type OptionValue, optionKeys, parseOptions, stringList } from "./rule-options.ts";
 import { type ConfigFile, spanOfRuleTable } from "./source-span.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -249,8 +249,7 @@ export function ruleLevel(
   const { select, extendSelect = [], ignore = [], severity = {}, options = {} } = rules ?? {};
   const rule = ruleFor(code);
   const chosen = select === undefined ? rule?.default !== "off" : select.includes(code);
-  const modules = rule === undefined ? undefined : options[rule.name]?.["modules"];
-  const scope = typeof modules === "object" ? modules : undefined;
+  const scope = rule === undefined ? undefined : stringList(options[rule.name]?.["modules"]);
   const inScope =
     scope === undefined ||
     module === "" ||

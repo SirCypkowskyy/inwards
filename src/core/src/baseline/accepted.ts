@@ -20,9 +20,11 @@ const UNCHECKED =
 /**
  * INW005 calls a uv workspace member a "workspace package" since #203, where
  * it said "library" before; both spellings share one key, so older baselines
- * keep matching.
+ * keep matching. A prefix deny's message (`Module "..." imports`, #219) is
+ * read the same way.
  */
-const WORKSPACE_PACKAGE = /^(?<head>Layer "[^"]*" imports "[^"]*" from )workspace package "/u;
+const WORKSPACE_PACKAGE =
+  /^(?<head>(?:Layer|Module) "[^"]*" imports "[^"]*" from )workspace package "/u;
 
 /** The rules whose messages end with the layer order. */
 const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);

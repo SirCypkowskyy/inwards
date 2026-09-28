@@ -572,6 +572,15 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 
 **Alternatives.** *Read installed distributions from the virtualenv*: exact, but breaks C4 and fails in CI images without the dependencies. *Default deny for every layer but the outermost*: guesses too much about what an application layer may use. *Name the configured list in the message*: a changed list would bring back every baselined violation.
 
+**Amendment, 2026-09-28: libraries denied to a module prefix ([#219](https://github.com/SirCypkowskyy/inwards/issues/219)).** import-linter's most common `forbidden` contract, "`mypackage.one` must not import `django`", names a package that isn't a layer, so `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) had to skip it.
+
+- **In INW005's options table.** `[tool.inwards.rules.pure-domain]` takes `deny`, a list of `{ modules, libraries }` tables, next to the `modules` every rule has since [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)'s #181 amendment. `modules` has the grammar of `layers[].modules`, and `libraries` the grammar of `deny-libraries`. Only `pure-domain` takes the key; on another rule's table it is an unknown key.
+- **Independent of layers.** An entry applies to the modules it matches whether a layer owns them or not, so a file outside every layer that an entry covers gets its imports read. The layer's `allow-libraries` doesn't undo it: an entry is narrower than a layer, and a team writes one to take something away.
+- **The layer's lists are asked first.** When they deny the import too, the finding is the layer's, with the layer's message, so adding an entry leaves existing baseline keys alone. Otherwise the message names the module and the prefix the entry matched (`denies to "mypackage.one"`), and the fix puts the port in that prefix and the implementation outside it. The table's own `modules` still scopes every INW005 finding.
+- **`import-config`** keeps `extend-deny-libraries` for sources that are exactly one or more layers and writes a `deny` entry for everything else.
+
+*Alternatives.* *`deny-libraries` on a `[[tool.inwards.contexts]]` entry*: a context also brings INW002 and INW003 permissions, so a converted contract would change what else the package may import and who may import it. *A `modules` field on a layer's deny entries*: `deny-libraries` is a list of strings, and turning its entries into tables would change the type of an existing key.
+
 ## ADR-024: A Polish translation as a second build, translated in the same PR
 
 **Status:** Accepted · 2026-09-26 · [#149](https://github.com/SirCypkowskyy/inwards/issues/149)
