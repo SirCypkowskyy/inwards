@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: bd4c1b957f4c7e19cbc09abadc06b92f2e4e366a44905d03a92304a9253f2eda
+source_hash: fafd0de32317a1cb01c7d6bb4dacc117ac77d63349624032036bf9fea3f59d84
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -48,7 +48,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     W projekcie, który nie ma jeszcze `[tool.inwards]`, `inwards init --style hexagonal --agent claude` zapisuje warstwy z presetu i hooki w jednym uruchomieniu (zobacz [Instalacja](guides/install.md#a-new-project-start-from-a-preset)).
 
-    Polecenie zapisuje hooki w `.claude/settings.local.json`, który przechowuje ustawienia tylko dla tej maszyny (`init` dodaje go do `.gitignore`), i zachowuje wszystkie hooki i ustawienia, które już tam są. Każdy hook używa formy exec (`"command"`: bezwzględna ścieżka do pliku binarnego, `"args"`: `["hook", "claude-code"]`), więc Claude Code uruchamia go bez powłoki: `PATH`, aktywowany virtualenv, spacje ani `$` w ścieżce, ani Git Bash kontra PowerShell na Windows nie mają znaczenia. `init` dodaje też `.inwards/` do `.gitignore`, przypina `required-version` i domyślną listę `ignore` (`tests`, `scripts`, `migrations`, `conftest`) w `[tool.inwards]` i dodaje trzy reguły `permissions.deny`, `Edit(/.claude/settings*.json)`, `Edit(/.inwards/**)` i `Edit(/**/inwards-baseline.json)`, więc sam Claude Code odrzuca te edycje, nawet gdy hooka zabraknie. Ponowne uruchomienie niczego nie zmienia. Instaluje każde zdarzenie hooka, które implementuje Inwards: SessionStart, PreToolUse (config guard), PostToolUse i Stop.
+    Polecenie zapisuje hooki w `.claude/settings.local.json`, który przechowuje ustawienia tylko dla tej maszyny (`init` dodaje go do `.gitignore`), i zachowuje wszystkie hooki i ustawienia, które już tam są. Każdy hook używa formy exec (`"command"`: bezwzględna ścieżka do pliku binarnego, `"args"`: `["hook", "claude-code"]`), więc Claude Code uruchamia go bez powłoki: `PATH`, aktywowany virtualenv, spacje ani `$` w ścieżce, ani Git Bash kontra PowerShell na Windows nie mają znaczenia. Z `--launcher "uv run"` (dla Inwards jako zależności deweloperskiej uv) każdy hook jest zamiast tego poleceniem powłoki `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`, które nie zawiera żadnej ścieżki, a `init` ostrzega, gdy ścieżka, którą by zapisał, leży w pamięci podręcznej uv albo bunx. `init` dodaje też `.inwards/` do `.gitignore`, przypina `required-version` i domyślną listę `ignore` (`tests`, `scripts`, `migrations`, `conftest`) w `[tool.inwards]` i dodaje trzy reguły `permissions.deny`, `Edit(/.claude/settings*.json)`, `Edit(/.inwards/**)` i `Edit(/**/inwards-baseline.json)`, więc sam Claude Code odrzuca te edycje, nawet gdy hooka zabraknie. Ponowne uruchomienie niczego nie zmienia. Instaluje każde zdarzenie hooka, które implementuje Inwards: SessionStart, PreToolUse (config guard), PostToolUse i Stop.
 
     Claude Code uruchamia [hooki](https://code.claude.com/docs/en/hooks) wokół wywołań narzędzi. Dla `PostToolUse` kod wyjścia 2 nie cofa edycji (ona już się wydarzyła), ale Claude widzi stderr hooka i na nie reaguje. Dla `Stop` kod wyjścia 2 każe Claude'owi dalej pracować zamiast kończyć turę. Dane wejściowe hooka zawierają `stop_hook_active`, a Claude Code i tak kończy turę po kilku kolejnych blokadach, więc zepsuty hook Stop nie może uwięzić sesji.
 
@@ -116,6 +116,10 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     Bramka blokuje turę najwyżej `escalate-after` razy (domyślnie 3). Stop po ostatniej blokadzie pozwala zakończyć turę i pokazuje użytkownikowi, co wciąż jest nierozwiązane, a eskalacja (niżej) zamienia powtarzającą się porażkę w pytanie do użytkownika. Licznik zaczyna się od nowa z każdą nową turą. Jeśli sama bramka zawiedzie (na przykład nieczytelny plik), blokuje raz z błędem i pozwala zakończyć turę przy następnej próbie, więc zepsuta bramka nie może ciągnąć sesji w nieskończoność.
 
+=== ":material-code-braces: OpenCode"
+
+    `inwards init --agent opencode` zapisuje plugin projektu `.opencode/plugins/inwards.js` (dodany też do `.gitignore`, bo zawiera bezwzględną ścieżkę do pliku binarnego). Plugin zamienia zdarzenia OpenCode na powyższe ładunki i uruchamia `inwards hook claude-code`, więc sprawdzenie po edycji, strażnik konfiguracji, bramka Stop i eskalacja to ten sam kod. OpenCode nie może odmówić zakończenia tury: gdy sesja przechodzi w bezczynność, blokująca bramka Stop odsyła swoje powody jako nową wiadomość, która zaczyna kolejną turę. Strażnik nie przeczyta `apply_patch`, więc plugin odmawia łatek dotykających `pyproject.toml` albo plików Inwards. [Przewodnik po OpenCode](guides/opencode.md#what-holds-on-opencode) wymienia każdą różnicę, a [ADR-033](05-ADR.md#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) opisuje projekt.
+
 === ":material-console: Aider"
 
     Aider lintuje pliki, które edytuje, a gdy linter zgłasza błąd, pokazuje wyjście modelowi i prosi go o naprawienie problemów. Inwards podłącza się jako polecenie lintujące dla Pythona. `inwards init --agent aider` wypisuje dokładną linię, z bezwzględną ścieżką do pliku binarnego, do `.aider.conf.yml`:
@@ -167,6 +171,8 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
 `--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst i `concise` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
 
+`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, a SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
+
 ### Pisanie diagnostyk dla modelu { #writing-diagnostics-for-a-model }
 
 Każda diagnostyka przestrzega tych samych pięciu zasad. To założenia projektowe o tym, co sprawia, że agent naprawia problem, zamiast go ukrywać, a metryka „naprawione w ramach jednej ponownej próby” z [rozdziału 2](02-Business-Context.md#business-hypothesis) pokaże, czy się sprawdzają.
@@ -187,7 +193,7 @@ Każda diagnostyka przestrzega tych samych pięciu zasad. To założenia projekt
 
 ### Kody wyjścia { #exit-codes }
 
-`0` czysto · `1` naruszenia · `2` błąd użycia albo konfiguracji. W Claude Code hook zamienia naruszenia na kod 2, sygnał „proszę napraw”, a kodu 1 używa dla tego, co powinien zobaczyć tylko użytkownik: nieczytelnych danych wejściowych, błędu wewnętrznego albo Stop gate, który zawodzi ponownie po jednorazowym zablokowaniu z własnym błędem. Błąd konfiguracji też trafia do modelu z kodem 2, bo agent, który zepsuł konfigurację, musi się o tym dowiedzieć.
+`0` czysto · `1` naruszenia · `2` błąd użycia albo konfiguracji. Dla `inwards check PATHS...` błędem użycia jest ścieżka, która nie istnieje, albo ścieżki, które wszystkie leżą poza `root`. W Claude Code hook zamienia naruszenia na kod 2, sygnał „proszę napraw”, a kodu 1 używa dla tego, co powinien zobaczyć tylko użytkownik: nieczytelnych danych wejściowych, błędu wewnętrznego albo Stop gate, który zawodzi ponownie po jednorazowym zablokowaniu z własnym błędem. Błąd konfiguracji też trafia do modelu z kodem 2, bo agent, który zepsuł konfigurację, musi się o tym dowiedzieć.
 
 ### Gdy agent nie umie tego naprawić { #when-the-agent-cant-fix-it }
 

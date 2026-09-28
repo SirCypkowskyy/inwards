@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: 245ffdf68f4c29ef2fb1943200d527489f5ca9045507d72abaad4e4c67dd54ab
+source_hash: ccf2feeb7c3de658215fae83f7463a23fec506b61621b2550a39938f3103ad47
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -36,6 +36,14 @@ Wielu agentów kodujących czyta instrukcje projektu z pliku [`AGENTS.md`](https
     <!-- inwards:end -->
     ```
 
+    Jeśli projekt uruchamia Inwards przez uv (zależność deweloperska, bez aktywowanego virtualenva), dodaj `--launcher "uv run"`, a sekcja poda `uv run inwards check --format json`:
+
+    ```sh
+    uv run inwards init --agent agents-md --launcher "uv run"
+    ```
+
+    Sekcja podaje jedno polecenie dla projektu. Przy kilku tabelach `[tool.inwards]` (na przykład w workspace uv) dopisz ręcznie, poza znacznikami, po linii na konfigurację, z `--config <member>/pyproject.toml`.
+
 3. Zacommituj `AGENTS.md`. Ponowne uruchomienie `init` zastępuje tylko tekst między znacznikami.
 
 ## Sprawdź, czy działa { #check-it-works }
@@ -49,6 +57,6 @@ Wielu agentów kodujących czyta instrukcje projektu z pliku [`AGENTS.md`](https
 |---|---|
 | Agent nigdy nie uruchamia sprawdzenia | To instrukcja, a nie hook, więc agent może ją pominąć. Użyj agenta z hookami (takiego jak [Claude Code](claude-code.md)) albo uruchamiaj `inwards check` w CI. |
 | `init` zatrzymuje się z komunikatem „unmatched markers” | `AGENTS.md` nie ma dokładnie jednego znacznika `inwards:begin` i jednego `inwards:end`. Popraw je albo usuń ręcznie, a potem uruchom `init` ponownie. |
-| `inwards: command not found` w powłoce agenta | Środowisko agenta nie widzi pliku binarnego. Dodaj go tam do `PATH`. (Edycja polecenia między znacznikami działa do następnego `init`, który przywraca sekcję). |
+| `inwards: command not found` w powłoce agenta | Środowisko agenta nie widzi pliku binarnego. Dodaj go tam do `PATH` albo, gdy Inwards jest zależnością deweloperską uv, uruchom ponownie `init` z `--launcher "uv run"`. (Edycja polecenia między znacznikami działa do następnego `init`, który przywraca sekcję). |
 
 Twardą blokadę daje `inwards check` w CI: kod wyjścia 1 oblewa zadanie. [Przewodnik po GitHub Actions](ci.md) zawiera workflow, który dodatkowo dodaje adnotacje do pull requestu i wysyła SARIF do code scanning.

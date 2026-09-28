@@ -16,6 +16,7 @@ import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "../init/styles.ts
 
 const AGENT_HINTS: Readonly<Record<Agent, string>> = {
   claude: "hooks in .claude/settings.local.json",
+  opencode: "a plugin in .opencode/plugins/inwards.js",
   aider: "prints the lint-cmd line",
   "agents-md": "a section in AGENTS.md",
 };
@@ -113,7 +114,7 @@ function cancelled(cancel: (message?: string) => void): void {
  * Builds the command line that does what the picker chose.
  *
  * @param plan - the choices.
- * @param flags - the options given with the picker (`--package`, `--dry-run`).
+ * @param flags - the options given with the picker (`--package`, `--launcher`, `--dry-run`).
  * @returns e.g. `inwards init --style hexagonal --scaffold --agent claude`.
  */
 function equivalentCommand(plan: InitPlan, flags: InitFlags): string {
@@ -123,6 +124,9 @@ function equivalentCommand(plan: InitPlan, flags: InitFlags): string {
     plan.scaffold && plan.style !== undefined ? "--scaffold" : "",
     flags.package === undefined ? "" : `--package ${flags.package}`,
     plan.agent === undefined ? "" : `--agent ${plan.agent}`,
+    plan.agent === undefined || flags.launcher === undefined
+      ? ""
+      : `--launcher ${JSON.stringify(flags.launcher)}`,
     flags["dry-run"] === true ? "--dry-run" : "",
   ]
     .filter((part) => part !== "")

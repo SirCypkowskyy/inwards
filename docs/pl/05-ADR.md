@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: a0d463f78d4c17268730effa317316ea8eaff9fe9a9943b5f3cccb7a7af230b3
+source_hash: ce2c54721c38c34f015c0058e1fbd6d65fc227459b6f08bf969989d150c1187e
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -38,6 +38,9 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty, serwer języka czyta tabelę ponownie bez restartu od [#163](03-Architecture-C4.md#known-limitations) |
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :white_check_mark: Przyjęty |
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji | :white_check_mark: Przyjęty |
+| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :white_check_mark: Przyjęty |
+| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :white_check_mark: Przyjęty |
+| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -743,3 +746,132 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - *Nauczyć indeks modułów, że moduły generowane istnieją, dla wszystkich reguł:* INW006 miałby tę samą treść w obu checkoutach, ale INW005, INW006 i serwer języka wierzyłyby w pliki, których nie ma, a indeks potrzebowałby konfiguracji.
 - *Ignorowanie INW010 dla pliku w konfiguracji:* jeszcze jedno miejsce do utrzymywania w zgodzie z kodem, a wyciszenie w linii już istnieje.
 - *Zbiory w nawiasach fnmatch, jak we wzorcach elementów kształtu:* zawartość zbioru omija sprawdzenie znaków, a `*` i `?` wystarczają na każdy przypadek z issue.
+
+## ADR-030: Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami { #adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes }
+
+**Stan:** Przyjęty · 2026-09-27 · [#51](https://github.com/SirCypkowskyy/inwards/issues/51)
+
+**Kontekst.** Warstwy opisują jedną cebulę: uporządkowaną listę, w której każdy moduł może importować warstwy wymienione przed nim. Konteksty ograniczone (bounded contexts) i pionowe wycinki przecinają ją w poprzek. `orders` i `billing` mają każdy swoją domenę i aplikację, a zamówienia mogą korzystać z rozliczeń tylko przez ich API. [ADR-005](#adr-005-configuration-lives-in-pyprojecttoml) obiecywał, że takie nieliniowe reguły dostaną własne tabele, żeby prosty przypadek pozostał prosty. INW002 (konteksty zależą od siebie tylko tak, jak to zadeklarowano) i INW003 (kod z zewnątrz korzysta tylko z publicznych modułów kontekstu) potrzebują wspólnej definicji tego, co kontekst posiada i na co pozwala.
+
+**Decyzja.**
+
+- **Tabela `[[tool.inwards.contexts]]`**, jeden wpis na kontekst, z kluczami `name`, `modules`, `public` i `depends-on`. Klucze wymienia [dokumentacja konfiguracji](guides/configuration.md#contexts).
+- **Dosłowne prefiksy, wygrywa najdłuższe dopasowanie.** `modules` i `public` to pełne nazwy modułów rozdzielone kropkami, tak jak wpisy warstw. Moduł należy do kontekstu, którego prefiks dopasowuje najdłuższą część jego nazwy, więc zagnieżdżone konteksty działają, a kolejność tabel nigdy nie ma znaczenia. Ten sam prefiks w dwóch kontekstach to błąd konfiguracji. Selektory z gwiazdkami (`shop.*`) zostają dla [#191](https://github.com/SirCypkowskyy/inwards/issues/191), który wprowadzi je najpierw do warstw; do tego czasu gwiazdka w kontekście jest błędem konfiguracji, a nie po cichu dosłownym tekstem.
+- **`public` jest bezwzględne i musi należeć do kontekstu.** Wpis publiczny to pełna nazwa modułu, a nie nazwa względna wobec kontekstu, i musi należeć do tego kontekstu według reguły najdłuższego dopasowania. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu, więc kontekst zagnieżdżony w publicznym pakiecie zachowuje swoje wnętrze jako prywatne. Publiczność dotyczy modułów: importowana nazwa jest najpierw rozwiązywana do swojego modułu.
+- **`depends-on` jest bezpośrednie.** Wymienia konteksty, z których ten może importować. Nie przechodzi dalej przez łańcuch i nie działa w drugą stronę. Odwołanie do kontekstu zadeklarowanego niżej jest w porządku; własna nazwa, nieznana nazwa i powtórzenie to błędy konfiguracji. Parser dopuszcza cykle między kontekstami; może ich zabronić INW004.
+- **Konteksty i warstwy się sumują.** Zadeklarowana zależność ani moduł publiczny nigdy nie pozwalają na import, którego zabrania kolejność warstw, a przynależność do kontekstu nic nie mówi o warstwie ani odwrotnie. Sprawdzenia kontekstów działają niezależnie od tego, czy plik należy do jakiejś warstwy.
+- **Uprawnienia dla INW002 i INW003.** INW002 wymaga `depends-on` tylko między dwoma różnymi kontekstami, do których należą oba końce importu, i nic nie mówi, gdy któryś koniec nie należy do żadnego kontekstu. INW003 wymaga publicznego celu od każdego importującego spoza kontekstu celu, także od kodu, który nie należy do żadnego kontekstu. Kontekst korzysta tylko ze swoich własnych deklaracji, także wtedy, gdy jego prefiksy leżą wewnątrz innego kontekstu.
+- **JSON Schema** dla całej tabeli, w wersji draft-07 dla zgodności ze SchemaStore, publikowany z dokumentacją i dołączany do każdego wydania. Sprawdza strukturę; parser sprawdza dodatkowo relacje między wpisami, których draft-07 nie potrafi wyrazić. Testy utrzymują zgodność obu: klucze, kody reguł i wartości domyślne.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Jedna definicja przynależności i uprawnień dla INW002 i INW003, ustalona, zanim powstała którakolwiek z reguł, więc nie mogą się rozjechać.
+- :material-plus-circle-outline: Konfiguracja bez `contexts` działa dokładnie jak wcześniej, a `contexts = []` znaczy to samo.
+- :material-plus-circle-outline: Edytory mogą podpowiadać i sprawdzać `[tool.inwards]` na podstawie schematu, a przykłady z samej dokumentacji są względem niego sprawdzane.
+- :material-minus-circle-outline: Projekt z dwudziestoma wycinkami wymienia dwadzieścia kontekstów, dopóki #191 nie wprowadzi gwiazdek.
+- :material-minus-circle-outline: `public` nie wyrazi „tylko te nazwy z modułu”; reeksporty i `__all__` są poza zakresem.
+- :material-minus-circle-outline: Dopóki INW002 i INW003 nie trafią do wydania, tabela `contexts` jest wczytywana i sprawdzana, ale niczego nie zgłasza.
+
+**Alternatywy.**
+
+- *Kontrakty import-lintera (niezależność, zakazy i warstwy jako osobne typy kontraktów):* ekspresyjne, ale każdy kontrakt wymienia swoje moduły od nowa, a relacje między kontraktami nie są sprawdzane. Jedna tabela z regułami przynależności trzyma kontekst każdego modułu w jednym miejscu. `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) będzie tłumaczyć kontrakty.
+- *Konteksty wewnątrz `layers` (warstwa na kontekst):* miesza dwa niezależne wymiary i każe każdemu kontekstowi powtarzać cebulę.
+- *Wygrywa pierwsze dopasowanie, jak przy kształtach:* kolejność tabel zmieniałaby wtedy architekturę. Najdłuższe dopasowanie to to, co już robią warstwy.
+- *Względne wpisy `public` (`api` jako `api` danego kontekstu):* krótsze, ale niejednoznaczne przy kilku prefiksach na kontekst i niespójne z każdą inną nazwą modułu w konfiguracji.
+
+## ADR-031: Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają { #adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read }
+
+**Stan:** Przyjęty · 2026-09-27 · [#56](https://github.com/SirCypkowskyy/inwards/issues/56)
+
+**Kontekst.** Pełne sprawdzenie parsuje każdy plik, nawet gdy żaden nie zmienił się od poprzedniego uruchomienia: około 0,9 s dla syntetycznego repozytorium z 2100 plikami, w większości na parsowanie w WASM. To, co wynika z pliku, zależy prawie wyłącznie od jego własnego tekstu. Pamięć podręczna leżałaby jednak w projekcie, do którego może pisać agent pilnowany przez Inwards, a hooki są ścieżką egzekwowania reguł. Podrzucony wpis mówiący, że plik niczego nie importuje, nigdy nie może przepuścić naruszenia przez PostToolUse ani Stop gate.
+
+**Decyzja.**
+
+- **Zapamiętywane są tylko fakty o pojedynczym pliku**: szkielet importów z prescanu (albo jego odmowa), statyczne importy z pełnego parsowania i komentarze wyciszające. Importy dynamiczne (INW011) nie są, bo to, czy zaimportowany `eval` może być wbudowanym, zależy od innych plików. Nie jest też zapamiętywane nic, co silnik wyprowadza z tych faktów: warstwy, ustawienia reguł, baseline, istnienie celu importu (INW010).
+- **Kluczem jest cała tożsamość**: znormalizowany tekst, nazwa modułu, to, czy plik jest `__init__` pakietu, oraz rewizja ekstrakcji. Rewizję podnosi się za każdym razem, gdy prescan, parser, nazywanie modułów, parsowanie wyciszeń albo rejestr reguł zmieniają to, co wynika z tekstu; test liczy odcisk tych plików i nie przechodzi, dopóki rewizja nie zostanie podniesiona. Nazwa katalogu przestrzeni nazw zawiera też format pamięci podręcznej i hash załadowanych gramatyk.
+- **Silnik przyjmuje opcjonalny port.** `Engine.create(wasm, config, { cache })` przyjmuje dowolny `ExtractionCache`; bez niego parsuje jak wcześniej. Silnik nadal nie wykonuje operacji wejścia-wyjścia ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **`inwards check` i `inwards baseline` używają `.inwards/cache`; nic innego go nie czyta.** Hooki nie dostają pamięci podręcznej, a serwer języka trzyma własną w pamięci, która nigdy nie dotyka dysku: tylko najnowszy tekst każdego modułu, najwyżej 5000 wpisów i około 32 MB, najpierw usuwane najdawniej używane. `--no-cache` albo `INWARDS_NO_CACHE=1` wyłącza pamięć podręczną na dysku.
+- **Odczyt niczemu nie ufa.** Wpis jest czytany tylko wtedy, gdy każdy katalog na jego ścieżce jest prawdziwym katalogiem; plik jest otwierany bez podążania za dowiązaniem i bez czekania na FIFO, a czytany tylko wtedy, gdy jest zwykłym plikiem mniejszym niż 256 KB. Jego JSON musi mieć oczekiwany kształt i zapisywać tę samą tożsamość; wszystko inne to chybienie.
+- **Zapis znosi wyścigi.** Każdy wpis trafia do pliku tymczasowego o unikalnej nazwie i jest przemianowywany na miejsce. Dwa uruchomienia mogą nadpisać sobie nawzajem wpisy; żadne nie zobaczy połowy wpisu. Każdy błąd kończy się zwykłym parsowaniem.
+- **Przycinanie jest ograniczone.** Uruchomienie przycina część pamięci podręcznej (jeden z 256 katalogów) przy pierwszym zapisie do niej i ponownie, gdy jego własne zapisy przekroczą w niej 512 KB: pliki tymczasowe starsze niż godzina, wpisy starsze niż 30 dni, a potem najstarsze wpisy, aż część zmieści się w limicie. Najpierw ponownie sprawdza katalogi od projektu w dół i usuwa tylko nazwy, które zapisuje sama pamięć podręczna.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Ciepłe `inwards check` pomija parsowanie niezmienionych plików: na syntetycznym repozytorium 3,0 raza szybciej (0,46 s wobec 1,25 s, p50). Benchmark podaje osobno uruchomienia bez pamięci podręcznej, z pustą i z ciepłą.
+- :material-plus-circle-outline: Nic w `.inwards/cache` nie może zmienić wyników hooków, co sprawdza test z podrzuconym wpisem.
+- :material-minus-circle-outline: `inwards check` z pamięcią podręczną jej ufa. Każdy, kto może pisać do projektu, może sprawić, że przeoczy ono naruszenie. CI, które odtwarza pamięć podręczną z niezaufanej gałęzi, powinno używać `--no-cache`, jak mówi [przewodnik po GitHub Actions](guides/ci.md#caching-between-runs).
+- :material-minus-circle-outline: Katalogi są sprawdzane po ścieżce, a nie trzymane otwarte: Node nie ma `openat` ani `unlinkat`. Pamięć podręczna zakłada, że ten, kto może pisać do projektu, działa też jako użytkownik, tak jak agent z dostępem do powłoki; proces, który może tylko pisać pliki i ściga się z uruchomieniem, podmieniając katalog na dowiązanie między sprawdzeniem a zapisem albo przycinaniem, może skierować tę jedną operację gdzie indziej. Każda publikacja i każde przycinanie najpierw sprawdza cały łańcuch katalogów i przestaje używać części, która się zmieniła, a przycinanie usuwa tylko nazwy, które zapisuje sama pamięć podręczna.
+- :material-minus-circle-outline: Rewizję trzeba podnosić ręcznie; test odcisku zauważa tylko, że pliki się zmieniły.
+- :material-minus-circle-outline: Pusta pamięć podręczna płaci za zapis każdego pliku: uruchomienie, które ją wypełnia, było na syntetycznym repozytorium o 27% wolniejsze. Benchmark podaje ten koszt, ale go nie bramkuje, bo zależy bardziej od systemu plików runnera niż od kodu.
+
+**Alternatywy.**
+
+- *Klucz ze ścieżki i czasu modyfikacji:* tańszy do sprawdzenia, ale checkout albo `touch` psują go w obie strony i nie da się go współdzielić między klonami.
+- *Jeden plik pamięci podręcznej na projekt:* mniej plików, ale każde uruchomienie przepisuje całość, a równoległe uruchomienia potrzebują blokady.
+- *Pamięć podręczna także dla hooków, z HMAC-iem kluczowanym poza projektem:* klucz musiałby leżeć tam, gdzie agent nie może go przeczytać, a hooki sprawdzają jeden plik, w którym parsowanie nie jest kosztem ([rozdział 6](06-Constraints-and-Quality.md#where-a-single-file-check-spends-its-time)).
+- *Zapamiętywanie całych wyników:* zależą od konfiguracji, baseline'u i innych plików; poprawne unieważnianie ich to właśnie ten trudny problem, którego ten projekt unika.
+
+## ADR-032: Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta { #adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads }
+
+**Stan:** Przyjęty · 2026-09-27 · [#54](https://github.com/SirCypkowskyy/inwards/issues/54)
+
+**Kontekst.** Cykl między modułami albo między kontekstami ograniczonymi to problem architektury, którego nie widać w żadnym pojedynczym imporcie: każdy krok z osobna może być dozwolony. ADR-030 zostawił cykle między kontekstami dla INW004. Znalezienie cyklu wymaga importów wszystkich modułów, a hooki sprawdzają jeden plik w budżecie 100 ms. Zgłoszenie wymagało, żeby zimne uruchomienie na syntetycznym repozytorium, łącznie z szukaniem cykli, zmieściło się w 1 s.
+
+**Decyzja.**
+
+- **Tylko przy sprawdzaniu całego projektu.** INW004 działa, gdy sprawdzenie obejmuje cały projekt: `inwards check` bez ścieżek, `inwards baseline`, bramka Stop z `stop-gate = "project"`. Hook po każdej edycji i serwer języka nigdy go nie zgłaszają.
+- **Z importów, które sprawdzenie i tak czyta.** Silnik zachowuje importy każdego sprawdzonego pliku, gdy je skanuje i potwierdza: ze szkieletu albo z pełnego parsowania razem z czytelnymi importami dynamicznymi. Żaden plik nie jest czytany dwa razy, a pamięć podręczna ekstrakcji ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) działa. Liczy się każdy import, także w funkcjach i za `TYPE_CHECKING`, tak jak w innych regułach.
+- **Węzłami są sprawdzone moduły.** Import to krawędź do najdłuższego sprawdzonego modułu, od którego zaczyna się jego cel. Nic innego, ani biblioteka standardowa, ani pakiet spoza sprawdzenia, nie może zamknąć cyklu i nie daje krawędzi; rozwiązanie celów nie potrzebuje systemu plików.
+- **Jedno zgłoszenie na silnie spójną grupę.** Grupy znajduje algorytm Tarjana w wersji iteracyjnej; każda dostaje najkrótszy cykl przez swój pierwszy moduł, z pełną ścieżką, przy imporcie, który robi pierwszy krok. Węzły i krawędzie są odwiedzane w posortowanej kolejności, więc zgłoszenie jest za każdym razem takie samo. Komunikat podaje też rozmiar grupy w elementach i powiązaniach oraz skrót jej powiązań, więc baseline przestaje pasować, gdy grupa zmieni się w jakikolwiek sposób. Dotyczy to także grupy, która straciła powiązanie: projekt uruchamia wtedy `inwards baseline` ponownie, żeby ją przyjąć.
+- **Każdy plik w cyklicznej grupie jest potwierdzany.** Szkielet może odczytać import, którego nie ma: linię wewnątrz wieloliniowego napisu albo f-stringa, albo linię, której parser, wychodząc z błędu składni, nie czyta jako importu. Jedna taka krawędź może połączyć dwie grupy w jedną. Dlatego każdy plik z krawędzią wewnątrz cyklicznej grupy, który przeczytał tylko szkielet, jest potwierdzany, a wyszukiwanie rusza od nowa, aż każda grupa opiera się na potwierdzonych importach. Potwierdzanie pozostaje tanie. Plik, który do ostatniego importu ma wyłącznie importy najwyższego poziomu, komentarze i puste linie, nie wymaga parsowania: jego szkielet to ten sam tekst, który sparsował się do samych importów. Każdy inny plik jest parsowany do końca swojego ostatniego importu. Gdy ten tekst parsuje się bez błędu, cięcie leży poza każdym napisem, nawiasem i kontynuacją, więc zawiera te same importy co cały plik (szkielet nigdy nie pomija importu, więc dalej żadnego nie ma); w przeciwnym razie parsowany jest cały plik.
+- **`cycles` wybiera rodzaje**, domyślnie `["contexts"]`: cykle między kontekstami to pytanie architektoniczne, dla którego konteksty istnieją, a cykle modułów przy aktualizacji wywróciłyby wiele istniejących projektów. `"modules"` je dodaje; `[]` wyłącza regułę.
+- **Nie da się go wyciszyć w linii.** Sprawdzenie jednego pliku nie wie, czy wyciszony cykl nadal istnieje, a komentarz siedziałby przy jednym imporcie z wielu. Cykle, które projekt już ma, przyjmuje baseline.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Na syntetycznym repozytorium (2100 plików), gdzie losowe importy generatora wkładają większość modułów każdej warstwy do jednej cyklicznej grupy, szukanie cykli razem z potwierdzaniem dało zimne sprawdzenie całego projektu 1,51 s wobec 1,35 s bez niego (mediany 8 naprzemiennych uruchomień z `INWARDS_NO_CACHE=1`, średnie obciążenie około 1,1). Pełne parsowanie każdego pliku w grupie trwało zamiast tego około 7 s. Szukanie znalazło cztery cykle. Zimne sprawdzenie przekracza na tej maszynie budżet 1 s z szukaniem i bez niego.
+- :material-plus-circle-outline: Cykl między kontekstami jest wykrywany nawet wtedy, gdy `depends-on` pozwala na oba kierunki.
+- :material-minus-circle-outline: Edytor i hook po edycji nie pokazują cykli; bramka Stop pokazuje je tylko w trybie projektu.
+- :material-minus-circle-outline: Import podmodułu uruchamia też `__init__` jego pakietu; ten niejawny krok nie jest krawędzią, więc cykl, który zamyka się tylko przez `__init__`, nie jest wykrywany.
+- :material-minus-circle-outline: Bez kontekstów pliki poza wszystkimi warstwami nie są parsowane, więc cykle przez nie nie są widoczne.
+- :material-minus-circle-outline: Plik z błędem składni za ostatnim importem liczy się z importami zapisanymi nad błędem; Python w ogóle by go nie zaimportował.
+
+**Alternatywy.**
+
+- *Osobne przejście po grafie, które czyta każdy plik:* prostsze do napisania, ale podwaja czytanie i parsowanie, które sprawdzenie już wykonuje.
+- *Rozwiązywanie krawędzi przez `ownerOf`:* dokładnie jak w Pythonie, ale sprawdza system plików dla każdego importu, 55 ms pierwszego pomiaru, a moduł spoza sprawdzenia i tak nie może leżeć na zgłaszanym cyklu.
+- *Skaner tokenów, który rozstrzyga, kiedy można ufać szkieletowi:* pierwsza wersja tej reguły go miała. Review znalazło poprawny kod, który źle odczytywał (f-string zagnieżdżony w f-stringu, dozwolony od Pythona 3.12), i błędy składni, za którymi nie nadążał; tokenizera Pythona i odtwarzania po błędach w parserze nie da się wiernie odwzorować skanerem.
+- *Pełne parsowanie każdego pliku w cyklicznej grupie:* poprawne, ale na zimno około 7 s na syntetycznym repozytorium.
+- *Zgłaszanie każdego cyklu elementarnego:* ich liczba eksploduje wraz z rozmiarem grupy; jeden najkrótszy cykl na grupę wystarcza do działania, a następne uruchomienie pokaże kolejny.
+- *Cykle modułów domyślnie włączone:* ustawienie bardziej rygorystyczne, ale aktualizacja, która wywraca większość kodu, uczy ludzi wyłączać regułę.
+
+## ADR-033: OpenCode przez plugin, który uruchamia hook Claude Code { #adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook }
+
+**Stan:** Przyjęty · 2026-09-27 · [#170](https://github.com/SirCypkowskyy/inwards/issues/170)
+
+**Kontekst.** Ewaluacje agentów ([#48](https://github.com/SirCypkowskyy/inwards/issues/48)) działają na OpenCode, a Inwards może mierzyć tylko agenta, do którego jest podłączony. OpenCode nie ma ustawień hooków takich jak Claude Code. Ładuje pluginy JavaScript z `.opencode/plugins/`, a plugin dostaje zdarzenia i wywołania narzędzi: `tool.execute.before` może rzucić wyjątek, żeby zablokować wywołanie, `tool.execute.after` może zmienić wynik narzędzia, a zdarzenie `session.idle` przychodzi po zakończeniu tury. Reguły, zapis sesji, strażnik konfiguracji i bramka Stop już istnieją jako `inwards hook claude-code`. Projekt i jego gwarancje opierają się na OpenCode 1.18.31.
+
+**Decyzja.**
+
+- **Plugin, który tłumaczy, i jedna implementacja hooka.** `inwards init --agent opencode` zapisuje `.opencode/plugins/inwards.js`, zwykły JavaScript bez kroku budowania i bez zależności. Plugin zamienia zdarzenia OpenCode na ładunki, które wysyła Claude Code, i uruchamia z nimi `inwards hook claude-code`: `session.created` staje się SessionStart, `tool.execute.before` dla `edit`, `write` i `bash` staje się PreToolUse (z przemianowanymi `filePath`, `oldString` i resztą), `tool.execute.after` dla `edit`, `write` i `apply_patch` staje się PostToolUse, a `session.idle` staje się Stop. Na razie nie ma `inwards hook opencode`; nagrane ładunki pozostają jedynym kontraktem.
+- **Tak jak plik ustawień Claude Code, plugin zawiera ścieżkę do pliku binarnego na tej maszynie.** Uruchamia Inwards bez powłoki, pod bezwzględną ścieżką znalezioną przez `init`, a `init` dodaje go do `.gitignore`. Pierwsza linia oznacza plik jako zapisany przez `init`, który odmawia zastąpienia pliku bez niej, katalogu albo dowiązania. Hook działa w projekcie, w którym leży plik, a nie w katalogu, z którego uruchomiono OpenCode, bo OpenCode ładuje też pluginy katalogów nadrzędnych.
+- **Blokada to rzucony błąd; wszystko inne, co mówi hook, dołącza do wyniku narzędzia albo do sesji.** Odmowa z PreToolUse staje się `Error` z powodem strażnika, który OpenCode pokazuje modelowi zamiast uruchomić narzędzie. Znalezisko, ostrzeżenie albo prośba eskalacji z PostToolUse jest dopisywane do wyniku narzędzia, który model czyta przed następnym krokiem. To, co Claude Code pokazuje użytkownikowi albo dodaje na starcie sesji (końcowe podsumowanie bramki Stop, problemy pozostawione przez wcześniejsze sesje), trafia do sesji jako wiadomość od pluginu, która nie zaczyna tury (`noReply`).
+- **Bramka Stop zaczyna kolejną turę.** Gdy bramka blokuje przy `session.idle`, plugin wysyła jej powody do sesji przez `client.session.promptAsync`, z nagłówkiem „Inwards Stop gate (sent by the Inwards plugin, not the user)”. Wiadomość idzie jako agent, model i wariant, które użytkownik ostatnio wybrał. Bez nagłówka model wziął raport za użytkownika, który powtarza prośbę. Plugin trzyma `stop_hook_active` dla każdej sesji i czyści je, gdy użytkownik wyśle wiadomość, więc `escalate-after` działa tak jak w Claude Code. OpenCode nie czeka na jedno zdarzenie przed następnym, więc bramka działa po kolei w każdej sesji, a wynik jest odrzucany, gdy użytkownik wysłał wiadomość po bezczynności, na którą odpowiada, gdy trwa tura albo gdy ostatnia wiadomość bramki jeszcze nie dotarła. Bramka działa tylko przy bezczynności kończącej turę rozpoczętą wiadomością (użytkownika albo jej własną, widzianą przez `chat.message`): polecenie powłoki, ręczna kompakcja ani przerwanie (`MessageAbortedError`) nikogo nie odsyłają. Odrzucona wiadomość jest wysyłana do trzech razy; taka, której nadal nie da się wysłać albo której żądanie się urwało, wychodzi przy następnej bezczynności, chyba że dotarła albo użytkownik napisał pierwszy. Polecenie powłoki, które zaczyna się i kończy w trakcie działania bramki, unieważnia jej wynik, a bezczynność po nim sprawdza ponownie.
+- **Czego strażnik nie przeczyta, tego plugin odmawia.** Strażnik konfiguracji ocenia edycję po starym i nowym tekście, a `apply_patch` nie ma żadnego z nich. Dlatego plugin odmawia łatki, która dotyka `pyproject.toml`, `.opencode/`, `opencode.json(c)`, `.inwards/` albo `inwards-baseline.json`, oraz `edit` albo `write` czterech ostatnich, które w Claude Code obejmuje `permissions.deny`. Nagłówki łatek są czytane tak łagodnie, jak czyta je OpenCode, a ścieżki są porównywane w zapisanej postaci i po rozwiązaniu dowiązań. Gdy hook nie może się uruchomić, wywołanie dotykające tych plików albo `pyproject.toml` jest odrzucane, a nie przepuszczane bez sprawdzenia, a uruchomienie hooka jest przerywane po 60 sekundach, domyślnym limicie czasu hooka w Claude Code. Dwa argumenty OpenCode, których strażnik nigdy nie widzi, sprawdza plugin: `bash` nie może działać w katalogu Inwards (swoim `workdir`, a bez niego w katalogu OpenCode), a `edit` pliku `pyproject.toml`, którego `oldString` nie pasuje dokładnie jeden raz (co najmniej raz z `replaceAll`), jest odrzucany, bo OpenCode sięga wtedy po luźniejsze dopasowania, za którymi symulacja strażnika nie nadąży.
+- **Subagenty dzielą sesję najwyższego poziomu**, tak jak w Claude Code: wywołania sesji podrzędnej używają identyfikatora sesji jej korzenia, a bramka Stop działa tylko dla sesji najwyższego poziomu. Sesja, której utworzenia plugin nie widział (subagent wznowiony po restarcie), jest wyszukiwana przez SDK, najwyżej trzy razy; dopóki wyszukiwanie zawodzi, jej wywołania są sprawdzane pod jej własnym identyfikatorem, a bramka Stop dla niej nie działa.
+- **Bramka Stop sprawdza plik pluginu**, a nie ustawienia Claude Code, gdy `INWARDS_HOOK_HOST=opencode` mówi, kto wywołuje. Plugin liczy skrót własnego pliku, gdy OpenCode go ładuje, i przekazuje go dalej; bramka blokuje, gdy pliku na dysku nie ma albo się różni, więc plugin opróżniony w trakcie sesji, z zachowanym znacznikiem, zostaje zgłoszony, zanim następny start niczego nie uruchomi.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Reguły, strażnik, bramka Stop i eskalacja mają jedną implementację, a ich zmiana trafia do OpenCode bez zmiany pluginu.
+- :material-plus-circle-outline: Test end-to-end uruchamia `opencode run` z prawdziwym modelem, gdy jest skonfigurowany: agent zapisuje import na zewnątrz, czyta INW001 w wyniku narzędzia i go poprawia.
+- :material-minus-circle-outline: OpenCode nie może odmówić zakończenia tury. Powody bramki przychodzą jako nowa wiadomość po zakończeniu tury, a `opencode run` w tym momencie kończy działanie, więc nieinteraktywne uruchomienie nie dostaje drugiej tury; sprawdzenie po edycji i tak dociera do agenta. [Przewodnik](guides/opencode.md#what-holds-on-opencode) wymienia każdą różnicę.
+- :material-minus-circle-outline: Plugin nie może zablokować wiadomości wysłanej przez użytkownika, a nowa wiadomość zeruje licznik `escalate-after`, tak jak nowa tura w Claude Code.
+- :material-minus-circle-outline: Polecenie Bash nadal może usunąć albo przepisać plugin. Bramka Stop działającej sesji to zauważy, ale przy następnym starcie OpenCode nie ładuje niczego, co mogłoby to zauważyć, jak po usunięciu pliku ustawień Claude Code.
+- :material-minus-circle-outline: Ponowne uruchomienie `init` w trakcie sesji z innym Inwards (po aktualizacji albo przeniesieniu pliku binarnego) zapisuje inne bajty, więc bramka prosi o restart OpenCode, zanim tura może się skończyć; ponowne uruchomienie, które niczego nie zmienia, tego nie robi.
+
+**Alternatywy.**
+
+- *Punkt wejścia `inwards hook opencode`, który czyta kształty OpenCode:* tłumaczenie przeszłoby do przetestowanego CLI, ale dodałoby drugi kontrakt ładunków dla API pluginów, które wciąż się zmienia. Tłumaczenie jest małe; może się przenieść później.
+- *Plugin, który implementuje sprawdzenia na nowo w JavaScripcie:* bez procesu na każde zdarzenie, ale z dwiema implementacjami każdej reguły i strażnika.
+- *Blokowanie końca tury przez `chat.message` albo uprawnienia:* żadne z nich nie działa przy końcu tury; `session.idle` to jedyny punkt, a przychodzi po turze.

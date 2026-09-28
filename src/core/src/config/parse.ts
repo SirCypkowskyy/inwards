@@ -7,10 +7,19 @@
  */
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
+import { type ContextSpec, parseContexts } from "./contexts.ts";
+import { type CycleMode, parseCycles } from "./cycles.ts";
+import { CONFIG_DEFAULTS } from "./defaults.ts";
 import { parseGenerated } from "./generated.ts";
+import {
+  type AgentSuppressions,
+  agentSuppressionsKey,
+  type StopGate,
+  stopGateKey,
+} from "./hook-keys.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
-import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 export interface LayerSpec {
   name: string;
@@ -82,15 +91,15 @@ export interface InwardsConfig {
    * Absent when not set.
    */
   agentSuppressions?: AgentSuppressions;
+  /**
+   * Bounded contexts or slices, `[[tool.inwards.contexts]]`: which modules each
+   * owns, which of them other contexts may import, and which contexts it may
+   * depend on (INW002, INW003). Absent when not set or empty.
+   */
+  contexts?: ContextSpec[];
+  /** Which import cycles INW004 reports (`cycles`, see `cycles.ts`); absent when not set. */
+  cycles?: CycleMode[];
 }
-
-/** What the hooks do with a suppression the agent added, see `InwardsConfig.agentSuppressions`. */
-export type AgentSuppressions = "deny" | "allow";
-const AGENT_SUPPRESSIONS: readonly string[] = ["deny", "allow"] satisfies AgentSuppressions[];
-
-/** What the Stop gate checks, see `InwardsConfig.stopGate`. */
-export type StopGate = "changed" | "project";
-const STOP_GATES: readonly string[] = ["changed", "project"] satisfies StopGate[];
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
 const PRERELEASE = /-.*$/u;
@@ -98,7 +107,7 @@ const PRERELEASE = /-.*$/u;
 const RELEASE = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/u;
 
 /** Keys `[tool.inwards]` understands; anything else is a typo or a newer feature. */
-const TABLE_KEYS: ReadonlySet<string> = new Set([
+export const TABLE_KEYS: ReadonlySet<string> = new Set([
   "root",
   "layers",
   "required-version",
@@ -111,17 +120,16 @@ const TABLE_KEYS: ReadonlySet<string> = new Set([
   "names",
   "rules",
   "agent-suppressions",
+  "contexts",
+  "cycles",
 ]);
-const LAYER_KEYS: ReadonlySet<string> = new Set([
+export const LAYER_KEYS: ReadonlySet<string> = new Set([
   "name",
   "modules",
   "allow-libraries",
   "deny-libraries",
   "extend-deny-libraries",
 ]);
-
-/** An import name: dotted Python identifiers, e.g. `http.client` (INW005 library lists). */
-const DOTTED_NAME = /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*$/u;
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
 const INWARDS_WORD = /\binwards\b/u;
@@ -193,7 +201,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     throw new ConfigError("pyproject.toml has no [tool.inwards] table.");
   }
   rejectUnknownKeys(raw, TABLE_KEYS, "tool.inwards");
-  const { root = ".", layers } = raw;
+  const { root = CONFIG_DEFAULTS.root, layers } = raw;
   if (typeof root !== "string") {
     throw new ConfigError("tool.inwards.root must be a string.");
   }
@@ -212,6 +220,8 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...parseShapeKeys(raw),
     ...parseRules(raw["rules"]),
     ...agentSuppressionsKey(raw["agent-suppressions"]),
+    ...parseContexts(raw["contexts"]),
+    ...parseCycles(raw["cycles"]),
   };
   return config;
 }
@@ -245,60 +255,6 @@ function optionalKeys(
     ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
     ...(runLog === undefined ? {} : { runLog }),
   };
-}
-
-/**
- * Validates `stop-gate`.
- *
- * @param value - the raw `stop-gate` value, if any.
- * @returns `{ stopGate }` when it is set, else nothing.
- * @throws {ConfigError} when it is neither "changed" nor "project".
- */
-function stopGateKey(value: unknown): Pick<InwardsConfig, "stopGate"> {
-  if (value === undefined) {
-    return {};
-  }
-  if (!isStopGate(value)) {
-    throw new ConfigError('tool.inwards.stop-gate must be "changed" or "project".');
-  }
-  return { stopGate: value };
-}
-
-/**
- * Validates `agent-suppressions`.
- *
- * @param value - the raw value, if any.
- * @returns `{ agentSuppressions }` when it is set, else nothing.
- * @throws {ConfigError} when it is neither "deny" nor "allow".
- */
-function agentSuppressionsKey(value: unknown): Pick<InwardsConfig, "agentSuppressions"> {
-  if (value === undefined) {
-    return {};
-  }
-  if (!isAgentSuppressions(value)) {
-    throw new ConfigError('tool.inwards.agent-suppressions must be "deny" or "allow".');
-  }
-  return { agentSuppressions: value };
-}
-
-/**
- * Tells whether a raw value is an `agent-suppressions` mode.
- *
- * @param value - the raw value.
- * @returns true for "deny" or "allow".
- */
-function isAgentSuppressions(value: unknown): value is AgentSuppressions {
-  return typeof value === "string" && AGENT_SUPPRESSIONS.includes(value);
-}
-
-/**
- * Tells whether a raw value is a Stop gate mode.
- *
- * @param value - the raw `stop-gate` value.
- * @returns true for "changed" or "project".
- */
-function isStopGate(value: unknown): value is StopGate {
-  return typeof value === "string" && STOP_GATES.includes(value);
 }
 
 /**
@@ -349,7 +305,7 @@ function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
  */
 function libraryList(layer: unknown, i: number, key: string): string[] | undefined {
   const value = isRecord(layer) ? layer[key] : undefined;
-  const valid = isModuleList(value) && value.every((entry) => DOTTED_NAME.test(entry));
+  const valid = isModuleList(value) && value.every((entry) => isDottedName(entry));
   if (value !== undefined && !valid) {
     throw new ConfigError(
       `tool.inwards.layers[${i}].${key} must be a list of import names such as "sqlalchemy" or "http.client": no globs, and no distribution names like "python-dateutil".`,

@@ -21,18 +21,14 @@
  */
 import type { Node, Parser, Tree } from "web-tree-sitter";
 import { type RuleSettings, ruleLevel } from "../config/rule-settings.ts";
-import type { Diagnostic, SourceFile, Span, Suppressed } from "../contracts/records.ts";
+import type {
+  Diagnostic,
+  SourceFile,
+  Suppressed,
+  SuppressionComment,
+} from "../contracts/records.ts";
 import { diagnostic, RULES } from "../meta/registry.ts";
 import { parsePython } from "../python/parser.ts";
-
-/** One `# inwards: ignore` comment as read. */
-export interface SuppressionComment {
-  span: Span;
-  codes: string[];
-  reason: string;
-  /** Why it suppresses nothing, one sentence each; empty when it is valid. */
-  problems: string[];
-}
 
 /** Cheap check before any parse: can the text hold a suppression at all? */
 const MARKER = /inwards:\s*ignore\b/u;
@@ -45,10 +41,12 @@ const EXAMPLE = '# inwards: ignore[INW001] reason="why this import is allowed"';
 
 /**
  * Rules a comment can't suppress: INW000 marks a file that isn't checked at
- * all, INW007 and INW008 are about the package tree (configure the shape
- * instead), and INW009 is about the suppressions themselves.
+ * all, INW004 is about the whole project (a one-file check can't tell whether
+ * a suppressed cycle still exists; the baseline accepts one), INW007 and
+ * INW008 are about the package tree (configure the shape instead), and
+ * INW009 is about the suppressions themselves.
  */
-const FIXED: ReadonlySet<string> = new Set(["INW000", "INW007", "INW008", "INW009"]);
+const FIXED: ReadonlySet<string> = new Set(["INW000", "INW004", "INW007", "INW008", "INW009"]);
 
 /**
  * Tells whether a file may hold a suppression comment, before any parse.

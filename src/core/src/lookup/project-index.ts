@@ -19,9 +19,14 @@ import { type ModuleLookup, type PathKind, probeLookup } from "./module-lookup.t
 const NON_ASCII = /[^ -~\t\n\r\f]/u;
 /** What a package's `__init__.py` spells when it merges with packages elsewhere (pkgutil or pkg_resources style). */
 const EXTENDS_PATH = /__path__|declare_namespace/u;
+/** A Python identifier in ASCII, the only names `exposes` looks for. */
+const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 
 /** Reads the imports of one file; the engine supplies it, so this module needs no parser. */
 type ImportReader = (file: SourceFile) => readonly ImportRef[];
+
+/** Reads the names a file binds at its top level; the engine supplies it too. */
+type BindingReader = (file: SourceFile) => ReadonlySet<string>;
 
 /** A listed Python file, before its text is read. */
 type Listed = Omit<SourceFile, "text">;
@@ -77,6 +82,8 @@ export class ProjectIndex {
   readonly listDir: ListDir;
   private readonly source: ProjectFiles;
   private readonly readImports: ImportReader;
+  private readonly readBindings: BindingReader | undefined;
+  private readonly bindings = new Map<string, ReadonlySet<string>>();
   private listed: readonly Listed[] | undefined;
   private names: ReadonlySet<string> | undefined;
   private readonly imports = new Map<string, readonly ImportRef[]>();
@@ -90,21 +97,31 @@ export class ProjectIndex {
    *
    * @param source - the adapter's listing, probe and reader, rooted at the config root.
    * @param readImports - reads one file's imports (skeleton first, full parse as fallback).
+   * @param readBindings - reads the names one file binds at its top level (full parse), for `exposes`.
    */
-  constructor(source: ProjectFiles, readImports: ImportReader) {
+  constructor(source: ProjectFiles, readImports: ImportReader, readBindings?: BindingReader) {
     this.source = source;
     this.readImports = readImports;
+    this.readBindings = readBindings;
     this.listDir = source.listDir;
     // Imports share prefixes, so each path is probed once: INW010 asks for every import.
     // A long-lived adapter must rebuild the index when a path that could be a module is
     // created or deleted; the language server does, or builds one per check without file events.
     const kinds = new Map<string, ReturnType<PathKind>>();
-    this.ownerOf = probeLookup((rel: string): ReturnType<PathKind> => {
+    const lookup = probeLookup((rel: string): ReturnType<PathKind> => {
       if (!kinds.has(rel)) {
         kinds.set(rel, source.kind(rel));
       }
       return kinds.get(rel);
     });
+    // Several rules, and the import graph, ask about the same targets.
+    const owners = new Map<string, string | undefined>();
+    this.ownerOf = (target: string): string | undefined => {
+      if (!owners.has(target)) {
+        owners.set(target, lookup(target));
+      }
+      return owners.get(target);
+    };
   }
 
   /**
@@ -172,6 +189,45 @@ export class ProjectIndex {
   }
 
   /**
+   * Tells whether a module binds a name at its top level (a `def`, a
+   * `class`, an assignment with a value, or an import, under its `as` name),
+   * so other code can import the name from it: INW003's fix names the public
+   * module that does. Reads the module's full syntax tree once, through the
+   * engine's reader; without one, nothing is exposed.
+   *
+   * @param module - a dotted module name.
+   * @param name - an identifier, e.g. `Discount`.
+   * @returns true when the module's file binds the name.
+   */
+  exposes(module: string, name: string): boolean {
+    const file = this.readBindings && IDENTIFIER.test(name) ? this.fileOf(module) : undefined;
+    if (file === undefined || this.readBindings === undefined) {
+      return false;
+    }
+    let names = this.bindings.get(file.path);
+    if (names === undefined) {
+      names = this.readBindings({ ...file, text: this.text(file) });
+      this.bindings.set(file.path, names);
+    }
+    return names.has(name);
+  }
+
+  /**
+   * Finds a module's file on disk: `a/b.py`, `a/b/__init__.py`, then their
+   * `.pyi` stubs, which describe the same names.
+   *
+   * @param module - a dotted module name.
+   * @returns the file, text not yet read, or undefined when neither exists.
+   */
+  private fileOf(module: string): Listed | undefined {
+    const base = module.split(".").join("/");
+    const path = [`${base}.py`, `${base}/__init__.py`, `${base}.pyi`, `${base}/__init__.pyi`].find(
+      (candidate) => this.source.kind(candidate) === "file",
+    );
+    return path === undefined ? undefined : { path, ...moduleNameFor(path) };
+  }
+
+  /**
    * Lists the project's Python files under their module names, once.
    *
    * @returns every listed file, text not yet read.
@@ -222,16 +278,26 @@ export class ProjectIndex {
    * @returns true when one of the file's imports resolves to that module.
    */
   private fileImports(file: Listed, module: string): boolean {
+    // The owner is a prefix of the target, so the string test spares most probes.
+    return this.importsOf(file).some(
+      (ref) =>
+        (ref.target === module || ref.target.startsWith(`${module}.`)) &&
+        this.ownerOf(ref.target) === module,
+    );
+  }
+
+  /**
+   * Reads a file's imports through the engine's reader, once.
+   *
+   * @param file - a listed file.
+   * @returns its imports.
+   */
+  private importsOf(file: Listed): readonly ImportRef[] {
     let refs = this.imports.get(file.path);
     if (refs === undefined) {
       refs = this.readImports({ ...file, text: this.text(file) });
       this.imports.set(file.path, refs);
     }
-    // The owner is a prefix of the target, so the string test spares most probes.
-    return refs.some(
-      (ref) =>
-        (ref.target === module || ref.target.startsWith(`${module}.`)) &&
-        this.ownerOf(ref.target) === module,
-    );
+    return refs;
   }
 }

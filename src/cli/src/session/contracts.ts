@@ -34,12 +34,18 @@ export interface Check {
  * @param configPath - the pyproject.toml.
  * @param targets - absolute files; undefined for the whole project.
  * @param base - the directory report paths are relative to.
- * @param options - whether the baseline applies, and file contents to check instead of the disk's.
+ * @param options - whether the baseline applies, file contents to check instead
+ *   of the disk's, and whether the extraction cache on disk may be used (never by a hook).
  * @returns the report.
  */
 export type CheckRunner = (
   configPath: string,
   targets: string[] | undefined,
   base: string,
-  options: { baseline?: boolean; required?: boolean; texts?: ReadonlyMap<string, string> },
+  options: {
+    baseline?: boolean;
+    required?: boolean;
+    texts?: ReadonlyMap<string, string>;
+    cache?: boolean;
+  },
 ) => Promise<Report>;

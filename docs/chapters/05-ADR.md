@@ -33,6 +33,9 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
 | [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
 | [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
+| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
+| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
+| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -738,3 +741,132 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - *Teach the module index that generated modules exist, for every rule:* INW006 would word its finding the same in both checkouts, but INW005, INW006 and the language server would believe in files that aren't there, and the index would need the config.
 - *A per-file INW010 ignore in the config:* one more place to keep in sync with the code, and the per-line suppression already exists.
 - *fnmatch bracket sets, as in the shape member patterns:* a set's contents escape the character check, and `*` and `?` cover every case the issue names.
+
+## ADR-030: Bounded contexts as a `contexts` table of literal prefixes
+
+**Status:** Accepted · 2026-09-27 · [#51](https://github.com/SirCypkowskyy/inwards/issues/51)
+
+**Context.** Layers describe one onion: an ordered list in which every module may import the layers before it. Bounded contexts and vertical slices cut across that. `orders` and `billing` each have a domain and an application, and orders may use billing only through billing's API. [ADR-005](#adr-005-configuration-lives-in-pyprojecttoml) promised that such non-linear rules would get their own tables, so the simple case stays simple. INW002 (contexts depend on each other only as declared) and INW003 (outside callers use only a context's public modules) need a shared definition of what a context owns and allows.
+
+**Decision.**
+
+- **A `[[tool.inwards.contexts]]` table**, one entry per context, with `name`, `modules`, `public` and `depends-on`. [The configuration reference](guides/configuration.md#contexts) lists the keys.
+- **Literal prefixes, longest match wins.** `modules` and `public` are full dotted module names, as layer entries are. The context whose prefix matches the most of a module owns it, so nested contexts work and the order of the tables never matters. The same prefix in two contexts is a config error. Glob selectors (`shop.*`) are left to [#191](https://github.com/SirCypkowskyy/inwards/issues/191), which brings them to layers first; until then a wildcard in a context is a config error, not a silent literal.
+- **`public` is absolute and owned.** A public entry is a full module name, not relative to its context, and the context must own it under the longest-match rule. A module is public when it lies at or under a public prefix and its owner is this context, so a context nested inside a public package keeps its own internals private. Public status belongs to modules: an imported name is first resolved to its module.
+- **`depends-on` is direct.** It names the contexts this one may import from. It isn't passed on through a chain and isn't granted in return. Forward references are fine; the context's own name, an unknown name and a repeat are config errors. Cycles between contexts are allowed by the parser; INW004 may forbid them.
+- **Contexts and layers add up.** A declared dependency or a public module never allows an import that the layer order forbids, and belonging to a context says nothing about the layer, or the other way round. Context checks apply whether or not a layer owns the file.
+- **Permissions, for INW002 and INW003.** INW002 requires a `depends-on` only between two different owned contexts, and says nothing when either end belongs to no context. INW003 requires a public target for every caller outside the target's context, including callers that belong to no context. A context uses only its own declarations, even when its prefixes sit inside another context's.
+- **A JSON Schema** for the whole table, draft-07 for SchemaStore compatibility, published with the docs and attached to each release. It checks structure; the parser also checks relations between entries, which draft-07 can't express. Tests keep the two equal: keys, rule codes and defaults.
+
+**Consequences.**
+
+- :material-plus-circle-outline: One definition of ownership and permission for INW002 and INW003, decided before either rule is written, so they can't disagree.
+- :material-plus-circle-outline: A config with no `contexts` behaves exactly as before, and `contexts = []` means the same.
+- :material-plus-circle-outline: Editors can complete and check `[tool.inwards]` with the schema, and the docs' own examples are validated against it.
+- :material-minus-circle-outline: A project with twenty slices lists twenty contexts until #191 brings globs.
+- :material-minus-circle-outline: `public` can't express "only these names from the module"; re-exports and `__all__` are out of scope.
+- :material-minus-circle-outline: Until INW002 and INW003 ship, a `contexts` table is parsed and checked but reports nothing.
+
+**Alternatives.**
+
+- *import-linter's contracts (independence, forbidden, layers as separate contract types):* expressive, but every contract names its modules again, and the relations between contracts aren't checked. One table with ownership rules keeps each module's context in one place. `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) will translate contracts.
+- *Contexts inside `layers` (a layer per context):* mixes two independent dimensions and makes every context repeat the onion.
+- *First match wins, as for shapes:* makes the order of the tables change the architecture. Longest match is what layers already do.
+- *Relative `public` entries (`api` meaning the context's `api`):* shorter, but ambiguous with several prefixes per context and inconsistent with every other module name in the config.
+
+## ADR-031: A content-keyed extraction cache that the hooks never read
+
+**Status:** Accepted · 2026-09-27 · [#56](https://github.com/SirCypkowskyy/inwards/issues/56)
+
+**Context.** A full check parses every file, even when none changed since the last run: about 0.9 s for the 2,100-file synthetic repo, most of it in WASM parsing. What a file yields depends almost entirely on its own text. But the cache would sit in the project, where the agent Inwards guards can write, and the hooks are the enforcement path. A planted entry that says a file imports nothing must never let a violation past PostToolUse or the Stop gate.
+
+**Decision.**
+
+- **Only per-file facts are cached**: the prescan's import skeleton (or its refusal), the full parse's static imports and the suppression comments. Dynamic imports (INW011) aren't, because whether an imported `eval` could be the builtin depends on other files. Neither is anything the engine decides from those facts: layers, rule settings, the baseline, whether a target exists (INW010).
+- **The key is the whole identity**: the normalised text, the module name, whether the file is a package's `__init__`, and an extraction revision. The revision is bumped whenever the prescan, the parser, module naming, suppression parsing or the rule registry changes what a text yields; a test fingerprints those files and fails until it is. The namespace directory also names the cache format and a hash of the loaded grammars.
+- **The engine takes an optional port.** `Engine.create(wasm, config, { cache })` accepts any `ExtractionCache`; without one it parses as before. The engine still does no I/O ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **`inwards check` and `inwards baseline` use `.inwards/cache`; nothing else reads it.** The hooks get no cache, and the language server keeps an in-memory one that never touches the disk: only each module's latest text, at most 5,000 entries and about 32 MB, the least recently used going first. `--no-cache` or `INWARDS_NO_CACHE=1` turns the disk cache off.
+- **Reading trusts nothing.** An entry is read only if every directory on its path is a real directory, and it is opened without following a link or waiting on a FIFO, then read only if it is a regular file under 256 KB. Its JSON must have the expected shape and record the same identity; anything else is a miss.
+- **Writing is safe to race.** Each entry is written to a uniquely named temporary file and renamed into place. Two runs can overwrite each other's entries; neither sees half of one. Every failure falls back to parsing.
+- **Pruning is bounded.** A run prunes a shard (one of 256 directories) the first time it writes there, and again whenever its own writes take the shard past 512 KB: temporary files older than an hour, entries older than 30 days, then the oldest entries until the shard is under the limit. It checks the directories from the project down again first, and deletes only names the cache itself writes.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A warm `inwards check` skips parsing unchanged files: 3.0 times faster on the synthetic repo (0.46 s against 1.25 s, p50). The benchmark reports no cache, an empty cache and a warm cache separately.
+- :material-plus-circle-outline: The hooks' results can't be changed by anything in `.inwards/cache`, which a test checks with a planted entry.
+- :material-minus-circle-outline: A cached `inwards check` trusts the cache. Anyone who can write the project can make it miss a violation. CI that restores the cache from an untrusted branch should run `--no-cache`, as the [GitHub Actions guide](guides/ci.md#caching-between-runs) says.
+- :material-minus-circle-outline: Directories are checked by path, not held open: Node has no `openat` or `unlinkat`. The cache assumes that whoever can write the project also runs as the user, as a coding agent with a shell does; a process that can only write files, and races a run by swapping a directory for a link between a check and the write or prune after it, can send that one operation elsewhere. Every publication and every prune checks the whole chain first and stops using a shard that changed, and pruning deletes only names the cache writes.
+- :material-minus-circle-outline: The revision has to be bumped by hand; the fingerprint test only notices that the files changed.
+- :material-minus-circle-outline: An empty cache pays for a write per file: the run that fills it was 27% slower on the synthetic repo. The benchmark reports that cost and doesn't gate it, since it depends on the runner's filesystem more than on the code.
+
+**Alternatives.**
+
+- *Key by path and modification time:* cheaper to check, but a checkout or `touch` breaks it both ways, and it can't be shared between clones.
+- *One cache file per project:* fewer files, but every run rewrites all of it and concurrent runs need a lock.
+- *Cache for the hooks too, with an HMAC keyed outside the project:* the key would have to live where the agent can't read it, and the hooks check one file, where parsing isn't the cost ([chapter 6](06-Constraints-and-Quality.md#where-a-single-file-check-spends-its-time)).
+- *Cache whole results:* they depend on the config, the baseline and other files; invalidating them correctly is the hard problem this design avoids.
+
+## ADR-032: Import cycles on whole-project runs, from the imports the check already reads
+
+**Status:** Accepted · 2026-09-27 · [#54](https://github.com/SirCypkowskyy/inwards/issues/54)
+
+**Context.** A cycle between modules, or between bounded contexts, is an architecture smell no single import shows: every step can be allowed on its own. ADR-030 left cycles between contexts to INW004. Finding a cycle needs every module's imports, and the hooks check one file within a 100 ms budget. The issue asked for a cold run on the synthetic repo to stay under 1 s, cycle search included.
+
+**Decision.**
+
+- **Whole-project runs only.** INW004 runs when a check covers the whole project: `inwards check` without paths, `inwards baseline`, the Stop gate with `stop-gate = "project"`. The per-edit hook and the language server never report it.
+- **From the imports the check already reads.** The engine keeps each checked file's imports as it scans and confirms them: the skeleton's, or the full parse's with readable dynamic imports. No file is read twice, and the extraction cache ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) applies. Every import counts, function-level and `TYPE_CHECKING` ones included, as for the other rules.
+- **Nodes are the checked modules.** An import is an edge to the longest checked module its target starts with. Anything else, the standard library or a package outside the check, can't close a cycle and makes no edge; resolving targets needs no filesystem.
+- **One report per strongly connected group.** Tarjan's algorithm, iterative, finds the groups; each gets the shortest cycle through its first module, with the full path, on the import that makes the first step. Nodes and edges are visited in sorted order, so the report is the same on every run. The message also gives the group's size in members and links and a hash of its links, so a baseline stops matching when the group changes in any way. That includes a group that lost a link: the project runs `inwards baseline` again to accept it.
+- **Every file in a cyclic group is confirmed.** The skeleton can read an import that isn't one: a line inside a multi-line string or an f-string, or a line the parser, recovering from a syntax error, doesn't read as an import. One such edge can join two groups into one. So every file with an edge inside a cyclic group that only the skeleton read is confirmed, and the search runs again until every group stands on confirmed imports. Confirming stays cheap. A file with nothing but top-level imports, comments and blank lines up to its last import needs no parse: its skeleton is that same text, which parsed into imports alone. Any other file is parsed up to the end of its last import. When that text parses without an error, the cut is outside every string, bracket and continuation, so it holds the same imports as the whole file (the skeleton never misses one, so none come later); otherwise the whole file is parsed.
+- **`cycles` picks the kinds**, `["contexts"]` by default: cycles between contexts are the architecture question contexts exist for, and module cycles would fail many existing projects on upgrade. `"modules"` adds them; `[]` turns the rule off.
+- **Not suppressible inline.** A one-file check can't tell whether a suppressed cycle still exists, and the comment would sit on one import of many. The baseline accepts the cycles a project already has.
+
+**Consequences.**
+
+- :material-plus-circle-outline: On the synthetic repo (2,100 files), where the generator's random imports put most modules of each layer in one cyclic group, the search with its confirmation made a cold whole-project check 1.51 s against 1.35 s without it (medians of 8 alternating runs with `INWARDS_NO_CACHE=1`, load average about 1.1). A full parse of every file in a group took about 7 s instead. The search found four cycles. The cold check is over the 1 s budget on this machine with or without it.
+- :material-plus-circle-outline: A cycle between contexts is caught even when `depends-on` allows both directions.
+- :material-minus-circle-outline: The editor and the per-edit hook don't show cycles; the Stop gate does only in project mode.
+- :material-minus-circle-outline: Importing a submodule also runs its package's `__init__`; that implicit step is no edge, so a cycle that only closes through an `__init__` is missed.
+- :material-minus-circle-outline: Without contexts, files outside every layer aren't parsed, so cycles through them aren't seen.
+- :material-minus-circle-outline: A file with a syntax error after its last import counts with the imports written above the error; Python wouldn't import it at all.
+
+**Alternatives.**
+
+- *A separate graph pass that reads every file:* simpler to write, but it doubles the reading and parsing the check already does.
+- *Resolve edges with `ownerOf`:* follows Python exactly, but probes the filesystem for every import, 55 ms of the first measurement, and a module outside the check can't be on a reported cycle anyway.
+- *A token scanner that decides when the skeleton can be trusted:* the first version of this rule had one. Review found valid code it misread (an f-string nested in an f-string, allowed since Python 3.12) and syntax errors it couldn't follow; Python's tokenizer and the parser's error recovery are more than a scanner can mirror.
+- *A full parse of every file in a cyclic group:* sound, but about 7 s cold on the synthetic repo.
+- *Report every elementary cycle:* the count explodes with the size of a group; one shortest cycle per group is enough to act on, and the next run shows the next.
+- *Module cycles on by default:* the stricter setting, but an upgrade that fails most codebases teaches people to turn the rule off.
+
+## ADR-033: OpenCode through a plugin that runs the Claude Code hook
+
+**Status:** Accepted · 2026-09-27 · [#170](https://github.com/SirCypkowskyy/inwards/issues/170)
+
+**Context.** The agent evals ([#48](https://github.com/SirCypkowskyy/inwards/issues/48)) run on OpenCode, and Inwards can only measure an agent it's wired into. OpenCode has no hook settings like Claude Code's. It loads JavaScript plugins from `.opencode/plugins/`, and a plugin gets events and tool calls: `tool.execute.before` can throw to block a call, `tool.execute.after` can change the tool's output, and the `session.idle` event fires after a turn has ended. The rules, the session record, the config guard and the Stop gate already exist as `inwards hook claude-code`. The design and its guarantees are based on OpenCode 1.18.31.
+
+**Decision.**
+
+- **A plugin that translates, one hook implementation.** `inwards init --agent opencode` writes `.opencode/plugins/inwards.js`, plain JavaScript with no build step and no dependencies. The plugin turns OpenCode's events into the payloads Claude Code sends and runs `inwards hook claude-code` with them: `session.created` becomes SessionStart, `tool.execute.before` for `edit`, `write` and `bash` becomes PreToolUse (with `filePath`, `oldString` and the rest renamed), `tool.execute.after` for `edit`, `write` and `apply_patch` becomes PostToolUse, and `session.idle` becomes Stop. There is no `inwards hook opencode` for now; the recorded payloads stay the one contract.
+- **Like Claude Code's settings file, the plugin holds this machine's path to the binary.** It starts Inwards with no shell, by the absolute path `init` found, and `init` adds it to `.gitignore`. A first line marks the file as written by `init`, which refuses to replace a file without it, a directory or a link. The hook runs in the project the file sits in, not in the directory OpenCode was started from, since OpenCode also loads the plugins of parent directories.
+- **A block is a thrown error; everything else the hook says joins the tool result or the session.** A PreToolUse deny becomes an `Error` with the guard's reason, which OpenCode shows to the model instead of running the tool. A PostToolUse finding, warning or escalation request is appended to the tool's output, which the model reads before its next step. What Claude Code shows the user or adds at session start (the Stop gate's final summary, the problems earlier sessions left) goes into the session as a message from the plugin that starts no turn (`noReply`).
+- **The Stop gate starts another turn.** When the gate blocks on `session.idle`, the plugin sends its reasons into the session with `client.session.promptAsync`, prefaced "Inwards Stop gate (sent by the Inwards plugin, not the user)", as the agent, model and variant the user last picked. Without the preface, a model took the report for the user repeating a request. The plugin keeps `stop_hook_active` per session and clears it when the user sends a message, so `escalate-after` works as on Claude Code. OpenCode doesn't wait for one event before the next, so the gate runs one at a time per session, and a result is dropped when the user sent a message after the idle it answers, when a turn is running, or when the gate's last message hasn't arrived yet. The gate runs only for an idle that ends a turn a message started (the user's or its own, seen through `chat.message`): a shell command, a manual compaction or an abort (`MessageAbortedError`) sends nobody back. A refused message is tried three times; one that still fails, or whose request broke off, goes out at the next idle unless it arrived or the user wrote first. A shell command that starts and ends while the gate runs drops the result, and the idle after it checks again.
+- **What the guard can't read, the plugin refuses.** The config guard judges an edit by its old and new text, and `apply_patch` has neither. So the plugin refuses a patch that touches `pyproject.toml`, `.opencode/`, `opencode.json(c)`, `.inwards/` or `inwards-baseline.json`, and an `edit` or `write` of the last four, which on Claude Code `permissions.deny` covers. Patch headers are read as leniently as OpenCode reads them, and paths are compared as written and with links resolved. When the hook can't run, a call that touches those files or `pyproject.toml` is refused instead of let through unchecked, and a hook run is stopped after 60 seconds, Claude Code's default hook timeout. Two OpenCode arguments the guard never sees are checked in the plugin: `bash` may not run in one of Inwards' directories (its `workdir`, or OpenCode's own directory without one), and an `edit` of `pyproject.toml` whose `oldString` doesn't match exactly once (at least once with `replaceAll`) is refused, because OpenCode then falls back to looser matches the guard's simulation can't follow.
+- **Subagents share their top-level session**, as on Claude Code: a child session's calls use its root's session id, and the Stop gate runs for top-level sessions only. A session the plugin didn't see created (a subagent resumed after a restart) is looked up through the SDK, up to three times; while the lookup fails, its calls are checked under its own session id, and the Stop gate doesn't run for it.
+- **The Stop gate checks the plugin file**, not Claude Code's settings, when `INWARDS_HOOK_HOST=opencode` says who is calling. The plugin hashes its own file when OpenCode loads it and passes the hash along; the gate blocks when the file on disk is gone or differs, so a plugin emptied during a session, marker kept, is reported before the next start runs nothing.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The rules, the guard, the Stop gate and escalation have one implementation, and a change to them reaches OpenCode with no plugin change.
+- :material-plus-circle-outline: An end-to-end test runs `opencode run` with a real model when one is configured: the agent writes an outward import, reads INW001 in the tool result and fixes it.
+- :material-minus-circle-outline: OpenCode can't refuse the end of a turn. The gate's reasons arrive as a new message after the turn ended, and `opencode run` exits at that point, so a non-interactive run gets no second turn; the per-edit check still reaches the agent. [The guide](guides/opencode.md#what-holds-on-opencode) lists every difference.
+- :material-minus-circle-outline: The plugin can't block a message the user sends, and a new message resets the `escalate-after` count, as a new turn does on Claude Code.
+- :material-minus-circle-outline: A Bash command can still delete or rewrite the plugin. The Stop gate of the running session notices, but the next OpenCode start loads nothing to notice with, as when Claude Code's settings file is deleted.
+- :material-minus-circle-outline: Running `init` again during a session with a different Inwards (an upgrade, a moved binary) writes different bytes, so the gate asks for a restart of OpenCode before the turn can end; a rerun that changes nothing doesn't.
+
+**Alternatives.**
+
+- *An `inwards hook opencode` entry point that reads OpenCode's shapes:* the translation would move into the tested CLI, but it would add a second payload contract for a plugin API that is still changing. The translation is small; it can move later.
+- *A plugin that reimplements the checks in JavaScript:* no process per event, but two implementations of every rule and of the guard.
+- *Blocking the end of a turn through `chat.message` or permissions:* neither runs when a turn ends; `session.idle` is the only point, and it comes after the turn.

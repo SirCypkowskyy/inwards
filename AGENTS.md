@@ -443,3 +443,22 @@ done until both match the code.
 
 Docs (except `docs/pl/`), commit messages and PR text in English, plain and specific (the
 `humanizer` skill's rules): no filler, no em dashes, numbers over adjectives.
+
+Docs snippets are tested, so mark what isn't a complete example:
+
+- A shell fence after `<!-- e2e -->` runs against the compiled CLI
+  (`src/cli/test/integration/docs.test.ts`).
+- A TOML fence with `[tool.inwards]` must be a complete, valid config, which
+  `src/core/test/config/schema.test.ts` parses and validates against
+  `schema/tool-inwards.schema.json`. A partial one gets
+  `<!-- config: fragment -->` (merged into a minimal config, then checked) and
+  a deliberately wrong one `<!-- config: invalid <key> -->`, where `<key>` is
+  the key the parser's error must name. The marker sits on its own line, one
+  blank line before the fence, in both languages.
+- A new `[tool.inwards]` key changes the parser, the schema and
+  `guides/configuration.md` (EN and PL) together. The schema test catches a
+  key present on one side only, a rule code or default that disagrees, and a
+  reference link to a missing anchor. Types, required keys and bounds are
+  compared only through the paired negative cases in that test, so add cases
+  for the new key there. Then rebuild the whole-file schema with
+  `bun run scripts/build-pyproject-schema.ts`; a test fails while it's stale.

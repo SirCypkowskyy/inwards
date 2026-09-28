@@ -79,7 +79,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW010, INW011 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code` |
 | **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server/server.ts` | :white_check_mark: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; with a fresh engine when `pyproject.toml` changes; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
@@ -110,7 +110,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / index</small>"]
@@ -132,7 +132,7 @@ flowchart LR
 
 | Component | Responsibility | Notes |
 |---|---|---|
-| Config parser | Reads `[tool.inwards]`, validates it, and names the exact key that's wrong | Throws `ConfigError`. The CLI maps that to exit code 2 |
+| Config parser | Reads `[tool.inwards]`, validates it, and names the exact key that's wrong | Throws `ConfigError`. The CLI maps that to exit code 2. A [JSON Schema](guides/configuration.md#editor-completion) describes the same keys for editors, and tests keep the two equal |
 | Import skeleton prescan | Keeps only import lines, dedents them, blanks the rest so line numbers stay put | Refuses the file when `import` shows up somewhere it can't account for, which forces a full parse. See [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Parser adapter | Initialises web-tree-sitter from bytes and parses | Frees every tree explicitly, because WASM memory isn't garbage collected |
 | Import extractor | Finds `import` / `from ... import` nodes anywhere in the tree, resolves relative imports | `from shop import infrastructure` is recorded as `shop.infrastructure`, so it can't slip past |
@@ -154,13 +154,13 @@ sequenceDiagram
     participant R as Rules
 
     A->>E: checkFile({path, module, text}, index)
-    alt file outside every layer
+    alt file outside every layer and every context
         E-->>A: INW006 warning for its package, or [] (no parse)
     else declared encoding Inwards can't read
         E-->>A: INW000
     else file names a loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(full text)
-        E->>R: INW001 + INW005 + INW006 + INW010 + INW011
+        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011
         R-->>E: diagnostics
         E-->>A: diagnostics
     else everything else
@@ -169,21 +169,21 @@ sequenceDiagram
             P-->>E: skeleton (imports only)
             E->>T: parse(skeleton)
             T-->>E: tiny tree
-            E->>R: INW001 + INW005 + INW006 + INW010 (imports)
+            E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 (imports)
             alt no violations (the common case)
                 R-->>E: []
                 E-->>A: []
             else violations found
                 E->>T: parse(full text)
                 T-->>E: full tree
-                E->>R: INW001 + INW005 + INW006 + INW010 (imports from full tree)
+                E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 (imports from full tree)
                 R-->>E: confirmed diagnostics
                 E-->>A: diagnostics
             end
         else skeleton refused (odd import placement)
             P-->>E: null
             E->>T: parse(full text)
-            E->>R: INW001 + INW005 + INW006 + INW010
+            E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010
             R-->>E: diagnostics
             E-->>A: diagnostics
         end
@@ -194,7 +194,7 @@ The prescan may report false positives, such as an import-shaped line inside a d
 
 The skeleton keeps import statements only, so a file whose only outward dependency is `importlib.import_module("shop.infrastructure.db")` would pass it. Before the prescan runs, a text check looks for the names every loading call has to spell (`importlib`, `runpy`, `builtins`, `__import__`, or a bare `exec`, `eval` or `compile`, after NFKC). A file in a layer that matches goes straight to the full parse, which also looks for dynamic imports. `re.compile` does not match. On the CPython 3.14 standard library, 209 of 1,921 files match. See [ADR-015](05-ADR.md#adr-015-check-literal-dynamic-imports-as-inw011).
 
-The cost model has one bad case: a legacy codebase where most files already violate. Without a baseline, nearly every file pays for the skeleton parse and then the full parse, which is slower than parsing everything once. With one, the CLI hands the baseline's keys and counts (rule, module, message without the "Allowed direction" sentence) to the engine as data. The engine scans every file first. A module skips the confirming parse when every one of its files went through the skeleton, every skeleton finding is an error, and for each key the findings across the module's files (`order.py` and `order.pyi` are one module) are no more than the accepted copies. The skeleton never misses an import, and a finding depends only on the import's target, which both parses read alike. So the real findings are no more than the skeleton's, and the baseline would hide all of them after a full parse as well. The errors a check reports are the same with or without the skip; a test compares both on every pair of spellings (real import, docstring or string copy) in a `.py` and its `.pyi`. The counts can differ: a skipped module's false positives (an import-shaped line in a docstring) are hidden along with its real findings, so `baselined` can be higher and `resolved` lower than after a full parse, for example when a fixed violation's import still sits in a string. On the synthetic repo in legacy mode (`bench/generate.py --legacy`: 2,101 files, each of the 2,000 modules with one violation, all baselined), a cold `inwards check` took a median of 3.05 s before this change and 0.55 s after. A bare full parse of every file took 2.0 to 3.1 s, and the clean repo 0.47 s (Intel Core Ultra 7 155H, one core).
+The cost model has one bad case: a legacy codebase where most files already violate. Without a baseline, nearly every file pays for the skeleton parse and then the full parse, which is slower than parsing everything once. With one, the CLI hands the baseline's keys and counts (rule, module, message without the "Allowed direction" sentence) to the engine as data. The engine scans every file first. A module skips the confirming parse when every one of its files went through the skeleton, every skeleton finding is an error, and for each key the findings across the module's files (`order.py` and `order.pyi` are one module) are no more than the accepted copies. The skeleton never misses an import, and a finding depends only on the import's target, which both parses read alike. So the real findings are no more than the skeleton's, and the baseline would hide all of them after a full parse as well. The errors a check reports are the same with or without the skip; a test compares both on every pair of spellings (real import, docstring or string copy) in a `.py` and its `.pyi`. The counts can differ: a skipped module's false positives (an import-shaped line in a docstring) are hidden along with its real findings, so `baselined` can be higher and `resolved` lower than after a full parse, for example when a fixed violation's import still sits in a string. On the synthetic repo in legacy mode (`bench/generate.py --legacy`: 2,101 files, each of the 2,000 modules with one violation, all baselined), a cold `inwards check` took a median of 3.05 s before this change and 0.55 s after. A bare full parse of every file took 2.0 to 3.1 s, and the clean repo 0.47 s (one core).
 
 ## C3: Components of the CLI
 
@@ -218,7 +218,7 @@ Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usag
 The other commands reuse the same pieces:
 
 - `inwards hook claude-code` reads a Claude Code hook payload from stdin and dispatches on the event: SessionStart records the session state, PreToolUse runs the config guard, PostToolUse checks the edited file, and Stop runs the Stop gate over what the session changed. [Chapter 4](04-AI-Integration.md) describes each one.
-- `inwards init --agent claude|aider|agents-md` computes every file change first, so `--dry-run` can print it as a diff and a second run changes nothing.
+- `inwards init --agent claude|opencode|aider|agents-md` computes every file change first, so `--dry-run` can print it as a diff and a second run changes nothing.
 - `inwards init --style layered|clean|hexagonal [--scaffold]` writes a preset's `[tool.inwards]` (and an example package) only where nothing exists yet, then runs the check in process and prints the package as an annotated tree. On a terminal with no flags, a picker built on `@clack/prompts` asks instead; it is loaded with a dynamic import that the build puts in its own chunk ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
 ## Deployment and distribution
@@ -336,7 +336,7 @@ To put a pre-release on PyPI as well, run the workflow from its tag, which the `
     - a false negative, accepted over noise: a bare `exec` or `eval` with a computed source is skipped only when the code surely rebinds that name at the call. The binding must be a `def`, `class`, plain assignment or import placed directly in the module body (before the top-level statement holding the call) or in the body of a function that encloses the call, a parameter of a function or lambda whose body holds the call, or a `for` target inside its loop. The exemption is off for the whole file when any binding of the name could be the builtin: an assignment, walrus, `for`, `with` or `except` target, or parameter default that mentions a loader; a `def` or `class` whose decorators or class arguments (bases, `metaclass=`) mention one; an import from `builtins`, `importlib`, `runpy`, a relative module or a first-party module (any of which may re-export the builtin). It is also off when the name has a `global`, `nonlocal` or `del`, or when the file has a wildcard import or names `globals`, `vars`, `locals`, `setattr`, `delattr`, `__dict__`, `__builtins__` or `sys.modules`. So `def eval(model, loader)` in training code isn't reported. It still misses the builtin passed in as an argument (`def run(exec, c): return exec(c)` called as `run(exec, code)`) and the builtin reached through an object without naming a loader or a namespace writer, such as `exec = operator.attrgetter("exec")(print.__self__)` ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). The same check guards `exec(compile("<literal>", ...))`, which is trusted only while `compile` isn't rebound;
     - accepted false positives of that conservative check: a comprehension variable (`[eval(m) for eval in evaluators]`), a method name used inside its own class body, and a `match` capture named `eval` or `exec` are still reported.
 - INW010 checks only the module part of a static import ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` passes when `shop/domain` is a package, since `pricing` could be a name its `__init__.py` defines, and dynamic imports aren't checked. A module generated at build time passes when `generated` covers it, as protoc's `*_pb2` and `*_pb2_grpc` and the `_version` module are by default ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)); any other one is reported until it exists in the checkout, and so is an optional import behind `try/except ImportError`. A hallucinated import whose name a `generated` pattern covers passes too. The other rules still see a generated module that isn't on disk as missing: INW001 goes by name and reports an outward import either way, and INW006 judges the import by the nearest package that exists, so a generated module directly in the package above the layers (`shop._version`, imported from a layer) gets an INW006 error worded differently with and without the file, and a baseline entry taken in one checkout doesn't match in the other. A generated top-level package with no committed `__init__.py` looks third-party to every rule. A namespace package shared with an installed distribution is reported as missing ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). The language server doesn't notice an `__init__.py` that starts extending its `__path__` until a file is created or deleted.
-- Modules that belong to no layer are not checked themselves. INW006 makes that visible (a warning per package, an error for an import into one from a layer, and dead prefixes), but the imports inside an unassigned package are still unchecked until the user assigns it. Sourceless modules, `ignore` depth, renamed top-level packages and path-scoped prefix checks are open in [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
+- Modules that belong to no layer get no layer rule. INW006 makes that visible (a warning per package, an error for an import into one from a layer, and dead prefixes), but the imports inside an unassigned package aren't checked against the layers until the user assigns it. Once [contexts](guides/configuration.md#contexts) are declared, every module's imports are checked against them (INW002, INW003), and INW000 applies to every file. Sourceless modules, `ignore` depth, renamed top-level packages and path-scoped prefix checks are open in [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Rule catalogue
 
@@ -346,14 +346,14 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 |---|---|---|---|
 | INW000 | `unsupported-encoding` | A file in a layer declares an encoding (PEP 263) such as `unicode_escape` or `utf-7`, under which text Inwards reads as a comment can be a real import to CPython. The file is reported, not skipped | :white_check_mark: |
 | INW001 | `layer-dependency` | An inner layer importing an outer one | :white_check_mark: |
-| INW002 | `context-independence` | One bounded context or vertical slice importing another's internals | :material-progress-clock: [#52](https://github.com/SirCypkowskyy/inwards/issues/52) |
-| INW003 | `public-api-only` | Importing past a context's public module (`__init__` or `api.py`) | :material-progress-clock: [#53](https://github.com/SirCypkowskyy/inwards/issues/53) |
-| INW004 | `no-cycles` | Import cycles between modules or contexts | :material-progress-clock: needs the graph, [#54](https://github.com/SirCypkowskyy/inwards/issues/54) |
+| INW002 | `context-independence` | A bounded context or vertical slice importing another context its `depends-on` doesn't declare, static or dynamic, whether or not a layer owns the file. Either end outside every context is left alone, and a nested context is a context of its own. See [contexts](guides/configuration.md#contexts) | :white_check_mark: |
+| INW003 | `public-api-only` | An import, from outside a context (another context or none), of one of its modules that isn't at or under its `public` prefixes, static or dynamic. An import INW002 already reports gets no INW003. The fix names the public module that exposes the imported name, when one does | :white_check_mark: |
+| INW004 | `import-cycles` | Modules (`cycles = ["modules"]`) or contexts (the default, `["contexts"]`) that import each other in a cycle, reported once per strongly connected group with the full path and the group's size. Whole-project runs only, from the imports the check already reads; a file in a cyclic group whose skeleton could misread an import is confirmed with a full parse. Not suppressible inline; the baseline accepts existing cycles. See [ADR-032](05-ADR.md#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | :white_check_mark: |
 | INW005 | `pure-domain` | A layer importing a third-party or standard-library module its `allow-libraries` / `deny-libraries` / `extend-deny-libraries` don't let it use, static or dynamic, in functions and behind `TYPE_CHECKING` too. The innermost of two or more layers denies frameworks, database and network clients and stdlib I/O (`sqlalchemy`, `fastapi`, `requests`, `subprocess`...) by default; `extend-deny-libraries` adds to that list, `deny-libraries` replaces it. First-party code is left to INW001 and INW006. See [Libraries per layer](guides/libraries.md) | :white_check_mark: |
 | INW006 | `unassigned-module` | An import from a layer into first-party code that belongs to no layer, including the package above the layers (`from shop import x` runs `shop/__init__.py`, which no layer owns), static or dynamic (error); layer code moved out of every layer during a session (error); a package outside every layer and `ignore` (warning); a layer prefix matching no module (warning), a layer with no live prefix, or a prefix emptied during the session (error). Unknown keys and overlapping prefixes are config errors | :white_check_mark: |
 | INW007 | `package-shape` | A package member its `[[tool.inwards.shape]]` doesn't allow (error, or a warning with `extra = "warning"`) or forbids, such as a new `helpers.py` next to `service.py`; a member name outside its `[[tool.inwards.names]]` `only-in` packages, such as `test_x.py` in the app (error); a shape selector that matches no package (warning, in pyproject.toml). The message never lists the allowed members; the fix names the likely target. See [Package shape](guides/package-shape.md) | :white_check_mark: |
 | INW008 | `missing-member` | A member the package's shape requires is missing, reported on its `__init__.py`. Whole-project runs report every one; the Stop gate blocks only those new since the session started | :white_check_mark: |
-| INW009 | `suppression-comment` | An inline suppression, `# inwards: ignore[INW001] reason="..."`, that hides nothing: malformed, without a reason, or naming a code that is unknown or can't be suppressed (INW000, INW007, INW008, INW009) (error); one with a code that matches no finding on its line (warning). See [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :white_check_mark: |
+| INW009 | `suppression-comment` | An inline suppression, `# inwards: ignore[INW001] reason="..."`, that hides nothing: malformed, without a reason, or naming a code that is unknown or can't be suppressed (INW000, INW004, INW007, INW008, INW009) (error); one with a code that matches no finding on its line (warning). See [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :white_check_mark: |
 | INW010 | `unknown-first-party` | A static import, in a layer, of a first-party module that doesn't exist, the typical agent hallucination (`from shop.domain.pricing import X` with no `pricing`), and a relative import that climbs above the top-level package, which Python always refuses. The module part is checked: `X` of `from X import name`, the whole name otherwise. Existence is probed on disk, so namespace packages, stubs and compiled extensions (`.so`, `.pyd`, `.pyx`) count; the fix lists the three closest modules in the same package. Such an import gets no INW006 as well, and an outward import INW001 reports gets no INW010. Packages that extend their `__path__` are skipped, and so are modules a build step writes (`generated`, by default `*_pb2`, `*_pb2_grpc` and `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). See [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :white_check_mark: |
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. In every layer but the outermost, a target Inwards can't read is reported as unverifiable: a variable, an f-string field, a `\N{...}` escape, an argument hidden behind `*args` or `**kwargs`, a relative `import_module` whose `package` isn't known, `exec` or `eval` of a non-literal source ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). A common way to dodge INW001. Known gaps are listed above | :white_check_mark: |
 
@@ -380,6 +380,9 @@ src/
 │   │   │   │              #   edit-distance.ts
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
+│   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
+│   │   │   ├── public-api-only.ts       # INW003: a context's public modules
+│   │   │   ├── import-cycles/           # INW004: graph.ts (Tarjan, shortest cycle), cycles.ts
 │   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
 │   │   │   │                            #   layout.ts (dead prefixes, layer code moved away)

@@ -95,7 +95,7 @@ export function writeBaseline(
     const entry = entries.get(baselineKey(d)) ?? {
       code: d.code,
       module: d.module,
-      message: stableMessage(d.message),
+      message: stableMessage(d),
       count: 0,
     };
     entry.count += 1;

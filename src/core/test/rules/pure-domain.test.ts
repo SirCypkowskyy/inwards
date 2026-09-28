@@ -57,7 +57,9 @@ layers = [
   { name = "infrastructure", modules = ["shop.infrastructure"] },
 ]
 `);
-  return checkLibraries(file("shop/domain/order.py", ""), [importOf(target)], layers, OWNERS);
+  return checkLibraries(file("shop/domain/order.py", ""), [importOf(target)], layers, {
+    ownerOf: OWNERS,
+  });
 }
 
 describe("INW005 pure-domain", () => {
@@ -115,7 +117,9 @@ describe("INW005 pure-domain", () => {
       '[tool.inwards]\nlayers = [{ name = "app", modules = ["shop"] }]\n',
     );
     const ref = importOf("fastapi");
-    expect(checkLibraries(file("shop/api.py", ""), [ref], layers, () => undefined)).toEqual([]);
+    expect(
+      checkLibraries(file("shop/api.py", ""), [ref], layers, { ownerOf: () => undefined }),
+    ).toEqual([]);
   });
 
   test("a first-party package named like a library is first-party", () => {
@@ -123,9 +127,11 @@ describe("INW005 pure-domain", () => {
 layers = [{ name = "d", modules = ["shop.domain"] }, { name = "i", modules = ["shop.infrastructure"] }]
 `);
     const ref = importOf("redis.client");
-    expect(checkLibraries(file("shop/domain/order.py", ""), [ref], layers, ownRedis)).toEqual([]);
     expect(
-      checkLibraries(file("shop/domain/order.py", ""), [ref], layers, () => undefined),
+      checkLibraries(file("shop/domain/order.py", ""), [ref], layers, { ownerOf: ownRedis }),
+    ).toEqual([]);
+    expect(
+      checkLibraries(file("shop/domain/order.py", ""), [ref], layers, { ownerOf: () => undefined }),
     ).toHaveLength(1);
   });
 
@@ -209,14 +215,20 @@ layers = [
 ]
 `);
     const infra = file("shop/infrastructure/db.py", "");
-    expect(checkLibraries(infra, [importOf("pika")], layers, OWNERS)).toHaveLength(1);
-    expect(checkLibraries(infra, [importOf("sqlalchemy")], layers, OWNERS)).toEqual([]);
+    expect(checkLibraries(infra, [importOf("pika")], layers, { ownerOf: OWNERS })).toHaveLength(1);
+    expect(checkLibraries(infra, [importOf("sqlalchemy")], layers, { ownerOf: OWNERS })).toEqual(
+      [],
+    );
     const single = parseConfig(
       '[tool.inwards]\nlayers = [{ name = "app", modules = ["shop"], extend-deny-libraries = ["pika"] }]\n',
     ).layers;
     const api = file("shop/api.py", "");
-    expect(checkLibraries(api, [importOf("pika")], single, () => undefined)).toHaveLength(1);
-    expect(checkLibraries(api, [importOf("fastapi")], single, () => undefined)).toEqual([]);
+    expect(
+      checkLibraries(api, [importOf("pika")], single, { ownerOf: () => undefined }),
+    ).toHaveLength(1);
+    expect(
+      checkLibraries(api, [importOf("fastapi")], single, { ownerOf: () => undefined }),
+    ).toEqual([]);
   });
 
   test("with no outer layer allowed to use it, the fix asks the user", () => {
@@ -227,10 +239,38 @@ layers = [
 ]
 `);
     const ref = importOf("sqlalchemy");
-    const [d] = checkLibraries(file("shop/domain/order.py", ""), [ref], layers, OWNERS);
+    const [d] = checkLibraries(file("shop/domain/order.py", ""), [ref], layers, {
+      ownerOf: OWNERS,
+    });
     expect(d?.fix.summary).toContain(
       '"domain" may not use "sqlalchemy", and no outer layer may either',
     );
+  });
+
+  test("a uv workspace member is a workspace package, with no port in the fix (#203)", () => {
+    const { layers } = parseConfig(`[tool.inwards]
+layers = [
+  { name = "core", modules = ["shop.domain"], allow-libraries = ["attrs"] },
+  { name = "infrastructure", modules = ["shop.infrastructure"] },
+]
+`);
+    const refs = [importOf("qv_other.models"), importOf("requests")];
+    const [member, library] = checkLibraries(file("shop/domain/order.py", ""), refs, layers, {
+      ownerOf: OWNERS,
+      workspace: new Set(["qv_other"]),
+    });
+    expect(member?.message).toBe(
+      'Layer "core" imports "qv_other.models" from workspace package "qv_other", which "core" may not use.',
+    );
+    expect(member?.fix.summary).toBe(
+      '"core" may not use workspace package "qv_other": use a package it may use, or ask the user to allow "qv_other".',
+    );
+    expect(member?.fix.steps).toHaveLength(3);
+    expect(member?.fix.steps.join(" ")).not.toContain("Protocol");
+    expect(library?.message).toBe(
+      'Layer "core" imports "requests" from library "requests", which "core" may not use.',
+    );
+    expect(library?.fix.steps.join(" ")).toContain("Protocol");
   });
 
   test.each([

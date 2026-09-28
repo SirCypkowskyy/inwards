@@ -66,6 +66,8 @@ uvx inwards --version   # one-off, no project
 
 Until then, `inwards` on PyPI is a 0.0.0 name placeholder: `--version` says the linter isn't released yet and every other command exits 2. Use the wheels from a GitHub release below. Releases reach PyPI through [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); the first one comes with a later milestone, not with v0.1.0-rc.1.
 
+To wire an agent in such a project, pass `--launcher "uv run"` to `init` (`uv run inwards init --agent claude --launcher "uv run"`): the hooks and the `AGENTS.md` section then say `uv run inwards` and hold no path. Without it, `init` records the path of the binary it runs as, which in a project is inside `.venv` and differs per worktree, and under `uvx` is in uv's cache, which `init` warns about.
+
 `uv add --dev inwards` takes the newest full release and skips pre-releases. To try a pre-release that is on PyPI, ask for it: `uv add --dev "inwards>=0.2.0rc1"`.
 
 ### From a GitHub release
@@ -152,7 +154,7 @@ src/app/  (hexagonal)
 inwards check: 0 violations, 0 warnings.
 
 Try the example: uv run python -m app.bootstrap book 2
-Wire an agent: inwards init --agent claude|aider|agents-md
+Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 ```
 
 Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
@@ -219,4 +221,4 @@ Run it before you turn on the agent hooks, too. The Claude Code hooks already tr
 
 Once a project has a baseline, `stop-gate = "project"` in `[tool.inwards]` makes the Claude Code Stop gate check the whole project against it instead of only the files the session changed, so a violation anywhere blocks the turn ([chapter 4](../04-AI-Integration.md)). A check skips the confirming parse where the baseline accepts everything the prescan found, so a fully baselined check costs about as much as a clean one.
 
-Next, wire Inwards into your agent: [Claude Code](claude-code.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md). To fail pull requests that break a layer, add the [GitHub Actions](ci.md) workflow.
+Next, wire Inwards into your agent: [Claude Code](claude-code.md), [OpenCode](opencode.md), [Aider](aider.md), or any agent that reads [AGENTS.md](agents-md.md). To fail pull requests that break a layer, add the [GitHub Actions](ci.md) workflow.

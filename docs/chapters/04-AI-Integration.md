@@ -43,7 +43,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     On a project with no `[tool.inwards]` yet, `inwards init --style hexagonal --agent claude` writes a preset's layers and the hooks in one run (see [Install](guides/install.md#a-new-project-start-from-a-preset)).
 
-    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only (`init` adds it to `.gitignore`), and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. `init` also adds `.inwards/` to `.gitignore`, pins `required-version` and a default `ignore` list (`tests`, `scripts`, `migrations`, `conftest`) in `[tool.inwards]`, and adds three `permissions.deny` rules, `Edit(/.claude/settings*.json)`, `Edit(/.inwards/**)` and `Edit(/**/inwards-baseline.json)`, so Claude Code itself refuses those edits even if a hook is gone. Running it again changes nothing. It installs every hook event Inwards implements: SessionStart, PreToolUse (the config guard), PostToolUse and Stop.
+    It writes the hooks into `.claude/settings.local.json`, which holds settings for this machine only (`init` adds it to `.gitignore`), and keeps any hooks and settings already there. Each hook uses exec form (`"command"`: the absolute path of the binary, `"args"`: `["hook", "claude-code"]`), so Claude Code starts it with no shell: `PATH`, an activated virtualenv, spaces or `$` in the path, and Git Bash versus PowerShell on Windows make no difference. With `--launcher "uv run"` (for Inwards as a uv dev dependency), each hook is instead the shell command `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`, which holds no path, and `init` warns when the path it would record is in uv's or bunx's cache. `init` also adds `.inwards/` to `.gitignore`, pins `required-version` and a default `ignore` list (`tests`, `scripts`, `migrations`, `conftest`) in `[tool.inwards]`, and adds three `permissions.deny` rules, `Edit(/.claude/settings*.json)`, `Edit(/.inwards/**)` and `Edit(/**/inwards-baseline.json)`, so Claude Code itself refuses those edits even if a hook is gone. Running it again changes nothing. It installs every hook event Inwards implements: SessionStart, PreToolUse (the config guard), PostToolUse and Stop.
 
     Claude Code runs [hooks](https://code.claude.com/docs/en/hooks) around tool calls. For `PostToolUse`, exit code 2 doesn't undo the edit (it already happened), but Claude sees the hook's stderr and reacts to it. For `Stop`, exit code 2 keeps Claude working instead of ending the turn. The hook input includes `stop_hook_active`, and Claude Code ends the turn anyway after several consecutive blocks, so a broken stop hook can't trap the session.
 
@@ -111,6 +111,10 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     It blocks a turn at most `escalate-after` times (default 3). The Stop after the last block lets the turn end and shows the user what is still unresolved, and escalation (below) turns the repeated failure into a question for the user. The count starts again with each new turn. If the gate itself fails (an unreadable file, say), it blocks once with the error and lets the turn end on the next try, so a broken gate can't keep a session going forever.
 
+=== ":material-code-braces: OpenCode"
+
+    `inwards init --agent opencode` writes the project plugin `.opencode/plugins/inwards.js` (also added to `.gitignore`, since it holds the binary's absolute path). The plugin turns OpenCode's events into the payloads above and runs `inwards hook claude-code`, so the per-edit check, the config guard, the Stop gate and escalation are the same code. OpenCode can't refuse the end of a turn: when the session goes idle, a blocking Stop gate sends its reasons back as a new message, which starts another turn. `apply_patch` can't be read by the guard, so the plugin refuses patches that touch `pyproject.toml` or Inwards' files. The [OpenCode guide](guides/opencode.md#what-holds-on-opencode) lists every difference, and [ADR-033](05-ADR.md#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) the design.
+
 === ":material-console: Aider"
 
     Aider lints the files it edits and, when the linter fails, shows the output to the model and asks it to fix the problems. Inwards plugs in as the Python lint command. `inwards init --agent aider` prints the exact line, with the absolute binary path, for `.aider.conf.yml`:
@@ -162,6 +166,8 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
 `--max-diagnostics N` prints at most N diagnostics, errors before warnings, and says what it left out. Text and `concise` add a line such as `Not shown: 3 violations, 1 warning.`; JSON adds `summary.omitted`. The summary counts and the exit code still cover every diagnostic. SARIF refuses the flag, because code scanning should see every finding.
 
+`inwards check PATHS...` checks only the Python files under `root`. A named path that gives no file to check, because it lies outside `root` or holds no Python file, gets a line such as `warning: tools/x.py is outside root "src" and was not checked.` JSON lists these in a top-level `notChecked` array of `path` and `message`, and SARIF puts them in `invocations[0].toolExecutionNotifications` at level `warning`. The other paths are still checked. If none of the named paths gave a file, the summary line reads `Nothing checked: 0 files` instead of `All clear` and the exit code is 2.
+
 ### Writing diagnostics for a model
 
 Every diagnostic follows the same five rules. They're design assumptions about what makes an agent fix the problem rather than hide it, and the "fixed within one retry" metric in [chapter 2](02-Business-Context.md#business-hypothesis) is how we'll find out whether they hold.
@@ -182,7 +188,7 @@ Every diagnostic follows the same five rules. They're design assumptions about w
 
 ### Exit codes
 
-`0` clean · `1` violations · `2` usage or config error. For Claude Code, the hook turns violations into exit 2, the "please fix" signal, and uses exit 1 for what only the user should see: an unreadable payload, an internal error, or a Stop gate that fails again after blocking once with its own error. A config error also goes to the model with exit 2, because an agent that broke the config needs to hear about it.
+`0` clean · `1` violations · `2` usage or config error. For `inwards check PATHS...`, a path that doesn't exist, or paths that all lie outside `root`, are usage errors. For Claude Code, the hook turns violations into exit 2, the "please fix" signal, and uses exit 1 for what only the user should see: an unreadable payload, an internal error, or a Stop gate that fails again after blocking once with its own error. A config error also goes to the model with exit 2, because an agent that broke the config needs to hear about it.
 
 ### When the agent can't fix it
 

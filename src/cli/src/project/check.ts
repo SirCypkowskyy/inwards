@@ -6,6 +6,7 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkNestedProjects,
   checkPrefixes,
   checkRequired,
   checkSelectors,
@@ -26,9 +27,10 @@ import {
   type SourceFile,
 } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
+import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
+import { workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {
@@ -46,19 +48,39 @@ interface Project {
 }
 
 /**
+ * Tells whether a command may use the extraction cache on disk: yes unless
+ * `--no-cache` or `INWARDS_NO_CACHE` says otherwise.
+ *
+ * @param runtime - the environment, for `INWARDS_NO_CACHE`.
+ * @param flag - the command's `--no-cache`, if given.
+ * @returns true to pass `cache: true` to the check.
+ */
+export function diskCacheWanted(
+  runtime: Pick<Runtime, "noCache">,
+  flag: boolean | undefined,
+): boolean {
+  return !(flag === true || runtime.noCache);
+}
+
+/**
  * Reads the config and builds an engine for it.
  *
- * @param io - reads the config and loads the grammars.
+ * @param io - reads the config, loads the grammars and opens the extraction cache.
  * @param configPath - absolute path of the pyproject.toml to use.
+ * @param cache - true to give the engine the disk cache, when `io` has one.
  * @returns the engine and the config root, as written and resolved.
  * @throws {ConfigError} when the config is invalid.
  */
-async function openProject(io: ProjectIo, configPath: string): Promise<Project> {
+async function openProject(io: ProjectIo, configPath: string, cache = false): Promise<Project> {
   const configText = io.read.text(configPath);
   const config = parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
+  const wasm = await io.grammars();
+  const dir = dirname(configPath);
+  const store = cache ? io.extractionCache?.(io.probe.realpath(dir) ?? dir, wasm) : undefined;
+  const options = { workspacePackages: workspacePackages(io, dir) };
   return {
-    engine: await Engine.create(await io.grammars(), config),
+    engine: await Engine.create(wasm, config, store ? { ...options, cache: store } : options),
     config,
     configPath,
     configText,
@@ -99,7 +121,8 @@ export function layerDirs(
 /**
  * Reads the Python files under the targets, once per module name they have.
  * Files outside the config root are dropped: they have no module name in the
- * project. A file reached through an alias and through its real path gets one
+ * project, and `notCheckedOf` tells the user about a named path that lost all
+ * of them. A file reached through an alias and through its real path gets one
  * entry per distinct (module, real file), so it is never reported twice.
  *
  * @param io - walks the targets and reads the files.
@@ -108,7 +131,8 @@ export function layerDirs(
  * @param what.targets - absolute files or directories; undefined means the config root.
  * @param what.base - directory that report paths are made relative to.
  * @param what.texts - content to check instead of what is on disk, by absolute path.
- * @returns the source files, with forward-slash paths on every OS.
+ * @returns the source files, with forward-slash paths on every OS, and the
+ *   walked paths that gave at least one of them.
  */
 function loadSources(
   io: ProjectIo,
@@ -122,14 +146,20 @@ function loadSources(
     base: string;
     texts: ReadonlyMap<string, string> | undefined;
   },
-): SourceFile[] {
+): { files: SourceFile[]; loaded: string[] } {
   const { lexicalRoot, realRoot } = project;
   const files: SourceFile[] = [];
+  const loaded: string[] = [];
   const seen = new Set<string>();
   for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
+    const names = moduleNames(io.probe, abs, lexicalRoot, realRoot);
+    if (names.length === 0) {
+      continue; // outside the root: not read at all
+    }
+    loaded.push(abs);
     const text = texts?.get(abs) ?? io.read.text(abs);
     const real = io.probe.realpath(abs) ?? abs;
-    for (const { rel, shown } of moduleNames(io.probe, abs, lexicalRoot, realRoot)) {
+    for (const { rel, shown } of names) {
       const named = moduleNameFor(rel);
       // Keyed on the real file too: order.py and order.pyi are one module, two files.
       const key = `${named.module}\u0000${real}`;
@@ -139,7 +169,53 @@ function loadSources(
       }
     }
   }
-  return files;
+  return { files, loaded };
+}
+
+/**
+ * Tells whether a path is a directory or lies below it, by the text alone.
+ *
+ * @param dir - the directory.
+ * @param path - the path to test.
+ * @returns true when `path` is `dir` or inside it.
+ */
+function atOrInside(dir: string, path: string): boolean {
+  return path === dir || isInside(dir, path);
+}
+
+/**
+ * Lists the named paths that gave no file to check, each with the line that
+ * says why: outside the config root (#200), or holding no Python file. A
+ * directory that holds the root, such as `.`, counts as checked when any file
+ * under the root came from it.
+ *
+ * @param probe - resolves real paths.
+ * @param project - the loaded project.
+ * @param base - directory the reported paths are made relative to.
+ * @param walked - what was named, and what gave files.
+ * @param walked.targets - the absolute paths named on the command line.
+ * @param walked.loaded - the walked paths that gave at least one source file.
+ * @returns one entry per target that gave nothing, in the order named.
+ */
+function notCheckedOf(
+  probe: Pick<PathProbe, "realpath">,
+  project: Project,
+  base: string,
+  { targets, loaded }: { targets: readonly string[]; loaded: readonly string[] },
+): { path: string; message: string }[] {
+  return targets
+    .filter((target) => !loaded.some((abs) => atOrInside(target, abs)))
+    .map((target) => {
+      const path = posix(relative(base, target)) || ".";
+      const real = probe.realpath(target);
+      const inRoot =
+        atOrInside(project.lexicalRoot, target) ||
+        (real !== undefined && atOrInside(project.realRoot, real));
+      const message = inRoot
+        ? `${path} has no Python files to check.`
+        : `${path} is outside root "${project.config.root}" and was not checked.`;
+      return { path, message };
+    });
 }
 
 /**
@@ -165,11 +241,14 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
 /**
  * Loads the config and engine, then checks the Python files under the targets.
  * A whole-project run (no targets) also checks the layer prefixes and shape
- * selectors against the modules found (INW006, INW007) and every shaped
- * package's required members (INW008). With `required`, a partial run checks
+ * selectors against the modules found (INW006, INW007), warns about nested
+ * projects such as uv workspace members (INW006), every shaped
+ * package's required members (INW008) and the import cycles among the
+ * checked files (INW004). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
  * Errors the config's baseline accepts are left out, unless `baseline` is
- * false; findings inline comments suppress go in `suppressed`. The duration
+ * false; findings inline comments suppress go in `suppressed`, and a target
+ * that gave no file to check goes in `notChecked` (#200). The duration
  * covers config, grammar loading, reading and checking.
  *
  * @param io - reads, walks and probes the project, loads the grammars, and times the run.
@@ -183,6 +262,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * @param options.baseline - false to report violations the baseline accepts.
  * @param options.required - true to add INW008 for the targets' packages.
  * @param options.texts - content to check instead of a file's, by absolute path.
+ * @param options.cache - true to read and fill the extraction cache on disk
+ *   (`inwards check` and `inwards baseline`); the hooks never pass it (#56).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -195,20 +276,25 @@ export async function runCheck(
     baseline = true,
     required = false,
     texts,
+    cache = false,
   }: {
     base: string;
     baseline?: boolean | undefined;
     required?: boolean | undefined;
     texts?: ReadonlyMap<string, string> | undefined;
+    cache?: boolean | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
-  const project = await openProject(io, configPath);
-  const files = loadSources(io, project, { targets, base, texts });
+  const project = await openProject(io, configPath, cache);
+  const { files, loaded } = loadSources(io, project, { targets, base, texts });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
-  const index = project.engine.index(projectFiles(io, project));
-  const { diagnostics, suppressed } = project.engine.check(files, index, accepted);
+  const listing = projectFiles(io, project);
+  const index = project.engine.index(listing);
+  // A whole-project run also looks for import cycles (INW004), which one file can't show.
+  const whole = targets === undefined;
+  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, { whole });
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -218,15 +304,19 @@ export async function runCheck(
     diagnostics.unshift(
       ...checkPrefixes(project.config, modules, pyproject),
       ...checkSelectors(project.config, packages, pyproject),
+      ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
     );
     diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
   } else if (required) {
     diagnostics.push(...requiredAround(io, project, files, shownRoot));
   }
+  const notChecked =
+    targets === undefined ? [] : notCheckedOf(io.probe, project, base, { targets, loaded });
   const report = {
     diagnostics,
     suppressed,
     filesChecked: files.length,
+    ...(notChecked.length === 0 ? {} : { notChecked }),
     durationMs: io.clock.elapsed() - started,
   };
   return accepted ? applyBaseline(accepted, report, targets === undefined) : report;

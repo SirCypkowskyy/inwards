@@ -84,6 +84,21 @@ describe("config integrity (INW006)", () => {
       'stop-gate must be "changed" or "project"',
     ],
     [
+      "cycles that isn't a list",
+      `[tool.inwards]\ncycles = "modules"\nlayers = [${layer}]\n`,
+      'tool.inwards.cycles must be a list of "modules" and "contexts"',
+    ],
+    [
+      "an unknown cycle mode",
+      `[tool.inwards]\ncycles = ["loops"]\nlayers = [${layer}]\n`,
+      'tool.inwards.cycles[0] must be "modules" or "contexts"',
+    ],
+    [
+      "a repeated cycle mode",
+      `[tool.inwards]\ncycles = ["modules", "modules"]\nlayers = [${layer}]\n`,
+      'tool.inwards.cycles[1] repeats "modules"',
+    ],
+    [
       "an ignore that isn't a list",
       `[tool.inwards]\nignore = "tests"\nlayers = [${layer}]\n`,
       "ignore",
@@ -96,6 +111,10 @@ describe("config integrity (INW006)", () => {
     const text = `[tool.inwards]\nstop-gate = "project"\nlayers = [${layer}]\n`;
     expect(parseConfig(text).stopGate).toBe("project");
     expect(parseConfig(`[tool.inwards]\nlayers = [${layer}]\n`).stopGate).toBeUndefined();
+    expect(
+      parseConfig(`[tool.inwards]\ncycles = ["modules", "contexts"]\nlayers = [${layer}]\n`).cycles,
+    ).toEqual(["modules", "contexts"]);
+    expect(parseConfig(`[tool.inwards]\ncycles = []\nlayers = [${layer}]\n`).cycles).toEqual([]);
   });
 
   test("ignore is absent unless set", () => {

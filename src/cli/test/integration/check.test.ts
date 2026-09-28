@@ -1,7 +1,10 @@
 /**
  * @file `inwards check` output paths on every OS: diagnostics and SARIF use
  * forward slashes. A `--config` spelled through a link to the project names
- * files from the real cwd (the macOS /var case).
+ * files from the real cwd (the macOS /var case). A named path outside the
+ * config root is reported in every format instead of passing as clean (#200),
+ * and a uv workspace checked from its root warns about each member instead of
+ * passing silently (#201).
  */
 import { expect, test } from "bun:test";
 import { symlinkSync } from "node:fs";
@@ -115,4 +118,112 @@ test.each([
   const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
   expect(code).toBe(1);
   expect(errors(stdout).map((d: { file: string }) => d.file)).toEqual([`${dir}/leak.py`]);
+});
+
+/** A config whose root is `src`, with a file outside it that would break a layer. */
+const rooted = project({
+  "pyproject.toml": `[tool.inwards]
+root = "src"
+layers = [{ name = "core", modules = ["core"] }, { name = "app", modules = ["app"] }]
+`,
+  "src/core/order.py": "import app.web\n",
+  "src/app/web.py": "",
+  "src/empty/README.md": "",
+  "tools/x.py": "import app\n",
+});
+const OUTSIDE = 'tools/x.py is outside root "src" and was not checked.';
+
+test("a path outside the config root warns and exits 2, not All clear (#200)", () => {
+  // concise: text is coloured here (FORCE_COLOR), and both share the footer.
+  const { code, stdout } = inwards(["check", "--format", "concise", "tools/x.py"], { cwd: rooted });
+  expect(code).toBe(2);
+  expect(stdout).toContain(`warning: ${OUTSIDE}`);
+  expect(stdout).toContain("Nothing checked: 0 files");
+  expect(stdout).not.toContain("All clear");
+});
+
+test("a directory under the root with no Python files warns and exits 2", () => {
+  const { code, stdout } = inwards(["check", "src/empty"], { cwd: rooted });
+  expect(code).toBe(2);
+  expect(stdout).toContain("src/empty has no Python files to check.");
+  expect(stdout).toContain("Nothing checked:");
+});
+
+test("a mix of paths checks the ones inside the root and warns about the rest", () => {
+  const { code, stdout } = inwards(["check", "--format", "json", "tools", "src/core/order.py"], {
+    cwd: rooted,
+  });
+  expect(code).toBe(1);
+  const report = JSON.parse(stdout);
+  expect(report.summary.filesChecked).toBe(1);
+  expect(report.diagnostics.map((d: { file: string }) => d.file)).toEqual(["src/core/order.py"]);
+  expect(report.notChecked).toEqual([
+    { path: "tools", message: 'tools is outside root "src" and was not checked.' },
+  ]);
+});
+
+test("SARIF carries a path outside the root as a warning notification", () => {
+  const { code, stdout } = inwards(["check", "--format", "sarif", "tools/x.py"], { cwd: rooted });
+  expect(code).toBe(2);
+  expect(JSON.parse(stdout).runs[0].invocations).toEqual([
+    {
+      executionSuccessful: false,
+      toolExecutionNotifications: [
+        {
+          level: "warning",
+          message: { text: OUTSIDE },
+          locations: [
+            {
+              physicalLocation: { artifactLocation: { uri: "tools/x.py", uriBaseId: "%SRCROOT%" } },
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+});
+
+test("a directory that holds the root, and a whole-project run, report nothing unchecked", () => {
+  for (const args of [
+    ["check", "--format", "json", "."],
+    ["check", "--format", "json"],
+  ]) {
+    const { code, stdout } = inwards(args, { cwd: rooted });
+    expect(code).toBe(1);
+    expect(JSON.parse(stdout).notChecked).toBeUndefined();
+  }
+});
+
+test("a named path that doesn't exist is a usage error", () => {
+  const { code, stdout, stderr } = inwards(["check", "nope.py"], { cwd: rooted });
+  expect(code).toBe(2);
+  expect(stdout).toBe("");
+  expect(stderr).toBe("nope.py is not a file or directory.\n");
+});
+
+test("a uv workspace checked from its root warns about each member, not All clear alone", () => {
+  const root = project({
+    "pyproject.toml": `[tool.uv.workspace]
+members = ["src/packages/*", "src/services/*"]
+
+[tool.inwards]
+root = "src"
+layers = [
+  { name = "core", modules = ["packages.core.src.core"] },
+  { name = "app", modules = ["services.app.src.app"] },
+]
+`,
+    "src/packages/core/pyproject.toml": "",
+    "src/packages/core/src/core/__init__.py": "",
+    "src/packages/core/src/core/leak.py": "import app\n",
+    "src/services/app/pyproject.toml": "",
+    "src/services/app/src/app/__init__.py": "",
+  });
+  const { code, stdout } = inwards(["check"], { cwd: root });
+  expect(code).toBe(0);
+  expect(stdout).toContain(
+    "src/packages/core is a nested project with its own pyproject.toml: its code is indexed as packages.core.src.core",
+  );
+  expect(stdout).toContain("inwards check --config src/services/app/pyproject.toml");
+  expect(stdout).toContain(" 3 files, 0 violations, 2 warnings ");
 });

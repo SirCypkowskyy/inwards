@@ -10,8 +10,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   AgentSuppressions,
+  CachedExtraction,
   Checked,
+  ContextSpec,
   Diagnostic,
+  ExtractionCache,
+  ExtractionIdentity,
   Fix,
   Format,
   GrammarBinaries,
@@ -44,8 +48,12 @@ const TYPE_PREFIX = /^type\s+/u;
 /** Every type `index.ts` exports; the tuple fails to compile when one goes missing. */
 type PublicTypes = [
   AgentSuppressions,
+  CachedExtraction,
   Checked,
+  ContextSpec,
   Diagnostic,
+  ExtractionCache,
+  ExtractionIdentity,
   Fix,
   Format,
   GrammarBinaries,
@@ -72,6 +80,7 @@ test("the runtime exports are unchanged", async () => {
   // A namespace import would be the natural spelling; Biome allows only this one.
   const core = await import("../src/index.ts");
   expect(Object.keys(core).sort()).toEqual([
+    "CONFIG_DEFAULTS",
     "ConfigError",
     "DOCS_BASE",
     "Engine",
@@ -80,6 +89,7 @@ test("the runtime exports are unchanged", async () => {
     "baselineKey",
     "checkLayers",
     "checkMoves",
+    "checkNestedProjects",
     "checkPrefixes",
     "checkRequired",
     "checkSelectors",
@@ -120,11 +130,16 @@ test("index.ts re-exports exactly these names, types included", () => {
   expect(names).toEqual(
     [
       "AgentSuppressions",
+      "CachedExtraction",
       "Checked",
+      "CONFIG_DEFAULTS",
       "ConfigError",
+      "ContextSpec",
       "DOCS_BASE",
       "Diagnostic",
       "Engine",
+      "ExtractionCache",
+      "ExtractionIdentity",
       "Fix",
       "Format",
       "GrammarBinaries",
@@ -146,10 +161,12 @@ test("index.ts re-exports exactly these names, types included", () => {
       "SourceFile",
       "Span",
       "Suppressed",
+      "SuppressionComment",
       "VERSION",
       "baselineKey",
       "checkLayers",
       "checkMoves",
+      "checkNestedProjects",
       "checkPrefixes",
       "checkRequired",
       "checkSelectors",

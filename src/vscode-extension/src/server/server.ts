@@ -22,7 +22,6 @@ import {
   type Diagnostic,
   DiagnosticSeverity,
   DidChangeWatchedFilesNotification,
-  FileChangeType,
   type FileSystemWatcher,
   MessageType,
   ProposedFeatures,
@@ -33,6 +32,8 @@ import {
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { type ConfigProblem, configDiagnostics, problemOf, readConfig } from "./config-file.ts";
+import { type Pass, passFor, stronger } from "./file-events.ts";
+import { memoryCache } from "./memory-cache.ts";
 import { mayHoldModule, projectFiles, workspaceDiagnostics } from "./workspace.ts";
 
 /** A valid config and what the server built from it. */
@@ -56,6 +57,8 @@ let configPath: string | undefined;
 let problem: ConfigProblem | undefined;
 /** The last workspace pass (INW007 and INW008 from the listing), by absolute path. */
 let workspace = new Map<string, CoreDiagnostic[]>();
+/** What the engine read out of each file's text, across config reloads (#56). */
+const extractions = memoryCache();
 /** The full check of each open document, by absolute path. */
 const opened = new Map<string, { uri: string; found: CoreDiagnostic[] }>();
 /** What the client reports for modules: every path, created or deleted (a rename is both). */
@@ -63,6 +66,11 @@ const WATCHED: FileSystemWatcher = {
   globPattern: "**/*",
   kind: WatchKind.Create + WatchKind.Delete,
 };
+/**
+ * Content changes of Python files: with contexts, INW003's fix names the
+ * public module that exposes a name, which depends on that module's text.
+ */
+const EDITS_WATCHED: FileSystemWatcher = { globPattern: "**/*.{py,pyi}", kind: WatchKind.Change };
 /** What the client reports for the config: created, changed or deleted. */
 const CONFIG_WATCHED: FileSystemWatcher = { globPattern: "**/pyproject.toml" };
 /**
@@ -76,8 +84,8 @@ let modulesWatched = false;
 /** How long file events are collected before the workspace pass reruns. */
 const DEBOUNCE_MS = 100;
 let pending: ReturnType<typeof setTimeout> | undefined;
-/** Whether the events collected since the last pass include the config. */
-let reread = false;
+/** The pass the events collected since the last one need (see `file-events.ts`). */
+let wanted: Pass | undefined;
 /** Reloads and passes run one after another, so an older config never lands last. */
 let queue: Promise<void> = Promise.resolve();
 
@@ -138,11 +146,15 @@ documents.onDidClose(({ document }) => {
   }
 });
 
-// A client that can't watch files still tells the server when it saves the
-// config, if the config is open in it.
+// A client that can't watch files still tells the server when it saves an open
+// file: the config reloads, and with contexts a Python file rechecks the open
+// documents, whose INW003 fix may name what that file exposes.
 documents.onDidSave(({ document }) => {
-  if (!watching && fileURLToPath(document.uri) === configPath) {
+  const path = fileURLToPath(document.uri);
+  if (!watching && path === configPath) {
     enqueue(reload);
+  } else if (!watching && state?.config.contexts && mayHoldModule(state.root, path)) {
+    enqueue(reindex);
   }
 });
 
@@ -164,21 +176,18 @@ connection.onInitialized(() => {
   enqueue(reload);
 });
 connection.onDidChangeWatchedFiles(({ changes }) => {
-  const root = state?.root;
-  const paths = changes.map((change) => ({ type: change.type, path: fileURLToPath(change.uri) }));
-  const config = paths.some(({ path }) => path === configPath);
-  const moved = paths.some(
-    ({ type, path }) =>
-      type !== FileChangeType.Changed && root !== undefined && mayHoldModule(root, path),
-  );
-  if (!(config || moved)) {
+  const events = changes.map((change) => ({ type: change.type, path: fileURLToPath(change.uri) }));
+  const contexts = state?.config.contexts !== undefined;
+  const pass = passFor(events, { configPath, root: state?.root, contexts, mayHoldModule });
+  if (pass === undefined) {
     return; // .git, caches, virtualenvs, docs: nothing a module lookup reads
   }
-  reread = reread || config;
+  wanted = stronger(wanted, pass);
   clearTimeout(pending);
   pending = setTimeout(() => {
-    enqueue(reread ? reload : refresh);
-    reread = false;
+    const run = { reload, refresh, reindex }[wanted ?? "reindex"];
+    wanted = undefined;
+    enqueue(run);
   }, DEBOUNCE_MS);
 });
 
@@ -230,6 +239,7 @@ async function reload(): Promise<void> {
   if (state && watching && !modulesWatched) {
     modulesWatched = true;
     watch(WATCHED);
+    watch(EDITS_WATCHED);
   }
   if (problem && problem.message !== shown) {
     const message = `Inwards is off until pyproject.toml is fixed: ${problem.message.split("\n")[0]}`;
@@ -258,6 +268,7 @@ async function load(): Promise<State | undefined> {
   const engine = await Engine.create(
     { runtime: wasm("web-tree-sitter.wasm"), python: wasm("tree-sitter-python.wasm") },
     config,
+    { cache: extractions },
   );
   const root = resolve(dirname(configPath), config.root);
   return { engine, config, root, index: engine.index(projectFiles(root)) };
@@ -283,6 +294,20 @@ function refresh(): void {
     if (changed && !opened.has(path)) {
       publish(path);
     }
+  }
+}
+
+/**
+ * Rebuilds the module index and rechecks the open documents, without the
+ * workspace pass: a saved file changes no shape and no listing, only what
+ * the index reads from files.
+ */
+function reindex(): void {
+  if (state) {
+    state.index = state.engine.index(projectFiles(state.root));
+  }
+  for (const document of documents.all()) {
+    check(document);
   }
 }
 

@@ -9,12 +9,12 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha. Nine rules (INW001 layer direction, INW011 dynamic imports,
-INW005 libraries per layer, INW006 code outside every layer, INW010 imports of first-party modules that don't exist, INW007/INW008 package shape, INW000 encodings that could hide
+Status: pre-alpha. Twelve rules (INW001 layer direction, INW011 dynamic imports,
+INW002 dependencies between bounded contexts, INW003 their public modules, INW004 import cycles, INW005 libraries per layer, INW006 code outside every layer, INW010 imports of first-party modules that don't exist, INW007/INW008 package shape, INW000 encodings that could hide
 imports, INW009 inline suppressions without a reason) work end to end, and
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
-a config guard and escalation to the user (`--agent aider` and `--agent agents-md` cover Aider
-and `AGENTS.md`). On a new project, `inwards init --style hexagonal --scaffold` writes the layers
+a config guard and escalation to the user (`--agent opencode` does the same through an OpenCode
+plugin; `--agent aider` and `--agent agents-md` cover Aider and `AGENTS.md`). On a new project, `inwards init --style hexagonal --scaffold` writes the layers
 (`layered` and `clean` too) and an example package that passes the check. The only release so far is the pre-release v0.1.0-rc.1, with binaries for six
 platforms and platform wheels for `uv add`; see the
 [install guide](https://sircypkowskyy.github.io/inwards/guides/install/).

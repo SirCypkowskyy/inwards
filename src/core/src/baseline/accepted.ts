@@ -8,16 +8,45 @@ import type { Diagnostic } from "../contracts/records.ts";
 
 /** INW001 and INW011 end with the whole layer order, which isn't part of the violation. */
 const DIRECTION = / Allowed direction: [^\n]*$/u;
+/**
+ * INW006's messages end with what being outside every layer means for the
+ * package, worded differently before INW002 ("nothing checks", "are not
+ * checked"). Dropping that clause keeps older baselines matching, including
+ * a package warning promoted to an error.
+ */
+const UNCHECKED =
+  /, so (?:(?:nothing|no layer rule) checks what "[^"]*" imports|its imports are not checked|no layer rule checks its imports)\.$/u;
+
+/**
+ * INW005 calls a uv workspace member a "workspace package" since #203, where
+ * it said "library" before; both spellings share one key, so older baselines
+ * keep matching.
+ */
+const WORKSPACE_PACKAGE = /^(?<head>Layer "[^"]*" imports "[^"]*" from )workspace package "/u;
+
+/** The rules whose messages end with the layer order. */
+const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
 
 /**
  * Drops the part of a message that depends on the rest of the config, so
  * adding an unrelated layer doesn't bring every accepted violation back.
+ * Only the rules that write those clauses lose them: another rule's message
+ * may quote a name the user chose, such as a context called "billing Allowed
+ * direction: EU", and must stay whole.
  *
- * @param message - a diagnostic message.
- * @returns the message without its "Allowed direction" sentence.
+ * @param d - a diagnostic or baseline entry: its rule code and message.
+ * @param d.code - which rule wrote it, which decides what is dropped.
+ * @param d.message - the text to normalise.
+ * @returns the message without INW001's and INW011's "Allowed direction" sentence or INW006's closing clause, and with INW005's "workspace package" read as "library".
  */
-export function stableMessage(message: string): string {
-  return message.replace(DIRECTION, "");
+export function stableMessage({ code, message }: Pick<Diagnostic, "code" | "message">): string {
+  if (WITH_DIRECTION.has(code)) {
+    return message.replace(DIRECTION, "");
+  }
+  if (code === "INW005") {
+    return message.replace(WORKSPACE_PACKAGE, '$<head>library "');
+  }
+  return code === "INW006" ? message.replace(UNCHECKED, ".") : message;
 }
 
 /**
@@ -28,7 +57,7 @@ export function stableMessage(message: string): string {
  * @returns rule, module and stable message joined.
  */
 export function baselineKey(d: Pick<Diagnostic, "code" | "module" | "message">): string {
-  return `${d.code}\u0000${d.module}\u0000${stableMessage(d.message)}`;
+  return `${d.code}\u0000${d.module}\u0000${stableMessage(d)}`;
 }
 
 /**

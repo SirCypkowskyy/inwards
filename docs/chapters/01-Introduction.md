@@ -43,6 +43,8 @@ layers = [
 ]
 ```
 
+Every key is described in the [configuration reference](guides/configuration.md), which also links a JSON Schema for completion and checking in the editor.
+
 <figure markdown="span">
   ![inwards check on a clean codebase](assets/screens/check-clean.svg){ loading=lazy }
   <figcaption>The example app as shipped: every import points inward.</figcaption>
@@ -71,6 +73,8 @@ Layers are listed innermost first. A module may import its own layer and anythin
 The diagnostic comes from the working scaffold in this repository, run on a copy of `examples/clean-app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
 
 To phase rules in, a `[tool.inwards.rules]` table sets which rules report and how loudly:
+
+<!-- config: fragment -->
 
 ```toml title="pyproject.toml"
 [tool.inwards.rules]

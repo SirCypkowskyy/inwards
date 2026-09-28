@@ -29,7 +29,7 @@ export interface RuleSettings {
   severity?: Record<string, Severity>;
 }
 
-const RULE_KEYS: ReadonlySet<string> = new Set(["select", "ignore", "severity"]);
+export const RULE_KEYS: ReadonlySet<string> = new Set(["select", "ignore", "severity"]);
 const SEVERITIES: readonly string[] = ["error", "warning"] satisfies Severity[];
 /** Always reports at its own severity, see the module comment. */
 const FIXED = "INW000";

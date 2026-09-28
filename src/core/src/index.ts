@@ -5,8 +5,10 @@
  * pins this list, so a change to it is deliberate.
  */
 export { baselineKey, stableMessage } from "./baseline/accepted.ts";
+export type { ContextSpec } from "./config/contexts.ts";
+export { CONFIG_DEFAULTS } from "./config/defaults.ts";
+export type { AgentSuppressions } from "./config/hook-keys.ts";
 export {
-  type AgentSuppressions,
   declaresInwards,
   type InwardsConfig,
   inwardsTable,
@@ -17,13 +19,17 @@ export { type RuleSettings, ruleLevel } from "./config/rule-settings.ts";
 export type { NameRule, ShapeSpec } from "./config/shape.ts";
 export { ConfigError } from "./config/toml.ts";
 export type {
+  CachedExtraction,
   Diagnostic,
+  ExtractionCache,
+  ExtractionIdentity,
   Fix,
   ImportRef,
   Severity,
   SourceFile,
   Span,
   Suppressed,
+  SuppressionComment,
 } from "./contracts/records.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";
@@ -45,4 +51,8 @@ export {
   rootPathOf,
 } from "./rules/package-shape/shape.ts";
 export { layerIndexOf } from "./rules/shared/layer-ownership.ts";
-export { checkMoves, checkPrefixes } from "./rules/unassigned-module/layout.ts";
+export {
+  checkMoves,
+  checkNestedProjects,
+  checkPrefixes,
+} from "./rules/unassigned-module/layout.ts";

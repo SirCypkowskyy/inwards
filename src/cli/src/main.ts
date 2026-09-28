@@ -24,10 +24,11 @@ import { print } from "./platform/print.ts";
 const USAGE = `inwards ${VERSION}
 
 Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
-                     [--config pyproject.toml] [--log]
-       inwards baseline [--config pyproject.toml]    (accept today's violations)
+                     [--config pyproject.toml] [--log] [--no-cache]
+       inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
        inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
-       inwards init --agent claude|aider|agents-md [--dry-run]   (--list-styles: the presets)
+       inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
+                    (--list-styles: the presets)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -57,12 +58,14 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       "dry-run": { type: "boolean" },
       log: { type: "boolean" },
       "max-diagnostics": { type: "string" },
+      "no-cache": { type: "boolean" },
       export: { type: "string" },
       redact: { type: "boolean" },
       style: { type: "string" },
       scaffold: { type: "boolean" },
       package: { type: "string" },
       "list-styles": { type: "boolean" },
+      launcher: { type: "string" },
     },
   });
 
@@ -103,6 +106,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param values.agent - `--agent`, for init (so are the other InitFlags).
  * @param values."dry-run" - `--dry-run`, for init.
  * @param values.config - `--config`, for baseline (stats refuses it).
+ * @param values."no-cache" - `--no-cache`, for baseline.
  * @param values.format - `--format`, for stats.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
@@ -114,6 +118,7 @@ async function setupCommand(
   paths: string[],
   values: InitFlags & {
     config?: string | undefined;
+    "no-cache"?: boolean | undefined;
     format?: string | undefined;
     export?: string | undefined;
     redact?: boolean | undefined;
@@ -140,7 +145,9 @@ async function setupCommand(
   if (command === "init") {
     return await initMain(deps, paths, values, USAGE);
   }
-  return paths.length === 0 ? await baselineCommand(deps, values.config) : print(streams, USAGE, 2);
+  return paths.length === 0
+    ? await baselineCommand(deps, values.config, values["no-cache"] === true)
+    : print(streams, USAGE, 2);
 }
 
 /**

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: 1bc91f1cda76c80e8cfd621f8b9ef33a3dc58a1b8ee1458a81a29c0270d4cdcc
+source_hash: 89660e4eea14bdfc0a6ab49ca2a38a714c40fde5c122a0d23d9ffedcf731c570
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -41,7 +41,7 @@ Adapter
 :   Kod, który łączy port z prawdziwą technologią: repozytorium SQL, klient HTTP, konsument wiadomości. Adaptery żyją w warstwach zewnętrznych.
 
 Kontekst ograniczony (bounded context)
-:   Część systemu z własnym modelem i własnym językiem (DDD). W kodzie Pythona zwykle pakiet najwyższego poziomu, taki jak `billing` albo `shipping`. INW002 (planowana) nie pozwala kontekstom importować wzajemnie swoich elementów wewnętrznych.
+:   Część systemu z własnym modelem i własnym językiem (DDD). W kodzie Pythona zwykle pakiet najwyższego poziomu, taki jak `billing` albo `shipping`. [Konteksty](guides/configuration.md#contexts) deklaruje się w `[[tool.inwards.contexts]]`; [INW002](rules/INW002.md) pozwala jednemu importować inny tylko wtedy, gdy deklaruje go jego `depends-on`.
 
 Czysta architektura (Clean Architecture)
 :   Podział na warstwy według Roberta C. Martina: encje w centrum, potem przypadki użycia, potem adaptery interfejsu, potem frameworki. Jej reguła zależności mówi, że zależności w kodzie źródłowym wskazują tylko do środka.
@@ -65,7 +65,7 @@ Port
 :   Interfejs, którego właścicielem jest kod wewnętrzny, a który implementuje kod zewnętrzny. W Pythonie zwykle `typing.Protocol`.
 
 Pionowy wycinek (vertical slice)
-:   Organizowanie kodu według funkcji (`orders/`, `invoices/`), a nie według warstwy technicznej, przy czym każdy wycinek ma własne handlery i dostęp do danych. Wycinki nie powinny sięgać do siebie nawzajem. Wzorce glob dla wycinków w konfiguracji warstw przyjdą ze schematem konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51)), a INW002 (planowana) będzie trzymać wycinki osobno.
+:   Organizowanie kodu według funkcji (`orders/`, `invoices/`), a nie według warstwy technicznej, przy czym każdy wycinek ma własne handlery i dostęp do danych. Wycinki nie powinny sięgać do siebie nawzajem. Każdy wycinek można zadeklarować jako [kontekst](guides/configuration.md#contexts), a [INW002](rules/INW002.md) trzyma wycinki osobno, chyba że `depends-on` mówi inaczej; selektory glob, dzięki którym dwadzieścia wycinków nie wymaga dwudziestu wpisów, to [#191](https://github.com/SirCypkowskyy/inwards/issues/191).
 
 ## Terminy Inwards { #inwards-terms }
 
@@ -95,6 +95,9 @@ Eskalacja (escalation)
 
 Obejście (evasion)
 :   Zmiana kodu przez agenta, po której sprawdzenie milknie, choć projekt nie został naprawiony, na przykład przeniesienie importu do funkcji. Rozdział 4 wymienia obejścia, z którymi radzi sobie Inwards.
+
+Pamięć podręczna ekstrakcji (extraction cache)
+:   `.inwards/cache`: to, co `inwards check` i `inwards baseline` odczytują z każdego pliku (szkielet importów, importy statyczne i komentarze wyciszające), pod kluczem z hasha jego treści, nazwy modułu i reguł ekstrakcji. Hooki nigdy jej nie czytają; serwer języka trzyma własną w pamięci. `--no-cache` albo `INWARDS_NO_CACHE=1` ją wyłącza. Zobacz [ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read).
 
 Fingerprint
 :   16-cyfrowy szesnastkowy hash kodu reguły, modułu i komunikatu naruszenia. Stan sesji i run log używają go, żeby rozpoznać to samo naruszenie w kolejnych edycjach, niezależnie od numeru linii.

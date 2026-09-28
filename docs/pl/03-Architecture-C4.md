@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 4d98dbd92f3b23c7e6aa45667272ccc7213044efd48ec5285bbd3c5ab4123a81
+source_hash: d5a157b422a377de6809453ce8456f99ba9813a7f00249144c3943461e78cbf4
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -84,7 +84,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW005, INW006, INW007, INW008, INW010, INW011 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :white_check_mark: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :white_check_mark: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
 | **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :white_check_mark: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
@@ -115,7 +115,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / index</small>"]
@@ -137,7 +137,7 @@ flowchart LR
 
 | Komponent | Odpowiedzialność | Uwagi |
 |---|---|---|
-| Parser konfiguracji | Czyta `[tool.inwards]`, waliduje je i podaje dokładnie ten klucz, który jest błędny | Rzuca `ConfigError`. CLI zamienia go na kod wyjścia 2 |
+| Parser konfiguracji | Czyta `[tool.inwards]`, waliduje je i podaje dokładnie ten klucz, który jest błędny | Rzuca `ConfigError`. CLI zamienia go na kod wyjścia 2. Te same klucze opisuje dla edytorów [JSON Schema](guides/configuration.md#editor-completion), a testy pilnują zgodności obu |
 | Prescan szkieletu importów | Zostawia tylko linie importów, usuwa im wcięcie, a resztę czyści, żeby numery linii się nie przesunęły | Odmawia przetworzenia pliku, gdy `import` pojawia się w miejscu, którego nie umie wyjaśnić, co wymusza pełne parsowanie. Zobacz [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Adapter parsera | Inicjalizuje web-tree-sitter z bajtów i parsuje | Jawnie zwalnia każde drzewo, bo pamięć WASM nie jest odśmiecana |
 | Ekstraktor importów | Znajduje węzły `import` / `from ... import` w dowolnym miejscu drzewa i rozwiązuje importy względne | `from shop import infrastructure` jest zapisywane jako `shop.infrastructure`, więc nie prześlizgnie się |
@@ -159,13 +159,13 @@ sequenceDiagram
     participant R as Reguły
 
     A->>E: checkFile({path, module, text}, index)
-    alt plik poza wszystkimi warstwami
+    alt plik poza wszystkimi warstwami i kontekstami
         E-->>A: ostrzeżenie INW006 dla jego pakietu albo [] (bez parsowania)
     else zadeklarowane kodowanie, którego Inwards nie umie czytać
         E-->>A: INW000
     else plik wymienia loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(pełny tekst)
-        E->>R: INW001 + INW005 + INW006 + INW010 + INW011
+        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011
         R-->>E: diagnostyki
         E-->>A: diagnostyki
     else wszystko inne
@@ -174,21 +174,21 @@ sequenceDiagram
             P-->>E: szkielet (same importy)
             E->>T: parse(szkielet)
             T-->>E: maleńkie drzewo
-            E->>R: INW001 + INW005 + INW006 + INW010 (importy)
+            E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 (importy)
             alt brak naruszeń (typowy przypadek)
                 R-->>E: []
                 E-->>A: []
             else znaleziono naruszenia
                 E->>T: parse(pełny tekst)
                 T-->>E: pełne drzewo
-                E->>R: INW001 + INW005 + INW006 + INW010 (importy z pełnego drzewa)
+                E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 (importy z pełnego drzewa)
                 R-->>E: potwierdzone diagnostyki
                 E-->>A: diagnostyki
             end
         else szkielet odrzucony (nietypowe położenie importu)
             P-->>E: null
             E->>T: parse(pełny tekst)
-            E->>R: INW001 + INW005 + INW006 + INW010
+            E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010
             R-->>E: diagnostyki
             E-->>A: diagnostyki
         end
@@ -199,7 +199,7 @@ Prescan może zgłaszać fałszywe alarmy, na przykład linię wyglądającą ja
 
 Szkielet zachowuje wyłącznie instrukcje importu, więc plik, którego jedyną zależnością na zewnątrz jest `importlib.import_module("shop.infrastructure.db")`, by go przeszedł. Zanim uruchomi się prescan, sprawdzenie tekstu szuka nazw, które każde wywołanie ładujące musi zapisać (`importlib`, `runpy`, `builtins`, `__import__` albo samo `exec`, `eval` lub `compile`, po normalizacji NFKC). Plik w warstwie, który pasuje, trafia prosto do pełnego parsowania, które szuka też importów dynamicznych. `re.compile` nie pasuje. W bibliotece standardowej CPythona 3.14 pasuje 209 z 1921 plików. Zobacz [ADR-015](05-ADR.md#adr-015-check-literal-dynamic-imports-as-inw011).
 
-Model kosztów ma jeden zły przypadek: starszy kod, w którym większość plików już narusza reguły. Bez baseline'u prawie każdy plik płaci za parsowanie szkieletu, a potem za pełne parsowanie, co jest wolniejsze niż sparsowanie wszystkiego raz. Z baseline'em CLI przekazuje silnikowi jego klucze i liczniki (reguła, moduł, komunikat bez zdania „Allowed direction”) jako dane. Silnik najpierw skanuje każdy plik. Moduł pomija parsowanie potwierdzające, gdy każdy z jego plików przeszedł przez szkielet, każdy wynik ze szkieletu jest błędem, a dla każdego klucza wyniki ze wszystkich plików modułu (`order.py` i `order.pyi` to jeden moduł) nie przekraczają liczby zaakceptowanych kopii. Szkielet nigdy nie pomija importu, a wynik zależy tylko od celu importu, który oba parsowania odczytują tak samo. Prawdziwych wyników nie jest więc więcej niż wyników ze szkieletu, a baseline ukryłby je wszystkie także po pełnym parsowaniu. Błędy zgłaszane przez sprawdzenie są takie same z pominięciem i bez niego; test porównuje oba warianty dla każdej pary zapisów (prawdziwy import, kopia w docstringu albo w napisie) w pliku `.py` i jego `.pyi`. Liczniki mogą się różnić: fałszywe alarmy pominiętego modułu (linia wyglądająca jak import w docstringu) są ukrywane razem z jego prawdziwymi wynikami, więc `baselined` może być wyższe, a `resolved` niższe niż po pełnym parsowaniu, na przykład gdy import naprawionego naruszenia wciąż siedzi w napisie. Na syntetycznym repozytorium w trybie starszego kodu (`bench/generate.py --legacy`: 2101 plików, każdy z 2000 modułów z jednym naruszeniem, wszystkie w baseline'ie) zimne `inwards check` trwało w medianie 3,05 s przed tą zmianą i 0,55 s po niej. Samo pełne parsowanie każdego pliku trwało od 2,0 do 3,1 s, a czyste repozytorium 0,47 s (Intel Core Ultra 7 155H, jeden rdzeń).
+Model kosztów ma jeden zły przypadek: starszy kod, w którym większość plików już narusza reguły. Bez baseline'u prawie każdy plik płaci za parsowanie szkieletu, a potem za pełne parsowanie, co jest wolniejsze niż sparsowanie wszystkiego raz. Z baseline'em CLI przekazuje silnikowi jego klucze i liczniki (reguła, moduł, komunikat bez zdania „Allowed direction”) jako dane. Silnik najpierw skanuje każdy plik. Moduł pomija parsowanie potwierdzające, gdy każdy z jego plików przeszedł przez szkielet, każdy wynik ze szkieletu jest błędem, a dla każdego klucza wyniki ze wszystkich plików modułu (`order.py` i `order.pyi` to jeden moduł) nie przekraczają liczby zaakceptowanych kopii. Szkielet nigdy nie pomija importu, a wynik zależy tylko od celu importu, który oba parsowania odczytują tak samo. Prawdziwych wyników nie jest więc więcej niż wyników ze szkieletu, a baseline ukryłby je wszystkie także po pełnym parsowaniu. Błędy zgłaszane przez sprawdzenie są takie same z pominięciem i bez niego; test porównuje oba warianty dla każdej pary zapisów (prawdziwy import, kopia w docstringu albo w napisie) w pliku `.py` i jego `.pyi`. Liczniki mogą się różnić: fałszywe alarmy pominiętego modułu (linia wyglądająca jak import w docstringu) są ukrywane razem z jego prawdziwymi wynikami, więc `baselined` może być wyższe, a `resolved` niższe niż po pełnym parsowaniu, na przykład gdy import naprawionego naruszenia wciąż siedzi w napisie. Na syntetycznym repozytorium w trybie starszego kodu (`bench/generate.py --legacy`: 2101 plików, każdy z 2000 modułów z jednym naruszeniem, wszystkie w baseline'ie) zimne `inwards check` trwało w medianie 3,05 s przed tą zmianą i 0,55 s po niej. Samo pełne parsowanie każdego pliku trwało od 2,0 do 3,1 s, a czyste repozytorium 0,47 s (jeden rdzeń).
 
 ## C3: komponenty CLI { #c3-components-of-the-cli }
 
@@ -223,7 +223,7 @@ Kody wyjścia są takie jak w Ruffie: `0` czysto (ostrzeżenia dozwolone), `1` z
 Pozostałe polecenia korzystają z tych samych elementów:
 
 - `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
-- `inwards init --agent claude|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
+- `inwards init --agent claude|opencode|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
 - `inwards init --style layered|clean|hexagonal [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
 ## Wdrożenie i dystrybucja { #deployment-and-distribution }
@@ -341,7 +341,7 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
     - fałszywie negatywny wynik, zaakceptowany zamiast szumu: samo `exec` albo `eval` z wyliczanym kodem jest pomijane tylko wtedy, gdy kod na pewno ponownie wiąże tę nazwę przy wywołaniu. Wiązaniem musi być `def`, `class`, zwykłe przypisanie albo import umieszczone bezpośrednio w ciele modułu (przed instrukcją najwyższego poziomu, która zawiera wywołanie) lub w ciele funkcji otaczającej wywołanie, parametr funkcji albo lambdy, której ciało zawiera wywołanie, albo cel pętli `for` wewnątrz tej pętli. Wyjątek jest wyłączony dla całego pliku, gdy którekolwiek wiązanie tej nazwy może być funkcją wbudowaną: przypisanie, operator morsa, cel `for`, `with` albo `except` czy domyślna wartość parametru, które wspominają loader; `def` albo `class`, których dekoratory lub argumenty klasy (klasy bazowe, `metaclass=`) go wspominają; import z `builtins`, `importlib`, `runpy`, modułu względnego albo własnego modułu projektu (każdy z nich może ponownie eksportować funkcję wbudowaną). Jest wyłączony także wtedy, gdy nazwa ma `global`, `nonlocal` albo `del` albo gdy plik ma import z gwiazdką lub wspomina `globals`, `vars`, `locals`, `setattr`, `delattr`, `__dict__`, `__builtins__` albo `sys.modules`. Dlatego `def eval(model, loader)` w kodzie treningowym nie jest zgłaszane. Nadal przeoczona zostaje funkcja wbudowana przekazana jako argument (`def run(exec, c): return exec(c)` wywołane jako `run(exec, code)`) oraz funkcja wbudowana osiągnięta przez obiekt bez nazwania loadera ani funkcji zapisującej przestrzeń nazw, na przykład `exec = operator.attrgetter("exec")(print.__self__)` ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)). To samo sprawdzenie chroni `exec(compile("<literal>", ...))`, któremu ufamy tylko, dopóki `compile` nie jest ponownie związane;
     - zaakceptowane fałszywe alarmy tego ostrożnego sprawdzenia: zmienna wyrażenia listowego (`[eval(m) for eval in evaluators]`), nazwa metody użyta w ciele jej własnej klasy i przechwycenie `match` o nazwie `eval` albo `exec` są nadal zgłaszane.
 - INW010 sprawdza tylko tę część importu statycznego, która jest modułem ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` przechodzi, gdy `shop/domain` jest pakietem, bo `pricing` może być nazwą zdefiniowaną w jego `__init__.py`, a importy dynamiczne nie są sprawdzane. Moduł generowany przy budowaniu przechodzi, gdy obejmuje go `generated`, a domyślnie obejmuje `*_pb2` i `*_pb2_grpc` z protoc oraz moduł `_version` ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)); każdy inny jest zgłaszany, dopóki nie pojawi się w checkoucie, podobnie jak opcjonalny import za `try/except ImportError`. Zmyślony import, którego nazwę obejmuje wzorzec z `generated`, też przechodzi. Pozostałe reguły nadal widzą moduł generowany, którego nie ma na dysku, jako brakujący: INW001 patrzy na nazwę i zgłasza import skierowany na zewnątrz tak czy inaczej, a INW006 ocenia import po najbliższym istniejącym pakiecie, więc moduł generowany leżący bezpośrednio w pakiecie nad warstwami (`shop._version`, importowany z warstwy) dostaje błąd INW006 o innej treści z plikiem i bez niego, a wpis baseline'u zrobiony w jednym checkoucie nie pasuje w drugim. Generowany pakiet najwyższego poziomu bez zacommitowanego `__init__.py` wygląda dla każdej reguły jak kod zewnętrzny. Pakiet przestrzeni nazw współdzielony z zainstalowaną dystrybucją jest zgłaszany jako brakujący ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). Serwer języka nie zauważa, że `__init__.py` zaczął rozszerzać swój `__path__`, dopóki jakiś plik nie powstanie albo nie zniknie.
-- Moduły, które nie należą do żadnej warstwy, nie są same sprawdzane. INW006 to uwidacznia (ostrzeżenie na pakiet, błąd dla importu do takiego pakietu z warstwy i martwe prefiksy), ale importy wewnątrz nieprzypisanego pakietu pozostają niesprawdzone, dopóki użytkownik go nie przypisze. Moduły bez źródeł, głębokość `ignore`, przemianowane pakiety najwyższego poziomu i sprawdzanie prefiksów w zakresie ścieżek są otwarte w [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
+- Moduły, które nie należą do żadnej warstwy, nie podlegają żadnej regule warstw. INW006 to uwidacznia (ostrzeżenie na pakiet, błąd dla importu do takiego pakietu z warstwy i martwe prefiksy), ale importy wewnątrz nieprzypisanego pakietu nie są sprawdzane względem warstw, dopóki użytkownik go nie przypisze. Gdy zadeklarowano [konteksty](guides/configuration.md#contexts), importy każdego modułu są z nimi porównywane (INW002, INW003), a INW000 dotyczy każdego pliku. Moduły bez źródeł, głębokość `ignore`, przemianowane pakiety najwyższego poziomu i sprawdzanie prefiksów w zakresie ścieżek są otwarte w [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Katalog reguł { #rule-catalogue }
 
@@ -351,14 +351,14 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 |---|---|---|---|
 | INW000 | `unsupported-encoding` | Plik w warstwie deklaruje kodowanie (PEP 263), takie jak `unicode_escape` albo `utf-7`, przy którym tekst, który Inwards czyta jako komentarz, może być dla CPythona prawdziwym importem. Plik jest zgłaszany, a nie pomijany | :white_check_mark: |
 | INW001 | `layer-dependency` | Warstwa wewnętrzna importująca zewnętrzną | :white_check_mark: |
-| INW002 | `context-independence` | Jeden kontekst ograniczony albo pionowy wycinek importujący wewnętrzne moduły innego | :material-progress-clock: [#52](https://github.com/SirCypkowskyy/inwards/issues/52) |
-| INW003 | `public-api-only` | Import z pominięciem publicznego modułu kontekstu (`__init__` albo `api.py`) | :material-progress-clock: [#53](https://github.com/SirCypkowskyy/inwards/issues/53) |
-| INW004 | `no-cycles` | Cykle importów między modułami albo kontekstami | :material-progress-clock: wymaga grafu, [#54](https://github.com/SirCypkowskyy/inwards/issues/54) |
+| INW002 | `context-independence` | Kontekst ograniczony albo pionowy wycinek importujący inny kontekst, którego jego `depends-on` nie deklaruje, statycznie albo dynamicznie, niezależnie od tego, czy plik należy do warstwy. Koniec poza wszystkimi kontekstami jest pomijany, a kontekst zagnieżdżony jest osobnym kontekstem. Zobacz [konteksty](guides/configuration.md#contexts) | :white_check_mark: |
+| INW003 | `public-api-only` | Import, spoza kontekstu (z innego kontekstu albo z żadnego), jednego z jego modułów, który nie leży na prefiksach `public` ani pod nimi, statyczny albo dynamiczny. Import zgłoszony już przez INW002 nie dostaje INW003. Poprawka wskazuje moduł publiczny, który udostępnia importowaną nazwę, jeśli taki istnieje | :white_check_mark: |
+| INW004 | `import-cycles` | Moduły (`cycles = ["modules"]`) albo konteksty (domyślnie, `["contexts"]`), które importują się nawzajem w cyklu, zgłaszane raz na silnie spójną grupę, z pełną ścieżką i rozmiarem grupy. Tylko przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta; plik w cyklicznej grupie, którego szkielet mógł źle odczytać import, jest potwierdzany pełnym parsowaniem. Nie da się go wyciszyć w linii; istniejące cykle przyjmuje baseline. Zobacz [ADR-032](05-ADR.md#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | :white_check_mark: |
 | INW005 | `pure-domain` | Warstwa importująca moduł zewnętrzny albo z biblioteki standardowej, na który nie pozwalają jej `allow-libraries` / `deny-libraries` / `extend-deny-libraries`, statycznie albo dynamicznie, także w funkcjach i pod `TYPE_CHECKING`. Najbardziej wewnętrzna z dwóch lub więcej warstw domyślnie zabrania frameworków, klientów baz danych i sieci oraz operacji wejścia-wyjścia z biblioteki standardowej (`sqlalchemy`, `fastapi`, `requests`, `subprocess`...); `extend-deny-libraries` dopisuje wpisy do tej listy, a `deny-libraries` ją zastępuje. Własny kod zostaje dla INW001 i INW006. Zobacz [Biblioteki w warstwach](guides/libraries.md) | :white_check_mark: |
 | INW006 | `unassigned-module` | Import z warstwy do własnego kodu, który nie należy do żadnej warstwy, w tym do pakietu nad warstwami (`from shop import x` uruchamia `shop/__init__.py`, który nie należy do żadnej warstwy), statyczny albo dynamiczny (błąd); kod warstwy przeniesiony w trakcie sesji poza wszystkie warstwy (błąd); pakiet poza wszystkimi warstwami i poza `ignore` (ostrzeżenie); prefiks warstwy, który nie pasuje do żadnego modułu (ostrzeżenie), warstwa bez żywego prefiksu albo prefiks opróżniony w trakcie sesji (błąd). Nieznane klucze i nakładające się prefiksy to błędy konfiguracji | :white_check_mark: |
 | INW007 | `package-shape` | Element pakietu, na który `[[tool.inwards.shape]]` nie pozwala (błąd albo ostrzeżenie przy `extra = "warning"`) albo którego zabrania, taki jak nowy `helpers.py` obok `service.py`; nazwa elementu poza jej pakietami `only-in` z `[[tool.inwards.names]]`, taka jak `test_x.py` w aplikacji (błąd); selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie, w pyproject.toml). Komunikat nigdy nie wypisuje dozwolonych elementów; poprawka podaje prawdopodobny cel. Zobacz [Kształt pakietu](guides/package-shape.md) | :white_check_mark: |
 | INW008 | `missing-member` | Brakuje elementu, którego wymaga kształt pakietu; zgłaszane w jego `__init__.py`. Uruchomienia dla całego projektu zgłaszają każdy taki brak; Stop gate blokuje tylko te, które pojawiły się od początku sesji | :white_check_mark: |
-| INW009 | `suppression-comment` | Wyciszenie w linii, `# inwards: ignore[INW001] reason="..."`, które niczego nie ukrywa: w złej postaci, bez powodu albo z kodem nieznanym lub takim, którego nie da się wyciszyć (INW000, INW007, INW008, INW009) (błąd); wyciszenie z kodem, który nie pasuje do żadnej diagnostyki w jego linii (ostrzeżenie). Zobacz [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :white_check_mark: |
+| INW009 | `suppression-comment` | Wyciszenie w linii, `# inwards: ignore[INW001] reason="..."`, które niczego nie ukrywa: w złej postaci, bez powodu albo z kodem nieznanym lub takim, którego nie da się wyciszyć (INW000, INW004, INW007, INW008, INW009) (błąd); wyciszenie z kodem, który nie pasuje do żadnej diagnostyki w jego linii (ostrzeżenie). Zobacz [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :white_check_mark: |
 | INW010 | `unknown-first-party` | Import statyczny w warstwie, który wskazuje własny moduł, który nie istnieje, typowa halucynacja agenta (`from shop.domain.pricing import X` bez żadnego `pricing`), oraz import względny, który wychodzi ponad pakiet najwyższego poziomu, czego Python nigdy nie przyjmuje. Sprawdzana jest część będąca modułem: `X` w `from X import name`, a w pozostałych przypadkach cała nazwa. Istnienie jest sondowane na dysku, więc liczą się pakiety przestrzeni nazw, zaślepki i skompilowane moduły rozszerzeń (`.so`, `.pyd`, `.pyx`); poprawka wymienia trzy najbliższe moduły z tego samego pakietu. Taki import nie dostaje dodatkowo INW006, a import skierowany na zewnątrz, który zgłasza INW001, nie dostaje INW010. Pakiety, które rozszerzają swój `__path__`, są pomijane, podobnie jak moduły zapisywane przez krok budowania (`generated`, domyślnie `*_pb2`, `*_pb2_grpc` i `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). Zobacz [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :white_check_mark: |
 | INW011 | `dynamic-import` | Import dynamiczny z celem w postaci literału napisowego, który sięga do warstwy zewnętrznej: `importlib.import_module`, `__import__` (także `builtins.` i `importlib.`), `runpy.run_module` oraz instrukcje importu wewnątrz dosłownego kodu dla `exec` / `eval` / `compile` (bajty, których zadeklarowanego kodowania Inwards nie umie czytać, są zgłaszane jako niesprawdzone). Śledzone są aliasy importów, przypisania `name = loader`, `getattr(m, "name")`, `m.__dict__["name"]` i `vars(m)["name"]`; `+` między literałami i f-stringi z dosłownymi polami są składane. W każdej warstwie poza najbardziej zewnętrzną cel, którego Inwards nie umie odczytać, jest zgłaszany jako niesprawdzalny: zmienna, pole f-stringa, sekwencja `\N{...}`, argument ukryty za `*args` albo `**kwargs`, względne `import_module` z nieznanym `package`, `exec` albo `eval` z niedosłownym kodem ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Popularny sposób obejścia INW001. Znane luki są wymienione wyżej | :white_check_mark: |
 
@@ -385,6 +385,9 @@ src/
 │   │   │   │              #   edit-distance.ts
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
+│   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
+│   │   │   ├── public-api-only.ts       # INW003: a context's public modules
+│   │   │   ├── import-cycles/           # INW004: graph.ts (Tarjan, shortest cycle), cycles.ts
 │   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
 │   │   │   │                            #   layout.ts (dead prefixes, layer code moved away)

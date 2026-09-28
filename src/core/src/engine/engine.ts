@@ -8,17 +8,23 @@
 import type { Parser } from "web-tree-sitter";
 import { acceptedModules } from "../baseline/accepted.ts";
 import type { InwardsConfig } from "../config/parse.ts";
-import { applyRules } from "../config/rule-settings.ts";
-import type { Diagnostic, ImportRef, SourceFile, Suppressed } from "../contracts/records.ts";
+import { applyRules, ruleLevel } from "../config/rule-settings.ts";
+import type {
+  Diagnostic,
+  ExtractionCache,
+  ImportRef,
+  SourceFile,
+  Suppressed,
+} from "../contracts/records.ts";
 import { type ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
+import { topLevelBindings } from "../python/bindings.ts";
 import {
   createPythonParser,
-  extractImports,
   type GrammarBinaries,
   normalizeSource,
   parsePython,
 } from "../python/parser.ts";
-import { skeletonImports } from "../python/prescan.ts";
+import { checkContextDependencies } from "../rules/context-independence.ts";
 import {
   checkDynamicImports,
   extractDynamicImports,
@@ -26,56 +32,46 @@ import {
 } from "../rules/dynamic-import/imports.ts";
 import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
+import { checkPublicApi } from "../rules/public-api-only.ts";
 import { checkLibraries } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
-import {
-  commentsIn,
-  mentionsSuppression,
-  type SuppressionComment,
-  suppress,
-} from "../rules/suppression-comment.ts";
+import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
 import { checkUnassignedImports, unassignedWarning } from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { type Collected, projectCycles } from "./cycles.ts";
+import { Extractor } from "./extraction.ts";
+import { type Checked, type Confirmed, keptOnce, ordered, type Scan } from "./stages.ts";
 
-/** A file after the prescan, before any full parse. */
-interface Scan {
-  /** The findings so far; null when the prescan was skipped or refused the file. */
-  found: Diagnostic[] | null;
-  /** True when `found` is final and needs no full parse. */
-  exact: boolean;
-  /** True when the full parse must also look for dynamic imports (INW011). */
-  dynamic: boolean;
-}
-
-/** A file's findings after the full parse, if it ran, and its suppression comments. */
-interface Confirmed {
-  found: Diagnostic[];
-  /** Read from the full parse of a file that mentions `inwards: ignore`; absent otherwise. */
-  comments?: SuppressionComment[];
-}
-
-/** What `check` returns: the findings to report, and the ones inline suppressions hid. */
-export interface Checked {
-  diagnostics: Diagnostic[];
-  suppressed: Suppressed[];
-}
+export type { Checked } from "./stages.ts";
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
 export class Engine {
   private readonly parser: Parser;
   private readonly config: InwardsConfig;
+  private readonly extractor: Extractor;
+  /** The top-level import packages of the uv workspace's members (INW005's wording). */
+  private readonly workspace: ReadonlySet<string>;
 
   /**
-   * Stores a ready parser and a validated config.
+   * Stores a ready parser, a validated config and the extraction helper.
    * Private: `Engine.create` is the only way in, because loading the grammar is async.
    *
    * @param parser - tree-sitter parser with the Python grammar already set.
    * @param config - layers and root read from `[tool.inwards]`.
+   * @param options - optional inputs, see `create`.
+   * @param options.cache - where extractions are kept between checks, if anywhere.
+   * @param options.workspacePackages - the uv workspace members' import packages.
    */
-  private constructor(parser: Parser, config: InwardsConfig) {
+  private constructor(
+    parser: Parser,
+    config: InwardsConfig,
+    options: { cache?: ExtractionCache; workspacePackages?: ReadonlySet<string> },
+  ) {
     this.parser = parser;
     this.config = config;
+    this.extractor = new Extractor(parser, options.cache);
+    this.workspace = options.workspacePackages ?? new Set();
   }
 
   /**
@@ -83,12 +79,28 @@ export class Engine {
    * Initialises the tree-sitter runtime and loads the Python grammar once;
    * every later check reuses that parser.
    *
+   * With `options.cache`, what the engine reads out of a file's text (the
+   * import skeleton, the full parse's static imports, the suppression
+   * comments) is kept there and reused while the text is unchanged (#56).
+   * Results never differ with or without it.
+   *
+   * `options.workspacePackages` names the top-level import packages of the
+   * uv workspace the project belongs to. It changes only INW005's wording:
+   * an import of one is a "workspace package", not a "library" (#203).
+   *
    * @param wasm - the tree-sitter runtime and Python grammar as WASM bytes.
    * @param config - layers and root read from `[tool.inwards]`.
+   * @param options - optional inputs.
+   * @param options.cache - where extractions are kept between checks.
+   * @param options.workspacePackages - the uv workspace members' import packages; none by default.
    * @returns an engine ready to check files.
    */
-  static async create(wasm: GrammarBinaries, config: InwardsConfig): Promise<Engine> {
-    return new Engine(await createPythonParser(wasm), config);
+  static async create(
+    wasm: GrammarBinaries,
+    config: InwardsConfig,
+    options: { cache?: ExtractionCache; workspacePackages?: ReadonlySet<string> } = {},
+  ): Promise<Engine> {
+    return new Engine(await createPythonParser(wasm), config, options);
   }
 
   /**
@@ -108,8 +120,11 @@ export class Engine {
    * whose text names a loader (`mentionsDynamicImport`) skips the skeleton and
    * gets the full parse, which also looks for dynamic imports (INW011).
    *
-   * A file outside every layer isn't parsed: besides its shape, it gets at
-   * most an INW006 warning naming its package.
+   * A file outside every layer isn't parsed unless contexts are declared:
+   * besides its shape, it gets at most an INW006 warning naming its package.
+   * With contexts, every file is parsed, since any of them may import a
+   * context (INW002, INW003); outside the layers it gets that warning and
+   * the context rules.
    *
    * Inline suppression comments then hide the findings they cover and add
    * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).
@@ -134,7 +149,8 @@ export class Engine {
    * @returns the findings so far, and what the full parse would still have to do.
    */
   private scan(src: SourceFile, project: ProjectIndex): Scan {
-    if (layerIndexOf(src.module, this.config.layers) === -1) {
+    const layered = this.layered(src);
+    if (!(layered || this.config.contexts)) {
       const warning = unassignedWarning(src, this.config);
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
@@ -144,10 +160,32 @@ export class Engine {
     }
     const dynamic = mentionsDynamicImport(src.text);
     // A file with a suppression comment gets the full parse, which also reads the comments.
-    const fast =
-      dynamic || mentionsSuppression(src.text) ? null : skeletonImports(this.parser, src);
+    const fast = dynamic || mentionsSuppression(src.text) ? null : this.extractor.skeleton(src);
     const found = fast ? this.importFindings(src, fast, project) : null;
-    return { found, exact: found?.length === 0, dynamic };
+    // Outside every layer, the unassigned-package warning needs no confirmation.
+    const unsettled = layered ? found : found?.filter((d) => d.code !== "INW006");
+    return { found, exact: unsettled?.length === 0, dynamic, ...(fast ? { imports: fast } : {}) };
+  }
+
+  /**
+   * Tells whether a layer owns a file.
+   *
+   * @param src - the source file.
+   * @returns true when one of the configured layers owns its module.
+   */
+  private layered(src: SourceFile): boolean {
+    return layerIndexOf(src.module, this.config.layers) !== -1;
+  }
+
+  /**
+   * Tells whether INW002 reports undeclared dependencies, so INW003 leaves
+   * them alone; with INW002 off, INW003 still holds such imports to the
+   * public modules.
+   *
+   * @returns true unless `[tool.inwards.rules]` turns INW002 off.
+   */
+  private defersToInw002(): boolean {
+    return ruleLevel("INW002", this.config.rules) !== "off";
   }
 
   /**
@@ -163,7 +201,18 @@ export class Engine {
     confirmed: Confirmed,
   ): { kept: Diagnostic[]; suppressed: Suppressed[] } {
     const found = [...shapeFindings(src, this.config), ...confirmed.found];
-    return suppress(this.parser, src, { ...confirmed, found }, this.config.rules);
+    // Read the comments here, through the cache, rather than let suppress() parse.
+    const needed =
+      confirmed.comments === undefined &&
+      mentionsSuppression(src.text) &&
+      !found.some((d) => d.code === "INW000");
+    const comments = needed ? this.extractor.full(src).comments : confirmed.comments;
+    return suppress(
+      this.parser,
+      src,
+      comments === undefined ? { found } : { found, comments },
+      this.config.rules,
+    );
   }
 
   /**
@@ -184,11 +233,13 @@ export class Engine {
   }
 
   /**
-   * Applies the rules that look at import statements: INW001, INW005, INW006 and INW010.
+   * Applies the rules that look at import statements: INW001, INW002, INW005, INW006 and INW010.
    * An import of a module that doesn't exist gets INW010 alone, not INW006
    * as well, and one that climbs above the top-level package (empty target)
    * reaches no other rule. An outward import gets INW001 alone, even when its
-   * module doesn't exist either.
+   * module doesn't exist either. INW002 is independent of the layer rules: an
+   * import can break a layer and a context boundary at once. A file outside
+   * every layer gets only INW002 and its unassigned-package warning.
    *
    * @param file - the source file.
    * @param imports - its imports.
@@ -200,7 +251,15 @@ export class Engine {
     imports: readonly ImportRef[],
     project: ProjectIndex,
   ): Diagnostic[] {
-    const { layers } = this.config;
+    const { layers, contexts = [] } = this.config;
+    const across = [
+      ...checkContextDependencies(file, imports, contexts, project.ownerOf),
+      ...checkPublicApi(file, imports, project, { contexts, defer: this.defersToInw002() }),
+    ];
+    if (!this.layered(file)) {
+      const warning = unassignedWarning(file, this.config);
+      return warning ? [warning, ...across] : across;
+    }
     // INW001's fix deletes an outward import; "create the module" would contradict it.
     const outward = new Set(outwardImports(file, imports, layers).map((o) => o.ref));
     const unknown = checkUnknownImports(
@@ -213,9 +272,13 @@ export class Engine {
     const existing = resolved.filter((ref) => !unknown.missing.has(ref));
     return [
       ...checkLayers(file, resolved, layers),
-      ...checkLibraries(file, resolved, layers, project.ownerOf),
+      ...checkLibraries(file, resolved, layers, {
+        ownerOf: project.ownerOf,
+        workspace: this.workspace,
+      }),
       ...checkUnassignedImports(file, existing, layers, project.ownerOf),
       ...unknown.found,
+      ...across,
     ];
   }
 
@@ -229,38 +292,34 @@ export class Engine {
    * @returns the violations found, and the suppression comments of a file that mentions them.
    */
   private fullCheck(file: SourceFile, dynamic: boolean, project: ProjectIndex): Confirmed {
+    if (!dynamic) {
+      const { imports, comments } = this.extractor.full(file);
+      return { ...ordered(file, this.importFindings(file, imports, project), comments), imports };
+    }
     const { layers } = this.config;
     const tree = parsePython(this.parser, file.text);
     try {
-      const found = this.importFindings(file, extractImports(tree, file), project);
-      if (dynamic) {
-        const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
-        const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
+      const { imports, comments } = this.extractor.fromTree(file, tree);
+      const found = this.importFindings(file, imports, project);
+      // Dynamic imports are never cached: they depend on other files (ownerOf).
+      const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
+      const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
+      const { contexts = [] } = this.config;
+      found.push(
+        ...checkContextDependencies(file, readable, contexts, project.ownerOf),
+        ...checkPublicApi(file, readable, project, { contexts, defer: this.defersToInw002() }),
+      );
+      if (this.layered(file)) {
         found.push(
           ...checkDynamicImports(file, refs, layers),
-          ...checkLibraries(file, readable, layers, project.ownerOf),
+          ...checkLibraries(file, readable, layers, {
+            ownerOf: project.ownerOf,
+            workspace: this.workspace,
+          }),
           ...checkUnassignedImports(file, readable, layers, project.ownerOf),
         );
       }
-      found.sort((a, b) => a.line - b.line || a.column - b.column);
-      return mentionsSuppression(file.text) ? { found, comments: commentsIn(tree) } : { found };
-    } finally {
-      tree.delete(); // WASM memory is not garbage collected
-    }
-  }
-
-  /**
-   * Extracts every import from a full parse of the file.
-   * The slow, exact path. The tree is freed before returning because WASM
-   * memory is not garbage collected.
-   *
-   * @param file - the source file, with normalised text.
-   * @returns every import statement target with its span.
-   */
-  private imports(file: SourceFile): ImportRef[] {
-    const tree = parsePython(this.parser, file.text);
-    try {
-      return extractImports(tree, file);
+      return { ...ordered(file, found, comments), imports: [...imports, ...readable] };
     } finally {
       tree.delete(); // WASM memory is not garbage collected
     }
@@ -276,10 +335,21 @@ export class Engine {
    * @returns a lazy index that lists and reads only when a rule asks.
    */
   index(files: ProjectFiles): ProjectIndex {
-    return new ProjectIndex(files, (file) => {
-      const src = { ...file, text: normalizeSource(file.text) };
-      return skeletonImports(this.parser, src) ?? this.imports(src);
-    });
+    return new ProjectIndex(
+      files,
+      (file) => {
+        const src = { ...file, text: normalizeSource(file.text) };
+        return this.extractor.skeleton(src) ?? this.extractor.full(src).imports;
+      },
+      (file) => {
+        const tree = parsePython(this.parser, normalizeSource(file.text));
+        try {
+          return topLevelBindings(tree, file.path.endsWith(".pyi"));
+        } finally {
+          tree.delete(); // WASM memory is not garbage collected
+        }
+      },
+    );
   }
 
   /**
@@ -321,12 +391,16 @@ export class Engine {
    * @param files - the source files to check.
    * @param project - the project's module index (see `index`).
    * @param accepted - accepted copies by baseline key, when a baseline applies.
+   * @param options - `whole: true` when the files are the whole project, which
+   *   adds the import cycles among them (INW004, `engine/cycles.ts`).
+   * @param options.whole - true for a whole-project run.
    * @returns the violations, as `checkFiles` returns them, and the suppressed findings.
    */
   check(
     files: Iterable<SourceFile>,
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
+    { whole = false }: { whole?: boolean } = {},
   ): Checked {
     const { rules } = this.config;
     const scanned = [...files].map((file) => {
@@ -345,21 +419,27 @@ export class Engine {
     const all: Diagnostic[] = [];
     const suppressed: Suppressed[] = [];
     const warned = new Set<string>();
+    const collected: Collected[] = [];
     for (const { src, scan } of scanned) {
       const skip = hidden.has(src.module);
-      const own = this.suppressIn(src, this.confirm(src, scan, project, skip));
-      suppressed.push(...own.suppressed);
-      for (const found of own.kept) {
-        // An unused-suppression warning (INW009) names no place: each comment is its own.
-        const once =
-          found.severity === "warning" && found.code !== "INW009" ? found.message : undefined;
-        if (once === undefined || !warned.has(once)) {
-          all.push(found);
-        }
-        if (once !== undefined) {
-          warned.add(once);
-        }
+      const confirmed = this.confirm(src, scan, project, skip);
+      const imports = confirmed.imports ?? scan.imports;
+      if (imports !== undefined) {
+        collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
       }
+      const own = this.suppressIn(src, confirmed);
+      suppressed.push(...own.suppressed);
+      all.push(...keptOnce(own.kept, warned));
+    }
+    if (whole) {
+      all.push(
+        ...projectCycles(collected, {
+          modes: this.config.cycles,
+          contexts: this.config.contexts ?? [],
+          fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
+            this.extractor.importsUpTo(file, lastLine),
+        }),
+      );
     }
     return {
       diagnostics: applyRules(all, rules),

@@ -25,6 +25,9 @@ export interface RuleMeta {
 type RuleCode =
   | "INW000"
   | "INW001"
+  | "INW002"
+  | "INW003"
+  | "INW004"
   | "INW005"
   | "INW006"
   | "INW007"
@@ -59,6 +62,27 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     severity: "error",
     summary: "Dependencies must point toward inner layers.",
     docs: page("INW001"),
+  },
+  INW002: {
+    code: "INW002",
+    name: "context-independence",
+    severity: "error",
+    summary: "A bounded context imports another context only when it declares it in depends-on.",
+    docs: page("INW002"),
+  },
+  INW003: {
+    code: "INW003",
+    name: "public-api-only",
+    severity: "error",
+    summary: "Code outside a bounded context imports only the context's public modules.",
+    docs: page("INW003"),
+  },
+  INW004: {
+    code: "INW004",
+    name: "import-cycles",
+    severity: "error",
+    summary: "Modules, or bounded contexts, don't import each other in a cycle.",
+    docs: page("INW004"),
   },
   INW005: {
     code: "INW005",

@@ -12,6 +12,7 @@
 import { resolve } from "node:path";
 import {
   type AgentSuppressions,
+  CONFIG_DEFAULTS,
   type Diagnostic,
   parseConfig,
   type Report,
@@ -95,7 +96,7 @@ export async function agentSuppressions(
  * @returns one line of advice, then one line per finding.
  */
 export function rejectedNote(rejected: readonly Diagnostic[]): string {
-  const lines = rejected.map((d) => `- ${d.file}:${d.line} ${d.code} ${stableMessage(d.message)}`);
+  const lines = rejected.map((d) => `- ${d.file}:${d.line} ${d.code} ${stableMessage(d)}`);
   return [
     "These findings have an inline suppression that wasn't in the file when the session started, or the file wasn't committed at session start, and this project doesn't let an agent add one (agent-suppressions). If you added it, fix the code instead, or remove the suppression and ask the user to add it; if it was already there, leave it and tell the user:",
     ...lines,
@@ -120,5 +121,5 @@ function modeOf(
   const config = start
     ? start.configs[projectPath(lookups.probe, lookups.project, configPath)]
     : parseConfig(lookups.read.text(configPath));
-  return config?.agentSuppressions ?? "deny";
+  return config?.agentSuppressions ?? CONFIG_DEFAULTS.agentSuppressions;
 }

@@ -9,6 +9,7 @@
  */
 
 import type { Severity } from "../contracts/records.ts";
+import { CONFIG_DEFAULTS } from "./defaults.ts";
 import { globMatches, isGlob } from "./glob.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -33,14 +34,14 @@ export interface NameRule {
   onlyIn: string[];
 }
 
-const SHAPE_KEYS: ReadonlySet<string> = new Set([
+export const SHAPE_KEYS: ReadonlySet<string> = new Set([
   "packages",
   "allow",
   "require",
   "forbid",
   "extra",
 ]);
-const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
+export const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
 /** A member name as a directory lists it: `x.py`, `x.pyi` or `x/`. */
 const MEMBER = /^(?<stem>[^/]+?)(?<kind>\.pyi?|\/)$/u;
 /** A member pattern: a glob stem, optionally ending in `.py` or `/`. */
@@ -166,7 +167,7 @@ function tables(value: unknown, key: string): Record<string, unknown>[] {
 function parseShape(entry: Record<string, unknown>, i: number): ShapeSpec {
   const where = `tool.inwards.shape[${i}]`;
   rejectUnknownKeys(entry, SHAPE_KEYS, where);
-  const { extra = "error" } = entry;
+  const { extra = CONFIG_DEFAULTS.shapeExtra } = entry;
   if (extra !== "error" && extra !== "warning") {
     throw new ConfigError(`${where}.extra must be "error" or "warning".`);
   }

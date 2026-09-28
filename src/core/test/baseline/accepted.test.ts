@@ -88,3 +88,80 @@ describe("baselined violations skip the confirming parse", () => {
     expect(shown(engine.checkFiles(files, PROJECT, accepted), accepted)).toEqual(plain);
   });
 });
+
+describe("INW006's older wording", () => {
+  test("gives the same keys as the current one", () => {
+    const pairs = [
+      [
+        '"shop.common" belongs to no layer, so its imports are not checked.',
+        '"shop.common" belongs to no layer, so no layer rule checks its imports.',
+      ],
+      [
+        'Layer "domain" imports "shop.common.money.Money", which belongs to no layer, so nothing checks what "shop.common" imports.',
+        'Layer "domain" imports "shop.common.money.Money", which belongs to no layer, so no layer rule checks what "shop.common" imports.',
+      ],
+    ];
+    /**
+     * The baseline key of an INW006 message.
+     *
+     * @param message - an old or a current INW006 message.
+     * @returns its key for one module.
+     */
+    function key(message: string): string {
+      return baselineKey({ code: "INW006", module: "shop.domain.order", message });
+    }
+    for (const [old = "", now = ""] of pairs) {
+      expect(key(old)).toBe(key(now));
+    }
+  });
+});
+
+describe("INW005's workspace wording", () => {
+  test("a workspace package keys like the library it was called before, and nothing else changes", () => {
+    /**
+     * The baseline key of a message, for one module.
+     *
+     * @param code - the rule code the key is made for.
+     * @param message - the message text the key normalises.
+     * @returns the key the baseline matches on.
+     */
+    function key(code: string, message: string): string {
+      return baselineKey({ code, module: "core.x", message });
+    }
+    const now =
+      'Layer "core" imports "qv_core.models" from workspace package "qv_core", which "core" may not use.';
+    const old =
+      'Layer "core" imports "qv_core.models" from library "qv_core", which "core" may not use.';
+    expect(key("INW005", now)).toBe(key("INW005", old));
+    expect(key("INW001", now)).toContain("workspace package");
+  });
+});
+
+/**
+ * An INW004 message whose context name holds "Allowed direction: ".
+ *
+ * @param hash - the group's link hash.
+ * @returns the message.
+ */
+function cycle(hash: string): string {
+  return `Contexts import each other in a cycle: anchor -> billing Allowed direction: EU -> anchor. The group holds 2 contexts and 2 links between them (link hash ${hash}).`;
+}
+
+describe("what a key drops", () => {
+  test("only INW001 and INW011 lose the layer order, and only INW006 its closing clause", () => {
+    const module = "shop.domain.order";
+    const layered =
+      'Layer "domain" imports "shop.infrastructure.db". Allowed direction: domain <- infrastructure';
+    expect(baselineKey({ code: "INW001", module, message: layered })).toBe(
+      baselineKey({ code: "INW001", module, message: `${layered} <- api` }),
+    );
+    // A context may be named anything, "Allowed direction: " included; INW004's link hash must stay.
+    expect(baselineKey({ code: "INW004", module, message: cycle("aaaa") })).not.toBe(
+      baselineKey({ code: "INW004", module, message: cycle("bbbb") }),
+    );
+    const unchecked = '"shop.common" belongs to no layer, so its imports are not checked.';
+    expect(baselineKey({ code: "INW010", module, message: unchecked })).toContain(
+      "are not checked",
+    );
+  });
+});
