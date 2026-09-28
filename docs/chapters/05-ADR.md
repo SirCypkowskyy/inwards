@@ -38,6 +38,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
 | [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Layer selectors anchored in a top-level package, with slice-aware session checks | :white_check_mark: Accepted |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
+| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :white_check_mark: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -949,3 +950,32 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 - *A walk for every nested `pyproject.toml` with `[tool.inwards]`:* covers non-uv monorepos, but costs a tree walk per run and has no notion of which directories belong together.
 - *A `--workspace` flag:* explicit, but running at the workspace root already says it, and the old behaviour there (one config indexing members by path) was the false green #201 warns about.
 - *Skipping INW010 under every namespace package:* simpler, but a hallucinated module in a namespace package would pass silently in every project that omits `__init__.py`.
+
+## ADR-037: Framework rule families, opt-in, with their own prefix
+
+**Status:** Accepted · 2026-09-28 · [#186](https://github.com/SirCypkowskyy/inwards/issues/186)
+
+**Context.** Chapter 1 says Inwards only reasons about the dependency structure between your own modules. [#98](https://github.com/SirCypkowskyy/inwards/issues/98) already plans content rules scoped to a layer's role. FastAPI is the next step: some of what goes wrong in a FastAPI project is architectural and needs a project-wide view that a per-file linter can't have. An `APIRouter` nothing includes, error codes the OpenAPI schema doesn't declare, and exception handlers registered in another file all span files. Ruff already has FastAPI rules (`FAST001` to `FAST003`, `FAST004` in review) and flake8-fastapi has `CF` codes, both one file at a time. Opt-in rules and per-rule options exist since [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)'s #181 amendment.
+
+**Decision.**
+
+- **Framework rules come in families with their own prefix.** FastAPI rules are `FAPI` plus three digits. `INW` codes stay for architecture rules that hold in any Python project; a `FAPI` code says at once that the advice is about the framework. `FAST` is Ruff's and `CF` flake8-fastapi's, so reusing either would give one code two meanings in the same repository. A later family (`DJ` for Django, say) takes its own prefix, without renumbering anything. Codes are exact everywhere, so `select`, `ignore`, suppressions and SARIF need no change.
+- **Every family rule is opt-in** (`default: "off"`): it reports only when `extend-select` or `select` lists it, and takes options in `[tool.inwards.rules.<rule-name>]`. A project that doesn't use the framework pays nothing, not even a parse: the shared model reads a file only when its text mentions the framework.
+- **Don't duplicate Ruff.** A family rule never reports what Ruff's rules for that framework (`FAST`) or flake8-async (`ASYNC`) already report. Where Ruff covers the single-file case, the Inwards rule covers only what needs other files.
+- **One shared model per family.** The FAPI rules read one model of apps, routers, path operations, wiring and exception handlers (`rules/fastapi/`), built statically from the source and resolved across files through `ProjectIndex`. The application is never imported or run ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **Registered codes may ship before their checks.** FAPI001 to FAPI003 are registered with their pages now and report nothing until [#183](https://github.com/SirCypkowskyy/inwards/issues/183) and [#184](https://github.com/SirCypkowskyy/inwards/issues/184); their pages say so. Codes planned later (FAPI004 for the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike, FAPI005 to FAPI009 for #224 to #228) are listed in the rules index but not registered, so they stay config errors until they ship.
+
+**Consequences.**
+
+- :material-plus-circle-outline: A team turns the family on rule by rule, and a finding's code says whether it is architecture or framework advice.
+- :material-plus-circle-outline: The model is written once; each FAPI rule is a query over it.
+- :material-minus-circle-outline: Chapter 1's "only the dependency structure" no longer holds for opt-in families; the default rule set still does.
+- :material-minus-circle-outline: A registered code with no checks yet is accepted by `extend-select` and does nothing, which a user may not expect; the page's banner is the only signal.
+- :material-minus-circle-outline: Static resolution misses dynamic wiring (routers found by `importlib`, factories); each rule has to say how it degrades.
+
+**Alternatives.**
+
+- *FastAPI rules as `INW` codes:* one namespace, but a team couldn't turn the framework advice on or off as a unit, and the codes would mix two kinds of rule.
+- *Reuse Ruff's `FAST` prefix:* familiar, but `FAST002` would mean two different rules in one repository.
+- *On by default in projects that import FastAPI:* less configuration, but new errors would appear on an upgrade in every FastAPI project.
+- *Contribute the checks to Ruff:* Ruff lints one file at a time, and these checks need the project-wide view.

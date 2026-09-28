@@ -116,7 +116,7 @@ Prescan refusal
 :   The prescan declining a file because `import` appears somewhere it can't account for. The file then gets a full parse. 8.3 % of CPython's stdlib files are refused.
 
 Rule code
-:   `INW` plus three digits. Codes are never reused, and a retired rule keeps its number.
+:   `INW` or a family prefix such as `FAPI` (FastAPI rules), plus three digits. Codes are never reused, and a retired rule keeps its number.
 
 Release PR
 :   The pull request release-please keeps open with the next version and its changelog. Merging it cuts the release ([ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)).

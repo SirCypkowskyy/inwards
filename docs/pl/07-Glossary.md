@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: 4235074afef4c76b5c5a572ec7738d5ddeba2c4154bfc9deeede41df51b7a600
+source_hash: 4e7164239d88d91ccd562381f48c95a9439f9e2540a3cb4735cc8588d0c1ce22
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -121,7 +121,7 @@ Odmowa prescanu (prescan refusal)
 :   Prescan rezygnuje z pliku, bo `import` pojawia się w miejscu, którego nie umie wyjaśnić. Plik dostaje wtedy pełne parsowanie. Odmowę dostaje 8,3 % plików biblioteki standardowej CPythona.
 
 Kod reguły (rule code)
-:   `INW` i trzy cyfry. Kody nigdy nie są używane ponownie, a wycofana reguła zachowuje swój numer.
+:   `INW` albo prefiks rodziny, np. `FAPI` (reguły FastAPI), i trzy cyfry. Kody nigdy nie są używane ponownie, a wycofana reguła zachowuje swój numer.
 
 Release PR
 :   Pull request, który release-please utrzymuje otwarty z następną wersją i jej changelogiem. Scalenie go tworzy wydanie ([ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr)).

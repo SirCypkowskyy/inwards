@@ -17,6 +17,27 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | error | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | error | yes |
 
+## FastAPI rules { #fastapi }
+
+The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do. FAPI001 to FAPI003 are registered, so config, suppressions and SARIF accept their codes, but their checks land in [#183](https://github.com/SirCypkowskyy/inwards/issues/183) and [#184](https://github.com/SirCypkowskyy/inwards/issues/184); until then they report nothing.
+
+| Code | Name | What it flags | Default | Inline suppression |
+|---|---|---|---|---|
+| [FAPI001](FAPI001.md) | `endpoint-metadata` | A path operation without the OpenAPI metadata the project requires (summary, response model, status code) | opt-in, error | yes |
+| [FAPI002](FAPI002.md) | `undocumented-error-response` | A path operation that can produce an error status code its `responses=` doesn't declare | opt-in, error | yes |
+| [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` no app includes, or routers that include each other in a cycle | opt-in, error | yes |
+
+Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
+
+| Code | Name | Issue | Status |
+|---|---|---|---|
+| FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | reserved until the #185 spike says go |
+| FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planned |
+| FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planned |
+| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planned |
+| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planned |
+| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
+
 The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.
 
 ## Configure rules
@@ -37,7 +58,7 @@ Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `
 
 ### Opt-in rules and rule options { #opt-in-rules }
 
-A rule whose Default column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. Every rule that ships today is on by default; the opt-in ones are the rules that judge code against thresholds a team picks. SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
+A rule whose Default column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default; the opt-in ones are the rules that judge code against thresholds a team picks, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
 
 A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
 
@@ -56,7 +77,7 @@ To accept one finding for good, put a suppression on the line it points at, with
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW003, INW005, INW006, INW010 and INW011. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
+Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW003, INW005, INW006, INW010, INW011 and the FAPI rules. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
 
 ## Page format
 

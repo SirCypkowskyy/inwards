@@ -133,7 +133,7 @@ A suppression with no reason, an unknown code or a malformed comment hides nothi
 
 ## What Inwards is not
 
-It is not a general linter, a type checker or a formatter. Keep Ruff and ty. Inwards only reasons about the dependency structure between your own modules, and it assumes you already know what architecture you want. It won't invent one for you.
+It is not a general linter, a type checker or a formatter. Keep Ruff and ty. By default Inwards only reasons about the dependency structure between your own modules (opt-in rule families such as [FastAPI](rules/index.md#fastapi) go further, [ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)), and it assumes you already know what architecture you want. It won't invent one for you.
 
 ## How these docs are organised
 

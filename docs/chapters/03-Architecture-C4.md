@@ -356,6 +356,11 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | INW009 | `suppression-comment` | An inline suppression, `# inwards: ignore[INW001] reason="..."`, that hides nothing: malformed, without a reason, or naming a code that is unknown or can't be suppressed (INW000, INW004, INW007, INW008, INW009) (error); one with a code that matches no finding on its line (warning). See [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :white_check_mark: |
 | INW010 | `unknown-first-party` | A static import, in a layer, of a first-party module that doesn't exist, the typical agent hallucination (`from shop.domain.pricing import X` with no `pricing`), and a relative import that climbs above the top-level package, which Python always refuses. The module part is checked: `X` of `from X import name`, the whole name otherwise. Existence is probed on disk, so namespace packages, stubs and compiled extensions (`.so`, `.pyd`, `.pyx`) count; the fix lists the three closest modules in the same package. Such an import gets no INW006 as well, and an outward import INW001 reports gets no INW010. Packages that extend their `__path__` are skipped, and so are modules a build step writes (`generated`, by default `*_pb2`, `*_pb2_grpc` and `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). See [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :white_check_mark: |
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. In every layer but the outermost, a target Inwards can't read is reported as unverifiable: a variable, an f-string field, a `\N{...}` escape, an argument hidden behind `*args` or `**kwargs`, a relative `import_module` whose `package` isn't known, `exec` or `eval` of a non-literal source ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). A common way to dodge INW001. Known gaps are listed above | :white_check_mark: |
+| FAPI001 | `endpoint-metadata` | Opt-in. A FastAPI path operation without the OpenAPI metadata the project requires. Registered; checks in [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
+| FAPI002 | `undocumented-error-response` | Opt-in. A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare. Registered; checks in [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
+| FAPI003 | `router-wiring` | Opt-in. An `APIRouter` no app includes, or routers that include each other in a cycle. Registered; checks in [#184](https://github.com/SirCypkowskyy/inwards/issues/184) | :material-progress-clock: |
+
+The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is reserved for the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike, and FAPI005 to FAPI009 are planned ([rules index](rules/index.md#fastapi)).
 
 ## Code map
 
@@ -389,8 +394,10 @@ src/
 │   │   │   ├── package-shape/           # INW007 + INW008: shape.ts, fix.ts (wording, likely target)
 │   │   │   ├── suppression-comment.ts   # INW009: inline suppressions, what they hide
 │   │   │   ├── unknown-first-party.ts   # INW010: first-party modules that don't exist
-│   │   │   └── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
-│   │   │                                #   loader-targets.ts, computed-source.ts
+│   │   │   ├── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
+│   │   │   │                            #   loader-targets.ts, computed-source.ts
+│   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
+│   │   │                                #   handlers, resolved across files); rules in #183, #184
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut
 │   │   └── report/        # render.ts: text / concise / json / sarif
