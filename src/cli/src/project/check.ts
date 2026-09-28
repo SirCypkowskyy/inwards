@@ -68,12 +68,19 @@ export function diskCacheWanted(
  * @param io - reads the config, loads the grammars and opens the extraction cache.
  * @param configPath - absolute path of the pyproject.toml to use.
  * @param cache - true to give the engine the disk cache, when `io` has one.
+ * @param parsed - the config to use instead of the one in `configPath`, whose
+ *   text still places findings about the config itself.
  * @returns the engine and the config root, as written and resolved.
  * @throws {ConfigError} when the config is invalid.
  */
-async function openProject(io: ProjectIo, configPath: string, cache = false): Promise<Project> {
+async function openProject(
+  io: ProjectIo,
+  configPath: string,
+  cache = false,
+  parsed?: InwardsConfig,
+): Promise<Project> {
   const configText = io.read.text(configPath);
-  const config = parseConfig(configText);
+  const config = parsed ?? parseConfig(configText);
   const lexicalRoot = resolve(dirname(configPath), config.root);
   const wasm = await io.grammars();
   const dir = dirname(configPath);
@@ -264,6 +271,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * @param options.texts - content to check instead of a file's, by absolute path.
  * @param options.cache - true to read and fill the extraction cache on disk
  *   (`inwards check` and `inwards baseline`); the hooks never pass it (#56).
+ * @param options.config - the config to check with instead of the one in
+ *   `configPath` (the Stop gate's session-start config, after the agent changed it).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -277,16 +286,18 @@ export async function runCheck(
     required = false,
     texts,
     cache = false,
+    config,
   }: {
     base: string;
     baseline?: boolean | undefined;
     required?: boolean | undefined;
     texts?: ReadonlyMap<string, string> | undefined;
     cache?: boolean | undefined;
+    config?: InwardsConfig | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
-  const project = await openProject(io, configPath, cache);
+  const project = await openProject(io, configPath, cache, config);
   const { files, loaded } = loadSources(io, project, { targets, base, texts });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;

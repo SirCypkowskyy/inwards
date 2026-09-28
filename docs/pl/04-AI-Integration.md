@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: fafd0de32317a1cb01c7d6bb4dacc117ac77d63349624032036bf9fea3f59d84
+source_hash: e7e9ded8ffe0a6e9625de5125c68a2ac84d763303fc7a65583c4cf509da4c933
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -111,7 +111,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
     Bramka nie pozwala też zakończyć tury, gdy nie może ufać sesji:
 
     - **Brak zapisu startu**, bo usunięto `.inwards/` albo hooki zainstalowano w trakcie sesji. Gdy Claude Code ustawi `stop_hook_active` po blokadzie, bramka pozwala tej turze się zakończyć.
-    - **`[tool.inwards]` różni się od migawki z początku sesji**, na przykład po `sed -i` przez Bash, albo **zmieniony plik podlega `pyproject.toml`, który na początku nie miał poprawnego `[tool.inwards]`** (nowa, pobłażliwa konfiguracja zagnieżdżona w warstwie).
+    - **`[tool.inwards]` różni się od migawki z początku sesji**, na przykład po `sed -i` przez Bash, albo **zmieniony plik podlega `pyproject.toml`, który na początku nie miał poprawnego `[tool.inwards]`** (nowa, pobłażliwa konfiguracja zagnieżdżona w warstwie). Po zmianie `[tool.inwards]` bramka sprawdza zmienione pliki według migawki z początku sesji, więc blokada pokazuje też to, co zmiana by ukryła: gdy przez Bash dodano `ignore = ["INW001"]` albo `severity = { INW001 = "warning" }`, naruszenie INW001 nadal pojawia się jako błąd ([#164](https://github.com/SirCypkowskyy/inwards/issues/164)).
     - **Hook `SessionStart`, `PreToolUse` albo `PostToolUse` Inwards zniknął ze wszystkich warstw ustawień** (użytkownika, projektu, lokalnej), łącznie z matcherem, który nie obejmuje już narzędzi, które musi widzieć, albo ustawiono **`disableAllHooks`**. Sprawdzenie czyta ustawienia, a nie programy, które one uruchamiają, więc dowodzi konfiguracji, a nie tego, że działa prawdziwy Inwards. Claude Code przeładowuje hooki, gdy ustawienia się zmieniają, więc usunięcie samego hooka Stop od razu wyłącza bramkę; te edycje blokuje config guard (niżej).
 
     Bramka blokuje turę najwyżej `escalate-after` razy (domyślnie 3). Stop po ostatniej blokadzie pozwala zakończyć turę i pokazuje użytkownikowi, co wciąż jest nierozwiązane, a eskalacja (niżej) zamienia powtarzającą się porażkę w pytanie do użytkownika. Licznik zaczyna się od nowa z każdą nową turą. Jeśli sama bramka zawiedzie (na przykład nieczytelny plik), blokuje raz z błędem i pozwala zakończyć turę przy następnej próbie, więc zepsuta bramka nie może ciągnąć sesji w nieskończoność.

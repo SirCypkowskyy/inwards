@@ -19,6 +19,8 @@ export interface Check {
   configPath: string;
   base: string;
   baseline: boolean;
+  /** The config to check with instead of the one in `configPath`, as `CheckRunner` takes it. */
+  config?: InwardsConfig | undefined;
   /**
    * The path the agent wrote for a checked file, when the hook had to resolve
    * a `..` to find it: absolute checked file to the payload's cwd joined with
@@ -35,7 +37,8 @@ export interface Check {
  * @param targets - absolute files; undefined for the whole project.
  * @param base - the directory report paths are relative to.
  * @param options - whether the baseline applies, file contents to check instead
- *   of the disk's, and whether the extraction cache on disk may be used (never by a hook).
+ *   of the disk's, whether the extraction cache on disk may be used (never by a
+ *   hook), and a config to use instead of the one in `configPath`.
  * @returns the report.
  */
 export type CheckRunner = (
@@ -47,5 +50,6 @@ export type CheckRunner = (
     required?: boolean;
     texts?: ReadonlyMap<string, string>;
     cache?: boolean;
+    config?: InwardsConfig | undefined;
   },
 ) => Promise<Report>;

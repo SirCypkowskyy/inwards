@@ -4,7 +4,8 @@
  * falls under at session start. A config set to `stop-gate = "project"` gets
  * a whole-project check instead. Violations a changed file already had at
  * session start and suppressions the agent added are sorted out here, with
- * the invocation's start lookups.
+ * the invocation's start lookups. A config the agent changed checks with its
+ * session-start version.
  */
 import { dirname, join } from "node:path";
 import type { Diagnostic, InwardsConfig, Report } from "@inwards/core";
@@ -62,6 +63,10 @@ export function changedFiles(
  * "project"` at session start gets a whole-project check instead, changed
  * files or not, from every path it was found at, but only while the
  * baselines can be trusted: otherwise it would report every legacy violation.
+ * A config that changed during the session checks with its session-start
+ * version, so the report shows what the change would hide, such as a
+ * violation of a rule it now ignores (#164); the change itself fails the
+ * gate in `stop-gate.ts`.
  *
  * @param lookups - this invocation's start lookups, with the project and the check runner.
  * @param files - absolute changed files.
@@ -120,12 +125,18 @@ export async function checkChanged(
   }
   const reports = await Promise.all(
     [...byConfig].map(async ([config, group]) => {
-      const check = { configPath: config, base: project, baseline };
+      const rel = projectPath(lookups.probe, project, config);
+      const check = {
+        configPath: config,
+        base: project,
+        baseline,
+        config: startIfChanged(start.configs, now, rel),
+      };
       const { report, rejected } = await agentSuppressions(
         lookups,
         start,
         check,
-        await lookups.check(config, group, project, { baseline }),
+        await lookups.check(config, group, project, { baseline, config: check.config }),
       );
       const old = group ? await oldErrors(lookups, start, check, report.diagnostics) : [];
       const diagnostics = report.diagnostics.filter((d) => !old.includes(d));
@@ -144,6 +155,24 @@ export async function checkChanged(
     strangers,
     governing: [...byConfig.keys()].map((config) => projectPath(lookups.probe, project, config)),
   };
+}
+
+/**
+ * Picks the session-start version of a config the agent changed, so the check
+ * shows what the change would hide (#164).
+ *
+ * @param start - the configs at session start, by project-relative path.
+ * @param now - the valid configs now.
+ * @param rel - the project-relative pyproject.toml.
+ * @returns the start config when it differs from the one now, else undefined
+ *   (check with the config on disk, as for an unchanged one).
+ */
+function startIfChanged(
+  start: Record<string, InwardsConfig>,
+  now: Record<string, InwardsConfig>,
+  rel: string,
+): InwardsConfig | undefined {
+  return JSON.stringify(start[rel]) === JSON.stringify(now[rel]) ? undefined : start[rel];
 }
 
 /**
