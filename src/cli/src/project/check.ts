@@ -6,6 +6,7 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkLinks,
   checkNestedProjects,
   checkPrefixes,
   checkRequired,
@@ -32,6 +33,7 @@ import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
+import { layerLinks, linksUnder } from "./links.ts";
 import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
@@ -259,7 +261,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * Loads the config and engine, then checks the Python files under the targets.
  * A whole-project run (no targets) also checks the layer prefixes and shape
  * selectors against the modules found (INW006, INW007), warns about nested
- * projects such as uv workspace members (INW006), every shaped
+ * projects such as uv workspace members (INW006), reports symlinks in layers
+ * that hide code from the rules (INW006, `checkLinks`), every shaped
  * package's required members (INW008) and the import cycles among the
  * checked files (INW004). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
@@ -331,6 +334,16 @@ export async function runCheck(
       ...checkSelectors(project.config, packages, pyproject),
       ...checkRuleOptions(project.config.rules, pyproject),
       ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
+      ...checkLinks(project.config, {
+        links: linksUnder(
+          io.probe,
+          layerLinks(io, project.configPath, project.config),
+          project.lexicalRoot,
+          project.config,
+        ),
+        modules,
+        shownRoot,
+      }),
     );
     diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
   } else if (required) {

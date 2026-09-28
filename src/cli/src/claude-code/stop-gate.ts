@@ -9,7 +9,9 @@
  * every file whose content hash differs from the SessionStart manifest. The
  * manifest walks layer packages without skipping anything, so a commit,
  * `git update-index --assume-unchanged`, a gitignored or untracked file, or a
- * pyvenv.cfg disguise inside a layer all show up as changed. In a changed
+ * pyvenv.cfg disguise inside a layer all show up as changed. The symlinks in
+ * layer packages are recorded too, so a link made during the session out of
+ * the config root or into another layer blocks (#83, #84). In a changed
  * file, only violations it didn't have at session start block; the old ones
  * go along as context when the gate blocks for something else (`session/old-errors.ts`).
  * Under `agent-suppressions = "deny"`, the default, an inline suppression
@@ -29,7 +31,7 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { changedBaselines } from "../project/baseline.ts";
-import { projectConfigs, projectManifest } from "../project/snapshot.ts";
+import { projectConfigs, projectLinks, projectManifest } from "../project/snapshot.ts";
 import { rejectedNote } from "../session/agent-suppressions.ts";
 import { fingerprint } from "../session/fingerprint.ts";
 import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";
@@ -188,8 +190,8 @@ async function review(
   const layout = newLayoutErrors(
     project,
     { valid: configs, texts },
-    state.start.manifest,
-    manifest,
+    { before: state.start.manifest, now: manifest },
+    { before: state.start.links, now: projectLinks(io, project, configs), probe: io.probe },
   );
   checked.report.diagnostics = [
     ...layout,

@@ -70,6 +70,14 @@ layers = [
 ]
 `;
 
+/** Vertical slices: every slice's domain and infrastructure (layer selectors). */
+export const SLICES = `[tool.inwards]
+layers = [
+  { name = "domain", modules = ["shop.*.domain"] },
+  { name = "infrastructure", modules = ["shop.*.infrastructure"] },
+]
+`;
+
 const TMP = tempDir("inwards-e2e-");
 
 /**
