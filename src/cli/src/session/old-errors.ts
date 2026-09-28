@@ -7,7 +7,9 @@
  * Each file with an error is checked again as it was at session start
  * (`start-content.ts`), looked up by its start identity
  * (`start-identity.ts`); a file with no proven start content has no old
- * errors: when in doubt, the gate blocks.
+ * errors: when in doubt, the gate blocks. A file the Stop gate checks only
+ * because it mentions a new top-level package, and that the session didn't
+ * change, is its own start content (#86).
  */
 import { resolve } from "node:path";
 import { type Diagnostic, type Report, stableMessage } from "@inwards/core";
@@ -55,11 +57,15 @@ export async function atStart(
 ): Promise<Report | undefined> {
   const texts = new Map<string, string>();
   for (const d of found) {
+    const abs = resolve(check.base, d.file);
     const rel = lookups.identity.identityOf(lookups.project, check, d.file);
     const text =
-      rel === undefined ? undefined : lookups.content.startText(lookups.project, start, rel);
+      rel === undefined
+        ? undefined
+        : (lookups.content.startText(lookups.project, start, rel) ??
+          (check.unchanged?.has(abs) ? textNow(lookups, abs) : undefined));
     if (text !== undefined) {
-      texts.set(resolve(check.base, d.file), text);
+      texts.set(abs, text);
     }
   }
   if (texts.size === 0) {
@@ -69,7 +75,23 @@ export async function atStart(
     baseline: check.baseline,
     texts,
     config: check.config,
+    absent: check.absent,
   });
+}
+
+/**
+ * Reads a file the session didn't change, as its start content.
+ *
+ * @param lookups - reads the file.
+ * @param file - the absolute file.
+ * @returns its text, or undefined when it can't be read.
+ */
+function textNow(lookups: Pick<StartLookups, "read">, file: string): string | undefined {
+  try {
+    return lookups.read.text(file);
+  } catch {
+    return undefined; // gone: no start content, so its errors block
+  }
 }
 
 /**

@@ -32,7 +32,7 @@ export type {
 } from "./contracts/records.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";
-export type { PathKind } from "./lookup/module-lookup.ts";
+export { type PathKind, topLevelModules } from "./lookup/module-lookup.ts";
 export type { ProjectFiles, ProjectIndex } from "./lookup/project-index.ts";
 export { DOCS_BASE, VERSION } from "./meta/product.ts";
 export { RULES } from "./meta/registry.ts";

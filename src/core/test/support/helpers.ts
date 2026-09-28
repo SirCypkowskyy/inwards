@@ -98,14 +98,15 @@ export function indexOn(
     kind: (rel: string): "file" | "dir" | undefined => disk.get(rel),
     list: (): string[] => [...disk].flatMap(([rel, kind]) => (kind === "file" ? [rel] : [])),
     read: (rel: string): string => texts.get(rel) ?? "",
-    listDir: (rel: string): { name: string; dir: boolean }[] | undefined =>
-      disk.get(rel) === "dir"
+    listDir: (rel: string): { name: string; dir: boolean }[] | undefined => {
+      // `""` is the config root, which always exists.
+      const prefix = rel === "" ? "" : `${rel}/`;
+      return rel === "" || disk.get(rel) === "dir"
         ? [...disk]
-            .filter(
-              ([path]) => path.startsWith(`${rel}/`) && !path.slice(rel.length + 1).includes("/"),
-            )
-            .map(([path, kind]) => ({ name: path.slice(rel.length + 1), dir: kind === "dir" }))
-        : undefined,
+            .filter(([path]) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/"))
+            .map(([path, kind]) => ({ name: path.slice(prefix.length), dir: kind === "dir" }))
+        : undefined;
+    },
   });
 }
 

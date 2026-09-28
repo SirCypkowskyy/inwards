@@ -710,8 +710,8 @@
           "pattern": "^\\d+\\.\\d+\\.\\d+$"
         },
         "ignore": {
-          "description": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name.",
-          "markdownDescription": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#ignore)",
+          "description": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name, or at its start when the entry begins with /.",
+          "markdownDescription": "Module names left out of the INW006 unassigned-package warning, matched as whole segments anywhere in a module name, or at its start when the entry begins with /.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#ignore)",
           "type": "array",
           "items": {
             "type": "string",

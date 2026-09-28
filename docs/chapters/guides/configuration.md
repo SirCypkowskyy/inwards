@@ -141,13 +141,13 @@ The oldest Inwards allowed to check the project. An older binary fails with a co
 
 Type: list of module names. Default: none.
 
-Modules left out of the INW006 warning about code outside every layer, such as `tests` or `migrations`. An entry matches whole name segments anywhere in a module name: `migrations` covers `shop.orders.migrations.0001_initial`. Imports from a layer into them are still checked.
+Modules left out of the INW006 warning about code outside every layer, such as `tests` or `migrations`. An entry matches whole name segments anywhere in a module name: `migrations` covers `shop.orders.migrations.0001_initial`, and `tests` covers `shop.tests` as well as the top-level `tests`. An entry that starts with `/` matches at the start of the name only: `/tests` covers `tests.test_order` but not `shop.tests.test_order`, which still gets the warning. `inwards init` writes the unanchored defaults. Imports from a layer into ignored modules are still checked.
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
-ignore = ["tests", "scripts", "migrations", "conftest"]
+ignore = ["/tests", "scripts", "migrations", "conftest"]
 ```
 
 ### `generated` { #generated }
