@@ -11,6 +11,8 @@
  * Metrics:
  * - hook: `inwards hook claude-code` with a PostToolUse payload for one file,
  *   the quality goal's "a hook checks one edited file" (p95 < 100 ms);
+ * - pre-write: `inwards hook claude-code` with a PreToolUse Write of a new
+ *   Python file, which the config guard and the shape guard (#96) both see;
  * - full: a cold `inwards check` of the whole repo, with `INWARDS_NO_CACHE=1`
  *   for both binaries, so the gate compares the work itself (#56).
  *
@@ -370,12 +372,24 @@ function main(): number {
     cwd: repo,
     tool_input: { file_path: file },
   });
+  const preWrite = JSON.stringify({
+    session_id: "bench",
+    hook_event_name: "PreToolUse",
+    tool_name: "Write",
+    cwd: repo,
+    tool_input: { file_path: join(repo, "src/shop/domain/p0/new_module.py"), content: "X = 1\n" },
+  });
   const binaries = { base: resolve(base), head: resolve(head) };
   // Every hook run appends to the "bench" session's log; start from none.
   rmSync(join(repo, ".inwards"), { recursive: true, force: true });
   const hook = alternate(
     binaries,
     { argv: ["hook", "claude-code"], cwd: repo, stdin: payload },
+    { measured: hookRuns, warmup: DEFAULTS.warmup },
+  );
+  const pre = alternate(
+    binaries,
+    { argv: ["hook", "claude-code"], cwd: repo, stdin: preWrite },
     { measured: hookRuns, warmup: DEFAULTS.warmup },
   );
   const full = alternate(
@@ -385,6 +399,7 @@ function main(): number {
   );
   const verdicts = [
     judge("hook (one file)", hook, threshold),
+    judge("pre-write (new file)", pre, threshold),
     judge("full check", full, threshold),
   ];
   const cache = cacheModes(binaries.head, repo, { measured: fullRuns, warmup: 1 });

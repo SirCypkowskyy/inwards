@@ -1,13 +1,14 @@
 /**
  * @file Routes a Claude Code hook payload to the handler for its event:
- * SessionStart, PreToolUse (the config guard), PostToolUse and Stop (the
- * gate). Any other event passes with exit 0, so a hook installed for more
+ * SessionStart, PreToolUse (the shape guard, then the config guard),
+ * PostToolUse and Stop (the gate). Any other event passes with exit 0, so a hook installed for more
  * events than Inwards handles never blocks the agent.
  */
 import { configGuard } from "./config-guard.ts";
 import { postToolUse } from "./post-tool-use.ts";
 import type { HookDeps } from "./protocol.ts";
 import { sessionStart } from "./session-start.ts";
+import { shapeGuard } from "./shape-guard.ts";
 import { stopGate } from "./stop-gate.ts";
 
 /**
@@ -30,7 +31,9 @@ export async function dispatch(
     return await stopGate(deps, input);
   }
   if (event === "PreToolUse") {
-    return configGuard(deps.io, input);
+    // A shape denial only ever answers a Write of a new Python file, which the
+    // config guard would pass; one decision per call keeps stdout one JSON.
+    return shapeGuard(deps, input) ? 0 : configGuard(deps.io, input);
   }
   return event === "PostToolUse" ? await postToolUse(deps, input) : 0;
 }

@@ -204,7 +204,7 @@ function reply(
  * @param diagnostics - this run's blocking errors.
  * @returns the limit, and whether every error in the run reached it; undefined when none did.
  */
-function escalationOf(
+export function escalationOf(
   io: Pick<Platform, "probe" | "read" | "state">,
   { project, id }: { project: string; id: unknown },
   configPath: string,
@@ -233,7 +233,7 @@ function escalationOf(
  * @param start - the session's start record, if it has one.
  * @returns the config path, or undefined without one.
  */
-function sessionConfig(
+export function sessionConfig(
   io: Pick<Platform, "probe" | "read">,
   dir: string,
   project: string,
@@ -264,7 +264,7 @@ function sessionConfig(
  * @param file - the edited file.
  * @param diagnostics - the errors the check blocked on (context-only findings are left out).
  */
-function rememberEdit(
+export function rememberEdit(
   io: Pick<Platform, "probe" | "clock" | "state">,
   { project, id }: { project: string; id: unknown },
   file: string,

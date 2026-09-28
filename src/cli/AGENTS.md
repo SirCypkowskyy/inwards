@@ -13,7 +13,7 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle | hold logic a test would want to call |
 | `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`) | import `adapters/` |
-| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings`, and `protocol` (shared by all of them) | read the environment or the filesystem itself |
+| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings`, and `protocol` (shared by all of them) | read the environment or the filesystem itself |
 | `session/` | the session record, start identity and start content, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
 | `project/` | running a check, the baseline, config discovery, project snapshots | own a filesystem walk (that is `adapters/file-walk.ts`) |
 | `runlog/` | the run log, reading it back, stats, `--export` | keep notes in a module global |

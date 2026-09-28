@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: e0f9c1e9aa3099198a275cad31ef89405d4ff5e108ad00e73a3ea279754cca13
+source_hash: 61ae652bc6389ddd258ac70a4777115484a354f3147616472b28b9ce32ae6c8a
 ---
 
 # Claude Code { #claude-code }
@@ -50,6 +50,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 | „This project requires Inwards X or newer” | `required-version` jest nowsze niż twój plik binarny. Zainstaluj nowsze wydanie. |
 | `config error: Unknown key tool.inwards.…` | Literówka w `[tool.inwards]`. Komunikat podaje klucz i wypisuje znane klucze. |
 | Claude mówi, że edycja `pyproject.toml` została odrzucona | Edycja dotknęła `[tool.inwards]`. To config guard. Jeśli naprawdę chcesz zmienić warstwy, zrób to sam. |
+| Claude mówi, że nowy plik `.py` „was not created” | `[[tool.inwards.shape]]` albo `[[tool.inwards.names]]` pakietu nie dopuszcza tej nazwy, więc shape guard odrzucił `Write` ([INW007](../rules/INW007.md)). Powód mówi, gdzie powinien trafić kod. Jeśli pakiet potrzebuje tego elementu, zmień kształt sam. |
 | Komunikat „an inline suppression that wasn't in the file when the session started” | Hooki pomijają wyciszenie dodane w trakcie sesji albo takie, które jest w pliku niezacommitowanym na starcie sesji i zedytowanym później ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)). Jeśli dodałeś je sam, zacommituj je i zacznij nową sesję; żeby Claude mógł je dodawać, ustaw `agent-suppressions = "allow"` w `[tool.inwards]`. |
 | Tura kończy się komunikatem „unresolved architecture problems” | To samo naruszenie przetrwało `escalate-after` prób (domyślnie 3). Claude powinien zapytać cię, co dalej. Lista trafia też do następnej sesji. |
 | `init` ostrzega, że ścieżka „is in uv's cache” (albo bunx's) | Uruchomiono go przez `uvx` albo `bunx`, więc ścieżka, którą by zapisał, znika po `uv cache clean` albo przy następnej wersji. Dodaj Inwards do projektu i uruchom `uv run inwards init --agent claude --launcher "uv run"` albo zainstaluj plik binarny z wydania i uruchom nim `init`. |

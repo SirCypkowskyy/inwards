@@ -48,6 +48,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | hook, agent hook | hook, hook agenta (hooka, hooki, hookach) | the four Claude Code hooks: SessionStart, PreToolUse, PostToolUse, Stop |
 | Stop gate | Stop gate | "Stop gate blokuje turę", not "bramka Stop" |
 | config guard | config guard | the PreToolUse guard |
+| shape guard | shape guard | the PreToolUse check of a new file against INW007 |
 | baseline | baseline (baseline'u); `inwards-baseline.json` | "przyjąć naruszenia do baseline'u" |
 | fingerprint | fingerprint (fingerprintu) | the 16-hex-digit hash |
 | run log | run log (run logu) | `.inwards/runs.jsonl` |
