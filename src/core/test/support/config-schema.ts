@@ -22,6 +22,8 @@ export interface Schema {
   definitions?: Record<string, Schema>;
   items?: Schema;
   allOf?: Schema[];
+  anyOf?: Schema[];
+  additionalProperties?: Schema | boolean;
   // biome-ignore lint/style/useNamingConvention: the JSON Schema keyword is spelled $ref.
   $ref?: string;
   enum?: string[];

@@ -18,7 +18,8 @@
  * selector alive is still caught (ADR-034).
  */
 import { isSelector, matchEntry } from "../../config/layer-selector.ts";
-import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
+import type { LayerSpec } from "../../config/layers.ts";
+import type { InwardsConfig } from "../../config/parse.ts";
 import { applyRules } from "../../config/rule-settings.ts";
 import { type ConfigFile, spanOf } from "../../config/source-span.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";

@@ -4,6 +4,11 @@
  * the hook settings (`escalate-after`, `run-log`, `stop-gate`,
  * `agent-suppressions`). Unknown keys and wrong types throw `ConfigError`, so
  * a typo fails loudly instead of quietly turning a rule off.
+ *
+ * Templates (`templates.ts`) are expanded here, once, before anything else is
+ * checked: `layers.ts` turns a layer entry with a template into its role
+ * layers, and the shape and context entries get the template's keys. The
+ * result holds no trace of templates, so the rules never see them.
  */
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
@@ -17,30 +22,11 @@ import {
   type StopGate,
   stopGateKey,
 } from "./hook-keys.ts";
-import { isSelector, selectorProblem } from "./layer-selector.ts";
+import { isModuleList, type LayerSpec, parseLayers } from "./layers.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
-
-export interface LayerSpec {
-  name: string;
-  /**
-   * Module prefixes and selectors that belong to the layer. `shop.domain`
-   * matches `shop.domain.order`; `shop.*.domain` matches
-   * `shop.orders.domain.order` (ADR-034).
-   */
-  modules: string[];
-  /** Libraries the layer may import (`allow-libraries`); set, any other third-party one is denied (INW005). */
-  allowLibraries?: string[];
-  /** Libraries the layer may not import (`deny-libraries`), stdlib included (INW005). */
-  denyLibraries?: string[];
-  /**
-   * Libraries added to the layer's deny list (`extend-deny-libraries`): to
-   * `deny-libraries` when set, else to the default list the innermost layer
-   * gets, else to nothing (INW005).
-   */
-  extendDenyLibraries?: string[];
-}
+import { parseTemplates, withContextTemplates, withShapeTemplates } from "./templates.ts";
+import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 export interface InwardsConfig {
   /** Directory, relative to the config file, that module names are computed from. */
@@ -136,13 +122,7 @@ export const TABLE_KEYS: ReadonlySet<string> = new Set([
   "agent-suppressions",
   "contexts",
   "cycles",
-]);
-export const LAYER_KEYS: ReadonlySet<string> = new Set([
-  "name",
-  "modules",
-  "allow-libraries",
-  "deny-libraries",
-  "extend-deny-libraries",
+  "templates",
 ]);
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
@@ -194,7 +174,8 @@ export function inwardsTable(pyprojectText: string): unknown {
  * `root` defaults to `.` and has backslashes turned into slashes. Layer names
  * must be unique and non-empty; each layer needs a list of non-empty module
  * prefixes or selectors, a selector must be well formed, and no entry may
- * belong to two layers. Unknown keys are errors,
+ * belong to two layers. Templates are expanded first, so these checks see
+ * the layers, shapes and contexts they produce. Unknown keys are errors,
  * since a mistyped key would silently change nothing. The TOML parser's own
  * error is kept as `cause`.
  *
@@ -223,9 +204,8 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
   if (!Array.isArray(layers) || layers.length === 0) {
     throw new ConfigError("tool.inwards.layers must be a non-empty array.");
   }
-  const seen = new Set<string>();
-  const parsed = layers.map((layer: unknown, i) => parseLayer(layer, i, seen));
-  rejectOverlaps(parsed);
+  const templates = parseTemplates(raw["templates"]);
+  const parsed = parseLayers(layers, templates);
   const config: InwardsConfig = {
     root: root.replaceAll("\\", "/"),
     layers: parsed,
@@ -233,10 +213,10 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...parseGenerated(raw["generated"]),
     ...namespacePackagesKey(raw["namespace-packages"]),
     ...stopGateKey(raw["stop-gate"]),
-    ...parseShapeKeys(raw),
+    ...parseShapeKeys({ ...raw, shape: withShapeTemplates(raw["shape"], templates) }),
     ...parseRules(raw["rules"]),
     ...agentSuppressionsKey(raw["agent-suppressions"]),
-    ...parseContexts(raw["contexts"]),
+    ...parseContexts(withContextTemplates(raw["contexts"], templates)),
     ...parseCycles(raw["cycles"]),
   };
   return config;
@@ -291,101 +271,6 @@ function optionalKeys(
     ...(typeof escalateAfter === "number" ? { escalateAfter } : {}),
     ...(runLog === undefined ? {} : { runLog }),
   };
-}
-
-/**
- * Validates one entry of `layers`.
- *
- * @param layer - the raw entry.
- * @param i - its index, for messages.
- * @param seen - layer names so far, updated in place.
- * @returns the validated layer, with its optional library lists.
- * @throws {ConfigError} for unknown keys, a missing or repeated name, a malformed selector, or bad modules or libraries.
- */
-function parseLayer(layer: unknown, i: number, seen: Set<string>): LayerSpec {
-  if (isRecord(layer)) {
-    rejectUnknownKeys(layer, LAYER_KEYS, `tool.inwards.layers[${i}]`);
-  }
-  const { name, modules } = isRecord(layer) ? layer : {};
-  if (typeof name !== "string" || name === "") {
-    throw new ConfigError(`tool.inwards.layers[${i}].name must be a non-empty string.`);
-  }
-  if (seen.has(name)) {
-    throw new ConfigError(`Layer "${name}" is declared twice.`);
-  }
-  seen.add(name);
-  if (!isModuleList(modules)) {
-    throw new ConfigError(`tool.inwards.layers[${i}].modules must be a list of module names.`);
-  }
-  modules.forEach((entry, k) => {
-    const problem = isSelector(entry) ? selectorProblem(entry) : undefined;
-    if (problem !== undefined) {
-      throw new ConfigError(
-        `tool.inwards.layers[${i}].modules[${k}]: "${entry}" is not a valid selector: ${problem}. A selector's segments are package names, * (one segment) or ** (one or more), and it starts with a package name, such as "shop.*.domain".`,
-      );
-    }
-  });
-  const allow = libraryList(layer, i, "allow-libraries");
-  const deny = libraryList(layer, i, "deny-libraries");
-  const extend = libraryList(layer, i, "extend-deny-libraries");
-  return {
-    name,
-    modules,
-    ...(allow === undefined ? {} : { allowLibraries: allow }),
-    ...(deny === undefined ? {} : { denyLibraries: deny }),
-    ...(extend === undefined ? {} : { extendDenyLibraries: extend }),
-  };
-}
-
-/**
- * Validates a layer's `allow-libraries`, `deny-libraries` or
- * `extend-deny-libraries` (INW005).
- *
- * @param layer - the raw layer entry.
- * @param i - its index, for messages.
- * @param key - which of the three keys to read.
- * @returns the module names, or undefined when the key is absent.
- * @throws {ConfigError} when the value isn't a list of dotted Python identifiers.
- */
-function libraryList(layer: unknown, i: number, key: string): string[] | undefined {
-  const value = isRecord(layer) ? layer[key] : undefined;
-  const valid = isModuleList(value) && value.every((entry) => isDottedName(entry));
-  if (value !== undefined && !valid) {
-    throw new ConfigError(
-      `tool.inwards.layers[${i}].${key} must be a list of import names such as "sqlalchemy" or "http.client": no globs, and no distribution names like "python-dateutil".`,
-    );
-  }
-  return valid ? value : undefined;
-}
-
-/**
- * Throws when a prefix belongs to two layers: which one owns it would be a guess.
- *
- * @param layers - the parsed layers.
- * @throws {ConfigError} naming the prefix and both layers.
- */
-function rejectOverlaps(layers: readonly LayerSpec[]): void {
-  const owners = new Map<string, string>();
-  for (const { name, modules } of layers) {
-    for (const prefix of modules) {
-      const owner = owners.get(prefix);
-      if (owner !== undefined && owner !== name) {
-        throw new ConfigError(`"${prefix}" is in two layers, "${owner}" and "${name}".`);
-      }
-      owners.set(prefix, name);
-    }
-  }
-}
-
-/**
- * Tells whether a layer's `modules` value is a list of module prefixes.
- * An empty list passes; an empty string inside it does not.
- *
- * @param value - the raw `modules` value of one layer.
- * @returns true when every entry is a non-empty string.
- */
-function isModuleList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((m) => typeof m === "string" && m !== "");
 }
 
 /**

@@ -14,7 +14,8 @@
  * selector matches (`Evidence`, ADR-034).
  */
 import { deepestMatch, entryReach, isSelector } from "../../config/layer-selector.ts";
-import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
+import type { LayerSpec } from "../../config/layers.ts";
+import type { InwardsConfig } from "../../config/parse.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";

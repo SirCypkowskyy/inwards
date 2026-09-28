@@ -35,7 +35,7 @@
  * running that takes `exec` or `eval`, which are reported themselves.
  */
 import type { Parser, Tree } from "web-tree-sitter";
-import type { LayerSpec } from "../../config/parse.ts";
+import type { LayerSpec } from "../../config/layers.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
@@ -45,6 +45,7 @@ import {
   outwardImports,
   portHome,
   portSteps,
+  rankOf,
 } from "../shared/layer-ownership.ts";
 import { builtinBindings } from "./callees.ts";
 import { loadingCalls, type Reader } from "./calls.ts";
@@ -155,28 +156,31 @@ export function checkDynamicImports(
   layers: readonly LayerSpec[],
 ): Diagnostic[] {
   const readable = refs.filter((ref) => ref.unreadable === null);
-  const outward = outwardImports(file, readable, layers).map(({ ref, source, target }) => {
-    const message =
-      `Layer "${source.name}" imports "${ref.target}" from outer layer "${target.name}" ` +
-      `through a dynamic import (${ref.via}). Allowed direction: ${allowedDirection(layers)}.`;
-    return diagnostic(RULES.INW011, file, {
-      span: ref,
-      message,
-      fix: {
-        summary: `Remove the dynamic import and depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
-        steps: [
-          `Delete \`${ref.statement}\`. A dynamic import is still a dependency: building the module name at runtime or moving it to another loader hides it instead of removing it.`,
-          ...portSteps(file, layers, target, ref),
-        ],
-      },
-    });
-  });
-  const own = layers[layerIndexOf(file.module, layers)];
+  const outward = outwardImports(file, readable, layers).map(
+    ({ ref, source, target, relation }) => {
+      const message =
+        `Layer "${source.name}" imports "${ref.target}" from ${relation} "${target.name}" ` +
+        `through a dynamic import (${ref.via}). Allowed direction: ${allowedDirection(layers)}.`;
+      return diagnostic(RULES.INW011, file, {
+        span: ref,
+        message,
+        fix: {
+          summary: `Remove the dynamic import and depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
+          steps: [
+            `Delete \`${ref.statement}\`. A dynamic import is still a dependency: building the module name at runtime or moving it to another loader hides it instead of removing it.`,
+            ...portSteps(file, layers, target, ref),
+          ],
+        },
+      });
+    },
+  );
+  const index = layerIndexOf(file.module, layers);
+  const own = layers[index];
   const outermost = layers.at(-1);
   if (!(own && outermost)) {
     return outward;
   }
-  const inner = own !== outermost;
+  const inner = rankOf(layers, index) < rankOf(layers, layers.length - 1);
   const unreadable = refs.flatMap((ref) => {
     const why = ref.unreadable;
     if (why?.kind === "encoding") {
