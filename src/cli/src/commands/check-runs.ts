@@ -61,14 +61,20 @@ export async function runPlan(
   let exit = 0;
   for (const run of runs) {
     const report = withoutCovered(run.report, covered, run);
-    const code = run.invalid ? 2 : exitCode(report);
+    // Nothing checked is judged once, on the merged report: another config may have checked files.
+    const code = run.invalid ? 2 : (several ? errorCode : exitCode)(report);
     exit = Math.max(exit, code);
     // Paths from the project even when --config spells it through a link (macOS /var).
     const project = io.probe.realpath(dirname(run.config));
     if (project && !run.invalid) {
       deps.runlog.noteRun(project, run.targets ?? [project], report.diagnostics);
       deps.runlog.noteSuppressions(report, []);
-      deps.runlog.logRun(project, { event: "check", exit: code, force: log });
+      deps.runlog.logRun(project, {
+        event: "check",
+        exit: code,
+        force: log,
+        durationMs: report.durationMs,
+      });
     }
     shown.push(project ? shownReport(io.probe, project, cwd, report) : report);
   }
@@ -76,7 +82,7 @@ export async function runPlan(
   return {
     merged,
     lines: several ? runs.map((run, i) => configLine(cwd, run, shown[i] ?? run.report)) : [],
-    exit: runs.length === 0 ? exitCode(merged) : exit,
+    exit: Math.max(exit, exitCode(merged)),
   };
 }
 
@@ -121,6 +127,16 @@ function exitCode(report: Report): number {
   if (report.filesChecked === 0 && (report.notChecked?.length ?? 0) > 0) {
     return 2;
   }
+  return errorCode(report);
+}
+
+/**
+ * Picks the exit code for a report's findings alone.
+ *
+ * @param report - one config's report.
+ * @returns 1 with errors, 0 without.
+ */
+function errorCode(report: Report): number {
   return report.diagnostics.some((d) => d.severity === "error") ? 1 : 0;
 }
 

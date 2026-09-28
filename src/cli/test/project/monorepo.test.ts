@@ -7,12 +7,24 @@
  * relative imports reach into the other member, and one member without a config.
  */
 import { describe, expect, test } from "bun:test";
-import { cpSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { inwards } from "../support/run.ts";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { inwards, project } from "../support/run.ts";
 import { tempDir } from "../support/temp.ts";
 
 const FIXTURE = join(import.meta.dir, "../support/fixtures/workspace");
+
+/** The fixture's root pyproject.toml with a `[tool.inwards]` of its own. */
+const ROOT_CONFIG = `[project]
+name = "acme"
+version = "0.1.0"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.inwards]
+layers = [{ name = "scripts", modules = ["scripts"] }]
+`;
 
 /**
  * Copies the workspace fixture to a temp directory, so no config above it
@@ -51,6 +63,27 @@ function checkJson(
   const { code, stdout, stderr } = inwards(["check", "--format", "json", ...args], { cwd });
   const report: JsonReport = JSON.parse(stdout);
   return { code, report, stderr };
+}
+
+/**
+ * Reads the one line a check wrote to a member's run log.
+ *
+ * @param root - the workspace copy.
+ * @param member - the member directory, workspace-relative.
+ * @returns the line's codes and files.
+ */
+function runLine(root: string, member: string): { codes: string[]; files: string[] } {
+  return JSON.parse(readFileSync(join(root, member, ".inwards/runs.jsonl"), "utf8"));
+}
+
+/**
+ * Writes a member pyproject.toml whose one layer is a package.
+ *
+ * @param pkg - the package, also the project name.
+ * @returns the pyproject.toml text.
+ */
+function oneLayer(pkg: string): string {
+  return `[project]\nname = "${pkg}"\n\n[tool.inwards]\nlayers = [{ name = "app", modules = ["${pkg}"] }]\n`;
 }
 
 describe("inwards check at a uv workspace root (#57)", () => {
@@ -121,18 +154,7 @@ describe("inwards check at a uv workspace root (#57)", () => {
   });
 
   test("a root config leaves the members with their own config to them", () => {
-    const root = workspace({
-      "pyproject.toml": `[project]
-name = "acme"
-version = "0.1.0"
-
-[tool.uv.workspace]
-members = ["packages/*"]
-
-[tool.inwards]
-layers = [{ name = "scripts", modules = ["scripts"] }]
-`,
-    });
+    const root = workspace({ "pyproject.toml": ROOT_CONFIG });
     writeFileSync(join(root, "scripts.py"), "");
     const { code, report } = checkJson(root);
     expect(code).toBe(0);
@@ -141,6 +163,32 @@ layers = [{ name = "scripts", modules = ["scripts"] }]
     // The nested-project warning is left for the member without a config of its own.
     const nested = report.diagnostics.filter((d) => d.message.includes("nested project"));
     expect(nested.map((d) => d.message.split(" ")[0])).toEqual(["packages/tools"]);
+    // packages/tools is checked by the root's config, so it isn't listed as not checked.
+    expect(report.notChecked).toBeUndefined();
+  });
+
+  test("each config's run-log line holds only its own findings", () => {
+    const root = workspace({
+      "packages/api/src/acme/plugins/api_plugin.py":
+        "from .registry import register\nfrom acme.api.handlers import orders\n",
+    });
+    expect(inwards(["check", "--log"], { cwd: root }).code).toBe(1);
+    expect(runLine(root, "packages/api").codes).toEqual(["INW001"]);
+    expect(runLine(root, "packages/core").codes).toEqual([]);
+    expect(runLine(root, "packages/core").files).toEqual(["."]);
+  });
+
+  test("nested members are each checked once, by their own config", () => {
+    const root = project({
+      "pyproject.toml": '[tool.uv.workspace]\nmembers = ["a", "a/sub"]\n',
+      "a/pyproject.toml": oneLayer("pkg"),
+      "a/pkg/m.py": "",
+      "a/sub/pyproject.toml": oneLayer("sp"),
+      "a/sub/sp/m.py": "",
+    });
+    const { code, report } = checkJson(root);
+    expect(code).toBe(0);
+    expect(report.summary.filesChecked).toBe(2);
   });
 });
 
@@ -166,7 +214,28 @@ describe("inwards check <paths> routes each path to its nearest config (#57)", (
     const { code, report } = checkJson(workspace(), ["."]);
     expect(code).toBe(0);
     expect(report.summary.filesChecked).toBe(6);
-    expect(report.notChecked).toBeUndefined();
+    expect(report.notChecked?.map((n) => n.path)).toEqual(["packages/tools"]);
+  });
+
+  test("a path that gave no file is fine when another path was checked", () => {
+    const root = workspace();
+    mkdirSync(join(root, "packages/core/docs"));
+    writeFileSync(join(root, "packages/core/docs/r.txt"), "hi\n");
+    const { code, report } = checkJson(root, ["packages/api/src", "packages/core/docs"]);
+    expect(report.summary.filesChecked).toBe(2);
+    expect(report.notChecked?.map((n) => n.path)).toEqual(["packages/core/docs"]);
+    expect(code).toBe(0);
+  });
+
+  test("the workspace is found from the path, not the working directory", () => {
+    const root = workspace({ "pyproject.toml": ROOT_CONFIG });
+    const args = ["check", "--format", "concise", "acme"];
+    const { code, stdout } = inwards(args, { cwd: dirname(root) });
+    expect(code).toBe(0);
+    // api and core are checked by their own configs, not indexed by path under the root's.
+    expect(stdout).toContain("acme/packages/api/pyproject.toml: 2 files, 0 violations");
+    expect(stdout).toContain("acme/packages/core/pyproject.toml: 4 files, 0 violations");
+    expect(stdout).toContain("acme/pyproject.toml: 1 file, 0 violations");
   });
 
   test("a path with no config above it is reported, and alone it is a usage error", () => {
