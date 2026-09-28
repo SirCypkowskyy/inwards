@@ -184,7 +184,8 @@
         "FAPI001",
         "FAPI002",
         "FAPI003",
-        "FAPI006"
+        "FAPI006",
+        "FAPI007"
       ]
     },
     "layer": {
@@ -444,6 +445,9 @@
           "$ref": "#/definitions/routerWiringOptions"
         },
         "lifespan-events": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "yield-dependency-swallows": {
           "$ref": "#/definitions/ruleOptions"
         }
       }

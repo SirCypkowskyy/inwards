@@ -27,6 +27,7 @@ The `FAPI` family checks FastAPI applications across files: which router the app
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | A path operation that can produce an error status code (raised directly, in a helper or dependency, or through an app's exception handler) its `responses=` doesn't declare | opt-in, error | yes |
 | [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` with routes that no app includes, routers that include each other in a cycle, or an `include_router` above the included router's routes | opt-in, error | yes |
 | [FAPI006](FAPI006.md) | `lifespan-events` | A startup or shutdown handler registered through the deprecated events API, or next to a `lifespan=` that makes FastAPI ignore it | opt-in, error, deprecated events alone warn | yes |
+| [FAPI007](FAPI007.md) | `yield-dependency-swallows` | An `except` around a dependency's `yield` that can end without raising, so it swallows what the endpoint raised | opt-in, error | yes |
 
 Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
 
@@ -34,7 +35,6 @@ Codes reserved for later FastAPI rules, not registered yet (an unknown code is s
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
 | FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planned |
-| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planned |
 | FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planned |
 | FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
 

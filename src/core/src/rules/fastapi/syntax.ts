@@ -9,6 +9,9 @@ import type { Span } from "../../contracts/records.ts";
 import { argumentAt } from "../../python/literals.ts";
 import type { PathOperation } from "./records.ts";
 
+/** Nodes that start a new scope: a `yield` or `return` in one belongs to it, not to the function around it. */
+const SCOPES: ReadonlySet<string> = new Set(["function_definition", "lambda", "class_definition"]);
+
 /**
  * Gives a node's 1-based span.
  *
@@ -72,4 +75,24 @@ export function joined(words: readonly string[], conjunction = "and"): string {
   return words.length <= 1
     ? (words[0] ?? "")
     : `${words.slice(0, -1).join(", ")} ${conjunction} ${words.at(-1) ?? ""}`;
+}
+
+/**
+ * Lists a function's own named nodes of one type, not those of a nested
+ * function, lambda or class. Named only, since the `yield` keyword is a node
+ * of type `yield` too.
+ *
+ * @param fn - a `function_definition` node.
+ * @param type - the node type, e.g. `yield`.
+ * @returns the nodes, in source order.
+ */
+export function scopeNodes(fn: Node, type: string): Node[] {
+  return fn.descendantsOfType(type).flatMap((node) => {
+    for (let at = node?.parent ?? null; at !== null && at.id !== fn.id; at = at.parent) {
+      if (SCOPES.has(at.type)) {
+        return [];
+      }
+    }
+    return node?.isNamed ? [node] : [];
+  });
 }
