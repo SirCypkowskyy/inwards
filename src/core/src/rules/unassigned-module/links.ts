@@ -16,7 +16,8 @@
  * then own.
  */
 import { entryReach } from "../../config/layer-selector.ts";
-import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
+import type { LayerSpec } from "../../config/layers.ts";
+import type { InwardsConfig } from "../../config/parse.ts";
 import { applyRules } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
