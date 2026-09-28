@@ -15,7 +15,7 @@ import { CONTEXT_KEYS } from "../../src/config/contexts.ts";
 import { CONFIG_DEFAULTS } from "../../src/config/defaults.ts";
 import { DEFAULT_GENERATED } from "../../src/config/generated.ts";
 import { LAYER_KEYS, parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
-import { RULE_KEYS } from "../../src/config/rule-settings.ts";
+import { OPTION_KEYS, RULE_KEYS } from "../../src/config/rule-settings.ts";
 import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/shape.ts";
 import { RULES } from "../../src/meta/registry.ts";
 import {
@@ -100,7 +100,13 @@ describe("the schema and the parser agree", () => {
     expect(keysOf(itemsOf("shape"))).toEqual([...SHAPE_KEYS].sort());
     expect(keysOf(itemsOf("names"))).toEqual([...NAME_KEYS].sort());
     expect(keysOf(itemsOf("contexts"))).toEqual([...CONTEXT_KEYS].sort());
-    expect(keysOf(schema.properties?.["rules"] ?? {})).toEqual([...RULE_KEYS].sort());
+    // Every rule but INW000 may have an options table, named after the rule.
+    const tables = Object.values(RULES)
+      .filter((rule) => rule.code !== "INW000")
+      .map((rule) => rule.name);
+    expect(keysOf(schema.properties?.["rules"] ?? {})).toEqual([...RULE_KEYS, ...tables].sort());
+    const options = schema.definitions?.["ruleOptions"] ?? {};
+    expect(keysOf(options)).toEqual([...OPTION_KEYS].sort());
   });
 
   test("on the rule codes, taken from the registry", () => {

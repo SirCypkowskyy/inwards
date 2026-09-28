@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 1eeddaa267fae0d6194750094966456c26925a359f92673bb1a9c227f2a56649
+source_hash: b3cb829e2c057797ab5c9b3eb1331a9f579945b10b7e9dd8387e4cb8b8d0d82d
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -34,10 +34,26 @@ Tabela `[tool.inwards.rules]` w `pyproject.toml` określa, które reguły zgłas
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]      # these rules never report
 severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent
-# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+# extend-select = [...]           # turn opt-in rules on, next to the defaults
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule that is on by default)
 ```
 
-Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` wygrywa z `select`. Reguła ustawiona na `"warning"` pojawia się w każdym formacie, ale nie zmienia kodu wyjścia, nie blokuje hooków i nie trafia do baseline'u. INW000 nie da się wyłączyć ani obniżyć. Tabela jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej edytować.
+Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` wygrywa z `select` i `extend-select`. Reguła ustawiona na `"warning"` pojawia się w każdym formacie, ale nie zmienia kodu wyjścia, nie blokuje hooków i nie trafia do baseline'u. INW000 nie da się wyłączyć ani obniżyć. Tabela jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej edytować.
+
+### Reguły opt-in i opcje reguł { #opt-in-rules }
+
+Reguła, która w kolumnie Default ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Każda reguła dostępna dziś jest domyślnie włączona; opt-in będą reguły, które oceniają kod według progów wybranych przez zespół. SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
+
+Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
+
+<!-- config: fragment -->
+
+```toml title="pyproject.toml"
+[tool.inwards.rules.pure-domain]
+modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
+```
+
+Tabela opcji nie włącza reguły. Tabela dla reguły wyłączonej (opt-in i niewybranej albo wymienionej w `ignore`) nic nie robi, więc `inwards check` zgłasza ostrzeżenie przy tej tabeli w `pyproject.toml`, z kodem reguły. Dzięki temu zespół może przygotować opcje reguły, zanim ją włączy.
 
 Żeby na stałe zaakceptować jedną diagnostykę, dodaj wyciszenie w linii, na którą wskazuje, z kodem reguły i powodem ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)):
 

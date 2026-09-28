@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 87d24abb98dce46efdb2b294a07c90beca6ce6439a3102657ff2b73c67cbd0be
+source_hash: 7fe8363035254820e8771c6d2d2c45a77c3223c582ae090c02211093a81a84e6
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -192,11 +192,13 @@ Typ: tabela. Domyślnie: każda reguła zgłasza z własnym poziomem.
 
 Które reguły zgłaszają i jak głośno:
 
-- `select`: zgłaszają tylko te reguły. Musi zawierać co najmniej jeden kod.
-- `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select`.
+- `select`: zgłaszają tylko te reguły, także reguły opt-in. Musi zawierać co najmniej jeden kod.
+- `extend-select`: te reguły też zgłaszają, obok `select` albo reguł domyślnie włączonych. Włącza [reguły opt-in](../rules/index.md#opt-in-rules).
+- `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
+- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
 
-INW000 nie da się wyłączyć ani zmienić jego poziomu. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
+INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
 
 <!-- config: fragment -->
 
@@ -204,6 +206,9 @@ INW000 nie da się wyłączyć ani zmienić jego poziomu. Szczegóły są w [ADR
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]
 severity = { INW005 = "warning" }
+
+[tool.inwards.rules.pure-domain]
+modules = ["shop.domain"]
 ```
 
 ### `shape` i `names` { #shape }

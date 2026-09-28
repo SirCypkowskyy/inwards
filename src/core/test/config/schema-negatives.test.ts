@@ -84,6 +84,37 @@ describe("structural mistakes fail both the schema and the parser", () => {
     // INW000 can't be turned off or re-levelled.
     ["INW000 in ignore", withExtra('[tool.inwards.rules]\nignore = ["INW000"]\n')],
     ["INW000 in severity", withExtra('[tool.inwards.rules]\nseverity = { INW000 = "warning" }\n')],
+    ["INW000 in extend-select", withExtra('[tool.inwards.rules]\nextend-select = ["INW000"]\n')],
+    [
+      "an options table for INW000",
+      withExtra('[tool.inwards.rules.unsupported-encoding]\nmodules = ["shop"]\n'),
+    ],
+    // Rule options (#181).
+    [
+      "an unknown code in extend-select",
+      withExtra('[tool.inwards.rules]\nextend-select = ["INW999"]\n'),
+    ],
+    [
+      "an extend-select that isn't a list",
+      withExtra('[tool.inwards.rules]\nextend-select = "INW001"\n'),
+    ],
+    [
+      "an unknown key in an options table",
+      withExtra("[tool.inwards.rules.layer-dependency]\nmax-statements = 8\n"),
+    ],
+    [
+      "an options table that isn't a table",
+      withExtra("[tool.inwards.rules]\nlayer-dependency = true\n"),
+    ],
+    [
+      "a rule code as an options table",
+      withExtra('[tool.inwards.rules.INW001]\nmodules = ["shop"]\n'),
+    ],
+    ["an empty modules list", withExtra("[tool.inwards.rules.layer-dependency]\nmodules = []\n")],
+    [
+      "a modules selector that doesn't start with a package",
+      withExtra('[tool.inwards.rules.layer-dependency]\nmodules = ["*.api"]\n'),
+    ],
     // Empty strings and repeats.
     ["an empty layer name", withLayer('{ name = "", modules = ["shop"] }')],
     ["an empty layer module", withLayer('{ name = "d", modules = [""] }')],
@@ -187,6 +218,13 @@ describe("structural mistakes fail both the schema and the parser", () => {
   test("layer selectors and lenient literal entries pass both", () => {
     const text = withLayer(
       '{ name = "d", modules = ["shop.*.domain", "shop.**", "shop.**.domain.**", "shop.domain"] }, { name = "e", modules = [] }',
+    );
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("extend-select and an options table pass both", () => {
+    const text = withExtra(
+      '[tool.inwards.rules]\nextend-select = ["INW001"]\n[tool.inwards.rules.pure-domain]\nmodules = ["shop.domain", "shop.*.api", "shop.**"]\n',
     );
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });

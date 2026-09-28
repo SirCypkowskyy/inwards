@@ -2,7 +2,8 @@
  * @file The rule registry: every rule's code, name, default severity, one-line
  * summary and docs link, in one place. Rule modules build their diagnostics
  * with `diagnostic()` and reporters list rules from `RULES`, so adding a rule
- * touches only its own module and this file.
+ * touches only its own module and this file. Whether a rule reports by default
+ * lives here too; which rules a project turns on is `config/rule-settings.ts`.
  */
 
 import type { Diagnostic, Fix, Severity, SourceFile, Span } from "../contracts/records.ts";
@@ -15,6 +16,12 @@ export interface RuleMeta {
   /** Kebab-case name, e.g. `layer-dependency`. */
   name: string;
   severity: Severity;
+  /**
+   * Whether the rule reports without being asked to. An `"off"` (opt-in) rule
+   * reports only when `[tool.inwards.rules]` lists it in `extend-select` or
+   * `select` (#181).
+   */
+  default: "on" | "off";
   /** One sentence for SARIF `shortDescription` and rule listings. */
   summary: string;
   /** The rule's own docs page, `docs/chapters/rules/<code>.md` on the site. */
@@ -53,6 +60,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW000",
     name: "unsupported-encoding",
     severity: "error",
+    default: "on",
     summary: "The file's declared encoding can hide imports.",
     docs: page("INW000"),
   },
@@ -60,6 +68,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW001",
     name: "layer-dependency",
     severity: "error",
+    default: "on",
     summary: "Dependencies must point toward inner layers.",
     docs: page("INW001"),
   },
@@ -67,6 +76,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW002",
     name: "context-independence",
     severity: "error",
+    default: "on",
     summary: "A bounded context imports another context only when it declares it in depends-on.",
     docs: page("INW002"),
   },
@@ -74,6 +84,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW003",
     name: "public-api-only",
     severity: "error",
+    default: "on",
     summary: "Code outside a bounded context imports only the context's public modules.",
     docs: page("INW003"),
   },
@@ -81,6 +92,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW004",
     name: "import-cycles",
     severity: "error",
+    default: "on",
     summary: "Modules, or bounded contexts, don't import each other in a cycle.",
     docs: page("INW004"),
   },
@@ -88,6 +100,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW005",
     name: "pure-domain",
     severity: "error",
+    default: "on",
     summary: "A layer imports only the third-party and standard-library modules its config allows.",
     docs: page("INW005"),
   },
@@ -95,6 +108,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW006",
     name: "unassigned-module",
     severity: "error",
+    default: "on",
     summary: "First-party code must belong to a layer, and every layer prefix must match modules.",
     docs: page("INW006"),
   },
@@ -102,6 +116,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW007",
     name: "package-shape",
     severity: "error",
+    default: "on",
     summary:
       "A package holds only the members its configured shape allows, and names stay where they belong.",
     docs: page("INW007"),
@@ -110,6 +125,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW008",
     name: "missing-member",
     severity: "error",
+    default: "on",
     summary: "A package holds every member its configured shape requires.",
     docs: page("INW008"),
   },
@@ -117,6 +133,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW009",
     name: "suppression-comment",
     severity: "error",
+    default: "on",
     summary:
       "An inline suppression names rules that can be suppressed, gives a reason, and hides a finding.",
     docs: page("INW009"),
@@ -125,6 +142,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW010",
     name: "unknown-first-party",
     severity: "error",
+    default: "on",
     summary: "An imported first-party module must exist.",
     docs: page("INW010"),
   },
@@ -132,11 +150,24 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     code: "INW011",
     name: "dynamic-import",
     severity: "error",
+    default: "on",
     summary:
       "Dynamic imports (importlib, __import__, runpy, exec) must point toward inner layers too.",
     docs: page("INW011"),
   },
 };
+
+/**
+ * Looks a rule up by its code or its kebab-case name. Reads `RULES` on every
+ * call rather than a map built at load time, so a test can register a rule of
+ * its own.
+ *
+ * @param key - a code such as `INW001`, or a name such as `layer-dependency`.
+ * @returns the rule, or undefined when no registered rule has that code or name.
+ */
+export function ruleFor(key: string): RuleMeta | undefined {
+  return Object.values<RuleMeta>(RULES).find((rule) => rule.code === key || rule.name === key);
+}
 
 /** Where a finding is and what it says: the parts a rule module decides. */
 export interface Finding {
