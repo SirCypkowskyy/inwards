@@ -355,6 +355,14 @@
             "_version"
           ]
         },
+        "namespace-packages": {
+          "description": "Implicit namespace packages that installed distributions add to, such as acme.platform. INW010 doesn't report a missing module directly inside one; a missing module inside a subpackage that is in the project is still reported.",
+          "markdownDescription": "Implicit namespace packages that installed distributions add to, such as acme.platform. INW010 doesn't report a missing module directly inside one; a missing module inside a subpackage that is in the project is still reported.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#namespace-packages)",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dottedName"
+          }
+        },
         "escalate-after": {
           "description": "How many attempts at the same violation before the hooks stop blocking and tell the agent to ask the user.",
           "markdownDescription": "How many attempts at the same violation before the hooks stop blocking and tell the agent to ask the user.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#escalate-after)",

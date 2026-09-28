@@ -3,8 +3,8 @@
  * (for `inwards check` at a workspace root, #57) and the top-level import
  * packages of its members, so INW005 can call an import of a sibling member a
  * "workspace package" rather than a library (#203), and a probe of the other
- * members' import roots, so INW010 sees the portions of a namespace package
- * that live there. It reads through the
+ * members' import roots and the project's site-packages, so INW010 sees the
+ * portions of a namespace package that live there. It reads through the
  * injected `ProjectIo` and parses TOML with the function it is given; it
  * decides nothing about which imports are allowed.
  *
@@ -16,6 +16,7 @@ import { isRecord } from "../json/guards.ts";
 import { isInside } from "../paths/lexical.ts";
 import type { PathKind } from "../platform/contracts.ts";
 import type { ProjectIo } from "./contracts.ts";
+import { sitePackages } from "./site-packages.ts";
 
 /** What the discovery reads: files, directory listings, path kinds and TOML. */
 type WorkspaceIo = Pick<ProjectIo, "probe" | "read" | "toml">;
@@ -43,33 +44,39 @@ export function workspacePackages(io: WorkspaceIo, configDir: string): Set<strin
 }
 
 /**
- * Probes the import roots of the other members of the nearest uv workspace
- * (`src/` when a member has one, else the member itself), for the portions
- * of a namespace package that live there (INW010, #57). The member that
- * holds the config is left out. Like `workspacePackages`, anything that
- * can't be read gives no probe rather than failing the check.
+ * Probes the other portions of the project's namespace packages (INW010):
+ * the import roots of the other members of the nearest uv workspace (`src/`
+ * when a member has one, else the member itself, #57), and the site-packages
+ * of the `.venv` next to the config or at the workspace root (#161). The
+ * member that holds the config is left out. Like `workspacePackages`, a
+ * workspace that can't be read gives no members rather than failing the check.
  *
- * @param io - reads the pyproject.toml files and tells what a path is.
+ * @param io - reads the pyproject.toml files, lists directories and tells what a path is.
  * @param configDir - absolute directory of the config's pyproject.toml.
  * @returns what is at a forward-slash path under the first root that has it, or
- *   undefined outside a workspace or without other members.
+ *   undefined when there is no other portion to look in.
  */
 export function otherPortions(
   io: WorkspaceIo,
   configDir: string,
 ): ((rel: string) => PathKind) | undefined {
+  let members: string[] = [];
+  let workspaceDir = configDir;
   try {
-    const roots = (workspaceMembers(io, configDir)?.members ?? [])
+    const workspace = workspaceMembers(io, configDir);
+    workspaceDir = workspace?.dir ?? configDir;
+    members = (workspace?.members ?? [])
       .filter((dir) => !(dir === configDir || isInside(dir, configDir)))
       .map((dir) => (io.probe.kind(join(dir, "src")) === "dir" ? join(dir, "src") : dir));
-    if (roots.length === 0) {
-      return undefined;
-    }
-    return (rel: string): PathKind =>
-      roots.map((root) => io.probe.kind(join(root, rel))).find((kind) => kind !== undefined);
   } catch {
+    // An unreadable workspace: the virtualenv may still be there.
+  }
+  const roots = [...members, ...sitePackages(io, [...new Set([configDir, workspaceDir])])];
+  if (roots.length === 0) {
     return undefined;
   }
+  return (rel: string): PathKind =>
+    roots.map((root) => io.probe.kind(join(root, rel))).find((kind) => kind !== undefined);
 }
 
 /**

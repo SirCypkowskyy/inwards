@@ -25,7 +25,11 @@ const OTHER_MODULE = /^(?:\.[\w-]+)?\.(?:so|pyd)$|^\.(?:pyx|pyc)$/u;
 /** A Python source or stub file name, and its module name. */
 const SOURCE = /^(?<name>[^.]+)\.pyi?$/u;
 
-/** INW010's findings, and the imports they cover, which INW006 then leaves alone. */
+/**
+ * INW010's findings, and the imports whose module isn't under the config
+ * root: those it reports, and those another portion of a namespace package
+ * holds. INW006 leaves both alone, since neither is a package to put in a layer.
+ */
 interface Unknown {
   found: Diagnostic[];
   missing: ReadonlySet<ImportRef>;
@@ -42,21 +46,27 @@ interface Unknown {
  * that climbs above the top-level package (an empty target, see `ImportRef`)
  * is always flagged: Python raises on it. A missing module that a
  * `generated` pattern covers passes, and so reaches INW006 like one that exists.
- * So does one under an implicit namespace package that another portion of
- * it holds, such as another uv workspace member's `src` (#57).
+ * A module under an implicit namespace package that another portion of it
+ * holds passes too, such as one in another uv workspace member's `src` (#57)
+ * or the project's virtualenv (#161), and so does one directly inside a
+ * namespace package the config lists in `namespace-packages` (#161); neither
+ * reaches INW006, since its code isn't under the config root.
  *
  * @param file - the file the imports come from.
  * @param imports - its static imports.
  * @param project - the module index.
- * @param generated - the `generated` patterns; `DEFAULT_GENERATED` when not set.
- * @returns one error per missing module, and the imports they cover.
+ * @param names - what the config says about modules that aren't on disk.
+ * @param names.generated - the `generated` patterns; `DEFAULT_GENERATED` when not set.
+ * @param names.namespacePackages - the `namespace-packages` list; none when not set.
+ * @returns one error per missing module, and the imports whose module isn't under the config root.
  */
 export function checkUnknownImports(
   file: SourceFile,
   imports: readonly ImportRef[],
   project: ProjectIndex,
-  generated: readonly string[] = DEFAULT_GENERATED,
+  names: { generated?: readonly string[]; namespacePackages?: readonly string[] } = {},
 ): Unknown {
+  const { generated = DEFAULT_GENERATED, namespacePackages = [] } = names;
   const found: Diagnostic[] = [];
   const missing = new Set<ImportRef>();
   for (const ref of imports) {
@@ -68,9 +78,14 @@ export function checkUnknownImports(
     } else if (
       owner !== undefined &&
       owner !== module &&
+      project.inOtherPortion(module, owner, namespacePackages)
+    ) {
+      missing.add(ref);
+    } else if (
+      owner !== undefined &&
+      owner !== module &&
       !project.extendsPath(owner) &&
-      !isGenerated(module, generated) &&
-      !project.inOtherPortion(module, owner)
+      !isGenerated(module, generated)
     ) {
       finding = absent(file, ref, owner, project);
     }

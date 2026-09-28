@@ -158,6 +158,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | picker (`init` on a terminal) | kreator |
 | namespace package | pakiet przestrzeni nazw |
 | portion (of a namespace package, PEP 420) | część (pakietu przestrzeni nazw) |
+| virtualenv (`.venv`), site-packages | środowisko wirtualne (`.venv`), site-packages |
 | module index | indeks modułów |
 | package shape | kształt pakietu |
 | port | port |

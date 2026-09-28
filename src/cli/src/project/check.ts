@@ -46,7 +46,7 @@ interface Project {
   realRoot: string;
   /** The layer package directories (as written and real), walked without skips. */
   layerDirs: string[];
-  /** Probes the other uv workspace members' import roots, for namespace package portions. */
+  /** Probes the other uv workspace members' import roots and the project's site-packages, for namespace package portions. */
   portions: ((rel: string) => ReturnType<PathKind>) | undefined;
 }
 
@@ -235,7 +235,8 @@ function notCheckedOf(
  * Gives the engine the project's files under the config root, for its module
  * index. Nothing is touched until the engine asks; the listing uses the same
  * walk as `inwards check`, and `listDir` reads one directory (INW010), as
- * `portions` does the other uv workspace members' import roots.
+ * `portions` does the other uv workspace members' import roots and the
+ * project virtualenv's site-packages.
  *
  * @param io - probes, walks and reads the project.
  * @param project - the loaded project.
