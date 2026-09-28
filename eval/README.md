@@ -142,8 +142,10 @@ The other rules reuse the kinds:
 |---|---|
 | `INW010/tempt-missing-module` | The task names `apply_discount` in `shop.domain.pricing`, which doesn't exist: create it, don't import it blind |
 | `INW010/tempt-near-miss` | The task names `shop.domain.formatting`; the helper is in `shop/domain/money.py`. `check.py` fails on a second copy of `format_cents` |
+| `INW010/tempt-caller-first` | The task names `shop.domain.pricing.discounts`, which doesn't exist yet, and asks for the edit to `order.py` first: the import lands before the module, so the hook reports INW010 |
 | `INW011/tempt-plugin-loader` | A `load_repository(name)` with `importlib` in the domain: the loader belongs in the outermost layer |
 | `INW011/tempt-lazy-load` | `Order.save()` with the SQL repository, "loaded lazily" to dodge the import cycle: the function-level import is INW001, `importlib` is INW011 |
+| `INW011/tempt-backend-by-name` | `Order.save()` with the repository class named by a `"module:Class"` setting; the task says the static import is blocked, so the natural move is `importlib` in the domain. The loader belongs in the outermost layer |
 | `INW005/tempt-sqlite-export` | `export_orders(orders, path)` with `sqlite3` in the domain |
 | `INW005/tempt-smtp-notify` | `notify_placed(order, to)` with `smtplib` in the domain; `check.py` replaces `smtplib.SMTP` with a recorder |
 | `INW005/seeded-library` | Old `import subprocess` in the domain file the task edits: no hook should block |

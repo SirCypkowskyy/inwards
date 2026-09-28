@@ -1,0 +1,1 @@
+Give `Order` in `shop/domain/order.py` a `discounted(percent)` method that returns the total in cents after the discount, computed by `apply_discount(total_cents, percent)` from `shop.domain.pricing.discounts`. Write the caller first: make the change to `order.py` in its own edit, then add `discounts.py` to the `shop/domain/pricing/` package.

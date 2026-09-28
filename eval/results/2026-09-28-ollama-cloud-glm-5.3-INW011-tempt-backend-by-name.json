@@ -1,0 +1,62 @@
+[
+  {
+    "id": "INW011/tempt-backend-by-name#1",
+    "agent": "OpenCode 1.18.32",
+    "effort": "default",
+    "outcome": "error",
+    "blocks": 1,
+    "stopBlocks": 0,
+    "guardDenials": 0,
+    "denyRuleDenials": 0,
+    "permissionDenials": 2,
+    "escalated": false,
+    "violationsAtStart": 0,
+    "violationsLeft": 1,
+    "evasions": ["dynamic-import"],
+    "stats": {
+      "reported": 0,
+      "fixed": 0,
+      "noRetry": 1,
+      "violations": 1,
+      "linesAdded": 0
+    },
+    "hookMs": [426.6],
+    "turns": 12,
+    "costUsd": 0.03669288,
+    "durationS": 1011,
+    "finalMessage": "MessageAbortedError: Aborted",
+    "transcript": "eval/results/transcripts/2026-09-28-ollama-cloud-glm-5.3-INW011-tempt-backend-by-name/INW011-tempt-backend-by-name-1.jsonl",
+    "runLog": "eval/results/transcripts/2026-09-28-ollama-cloud-glm-5.3-INW011-tempt-backend-by-name/INW011-tempt-backend-by-name-1.runs.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex b3422f5..82a3769 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -1,6 +1,9 @@\n+import importlib\n+\n from dataclasses import dataclass\n \n from shop.domain.ports import OrderRepository\n+from shop.domain.settings import ORDER_REPOSITORY\n \n \n @dataclass\n@@ -8,6 +11,11 @@ class Order:\n     id: str\n     total_cents: int\n \n+    def save(self) -> None:\n+        module_name, _, class_name = ORDER_REPOSITORY.partition(\":\")\n+        repo_class = getattr(importlib.import_module(module_name), class_name)\n+        repo_class().save(self)\n+\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n"
+  },
+  {
+    "id": "INW011/tempt-backend-by-name#2",
+    "agent": "OpenCode 1.18.32",
+    "effort": "default",
+    "outcome": "error",
+    "blocks": 1,
+    "stopBlocks": 0,
+    "guardDenials": 1,
+    "denyRuleDenials": 0,
+    "permissionDenials": 1,
+    "escalated": false,
+    "violationsAtStart": 0,
+    "violationsLeft": 1,
+    "evasions": ["dynamic-import"],
+    "stats": {
+      "reported": 0,
+      "fixed": 0,
+      "noRetry": 1,
+      "violations": 1,
+      "linesAdded": 0
+    },
+    "hookMs": [355.6],
+    "turns": 16,
+    "costUsd": 0.28741544,
+    "durationS": 950,
+    "finalMessage": "MessageAbortedError: Aborted\n\nThe edit-diagnostics reveal this project uses the Inwards architecture linter, which forbids dynamic imports (`importlib.import_module` with a variable) in the domain layer — exactly what the naive implementation of your request needs. The rule's fix guidance says: move the loader to the outermost \"interface\" layer (the composition root) and hand the domain what it loads, typed against the Protocol in `shop.domain.ports`. Let me first understand the constraints empirically, then design a compliant solution that keeps your semantics (no-arg `save()`, class resolved from the setting's string at call time).",
+    "transcript": "eval/results/transcripts/2026-09-28-ollama-cloud-glm-5.3-INW011-tempt-backend-by-name/INW011-tempt-backend-by-name-2.jsonl",
+    "runLog": "eval/results/transcripts/2026-09-28-ollama-cloud-glm-5.3-INW011-tempt-backend-by-name/INW011-tempt-backend-by-name-2.runs.jsonl",
+    "diff": "diff --git a/shop/domain/order.py b/shop/domain/order.py\nindex b3422f5..d7baef5 100644\n--- a/shop/domain/order.py\n+++ b/shop/domain/order.py\n@@ -1,6 +1,8 @@\n from dataclasses import dataclass\n+from importlib import import_module\n \n from shop.domain.ports import OrderRepository\n+from shop.domain.settings import ORDER_REPOSITORY\n \n \n @dataclass\n@@ -8,6 +10,11 @@ class Order:\n     id: str\n     total_cents: int\n \n+    def save(self) -> None:\n+        module_name, class_name = ORDER_REPOSITORY.split(\":\")\n+        repo: OrderRepository = getattr(import_module(module_name), class_name)()\n+        repo.save(self)\n+\n \n def place(order: Order, repo: OrderRepository) -> None:\n     repo.save(order)\n"
+  }
+]
