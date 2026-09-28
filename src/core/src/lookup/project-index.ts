@@ -28,6 +28,18 @@ type ImportReader = (file: SourceFile) => readonly ImportRef[];
 /** Reads the names a file binds at its top level; the engine supplies it too. */
 type BindingReader = (file: SourceFile) => ReadonlySet<string>;
 
+/**
+ * Where a module path stands in a pruned search of the tree (`holdsMatch`):
+ * the pattern matches it, could match something below it, or can't.
+ */
+export type TreeStep = "match" | "descend" | "prune";
+
+/** One directory's entries, as `listDir` gives them. */
+type Entries = ReturnType<ListDir>;
+
+/** A Python source or stub file name, with its stem. */
+const PYTHON_FILE = /^(?<stem>.+)\.pyi?$/u;
+
 /** A listed Python file, before its text is read. */
 type Listed = Omit<SourceFile, "text">;
 
@@ -99,6 +111,9 @@ export class ProjectIndex {
   private readonly extended = new Map<string, boolean>();
   /** Finds a module in the other portions of namespace packages, when the adapter gave any. */
   private readonly portions: ModuleLookup | undefined;
+  private readonly dirs = new Map<string, Entries>();
+  private readonly pythonBelow = new Map<string, boolean>();
+  private readonly held = new Map<string, boolean>();
 
   /**
    * Wraps an adapter's file system. Nothing is listed or read yet.
@@ -223,6 +238,101 @@ export class ProjectIndex {
       );
     });
     return namespace && this.portions(module) === module;
+  }
+
+  /**
+   * Tells whether the project has a module at or below a package that a
+   * pattern matches: a path the pattern matches exactly (`step` says
+   * "match") that is a module file or a directory holding Python code, with
+   * everything below it. INW006 asks it whether a package holds a selector's
+   * layer (`shop` holds `shop.*.domain` only when some `shop/<x>/domain`
+   * holds code).
+   *
+   * It lists only the directories `step` lets it descend into, each once,
+   * and never the whole tree; hidden entries are skipped, and a symlinked
+   * directory is not followed (`listDir` reports it as no directory).
+   *
+   * @param pkg - a dotted package name; the search starts there.
+   * @param key - names the pattern, for the cache: the same key must mean the same `step`.
+   * @param step - where a module path, split on dots, stands against the pattern.
+   * @returns true when some module at or below `pkg` matches.
+   */
+  holdsMatch(pkg: string, key: string, step: (segments: readonly string[]) => TreeStep): boolean {
+    const cacheKey = `${key}\u0000${pkg}`;
+    let found = this.held.get(cacheKey);
+    if (found === undefined) {
+      const segments = pkg.split(".");
+      const base = segments.join("/");
+      const here = step(segments);
+      const file = [".py", ".pyi"].some((ext) => this.source.kind(`${base}${ext}`) === "file");
+      found =
+        here === "match"
+          ? file || this.holdsPython(base)
+          : here === "descend" && this.searchBelow(segments, step);
+      this.held.set(cacheKey, found);
+    }
+    return found;
+  }
+
+  /**
+   * Searches below a directory the pattern descends into (see `holdsMatch`).
+   *
+   * @param segments - the directory as a module path.
+   * @param step - where a module path stands against the pattern.
+   * @returns true when a matching module lies below it.
+   */
+  private searchBelow(
+    segments: readonly string[],
+    step: (segments: readonly string[]) => TreeStep,
+  ): boolean {
+    const dir = segments.join("/");
+    return (this.entries(dir) ?? []).some((entry) => {
+      const stem = entry.dir ? entry.name : PYTHON_FILE.exec(entry.name)?.groups?.["stem"];
+      if (stem === undefined || stem === "__init__" || entry.name.startsWith(".")) {
+        return false; // `__init__` is the directory itself, which didn't match
+      }
+      const path = [...segments, stem];
+      const where = step(path);
+      if (!entry.dir) {
+        return where === "match";
+      }
+      if (where === "match") {
+        return this.holdsPython(`${dir}/${entry.name}`);
+      }
+      return where === "descend" && this.searchBelow(path, step);
+    });
+  }
+
+  /**
+   * Tells whether a directory holds a Python file at any depth, hidden entries aside.
+   *
+   * @param dir - a directory relative to the config root.
+   * @returns true when some `.py` or `.pyi` file lies below it.
+   */
+  private holdsPython(dir: string): boolean {
+    let found = this.pythonBelow.get(dir);
+    if (found === undefined) {
+      found = (this.entries(dir) ?? []).some(
+        (entry) =>
+          !entry.name.startsWith(".") &&
+          (entry.dir ? this.holdsPython(`${dir}/${entry.name}`) : PYTHON_FILE.test(entry.name)),
+      );
+      this.pythonBelow.set(dir, found);
+    }
+    return found;
+  }
+
+  /**
+   * Lists a directory through the adapter, once.
+   *
+   * @param dir - a directory relative to the config root.
+   * @returns its entries, or undefined when it isn't a directory.
+   */
+  private entries(dir: string): Entries {
+    if (!this.dirs.has(dir)) {
+      this.dirs.set(dir, this.source.listDir(dir));
+    }
+    return this.dirs.get(dir);
   }
 
   /**

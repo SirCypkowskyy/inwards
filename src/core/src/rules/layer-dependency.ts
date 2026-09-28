@@ -29,7 +29,7 @@ export function checkLayers(
     return diagnostic(RULES.INW001, file, {
       span: ref,
       message,
-      fix: fixFor(source, target, ref),
+      fix: fixFor(file, layers, { source, target, ref }),
     });
   });
 }
@@ -40,17 +40,24 @@ export function checkLayers(
  * the inner layer, and wire the outer implementation at the composition root.
  * E2E snapshots pin this wording.
  *
- * @param source - the inner layer that made the import.
- * @param target - the outer layer it imported from.
- * @param ref - the offending import.
+ * @param file - the importing file.
+ * @param layers - the configured layers, innermost first.
+ * @param outward - the offending import and the two layers.
+ * @param outward.source - the inner layer that made the import.
+ * @param outward.target - the outer layer it imported from.
+ * @param outward.ref - the offending import.
  * @returns the summary and numbered steps of the fix.
  */
-function fixFor(source: LayerSpec, target: LayerSpec, ref: ImportRef): Diagnostic["fix"] {
+function fixFor(
+  file: SourceFile,
+  layers: readonly LayerSpec[],
+  { source, target, ref }: { source: LayerSpec; target: LayerSpec; ref: ImportRef },
+): Diagnostic["fix"] {
   return {
     summary: `Depend on an abstraction owned by "${source.name}" instead of "${ref.target}".`,
     steps: [
       `Delete \`${ref.statement}\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.`,
-      ...portSteps(source, target, ref),
+      ...portSteps(file, layers, target, ref),
     ],
   };
 }

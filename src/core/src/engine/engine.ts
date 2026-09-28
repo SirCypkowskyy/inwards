@@ -36,7 +36,11 @@ import { checkPublicApi } from "../rules/public-api-only.ts";
 import { checkLibraries } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
-import { checkUnassignedImports, unassignedWarning } from "../rules/unassigned-module/imports.ts";
+import {
+  checkUnassignedImports,
+  indexEvidence,
+  unassignedWarning,
+} from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
@@ -151,7 +155,7 @@ export class Engine {
   private scan(src: SourceFile, project: ProjectIndex): Scan {
     const layered = this.layered(src);
     if (!(layered || this.config.contexts)) {
-      const warning = unassignedWarning(src, this.config);
+      const warning = unassignedWarning(src, this.config, indexEvidence(project));
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
     const unreadable = checkEncoding(src);
@@ -257,7 +261,7 @@ export class Engine {
       ...checkPublicApi(file, imports, project, { contexts, defer: this.defersToInw002() }),
     ];
     if (!this.layered(file)) {
-      const warning = unassignedWarning(file, this.config);
+      const warning = unassignedWarning(file, this.config, indexEvidence(project));
       return warning ? [warning, ...across] : across;
     }
     // INW001's fix deletes an outward import; "create the module" would contradict it.
@@ -276,7 +280,10 @@ export class Engine {
         ownerOf: project.ownerOf,
         workspace: this.workspace,
       }),
-      ...checkUnassignedImports(file, existing, layers, project.ownerOf),
+      ...checkUnassignedImports(file, existing, layers, {
+        ownerOf: project.ownerOf,
+        evidence: indexEvidence(project),
+      }),
       ...unknown.found,
       ...across,
     ];
@@ -316,7 +323,10 @@ export class Engine {
             ownerOf: project.ownerOf,
             workspace: this.workspace,
           }),
-          ...checkUnassignedImports(file, readable, layers, project.ownerOf),
+          ...checkUnassignedImports(file, readable, layers, {
+            ownerOf: project.ownerOf,
+            evidence: indexEvidence(project),
+          }),
         );
       }
       return { ...ordered(file, found, comments), imports: [...imports, ...readable] };
