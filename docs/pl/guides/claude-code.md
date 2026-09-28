@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: 881563b6f85b084856d5f29194cfbaaeafdaa5a66f5426b30ea60e133a25cbd0
+source_hash: 1260e00d028204493fe777fd65e8b9bc6dd94e127975978ba7d89aefb94af530
 ---
 
 # Claude Code { #claude-code }
@@ -24,6 +24,14 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 
     To zapisuje cztery hooki (SessionStart, PreToolUse, PostToolUse, Stop) i dwie reguły `permissions.deny` w `.claude/settings.local.json`. Ten plik zawiera ścieżkę do pliku binarnego na tej maszynie, więc `init` dodaje go do `.gitignore`, razem z `.inwards/`. Przypina też `required-version` i domyślną listę `ignore` w `[tool.inwards]`. Ponowne uruchomienie niczego nie zmienia.
 
+    Jeśli Inwards jest zależnością deweloperską uv, zapisz launcher zamiast ścieżki:
+
+    ```sh
+    uv run inwards init --agent claude --launcher "uv run"
+    ```
+
+    Każdy hook uruchamia wtedy w powłoce `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`, z katalogu głównego projektu, więc korzysta z własnego środowiska projektu w każdym worktree i na każdej maszynie. `--launcher` przyjmuje tylko zwykłe słowa (litery, cyfry i `_ . : @ = + / -`), bo trafia do polecenia powłoki bez cudzysłowów.
+
 3. Rozpocznij nową sesję Claude Code w projekcie (albo uruchom `/clear`). Hooki zainstalowane w trakcie sesji też działają, ale Stop gate potrzebuje zapisu początku sesji.
 
 ## Sprawdź, czy działa { #check-it-works }
@@ -44,6 +52,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 | Claude mówi, że edycja `pyproject.toml` została odrzucona | Edycja dotknęła `[tool.inwards]`. To config guard. Jeśli naprawdę chcesz zmienić warstwy, zrób to sam. |
 | Komunikat „an inline suppression that wasn't in the file when the session started” | Hooki pomijają wyciszenie dodane w trakcie sesji albo takie, które jest w pliku niezacommitowanym na starcie sesji i zedytowanym później ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)). Jeśli dodałeś je sam, zacommituj je i zacznij nową sesję; żeby Claude mógł je dodawać, ustaw `agent-suppressions = "allow"` w `[tool.inwards]`. |
 | Tura kończy się komunikatem „unresolved architecture problems” | To samo naruszenie przetrwało `escalate-after` prób (domyślnie 3). Claude powinien zapytać cię, co dalej. Lista trafia też do następnej sesji. |
-| Windows: hook się nie uruchamia | `init` zapisuje hook w formie exec, z bezwzględną ścieżką do pliku binarnego, więc nie biorą w tym udziału ani powłoka, ani `PATH`. Jeśli przeniesiono plik binarny, uruchom ponownie `init`. |
+| `init` ostrzega, że ścieżka „is in uv's cache” (albo bunx's) | Uruchomiono go przez `uvx` albo `bunx`, więc ścieżka, którą by zapisał, znika po `uv cache clean` albo przy następnej wersji. Dodaj Inwards do projektu i uruchom `uv run inwards init --agent claude --launcher "uv run"` albo zainstaluj plik binarny z wydania i uruchom nim `init`. |
+| Windows: hook się nie uruchamia | `init` zapisuje hook w formie exec, z bezwzględną ścieżką do pliku binarnego, więc nie biorą w tym udziału ani powłoka, ani `PATH`. Jeśli przeniesiono plik binarny, uruchom ponownie `init`. Z `--launcher` hook działa w powłoce Claude Code, na Windows w Git Bash. |
 
 Żeby udostępnić tę konfigurację zespołowi przez commitowany plik `.claude/settings.json`, zobacz przykład w formie powłokowej w [rozdziale 4](../04-AI-Integration.md). Wymaga on `inwards` w `PATH` każdego programisty.

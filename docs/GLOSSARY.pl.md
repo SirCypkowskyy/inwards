@@ -73,6 +73,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | ruleset (GitHub) | ruleset (rulesetu) | |
 | runner, checkout | runner, checkout | CI terms |
 | loader (module loader) | loader (loadera) | |
+| launcher (`--launcher`, e.g. `uv run`) | launcher (launchera) | what starts Inwards in the project |
+| worktree (git) | worktree (worktree'a, worktree'y) | |
 
 ## Fixed Polish terms
 
@@ -138,6 +140,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | library; third-party library; standard library | biblioteka; biblioteka zewnętrzna; biblioteka standardowa |
 | inner, outer layer; innermost, outermost | warstwa wewnętrzna, zewnętrzna; najbardziej wewnętrzna, najbardziej zewnętrzna |
 | maintainer | opiekun projektu |
+| cache (uv's, bunx's) | pamięć podręczna (uv, bunx) |
+| dev dependency | zależność deweloperska |
 | member (of a package) | element (pakietu) |
 | miss (prescan) | przeoczenie |
 | owner (the repo's) | właściciel |

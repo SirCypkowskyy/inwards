@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/aider.md
-source_hash: 75ff3bef545e9915dbeac39b2ecbf86c2a3dabe401a18cd2d013a8676116b1cc
+source_hash: f66c3eb98f8b0c1a0bbb1c642871539a65ef9fb3db62363631123d19f4cc4b0c
 ---
 
 # Aider { #aider }
@@ -26,6 +26,8 @@ Aider po każdej edycji uruchamia polecenie lintujące i prosi model, żeby napr
     ```yaml title=".aider.conf.yml"
     lint-cmd: "python: '/home/you/.local/bin/inwards' check --format text"
     ```
+
+    Z `--launcher "uv run"` linia brzmi `python: uv run inwards check --format text`, bez ścieżki. `init` ostrzega, gdy ścieżka, którą by wypisał, leży w pamięci podręcznej uv albo bunx.
 
 3. Dodaj tę linię do `.aider.conf.yml` w projekcie (albo w katalogu domowym, dla wszystkich projektów). Zostaw włączone `auto-lint` Aidera; jest włączone domyślnie.
 

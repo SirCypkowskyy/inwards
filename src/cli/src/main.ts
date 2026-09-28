@@ -27,7 +27,8 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
                      [--config pyproject.toml] [--log] [--no-cache]
        inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
        inwards init --style layered|clean|hexagonal [--scaffold] [--agent ...] [--dry-run]
-       inwards init --agent claude|opencode|aider|agents-md [--dry-run]   (--list-styles: the presets)
+       inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
+                    (--list-styles: the presets)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
 
@@ -64,6 +65,7 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       scaffold: { type: "boolean" },
       package: { type: "string" },
       "list-styles": { type: "boolean" },
+      launcher: { type: "string" },
     },
   });
 

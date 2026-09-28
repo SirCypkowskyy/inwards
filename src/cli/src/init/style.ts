@@ -32,8 +32,8 @@ import {
 } from "./styles.ts";
 import { findTarget, noPackage, shown, sourceRoot } from "./target.ts";
 
-const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--dry-run]
-  inwards init --agent ${AGENTS.join("|")} [--dry-run]    (the project already has [tool.inwards])
+const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--dry-run]
+  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--dry-run]    (the project already has [tool.inwards])
   inwards init --list-styles`;
 
 /**
@@ -74,7 +74,7 @@ export async function initMain(
   if (style === undefined && agent !== undefined) {
     return flags.scaffold === true || flags.package !== undefined
       ? print(ctx.io.streams, "inwards init: --scaffold and --package need --style.", 2)
-      : initCommand(ctx, agent, dryRun);
+      : initCommand(ctx, agent, flags.launcher, dryRun);
   }
   if (style !== undefined) {
     return await styleCommand(
@@ -94,7 +94,7 @@ export async function initMain(
  * only here, so no other command pays for loading it.
  *
  * @param ctx - the platform, the check runner and init's writer and picker.
- * @param flags - the parsed options (`--scaffold`, `--package`).
+ * @param flags - the parsed options (`--scaffold`, `--package`, `--launcher`).
  * @param dryRun - print the changes instead of writing them (`--dry-run`).
  * @returns the exit code of the chosen init, or 2.
  */
@@ -120,7 +120,7 @@ async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean):
     return 2;
   }
   if (plan.style === undefined) {
-    return plan.agent === undefined ? 0 : initCommand(ctx, plan.agent, dryRun);
+    return plan.agent === undefined ? 0 : initCommand(ctx, plan.agent, flags.launcher, dryRun);
   }
   return await styleCommand(ctx, { ...plan, style: plan.style }, flags, dryRun);
 }
@@ -134,7 +134,7 @@ async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean):
  * @param ctx - the platform, the check runner and init's writer and picker.
  * @param plan - the style, whether to scaffold, and the agent.
  * @param plan.style - the preset.
- * @param flags - `--package`.
+ * @param flags - `--package` and `--launcher`.
  * @param dryRun - print every change as a diff instead of writing.
  * @returns 0 once written (or printed), 2 when init would overwrite something.
  */
@@ -182,7 +182,10 @@ async function styleCommand(
       2,
     );
   }
-  const wiring = plan.agent === undefined ? [] : agentChanges(ctx, plan.agent, project);
+  const wiring =
+    plan.agent === undefined
+      ? []
+      : agentChanges(ctx, { agent: plan.agent, launcher: flags.launcher }, project);
   if (typeof wiring === "string") {
     return print(ctx.io.streams, `inwards init: ${wiring}`, 2);
   }

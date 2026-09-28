@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: c0c23d69958db1024e7e89cd716c68b95c3643b350a4e00b6cf85afc808eb99d
+source_hash: f087df8c1ea27b6e0db664d20d35cb5996307b94b24169cecea4ff05128b8144
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -70,6 +70,8 @@ uvx inwards --version   # one-off, no project
 ```
 
 Do tego czasu `inwards` na PyPI to rezerwacja nazwy w wersji 0.0.0: `--version` mówi, że linter nie został jeszcze wydany, a każde inne polecenie kończy się kodem 2. Użyj wheeli z wydania na GitHubie, opisanych niżej. Wydania trafiają na PyPI przez [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); pierwsze przyjdzie z jednym z późniejszych kamieni milowych, nie z v0.1.0-rc.1.
+
+Żeby podłączyć agenta w takim projekcie, przekaż `init` flagę `--launcher "uv run"` (`uv run inwards init --agent claude --launcher "uv run"`): hooki i sekcja w `AGENTS.md` podają wtedy `uv run inwards` i nie zawierają ścieżki. Bez niej `init` zapisuje ścieżkę pliku binarnego, jako który działa; w projekcie leży ona w `.venv` i różni się między worktree'ami, a pod `uvx` leży w pamięci podręcznej uv, o czym `init` ostrzega.
 
 `uv add --dev inwards` bierze najnowsze pełne wydanie i pomija wersje przedpremierowe. Żeby wypróbować wersję przedpremierową, która jest na PyPI, poproś o nią wprost: `uv add --dev "inwards>=0.2.0rc1"`.
 

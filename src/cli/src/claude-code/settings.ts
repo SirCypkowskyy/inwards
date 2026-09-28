@@ -22,11 +22,13 @@ const EXE_SUFFIX = /\.exe$/iu;
 /** `inwards`, or a release asset name kept as downloaded, e.g. `inwards-linux-x64-musl`. */
 const INWARDS_BINARY = /^inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?$/iu;
 /**
- * The shell-form spelling the docs show for a shared settings.json: the whole
- * command is `inwards hook claude-code`, optionally with a (quoted) path.
+ * The shell-form spellings: `inwards hook claude-code` as the docs show it for
+ * a shared settings.json, optionally with a (quoted) path, and what
+ * `init --launcher` writes, `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`.
+ * A launcher is up to eight plain words, the characters `--launcher` accepts.
  */
 const SHELL_FORM =
-  /^\s*(?:"(?:[^"]*[\\/])?inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?(?:\.exe)?"|(?:[^\s"'#;&|$`]*[\\/])?inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?(?:\.exe)?)\s+hook\s+claude-code\s*$/iu;
+  /^\s*(?:cd\s+"\$CLAUDE_PROJECT_DIR"\s*&&\s*)?(?:[\w.:@=+/-]+\s+){0,8}(?:"(?:[^"]*[\\/])?inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?(?:\.exe)?"|(?:[^\s"'#;&|$`]*[\\/])?inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?(?:\.exe)?)\s+hook\s+claude-code\s*$/iu;
 /** Events whose Inwards hook must stay installed for the gate to trust the session. */
 const REQUIRED_EVENTS = ["SessionStart", "PreToolUse", "PostToolUse"];
 /** Tools each tool event's matcher must still cover. */
@@ -46,7 +48,7 @@ const MATCHER_LIST = /\s*[|,]\s*/u;
  * @param entry - one hook entry.
  * @returns true for an Inwards exec-form entry.
  */
-export function isOurHook(entry: unknown): boolean {
+function isOurHook(entry: unknown): boolean {
   if (!(isRecord(entry) && typeof entry["command"] === "string" && Array.isArray(entry["args"]))) {
     return false;
   }
@@ -113,18 +115,19 @@ function hasInwardsHook(settings: Record<string, unknown> | undefined, event: st
     if (!(REQUIRED_TOOLS.get(event) ?? []).every((tool) => matches(group, tool))) {
       return false;
     }
-    return entries.some(runsInwards);
+    return entries.some(isInwardsHook);
   });
 }
 
 /**
- * Tells whether a hook entry runs Inwards, in exec form (as `init` writes it)
- * or in the documented shell form.
+ * Tells whether a hook entry runs Inwards, in exec form (as `init` writes it
+ * by default) or in shell form (as the docs show it, or as `init --launcher`
+ * writes it). `init` replaces these entries; the Stop gate counts them.
  *
  * @param entry - one hook entry.
  * @returns true for an Inwards hook.
  */
-function runsInwards(entry: unknown): boolean {
+export function isInwardsHook(entry: unknown): boolean {
   return (
     isOurHook(entry) ||
     (isRecord(entry) && typeof entry["command"] === "string" && SHELL_FORM.test(entry["command"]))
@@ -152,7 +155,7 @@ export function holdsInwardsHooks(text: string): boolean {
         Array.isArray(groups) &&
         groups.some(
           (group: unknown) =>
-            isRecord(group) && Array.isArray(group["hooks"]) && group["hooks"].some(runsInwards),
+            isRecord(group) && Array.isArray(group["hooks"]) && group["hooks"].some(isInwardsHook),
         ),
     )
   );

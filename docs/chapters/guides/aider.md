@@ -22,6 +22,8 @@ Aider runs a lint command after each edit and asks the model to fix what it repo
     lint-cmd: "python: '/home/you/.local/bin/inwards' check --format text"
     ```
 
+    With `--launcher "uv run"`, the line says `python: uv run inwards check --format text` instead, with no path. `init` warns when the path it would print is in uv's or bunx's cache.
+
 3. Add that line to `.aider.conf.yml` in the project (or in your home directory for every project). Keep Aider's `auto-lint` on, which is the default.
 
 Aider runs the command from the git root, once per edited file, with that file's path appended, so Inwards checks only what changed. The `text` format carries the same numbered fix steps an agent gets in JSON. A `python:` lint command replaces Aider's built-in Python linter, so syntax errors are no longer reported by Aider; keep a compile step in your tests or CI.

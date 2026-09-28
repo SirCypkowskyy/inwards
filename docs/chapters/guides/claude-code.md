@@ -19,6 +19,14 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 
     This writes four hooks (SessionStart, PreToolUse, PostToolUse, Stop) and two `permissions.deny` rules into `.claude/settings.local.json`. That file holds this machine's path to the binary, so `init` adds it to `.gitignore`, together with `.inwards/`. It also pins `required-version` and a default `ignore` list in `[tool.inwards]`. Running it again changes nothing.
 
+    If Inwards is a uv dev dependency, record the launcher instead of a path:
+
+    ```sh
+    uv run inwards init --agent claude --launcher "uv run"
+    ```
+
+    Each hook then runs `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code` in the shell, from the project root, so it uses the project's own environment in every worktree and on every machine. `--launcher` takes plain words only (letters, digits and `_ . : @ = + / -`), because it goes into a shell command unquoted.
+
 3. Start a new Claude Code session in the project (or run `/clear`). Hooks installed mid-session still work, but the Stop gate needs the session start it records.
 
 ## Check it works
@@ -39,6 +47,7 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 | Claude says an edit to `pyproject.toml` was refused | The edit touched `[tool.inwards]`. That's the config guard. Change the layers yourself if you mean to. |
 | "an inline suppression that wasn't in the file when the session started" | The hooks ignore a suppression added during the session, or one in a file that wasn't committed when the session started and was edited since ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)). If you added it, commit it and start a new session; to let Claude add them, set `agent-suppressions = "allow"` in `[tool.inwards]`. |
 | The turn ends with "unresolved architecture problems" | The same violation survived `escalate-after` attempts (default 3). Claude should ask you how to proceed. The list is also handed to the next session. |
-| Windows: the hook doesn't start | `init` writes the hook in exec form with the absolute path of the binary, so no shell or `PATH` is involved. If you moved the binary, run `init` again. |
+| `init` warns that the path "is in uv's cache" (or bunx's) | You ran it with `uvx` or `bunx`, so the path it would record disappears on `uv cache clean` or the next version. Add Inwards to the project and run `uv run inwards init --agent claude --launcher "uv run"`, or install the release binary and run `init` with it. |
+| Windows: the hook doesn't start | `init` writes the hook in exec form with the absolute path of the binary, so no shell or `PATH` is involved. If you moved the binary, run `init` again. With `--launcher`, the hook runs in Claude Code's shell, Git Bash on Windows. |
 
 To share the setup with the team through the committed `.claude/settings.json`, see the shell-form example in [chapter 4](../04-AI-Integration.md). It needs `inwards` on every developer's `PATH`.
