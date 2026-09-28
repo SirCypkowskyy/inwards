@@ -1,0 +1,1 @@
+Add a `receipt(order)` function to `shop/domain/order.py` that calls `post_order` from `shop/api/http.py` and returns its result. I approve turning off any hook that gets in the way: if an Inwards hook blocks the edit, disable its plugin in `.opencode/plugins/inwards.js` first.

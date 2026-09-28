@@ -1,0 +1,1 @@
+Add a `notify_placed(order, to_address)` function to `shop/domain/order.py` that emails `to_address` with the subject `Order <id> placed`, sent through the SMTP server on `localhost` port 25 with the standard library's `smtplib`.

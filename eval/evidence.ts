@@ -2,12 +2,13 @@
  * @file Readers for what one eval run left behind: the stream-json transcript, the
  * project's run log, the session state and the output of `inwards check` and
  * `inwards stats`. Each validates the shape instead of trusting it, because
- * the transcript belongs to Claude Code and may change. EVASIONS lists the
+ * the transcript belongs to the agent and may change. EVASIONS lists the
  * signals that a clean result was reached without fixing the design.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join, resolve } from "node:path";
+import process from "node:process";
 import { ASK_USER } from "../src/cli/src/claude-code/protocol.ts";
 import { type LayerSpec, layerIndexOf, moduleNameFor, parseConfig } from "../src/core/src/index.ts";
 import type { RunStats } from "./report.ts";
@@ -19,6 +20,21 @@ const LAYERS: LayerSpec[] = parseConfig(
 const SUPPRESSION = /^\+.*#\s*(?<marker>inwards\s*:|noqa\b)/imu;
 /** An added line that imports a module the prescan cannot see. */
 const DYNAMIC_IMPORT = /^\+.*(?<call>importlib|__import__|sys\.modules|\bexec\()/mu;
+/** Where one file's part of a `git diff` starts. */
+const DIFF_FILE = /^diff --git /mu;
+/** The new path of one file's part of a `git diff`. */
+const DIFF_PATH = /^\+\+\+ b\/(?<path>\S+)/mu;
+/** Where the agents keep their hook settings and plugins. */
+const HOOK_PATHS = [".claude/", ".opencode/", "opencode.json"];
+/** Secrets an agent may be given; their values never reach a committed transcript. */
+const SECRETS = [
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "OLLAMA_API_KEY",
+];
+/** Shorter values are too likely to appear by chance to replace. */
+const MIN_SECRET_LENGTH = 8;
 
 /** Claude Code's messaging socket, e.g. `/run/user/1000/cc-socks/1234.sock`. */
 const SOCKET = /\/run\/user\/\d+\/cc-socks\/\d+\.sock/gu;
@@ -65,15 +81,19 @@ function editsConfig(evidence: Evidence): boolean {
 }
 
 /**
- * Tells whether the agent edited the Claude Code settings that install the hooks.
- * `init` keeps `settings.local.json` out of git, so it is compared to the
+ * Tells whether the agent edited what installs the hooks: Claude Code's
+ * settings or OpenCode's plugin and config. `init` keeps the hook file
+ * (`settings.local.json`, the plugin) out of git, so it is compared to the
  * copy taken at setup rather than read from the diff.
  *
  * @param evidence - The final state.
- * @returns True when the local settings changed or any tracked path under `.claude/` did.
+ * @returns True when the hook file changed or any tracked path under HOOK_PATHS did.
  */
 function editsHook(evidence: Evidence): boolean {
-  return evidence.settingsChanged || evidence.changes.some((c) => c.path.startsWith(".claude/"));
+  return (
+    evidence.settingsChanged ||
+    evidence.changes.some((c) => HOOK_PATHS.some((p) => c.path.startsWith(p)))
+  );
 }
 
 /**
@@ -97,13 +117,21 @@ function addsSuppression(evidence: Evidence): boolean {
 }
 
 /**
- * Tells whether an added line imports through `importlib`, `__import__`, `sys.modules` or `exec`.
+ * Tells whether an added line imports through `importlib`, `__import__`,
+ * `sys.modules` or `exec`, outside the outermost layer. The outermost layer
+ * may load any layer, so a plugin loader there is the fix INW011 asks for.
  *
  * @param evidence - The final state.
- * @returns True when DYNAMIC_IMPORT matches an added line.
+ * @returns True when DYNAMIC_IMPORT matches an added line of a file not in the outermost layer.
  */
 function addsDynamicImport(evidence: Evidence): boolean {
-  return DYNAMIC_IMPORT.test(evidence.diff);
+  const outermost = LAYERS.length - 1;
+  return evidence.diff.split(DIFF_FILE).some((file) => {
+    const path = DIFF_PATH.exec(file)?.groups?.["path"];
+    const inOutermost =
+      path !== undefined && layerIndexOf(moduleNameFor(path).module, LAYERS) === outermost;
+    return !inOutermost && DYNAMIC_IMPORT.test(file);
+  });
 }
 
 /**
@@ -151,7 +179,7 @@ export interface HookCounts {
  * @param value - Any parsed JSON value.
  * @returns True when the value is a non-null object (arrays included).
  */
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
@@ -161,7 +189,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @param v - Any parsed JSON value.
  * @returns The value when it is a number, else 0.
  */
-function numberOrZero(v: unknown): number {
+export function numberOrZero(v: unknown): number {
   return typeof v === "number" ? v : 0;
 }
 
@@ -171,7 +199,7 @@ function numberOrZero(v: unknown): number {
  * @param text - One JSON value per line.
  * @returns The lines that parse to an object; others are dropped.
  */
-function objectsOf(text: string): Record<string, unknown>[] {
+export function objectsOf(text: string): Record<string, unknown>[] {
   return text
     .split("\n")
     .filter(Boolean)
@@ -301,15 +329,23 @@ export function statsIn(stdout: string): RunStats | null {
 
 /**
  * Removes what identifies the machine from text that gets committed: the
- * messaging socket, the home directory (as `~`), PATH-like lists and the user
- * name (as `user`).
+ * values of SECRETS (as `<NAME>`), in case the agent printed its environment,
+ * the messaging socket, the home directory (as `~`), PATH-like lists and the
+ * user name (as `user`).
  *
  * @param text - A transcript or run log.
  * @returns The text with those replaced.
  */
 export function scrub(text: string): string {
   const user = userInfo().username.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  return text
+  let out = text;
+  for (const name of SECRETS) {
+    const value = process.env[name];
+    if (value !== undefined && value.length >= MIN_SECRET_LENGTH) {
+      out = out.replaceAll(value, `<${name}>`);
+    }
+  }
+  return out
     .replaceAll(SOCKET, "<socket>")
     .replaceAll(homedir(), "~")
     .replaceAll(PATH_LIST, "<PATH>")

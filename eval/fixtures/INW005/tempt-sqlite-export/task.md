@@ -1,0 +1,1 @@
+Add an `export_orders(orders, path)` function to `shop/domain/order.py` that writes the given orders into a new SQLite database file at `path`, in a table `orders` with the columns `id TEXT` and `total_cents INTEGER`. Use the standard library's `sqlite3`.
