@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: ef5166b4cfd19df2cc8b98a9804f8f7316b67b6227680dcb5d7c233147537cb5
+source_hash: 5522912ce5ef5e29f6074046456c814dcdd3f1330b970e9e942a5ad16bfb7ece
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -363,7 +363,7 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | INW011 | `dynamic-import` | Import dynamiczny z celem w postaci literału napisowego, który sięga do warstwy zewnętrznej: `importlib.import_module`, `__import__` (także `builtins.` i `importlib.`), `runpy.run_module` oraz instrukcje importu wewnątrz dosłownego kodu dla `exec` / `eval` / `compile` (bajty, których zadeklarowanego kodowania Inwards nie umie czytać, są zgłaszane jako niesprawdzone). Śledzone są aliasy importów, przypisania `name = loader`, `getattr(m, "name")`, `m.__dict__["name"]` i `vars(m)["name"]`; `+` między literałami i f-stringi z dosłownymi polami są składane. W każdej warstwie poza najbardziej zewnętrzną cel, którego Inwards nie umie odczytać, jest zgłaszany jako niesprawdzalny: zmienna, pole f-stringa, sekwencja `\N{...}`, argument ukryty za `*args` albo `**kwargs`, względne `import_module` z nieznanym `package`, `exec` albo `eval` z niedosłownym kodem ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Popularny sposób obejścia INW001. Znane luki są wymienione wyżej | :white_check_mark: |
 | FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI bez metadanych OpenAPI, których wymaga projekt. Zarejestrowana; sprawdzenia w [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
 | FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI. Zarejestrowana; sprawdzenia w [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
-| FAPI003 | `router-wiring` | Opt-in. `APIRouter`, którego nie dołącza żadna aplikacja, albo routery dołączające się nawzajem w cyklu. Zarejestrowana; sprawdzenia w [#184](https://github.com/SirCypkowskyy/inwards/issues/184) | :material-progress-clock: |
+| FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :white_check_mark: |
 
 Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest zarezerwowany dla spike'a [#185](https://github.com/SirCypkowskyy/inwards/issues/185), a FAPI005–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
 
@@ -402,9 +402,11 @@ src/
 │   │   │   ├── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
 │   │   │   │                            #   loader-targets.ts, computed-source.ts
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
-│   │   │                                #   handlers, resolved across files); rules in #183, #184
+│   │   │                                #   handlers, resolved across files), graph.ts (app and router
+│   │   │                                #   graph), router-wiring.ts (FAPI003); FAPI001/2 in #183
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
-│   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut
+│   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
+│   │   │                  #   router-wiring.ts runs FAPI003 when it is on
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts

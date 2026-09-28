@@ -45,6 +45,13 @@ export interface Wiring extends CallSyntax {
   readonly target: string | null;
   /** The mount path, or `prefix=` of an inclusion; null when not given. */
   readonly path: Value | null;
+  /**
+   * When the target is the variable of an enclosing `for` loop over a list or
+   * tuple literal (`for r in [a.router, b.router]: app.include_router(r)`),
+   * the qualified names of the literal's items, null for an item that isn't a
+   * name; empty otherwise.
+   */
+  readonly loopTargets: readonly (string | null)[];
 }
 
 /** An exception handler an app registers, and the status codes its responses set. */

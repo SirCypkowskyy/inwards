@@ -281,6 +281,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  * @param options.base - directory that report paths are made relative to.
  * @param options.baseline - false to report violations the baseline accepts.
  * @param options.required - true to add INW008 for the targets' packages.
+ * @param options.edit - true for a per-edit check (the PostToolUse hook): FAPI003
+ *   keeps only what one file shows, and leaves unmounted routers to the Stop gate.
  * @param options.texts - content to check instead of a file's, by absolute path.
  * @param options.cache - true to read and fill the extraction cache on disk
  *   (`inwards check` and `inwards baseline`); the hooks never pass it (#56).
@@ -299,6 +301,7 @@ export async function runCheck(
     base,
     baseline = true,
     required = false,
+    edit = false,
     texts,
     cache = false,
     config,
@@ -307,6 +310,7 @@ export async function runCheck(
     base: string;
     baseline?: boolean | undefined;
     required?: boolean | undefined;
+    edit?: boolean | undefined;
     texts?: ReadonlyMap<string, string> | undefined;
     cache?: boolean | undefined;
     config?: InwardsConfig | undefined;
@@ -322,7 +326,10 @@ export async function runCheck(
   const index = project.engine.index(listing);
   // A whole-project run also looks for import cycles (INW004), which one file can't show.
   const whole = targets === undefined;
-  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, { whole });
+  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, {
+    whole,
+    edit,
+  });
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));

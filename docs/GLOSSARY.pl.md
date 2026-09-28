@@ -166,6 +166,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | virtualenv (`.venv`), site-packages | środowisko wirtualne (`.venv`), site-packages |
 | module index | indeks modułów |
 | package shape | kształt pakietu |
+| path operation (FastAPI) | operacja ścieżki |
+| include a router (`include_router`) | dołączać router, dołączenie |
+| unmounted router (FAPI003) | niepodpięty router |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |

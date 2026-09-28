@@ -288,6 +288,7 @@
           "core-rule-suppression-comment",
           "core-rule-unknown-first-party",
           "core-rule-dynamic-import",
+          "core-rule-fastapi",
           "core-baseline"
         ]
       },

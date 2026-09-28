@@ -436,7 +436,7 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "router-wiring": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/routerWiringOptions"
         }
       }
     },
@@ -454,6 +454,48 @@
           "items": {
             "$ref": "#/definitions/layerEntry"
           }
+        }
+      }
+    },
+    "routerWiringOptions": {
+      "description": "FAPI003 router-wiring's options, [tool.inwards.rules.router-wiring]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "FAPI003 router-wiring's options, [tool.inwards.rules.router-wiring]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "entrypoints": {
+          "description": "The apps unmounted routers are measured from, as module:name, where name is the app's variable or the top-level function that builds it. Default: every FastAPI() in the project.",
+          "markdownDescription": "The apps unmounted routers are measured from, as module:name, where name is the app's variable or the top-level function that builds it. Default: every FastAPI() in the project.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s*?\\[\\]/\\\\:-]+(\\.[^.\\s*?\\[\\]/\\\\:-]+)*:[^.\\s*?\\[\\]/\\\\:-]+$"
+          }
+        },
+        "allow-unmounted": {
+          "description": "Routers that may stay unmounted, as module prefixes or selectors of their qualified name, such as app.experimental.*.",
+          "markdownDescription": "Routers that may stay unmounted, as module prefixes or selectors of their qualified name, such as app.experimental.*.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "unresolved-includes": {
+          "description": "What an include_router call Inwards can't resolve does to unmounted routers: warn turns them into warnings, silent drops them.",
+          "markdownDescription": "What an include_router call Inwards can't resolve does to unmounted routers: warn turns them into warnings, silent drops them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "enum": ["warn", "silent"],
+          "default": "warn"
+        },
+        "check-order": {
+          "description": "Whether to report an include_router call that runs above the included router's own routes in the same file.",
+          "markdownDescription": "Whether to report an include_router call that runs above the included router's own routes in the same file.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "boolean",
+          "default": true
         }
       }
     },

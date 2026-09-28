@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 4f5a310b22056578da498ff98641917b9a2cdf661e8c485ba567874e3e705820
+source_hash: 4ab8c248ac2a28d0e94f22f9f57b8fe4a680167d32a1242d74d7988257c6827d
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -215,7 +215,7 @@ Które reguły zgłaszają i jak głośno:
 - `extend-select`: te reguły też zgłaszają, obok `select` albo reguł domyślnie włączonych. Włącza [reguły opt-in](../rules/index.md#opt-in-rules).
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
-- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
+- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. [FAPI003](../rules/FAPI003.md#configuration) przyjmuje też `entrypoints`, `allow-unmounted`, `unresolved-includes` i `check-order`; każda inna reguła je odrzuca. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
 

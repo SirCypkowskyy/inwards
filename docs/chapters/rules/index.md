@@ -19,13 +19,13 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 
 ## FastAPI rules { #fastapi }
 
-The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do. FAPI001 to FAPI003 are registered, so config, suppressions and SARIF accept their codes, but their checks land in [#183](https://github.com/SirCypkowskyy/inwards/issues/183) and [#184](https://github.com/SirCypkowskyy/inwards/issues/184); until then they report nothing.
+The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do. FAPI003 reports. FAPI001 and FAPI002 are registered, so config, suppressions and SARIF accept their codes, but their checks land in [#183](https://github.com/SirCypkowskyy/inwards/issues/183); until then they report nothing.
 
 | Code | Name | What it flags | Default | Inline suppression |
 |---|---|---|---|---|
 | [FAPI001](FAPI001.md) | `endpoint-metadata` | A path operation without the OpenAPI metadata the project requires (summary, response model, status code) | opt-in, error | yes |
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | A path operation that can produce an error status code its `responses=` doesn't declare | opt-in, error | yes |
-| [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` no app includes, or routers that include each other in a cycle | opt-in, error | yes |
+| [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` with routes that no app includes, routers that include each other in a cycle, or an `include_router` above the included router's routes | opt-in, error | yes |
 
 Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
 

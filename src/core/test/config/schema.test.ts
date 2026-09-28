@@ -16,7 +16,7 @@ import { CONFIG_DEFAULTS } from "../../src/config/defaults.ts";
 import { DEFAULT_GENERATED } from "../../src/config/generated.ts";
 import { LAYER_KEYS } from "../../src/config/layers.ts";
 import { parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
-import { OPTION_KEYS, RULE_KEYS } from "../../src/config/rule-settings.ts";
+import { OPTION_KEYS, RULE_KEYS, RULE_OPTION_KEYS } from "../../src/config/rule-settings.ts";
 import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/shape.ts";
 import { TEMPLATE_KEYS } from "../../src/config/templates.ts";
 import { RULES } from "../../src/meta/registry.ts";
@@ -114,6 +114,11 @@ describe("the schema and the parser agree", () => {
     expect(keysOf(options)).toEqual([...OPTION_KEYS].sort());
     const template = schema.properties?.["templates"]?.additionalProperties;
     expect(keysOf(typeof template === "object" ? template : {})).toEqual([...TEMPLATE_KEYS].sort());
+    // A rule with options of its own has its own definition, with the shared keys too.
+    const rules = deref(schema.properties?.["rules"] ?? {}).properties ?? {};
+    for (const [name, keys] of Object.entries(RULE_OPTION_KEYS)) {
+      expect(keysOf(rules[name] ?? {})).toEqual([...OPTION_KEYS, ...keys].sort());
+    }
   });
 
   test("on the rule codes, taken from the registry", () => {

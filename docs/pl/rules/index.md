@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: db8dd58ef4af4fbabaefa95abd126315b76b26f9b3f0c03f2dfa045e71379b55
+source_hash: dd3d805731cdcfa0d3f944418abbc53b3b9a498effcf7dd90f55f83a68ebf602
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -24,13 +24,13 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 
 ## Reguły FastAPI { #fastapi }
 
-Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa. FAPI001–FAPI003 są zarejestrowane, więc konfiguracja, wyciszenia i SARIF akceptują ich kody, ale ich sprawdzenia trafią w [#183](https://github.com/SirCypkowskyy/inwards/issues/183) i [#184](https://github.com/SirCypkowskyy/inwards/issues/184); do tego czasu niczego nie zgłaszają.
+Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa. FAPI003 już zgłasza. FAPI001 i FAPI002 są zarejestrowane, więc konfiguracja, wyciszenia i SARIF akceptują ich kody, ale ich sprawdzenia trafią w [#183](https://github.com/SirCypkowskyy/inwards/issues/183); do tego czasu niczego nie zgłaszają.
 
 | Kod | Nazwa | Co zgłasza | Domyślnie | Wyciszenie w linii |
 |---|---|---|---|---|
 | [FAPI001](FAPI001.md) | `endpoint-metadata` | Operacja ścieżki bez metadanych OpenAPI, których wymaga projekt (podsumowanie, model odpowiedzi, kod statusu) | opt-in, błąd | tak |
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu niezadeklarowany w `responses=` | opt-in, błąd | tak |
-| [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter`, którego nie dołącza żadna aplikacja, albo routery dołączające się nawzajem w cyklu | opt-in, błąd | tak |
+| [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
 
 Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
 

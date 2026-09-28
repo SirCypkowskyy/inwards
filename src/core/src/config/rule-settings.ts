@@ -28,6 +28,14 @@ export interface RuleOptions {
    * reports only in the modules they match.
    */
   modules?: string[];
+  /** FAPI003 (`router-wiring`): the apps that count as roots, as `module:name`. */
+  entrypoints?: string[];
+  /** FAPI003: routers that may stay unmounted, as module prefixes or selectors of their qualified name. */
+  allowUnmounted?: string[];
+  /** FAPI003: what an `include_router` Inwards can't resolve does to unmounted findings. */
+  unresolvedIncludes?: "warn" | "silent";
+  /** FAPI003: false to skip "included before its routes". */
+  checkOrder?: boolean;
 }
 
 /**
@@ -53,11 +61,20 @@ export const RULE_KEYS: ReadonlySet<string> = new Set([
   "ignore",
   "severity",
 ]);
-/**
- * Keys every rule's options table may hold. No rule has options of its own
- * yet; the first one (#182) adds its keys and their validation here.
- */
+/** Keys every rule's options table may hold. */
 export const OPTION_KEYS: ReadonlySet<string> = new Set(["modules"]);
+/** Keys only one rule's options table may hold, by rule name, on top of `OPTION_KEYS`. */
+export const RULE_OPTION_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
+  "router-wiring": new Set([
+    "entrypoints",
+    "allow-unmounted",
+    "unresolved-includes",
+    "check-order",
+  ]),
+};
+/** An entrypoint: a dotted module, a colon, and a name, e.g. `app.main:app`. */
+const ENTRYPOINT =
+  /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*:[\p{XID_Start}_]\p{XID_Continue}*$/u;
 const SEVERITIES: readonly string[] = ["error", "warning"] satisfies Severity[];
 /** Always reports at its own severity, see the module comment. */
 const FIXED = "INW000";
@@ -137,13 +154,56 @@ function optionTables(table: Record<string, unknown>): Record<string, RuleOption
         `${where} must be a table of the rule's options, such as { modules = ["shop.api.*"] }.`,
       );
     }
-    rejectUnknownKeys(raw, OPTION_KEYS, where);
-    options[name] =
-      raw["modules"] === undefined
+    rejectUnknownKeys(raw, new Set([...OPTION_KEYS, ...(RULE_OPTION_KEYS[name] ?? [])]), where);
+    options[name] = {
+      ...(raw["modules"] === undefined
         ? {}
-        : { modules: moduleEntries(raw["modules"], `${where}.modules`) };
+        : { modules: moduleEntries(raw["modules"], `${where}.modules`) }),
+      ...routerWiringOptions(raw, where),
+    };
   }
   return options;
+}
+
+/**
+ * Validates the options only FAPI003's table (`router-wiring`) may hold;
+ * `rejectUnknownKeys` already refused them in any other table.
+ *
+ * @param raw - the raw options table.
+ * @param where - the table's dotted path, for messages.
+ * @returns the options that are set.
+ * @throws {ConfigError} for an entrypoint that isn't `module:name`, a bad
+ *   `allow-unmounted` entry, an `unresolved-includes` other than "warn" or
+ *   "silent", or a `check-order` that isn't a boolean.
+ */
+function routerWiringOptions(raw: Record<string, unknown>, where: string): RuleOptions {
+  const {
+    entrypoints,
+    "allow-unmounted": allow,
+    "unresolved-includes": unresolved,
+    "check-order": order,
+  } = raw;
+  const list: unknown[] = Array.isArray(entrypoints) ? entrypoints : [];
+  const points = list.filter((e): e is string => typeof e === "string" && ENTRYPOINT.test(e));
+  if (entrypoints !== undefined && !(points.length > 0 && points.length === list.length)) {
+    throw new ConfigError(
+      `${where}.entrypoints must be a non-empty list of "module:name" entries, such as ["app.main:app"].`,
+    );
+  }
+  if (unresolved !== undefined && unresolved !== "warn" && unresolved !== "silent") {
+    throw new ConfigError(`${where}.unresolved-includes must be "warn" or "silent".`);
+  }
+  if (order !== undefined && typeof order !== "boolean") {
+    throw new ConfigError(`${where}.check-order must be true or false.`);
+  }
+  return {
+    ...(entrypoints === undefined ? {} : { entrypoints: points }),
+    ...(allow === undefined
+      ? {}
+      : { allowUnmounted: moduleEntries(allow, `${where}.allow-unmounted`) }),
+    ...(unresolved === undefined ? {} : { unresolvedIncludes: unresolved }),
+    ...(order === undefined ? {} : { checkOrder: order }),
+  };
 }
 
 /**

@@ -36,7 +36,8 @@ export interface Check {
  * @param configPath - the pyproject.toml.
  * @param targets - absolute files; undefined for the whole project.
  * @param base - the directory report paths are relative to.
- * @param options - whether the baseline applies, file contents to check instead
+ * @param options - whether the baseline applies, whether it is a per-edit check
+ *   (`edit`, the PostToolUse hook), file contents to check instead
  *   of the disk's, whether the extraction cache on disk may be used (never by a
  *   hook), a config to use instead of the one in `configPath`, and the
  *   directories another config checks (`exclude`, uv workspace members).
@@ -49,6 +50,7 @@ export type CheckRunner = (
   options: {
     baseline?: boolean;
     required?: boolean;
+    edit?: boolean;
     texts?: ReadonlyMap<string, string>;
     cache?: boolean;
     config?: InwardsConfig | undefined;

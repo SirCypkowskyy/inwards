@@ -358,7 +358,7 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. In every layer but the outermost, a target Inwards can't read is reported as unverifiable: a variable, an f-string field, a `\N{...}` escape, an argument hidden behind `*args` or `**kwargs`, a relative `import_module` whose `package` isn't known, `exec` or `eval` of a non-literal source ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). A common way to dodge INW001. Known gaps are listed above | :white_check_mark: |
 | FAPI001 | `endpoint-metadata` | Opt-in. A FastAPI path operation without the OpenAPI metadata the project requires. Registered; checks in [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
 | FAPI002 | `undocumented-error-response` | Opt-in. A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare. Registered; checks in [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
-| FAPI003 | `router-wiring` | Opt-in. An `APIRouter` no app includes, or routers that include each other in a cycle. Registered; checks in [#184](https://github.com/SirCypkowskyy/inwards/issues/184) | :material-progress-clock: |
+| FAPI003 | `router-wiring` | Opt-in. An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | :white_check_mark: |
 
 The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is reserved for the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike, and FAPI005 to FAPI009 are planned ([rules index](rules/index.md#fastapi)).
 
@@ -397,9 +397,11 @@ src/
 │   │   │   ├── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
 │   │   │   │                            #   loader-targets.ts, computed-source.ts
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
-│   │   │                                #   handlers, resolved across files); rules in #183, #184
+│   │   │                                #   handlers, resolved across files), graph.ts (app and router
+│   │   │                                #   graph), router-wiring.ts (FAPI003); FAPI001/2 in #183
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
-│   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut
+│   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
+│   │   │                  #   router-wiring.ts runs FAPI003 when it is on
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
