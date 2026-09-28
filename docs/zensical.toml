@@ -58,6 +58,7 @@ nav = [
     { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },
+    { "FAPI006 lifespan-events" = "rules/FAPI006.md" },
   ] },
   { "1. Introduction" = "01-Introduction.md" },
   { "2. Business context" = "02-Business-Context.md" },

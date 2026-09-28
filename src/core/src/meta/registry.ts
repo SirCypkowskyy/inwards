@@ -47,7 +47,8 @@ type RuleCode =
   | "INW011"
   | "FAPI001"
   | "FAPI002"
-  | "FAPI003";
+  | "FAPI003"
+  | "FAPI006";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -187,6 +188,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Every APIRouter with routes is included in an app, and no routers include each other in a cycle.",
     docs: page("FAPI003"),
+  },
+  FAPI006: {
+    code: "FAPI006",
+    name: "lifespan-events",
+    severity: "error",
+    default: "off",
+    summary:
+      "A FastAPI app uses a lifespan handler, not the deprecated startup and shutdown events, and never both.",
+    docs: page("FAPI006"),
   },
 };
 

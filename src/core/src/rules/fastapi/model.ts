@@ -110,6 +110,20 @@ export class FastApiModel {
   }
 
   /**
+   * Parses a checked file whatever its text mentions, for the rules that
+   * walk its functions and calls (FAPI006, FAPI007, FAPI009), and pins its
+   * text as `fileModel` does. A file already parsed isn't parsed again.
+   *
+   * @param file - the source file, as the adapter read it.
+   * @returns the module node, valid until `dispose()`, and the file's name qualifier.
+   */
+  syntaxOf(file: SourceFile): { readonly root: Node; readonly qualify: Qualify } {
+    const { tree, qualify } = this.parse({ ...file, text: normalizeSource(file.text) }, true);
+    this.pinned.add(file.path);
+    return { root: tree.rootNode, qualify };
+  }
+
+  /**
    * Reads a first-party module's records through the project index. A text
    * `fileModel` was given for the same path wins over the one on disk.
    *

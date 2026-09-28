@@ -13,11 +13,12 @@
 import type { Node } from "web-tree-sitter";
 import { matchEntry } from "../../config/layer-selector.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
+import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES, type RuleMeta } from "../../meta/registry.ts";
 import type { GraphEdge, GraphNode, WiringGraph } from "./graph.ts";
 import { list, optionalList } from "./options.ts";
 import type { FastApiFile, Wiring } from "./records.ts";
+import { spanOf } from "./syntax.ts";
 
 const RULE: RuleMeta = RULES.FAPI003;
 const DONT_DELETE = "Don't delete the router or its routes to make this finding go away.";
@@ -381,21 +382,6 @@ function factoryOf(node: Node): string | null {
     }
   }
   return name;
-}
-
-/**
- * Gives a node's 1-based span.
- *
- * @param node - a syntax node.
- * @returns where it starts and ends.
- */
-function spanOf(node: Node): Span {
-  return {
-    line: node.startPosition.row + 1,
-    column: node.startPosition.column + 1,
-    endLine: node.endPosition.row + 1,
-    endColumn: node.endPosition.column + 1,
-  };
 }
 
 /**

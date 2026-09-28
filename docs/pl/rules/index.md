@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: f94ae8e8fc4d504d026677f15b766b0c9c0f44b9770cfd87e9740fc36a30c17f
+source_hash: 524d07f699073a0a07e92552a5635e7486caaf533a409a2f32a2afa32d85ed65
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -31,6 +31,7 @@ Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikac
 | [FAPI001](FAPI001.md) | `endpoint-metadata` | Operacja ścieżki bez metadanych OpenAPI, których wymaga projekt (podsumowanie, model odpowiedzi, kod statusu) | opt-in, błąd | tak |
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu (rzucony bezpośrednio, w funkcji pomocniczej albo zależności, albo przez handler wyjątków aplikacji) niezadeklarowany w `responses=` | opt-in, błąd | tak |
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
+| [FAPI006](FAPI006.md) | `lifespan-events` | Handler startu albo zamknięcia zarejestrowany przez przestarzałe API zdarzeń albo obok `lifespan=`, przez które FastAPI go pomija | opt-in, błąd, same przestarzałe zdarzenia dają ostrzeżenie | tak |
 
 Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
 
@@ -38,7 +39,6 @@ Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (niez
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
 | FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planowana |
-| FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planowana |
 | FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planowana |
 | FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planowana |
 | FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |

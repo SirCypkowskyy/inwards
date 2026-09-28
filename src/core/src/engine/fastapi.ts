@@ -1,11 +1,14 @@
 /**
  * @file Runs the FAPI rules for a check: builds the FastAPI model once, reads
- * the checked files through it, and hands each one its FAPI001, FAPI002 and
- * FAPI003 findings before its suppression comments apply. The project lookups
+ * the checked files through it, and hands each one its FAPI findings before
+ * its suppression comments apply. The project lookups
  * (`FastApiProject`: handlers, classes, the app and router graph) are shared
- * by all three and read the rest of the project only when a rule asks. With
+ * by all the rules and read the rest of the project only when a rule asks. With
  * every FAPI rule off, nothing is read or parsed; a file that doesn't mention
  * FastAPI is never parsed for them, and neither is one INW000 refuses.
+ * The rules that read a file's own functions and calls
+ * (`rules/fastapi/code-checks.ts`) parse a checked file whose text passes
+ * their own pre-filter, FastAPI mentioned or not.
  *
  * A per-edit check (the PostToolUse hook, the editor) keeps only FAPI003's
  * one-file findings: wiring a new router into the app is a second edit, so the
@@ -21,6 +24,7 @@ import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
+import { checkCode, codeRulesOn } from "../rules/fastapi/code-checks.ts";
 import { FastApiModel } from "../rules/fastapi/model.ts";
 import { FastApiProject } from "../rules/fastapi/project.ts";
 import { checkFileWiring, checkGraphWiring } from "../rules/fastapi/router-wiring.ts";
@@ -58,7 +62,8 @@ export function fastApiFindings(
 ): FastApiFound {
   const { rules } = config;
   const wiringOn = ruleLevel("FAPI003", rules) !== "off";
-  if (!(wiringOn || endpointRulesOn(rules))) {
+  const codeOn = codeRulesOn(rules);
+  if (!(wiringOn || endpointRulesOn(rules) || codeOn)) {
     return NONE;
   }
   const model = new FastApiModel(parser, project);
@@ -79,6 +84,16 @@ export function fastApiFindings(
       const wiring = wiringOn ? checkFileWiring(m, src, settings) : [];
       found.set(src.path, [...wiring, ...checkEndpoints(src, m, scope, rules)]);
     }
+    if (codeOn) {
+      addTo(
+        found,
+        checkCode(
+          files.filter((src) => !checkEncoding(src)),
+          scope,
+          rules,
+        ),
+      );
+    }
     const wired = own.some(({ m }) => m.objects.length > 0 || m.wiring.length > 0);
     const suppressed = own.some(
       ({ src }) => mentionsSuppression(src.text) && src.text.includes("FAPI003"),
@@ -88,12 +103,22 @@ export function fastApiFindings(
     }
     const checked = new Map(own.map(({ src }) => [src.path, src]));
     const extra = checkGraphWiring(scope.graph(), checked, settings);
-    for (const d of extra) {
-      found.set(d.file, [...(found.get(d.file) ?? []), d]);
-    }
+    addTo(found, extra);
     return { found, hidden: edit ? new Set(extra) : new Set() };
   } finally {
     model.dispose();
+  }
+}
+
+/**
+ * Files findings under their paths, after the ones already there.
+ *
+ * @param found - findings by file path, extended in place.
+ * @param extra - the findings to add.
+ */
+function addTo(found: Map<string, Diagnostic[]>, extra: readonly Diagnostic[]): void {
+  for (const d of extra) {
+    found.set(d.file, [...(found.get(d.file) ?? []), d]);
   }
 }
 
