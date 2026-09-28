@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 88b9adbf8ab71dcbab03e7916f46542f4d1ffcd46689b2653211f9b378d9e6b2
+source_hash: b243c306c75f55e3431e99d2edf1946bea2911bb8547434897bb4778b978f46a
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -361,6 +361,11 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | INW009 | `suppression-comment` | Wyciszenie w linii, `# inwards: ignore[INW001] reason="..."`, które niczego nie ukrywa: w złej postaci, bez powodu albo z kodem nieznanym lub takim, którego nie da się wyciszyć (INW000, INW004, INW007, INW008, INW009) (błąd); wyciszenie z kodem, który nie pasuje do żadnej diagnostyki w jego linii (ostrzeżenie). Zobacz [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :white_check_mark: |
 | INW010 | `unknown-first-party` | Import statyczny w warstwie, który wskazuje własny moduł, który nie istnieje, typowa halucynacja agenta (`from shop.domain.pricing import X` bez żadnego `pricing`), oraz import względny, który wychodzi ponad pakiet najwyższego poziomu, czego Python nigdy nie przyjmuje. Sprawdzana jest część będąca modułem: `X` w `from X import name`, a w pozostałych przypadkach cała nazwa. Istnienie jest sondowane na dysku, więc liczą się pakiety przestrzeni nazw, zaślepki i skompilowane moduły rozszerzeń (`.so`, `.pyd`, `.pyx`); poprawka wymienia trzy najbliższe moduły z tego samego pakietu. Taki import nie dostaje dodatkowo INW006, a import skierowany na zewnątrz, który zgłasza INW001, nie dostaje INW010. Pakiety, które rozszerzają swój `__path__`, są pomijane, podobnie jak moduły zapisywane przez krok budowania (`generated`, domyślnie `*_pb2`, `*_pb2_grpc` i `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). Zobacz [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :white_check_mark: |
 | INW011 | `dynamic-import` | Import dynamiczny z celem w postaci literału napisowego, który sięga do warstwy zewnętrznej: `importlib.import_module`, `__import__` (także `builtins.` i `importlib.`), `runpy.run_module` oraz instrukcje importu wewnątrz dosłownego kodu dla `exec` / `eval` / `compile` (bajty, których zadeklarowanego kodowania Inwards nie umie czytać, są zgłaszane jako niesprawdzone). Śledzone są aliasy importów, przypisania `name = loader`, `getattr(m, "name")`, `m.__dict__["name"]` i `vars(m)["name"]`; `+` między literałami i f-stringi z dosłownymi polami są składane. W każdej warstwie poza najbardziej zewnętrzną cel, którego Inwards nie umie odczytać, jest zgłaszany jako niesprawdzalny: zmienna, pole f-stringa, sekwencja `\N{...}`, argument ukryty za `*args` albo `**kwargs`, względne `import_module` z nieznanym `package`, `exec` albo `eval` z niedosłownym kodem ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Popularny sposób obejścia INW001. Znane luki są wymienione wyżej | :white_check_mark: |
+| FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI bez metadanych OpenAPI, których wymaga projekt. Zarejestrowana; sprawdzenia w [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
+| FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI. Zarejestrowana; sprawdzenia w [#183](https://github.com/SirCypkowskyy/inwards/issues/183) | :material-progress-clock: |
+| FAPI003 | `router-wiring` | Opt-in. `APIRouter`, którego nie dołącza żadna aplikacja, albo routery dołączające się nawzajem w cyklu. Zarejestrowana; sprawdzenia w [#184](https://github.com/SirCypkowskyy/inwards/issues/184) | :material-progress-clock: |
+
+Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest zarezerwowany dla spike'a [#185](https://github.com/SirCypkowskyy/inwards/issues/185), a FAPI005–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
 
 ## Mapa kodu { #code-map }
 
@@ -394,8 +399,10 @@ src/
 │   │   │   ├── package-shape/           # INW007 + INW008: shape.ts, fix.ts (wording, likely target)
 │   │   │   ├── suppression-comment.ts   # INW009: inline suppressions, what they hide
 │   │   │   ├── unknown-first-party.ts   # INW010: first-party modules that don't exist
-│   │   │   └── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
-│   │   │                                #   loader-targets.ts, computed-source.ts
+│   │   │   ├── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
+│   │   │   │                            #   loader-targets.ts, computed-source.ts
+│   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
+│   │   │                                #   handlers, resolved across files); rules in #183, #184
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut
 │   │   └── report/        # render.ts: text / concise / json / sarif

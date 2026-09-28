@@ -107,6 +107,8 @@
         "name": "core-rule-dynamic-import",
         "patterns": ["src/core/src/rules/dynamic-import.ts", "src/core/src/rules/dynamic-import/**"]
       },
+      // The FastAPI family (#186): the shared model now, FAPI001 to FAPI003 in #183 and #184.
+      { "name": "core-rule-fastapi", "patterns": ["src/core/src/rules/fastapi/**"] },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -254,6 +256,17 @@
           "core-rules-shared"
         ]
       },
+      {
+        "from": "core-rule-fastapi",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
       { "from": "core-baseline", "allow": ["core-contracts"] },
       {
         "from": "core-engine",
@@ -326,6 +339,7 @@
           "core-rule-suppression-comment",
           "core-rule-unknown-first-party",
           "core-rule-dynamic-import",
+          "core-rule-fastapi",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -522,6 +536,10 @@
         },
         {
           "from": "core-rule-dynamic-import",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-fastapi",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

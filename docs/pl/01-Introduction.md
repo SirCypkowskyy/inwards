@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 8d67bb777dd4256ef6c8c19c5f02354ba17702b61a16845cde59bb3bcafd093d
+source_hash: 39b322f7fae41b817538b6af63acf8936a2ef6d3eedadababbdaba91097ab5d0
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -138,7 +138,7 @@ Wyciszenie bez powodu, z nieznanym kodem albo w złej postaci niczego nie ukrywa
 
 ## Czym Inwards nie jest { #what-inwards-is-not }
 
-To nie jest linter ogólnego przeznaczenia, narzędzie do sprawdzania typów ani formatter. Nadal używaj Ruffa i ty. Inwards zajmuje się wyłącznie strukturą zależności między twoimi własnymi modułami i zakłada, że wiesz już, jakiej architektury chcesz. Nie wymyśli jej za ciebie.
+To nie jest linter ogólnego przeznaczenia, narzędzie do sprawdzania typów ani formatter. Nadal używaj Ruffa i ty. Domyślnie Inwards zajmuje się wyłącznie strukturą zależności między twoimi własnymi modułami (rodziny reguł opt-in, takie jak [FastAPI](rules/index.md#fastapi), idą dalej, [ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) i zakłada, że wiesz już, jakiej architektury chcesz. Nie wymyśli jej za ciebie.
 
 ## Jak zorganizowana jest ta dokumentacja { #how-these-docs-are-organised }
 

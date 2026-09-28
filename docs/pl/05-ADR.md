@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: fd838550743b8ae89de2df20c8e589207bb2dad2e07178c7f95f227f8094d597
+source_hash: 8dbb001779648a88ac5cb93fdb59a02e2a12e9ae0ac7be5930faff702730bb8b
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -43,6 +43,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :white_check_mark: Przyjęty |
 | [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji | :white_check_mark: Przyjęty |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :white_check_mark: Przyjęty |
+| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -954,3 +955,32 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - *Przeszukiwanie drzewa w poszukiwaniu każdego zagnieżdżonego `pyproject.toml` z `[tool.inwards]`:* obejmuje monorepo bez uv, ale kosztuje przejście drzewa przy każdym uruchomieniu i nie wie, które katalogi należą do siebie.
 - *Flaga `--workspace`:* jawna, ale uruchomienie w katalogu głównym workspace'u już to mówi, a dawne zachowanie w tym miejscu (jedna konfiguracja indeksująca członków po ścieżce) było fałszywą zielenią, przed którą ostrzega #201.
 - *Pomijanie INW010 pod każdym pakietem przestrzeni nazw:* prostsze, ale zmyślony moduł w pakiecie przestrzeni nazw przechodziłby po cichu w każdym projekcie bez `__init__.py`.
+
+## ADR-037: Rodziny reguł dla frameworków, opt-in, z własnym prefiksem { #adr-037-framework-rule-families-opt-in-with-their-own-prefix }
+
+**Stan:** Przyjęty · 2026-09-28 · [#186](https://github.com/SirCypkowskyy/inwards/issues/186)
+
+**Kontekst.** Rozdział 1 mówi, że Inwards rozumuje wyłącznie o strukturze zależności między twoimi własnymi modułami. [#98](https://github.com/SirCypkowskyy/inwards/issues/98) już planuje reguły treści zależne od roli warstwy. FastAPI to kolejny krok: część tego, co psuje się w projekcie FastAPI, dotyczy architektury i wymaga widoku całego projektu, którego linter działający plik po pliku nie ma. `APIRouter`, którego nic nie dołącza, kody błędów niezadeklarowane w schemacie OpenAPI i handlery wyjątków zarejestrowane w innym pliku obejmują wiele plików. Ruff ma już reguły FastAPI (`FAST001`–`FAST003`, `FAST004` w przeglądzie), a flake8-fastapi kody `CF`; oba działają plik po pliku. Reguły opt-in i opcje reguł istnieją od poprawki #181 do [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
+
+**Decyzja.**
+
+- **Reguły dla frameworków tworzą rodziny z własnym prefiksem.** Reguły FastAPI to `FAPI` i trzy cyfry. Kody `INW` zostają dla reguł architektury, które obowiązują w każdym projekcie Pythona; kod `FAPI` od razu mówi, że rada dotyczy frameworka. `FAST` należy do Ruffa, a `CF` do flake8-fastapi, więc użycie któregokolwiek dałoby jednemu kodowi dwa znaczenia w tym samym repozytorium. Kolejna rodzina (np. `DJ` dla Django) dostanie własny prefiks, bez przenumerowywania czegokolwiek. Kody są wszędzie dokładne, więc `select`, `ignore`, wyciszenia i SARIF nie wymagają zmian.
+- **Każda reguła rodziny jest opt-in** (`default: "off"`): zgłasza tylko wtedy, gdy wymienia ją `extend-select` albo `select`, a opcje przyjmuje w `[tool.inwards.rules.<rule-name>]`. Projekt, który nie używa frameworka, nic nie płaci, nawet parsowaniem: wspólny model czyta plik tylko wtedy, gdy jego tekst wspomina framework.
+- **Nie dublujemy Ruffa.** Reguła rodziny nigdy nie zgłasza tego, co już zgłaszają reguły Ruffa dla danego frameworka (`FAST`) albo flake8-async (`ASYNC`). Gdy Ruff pokrywa przypadek jednego pliku, reguła Inwards pokrywa tylko to, co wymaga innych plików.
+- **Jeden wspólny model na rodzinę.** Reguły FAPI czytają jeden model aplikacji, routerów, operacji ścieżek, połączeń i handlerów wyjątków (`rules/fastapi/`), zbudowany statycznie ze źródeł i rozwiązywany między plikami przez `ProjectIndex`. Aplikacja nigdy nie jest importowana ani uruchamiana ([ADR-006](#adr-006-the-engine-does-no-io)).
+- **Zarejestrowane kody mogą pojawić się przed swoimi sprawdzeniami.** FAPI001–FAPI003 są zarejestrowane razem ze swoimi stronami już teraz i niczego nie zgłaszają aż do [#183](https://github.com/SirCypkowskyy/inwards/issues/183) i [#184](https://github.com/SirCypkowskyy/inwards/issues/184); ich strony to mówią. Kody planowane później (FAPI004 dla spike'a [#185](https://github.com/SirCypkowskyy/inwards/issues/185), FAPI005–FAPI009 dla #224–#228) są wymienione w indeksie reguł, ale niezarejestrowane, więc do czasu wydania pozostają błędami konfiguracji.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Zespół włącza rodzinę reguła po regule, a kod znaleziska mówi, czy to rada o architekturze, czy o frameworku.
+- :material-plus-circle-outline: Model powstaje raz; każda reguła FAPI to zapytanie do niego.
+- :material-minus-circle-outline: Zdanie z rozdziału 1 o „wyłącznie strukturze zależności” przestaje być prawdą dla rodzin opt-in; domyślny zestaw reguł nadal je spełnia.
+- :material-minus-circle-outline: Zarejestrowany kod bez sprawdzeń jest akceptowany przez `extend-select` i nic nie robi, czego użytkownik może się nie spodziewać; jedynym sygnałem jest baner na stronie reguły.
+- :material-minus-circle-outline: Statyczne rozwiązywanie nie widzi dynamicznych połączeń (routery znajdowane przez `importlib`, fabryki); każda reguła musi powiedzieć, jak się wtedy zachowuje.
+
+**Alternatywy.**
+
+- *Reguły FastAPI jako kody `INW`:* jedna przestrzeń nazw, ale zespół nie mógłby włączać ani wyłączać rad o frameworku jako całości, a kody mieszałyby dwa rodzaje reguł.
+- *Użycie prefiksu `FAST` Ruffa:* znajomy, ale `FAST002` znaczyłby dwie różne reguły w jednym repozytorium.
+- *Domyślnie włączone w projektach, które importują FastAPI:* mniej konfiguracji, ale po aktualizacji w każdym projekcie FastAPI pojawiłyby się nowe błędy.
+- *Przekazanie sprawdzeń do Ruffa:* Ruff sprawdza plik po pliku, a te sprawdzenia potrzebują widoku całego projektu.
