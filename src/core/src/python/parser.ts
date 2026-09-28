@@ -104,6 +104,62 @@ export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
 }
 
 /**
+ * Maps each name the file's imports bind to the dotted name it refers to:
+ * `import a.b` binds `a`, `import a.b as c` binds `c` to `a.b`, and
+ * `from .m import x as y` binds `y` to `x` in the resolved `.m`. Wildcard
+ * imports, and relative imports that climb above the top-level package, bind
+ * nothing. Scopes are ignored and a later import of a name wins, so the map
+ * is a module-level view; rules that follow names across files use it.
+ *
+ * @param tree - the parsed file.
+ * @param file - the file the tree came from; its module resolves relative imports.
+ * @returns local name to dotted name, e.g. `users` to `app.routers.users`.
+ */
+export function importedNames(tree: Tree, file: SourceFile): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const stmt of tree.rootNode.descendantsOfType(IMPORT_STATEMENTS)) {
+    const from = stmt.childForFieldName("module_name");
+    const base = from ? resolveModule(from, file) : undefined;
+    if (base === null) {
+      continue; // climbs above the top-level package: binds nothing Python accepts
+    }
+    for (const entry of stmt.childrenForFieldName("name")) {
+      const bound = boundName(entry, base);
+      if (bound) {
+        names.set(bound.local, bound.target);
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * Reads the name one import list entry binds, and what it refers to.
+ *
+ * @param entry - a `dotted_name` or `aliased_import` node.
+ * @param base - the resolved `X` of `from X import ...` ("" for `from . import`
+ *   at the top), or undefined for a plain `import`.
+ * @returns the local name and its dotted target, or null when the entry has no name.
+ */
+function boundName(
+  entry: Node,
+  base: string | undefined,
+): { local: string; target: string } | null {
+  const dotted = importedName(entry);
+  const name = dotted ? canonicalName(dotted) : "";
+  const aliasNode = entry.type === "aliased_import" ? entry.childForFieldName("alias") : null;
+  const alias = aliasNode ? canonicalName(aliasNode) : undefined;
+  if (name === "") {
+    return null;
+  }
+  if (base !== undefined) {
+    return { local: alias ?? name, target: base ? `${base}.${name}` : name };
+  }
+  const top = name.split(".")[0] ?? name;
+  return alias ? { local: alias, target: name } : { local: top, target: top };
+}
+
+/**
  * Lists the modules named by an `import a.b, c as d` statement.
  * Aliases are dropped: `import c as d` imports `c`.
  *

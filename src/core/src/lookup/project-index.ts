@@ -373,6 +373,20 @@ export class ProjectIndex {
   }
 
   /**
+   * Reads a module's source through the adapter, once: `a/b.py`, else
+   * `a/b/__init__.py`, else their stubs. The FastAPI model reads the files a
+   * name leads to with it, so names resolve across files without importing
+   * anything.
+   *
+   * @param module - a dotted module name.
+   * @returns the file with its text as read, or undefined when no file holds the module.
+   */
+  sourceOf(module: string): SourceFile | undefined {
+    const file = this.fileOf(module);
+    return file === undefined ? undefined : { ...file, text: this.text(file) };
+  }
+
+  /**
    * Finds a module's file on disk: `a/b.py`, `a/b/__init__.py`, then their
    * `.pyi` stubs, which describe the same names.
    *

@@ -11,7 +11,10 @@ import { DOCS_BASE } from "./product.ts";
 
 /** What every consumer (diagnostics, SARIF, docs) needs to know about a rule. */
 export interface RuleMeta {
-  /** Stable code, e.g. `INW001`. Agents and suppressions refer to it. */
+  /**
+   * Stable code, e.g. `INW001`: `INW` or a family prefix such as `FAPI`, plus
+   * three digits. Agents and suppressions refer to it.
+   */
   code: string;
   /** Kebab-case name, e.g. `layer-dependency`. */
   name: string;
@@ -41,7 +44,10 @@ type RuleCode =
   | "INW008"
   | "INW009"
   | "INW010"
-  | "INW011";
+  | "INW011"
+  | "FAPI001"
+  | "FAPI002"
+  | "FAPI003";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -154,6 +160,33 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Dynamic imports (importlib, __import__, runpy, exec) must point toward inner layers too.",
     docs: page("INW011"),
+  },
+  // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
+  // #183 and #184; FAPI004 is reserved until the #185 spike says go.
+  FAPI001: {
+    code: "FAPI001",
+    name: "endpoint-metadata",
+    severity: "error",
+    default: "off",
+    summary: "A FastAPI path operation declares the OpenAPI metadata the project requires.",
+    docs: page("FAPI001"),
+  },
+  FAPI002: {
+    code: "FAPI002",
+    name: "undocumented-error-response",
+    severity: "error",
+    default: "off",
+    summary: "A FastAPI path operation declares every error status code it can produce.",
+    docs: page("FAPI002"),
+  },
+  FAPI003: {
+    code: "FAPI003",
+    name: "router-wiring",
+    severity: "error",
+    default: "off",
+    summary:
+      "Every APIRouter with routes is included in an app, and no routers include each other in a cycle.",
+    docs: page("FAPI003"),
   },
 };
 

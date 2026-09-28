@@ -63,7 +63,10 @@
         "INW008",
         "INW009",
         "INW010",
-        "INW011"
+        "INW011",
+        "FAPI001",
+        "FAPI002",
+        "FAPI003"
       ]
     },
     "layer": {
@@ -299,6 +302,15 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "dynamic-import": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "endpoint-metadata": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "undocumented-error-response": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "router-wiring": {
           "$ref": "#/definitions/ruleOptions"
         }
       }

@@ -3,8 +3,9 @@
  * `default: "off"` reports only when `extend-select` or `select` turns it on,
  * an options table `[tool.inwards.rules.<rule-name>]` is validated key by key,
  * a table for a rule that is off is a warning in pyproject.toml, and SARIF
- * lists the opt-in rule as disabled. No shipped rule is opt-in yet, so the
- * tests register one of their own in `RULES` and remove it afterwards.
+ * lists the opt-in rule as disabled. The tests register an opt-in rule of
+ * their own in `RULES`, so they don't depend on what a shipped one reports,
+ * and remove it afterwards.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { applyRules, checkRuleOptions, ruleLevel } from "../../src/config/rule-settings.ts";
@@ -109,7 +110,7 @@ describe("an opt-in rule", () => {
     );
   });
 
-  test("SARIF lists it with enabled = false, and every shipped rule without the key", () => {
+  test("SARIF lists it with enabled = false, and every shipped rule by its own default", () => {
     const report = { diagnostics: [], filesChecked: 1, durationMs: 0 };
     const { rules } = JSON.parse(render(report, "sarif")).runs[0].tool.driver;
     expect(rules.find((r: { id: string }) => r.id === "TST001")).toMatchInlineSnapshot(`
@@ -130,7 +131,9 @@ describe("an opt-in rule", () => {
     expect(shipped.map((r: { defaultConfiguration: object }) => r.defaultConfiguration)).toEqual(
       Object.values<RuleMeta>(RULES)
         .filter((r) => r.code !== PROBE.code)
-        .map((r) => ({ level: r.severity })),
+        .map((r) =>
+          r.default === "off" ? { enabled: false, level: r.severity } : { level: r.severity },
+        ),
     );
   });
 });
