@@ -17,6 +17,13 @@ const DIRECTION = / Allowed direction: [^\n]*$/u;
 const UNCHECKED =
   /, so (?:(?:nothing|no layer rule) checks what "[^"]*" imports|its imports are not checked|no layer rule checks its imports)\.$/u;
 
+/**
+ * INW005 calls a uv workspace member a "workspace package" since #203, where
+ * it said "library" before; both spellings share one key, so older baselines
+ * keep matching.
+ */
+const WORKSPACE_PACKAGE = /^(?<head>Layer "[^"]*" imports "[^"]*" from )workspace package "/u;
+
 /** The rules whose messages end with the layer order. */
 const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
 
@@ -30,11 +37,14 @@ const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
  * @param d - a diagnostic or baseline entry: its rule code and message.
  * @param d.code - which rule wrote it, which decides what is dropped.
  * @param d.message - the text to normalise.
- * @returns the message without INW001's and INW011's "Allowed direction" sentence or INW006's closing clause.
+ * @returns the message without INW001's and INW011's "Allowed direction" sentence or INW006's closing clause, and with INW005's "workspace package" read as "library".
  */
 export function stableMessage({ code, message }: Pick<Diagnostic, "code" | "message">): string {
   if (WITH_DIRECTION.has(code)) {
     return message.replace(DIRECTION, "");
+  }
+  if (code === "INW005") {
+    return message.replace(WORKSPACE_PACKAGE, '$<head>library "');
   }
   return code === "INW006" ? message.replace(UNCHECKED, ".") : message;
 }

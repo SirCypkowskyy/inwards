@@ -116,6 +116,27 @@ describe("INW006's older wording", () => {
   });
 });
 
+describe("INW005's workspace wording", () => {
+  test("a workspace package keys like the library it was called before, and nothing else changes", () => {
+    /**
+     * The baseline key of a message, for one module.
+     *
+     * @param code - the rule code the key is made for.
+     * @param message - the message text the key normalises.
+     * @returns the key the baseline matches on.
+     */
+    function key(code: string, message: string): string {
+      return baselineKey({ code, module: "core.x", message });
+    }
+    const now =
+      'Layer "core" imports "qv_core.models" from workspace package "qv_core", which "core" may not use.';
+    const old =
+      'Layer "core" imports "qv_core.models" from library "qv_core", which "core" may not use.';
+    expect(key("INW005", now)).toBe(key("INW005", old));
+    expect(key("INW001", now)).toContain("workspace package");
+  });
+});
+
 /**
  * An INW004 message whose context name holds "Allowed direction: ".
  *
