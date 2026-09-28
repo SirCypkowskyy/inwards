@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.3.1](https://github.com/SirCypkowskyy/inwards/compare/v0.3.0...v0.3.1) (2026-09-28)
+
+
+### Added
+
+* a content-keyed extraction cache for check and baseline ([#194](https://github.com/SirCypkowskyy/inwards/issues/194)) ([e478c15](https://github.com/SirCypkowskyy/inwards/commit/e478c1560364a8697359b24d87e47aedcd026aa5))
+* **cli:** init --launcher "uv run" writes hooks and the AGENTS.md command without a binary path ([#207](https://github.com/SirCypkowskyy/inwards/issues/207)) ([4df19d7](https://github.com/SirCypkowskyy/inwards/commit/4df19d7dbb17780d096e5386d8678168e79c5be5))
+* **cli:** inwards init --agent opencode wires Inwards into OpenCode ([#199](https://github.com/SirCypkowskyy/inwards/issues/199)) ([32e6460](https://github.com/SirCypkowskyy/inwards/commit/32e6460ac75841c9fdc55588b1826b923b2cd813))
+* **config:** contexts table, a JSON Schema and a configuration reference ([#193](https://github.com/SirCypkowskyy/inwards/issues/193)) ([c4d5f8f](https://github.com/SirCypkowskyy/inwards/commit/c4d5f8fe85cb5c635357f9b45ca00a9bf0149334))
+* **rules:** call a uv workspace member a workspace package in INW005 ([#204](https://github.com/SirCypkowskyy/inwards/issues/204)) ([1c98fe6](https://github.com/SirCypkowskyy/inwards/commit/1c98fe6f97527ee44171d644990cc954ab1f5efa))
+* **rules:** INW002 keeps each bounded context to the contexts it depends on ([#195](https://github.com/SirCypkowskyy/inwards/issues/195)) ([e839c3e](https://github.com/SirCypkowskyy/inwards/commit/e839c3e68d1d709bd559519fe7d5657a940102fd))
+* **rules:** INW003 keeps code outside a context to its public modules ([#196](https://github.com/SirCypkowskyy/inwards/issues/196)) ([76635a3](https://github.com/SirCypkowskyy/inwards/commit/76635a3470f14887abcb7863529d373cb01b5f02))
+* **rules:** INW004 reports import cycles between modules or contexts ([#197](https://github.com/SirCypkowskyy/inwards/issues/197)) ([ae212d2](https://github.com/SirCypkowskyy/inwards/commit/ae212d21b78283a5e98fab7bf5e5b186c567e147))
+
+
+### Fixed
+
+* **cli:** warn about check paths outside the config root instead of reporting All clear ([#205](https://github.com/SirCypkowskyy/inwards/issues/205)) ([7906bb4](https://github.com/SirCypkowskyy/inwards/commit/7906bb4565c854c1e67bafb5ff3a3cc7c133609d))
+* **rules:** warn when a uv workspace member is checked from the workspace root ([#206](https://github.com/SirCypkowskyy/inwards/issues/206)) ([b8c0ea7](https://github.com/SirCypkowskyy/inwards/commit/b8c0ea778dbb113b1371b1c032fbe01570695b04))
+
+
+### Documentation
+
+* describe CI's self-hosted part without naming the infrastructure ([#198](https://github.com/SirCypkowskyy/inwards/issues/198)) ([f3b77cd](https://github.com/SirCypkowskyy/inwards/commit/f3b77cdc38614bc92a01836eb2d2d19e57178a1d))
+
 ## [0.3.0](https://github.com/SirCypkowskyy/inwards/compare/v0.2.0...v0.3.0) (2026-09-27)
 
 
