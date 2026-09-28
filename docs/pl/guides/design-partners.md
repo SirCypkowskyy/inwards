@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/design-partners.md
-source_hash: eeaad8cbbdb484bf075e92554b0a82d9bc1133c8c2e55aea3cd046077fe0058e
+source_hash: 8135d63304f4a43d2c5ead883f0507c3fb97f426f46d83920fcda6251834f644
 ---
 
 # Design partnerzy { #design-partners }
@@ -16,7 +16,7 @@ Design partnerzy uruchamiają Inwards w prawdziwych projektach ze swoimi agentam
 
 1. **Zainstaluj** Inwards jako zależność deweloperską ([przewodnik instalacji](install.md)) i zapisz `[tool.inwards]` ze swoimi warstwami.
 2. **Zaakceptuj to, co jest dziś:** `inwards baseline`, a potem zacommituj `inwards-baseline.json`. Istniejące naruszenia przestają oblewać sprawdzenie; nowe nadal je oblewają ([przewodnik instalacji](install.md#on-an-existing-codebase)).
-3. **Podłącz swojego agenta:** `inwards init --agent claude` ([Claude Code](claude-code.md)), [Aider](aider.md) albo [AGENTS.md](agents-md.md) dla innych agentów.
+3. **Podłącz swojego agenta:** `inwards init --agent claude` ([Claude Code](claude-code.md)), `inwards init --agent opencode` ([OpenCode](opencode.md)), [Aider](aider.md) albo [AGENTS.md](agents-md.md) dla innych agentów.
 4. **Włącz run log:** `run-log = true` w głównym `[tool.inwards]` albo `INWARDS_RUN_LOG=1` w środowisku, w którym działa twój agent ([run log](../08-Run-Log.md#turning-it-on)).
 5. **Przed pierwszą zmianą w każdej sesji agenta** uruchom `inwards check --format json --log`. Zapisuje to naruszenia, które już były, żeby nie liczyły się na konto agenta.
 6. **Pracuj jak zwykle.** Nie zmieniaj ze względu na nas sposobu, w jaki piszesz polecenia dla agenta.

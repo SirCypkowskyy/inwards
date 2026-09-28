@@ -173,6 +173,16 @@ export interface Runtime {
   execPath: string;
   /** `CI` is set to a non-empty value. */
   ci: boolean;
+  /**
+   * Which agent runs the hook: `"opencode"` when OpenCode's Inwards plugin
+   * sets `INWARDS_HOOK_HOST=opencode`, else `"claude-code"`.
+   */
+  hookHost: "claude-code" | "opencode";
+  /**
+   * `INWARDS_PLUGIN_SHA256`: the hash of the OpenCode plugin file as OpenCode
+   * loaded it, which the plugin passes to the hook.
+   */
+  pluginSha256: string | undefined;
   /** Standard input is a terminal. */
   stdinIsTTY: boolean;
   /** Standard output is a terminal. */

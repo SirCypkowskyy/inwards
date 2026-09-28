@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: bd4c1b957f4c7e19cbc09abadc06b92f2e4e366a44905d03a92304a9253f2eda
+source_hash: 901959e34f1d81c0dc20550d20b6f96bf52124af33733f73ca61390cf8dea202
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -115,6 +115,10 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
     - **Hook `SessionStart`, `PreToolUse` albo `PostToolUse` Inwards zniknął ze wszystkich warstw ustawień** (użytkownika, projektu, lokalnej), łącznie z matcherem, który nie obejmuje już narzędzi, które musi widzieć, albo ustawiono **`disableAllHooks`**. Sprawdzenie czyta ustawienia, a nie programy, które one uruchamiają, więc dowodzi konfiguracji, a nie tego, że działa prawdziwy Inwards. Claude Code przeładowuje hooki, gdy ustawienia się zmieniają, więc usunięcie samego hooka Stop od razu wyłącza bramkę; te edycje blokuje config guard (niżej).
 
     Bramka blokuje turę najwyżej `escalate-after` razy (domyślnie 3). Stop po ostatniej blokadzie pozwala zakończyć turę i pokazuje użytkownikowi, co wciąż jest nierozwiązane, a eskalacja (niżej) zamienia powtarzającą się porażkę w pytanie do użytkownika. Licznik zaczyna się od nowa z każdą nową turą. Jeśli sama bramka zawiedzie (na przykład nieczytelny plik), blokuje raz z błędem i pozwala zakończyć turę przy następnej próbie, więc zepsuta bramka nie może ciągnąć sesji w nieskończoność.
+
+=== ":material-code-braces: OpenCode"
+
+    `inwards init --agent opencode` zapisuje plugin projektu `.opencode/plugins/inwards.js` (dodany też do `.gitignore`, bo zawiera bezwzględną ścieżkę do pliku binarnego). Plugin zamienia zdarzenia OpenCode na powyższe ładunki i uruchamia `inwards hook claude-code`, więc sprawdzenie po edycji, strażnik konfiguracji, bramka Stop i eskalacja to ten sam kod. OpenCode nie może odmówić zakończenia tury: gdy sesja przechodzi w bezczynność, blokująca bramka Stop odsyła swoje powody jako nową wiadomość, która zaczyna kolejną turę. Strażnik nie przeczyta `apply_patch`, więc plugin odmawia łatek dotykających `pyproject.toml` albo plików Inwards. [Przewodnik po OpenCode](guides/opencode.md#what-holds-on-opencode) wymienia każdą różnicę, a [ADR-033](05-ADR.md#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) opisuje projekt.
 
 === ":material-console: Aider"
 

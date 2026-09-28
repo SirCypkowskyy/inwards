@@ -12,7 +12,7 @@ import type { CheckRunner } from "../session/contracts.ts";
 import type { StyleName } from "./styles.ts";
 
 /** The agents `inwards init --agent` can wire Inwards into. */
-export const AGENTS = ["claude", "aider", "agents-md"] as const;
+export const AGENTS = ["claude", "opencode", "aider", "agents-md"] as const;
 
 /** One of {@link AGENTS}. */
 export type Agent = (typeof AGENTS)[number];
@@ -21,7 +21,7 @@ export type Agent = (typeof AGENTS)[number];
  * Tells whether a string names an agent init supports.
  *
  * @param value - what was passed to `--agent`, if anything.
- * @returns true for claude, aider or agents-md.
+ * @returns true for claude, opencode, aider or agents-md.
  */
 export function isAgent(value: string | undefined): value is Agent {
   return AGENTS.some((agent) => agent === value);

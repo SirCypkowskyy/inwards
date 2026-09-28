@@ -16,6 +16,7 @@ import { drawTree, STYLE_NAMES, STYLES, type StyleName } from "../init/styles.ts
 
 const AGENT_HINTS: Readonly<Record<Agent, string>> = {
   claude: "hooks in .claude/settings.local.json",
+  opencode: "a plugin in .opencode/plugins/inwards.js",
   aider: "prints the lint-cmd line",
   "agents-md": "a section in AGENTS.md",
 };

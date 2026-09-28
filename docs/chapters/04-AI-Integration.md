@@ -111,6 +111,10 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     It blocks a turn at most `escalate-after` times (default 3). The Stop after the last block lets the turn end and shows the user what is still unresolved, and escalation (below) turns the repeated failure into a question for the user. The count starts again with each new turn. If the gate itself fails (an unreadable file, say), it blocks once with the error and lets the turn end on the next try, so a broken gate can't keep a session going forever.
 
+=== ":material-code-braces: OpenCode"
+
+    `inwards init --agent opencode` writes the project plugin `.opencode/plugins/inwards.js` (also added to `.gitignore`, since it holds the binary's absolute path). The plugin turns OpenCode's events into the payloads above and runs `inwards hook claude-code`, so the per-edit check, the config guard, the Stop gate and escalation are the same code. OpenCode can't refuse the end of a turn: when the session goes idle, a blocking Stop gate sends its reasons back as a new message, which starts another turn. `apply_patch` can't be read by the guard, so the plugin refuses patches that touch `pyproject.toml` or Inwards' files. The [OpenCode guide](guides/opencode.md#what-holds-on-opencode) lists every difference, and [ADR-033](05-ADR.md#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) the design.
+
 === ":material-console: Aider"
 
     Aider lints the files it edits and, when the linter fails, shows the output to the model and asks it to fix the problems. Inwards plugs in as the Python lint command. `inwards init --agent aider` prints the exact line, with the absolute binary path, for `.aider.conf.yml`:

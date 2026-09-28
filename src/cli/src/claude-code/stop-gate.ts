@@ -44,8 +44,8 @@ import {
 } from "../session/record.ts";
 import { changedFiles, checkChanged } from "./changed-files.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
+import { hookProblem } from "./hook-host.ts";
 import { type HookDeps, hookProject } from "./protocol.ts";
-import { settingsProblem } from "./settings.ts";
 
 /**
  * Runs the Stop gate for one hook payload. An error inside the gate blocks
@@ -274,7 +274,7 @@ function errorsOf(report: Report): Diagnostic[] {
  * changed `[tool.inwards]` or baseline, or Claude Code settings without the
  * Inwards hooks.
  *
- * @param io - reads the Claude Code settings and knows where the user's live.
+ * @param io - reads the Claude Code settings or the OpenCode plugin, and knows which agent runs the hook.
  * @param project - the real project root.
  * @param state - the session state.
  * @param now - the valid configs now, and the baselines that changed during the session.
@@ -283,7 +283,7 @@ function errorsOf(report: Report): Diagnostic[] {
  * @returns the problems, one sentence each.
  */
 function trustProblems(
-  io: Pick<Platform, "read" | "runtime">,
+  io: Pick<Platform, "read" | "runtime" | "probe">,
   project: string,
   state: SessionState,
   { configs, edited }: { configs: Record<string, InwardsConfig>; edited: readonly string[] },
@@ -299,9 +299,9 @@ function trustProblems(
       `${edited.join(", ")} changed during this session, so no baseline was applied. Tell the user; only they can restore it or take a new baseline.`,
     );
   }
-  const hooks = settingsProblem(io, project);
+  const hooks = hookProblem(io, project);
   if (hooks !== undefined) {
-    problems.push(`${hooks} Restore them (\`inwards init --agent claude\`) or ask the user.`);
+    problems.push(hooks);
   }
   return problems;
 }

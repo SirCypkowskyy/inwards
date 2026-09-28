@@ -37,6 +37,7 @@ nav = [
     { "Instalacja" = "guides/install.md" },
     { "Konfiguracja" = "guides/configuration.md" },
     { "Claude Code" = "guides/claude-code.md" },
+    { "OpenCode" = "guides/opencode.md" },
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
     { "GitHub Actions" = "guides/ci.md" },

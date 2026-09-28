@@ -28,6 +28,8 @@ export function readRuntime(): Runtime {
     pid: process.pid,
     execPath: process.execPath,
     ci: Boolean(env["CI"]),
+    hookHost: env["INWARDS_HOOK_HOST"] === "opencode" ? "opencode" : "claude-code",
+    pluginSha256: env["INWARDS_PLUGIN_SHA256"] || undefined,
     stdinIsTTY: process.stdin.isTTY === true,
     stdoutIsTTY: process.stdout.isTTY === true,
   };
