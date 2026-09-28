@@ -678,6 +678,18 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 
 **Alternatives.** *Top-level `select` and `ignore`, as in Ruff:* familiar, but `ignore` is taken, and telling `INW001` from a module named `tests` by its shape is a guess. *One key per rule, `INW001 = "off"`, as in ESLint:* compact, but it can't say "only these rules". *Code prefixes:* see above. *Filtering in each adapter:* four call sites (the check, the Stop gate's layout check, two in the language server) that could drift apart.
 
+**Amendment, 2026-09-28: opt-in rules and options tables ([#181](https://github.com/SirCypkowskyy/inwards/issues/181)).** The next rules (the thin-endpoint rule, the FastAPI family) judge handler content against thresholds a team picks, so they must start off and take options. `select` can't turn one rule on without turning the rest off, and #98's `[[tool.inwards.rules]]` can't live next to the `rules` table in TOML.
+
+- **Default on or off.** Each registry entry has `default: "on"` or `"off"`. Every rule so far is `"on"`, so no existing config changes. A rule that is off reports only when `select` or the new `extend-select` lists it.
+- **`extend-select`** (Ruff's name) turns rules on next to `select`, or next to the defaults when `select` is absent. `ignore` still wins over both. Its codes are validated like the others, and it can't list INW000.
+- **Options tables.** A rule's options go in `[tool.inwards.rules.<rule-name>]`, keyed by the kebab-case name, so they can't clash with the four list and table keys. Every rule takes `modules`, a list of entries in the grammar of `layers[].modules` ([ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)): a prefix such as `shop.domain` covers that package and everything below it, and a selector such as `shop.*.api` uses wildcards. The rule reports only in the modules they match, and a finding in `pyproject.toml` itself isn't scoped. A rule with options of its own adds its keys; an unknown key or a wrong type is a config error that names the key. INW000 can't have a table, for the reason above. Tables come out sorted by name, so reordering them changes nothing.
+- **A table turns nothing on.** A table for a rule that is off is a warning located at the table in `pyproject.toml`, under that rule's code, not an error, so a team can stage options before turning a rule on. The warning isn't filtered by the table, since the rule it names is off.
+- **SARIF** lists an opt-in rule in `rules[]` with `defaultConfiguration.enabled = false`, so the output stays one list. Rules that are on keep their entry as before.
+- **Baseline.** An entry for a rule that is off in its module (opt-in and not selected, or scoped away by `modules`) is dormant, like an ignored rule's.
+- **Guarded.** The new keys are inside `[tool.inwards]`, so the config guard denies an agent edit of them and the Stop gate fails a change made through Bash. Tests pin both.
+
+The issue asked for the shape selectors of #95, but there `shop.domain` matches one package and nothing below it, which is the wrong default for scoping a rule; the layer grammar says the same thing a layer does. `inwards check` has no rule listing, so "opt-in" shows in the Default column of the docs rule index only.
+
 ## ADR-028: Inline suppressions need a reason, and an agent can't add one by default
 
 **Status:** Accepted · 2026-09-26 · [#50](https://github.com/SirCypkowskyy/inwards/issues/50)

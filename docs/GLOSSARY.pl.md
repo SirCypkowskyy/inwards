@@ -151,6 +151,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | dev dependency | zależność deweloperska |
 | member (of a package) | element (pakietu) |
 | miss (prescan) | przeoczenie |
+| opt-in rule (default off) | reguła opt-in (domyślnie wyłączona) |
+| options table (`[tool.inwards.rules.<rule-name>]`) | tabela opcji |
 | owner (the repo's) | właściciel |
 | payload (hook input) | dane wejściowe (hooka) |
 | per-edit hook | hook edycji |

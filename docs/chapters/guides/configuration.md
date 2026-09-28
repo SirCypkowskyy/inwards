@@ -187,11 +187,13 @@ Type: table. Default: every rule reports at its own severity.
 
 Which rules report and how loudly:
 
-- `select`: only these rules report. It needs at least one code.
-- `ignore`: these rules don't report. It wins over `select`.
+- `select`: only these rules report, opt-in rules included. It needs at least one code.
+- `extend-select`: these rules report too, next to `select` or the rules that are on by default. It turns [opt-in rules](../rules/index.md#opt-in-rules) on.
+- `ignore`: these rules don't report. It wins over `select` and `extend-select`.
 - `severity`: a table of rule code to `"error"` or `"warning"`.
+- `<rule-name>`: a table of that rule's options, such as `[tool.inwards.rules.pure-domain]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a layer's `modules`, which limits the rule to the modules they match. The table doesn't turn the rule on, and a table for a rule that is off gets a warning.
 
-INW000 can't be ignored or re-levelled. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
+INW000 can't be ignored, re-levelled or given options. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
 
 <!-- config: fragment -->
 
@@ -199,6 +201,9 @@ INW000 can't be ignored or re-levelled. [ADR-027](../05-ADR.md#adr-027-per-rule-
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]
 severity = { INW005 = "warning" }
+
+[tool.inwards.rules.pure-domain]
+modules = ["shop.domain"]
 ```
 
 ### `shape` and `names` { #shape }

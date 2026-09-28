@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 403bd9618284efe6c79ca31f44ba7031a0239bd2fe5a020b3a18c298223d169f
+source_hash: 6b81d395530c3db0b7292ca4eb3e980969f861bdbde8d3441e73f17693684d69
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -682,6 +682,18 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: Brak ustawień dla pojedynczych plików lub ścieżek. Należą do wyciszeń ([#50](https://github.com/SirCypkowskyy/inwards/issues/50)).
 
 **Alternatywy.** *`select` i `ignore` na najwyższym poziomie, jak w Ruffie:* znajome, ale `ignore` jest zajęte, a odróżnianie `INW001` od modułu o nazwie `tests` po samym kształcie to zgadywanie. *Jeden klucz na regułę, `INW001 = "off"`, jak w ESLint:* zwięzłe, ale nie da się powiedzieć „tylko te reguły”. *Prefiksy kodów:* patrz wyżej. *Filtrowanie w każdym adapterze:* cztery miejsca wywołań (sprawdzenie, sprawdzenie układu w Stop gate, dwa w serwerze języka), które mogłyby się rozjechać.
+
+**Poprawka, 2026-09-28: reguły opt-in i tabele opcji ([#181](https://github.com/SirCypkowskyy/inwards/issues/181)).** Kolejne reguły (reguła cienkiego endpointu, rodzina FastAPI) oceniają zawartość handlerów według progów wybranych przez zespół, więc muszą startować wyłączone i przyjmować opcje. `select` nie potrafi włączyć jednej reguły bez wyłączenia pozostałych, a `[[tool.inwards.rules]]` z #98 nie zmieści się w TOML obok tabeli `rules`.
+
+- **Domyślnie włączona albo wyłączona.** Każdy wpis rejestru ma `default: "on"` albo `"off"`. Każda dotychczasowa reguła ma `"on"`, więc żadna istniejąca konfiguracja się nie zmienia. Reguła wyłączona zgłasza tylko wtedy, gdy wymienia ją `select` albo nowy klucz `extend-select`.
+- **`extend-select`** (nazwa z Ruffa) włącza reguły obok `select` albo obok reguł domyślnych, gdy `select` nie ma. `ignore` nadal wygrywa z oboma. Kody są sprawdzane jak pozostałe, a INW000 nie może się tam znaleźć.
+- **Tabele opcji.** Opcje reguły trafiają do `[tool.inwards.rules.<rule-name>]`, z kluczem w postaci nazwy kebab-case, więc nie kolidują z czterema kluczami list i tabel. Każda reguła przyjmuje `modules`, listę wpisów w gramatyce `layers[].modules` ([ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)): prefiks taki jak `shop.domain` obejmuje ten pakiet i wszystko pod nim, a selektor taki jak `shop.*.api` używa symboli wieloznacznych. Reguła zgłasza tylko w pasujących modułach, a diagnostyka w samym `pyproject.toml` nie jest ograniczana. Reguła z własnymi opcjami dodaje swoje klucze; nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza. INW000 nie może mieć tabeli, z powodu opisanego wyżej. Tabele są sortowane według nazwy, więc zmiana ich kolejności niczego nie zmienia.
+- **Tabela niczego nie włącza.** Tabela dla reguły wyłączonej to ostrzeżenie wskazujące tę tabelę w `pyproject.toml`, z kodem tej reguły, a nie błąd, więc zespół może przygotować opcje przed włączeniem reguły. Tabela nie filtruje tego ostrzeżenia, bo reguła, której dotyczy, jest wyłączona.
+- **SARIF** wymienia regułę opt-in w `rules[]` z `defaultConfiguration.enabled = false`, więc wynik zostaje jedną listą. Reguły włączone mają wpis taki jak wcześniej.
+- **Baseline.** Wpis reguły wyłączonej w danym module (opt-in i niewybranej albo wyłączonej tam przez `modules`) jest uśpiony, tak jak wpis reguły z `ignore`.
+- **Chronione.** Nowe klucze są wewnątrz `[tool.inwards]`, więc config guard odrzuca ich edycję przez agenta, a zmiana przez Bash oblewa Stop gate. Oba przypadki mają testy.
+
+Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje do jednego pakietu i niczego pod nim, co jest złym domyślnym zachowaniem przy ograniczaniu reguły; gramatyka warstw znaczy to samo co warstwa. `inwards check` nie ma listy reguł, więc „opt-in” pojawia się tylko w kolumnie Default w indeksie reguł w dokumentacji.
 
 ## ADR-028: Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać { #adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default }
 

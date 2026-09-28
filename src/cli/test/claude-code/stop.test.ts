@@ -65,7 +65,12 @@ describe("Stop gate", () => {
     expect(stderr).toContain("[tool.inwards] changed");
   });
 
-  for (const rules of ['ignore = ["INW001"]', 'severity = { INW001 = "warning" }']) {
+  for (const rules of [
+    'ignore = ["INW001"]',
+    'severity = { INW001 = "warning" }',
+    'extend-select = ["INW001"]',
+    'layer-dependency = { modules = ["shop.infrastructure"] }',
+  ]) {
     test(`a Bash edit that sets ${rules} still lists the violation it hides`, () => {
       const root = session();
       const toml = readFileSync(join(root, "pyproject.toml"), "utf8");

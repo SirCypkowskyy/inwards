@@ -15,7 +15,11 @@ export {
   type LayerSpec,
   parseConfig,
 } from "./config/parse.ts";
-export { type RuleSettings, ruleLevel } from "./config/rule-settings.ts";
+export {
+  checkRuleOptions,
+  type RuleSettings,
+  ruleLevel,
+} from "./config/rule-settings.ts";
 export type { NameRule, ShapeSpec } from "./config/shape.ts";
 export { ConfigError } from "./config/toml.ts";
 export type {

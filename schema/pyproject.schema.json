@@ -197,18 +197,35 @@
       }
     },
     "rules": {
-      "description": "Which rules report and how loudly. ignore wins over select; INW000 can't be ignored or re-levelled.",
-      "markdownDescription": "Which rules report and how loudly. ignore wins over select; INW000 can't be ignored or re-levelled.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+      "description": "Which rules report and how loudly. ignore wins over select and extend-select; INW000 can't be ignored or re-levelled. A key named after a rule holds that rule's options.",
+      "markdownDescription": "Which rules report and how loudly. ignore wins over select and extend-select; INW000 can't be ignored or re-levelled. A key named after a rule holds that rule's options.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "select": {
-          "description": "Only these rules report. Must list at least one code.",
-          "markdownDescription": "Only these rules report. Must list at least one code.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "description": "Only these rules report, opt-in rules included. Must list at least one code.",
+          "markdownDescription": "Only these rules report, opt-in rules included. Must list at least one code.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
           "type": "array",
           "minItems": 1,
           "items": {
             "$ref": "#/definitions/ruleCode"
+          }
+        },
+        "extend-select": {
+          "description": "These rules report too, on top of select or the rules that are on by default. Turns opt-in rules on. INW000 can't be listed.",
+          "markdownDescription": "These rules report too, on top of select or the rules that are on by default. Turns opt-in rules on. INW000 can't be listed.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/definitions/ruleCode"
+              },
+              {
+                "not": {
+                  "const": "INW000"
+                }
+              }
+            ]
           }
         },
         "ignore": {
@@ -249,6 +266,56 @@
               "error",
               "warning"
             ]
+          }
+        },
+        "layer-dependency": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "context-independence": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "public-api-only": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "import-cycles": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "pure-domain": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "unassigned-module": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "package-shape": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "missing-member": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "suppression-comment": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "unknown-first-party": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "dynamic-import": {
+          "$ref": "#/definitions/ruleOptions"
+        }
+      }
+    },
+    "ruleOptions": {
+      "description": "A rule's options, [tool.inwards.rules.<rule-name>]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "A rule's options, [tool.inwards.rules.<rule-name>]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "description": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.",
+          "markdownDescription": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
           }
         }
       }

@@ -29,10 +29,26 @@ A `[tool.inwards.rules]` table in `pyproject.toml` says which rules report and h
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]      # these rules never report
 severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent
-# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+# extend-select = [...]           # turn opt-in rules on, next to the defaults
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule that is on by default)
 ```
 
-Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select`. A rule set to `"warning"` shows up in every format but doesn't change the exit code, block the hooks or go into the baseline. INW000 can't be ignored or lowered. The table is part of `[tool.inwards]`, so the config guard stops an agent from editing it.
+Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select` and `extend-select`. A rule set to `"warning"` shows up in every format but doesn't change the exit code, block the hooks or go into the baseline. INW000 can't be ignored or lowered. The table is part of `[tool.inwards]`, so the config guard stops an agent from editing it.
+
+### Opt-in rules and rule options { #opt-in-rules }
+
+A rule whose Default column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. Every rule that ships today is on by default; the opt-in ones are the rules that judge code against thresholds a team picks. SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
+
+A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
+
+<!-- config: fragment -->
+
+```toml title="pyproject.toml"
+[tool.inwards.rules.pure-domain]
+modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
+```
+
+An options table doesn't turn a rule on. A table for a rule that is off (opt-in and not selected, or listed in `ignore`) does nothing, so `inwards check` reports a warning at the table in `pyproject.toml`, under the rule's code; that lets a team stage a rule's options before turning it on.
 
 To accept one finding for good, put a suppression on the line it points at, with the rule's code and a reason ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)):
 

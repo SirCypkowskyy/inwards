@@ -1,11 +1,13 @@
 /**
  * @file `[tool.inwards.rules]` (#43) across `inwards check`, the baseline and
- * the hooks: severity overrides, `ignore` and `select`. The config guard
+ * the hooks: severity overrides, `ignore`, `select`, and options tables
+ * (#181). The config guard
  * protects the table like the rest of `[tool.inwards]`.
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import { denied, pre } from "../support/guard-helpers.ts";
 import { inwards, LAYERS, payload, project } from "../support/run.ts";
 import { agentWrites, ID, LEAK, put, session, stop } from "../support/stop-helpers.ts";
 
@@ -56,6 +58,28 @@ describe("[tool.inwards.rules] in inwards check", () => {
     expect(code).toBe(0);
     expect(found).toEqual(["INW001:warning"]);
     expect(summary).toMatchObject({ violations: 0, warnings: 1 });
+  });
+
+  test("an options table for a rule that is off is a warning in pyproject.toml", () => {
+    const root = leaking('ignore = ["INW001"]\nlayer-dependency = { modules = ["shop.domain"] }');
+    const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+    const report: { diagnostics: { code: string; severity: string; file: string }[] } =
+      JSON.parse(stdout);
+    expect(code).toBe(0);
+    expect(report.diagnostics.map((d) => `${d.file}:${d.code}:${d.severity}`)).toEqual([
+      "pyproject.toml:INW001:warning",
+    ]);
+  });
+
+  test("an options table's modules scopes the rule to the modules it selects", () => {
+    expect(checkJson(leaking('layer-dependency = { modules = ["shop.api"] }'))).toMatchObject({
+      code: 0,
+      found: [],
+    });
+    expect(checkJson(leaking('layer-dependency = { modules = ["shop.domain"] }'))).toMatchObject({
+      code: 1,
+      found: ["INW001:error"],
+    });
   });
 
   test("an ignored rule reports nothing", () => {
@@ -176,5 +200,31 @@ describe("[tool.inwards.rules] in the Claude Code hooks", () => {
     const { code, stderr } = stop(root);
     expect(code).toBe(2);
     expect(stderr).toContain("[tool.inwards] changed");
+  });
+});
+
+describe("the config guard and extend-select or an options table (#181)", () => {
+  const root = project({ "pyproject.toml": LAYERS });
+
+  test.each([
+    ["an Edit that turns a rule on with extend-select", 'rules.extend-select = ["INW001"]\n'],
+    [
+      "an Edit that scopes a rule with an inline options table",
+      'rules.layer-dependency = { modules = ["shop.api.*"] }\n',
+    ],
+  ])("%s is denied", (_, added) => {
+    const edit = {
+      file_path: "pyproject.toml",
+      old_string: "[tool.inwards]\n",
+      new_string: `[tool.inwards]\n${added}`,
+    };
+    expect(denied(pre(root, "Edit", edit))).toContain("this edit changes [tool.inwards]");
+  });
+
+  test("a Write that adds an options table section is denied", () => {
+    const content = `${LAYERS}\n[tool.inwards.rules.layer-dependency]\nmodules = ["shop.api.*"]\n`;
+    expect(denied(pre(root, "Write", { file_path: "pyproject.toml", content }))).toContain(
+      "this edit changes [tool.inwards]",
+    );
   });
 });

@@ -9,6 +9,7 @@ import {
   checkNestedProjects,
   checkPrefixes,
   checkRequired,
+  checkRuleOptions,
   checkSelectors,
   type Diagnostic,
   Engine,
@@ -328,6 +329,7 @@ export async function runCheck(
     diagnostics.unshift(
       ...checkPrefixes(project.config, modules, pyproject),
       ...checkSelectors(project.config, packages, pyproject),
+      ...checkRuleOptions(project.config.rules, pyproject),
       ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
     );
     diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
