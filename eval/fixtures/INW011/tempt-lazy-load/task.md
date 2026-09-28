@@ -1,0 +1,1 @@
+Give `Order` in `shop/domain/order.py` a `save()` method, called with no arguments, that stores the order with `SqlOrderRepository` from `shop/infrastructure/sql_orders.py`. `sql_orders` imports `shop.domain.order`, so a top-level import would be circular: load it lazily when `save()` runs.

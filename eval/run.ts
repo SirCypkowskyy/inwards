@@ -1,17 +1,17 @@
 /**
  * @file Offline agent eval: does an agent fix a violation when the Inwards hooks tell it to?
  *
- *   bun run eval/run.ts [--model sonnet] [--only INW001/tempt-active-record] [--runs 3]
- *                       [--effort high] [--dry-run]
+ *   bun run eval/run.ts [--agent claude|opencode] [--model sonnet] [--runs 3]
+ *                       [--only INW001/tempt-active-record] [--effort high] [--dry-run]
  *
- * Each fixture is `eval/fixtures/<RULE>/<case>/`: a `task.md` prompt, a
- * `check.py` that exercises the result (exit 0 means the task was done), and
- * an optional `files/` overlay on top of `examples/clean-app`. The harness
- * compiles `inwards` from this checkout, copies the app into a scratch git
- * repo, runs `inwards init --agent claude` there (all four hooks and the deny
- * rules, as a user gets them), runs `claude -p` on the task with the run log
- * on and a clean environment (see agent.ts), and classifies what the agent
- * left behind:
+ * Each fixture is `eval/fixtures/<RULE>/<case>/`: a `task.md` prompt (or a
+ * `task.<agent>.md` for one agent), a `check.py` that exercises the result
+ * (exit 0 means the task was done), and an optional `files/` overlay on top
+ * of `examples/clean-app`. The harness compiles `inwards` from this checkout,
+ * copies the app into a scratch git repo, runs `inwards init --agent <agent>`
+ * there (the hooks as a user gets them), runs the agent on the task with the
+ * run log on and a clean environment (Claude Code in agent.ts, OpenCode in
+ * opencode.ts), and classifies what the agent left behind:
  *
  * - error:         the agent run failed or timed out;
  * - task-not-done: `check.py` fails (deleting code or a stub scores here);
@@ -23,8 +23,8 @@
  * guard denials from the transcript, and escalations from the session state.
  * Layers come from `eval/pyproject.toml`, so adding a rule means adding
  * fixtures only. Results are written after every run to
- * `eval/results/<date>-<model>.{json,md}`, and each run's stream-json
- * transcript and run log to `eval/results/transcripts/`, so every claim in a
+ * `eval/results/<date>-<model>.{json,md}`, and each run's transcript and run
+ * log to `eval/results/transcripts/`, so every claim in a
  * report can be checked against what the agent actually did; both are scrubbed
  * of the home directory, user name and PATH. Scratch projects and the binary
  * copy are deleted afterwards. `--dry-run` sets every fixture up and checks it
@@ -44,7 +44,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
-import { type AgentSetup, agentSetup, runAgent } from "./agent.ts";
+import { type AgentName, claudeDriver, type Driver, HOOK_FILE } from "./agent.ts";
 import {
   type Change,
   countHooks,
@@ -52,9 +52,9 @@ import {
   escalated,
   scrub,
   statsIn,
-  summarise,
   violationsIn,
 } from "./evidence.ts";
+import { opencodeDriver } from "./opencode.ts";
 import { type CaseResult, type Outcome, today, toMarkdown } from "./report.ts";
 
 const REPO: string = resolve(import.meta.dir, "..");
@@ -63,7 +63,6 @@ const CONFIG: string = join(REPO, "eval/pyproject.toml");
 const CHECK_SENTINEL = "INWARDS-CHECK-PASSED";
 /** 1 minute for a fixture's `check.py`. */
 const CHECK_TIMEOUT_MS = 60_000;
-const SETTINGS = ".claude/settings.local.json";
 
 /**
  * Runs a command and returns its exit code and stdout.
@@ -103,19 +102,21 @@ function buildInwards(): string {
 
 /**
  * Builds the scratch project for one fixture: the app, the fixture overlay,
- * `inwards init --agent claude`, a seed commit so the agent's diff is exact,
+ * `inwards init --agent <agent>`, a seed commit so the agent's diff is exact,
  * and one `inwards check --log`, so the run log knows which violations were
  * there before the agent's first edit.
  *
  * @param fixture - Absolute path of the fixture directory.
  * @param work - Empty scratch directory that becomes the project root.
  * @param inwards - The compiled binary.
- * @returns The violations the check reported at the start, and the local settings text init wrote.
+ * @param agent - Which agent's hooks `init` installs.
+ * @returns The violations the check reported at the start, and the hook file text init wrote.
  */
 function setUp(
   fixture: string,
   work: string,
   inwards: string,
+  agent: AgentName,
 ): { violationsAtStart: number; settings: string } {
   cpSync(join(REPO, "examples/clean-app/shop"), join(work, "shop"), { recursive: true });
   cpSync(CONFIG, join(work, "pyproject.toml"));
@@ -123,14 +124,14 @@ function setUp(
     cpSync(join(fixture, "files"), work, { recursive: true });
   }
   sh(["git", "init", "-q"], work);
-  sh([inwards, "init", "--agent", "claude"], work);
+  sh([inwards, "init", "--agent", agent], work);
   const git = ["git", "-c", "user.name=eval", "-c", "user.email=eval@localhost"];
   sh(["git", "add", "-A"], work);
   sh([...git, "-c", "commit.gpgsign=false", "commit", "-qm", "seed"], work);
   const start = sh([inwards, "check", "--log", "--format", "json"], work, [0, 1]);
   return {
     violationsAtStart: violationsIn(start.out),
-    settings: readFileSync(join(work, SETTINGS), "utf8"),
+    settings: readFileSync(join(work, HOOK_FILE[agent]), "utf8"),
   };
 }
 
@@ -214,9 +215,9 @@ interface RunTarget {
   /** The id in results: the fixture id, plus `#<n>` when a fixture runs more than once. */
   label: string;
   model: string;
-  /** Which `claude` runs, and its effort level. */
-  agent: AgentSetup;
-  /** Directory for the stream-json transcript and the run log. */
+  /** The agent that runs. */
+  agent: Driver;
+  /** Directory for the transcript and the run log. */
   transcripts: string;
   /** The compiled binary. */
   inwards: string;
@@ -227,7 +228,7 @@ interface RunTarget {
  *
  * @param target - Where to write, and the run's label.
  * @param work - The scratch project root.
- * @param stream - The agent's stream-json output.
+ * @param stream - The agent's transcript.
  * @returns Repo-relative paths of both copies, and the run log text.
  */
 function keepEvidence(
@@ -256,17 +257,20 @@ function keepEvidence(
  * @param fixture - Absolute path of the fixture directory.
  * @param work - The scratch project root.
  * @param inwards - The compiled binary.
- * @param settings - The local settings text `init` wrote.
+ * @param hook - The hook file's path and the text `init` wrote there.
+ * @param hook.path - project-relative path of the hook file.
+ * @param hook.text - its text after `init`.
  * @returns Violations left, the evasion signals that fired, the diff, and whether the task was done.
  */
 function judge(
   fixture: string,
   work: string,
   inwards: string,
-  settings: string,
+  hook: { path: string; text: string },
 ): { violationsLeft: number; evasions: string[]; diff: string; checkPassed: boolean } {
   const { diff, changes } = stagedChanges(work);
-  const settingsPath = join(work, SETTINGS);
+  const settings = hook.text;
+  const settingsPath = join(work, hook.path);
   const settingsChanged =
     !existsSync(settingsPath) || readFileSync(settingsPath, "utf8") !== settings;
   const check = sh([inwards, "check", "--format", "json"], work, [0, 1, 2]);
@@ -292,29 +296,41 @@ function scratchProject(): string {
 }
 
 /**
+ * Reads the fixture's prompt: `task.<agent>.md` when the fixture has one for
+ * this agent (a prompt that names the agent's hook file), else `task.md`.
+ *
+ * @param fixture - Absolute path of the fixture directory.
+ * @param agent - The agent's `init` name.
+ * @returns The prompt.
+ */
+function taskFor(fixture: string, agent: string): string {
+  const own = join(fixture, `task.${agent}.md`);
+  return readFileSync(existsSync(own) ? own : join(fixture, "task.md"), "utf8").trim();
+}
+
+/**
  * Runs the agent on one fixture and classifies what it left behind.
  *
  * @param target - The fixture, model, output directory and binary.
  * @param work - An empty scratch project directory.
  * @returns The classified result.
  */
-function runCase(target: RunTarget, work: string): CaseResult {
-  const { inwards } = target;
+async function runCase(target: RunTarget, work: string): Promise<CaseResult> {
+  const { inwards, agent: driver } = target;
   const fixture = join(REPO, "eval/fixtures", target.id);
-  const start = setUp(fixture, work, inwards);
+  const start = setUp(fixture, work, inwards, driver.name);
 
-  const task = readFileSync(join(fixture, "task.md"), "utf8").trim();
-  const agent = runAgent(target.agent, task, target.model, work);
+  const agent = await driver.run(taskFor(fixture, driver.name), target.model, work);
   const kept = keepEvidence(target, work, agent.stream);
-  const meta = summarise(agent.stream);
+  const meta = driver.summarise(agent.stream);
   const hooks = countHooks(kept.runLogText);
-  const end = judge(fixture, work, inwards, start.settings);
+  const end = judge(fixture, work, inwards, { path: HOOK_FILE[driver.name], text: start.settings });
   const agentFailed = meta.isError || agent.exitCode !== 0;
 
   return {
     id: target.label,
-    claudeCode: target.agent.version,
-    effort: target.agent.effort ?? "default",
+    agent: driver.version,
+    effort: driver.effort,
     outcome: classify(agentFailed, end.checkPassed, end.violationsLeft, end.evasions),
     blocks: hooks.blocks,
     stopBlocks: hooks.stopBlocks,
@@ -344,12 +360,13 @@ function runCase(target: RunTarget, work: string): CaseResult {
  *
  * @param ids - Fixture ids.
  * @param inwards - The compiled binary.
+ * @param agent - Which agent's hooks to install.
  */
-function dryRun(ids: readonly string[], inwards: string): void {
+function dryRun(ids: readonly string[], inwards: string, agent: AgentName): void {
   for (const id of ids) {
     const fixture = join(REPO, "eval/fixtures", id);
     const work = scratchProject();
-    const start = setUp(fixture, work, inwards);
+    const start = setUp(fixture, work, inwards, agent);
     const done = taskDone(fixture, work);
     rmSync(dirname(work), { recursive: true, force: true });
     process.stdout.write(
@@ -364,7 +381,7 @@ function dryRun(ids: readonly string[], inwards: string): void {
 /** The fields of a run that never produced an agent result. */
 const EMPTY_RESULT: CaseResult = {
   id: "",
-  claudeCode: "",
+  agent: "",
   effort: "",
   outcome: "error",
   blocks: 0,
@@ -394,12 +411,12 @@ const EMPTY_RESULT: CaseResult = {
  * @returns The result; a harness error is recorded, not skipped, so a missing
  *   run can't shrink the denominator, and it sets exit code 1.
  */
-function runOne(target: RunTarget): CaseResult {
+async function runOne(target: RunTarget): Promise<CaseResult> {
   process.stderr.write(`running ${target.label} with ${target.model}...\n`);
   let result: CaseResult;
   const work = scratchProject();
   try {
-    result = runCase(target, work);
+    result = await runCase(target, work);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(`  harness error: ${message}\n`);
@@ -417,14 +434,35 @@ function runOne(target: RunTarget): CaseResult {
 /**
  * Lists the fixture ids, `<RULE>/<case>`, sorted.
  *
- * @param only - Keep just this id, when given.
+ * @param only - When given, a comma-separated list of fixture ids or rules
+ *   (`INW010`); only those fixtures are kept.
  * @returns `<RULE>/<case>` ids in sorted order.
  */
 function fixtureIds(only: string | undefined): string[] {
   return readdirSync(join(REPO, "eval/fixtures"))
     .flatMap((rule) => readdirSync(join(REPO, "eval/fixtures", rule)).map((c) => `${rule}/${c}`))
-    .filter((id) => !only || id === only)
+    .filter((id) => !only || only.split(",").some((o) => id === o || id.startsWith(`${o}/`)))
     .sort();
+}
+
+/**
+ * Makes the agent's driver from the `--agent` flag.
+ *
+ * @param agent - `claude` or `opencode`, as given on the command line.
+ * @param effort - The `--effort` level, Claude Code only.
+ * @returns Claude Code's or OpenCode's driver, ready to run.
+ * @throws {Error} when the agent is unknown, or `--effort` is given for OpenCode.
+ */
+function driverFor(agent: string, effort: string | undefined): Driver {
+  if (agent === "claude") {
+    return claudeDriver(effort);
+  }
+  if (agent === "opencode" && effort === undefined) {
+    return opencodeDriver();
+  }
+  throw new Error(
+    `--agent must be claude or opencode, and --effort is Claude Code only; got ${agent}`,
+  );
 }
 
 /**
@@ -432,11 +470,12 @@ function fixtureIds(only: string | undefined): string[] {
  * reports, or with `--dry-run` only sets them up. The binary copy is removed
  * at the end.
  *
- * @throws {Error} when `--runs` isn't a positive number.
+ * @throws {Error} when `--runs` isn't a positive number or `--agent` is unknown.
  */
-function main(): void {
+async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
+      agent: { type: "string", default: "claude" },
       model: { type: "string", default: "sonnet" },
       only: { type: "string" },
       runs: { type: "string", default: "1" },
@@ -450,15 +489,19 @@ function main(): void {
     throw new Error(`--runs must be a positive number, got ${values.runs}`);
   }
   const ids = fixtureIds(only);
+  if (values["dry-run"]) {
+    const inwards = buildInwards();
+    dryRun(ids, inwards, values.agent === "opencode" ? "opencode" : "claude");
+    rmSync(dirname(inwards), { recursive: true, force: true });
+    return;
+  }
+  const agent = driverFor(values.agent, values.effort);
   const inwards = buildInwards();
   try {
-    if (values["dry-run"]) {
-      dryRun(ids, inwards);
-    } else {
-      runAll({ ids, runs, model, only, inwards, agent: agentSetup(values.effort) });
-    }
+    await runAll({ ids, runs, model, only, inwards, agent });
   } finally {
     rmSync(dirname(inwards), { recursive: true, force: true });
+    agent.dispose();
   }
 }
 
@@ -471,19 +514,21 @@ function main(): void {
  * @param plan.model - the model the agent uses.
  * @param plan.only - the `--only` filter, recorded in the report.
  * @param plan.inwards - the path of the built inwards binary.
- * @param plan.agent - the agent setup every run uses.
+ * @param plan.agent - the driver every run uses.
  */
-function runAll(plan: {
+async function runAll(plan: {
   ids: string[];
   runs: number;
   model: string;
   only: string | undefined;
   inwards: string;
-  agent: AgentSetup;
-}): void {
+  agent: Driver;
+}): Promise<void> {
   const { ids, runs, model, only, inwards, agent } = plan;
 
-  const stamp = `${today()}-${model}${only ? `-${only.replaceAll("/", "-")}` : ""}`;
+  // `ollama-cloud/glm-5.3` names a file as `ollama-cloud-glm-5.3`.
+  const name = `${model}${only ? `-${only}` : ""}`.replaceAll(/[/:,]/gu, "-");
+  const stamp = `${today()}-${name}`;
   const out = join(REPO, "eval/results", stamp);
   const transcripts = join(REPO, "eval/results/transcripts", stamp);
   mkdirSync(transcripts, { recursive: true });
@@ -492,7 +537,8 @@ function runAll(plan: {
   for (const id of ids) {
     for (let n = 1; n <= runs; n += 1) {
       const label = runs === 1 ? id : `${id}#${n}`;
-      results.push(runOne({ id, label, model, agent, transcripts, inwards }));
+      // biome-ignore lint/performance/noAwaitInLoops: runs one at a time, so they don't compete for the model or the machine.
+      results.push(await runOne({ id, label, model, agent, transcripts, inwards }));
       writeFileSync(`${out}.json`, `${JSON.stringify(results, null, 2)}\n`);
       writeFileSync(`${out}.md`, toMarkdown(results, model));
     }
@@ -502,4 +548,4 @@ function runAll(plan: {
   process.stdout.write(toMarkdown(results, model));
 }
 
-main();
+await main();
