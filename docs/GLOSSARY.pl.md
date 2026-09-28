@@ -101,6 +101,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
 | contract (import-linter) | kontrakt |
+| container package (a package that holds layers) | pakiet-kontener |
 | config error | błąd konfiguracji |
 | confirming parse | parsowanie potwierdzające |
 | dead prefix | martwy prefiks |
@@ -111,6 +112,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | differential test | test różnicowy |
 | domain layer, application layer, infrastructure layer | warstwa domeny, warstwa aplikacji, warstwa infrastruktury |
 | dynamic import | import dynamiczny |
+| evidence (a matching module below a package, INW006) | dowód |
 | edit distance | odległość edycyjna |
 | computed (target, source) | wyliczany (cel, kod) |
 | unverifiable (INW011 target), unreadable | niesprawdzalny, nieczytelny |
@@ -174,6 +176,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
+| matched prefix (of a layer selector) | dopasowany prefiks |
+| truth table | tabela prawdy |
 | session | sesja |
 | session state | stan sesji |
 | session baseline (the start snapshot, not the file) | punkt odniesienia, migawka startowa |

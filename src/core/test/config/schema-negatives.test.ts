@@ -145,6 +145,20 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ],
     ["an empty selector segment", withExtra('[[tool.inwards.shape]]\npackages = ["shop..x"]\n')],
     [
+      "a layer selector with no leading package",
+      withLayer('{ name = "d", modules = ["*.domain"] }'),
+    ],
+    ["a layer selector that is only **", withLayer('{ name = "d", modules = ["**"] }')],
+    [
+      "a partial wildcard in a layer selector",
+      withLayer('{ name = "d", modules = ["shop.dom*"] }'),
+    ],
+    ["a ? in a layer selector", withLayer('{ name = "d", modules = ["shop.*?"] }')],
+    ["a bracket in a layer selector", withLayer('{ name = "d", modules = ["shop.[ab].*"] }')],
+    ["an empty layer selector segment", withLayer('{ name = "d", modules = ["shop..*"] }')],
+    ["a path in a layer selector", withLayer('{ name = "d", modules = ["shop/*/domain"] }')],
+    ["*** in a layer selector", withLayer('{ name = "d", modules = ["shop.***"] }')],
+    [
       "a distribution name as a library",
       withLayer('{ name = "d", modules = ["shop"], deny-libraries = ["python-dateutil"] }'),
     ],
@@ -155,6 +169,13 @@ describe("structural mistakes fail both the schema and the parser", () => {
 
   test("INW000 may still be selected", () => {
     const text = withExtra('[tool.inwards.rules]\nselect = ["INW000", "INW001"]\n');
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("layer selectors and lenient literal entries pass both", () => {
+    const text = withLayer(
+      '{ name = "d", modules = ["shop.*.domain", "shop.**", "shop.**.domain.**", "shop.domain"] }, { name = "e", modules = [] }',
+    );
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 

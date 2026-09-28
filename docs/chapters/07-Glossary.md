@@ -60,7 +60,7 @@ Port
 :   An interface the inner code owns and the outer code implements. In Python, usually a `typing.Protocol`.
 
 Vertical slice
-:   Organising code by feature (`orders/`, `invoices/`) rather than by technical layer, with each slice holding its own handlers and data access. Slices shouldn't reach into each other. Each slice can be declared as a [context](guides/configuration.md#contexts), and [INW002](rules/INW002.md) keeps slices apart unless `depends-on` says otherwise; glob selectors, so twenty slices don't need twenty entries, are [#191](https://github.com/SirCypkowskyy/inwards/issues/191).
+:   Organising code by feature (`orders/`, `invoices/`) rather than by technical layer, with each slice holding its own handlers and data access. Slices shouldn't reach into each other. Each slice can be declared as a [context](guides/configuration.md#contexts), and [INW002](rules/INW002.md) keeps slices apart unless `depends-on` says otherwise; a layer can cover every slice with one [selector](guides/configuration.md#selectors), such as `shop.*.domain`.
 
 ## Inwards terms
 
