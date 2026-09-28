@@ -20,6 +20,11 @@ export interface Report {
   resolved?: number;
   /** Findings inline suppression comments hid; counted in every format, listed in SARIF. */
   suppressed?: Suppressed[];
+  /**
+   * Paths named for the check that gave no file to check (outside the config
+   * root, or no Python files), each with the sentence to show for it.
+   */
+  notChecked?: { path: string; message: string }[];
 }
 
 export type Format = "text" | "concise" | "json" | "sarif";
@@ -172,22 +177,27 @@ function oneLine(text: string): string {
 }
 
 /**
- * Builds the lines under the diagnostics: the totals, what the cap left out,
- * and the baseline note.
+ * Builds the lines under the diagnostics: a warning per named path that gave
+ * nothing to check, the totals, what the cap left out, and the baseline note.
+ * With nothing checked at all the totals say so instead of "All clear".
  *
  * @param report - the report and the diagnostics cut from it.
  * @param c - the palette.
- * @returns one to three lines.
+ * @returns one line or more.
  */
 function footer(report: View, c: Paint): string[] {
-  const { diagnostics, filesChecked, durationMs, cut } = report;
+  const { diagnostics, filesChecked, durationMs, cut, notChecked = [] } = report;
   const ms = c.dim(`(${durationMs.toFixed(1)} ms)`);
   const files = plural(filesChecked, "file");
   const { errors, warnings } = counts(diagnostics);
   const warned = warnings === 0 ? "" : `, ${plural(warnings, "warning")}`;
+  const nothing = filesChecked === 0 && notChecked.length > 0;
+  const clear = nothing
+    ? `${c.red(c.bold("Nothing checked:"))} ${files} ${ms}.`
+    : `${c.green(c.bold("All clear:"))} ${files}, 0 violations${warned} ${ms}.`;
   const tail =
     errors === 0
-      ? `${c.green(c.bold("All clear:"))} ${files}, 0 violations${warned} ${ms}.`
+      ? clear
       : `${c.red(c.bold("Found"))} ${plural(errors, "violation")}${warned} in ${files} ${ms}.`;
   const hidden = counts(cut);
   const omitted = [
@@ -198,7 +208,8 @@ function footer(report: View, c: Paint): string[] {
   const suppressed = report.suppressed?.length ?? 0;
   const inline =
     suppressed === 0 ? [] : [`${plural(suppressed, "finding")} suppressed by inline comments.`];
-  return [tail, ...note, ...baselineNote(report), ...inline];
+  const skipped = notChecked.map((n) => `${c.bold("warning:")} ${oneLine(n.message)}`);
+  return [...skipped, tail, ...note, ...baselineNote(report), ...inline];
 }
 
 /**
@@ -257,8 +268,9 @@ function plural(n: number, word: string): string {
  * Renders the `inwards/diagnostics@1` JSON report.
  * Stable, versioned shape. Agents parse this, so fields are only ever added.
  * The duration is rounded to 0.1 ms. `summary` counts every diagnostic;
- * `omitted` appears only when a cap cut some, and `suppressed` only when
- * inline comments hid some.
+ * `omitted` appears only when a cap cut some, `suppressed` only when
+ * inline comments hid some, and the top-level `notChecked` only when a named
+ * path gave no file to check.
  *
  * @param report - the report and the diagnostics to print.
  * @param indent - spaces per level, or undefined for one line.
@@ -267,6 +279,7 @@ function plural(n: number, word: string): string {
 function renderJson(report: View, indent?: number): string {
   const { diagnostics, filesChecked, durationMs, baselined, resolved, shown, cut } = report;
   const suppressed = report.suppressed?.length ?? 0;
+  const notChecked = report.notChecked ?? [];
   return JSON.stringify(
     {
       schema: "inwards/diagnostics@1",
@@ -280,6 +293,7 @@ function renderJson(report: View, indent?: number): string {
         ...(suppressed === 0 ? {} : { suppressed }),
         durationMs: Math.round(durationMs * 10) / 10,
       },
+      ...(notChecked.length === 0 ? {} : { notChecked }),
       diagnostics: shown,
     },
     null,
@@ -305,15 +319,22 @@ function toUriPath(path: string): string {
  * the fix as text and as a `fix` property; file URIs are relative to
  * `%SRCROOT%`. A finding an inline comment hid is a result too, with an
  * `inSource` suppression whose justification is the comment's reason, so
- * viewers show it as suppressed rather than lose it.
+ * viewers show it as suppressed rather than lose it. A named path that gave
+ * nothing to check is a warning notification on the run's invocation, since
+ * it is about the run and not a finding in code.
  *
  * @param report - the report as capped for display; the counts and the cut are not part of SARIF.
  * @param report.shown - the diagnostics to print.
  * @param report.suppressed - the findings inline comments hid, printed as suppressed results.
+ * @param report.notChecked - the named paths that gave no file to check.
+ * @param report.filesChecked - how many files were checked; none means the run failed.
  * @param indent - spaces per level, or undefined for one line.
  * @returns the SARIF log.
  */
-function renderSarif({ shown, suppressed = [] }: View, indent?: number): string {
+function renderSarif(
+  { shown, suppressed = [], notChecked = [], filesChecked }: View,
+  indent?: number,
+): string {
   return JSON.stringify(
     {
       // biome-ignore lint/style/useNamingConvention: SARIF names this key "$schema".
@@ -335,6 +356,26 @@ function renderSarif({ shown, suppressed = [] }: View, indent?: number): string 
               })),
             },
           },
+          ...(notChecked.length === 0
+            ? {}
+            : {
+                invocations: [
+                  {
+                    executionSuccessful: filesChecked > 0,
+                    toolExecutionNotifications: notChecked.map(({ path, message }) => ({
+                      level: "warning",
+                      message: { text: message },
+                      locations: [
+                        {
+                          physicalLocation: {
+                            artifactLocation: { uri: toUriPath(path), uriBaseId: "%SRCROOT%" },
+                          },
+                        },
+                      ],
+                    })),
+                  },
+                ],
+              }),
           results: [
             ...shown.map(sarifResult),
             ...suppressed.map(({ diagnostic, reason }) => ({

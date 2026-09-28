@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 901959e34f1d81c0dc20550d20b6f96bf52124af33733f73ca61390cf8dea202
+source_hash: 4641e6c7958af564d1f1524aa530dc5ee5b0a306875654400ce450a87b05886d
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -171,6 +171,8 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
 `--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst i `concise` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
 
+`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, a SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
+
 ### Pisanie diagnostyk dla modelu { #writing-diagnostics-for-a-model }
 
 Każda diagnostyka przestrzega tych samych pięciu zasad. To założenia projektowe o tym, co sprawia, że agent naprawia problem, zamiast go ukrywać, a metryka „naprawione w ramach jednej ponownej próby” z [rozdziału 2](02-Business-Context.md#business-hypothesis) pokaże, czy się sprawdzają.
@@ -191,7 +193,7 @@ Każda diagnostyka przestrzega tych samych pięciu zasad. To założenia projekt
 
 ### Kody wyjścia { #exit-codes }
 
-`0` czysto · `1` naruszenia · `2` błąd użycia albo konfiguracji. W Claude Code hook zamienia naruszenia na kod 2, sygnał „proszę napraw”, a kodu 1 używa dla tego, co powinien zobaczyć tylko użytkownik: nieczytelnych danych wejściowych, błędu wewnętrznego albo Stop gate, który zawodzi ponownie po jednorazowym zablokowaniu z własnym błędem. Błąd konfiguracji też trafia do modelu z kodem 2, bo agent, który zepsuł konfigurację, musi się o tym dowiedzieć.
+`0` czysto · `1` naruszenia · `2` błąd użycia albo konfiguracji. Dla `inwards check PATHS...` błędem użycia jest ścieżka, która nie istnieje, albo ścieżki, które wszystkie leżą poza `root`. W Claude Code hook zamienia naruszenia na kod 2, sygnał „proszę napraw”, a kodu 1 używa dla tego, co powinien zobaczyć tylko użytkownik: nieczytelnych danych wejściowych, błędu wewnętrznego albo Stop gate, który zawodzi ponownie po jednorazowym zablokowaniu z własnym błędem. Błąd konfiguracji też trafia do modelu z kodem 2, bo agent, który zepsuł konfigurację, musi się o tym dowiedzieć.
 
 ### Gdy agent nie umie tego naprawić { #when-the-agent-cant-fix-it }
 
