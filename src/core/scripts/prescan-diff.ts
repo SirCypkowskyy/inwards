@@ -222,6 +222,27 @@ const FORMS = [
   "__import__(f'{M}')",
   "exec(M)",
   "importlib.import_module('.x', **{'package': 'M'})",
+  // Routes to a loader and loading APIs from #79.
+  "(im := importlib.import_module)('M')",
+  "im, _ = importlib.import_module, None\nim('M')",
+  "class L:\n    load = importlib.import_module\nL.load('M')",
+  "import functools\nfunctools.partial(importlib.import_module, 'M')()",
+  "from functools import partial\npartial(exec, 'import M')()",
+  "exec('from importlib import import_module as im')\nim('M')",
+  "print.__self__.exec('import M')",
+  "(lambda: 0).__globals__['__builtins__']['exec']('import M')",
+  "import sys\nsys.modules['importlib'].import_module('M')",
+  "pkgutil.resolve_name('M:Obj')",
+  "importlib.util.find_spec('M')",
+  "importlib.machinery.SourceFileLoader('x', 'M.py').load_module()",
+  // Constant targets from #79.
+  "T = 'M'\nimportlib.import_module(T)",
+  "importlib.import_module('%s' % 'M')",
+  "importlib.import_module('{}'.format('M'))",
+  "importlib.import_module(''.join(['M']))",
+  "importlib.import_module('M' * 1)",
+  "importlib.import_module('xM'[1:])",
+  "importlib.import_module(f\"{'M'!s:>1}\")",
 ];
 
 // Strings and comments: the forms that can swallow or be swallowed by their neighbours.
