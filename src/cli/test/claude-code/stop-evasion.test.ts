@@ -125,6 +125,35 @@ describe("Stop gate: edits made around the hooks", () => {
     expect(stderr).toContain('Layer \\"domain\\" imports \\"requests\\"');
   });
 
+  test.each([
+    ["a compiled module", { "requests.cpython-313-x86_64-linux-gnu.so": "" }],
+    [
+      "a package disguised as a virtualenv",
+      { "requests/pyvenv.cfg": "", "requests/__init__.py": "" },
+    ],
+    ["a package with a compiled __init__", { "requests/__init__.abi3.so": "" }],
+  ])("a new top-level %s that shadows an old import blocks (#86)", (_, files) => {
+    const root = session({ "shop/domain/order.py": "import requests\n" });
+    for (const [rel, text] of Object.entries(files)) {
+      put(root, rel, text);
+    }
+    const { code, stderr } = stop(root);
+    expect(code).toBe(2);
+    expect(stderr).toContain('Layer \\"domain\\" imports \\"requests\\"');
+  });
+
+  test("an unchanged file with an old error, past the copy cap, doesn't block when a new package is added (#86)", () => {
+    const big = `# newpkg\n${LEAK}${"x = 1  # padding padding padding padding padding\n".repeat(12_000)}`;
+    const root = session({
+      ".gitignore": "shop/domain/gen_pb2.py\n",
+      "shop/domain/gen_pb2.py": big,
+      "shop/infrastructure/db.py": "",
+    });
+    expect(stop(root).code).toBe(0);
+    put(root, "newpkg/__init__.py", "X = 1\n");
+    expect(stop(root).code).toBe(0);
+  });
+
   test("a FIFO named like a module doesn't hang the gate", () => {
     if (process.platform === "win32") {
       return; // no FIFOs

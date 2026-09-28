@@ -1,13 +1,21 @@
 /**
  * @file What a project looks like right now, as the session start and the Stop gate
  * compare it: every `[tool.inwards]` table, a content hash per Python
- * file, and the symlinks in layer packages. Paths are project-relative with forward slashes: real paths for
+ * file, the symlinks in layer packages, and the top-level modules under each
+ * config root. Paths are project-relative with forward slashes: real paths for
  * configs, the paths as walked for the manifest. The filesystem comes in
  * through the injected probe, reader and walker.
  */
 import { createHash } from "node:crypto";
-import { join, relative } from "node:path";
-import { ConfigError, declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";
+import { dirname, join, relative, resolve } from "node:path";
+import {
+  ConfigError,
+  declaresInwards,
+  type InwardsConfig,
+  type ListDir,
+  parseConfig,
+  topLevelModules,
+} from "@inwards/core";
 import { posix } from "../paths/lexical.ts";
 import type { FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 import { layerDirs } from "./check.ts";
@@ -165,6 +173,44 @@ export function projectLinks(
     }
   }
   return links;
+}
+
+/**
+ * Lists the top-level first-party modules under every config's root, by the
+ * module probe's rules (`topLevelModules`): nothing is skipped, and compiled
+ * modules and packages count, so the Stop gate sees a package that appears
+ * during the session even where the manifest walk doesn't look (#86). A
+ * symlinked directory counts when it leads to a directory.
+ *
+ * @param io - lists directories and tells what a symlink leads to.
+ * @param io.read - lists a directory's entries.
+ * @param io.probe - tells whether a symlinked entry leads to a directory.
+ * @param project - the real project root.
+ * @param configs - the project's configs, by project-relative path.
+ * @returns the names by project-relative config path.
+ */
+export function projectTopLevel(
+  io: { read: Pick<FileReader, "list">; probe: Pick<PathProbe, "kind"> },
+  project: string,
+  configs: Record<string, InwardsConfig>,
+): Record<string, string[]> {
+  return Object.fromEntries(
+    Object.entries(configs).map(([rel, config]) => {
+      const root = resolve(dirname(join(project, rel)), config.root);
+      /**
+       * Lists a directory under the root, a symlink to a directory counting as one.
+       *
+       * @param dir - relative to the root, `""` for the root.
+       * @returns its entries, or undefined when it can't be listed.
+       */
+      const list: ListDir = (dir: string) =>
+        io.read.list(join(root, dir))?.map((e) => ({
+          name: e.name,
+          dir: e.dir || (!e.file && io.probe.kind(join(root, dir, e.name)) === "dir"),
+        }));
+      return [rel, topLevelModules(list)];
+    }),
+  );
 }
 
 /**

@@ -9,13 +9,13 @@
  *
  * A top-level package that appeared during the session can turn an old
  * import, such as `import requests` in a layer, into first-party code
- * (#86). The files that mention its name are checked too, and their
+ * (#86). The files that spell its name as a top-level name are checked too, and their
  * session-start check doesn't see the package, so what it changed is new.
  */
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { Diagnostic, InwardsConfig, Report } from "@inwards/core";
 import { CONFIG_DEFAULTS } from "@inwards/core";
-import { isInside, posix } from "../paths/lexical.ts";
+import { isInside } from "../paths/lexical.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import { projectPath } from "../project/snapshot.ts";
@@ -68,69 +68,51 @@ export function changedFiles(
 
 /**
  * Names the top-level modules and packages that appeared under each
- * config's root during the session: the first segment of a Python file's
- * path under the root, without `.py` or `.pyi`, that no start file had.
+ * config's root during the session, from the lists SessionStart recorded and
+ * the lists now (`projectTopLevel`). An older start record without lists
+ * finds none, as before #86.
  *
  * @param project - the real project root.
  * @param configs - the valid configs now, by project-relative path.
- * @param manifests - project-relative Python path to content hash, at start and now.
- * @param manifests.before - the session-start manifest.
- * @param manifests.now - the manifest now.
+ * @param lists - the top-level module names by config path, at start and now.
+ * @param lists.before - at session start; undefined in an older start record.
+ * @param lists.now - the same lists, taken at this Stop.
  * @returns each config root and its new top-level names, by project-relative
  *   config path; configs without any are left out.
  */
 export function newTopLevel(
   project: string,
   configs: Record<string, InwardsConfig>,
-  { before, now }: { before: Record<string, string>; now: Record<string, string> },
+  { before, now }: { before: Record<string, string[]> | undefined; now: Record<string, string[]> },
 ): Record<string, Fresh> {
   const fresh: Record<string, Fresh> = {};
   for (const [rel, config] of Object.entries(configs)) {
-    const root = resolve(dirname(join(project, rel)), config.root);
-    const was = topLevel(project, root, before);
-    const names = [...topLevel(project, root, now)].filter((name) => !was.has(name));
+    const was = new Set(before?.[rel] ?? now[rel]);
+    const names = (now[rel] ?? []).filter((name) => !was.has(name));
     if (names.length > 0) {
-      fresh[rel] = { root, names };
+      fresh[rel] = { root: resolve(dirname(join(project, rel)), config.root), names };
     }
   }
   return fresh;
 }
 
 /**
- * Lists the top-level module names of the manifest's files under a root.
- *
- * @param project - the real project root.
- * @param root - the config root.
- * @param manifest - project-relative Python path to content hash.
- * @returns each first path segment under the root, without a Python suffix.
- */
-function topLevel(project: string, root: string, manifest: Record<string, string>): Set<string> {
-  const names = new Set<string>();
-  for (const path of Object.keys(manifest)) {
-    const abs = join(project, path);
-    if (isInside(root, abs)) {
-      const first = posix(relative(root, abs)).split("/")[0] ?? "";
-      names.add(first.replace(PYTHON_FILE, ""));
-    }
-  }
-  return names;
-}
-
-/**
  * Finds the files that may import a top-level name new this session: every
  * Python file under that config's root whose text, NFKC-normalised when it
- * isn't ASCII, mentions the name. A file that can't be read is included, so
- * the check reports on it. It reads every file under such a root, but only
- * in a session that added a top-level package.
+ * isn't ASCII, spells the name as a whole top-level name (`requests` in
+ * `import requests` or `"requests.api"`, not in `my_requests` or `x.requests`). A file that can't be read is included, so
+ * the check reports on it. A symlink is left out: its code is checked under
+ * its real path, and a link in a layer has checks of its own. It reads every
+ * file under such a root, but only in a session that added a top-level package.
  *
- * @param io - reads the files.
+ * @param io - reads the files and tells symlinks.
  * @param project - the real project root.
  * @param fresh - each config's root and new top-level names, from `newTopLevel`.
  * @param manifest - the content hashes now.
  * @returns absolute paths of the files that mention a new name.
  */
 export function freshImporters(
-  io: Pick<Platform, "read">,
+  io: Pick<Platform, "read" | "probe">,
   project: string,
   fresh: Record<string, Fresh>,
   manifest: Record<string, string>,
@@ -139,7 +121,7 @@ export function freshImporters(
   for (const { root, names } of Object.values(fresh)) {
     for (const path of Object.keys(manifest)) {
       const abs = join(project, path);
-      if (isInside(root, abs) && mentionsAny(io, abs, names)) {
+      if (isInside(root, abs) && io.probe.isLink(abs) === false && mentionsAny(io, abs, names)) {
         found.push(abs);
       }
     }
@@ -153,7 +135,7 @@ export function freshImporters(
  * @param io - reads the file.
  * @param file - the absolute file.
  * @param names - the words to look for.
- * @returns true when a name appears, or the file can't be read.
+ * @returns true when a name appears as a whole top-level name, or the file can't be read.
  */
 function mentionsAny(io: Pick<Platform, "read">, file: string, names: readonly string[]): boolean {
   let text: string;
@@ -163,7 +145,11 @@ function mentionsAny(io: Pick<Platform, "read">, file: string, names: readonly s
     return true; // unreadable: let the check say why
   }
   const plain = NON_ASCII.test(text) ? text.normalize("NFKC") : text;
-  return names.some((name) => plain.includes(name));
+  // Names are identifiers (`topLevelModules`), so they need no escaping.
+  return names.some(
+    (name) =>
+      new RegExp(`(?<![\\p{ID_Continue}.])${name}(?!\\p{ID_Continue})`, "u").exec(plain) !== null,
+  );
 }
 
 /**
@@ -189,6 +175,8 @@ function mentionsAny(io: Pick<Platform, "read">, file: string, names: readonly s
  * @param configs.now - the valid configs now.
  * @param configs.found - where each valid config was found now.
  * @param configs.fresh - the top-level names new this session by config, from `newTopLevel`.
+ * @param configs.unchanged - absolute files checked only because they mention such a name,
+ *   unchanged since the start, so their text now is their start content.
  * @param baseline - false to report violations the baselines accept.
  * @returns the merged report without the errors the changed files already had
  *   at session start, those errors (never in a whole-project check), the
@@ -204,11 +192,13 @@ export async function checkChanged(
     now,
     found,
     fresh = {},
+    unchanged,
   }: {
     start: SessionState["start"];
     now: Record<string, InwardsConfig>;
     found: Record<string, string[]>;
     fresh?: Record<string, Fresh>;
+    unchanged?: ReadonlySet<string>;
   },
   baseline: boolean,
 ): Promise<{
@@ -249,6 +239,7 @@ export async function checkChanged(
         baseline,
         config: startIfChanged(start.configs, now, rel),
         absent: fresh[rel]?.names,
+        unchanged,
       };
       const { report, rejected } = await agentSuppressions(
         lookups,

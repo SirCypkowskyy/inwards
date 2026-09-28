@@ -104,3 +104,49 @@ function compiledIn(listDir: ListDir | undefined, dir: string, name: string): bo
       !e.dir && e.name.startsWith(`${name}.`) && COMPILED_SUFFIX.test(e.name.slice(name.length)),
   );
 }
+
+/** A Python identifier, the only top-level name an import can spell. */
+const IDENTIFIER = /^[\p{ID_Start}_][\p{ID_Continue}]*$/u;
+/** A Python source or stub file, with its stem. */
+const SOURCE_FILE = /^(?<stem>[^.]+)\.pyi?$/u;
+
+/**
+ * Lists the top-level first-party module names under the config root, by the
+ * probe's rules: a source, stub, compiled or sourceless module file, or a
+ * directory with an `__init__` in any of those forms. Nothing is skipped, so a
+ * directory that holds a `pyvenv.cfg` still counts. The Stop gate compares
+ * this list at session start and now to find a package that appeared (#86).
+ *
+ * @param listDir - lists a directory relative to the config root, `""` for the root.
+ * @returns the names, sorted; empty when the root can't be listed.
+ */
+export function topLevelModules(listDir: ListDir): string[] {
+  const names = new Set<string>();
+  for (const entry of listDir("") ?? []) {
+    const stem = entry.name.split(".")[0] ?? entry.name;
+    const module = entry.dir
+      ? entry.name === stem && hasInit(listDir, entry.name)
+      : SOURCE_FILE.test(entry.name) || COMPILED_SUFFIX.test(entry.name.slice(stem.length));
+    if (module && IDENTIFIER.test(stem)) {
+      names.add(stem);
+    }
+  }
+  return [...names].sort();
+}
+
+/**
+ * Tells whether a directory holds an `__init__` Python would import it by.
+ *
+ * @param listDir - lists a directory relative to the config root.
+ * @param dir - the directory.
+ * @returns true for `__init__.py`, `__init__.pyi` or a compiled `__init__`.
+ */
+function hasInit(listDir: ListDir, dir: string): boolean {
+  return (listDir(dir) ?? []).some(
+    (e) =>
+      !e.dir &&
+      (e.name === "__init__.py" ||
+        e.name === "__init__.pyi" ||
+        (e.name.startsWith("__init__.") && COMPILED_SUFFIX.test(e.name.slice("__init__".length)))),
+  );
+}

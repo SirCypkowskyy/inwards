@@ -26,6 +26,12 @@ export interface SessionStart extends Start {
    * target (absent in older state files, where every link counts as new).
    */
   links?: Record<string, string>;
+  /**
+   * The top-level first-party modules under each config's root, by config
+   * path (`projectTopLevel`; absent in older state files, where no package
+   * counts as new).
+   */
+  topLevel?: Record<string, string[]>;
 }
 
 /** How a report was made: its config, the base of its paths, and whether the baseline applied. */
@@ -37,6 +43,12 @@ export interface Check {
   config?: InwardsConfig | undefined;
   /** Top-level names new this session, which the session-start check must not see. */
   absent?: readonly string[] | undefined;
+  /**
+   * Absolute files the Stop gate checks only because they mention a new
+   * top-level name, byte for byte what they were at start: their text now is
+   * their start content, even without a copy or a git blob (#86).
+   */
+  unchanged?: ReadonlySet<string> | undefined;
   /**
    * The path the agent wrote for a checked file, when the hook had to resolve
    * a `..` to find it: absolute checked file to the payload's cwd joined with

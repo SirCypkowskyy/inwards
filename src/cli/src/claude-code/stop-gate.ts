@@ -35,7 +35,12 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { changedBaselines } from "../project/baseline.ts";
-import { projectConfigs, projectLinks, projectManifest } from "../project/snapshot.ts";
+import {
+  projectConfigs,
+  projectLinks,
+  projectManifest,
+  projectTopLevel,
+} from "../project/snapshot.ts";
 import { rejectedNote } from "../session/agent-suppressions.ts";
 import { uncommittedConfigs } from "../session/committed-config.ts";
 import { fingerprint } from "../session/fingerprint.ts";
@@ -202,17 +207,18 @@ async function review(
   const { io } = deps;
   const manifest = projectManifest(io, project, configs);
   const lookups = createStartLookups({ ...io, check: deps.check }, { project, id });
-  const fresh = newTopLevel(project, configs, { before: state.start.manifest, now: manifest });
-  const changed = [
-    ...new Set([
-      ...changedFiles(io, lookups, state, manifest),
-      ...freshImporters(io, project, fresh, manifest),
-    ]),
-  ];
+  const fresh = newTopLevel(project, configs, {
+    before: state.start.topLevel,
+    now: projectTopLevel(io, project, configs),
+  });
+  const edits = changedFiles(io, lookups, state, manifest);
+  // Not in `edits`, so byte for byte what they were at start: their own start content.
+  const unchanged = freshImporters(io, project, fresh, manifest).filter((f) => !edits.includes(f));
+  const changed = [...edits, ...unchanged];
   const checked = await checkChanged(
     lookups,
     changed,
-    { start: state.start, now: configs, found, fresh },
+    { start: state.start, now: configs, found, fresh, unchanged: new Set(unchanged) },
     edited.length === 0,
   );
   const texts = Object.fromEntries(
