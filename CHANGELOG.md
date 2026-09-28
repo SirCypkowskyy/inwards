@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.4.0](https://github.com/SirCypkowskyy/inwards/compare/v0.3.1...v0.4.0) (2026-09-28)
+
+
+### Added
+
+* check every uv workspace member with its own config, and find namespace package portions in other members ([#217](https://github.com/SirCypkowskyy/inwards/issues/217)) ([8dbf052](https://github.com/SirCypkowskyy/inwards/commit/8dbf0529ebf964afa3fea8638e757d33fd9d5b5b))
+* **cli:** add vertical-slices, bounded-contexts and django presets, and make hexagonal adapters siblings ([#239](https://github.com/SirCypkowskyy/inwards/issues/239)) ([455ac94](https://github.com/SirCypkowskyy/inwards/commit/455ac94b2d3e373fc1a04c696d254b5ae27b1442))
+* **cli:** brief the agent on the architecture with inwards context and init --brief ([#213](https://github.com/SirCypkowskyy/inwards/issues/213)) ([2f590de](https://github.com/SirCypkowskyy/inwards/commit/2f590de93a40401536d8daddf6da7d2d6106d531))
+* **cli:** convert import-linter contracts with inwards import-config ([#220](https://github.com/SirCypkowskyy/inwards/issues/220)) ([3949a5b](https://github.com/SirCypkowskyy/inwards/commit/3949a5b73ca8d755ecbaaeb40d7626cf8f6d94a6))
+* **cli:** write package shapes with init --style --scaffold ([#218](https://github.com/SirCypkowskyy/inwards/issues/218)) ([0ecc210](https://github.com/SirCypkowskyy/inwards/commit/0ecc2106917e8094dc24f3b7ab575a3d1cc92e77))
+* **config:** layer selectors such as shop.*.domain for vertical slices ([#222](https://github.com/SirCypkowskyy/inwards/issues/222)) ([68e66be](https://github.com/SirCypkowskyy/inwards/commit/68e66be1b95a4f1c17c6fc1eff48f0aeaf624069))
+* **config:** opt-in rules, extend-select and per-rule option tables ([#223](https://github.com/SirCypkowskyy/inwards/issues/223)) ([e87e464](https://github.com/SirCypkowskyy/inwards/commit/e87e4646670c8343d0f5b44bfea06b1b74d067c2))
+* **config:** package templates with role layering and independent sibling layers ([#232](https://github.com/SirCypkowskyy/inwards/issues/232)) ([80c75ad](https://github.com/SirCypkowskyy/inwards/commit/80c75ad2e0e345f1feb0dc85c1199989bfa22d11))
+* **hook:** deny a Write that creates a Python file the package shape forbids ([#215](https://github.com/SirCypkowskyy/inwards/issues/215)) ([44f494a](https://github.com/SirCypkowskyy/inwards/commit/44f494a0a79344ac2ff987712efc96da5eb02cb3))
+* **hook:** know the start content of files dirty or untracked at session start ([#229](https://github.com/SirCypkowskyy/inwards/issues/229)) ([a9f854d](https://github.com/SirCypkowskyy/inwards/commit/a9f854d33fcb3981d4b3f7a9a58258ed7381dff1))
+* **rules:** add FAPI001 endpoint-metadata and FAPI002 undocumented-error-response ([#243](https://github.com/SirCypkowskyy/inwards/issues/243)) ([d4b94ea](https://github.com/SirCypkowskyy/inwards/commit/d4b94ea27ec7e46d77bfa785e8d2110d97a4a572))
+* **rules:** FAPI003 router-wiring reports unmounted routers, inclusion cycles and early includes ([#237](https://github.com/SirCypkowskyy/inwards/issues/237)) ([188c201](https://github.com/SirCypkowskyy/inwards/commit/188c201659b4fc8f14e6e036c0d24532d9b0a769))
+* **rules:** follow more loader routes and fold constant targets in INW011 ([#216](https://github.com/SirCypkowskyy/inwards/issues/216)) ([cfbd1ab](https://github.com/SirCypkowskyy/inwards/commit/cfbd1abe96392deb9db810fc04b8d24573c314ed))
+* **rules:** register the FastAPI rule family (FAPI001-FAPI003, opt-in) and its shared model ([#230](https://github.com/SirCypkowskyy/inwards/issues/230)) ([a735af0](https://github.com/SirCypkowskyy/inwards/commit/a735af0cf560d2920f962e2696ea20cb7fcc83de))
+
+
+### Fixed
+
+* **cli:** report a --config that isn't a file instead of crashing ([#214](https://github.com/SirCypkowskyy/inwards/issues/214)) ([8e21ec3](https://github.com/SirCypkowskyy/inwards/commit/8e21ec36bcbca35a99b76d2526d3cd82e8e348a1))
+* **hook:** catch a replayed SessionStart and a Stop hook removed through Bash ([#240](https://github.com/SirCypkowskyy/inwards/issues/240)) ([9f25ba2](https://github.com/SirCypkowskyy/inwards/commit/9f25ba2b35997dd23ea92632aadf69a77d2228a5))
+* **hook:** show what a Bash edit of [tool.inwards] hides by checking with the session-start config ([#211](https://github.com/SirCypkowskyy/inwards/issues/211)) ([c9981c4](https://github.com/SirCypkowskyy/inwards/commit/c9981c44cd6a965396508c1ed8e1056d7bef9ad2))
+* **rules:** accept namespace package portions installed in the project's .venv, or listed in namespace-packages ([#221](https://github.com/SirCypkowskyy/inwards/issues/221)) ([164f5b0](https://github.com/SirCypkowskyy/inwards/commit/164f5b0ad3195006333abed85a0325c715e3c64b))
+* **rules:** close the INW006 follow-ups for compiled modules, ignore depth and shadowing packages ([#244](https://github.com/SirCypkowskyy/inwards/issues/244)) ([59b52a1](https://github.com/SirCypkowskyy/inwards/commit/59b52a1db9196b9ebb77667d69cff1e772ccc3c7))
+* **rules:** report symlinks in layers that point out of the root or into another layer ([#231](https://github.com/SirCypkowskyy/inwards/issues/231)) ([d9a7670](https://github.com/SirCypkowskyy/inwards/commit/d9a76704f6bb6320e3d40067c6c156ed74685e74))
+
+
+### Documentation
+
+* **spike:** record the FAPI004 corpus run and its no-go per subset ([#241](https://github.com/SirCypkowskyy/inwards/issues/241)) ([8c46281](https://github.com/SirCypkowskyy/inwards/commit/8c4628186137612e4e3702a68771c387c39f808d))
+
+
+### Chores
+
+* promote develop to main ([#247](https://github.com/SirCypkowskyy/inwards/issues/247)) ([0251bfc](https://github.com/SirCypkowskyy/inwards/commit/0251bfc1689b7144e10f456699487c3da7d3fb0d))
+
 ## [0.3.1](https://github.com/SirCypkowskyy/inwards/compare/v0.3.0...v0.3.1) (2026-09-28)
 
 
