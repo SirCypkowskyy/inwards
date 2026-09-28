@@ -82,6 +82,13 @@ describe("what SessionStart copies", () => {
     expect(into.copies).toEqual({ "dirty.py": "X = 2\n", "new.py": "Y = 1\n" });
   });
 
+  test("mixed line endings over an LF blob get a copy: git can't give them back", () => {
+    const into = copier({ "mixed.py": "x = 1\ny = 2\n", "crlf.py": "x = 1\ny = 2\n" });
+    add(into, "mixed.py", "x = 1\r\ny = 2\n");
+    add(into, "crlf.py", "x = 1\r\ny = 2\r\n");
+    expect(into.copies).toEqual({ "mixed.py": "x = 1\r\ny = 2\n" });
+  });
+
   test("a symlink and invalid UTF-8 get no copy", () => {
     const into = copier({}, ["alias.py"]);
     add(into, "alias.py", "X = 1\n");

@@ -91,7 +91,12 @@ export function startCopier(
       const lf = text?.replaceAll("\r\n", "\n");
       if (
         text === undefined ||
-        (oid !== undefined && lf !== text && blobId(oid, new TextEncoder().encode(lf)) === oid) ||
+        // Skipped only when `start-content.ts` can undo it: the blob with every
+        // line ending turned into CRLF. Mixed endings get a copy.
+        (oid !== undefined &&
+          lf !== text &&
+          lf?.replaceAll("\n", "\r\n") === text &&
+          blobId(oid, new TextEncoder().encode(lf)) === oid) ||
         identity.startPath(project, file) !== rel
       ) {
         return;

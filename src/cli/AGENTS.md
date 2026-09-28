@@ -108,8 +108,10 @@ A module-level `Map` or array that grows at run time is a bug.
   never feed their output into an identity check, or symlink aliases can
   borrow another file's suppressions and excuses again.
 - **Start content comes from git without running anything the agent set up.**
-  Only `cat-file blob` with `--no-lazy-fetch`, never `--filters` or
-  `--textconv`, and `adapters/git.ts` turns off fsmonitor and hooks.
+  Only `cat-file blob` and `ls-tree`, both with `--no-lazy-fetch`, never
+  `--filters` or `--textconv`, and `adapters/git.ts` turns off fsmonitor and
+  hooks. SessionStart's copies of dirty files (`session/start-copies.ts`) are
+  trusted only when their SHA-256 matches the start manifest.
 - **Escalation ordering is policy.** PostToolUse computes escalation before
   recording the edit, old and context findings don't count, and Stop counts
   fresh and continuing turns differently. Don't hide it in a wrapper.
