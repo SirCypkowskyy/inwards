@@ -48,6 +48,8 @@ Type: string. Default: `"."`.
 
 The directory, relative to `pyproject.toml`, that module names are computed from. With `root = "src"`, `src/shop/domain/order.py` is the module `shop.domain.order`.
 
+One config has one root. In a uv workspace whose members each have their own `src/` (`src/packages/core/src/core`), a config at the workspace root names that package `packages.core.src.core`, and other members' `import core` passes as a third-party import. `inwards check` warns about each such member ([INW006](../rules/INW006.md)); give each member its own `[tool.inwards]` and check it with `--config <member>/pyproject.toml` until [#57](https://github.com/SirCypkowskyy/inwards/issues/57) lands.
+
 ### `layers` { #layers }
 
 Type: array of tables, at least one. Required.

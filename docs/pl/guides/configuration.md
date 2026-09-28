@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 41aafa3c28bc92bb05b77a3d2de06dc91439a465be5153c72627179ecff1c959
+source_hash: bd93f7a3ddcc33011a425df36a96eaa9656def22772cf9d98e7621c9ab3556a3
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -52,6 +52,8 @@ Konfiguracja, którą schemat przyjmuje, może więc nadal być błędna, a komu
 Typ: tekst. Domyślnie: `"."`.
 
 Katalog, względem `pyproject.toml`, od którego liczone są nazwy modułów. Przy `root = "src"` plik `src/shop/domain/order.py` to moduł `shop.domain.order`.
+
+Jedna konfiguracja ma jeden root. W workspace'ie uv, którego członkowie mają własne `src/` (`src/packages/core/src/core`), konfiguracja w katalogu głównym workspace'u nazywa ten pakiet `packages.core.src.core`, a `import core` w innych członkach przechodzi jako import biblioteki zewnętrznej. `inwards check` ostrzega o każdym takim członku ([INW006](../rules/INW006.md)); daj każdemu członkowi własne `[tool.inwards]` i sprawdzaj go przez `--config <member>/pyproject.toml`, dopóki nie wejdzie [#57](https://github.com/SirCypkowskyy/inwards/issues/57).
 
 ### `layers` { #layers }
 

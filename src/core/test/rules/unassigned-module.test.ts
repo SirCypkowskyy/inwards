@@ -1,12 +1,24 @@
 /**
  * @file INW006 unassigned-module: imports into code outside every layer, files
- * outside every layer, and layer prefixes that match nothing. The session
- * checks (a prefix emptied or layer code moved) are covered too.
+ * outside every layer, layer prefixes that match nothing, and nested projects
+ * (uv workspace members) under the root. The session checks (a prefix emptied
+ * or layer code moved) are covered too.
  */
 import { describe, expect, test } from "bun:test";
-import { parseConfig } from "../../src/index.ts";
-import { checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
+import { type PathKind, parseConfig } from "../../src/index.ts";
+import { checkNestedProjects, checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
 import { check, engine, file, OWNERS, PROJECT } from "../support/helpers.ts";
+
+/**
+ * Builds a path probe that sees a pyproject.toml in the given directories only.
+ *
+ * @param dirs - root-relative directories that hold a pyproject.toml.
+ * @returns a probe answering "file" for those pyproject.toml paths.
+ */
+function hasPyproject(...dirs: string[]): PathKind {
+  return (rel: string): ReturnType<PathKind> =>
+    dirs.some((dir) => rel === `${dir}/pyproject.toml`) ? "file" : undefined;
+}
 
 describe("INW006 unassigned-module", () => {
   test("a layer importing first-party code outside every layer is an error", () => {
@@ -97,5 +109,64 @@ layers = [
     expect(rest).toEqual([]);
     expect(d).toMatchObject({ severity: "error", file: "pyproject.toml" });
     expect(d?.message).toContain("matched modules when the session started");
+  });
+
+  describe("nested projects", () => {
+    const workspace = `[tool.inwards]
+root = "src"
+layers = [{ name = "core", modules = ["packages.core.src.core"] }]
+`;
+    const members = parseConfig(workspace);
+    const toml = { path: "pyproject.toml", text: workspace };
+    const modules = new Set([
+      "packages.core.src.core",
+      "packages.core.src.core.leak",
+      "services.app.src.app",
+      "tools.src.helper",
+    ]);
+
+    test("a member with its own pyproject.toml and a src folder warns, naming it", () => {
+      const kind = hasPyproject("packages/core", "services/app");
+      const found = checkNestedProjects(members, toml, { modules, kind, shownRoot: "src" });
+      expect(found.map((d) => [d.code, d.severity, d.line])).toEqual([
+        ["INW006", "warning", 2],
+        ["INW006", "warning", 2],
+      ]);
+      expect(found[0]?.message).toContain("src/packages/core is a nested project");
+      expect(found[0]?.message).toContain(
+        "indexed as packages.core.src.core, so an import of core",
+      );
+      expect(found[1]?.message).toContain("src/services/app");
+      expect(found[0]?.fix?.steps[0]).toContain("--config src/packages/core/pyproject.toml");
+    });
+
+    test("a src folder without a pyproject.toml, or at the root, stays quiet", () => {
+      const single = new Set(["src.shop.domain", "tools.src.helper"]);
+      expect(
+        checkNestedProjects(members, toml, {
+          modules: single,
+          kind: hasPyproject(""),
+          shownRoot: "",
+        }),
+      ).toEqual([]);
+    });
+
+    test("with the root at the workspace, a member under a top-level src/ is still found", () => {
+      const deep = new Set(["src.packages.core.src.core.leak", "src.shop"]);
+      const kind = hasPyproject("src/packages/core");
+      const found = checkNestedProjects(members, toml, { modules: deep, kind, shownRoot: "" });
+      expect(found.map((d) => d.message)).toEqual([
+        expect.stringContaining("src/packages/core is a nested project"),
+      ]);
+    });
+
+    test("[tool.inwards.rules] can turn it off", () => {
+      const off = parseConfig(`${workspace}
+[tool.inwards.rules]
+ignore = ["INW006"]
+`);
+      const kind = hasPyproject("packages/core");
+      expect(checkNestedProjects(off, toml, { modules, kind, shownRoot: "src" })).toEqual([]);
+    });
   });
 });
