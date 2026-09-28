@@ -2,7 +2,9 @@
  * @file `inwards check` output paths on every OS: diagnostics and SARIF use
  * forward slashes. A `--config` spelled through a link to the project names
  * files from the real cwd (the macOS /var case). A named path outside the
- * config root is reported in every format instead of passing as clean (#200).
+ * config root is reported in every format instead of passing as clean (#200),
+ * and a uv workspace checked from its root warns about each member instead of
+ * passing silently (#201).
  */
 import { expect, test } from "bun:test";
 import { symlinkSync } from "node:fs";
@@ -197,4 +199,29 @@ test("a named path that doesn't exist is a usage error", () => {
   expect(code).toBe(2);
   expect(stdout).toBe("");
   expect(stderr).toBe("nope.py is not a file or directory.\n");
+test("a uv workspace checked from its root warns about each member, not All clear alone", () => {
+  const root = project({
+    "pyproject.toml": `[tool.uv.workspace]
+members = ["src/packages/*", "src/services/*"]
+
+[tool.inwards]
+root = "src"
+layers = [
+  { name = "core", modules = ["packages.core.src.core"] },
+  { name = "app", modules = ["services.app.src.app"] },
+]
+`,
+    "src/packages/core/pyproject.toml": "",
+    "src/packages/core/src/core/__init__.py": "",
+    "src/packages/core/src/core/leak.py": "import app\n",
+    "src/services/app/pyproject.toml": "",
+    "src/services/app/src/app/__init__.py": "",
+  });
+  const { code, stdout } = inwards(["check"], { cwd: root });
+  expect(code).toBe(0);
+  expect(stdout).toContain(
+    "src/packages/core is a nested project with its own pyproject.toml: its code is indexed as packages.core.src.core",
+  );
+  expect(stdout).toContain("inwards check --config src/services/app/pyproject.toml");
+  expect(stdout).toContain(" 3 files, 0 violations, 2 warnings ");
 });

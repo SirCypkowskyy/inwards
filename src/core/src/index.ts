@@ -51,4 +51,8 @@ export {
   rootPathOf,
 } from "./rules/package-shape/shape.ts";
 export { layerIndexOf } from "./rules/shared/layer-ownership.ts";
-export { checkMoves, checkPrefixes } from "./rules/unassigned-module/layout.ts";
+export {
+  checkMoves,
+  checkNestedProjects,
+  checkPrefixes,
+} from "./rules/unassigned-module/layout.ts";

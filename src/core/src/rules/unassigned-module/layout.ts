@@ -2,7 +2,8 @@
  * @file INW006 layout checks against pyproject.toml: layer prefixes that match no
  * module (a warning for one dead prefix, an error when a whole layer matches
  * nothing or a prefix stopped matching during the session), and layer code
- * moved out of every layer during a session.
+ * moved out of every layer during a session, and nested projects (uv workspace
+ * members) whose code gets path-derived names nothing imports it by.
  *
  * `[tool.inwards.rules]` applies to `checkPrefixes` without a session start
  * only. The session comparison (a prefix emptied since the start, layer code
@@ -14,6 +15,7 @@ import type { InwardsConfig } from "../../config/parse.ts";
 import { applyRules } from "../../config/rule-settings.ts";
 import { type ConfigFile, spanOf } from "../../config/source-span.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
+import type { PathKind } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { layerIndexOf } from "../shared/layer-ownership.ts";
 import { holdsLayer, unassignedPackage } from "./imports.ts";
@@ -77,6 +79,64 @@ function prefixFindings(
     }
   }
   return found;
+}
+
+/**
+ * Warns about nested projects under the config root: a directory with its own
+ * pyproject.toml whose code sits in a `src/` folder, as in a uv workspace
+ * (`packages/core/src/core`). Its package is indexed as `packages.core.src.core`,
+ * but other code imports it as `core`, which matches no module and so passes
+ * as a third-party import: a layer violation between members goes unseen.
+ * Until one config can name several roots (#57), each member needs its own.
+ *
+ * @param config - the config, for its root and `[tool.inwards.rules]`.
+ * @param file - the pyproject.toml, to point at `root`.
+ * @param tree - what is under the config root.
+ * @param tree.modules - every first-party module now.
+ * @param tree.kind - probes a path relative to the config root.
+ * @param tree.shownRoot - the config root as report paths show it (`""` or `src`).
+ * @returns one warning per nested project.
+ */
+export function checkNestedProjects(
+  config: InwardsConfig,
+  file: ConfigFile,
+  { modules, kind, shownRoot }: { modules: ReadonlySet<string>; kind: PathKind; shownRoot: string },
+): Diagnostic[] {
+  const nested = new Map<string, Set<string>>();
+  for (const module of modules) {
+    const parts = module.split(".");
+    const src = parts.indexOf("src");
+    // A package right under a `src` below the root; `src` at the root itself is a single project.
+    if (src < 1 || src + 1 >= parts.length) {
+      continue;
+    }
+    const dir = parts.slice(0, src).join("/");
+    const packages = nested.get(dir) ?? new Set<string>();
+    packages.add(parts.slice(0, src + 2).join("."));
+    nested.set(dir, packages);
+  }
+  const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
+  const found = [...nested]
+    .filter(([dir]) => kind(`${dir}/pyproject.toml`) === "file")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dir, packages]) => {
+      const shown = [shownRoot, dir].filter(Boolean).join("/");
+      const names = [...packages].sort();
+      const short = names.map((name) => name.split(".").at(-1) ?? name);
+      return diagnostic(RULES.INW006, source, {
+        span: spanOf(file.text, config.root),
+        severity: "warning",
+        message: `${shown} is a nested project with its own pyproject.toml: its code is indexed as ${names.join(", ")}, so an import of ${short.join(", ")} is taken for a third-party import and not checked.`,
+        fix: {
+          summary: `Check ${shown} with its own [tool.inwards].`,
+          steps: [
+            `Give ${shown}/pyproject.toml its own [tool.inwards] and run \`inwards check --config ${shown}/pyproject.toml\`, once per workspace member.`,
+            "One config can't cover several source roots yet (#57). Don't edit [tool.inwards] yourself; tell the user.",
+          ],
+        },
+      });
+    });
+  return applyRules(found, config.rules);
 }
 
 /** SHA-256 of an empty file: every empty `__init__.py` has it, so it proves no move. */

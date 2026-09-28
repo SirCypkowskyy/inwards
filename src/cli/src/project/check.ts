@@ -6,6 +6,7 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkNestedProjects,
   checkPrefixes,
   checkRequired,
   checkSelectors,
@@ -238,7 +239,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
 /**
  * Loads the config and engine, then checks the Python files under the targets.
  * A whole-project run (no targets) also checks the layer prefixes and shape
- * selectors against the modules found (INW006, INW007), every shaped
+ * selectors against the modules found (INW006, INW007), warns about nested
+ * projects such as uv workspace members (INW006), every shaped
  * package's required members (INW008) and the import cycles among the
  * checked files (INW004). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
@@ -286,7 +288,8 @@ export async function runCheck(
   const { files, loaded } = loadSources(io, project, { targets, base, texts });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
-  const index = project.engine.index(projectFiles(io, project));
+  const listing = projectFiles(io, project);
+  const index = project.engine.index(listing);
   // A whole-project run also looks for import cycles (INW004), which one file can't show.
   const whole = targets === undefined;
   const { diagnostics, suppressed } = project.engine.check(files, index, accepted, { whole });
@@ -299,6 +302,7 @@ export async function runCheck(
     diagnostics.unshift(
       ...checkPrefixes(project.config, modules, pyproject),
       ...checkSelectors(project.config, packages, pyproject),
+      ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
     );
     diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
   } else if (required) {
