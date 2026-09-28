@@ -5,6 +5,7 @@
  * `main.ts`; nothing else in the CLI reads `process` for these.
  */
 import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import process from "node:process";
 import type { Clock, Runtime } from "../platform/contracts.ts";
 
@@ -15,6 +16,7 @@ import type { Clock, Runtime } from "../platform/contracts.ts";
  */
 export function readRuntime(): Runtime {
   const { env } = process;
+  const xdgState = env["XDG_STATE_HOME"] ?? "";
   return {
     cwd: process.cwd(),
     claudeProjectDir: env["CLAUDE_PROJECT_DIR"] || undefined,
@@ -24,6 +26,8 @@ export function readRuntime(): Runtime {
     noColor: Boolean(env["NO_COLOR"]),
     noCache: Boolean(env["INWARDS_NO_CACHE"]),
     home: homedir(),
+    // The XDG spec says a relative value is invalid and must be ignored.
+    stateHome: isAbsolute(xdgState) ? xdgState : join(homedir(), ".local", "state"),
     platform: process.platform,
     pid: process.pid,
     execPath: process.execPath,

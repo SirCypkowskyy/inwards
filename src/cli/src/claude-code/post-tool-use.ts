@@ -217,7 +217,7 @@ function reply(
  * @returns the limit, and whether every error in the run reached it; undefined when none did.
  */
 export function escalationOf(
-  io: Pick<Platform, "probe" | "read" | "state">,
+  io: Pick<Platform, "probe" | "read" | "state" | "runtime">,
   { project, id }: { project: string; id: unknown },
   configPath: string,
   diagnostics: readonly Diagnostic[],

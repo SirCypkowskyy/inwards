@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 1a4258e69ec2a80d3d515a7a6833ae44e152bc7af149ffd089cd0407ba6dc740
+source_hash: 3d501592b863f842d40c66e78cd12a3d5682c50fd45c4018f0eef7cb9a92e6cf
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -45,6 +45,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :white_check_mark: Przyjęty |
 | [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie | :white_check_mark: Przyjęty |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :white_check_mark: Przyjęty |
+| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1031,3 +1032,36 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - **Da się ją wyciszyć, w przeciwieństwie do INW004.** Każda diagnostyka FAPI003 ma własną linię (wywołanie `APIRouter(...)`, wywołanie `include_router`, które zamyka cykl), więc wyciszenie w niej dotyczy jednej decyzji. INW004 nie da się wyciszyć, bo komentarz stałby przy jednym z wielu importów.
 - **Tylko sprawdzane pliki, względem całego grafu.** Częściowe sprawdzenie (ścieżka w argumencie, Stop gate) buduje graf aplikacji i routerów ze wszystkich plików FastAPI w projekcie i zgłasza tylko w plikach, które sprawdza. Stop gate zgłasza więc router, który sesja utworzyła lub zmieniła, a router niepodpięty już na starcie sesji jest starym błędem.
 - **Hook edycji i edytor zgłaszają tylko diagnostyki z jednego pliku.** Utworzenie routera i podpięcie go do aplikacji to dwie edycje. Graf budują jednak wtedy, gdy plik wycisza FAPI003, żeby wyciszenie liczyło się jako użyte, a nie zamieniało w ostrzeżenie INW009, a potem odrzucają to, co znalazły.
+
+## ADR-038: Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart { #adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart }
+
+**Stan:** Przyjęty · 2026-09-28 · [#88](https://github.com/SirCypkowskyy/inwards/issues/88)
+
+**Kontekst.** Stop gate ufa plikowi `.inwards/state/<id>.start.json`: konfiguracjom, HEAD i skrótom plików, od których zaczęła się sesja. Config guard trzyma od niego z daleka narzędzia plikowe agenta, ale Bash dociera do niego na sposoby, których żaden wzorzec nie widzi. Przegląd #23 pokazał pełne obejście: poluzować `[tool.inwards]` przez `sed`, `d=.inw; rm -rf ${d}ards/state`, a potem przekazać do `I=inwards; $I hook claude-code` ładunek `SessionStart` z `source: startup` i tym samym identyfikatorem sesji. Hook zapisuje nowy start z poluzowanego projektu i Stop przechodzi. Częściowe odtworzenie (usunięcie samego `<id>.start.json`) też działało, a od #157 zapisuje także kopie własnych edycji agenta. Ten sam Bash może usunąć hook Stop z `settings.local.json`; Claude Code od razu przeładowuje hooki, więc Stop gate tej sesji w ogóle się nie uruchamia. Każdy stan, który trzyma Inwards, może zapisać użytkownik, na którym działa agent, więc żaden lokalny zapis nie jest odporny na podrobienie. Celem jest, żeby takie zmiany wychodziły na jaw przy Stop, bez blokowania użytkownika, który zmienił `[tool.inwards]` przed sesją i jeszcze tego nie zatwierdził.
+
+**Decyzja.**
+
+- **Kopia poza projektem.** SessionStart zapisuje ten sam zapis startu drugi raz, do `$XDG_STATE_HOME/inwards/sessions/<skrót ścieżki projektu>/<id>.start.json` (bez tej zmiennej `~/.local/state`), przycinany tylko według wieku (tydzień). Limit liczby sesji pozwoliłby zalewowi zmyślonych sesji, uruchomionych przez hook, wypchnąć kopię prawdziwej sesji przed odtworzeniem, więc go nie ma, a resume, compact i każdy Stop odświeżają kopię, więc kopia trwającej sesji nigdy się nie starzeje. Platforma dostaje `Runtime.stateHome` i `StateFiles.outsideDir`.
+- **Odtworzenie zachowuje oryginał.** SessionStart typu `startup` albo `clear` dla sesji, której pliku startu już nie ma, ale której kopia istnieje, to odtworzenie: kopia wraca jako plik startu, a do dziennika sesji trafia zdarzenie `replay`. Resume i compact działają jak dotąd: nigdy nie tworzą startu.
+- **Czytający wolą kopię.** `readSession` i `readSessionStart` biorą kopię, gdy istnieje, i mówią, jak wypada wobec niej zapis w projekcie: zachowany, usunięty, przepisany albo bez kopii. Hooki edycji też więc używają oryginalnego startu.
+- **Stop zgłasza to, co się nie zgadza.** Zapisane odtworzenie, usunięty zapis i przepisany zapis blokują, każdy z własnym komunikatem, obok tego, co wykaże porównanie z oryginalnym startem (zmieniona konfiguracja, nowe naruszenia). Eskalują jak każda inna blokada, więc ostatni Stop pokazuje listę użytkownikowi.
+- **Zatwierdzona konfiguracja tylko tam, gdzie nie ma kopii.** Zapisowi bez kopii (sesja ze starszej wersji Inwards, usunięta kopia albo katalog stanu, którego nie dało się zapisać) Inwards ufa tylko wtedy, gdy każda jego konfiguracja jest tą z HEAD na starcie, czytaną przez `git --no-lazy-fetch cat-file blob`, nigdy przez `git show`, które mogłoby uruchomić filtry agenta. Sesja z kopią nigdy tego porównania nie robi, więc niezatwierdzona zmiana konfiguracji zrobiona przez użytkownika przed sesją przechodzi.
+- **Brakujący hook Stop zgłasza następny SessionStart.** Gdy któraś warstwa ustawień wciąż ma hooki Inwards, ale żadna nie ma hooka Stop, SessionStart mówi o tym użytkownikowi w `systemMessage`, a modelowi w `additionalContext`. Stop gate sesji, która go usunęła, nie może się uruchomić, więc nie może tego zgłosić.
+- **Brak jakiegokolwiek zapisu też kończy się informacją dla użytkownika.** Gdy nie ma ani pliku startu, ani kopii, ostatni Stop kończy teraz turę z `systemMessage`, a nie po cichu.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Odtworzenie z #88 i częściowe z #157 oblewają Stop gate z komunikatem, który nazywa odtworzenie, a zmieniona konfiguracja jest zgłaszana względem oryginalnego startu.
+- :material-plus-circle-outline: Własna zmiana konfiguracji użytkownika przed sesją, `/clear`, resume i kompaktowanie działają jak wcześniej.
+- :material-minus-circle-outline: Kopia to próg zwalniający. Agent, który przed odtworzeniem usunie albo podrobi też `~/.local/state/inwards/sessions/...`, dostaje świeży punkt odniesienia. Dokumentacja wymienia pozostałe warstwy: `permissions.deny`, CODEOWNERS i `inwards check` w CI.
+- :material-minus-circle-outline: Hook Stop usunięty w trakcie sesji wyłącza bramkę tej sesji; ostrzeżenie przychodzi sesję później i tylko wtedy, gdy SessionStart wciąż się uruchamia.
+- :material-minus-circle-outline: Inwards pisze teraz poza projektem, w katalogu stanu użytkownika. Zapis kopii jest najlepszym wysiłkiem: gdy katalogu stanu nie da się zapisać (katalog domowy tylko do odczytu w kontenerze CI albo w piaskownicy agenta), SessionStart i tak się udaje, raz informuje użytkownika, a sesja wraca do porównania z zatwierdzoną konfiguracją.
+- :material-minus-circle-outline: Git starszy niż 2.44 nie ma `--no-lazy-fetch`. Poza częściowym klonem nic nie może zostać pobrane, więc zatwierdzona konfiguracja jest czytana bez tej flagi. W częściowym klonie (`extensions.partialClone` albo zdalne repozytorium z `promisor` lub `partialclonefilter`) nie jest czytana, a zapis bez kopii blokuje z komunikatem, że konfiguracji nie dało się sprawdzić i że pomoże nowszy git albo katalog stanu z prawem zapisu.
+- :material-minus-circle-outline: Zalew zmyślonych sesji tylko dodaje małe pliki kopii, które znikają po tygodniu.
+
+**Alternatywy.**
+
+- *Zawsze porównywać konfigurację startu z zatwierdzoną:* wykrywa odtworzenie bez kopii, ale blokuje każdą sesję, która zaczyna się z niezatwierdzoną zmianą konfiguracji, a tak właśnie użytkownicy zmieniają warstwy.
+- *Czytać transkrypt Claude Code i odrzucać start zapisany po pierwszym użyciu narzędzia w sesji:* `transcript_path` w ładunku Stop pochodzi od Claude Code, ale format transkryptu nie jest publicznym kontraktem, plik bywa duży, agent może go zapisać tak samo, a OpenCode go nie ma.
+- *Znacznik poza projektem przy pierwszym wywołaniu narzędzia w PreToolUse:* to samo polecenie Bash, które usuwa stan, może usunąć znacznik przed odtworzeniem.
+- *Podpisywać zapis startu:* klucz leżałby tam, gdzie użytkownik agenta może go odczytać.

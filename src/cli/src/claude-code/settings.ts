@@ -6,10 +6,11 @@
  * local (`.claude/settings.local.json`). Managed enterprise settings are not read.
  *
  * Claude Code reloads hooks when a settings file changes, so an agent that
- * deletes the Stop hook switches the gate off at once; this check can't see
- * that. It catches the hooks the gate depends on (SessionStart, PreToolUse,
+ * deletes the Stop hook switches the gate off at once; the gate can't see
+ * that. It catches the hooks it depends on (SessionStart, PreToolUse,
  * PostToolUse) going missing, and the config guard (`config-guard.ts`) is what stops
- * the edit itself.
+ * the edit itself. A Stop hook deleted through Bash is reported by the next
+ * SessionStart instead (`stopHookProblem`, #88), to the user.
  * It matches names, not programs: an entry that runs some other `inwards`
  * binary or `main.ts` passes, so it proves the configuration, not what runs.
  */
@@ -80,11 +81,7 @@ export function settingsProblem(
   io: { read: Pick<FileReader, "text">; runtime: Pick<Runtime, "claudeConfigDir" | "home"> },
   project: string,
 ): string | undefined {
-  const layers = [
-    join(userSettingsDir(io.runtime), "settings.json"),
-    join(project, ".claude", "settings.json"),
-    join(project, ".claude", "settings.local.json"),
-  ].map((path) => readSettings(io.read, path));
+  const layers = settingsLayers(io, project);
   // The highest layer that sets disableAllHooks decides, as in Claude Code.
   const disabled = layers
     .map((s) => s?.["disableAllHooks"])
@@ -101,6 +98,53 @@ export function settingsProblem(
   const hooks = missing.length === 1 ? "hook is" : "hooks are";
   const names = new Intl.ListFormat("en", { type: "conjunction" }).format(missing);
   return `The Inwards ${names} ${hooks} missing from every Claude Code settings file.`;
+}
+
+/**
+ * Says when the Inwards Stop hook is gone while other Inwards hooks are still
+ * installed: the trace of an agent that deleted it through Bash, which
+ * switched the Stop gate off for the rest of its session (#88). Settings with
+ * no Inwards hook at all say nothing, since then the hooks come from
+ * somewhere these layers don't show (managed settings, a test).
+ *
+ * @param io - reads the settings files and knows where the user's live.
+ * @param io.read - reads a settings file.
+ * @param io.runtime - `CLAUDE_CONFIG_DIR` and the home directory.
+ * @param project - the project root.
+ * @returns the warning for the user, or undefined when the Stop hook is in place.
+ */
+export function stopHookProblem(
+  io: { read: Pick<FileReader, "text">; runtime: Pick<Runtime, "claudeConfigDir" | "home"> },
+  project: string,
+): string | undefined {
+  const layers = settingsLayers(io, project);
+  const ours = [...REQUIRED_EVENTS, "Stop"].some((event) =>
+    layers.some((settings) => hasInwardsHook(settings, event)),
+  );
+  if (!ours || layers.some((settings) => hasInwardsHook(settings, "Stop"))) {
+    return undefined;
+  }
+  return "The Inwards Stop hook is missing from every Claude Code settings file while the other Inwards hooks are there, so the Stop gate won't run. If nobody removed it on purpose, an agent may have edited the settings: restore it with `inwards init --agent claude` and review the last session's changes.";
+}
+
+/**
+ * Reads the settings layers Inwards looks at, lowest precedence first.
+ *
+ * @param io - reads the settings files and knows where the user's live.
+ * @param io.read - reads a settings file.
+ * @param io.runtime - `CLAUDE_CONFIG_DIR` and the home directory.
+ * @param project - the project root.
+ * @returns the user, project and local settings, each undefined when absent or unreadable.
+ */
+function settingsLayers(
+  io: { read: Pick<FileReader, "text">; runtime: Pick<Runtime, "claudeConfigDir" | "home"> },
+  project: string,
+): (Record<string, unknown> | undefined)[] {
+  return [
+    join(userSettingsDir(io.runtime), "settings.json"),
+    join(project, ".claude", "settings.json"),
+    join(project, ".claude", "settings.local.json"),
+  ].map((path) => readSettings(io.read, path));
 }
 
 /**
