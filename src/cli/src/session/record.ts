@@ -5,9 +5,10 @@
  *
  * Two files per session in `.inwards/state/`:
  *
- * - `<id>.start.json`: HEAD, every `[tool.inwards]` table in the project and a
- *   content-hash manifest. Written once, at startup or /clear, to a temporary
- *   file that is then renamed, so a reader never sees half of it.
+ * - `<id>.start.json`: HEAD, every `[tool.inwards]` table in the project, a
+ *   content-hash manifest and the symlinks in layer packages. Written once,
+ *   at startup or /clear, to a temporary file that is then renamed, so a
+ *   reader never sees half of it.
  * - `<id>.jsonl`: one small event per line (edits, resumes). Hooks run in
  *   parallel, so nothing rewrites it; each hook appends one short line.
  * - `<id>.content.json`: copies of the Python files git can't give back as
@@ -29,7 +30,7 @@ import type { Diagnostic, InwardsConfig } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { baselineHashes } from "../project/baseline.ts";
-import { projectConfigs, projectManifest, projectPath } from "../project/snapshot.ts";
+import { projectConfigs, projectLinks, projectManifest, projectPath } from "../project/snapshot.ts";
 import { fingerprint } from "./fingerprint.ts";
 import { copiesName, startCopier } from "./start-copies.ts";
 
@@ -54,6 +55,11 @@ export interface SessionStart {
   manifest: Record<string, string>;
   /** Each config's inwards-baseline.json SHA-256, by config path (absent in older state files). */
   baselines?: Record<string, string>;
+  /**
+   * The symlinks in layer packages: project-relative link path to its real
+   * target (absent in older state files, where every link counts as new).
+   */
+  links?: Record<string, string>;
 }
 
 /** One line of the session log. */
@@ -129,6 +135,7 @@ export function recordStart(io: SessionIo, project: string, id: string, source: 
     invalid,
     manifest,
     baselines,
+    links: projectLinks(io, project, configs),
   };
   io.state.publish(dir, `${id}.start.json`, JSON.stringify(start));
 }

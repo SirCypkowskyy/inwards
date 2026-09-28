@@ -17,6 +17,7 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  checkLinks,
   checkMoves,
   checkPrefixes,
   checkRequired,
@@ -27,20 +28,29 @@ import {
   packagesOf,
 } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
+import type { PathProbe } from "../platform/contracts.ts";
+import { linksUnder } from "../project/links.ts";
 import type { StartIdentity } from "./start-identity.ts";
 
 /**
  * Finds the layout errors this session introduced, per config: emptied
- * prefixes, moved layer code, and missing required members.
+ * prefixes, moved layer code, missing required members, and symlinks in
+ * layers that hide code from the rules (`checkLinks`). A start record
+ * without links (an older state file) makes every such link new: fail closed.
  *
  * @param project - the real project root.
  * @param configs - the valid configs now, and each one's pyproject.toml text for locating
  *   findings, by project-relative path (the same as at start, or the gate fails anyway).
  * @param configs.valid - the parsed configs.
  * @param configs.texts - their pyproject.toml texts.
- * @param before - the session-start manifest: project-relative Python path to content hash.
- * @param now - the manifest now.
- * @returns the new errors, located in each pyproject.toml.
+ * @param manifests - project-relative Python path to content hash, at start and now.
+ * @param manifests.before - the session-start manifest.
+ * @param manifests.now - the manifest now.
+ * @param links - the symlinks in layer packages, at start and now, and a real-path probe.
+ * @param links.before - project-relative link path to its project-relative real target, at start.
+ * @param links.now - the same, now.
+ * @param links.probe - resolves each config root's real path.
+ * @returns the new errors, located in each pyproject.toml, or at the link for a link.
  */
 export function newLayoutErrors(
   project: string,
@@ -48,8 +58,15 @@ export function newLayoutErrors(
     valid: configs,
     texts,
   }: { valid: Record<string, InwardsConfig>; texts: Readonly<Record<string, string>> },
-  before: Readonly<Record<string, string>>,
-  now: Readonly<Record<string, string>>,
+  {
+    before,
+    now,
+  }: { before: Readonly<Record<string, string>>; now: Readonly<Record<string, string>> },
+  links: {
+    before: Readonly<Record<string, string>> | undefined;
+    now: Readonly<Record<string, string>>;
+    probe: Pick<PathProbe, "realpath">;
+  },
 ): Diagnostic[] {
   return Object.entries(configs).flatMap(([rel, config]) => {
     const path = join(project, rel);
@@ -73,8 +90,40 @@ export function newLayoutErrors(
     const emptied = checkPrefixes(config, isSet, file, wasSet).filter(
       (d) => d.severity === "error" && !atStart.has(d.message),
     );
-    return [...emptied, ...checkMoves(config, was, is, file), ...missing];
+    const realRoot = links.probe.realpath(root) ?? root;
+    const shownRoot = posix(relative(project, root));
+    const linked = checkLinks(
+      config,
+      {
+        links: linksUnder(absolute(project, links.now), root, realRoot),
+        modules: isSet,
+        shownRoot,
+      },
+      {
+        links: linksUnder(absolute(project, links.before ?? {}), root, realRoot),
+        modules: wasSet,
+        shownRoot,
+      },
+    );
+    return [...emptied, ...checkMoves(config, was, is, file), ...missing, ...linked];
   });
+}
+
+/**
+ * Turns recorded links back into absolute paths.
+ *
+ * @param project - the real project root.
+ * @param links - project-relative link path to its project-relative real target.
+ * @returns each link and target, absolute.
+ */
+function absolute(
+  project: string,
+  links: Readonly<Record<string, string>>,
+): { path: string; target: string }[] {
+  return Object.entries(links).map(([path, target]) => ({
+    path: join(project, path),
+    target: join(project, target),
+  }));
 }
 
 /**

@@ -21,7 +21,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Dokumentacja budowana Zensicalem, serwowana przez Cloudflare Workers | :material-swap-horizontal: Hosting zastąpiony przez 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Zmiana nazwy ze Stratum na Inwards | :white_check_mark: Przyjęty |
 | [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publikuj dokumentację na GitHub Pages, na razie | :white_check_mark: Przyjęty, wdrażana z `develop` od 019 |
-| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Rzeczywiste ścieżki dla granicy, ścieżki importu dla nazw modułów | :white_check_mark: Przyjęty |
+| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Rzeczywiste ścieżki dla granicy, ścieżki importu dla nazw modułów | :white_check_mark: Przyjęty, dowiązania symboliczne w warstwach ukrywające kod zgłaszane od [#83](https://github.com/SirCypkowskyy/inwards/issues/83) i [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
 | [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Zgłaszaj pliki, których zadeklarowane kodowanie może ukryć importy | :white_check_mark: Przyjęty |
 | [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Sprawdzaj dosłowne importy dynamiczne jako INW011 | :white_check_mark: Przyjęty, niesprawdzalne cele zgłaszane od 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Wersje i wydania wynikają z typów commitów, przez release PR | :material-swap-horizontal: Model gałęzi zastąpiony przez 019 |
@@ -273,6 +273,16 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 - :material-minus-circle-outline: Plik, który naprawdę ma dwie nazwy modułu, może zostać zgłoszony dwa razy, raz dla każdej nazwy. Obie są prawdziwymi ścieżkami importu, więc oba zgłoszenia są prawdziwe.
 
 **Alternatywy.** *Tylko ścieżki rzeczywiste*: zmienia nazwy dowiązanych plików i ukrywa warstwy. *Tylko ścieżki leksykalne*: pozwala dowiązaniu sięgnąć poza projekt. *Brak obsługi dowiązań symbolicznych*: pakiety dowiązane do projektu pozostawałyby niesprawdzone bez żadnego ostrzeżenia.
+
+**Poprawka · 2026-09-28 · [#83](https://github.com/SirCypkowskyy/inwards/issues/83), [#84](https://github.com/SirCypkowskyy/inwards/issues/84).** Dwa rodzaje dowiązań ukrywały kod przed regułami. `ln -s /outside/dir shop/domain/ext` daje importowalny `shop.domain.ext.leak`, którego walker, zgodnie z decyzją wyżej, nigdy nie czyta. `ln -s ../infrastructure shop/domain/infra_alias` daje `shop.domain.infra_alias.db`, kod infrastruktury, który INW001 po nazwie bierze za kod domeny, więc `from shop.domain.infra_alias import db` przechodzi.
+
+- **Dowiązanie symboliczne w warstwie to błąd INW006 w miejscu dowiązania**, gdy jego rzeczywisty cel leży poza katalogiem `root`, w innej warstwie albo nad warstwami (w pakiecie, który je zawiera, albo w `root`). Dowiązanie w obrębie własnej warstwy przechodzi, podobnie jak dowiązanie do kodu poza wszystkimi warstwami: ten kod jest sprawdzany pod nazwą dowiązania. Liczą się dowiązania do katalogu albo do pliku `.py` lub `.pyi`; wiszące dowiązania nie.
+- **Walker wypisuje dowiązania i za nimi nie podąża.** Obejmuje pakiet najwyższego poziomu każdej warstwy (`layerPackages`, [ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)) i sam ten pakiet, gdy jest dowiązaniem, więc katalog `root` złożony z dowiązań do członków workspace'u uv nazywa każde z nich. Silnik dostaje nazwy względem `root` i rozstrzyga.
+- **Zapis startu sesji zawiera dowiązania**: ścieżkę dowiązania i jego rzeczywisty cel. Przy Stop blokuje diagnostyka nowa od startu (nowe dowiązanie albo takie, które wskazuje gdzie indziej), a `[tool.inwards.rules]` nie ma tu zastosowania, tak jak przy przeniesieniu warstwy ([ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)). Dowiązanie, które było na starcie, nie blokuje, jak stare naruszenie w nietkniętym pliku. Zapis startu bez dowiązań, ze starszej wersji, sprawia, że każde takie dowiązanie liczy się jako nowe.
+
+*Konsekwencje:* kod za dowiązaniem spoza `root` nadal nie jest czytany; diagnostyka mówi, że tam jest. Katalog z plikami danych dowiązany do pakietu warstwy spoza `root` też jest zgłaszany. Serwer języka i `inwards check` ze ścieżkami jako argumentami nie zgłaszają dowiązań, tak jak nie zgłaszają martwych prefiksów.
+
+*Alternatywy:* *rozwiązywać każdy import do pliku, który ładuje Python, i brać warstwę z każdej nazwy tego pliku*: dokładne dla #84, ale każdy import wymagałby sprawdzenia rzeczywistej ścieżki przez nowy port silnika, a #83 nic by nie dało. *Sprawdzać cel tylko do odczytu*: czytałoby pliki spoza projektu, co wyklucza decyzja wyżej. *Zgłaszać każde dowiązanie w warstwie*: oznacza aliasy w obrębie warstwy, które ADR-013 celowo wspiera.
 
 ## ADR-014: Zgłaszaj pliki, których zadeklarowane kodowanie może ukryć importy { #adr-014-report-files-whose-declared-encoding-can-hide-imports }
 

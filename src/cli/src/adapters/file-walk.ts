@@ -1,7 +1,8 @@
 /**
  * @file Walking a project tree for its files, behind the `FileWalker` contract.
  * The rules (skips, symlinks, cycles, layer packages walked in full) are
- * described on `collectPythonFiles`.
+ * described on `collectPythonFiles`; `collectLinks` lists the symlinks in a
+ * layer package without following them, for INW006 (#83, #84).
  */
 import { type Dirent, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
@@ -213,8 +214,50 @@ function isPythonFile(name: string): boolean {
   return name.endsWith(".py") || name.endsWith(".pyi");
 }
 
+/**
+ * Lists the symlinks below a directory that Python could import through: to
+ * a directory, or to a `.py` or `.pyi` file. Links are recorded, never
+ * followed, so a link to `/` costs one entry and no walk, and there are no
+ * cycles to guard against. Only hidden entries are skipped: the directories
+ * are layer packages, where a `node_modules` or virtualenv name hides nothing.
+ *
+ * @param dir - the directory to walk; unreadable ones give nothing.
+ * @param out - the links found so far, written in place.
+ * @returns `out`, each link as found with its real target; dangling links are left out.
+ */
+function collectLinks(
+  dir: string,
+  out: { path: string; target: string }[] = [],
+): { path: string; target: string }[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out; // unreadable, or not a directory
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.name.startsWith(".")) {
+      continue;
+    }
+    if (!entry.isSymbolicLink()) {
+      if (entry.isDirectory()) {
+        collectLinks(full, out);
+      }
+      continue;
+    }
+    const kind = linkTargetKind(full);
+    const target = realOrUndefined(full);
+    if (target !== undefined && (kind === "dir" || (kind === "file" && isPythonFile(full)))) {
+      out.push({ path: full, target });
+    }
+  }
+  return out;
+}
+
 /** The walk behind the `FileWalker` contract. */
 export const nodeFileWalker: FileWalker = {
   pythonFiles: collectPythonFiles,
   files: collectFiles,
+  links: collectLinks,
 };

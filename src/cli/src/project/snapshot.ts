@@ -1,7 +1,7 @@
 /**
  * @file What a project looks like right now, as the session start and the Stop gate
- * compare it: every `[tool.inwards]` table, and a content hash per Python
- * file. Paths are project-relative with forward slashes: real paths for
+ * compare it: every `[tool.inwards]` table, a content hash per Python
+ * file, and the symlinks in layer packages. Paths are project-relative with forward slashes: real paths for
  * configs, the paths as walked for the manifest. The filesystem comes in
  * through the injected probe, reader and walker.
  */
@@ -11,6 +11,7 @@ import { ConfigError, declaresInwards, type InwardsConfig, parseConfig } from "@
 import { posix } from "../paths/lexical.ts";
 import type { FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 import { layerDirs } from "./check.ts";
+import { layerLinks } from "./links.ts";
 
 /** What taking a snapshot reads. */
 export interface SnapshotIo {
@@ -138,6 +139,32 @@ export function projectManifest(
     onFile?.(rel, file, bytes);
   }
   return manifest;
+}
+
+/**
+ * Lists the symlinks in every config's layer packages (`layerLinks`), so the
+ * Stop gate can tell a link made during the session from one that was there
+ * at the start. The manifest can't: a link out of the project adds no file
+ * to it (#83).
+ *
+ * @param io - resolves real paths and lists links.
+ * @param project - the real project root.
+ * @param configs - the project's configs, from `projectConfigs`.
+ * @returns each link's real target, both project-relative with forward
+ *   slashes (a target outside the project starts with `..`), by link path.
+ */
+export function projectLinks(
+  io: Pick<SnapshotIo, "probe" | "walk">,
+  project: string,
+  configs: Record<string, InwardsConfig>,
+): Record<string, string> {
+  const links: Record<string, string> = {};
+  for (const [path, config] of Object.entries(configs)) {
+    for (const link of layerLinks(io, join(project, path), config)) {
+      links[posix(relative(project, link.path))] = posix(relative(project, link.target));
+    }
+  }
+  return links;
 }
 
 /**

@@ -55,3 +55,4 @@ export {
   checkNestedProjects,
   checkPrefixes,
 } from "./rules/unassigned-module/layout.ts";
+export { checkLinks, type LayerLink } from "./rules/unassigned-module/links.ts";

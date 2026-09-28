@@ -9,8 +9,9 @@
  *
  * Every core function that returns diagnostics to an adapter applies these
  * settings (`applyRules`), so the CLI, the hooks, the Stop gate and the
- * language server agree. The exception is the session layout comparison in
- * `rules/unassigned-module/layout.ts`: it stops a layer being moved away, so it ignores the table.
+ * language server agree. The exceptions are the session comparisons in
+ * `rules/unassigned-module/layout.ts` and `links.ts`: they stop a layer being
+ * moved away or linked around, so they ignore the table.
  */
 
 import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";

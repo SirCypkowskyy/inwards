@@ -114,6 +114,15 @@ export interface FileWalker {
    * @returns unique paths, sorted.
    */
   files: (paths: string[], match: (name: string) => boolean, open?: readonly string[]) => string[];
+  /**
+   * Lists the symlinks below a directory that Python could import through:
+   * links to a directory or to a `.py` or `.pyi` file. Links are not followed,
+   * and nothing but hidden entries is skipped (the directories are layer packages).
+   *
+   * @param dir - the directory to walk.
+   * @returns each link as found, with its real target; dangling links are left out.
+   */
+  links: (dir: string) => { path: string; target: string }[];
 }
 
 /** Git plumbing that runs nothing the agent could have configured (see `adapters/git.ts`). */

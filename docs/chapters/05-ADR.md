@@ -16,7 +16,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Docs built with Zensical, served by Cloudflare Workers | :material-swap-horizontal: Hosting superseded by 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :white_check_mark: Accepted |
 | [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted, deployed from `develop` since 019 |
-| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted |
+| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted, symlinks in layers that hide code reported since [#83](https://github.com/SirCypkowskyy/inwards/issues/83) and [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
 | [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :white_check_mark: Accepted |
 | [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted, unreadable targets reported since 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :material-swap-horizontal: Branching model superseded by 019 |
@@ -268,6 +268,16 @@ Each record states the decision, the context it was made in, what it costs us, a
 - :material-minus-circle-outline: A file that really has two module names can be reported twice, once per name. Both are real import paths, so both reports are true.
 
 **Alternatives.** *Real paths only*: renames symlinked files and hides layers. *Lexical paths only*: lets a symlink reach outside the project. *No symlink support*: packages linked into a project would go unchecked without any warning.
+
+**Amendment · 2026-09-28 · [#83](https://github.com/SirCypkowskyy/inwards/issues/83), [#84](https://github.com/SirCypkowskyy/inwards/issues/84).** Two links hid code from the rules. `ln -s /outside/dir shop/domain/ext` gives an importable `shop.domain.ext.leak` that the walker never reads, as decided above. `ln -s ../infrastructure shop/domain/infra_alias` gives `shop.domain.infra_alias.db`, infrastructure code that INW001 takes for domain code by its name, so `from shop.domain.infra_alias import db` passes.
+
+- **A symlink inside a layer is an INW006 error at the link** when its real target lies outside the config root, in another layer, or above the layers (the package that holds them, or the root). A link within its layer passes, and so does a link into code outside every layer: that code is checked under the link's name. Links to a directory or to a `.py` or `.pyi` file count; dangling links don't.
+- **The walk lists links and doesn't follow them.** It covers every layer's top-level package (`layerPackages`, [ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)) and the package itself when it is a link, so a root of links to uv workspace members names each link. The engine gets root-relative names and decides.
+- **The session start records the links**, link path to real target. At Stop, a finding that is new since the start (a new link, or one pointing elsewhere) blocks, and `[tool.inwards.rules]` doesn't apply, as for a layer moved away ([ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)). A link that was there at the start doesn't block, like an old violation in an untouched file. A start record without links, from an older version, makes every such link new.
+
+*Consequences:* the code behind a link out of the root is still never read; the finding says it is there. A directory of data files linked into a layer package from outside the root is reported too. The language server and `inwards check` with path arguments don't report links, as they don't report dead prefixes.
+
+*Alternatives:* *resolve each import to the file Python loads and take the layer from every name that file has*: exact for #84, but every import would need a real-path probe through a new engine port, and it does nothing for #83. *Check the target read-only*: would read files outside the project, which the decision above rules out. *Report every link in a layer*: flags aliases within a layer, which ADR-013 supports on purpose.
 
 ## ADR-014: Report files whose declared encoding can hide imports
 
