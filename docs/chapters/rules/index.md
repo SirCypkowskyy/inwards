@@ -31,7 +31,7 @@ Codes reserved for later FastAPI rules, not registered yet (an unknown code is s
 
 | Code | Name | Issue | Status |
 |---|---|---|---|
-| FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | reserved until the #185 spike says go |
+| FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
 | FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planned |
 | FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planned |
 | FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planned |

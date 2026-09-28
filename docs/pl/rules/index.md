@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: dd3d805731cdcfa0d3f944418abbc53b3b9a498effcf7dd90f55f83a68ebf602
+source_hash: ceaf83754a1509d1d760e4aa7719a48f09d99f15d86efeb8c35197a6700e86aa
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -36,7 +36,7 @@ Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (niez
 
 | Kod | Nazwa | Zgłoszenie | Status |
 |---|---|---|---|
-| FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | zarezerwowany, dopóki spike #185 nie da zielonego światła |
+| FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
 | FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planowana |
 | FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planowana |
 | FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planowana |
