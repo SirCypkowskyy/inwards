@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 8dbb001779648a88ac5cb93fdb59a02e2a12e9ae0ac7be5930faff702730bb8b
+source_hash: da51fc54cab7fa9c4251d059f2098df8c0d417848a3ce07026c404c6fe221697
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -43,6 +43,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :white_check_mark: Przyjęty |
 | [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji | :white_check_mark: Przyjęty |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :white_check_mark: Przyjęty |
+| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie | :white_check_mark: Przyjęty |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :white_check_mark: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
@@ -955,6 +956,36 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - *Przeszukiwanie drzewa w poszukiwaniu każdego zagnieżdżonego `pyproject.toml` z `[tool.inwards]`:* obejmuje monorepo bez uv, ale kosztuje przejście drzewa przy każdym uruchomieniu i nie wie, które katalogi należą do siebie.
 - *Flaga `--workspace`:* jawna, ale uruchomienie w katalogu głównym workspace'u już to mówi, a dawne zachowanie w tym miejscu (jedna konfiguracja indeksująca członków po ścieżce) było fałszywą zielenią, przed którą ostrzega #201.
 - *Pomijanie INW010 pod każdym pakietem przestrzeni nazw:* prostsze, ale zmyślony moduł w pakiecie przestrzeni nazw przechodziłby po cichu w każdym projekcie bez `__init__.py`.
+
+## ADR-036: Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie { #adr-036-package-templates-expand-into-config-a-user-could-write-by-hand }
+
+**Stan:** Przyjęty · 2026-09-28 · [#97](https://github.com/SirCypkowskyy/inwards/issues/97)
+
+**Kontekst.** fastapi-best-practices daje każdej domenie te same moduły, tę samą kolejność importów między nimi (router, potem dependencies, potem service, potem models i schemas, potem constants) i te same nieliczne moduły, z których mogą korzystać inne domeny. Kształty ([ADR-018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)), selektory warstw ([ADR-034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks)) i konteksty ([ADR-030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes)) mogły powiedzieć każdy swoją część, ale tylko powtarzając listę modułów w trzech tabelach. Zgłoszenie prosiło też o niezależne warstwy sąsiednie (`models | schemas`), których kolejność warstw nie umiała wyrazić: warstwa zawsze mogła importować każdą warstwę wymienioną przed nią, więc jedna z dwóch sąsiednich mogła importować drugą.
+
+**Decyzja.**
+
+- **Szablon to nazwana tabela**, `[tool.inwards.templates.<nazwa>]`, z `roles` (od najbardziej wewnętrznej, `a | b` dla warstw sąsiednich), `public`, kluczami kształtu `allow`, `require`, `forbid` i `extra` oraz `hints`. `template = "<nazwa>"` działa we wpisie warstwy (role stają się warstwami wewnątrz modułów wpisu), we wpisie kształtu (szablon dostarcza klucze elementów, a klucz ustawiony przez wpis wygrywa) i w kontekście (nazwy `public` szablonu, pod każdym z modułów kontekstu, dołączają do jego `public`).
+- **Szablony rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie, raz, w parserze.** Wczytana konfiguracja nie ma po nich śladu, więc żadna reguła, baseline, opis architektury ani edytor nie muszą wiedzieć, że szablony istnieją, a szablon zawsze można zastąpić jego rozwinięciem. Każdy klucz szablonu ma więc ręczną postać, dlatego poza szablonami doszły dwa klucze: `hints` we wpisach kształtu i warstwy sąsiednie jako zagnieżdżona tablica w `layers`.
+- **Warstwy sąsiednie to miejsce w kolejności.** Warstwa ma miejsce (rank), gdy konfiguracja ma warstwy sąsiednie; warstwy z tego samego miejsca nie mogą importować jedna drugiej, a warstwa może importować każdą warstwę z niższego miejsca. INW001 i INW011 traktują import warstwy sąsiedniej jak import na zewnątrz i mówią `from sibling layer`; dozwolony kierunek łączy warstwy sąsiednie znakiem `|`; INW005 daje domyślną listę zakazów każdej warstwie z najniższego miejsca. Konfiguracja bez warstw sąsiednich nie dostaje miejsc, więc jej wczytana postać i każdy komunikat zostają bez zmian.
+- **Warstwy ról nazywają się `<wpis>.<rola>`** i obejmują `<moduł>.<rola>` dla każdego z modułów wpisu, z listami bibliotek wpisu. Sam wpis nie staje się warstwą: moduł w nim, którego nie obejmuje żadna rola, leży poza wszystkimi warstwami, co zgłasza INW006.
+- **Błędy nazywają to, co napisał użytkownik**: klucz `template` wpisu dla nieznanego szablonu albo takiego, któremu brakuje ról lub `public` potrzebnych w danym miejscu, oraz własny klucz szablonu dla błędnej roli, wzorca albo wskazówki. Problem, który widać dopiero po rozwinięciu (zajęta już nazwa albo prefiks warstwy roli), nazywa rozwiniętą warstwę.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Układ fastapi-best-practices to jeden szablon i trzy krótkie jego użycia, a nowa domena jest objęta od chwili, gdy powstanie. Fixture testowy zawiera szablon i jego ręczny odpowiednik, a oba dają te same diagnostyki.
+- :material-plus-circle-outline: Warstwy sąsiednie działają też bez szablonów, czego potrzebowało `a | b` z import-linter; `inwards import-config` nadal odwzorowuje `|` na jedną warstwę i konteksty, a mógłby przejść na zagnieżdżone tablice.
+- :material-minus-circle-outline: Komunikaty i opis architektury nazywają warstwy ról po rozwinięciu, `domain.service`, a dozwolony kierunek dużego szablonu jest długi.
+- :material-minus-circle-outline: Rola, której nie ma żaden pakiet, tworzy pustą warstwę, którą INW006 zgłasza jako błąd, więc opcjonalne elementy należą do `allow`, nie do `roles`.
+- :material-minus-circle-outline: Diagnostyki konfiguracji dla rozwiniętych selektorów, na przykład martwej warstwy roli, wskazują linię 1 pliku `pyproject.toml`: rozwiniętego tekstu nie ma w pliku.
+- :material-minus-circle-outline: Konteksty nadal przyjmują dosłowne prefiksy, więc każda domena potrzebuje własnego wpisu kontekstu; szablon oszczędza tylko jego listę `public`.
+
+**Alternatywy.**
+
+- *Szablony jako osobne pojęcie w regułach:* reguły musiałyby ustalać role każdego pakietu przy sprawdzaniu, a szablon mógłby wyrażać rzeczy, których nie wyrazi żadna ręczna konfiguracja, co utrudnia rozumowanie o nim i odejście od niego.
+- *Warstwy sąsiednie jako konteksty, tak jak `inwards import-config` odwzorowuje `|`:* konteksty przyjmują dosłowne prefiksy, więc nie obejmą `src.*.models`, a kontekst warstwy sąsiedniej zagnieżdżony w kontekście domeny zabrałby jej moduły z kontekstu domeny.
+- *Uporządkowanie warstw sąsiednich* (`models` przed `schemas`): `schemas -> models` by nie przeszło, ale `models -> schemas` by przeszło, a `|` znaczy co innego.
+- *Klucz `rank` na każdej warstwie:* bardziej elastyczny, ale łatwo o błąd; zagnieżdżona tablica pokazuje kolejność w samej liście.
 
 ## ADR-037: Rodziny reguł dla frameworków, opt-in, z własnym prefiksem { #adr-037-framework-rule-families-opt-in-with-their-own-prefix }
 

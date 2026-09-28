@@ -108,6 +108,28 @@ layers = [
     expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
   });
 
+  test("says what sibling layers may import, and gives the innermost siblings the default", () => {
+    const config = parseConfig(`[tool.inwards]
+layers = [
+  { name = "d", modules = ["app.*"], template = "slice" },
+  { name = "main", modules = ["app.main"] },
+]
+
+[tool.inwards.templates.slice]
+roles = ["models | schemas", "service"]
+`);
+    const brief = architectureBrief({ config, style: undefined, ports: [] });
+    expect(brief).toContain(
+      "never import a layer listed after your own, nor a sibling of your own layer.",
+    );
+    expect(brief).toContain(
+      "1. d.models (`app.*.models`): imports no other layer; not its sibling d.schemas",
+    );
+    expect(brief).toContain("3. d.service (`app.*.service`): may import d.models, d.schemas");
+    expect(brief).toContain("4. main (`app.main`): may import d.models, d.schemas, d.service");
+    expect(brief).toContain("- d.schemas: no web frameworks");
+  });
+
   test("leaves out the rules that are turned off", () => {
     const config = parseConfig(`${LAYERS}[tool.inwards.rules]
 ignore = ["INW005"]

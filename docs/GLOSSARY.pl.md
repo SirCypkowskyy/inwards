@@ -147,6 +147,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | inner, outer layer; innermost, outermost | warstwa wewnętrzna, zewnętrzna; najbardziej wewnętrzna, najbardziej zewnętrzna |
 | maintainer | opiekun projektu |
 | sibling (module, package; import-linter's layers) | moduł sąsiedni, sąsiedni pakiet |
+| sibling layers (a nested array in `layers`, `a \| b` in a template's roles) | warstwy sąsiednie |
+| template (`[tool.inwards.templates]`); role (a template's `roles`) | szablon; rola |
+| rank (of a layer among siblings) | miejsce (w kolejności warstw) |
 | cache (uv's, bunx's) | pamięć podręczna (uv, bunx) |
 | dev dependency | zależność deweloperska |
 | member (of a package) | element (pakietu) |

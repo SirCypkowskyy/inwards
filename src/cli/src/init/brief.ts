@@ -46,14 +46,16 @@ export function architectureBrief(input: BriefInput): string {
   const names = config.layers.map((layer) => layer.name);
   const preset = style === undefined ? "" : ` (the ${style.name} preset)`;
   const where = ports.length === 0 ? "the inner layer" : ports.map(code).join(" or ");
+  const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
+  const siblings = hasSiblings ? ", nor a sibling of your own layer" : "";
   const lines = [
     "## Architecture brief (Inwards)",
     "",
-    `\`[tool.inwards]\` in pyproject.toml enforces these layers${preset}, innermost first. Imports point inwards: never import a layer listed after your own.`,
+    `\`[tool.inwards]\` in pyproject.toml enforces these layers${preset}, innermost first. Imports point inwards: never import a layer listed after your own${siblings}.`,
     "",
     ...config.layers.map(
       (layer, i) =>
-        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${allowedImports(names, i)}`,
+        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${layerImports(config.layers, i, names)}`,
     ),
     "",
     `Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in ${where} and implement it in the outer layer.`,
@@ -61,6 +63,30 @@ export function architectureBrief(input: BriefInput): string {
     ...contextSection(config),
   ];
   return lines.join("\n");
+}
+
+/**
+ * Says what one layer may import. Without sibling layers that is every layer
+ * listed before it; with them (ADR-036), every layer of a lower rank, and the
+ * layer's siblings are named as off limits.
+ *
+ * @param layers - the configured layers, innermost first.
+ * @param i - the layer's index.
+ * @param names - the layer names, innermost first.
+ * @returns e.g. `may import domain; not its sibling schemas`.
+ */
+function layerImports(layers: readonly LayerSpec[], i: number, names: readonly string[]): string {
+  const rank = layers[i]?.rank;
+  if (rank === undefined) {
+    return allowedImports(names, i);
+  }
+  const inner = layers.filter((layer) => (layer.rank ?? 0) < rank).map((layer) => layer.name);
+  const siblings = layers.filter((layer, k) => k !== i && layer.rank === rank);
+  const base = inner.length === 0 ? "imports no other layer" : `may import ${inner.join(", ")}`;
+  const plural = siblings.length > 1 ? "siblings" : "sibling";
+  return siblings.length === 0
+    ? base
+    : `${base}; not its ${plural} ${siblings.map((layer) => layer.name).join(", ")}`;
 }
 
 /**
@@ -75,7 +101,7 @@ function librarySection(config: InwardsConfig): string[] {
     return [];
   }
   const rules = config.layers.flatMap((layer, i) => {
-    const rule = libraryRule(layer, i === 0 && config.layers.length > 1);
+    const rule = libraryRule(layer, (layer.rank ?? i) === 0 && config.layers.length > 1);
     return rule === undefined ? [] : [`- ${layer.name}: ${rule}`];
   });
   return rules.length === 0 ? [] : ["", "Libraries (INW005):", ...rules];

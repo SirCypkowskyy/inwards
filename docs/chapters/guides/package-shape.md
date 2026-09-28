@@ -120,10 +120,14 @@ only-in = ["tests", "tests.**"]
 
 Both configs are test fixtures (`src/cli/test/support/fixtures/shapes/`): each passes `inwards check` with 0 findings, and the tests plant `helpers.py`, `services/x.py` and `test_x.py` to check that each fails with the fix above.
 
+## Templates
+
+When every domain has the same shape, the same import order between its modules and the same public modules, a [template](configuration.md#templates) says it once: `template = "<name>"` on a shape entry supplies `allow`, `require`, `forbid`, `extra` and `hints`, and the same template can expand into layers for the roles and into the `public` list of each domain's context. `hints` adds project advice to the INW007 fix steps. The configuration reference shows fastapi-best-practices as one template.
+
 ## Shapes from a preset
 
 `inwards init --style layered|clean|hexagonal --scaffold` writes shapes that fit its example package. The package itself holds only its layer packages, `bootstrap.py`, `__main__.py` and `_version.py` (which hatch-vcs and setuptools-scm write), and `adapters/` in `hexagonal` holds only `inbound/` and `outbound/`; any other member there is an error, because no layer would hold it. In `clean` and `hexagonal`, `application/` must hold `ports/` and `use_cases/`, and any other member there is a warning. The layer packages have no shape, so they grow freely. [Install](install.md#a-new-project-start-from-a-preset) lists them; `inwards init --list-styles` prints them.
 
 ## Not covered yet
 
-Named templates, role layering and `inwards init --style fastapi` ([#97](https://github.com/SirCypkowskyy/inwards/issues/97)), non-Python files, and what a file contains.
+An `inwards init --style fastapi` preset ([#93](https://github.com/SirCypkowskyy/inwards/issues/93)), non-Python files, and what a file contains.

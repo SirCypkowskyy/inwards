@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 7fe8363035254820e8771c6d2d2c45a77c3223c582ae090c02211093a81a84e6
+source_hash: 9f202d536d4aa98fbc3c5b6777f909141f8684ad60542b1453a436724d649d22
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -39,7 +39,7 @@ To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, wię
 
 Schemat sprawdza strukturę: klucze, ich typy, dozwolone wartości, kody reguł i kształt nazw oraz wzorców. Inwards sprawdza więcej, gdy wczytuje konfigurację:
 
-- relacje między wpisami: unikalne nazwy warstw i kontekstów, prefiks w dwóch warstwach albo dwóch kontekstach, wpisy `public` należące do kontekstu, istniejące nazwy w `depends-on`;
+- relacje między wpisami: unikalne nazwy warstw i kontekstów, prefiks w dwóch warstwach albo dwóch kontekstach, wpisy `public` należące do kontekstu, istniejące nazwy w `depends-on`, istniejące nazwy w `template`, rola wymieniona dwa razy;
 - dokładne nazwy modułów i segmenty selektorów, tam gdzie schemat dopuszcza nieco luźniejszą postać, oraz zakresy w globach zapisane od końca, takie jak `[z-a]`;
 - `required-version` względem uruchomionego programu.
 
@@ -59,11 +59,12 @@ Jedna konfiguracja ma jeden root. W workspace'ie uv, którego członkowie mają 
 
 Typ: tablica tabel, co najmniej jedna. Wymagane.
 
-Warstwy, od najbardziej wewnętrznej. Moduł może importować własną warstwę i każdą wymienioną przed nią; import warstwy wymienionej po niej to INW001. Każda warstwa ma:
+Warstwy, od najbardziej wewnętrznej. Moduł może importować własną warstwę i każdą wymienioną przed nią; import warstwy wymienionej po niej to INW001. Wpis może też być zagnieżdżoną tablicą [warstw sąsiednich](#sibling-layers). Każda warstwa ma:
 
 - `name`: niepusty tekst, unikalny wśród warstw.
 - `modules`: prefiksy modułów i [selektory](#selectors). Prefiks `shop.domain` obejmuje `shop.domain` i wszystko pod nim, ale nie `shop.domainx`. Gdy do modułu pasuje kilka prefiksów, wygrywa najdłuższy, więc zagnieżdżony pakiet może należeć do innej warstwy niż jego rodzic. Ten sam wpis w dwóch warstwach to błąd konfiguracji. Pusta lista jest dozwolona.
 - `allow-libraries`, `deny-libraries`, `extend-deny-libraries`: które biblioteki warstwa może importować (INW005). Szczegóły są w [przewodniku o bibliotekach](libraries.md#configure-it).
+- `template`: nazwa [szablonu](#templates), którego role stają się warstwami wewnątrz modułów tego wpisu. Sam wpis nie jest wtedy warstwą.
 
 #### Selektory { #selectors }
 
@@ -116,6 +117,24 @@ Co zmieniają selektory:
 - **Sesje sprawdzają każdy wycinek.** Wycinek to prefiks dopasowanego modułu aż do ostatniego dosłownego segmentu selektora: `shop.orders.domain` dla `shop.*.domain`, `shop` dla `shop.**`. Wycinek, który na starcie sesji miał moduły, a teraz nie ma żadnego, zatrzymuje Stop gate, tak jak dosłowny prefiks. Dlatego zmiana nazwy albo usunięcie wycinka wymaga użytkownika: `git mv shop/orders shop/sales`, przeniesienie wycinka głębiej pod `shop.**.domain` albo usunięcie wycinka, którego jedynym modułem jest `__init__.py`. Usuwanie albo zmiana nazwy modułów wewnątrz wycinka, który zachowuje inne, nie wymaga.
 
 [ADR-034](../05-ADR.md#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) opisuje projekt.
+
+#### Warstwy sąsiednie { #sibling-layers }
+
+Zagnieżdżona tablica dwóch lub więcej warstw zawiera niezależne warstwy sąsiednie, odpowiednik `a | b` z import-linter. Zajmują jedno miejsce w kolejności: każda może importować warstwy sprzed grupy, warstwy po grupie mogą importować każdą z nich, a żadna nie może importować drugiej. Import z jednej warstwy sąsiedniej do drugiej to INW001, a komunikat mówi wtedy `from sibling layer`:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+layers = [
+  { name = "constants", modules = ["app.constants"] },
+  [
+    { name = "models", modules = ["app.models"] },
+    { name = "schemas", modules = ["app.schemas"] },
+  ],
+  { name = "service", modules = ["app.service"] },
+]
+```
+
+Tutaj `app.schemas` może importować `app.constants`, ale nie `app.models`, a `app.service` może importować oba. Dozwolony kierunek w komunikatach brzmi `constants <- models | schemas <- service`. Gdy najbardziej wewnętrzne miejsce zajmują warstwy sąsiednie, każda z nich dostaje domyślną listę zakazów INW005. Warstwa sąsiednia nie może wskazywać szablonu, a grupa z jedną warstwą to błąd konfiguracji.
 
 ### `required-version` { #required-version }
 
@@ -215,7 +234,7 @@ modules = ["shop.domain"]
 
 Typ: tablice tabel. Domyślnie: brak.
 
-Jakie elementy pakiet może, musi i nie może zawierać (INW007, INW008) oraz gdzie może się pojawić nazwa elementu. Obie tabele oraz składnię ich selektorów i wzorców opisuje [przewodnik o kształcie pakietu](package-shape.md).
+Jakie elementy pakiet może, musi i nie może zawierać (INW007, INW008) oraz gdzie może się pojawić nazwa elementu. Obie tabele oraz składnię ich selektorów i wzorców opisuje [przewodnik o kształcie pakietu](package-shape.md). Wpis kształtu może też ustawić `hints`, zdania dodawane do kroków naprawy jego diagnostyk INW007, oraz `template`, [szablon](#templates), który dostarcza `allow`, `require`, `forbid`, `extra` i `hints`; klucz ustawiony przez sam wpis wygrywa.
 
 ### `contexts` { #contexts }
 
@@ -244,8 +263,82 @@ Każdy kontekst ma:
 - `modules`: prefiksy modułów, które kontekst posiada, razem ze wszystkim pod nimi. To dosłowne nazwy z kropkami; gwiazdki są błędem konfiguracji. Gdy do modułu pasują prefiksy kilku kontekstów, wygrywa najdłuższy, więc kolejność tabel nigdy nie ma znaczenia. Ten sam prefiks w dwóch kontekstach to błąd konfiguracji.
 - `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu.
 - `depends-on` (domyślnie `[]`): konteksty, z których ten może importować. Zależność jest bezpośrednia: nie przechodzi dalej i nie działa w drugą stronę. Nazwa może wskazywać kontekst zadeklarowany niżej. Własna nazwa kontekstu, nieznana nazwa i powtórzona nazwa to błędy konfiguracji.
+- `template`: [szablon](#templates), którego nazwy `public`, pod każdym z `modules` kontekstu, dołączają do jego listy `public`.
 
 Konteksty i warstwy się sumują: zadeklarowana zależność ani moduł publiczny nigdy nie pozwalają na import, którego zabrania kolejność warstw, a przynależność do kontekstu nic nie mówi o warstwie ani odwrotnie. Kontekst korzysta tylko ze swoich własnych `depends-on` i `public`, także wtedy, gdy jego prefiksy leżą wewnątrz innego kontekstu. Uzasadnienie jest w [ADR-030](../05-ADR.md#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes).
+
+### `templates` { #templates }
+
+Typ: tabela tabel, `[tool.inwards.templates.<nazwa>]`. Domyślnie: brak.
+
+Szablon raz opisuje, jak wygląda pewien rodzaj pakietu, gdy dzieli go wiele pakietów: każda domena aplikacji FastAPI, każdy wycinek modularnego monolitu. Wpisy warstw, kształtów i kontekstów korzystają z niego przez `template = "<nazwa>"`. Układ [fastapi-best-practices](https://github.com/zhanymkanov/fastapi-best-practices) z domenami `src/orders/` i `src/users/` jako jeden szablon:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+layers = [
+  { name = "core", modules = ["src.config", "src.database", "src.exceptions", "src.models"], deny-libraries = ["fastapi"] },
+  { name = "domain", modules = ["src.*"], template = "fastapi-domain" },
+  { name = "app", modules = ["src.main"] },
+]
+
+# One template says what every domain package looks like, how its modules
+# import each other (innermost first; "a | b" are siblings that may not import
+# each other), and which modules other domains may import.
+[tool.inwards.templates.fastapi-domain]
+roles = [
+  "constants | config",
+  "exceptions | utils",
+  "models | schemas",
+  "service",
+  "dependencies",
+  "router",
+]
+public = ["router", "service", "dependencies", "schemas", "constants", "exceptions"]
+allow = []
+require = ["__init__", "router", "service"]
+hints = ["Other domains may import this one's router, service, dependencies, schemas, constants and exceptions, never its models, config or utils."]
+
+[[tool.inwards.shape]]
+packages = ["src.*"]
+template = "fastapi-domain"
+
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["src.orders"]
+depends-on = ["users"]
+template = "fastapi-domain"
+
+[[tool.inwards.contexts]]
+name = "users"
+modules = ["src.users"]
+template = "fastapi-domain"
+```
+
+Szablon ma te klucze, wszystkie opcjonalne:
+
+- `roles`: nazwy modułów względne wobec modułów wpisu warstwy, od najbardziej wewnętrznej. `"models | schemas"` umieszcza niezależne [warstwy sąsiednie](#sibling-layers) w jednym miejscu. Każda rola występuje raz.
+- `public`: nazwy modułów względne wobec modułów kontekstu, które mogą importować inne konteksty ([INW003](../rules/INW003.md)).
+- `allow`, `require`, `forbid`, `extra`: jak we [wpisie kształtu](package-shape.md#configure-it). Gdy `allow` jest ustawione, dochodzi do niego pierwszy segment każdej roli, więc `allow = []` oznacza tylko role, `require` i `__init__`.
+- `hints`: zdania dodawane do kroków naprawy diagnostyk [INW007](../rules/INW007.md) w pakietach, którym szablon nadaje kształt, na przykład gdzie trafia wspólny kod.
+
+Tam, gdzie ustawiono `template = "<nazwa>"`, oznacza to:
+
+| Gdzie | Rozwija się w |
+|---|---|
+| wpis `layers` | jedną warstwę na rolę, o nazwie `<wpis>.<rola>`, obejmującą `<moduł>.<rola>` dla każdego z modułów wpisu, z listami bibliotek wpisu; warstwy sąsiednie stają się zagnieżdżoną tablicą. Sam wpis nie jest warstwą. |
+| wpis `shape` | `allow`, `require`, `forbid`, `extra` i `hints` szablonu; klucz ustawiony przez wpis wygrywa |
+| wpis `contexts` | `<moduł>.<nazwa>` dla każdego z modułów kontekstu i każdej nazwy z `public`, dodane do własnego `public` kontekstu |
+
+W przykładzie wpis `domain` staje się dziewięcioma warstwami, od `domain.constants` do `domain.router`, więc import `src.orders.router` w `src.orders.service` to INW001, tak samo jak import `src.orders.models`, warstwy sąsiedniej, w `src.orders.schemas`. `src.*` obejmuje każdą domenę, także następną. `src.orders.router` może importować `src.users.service`: orders zależy od users, a `service` jest publiczny. Każdy import `src.users.models` z orders to INW003. Routery są publiczne, bo montuje je `src.main`, który nie należy do żadnego kontekstu.
+
+Szablony są rozwijane przy wczytywaniu konfiguracji, zanim cokolwiek innego zostanie sprawdzone, więc reguły, baseline, opis architektury i edytor widzą tylko wynik, który konfiguracja mogłaby też wypisać ręcznie. [Fixture testowy](https://github.com/SirCypkowskyy/inwards/tree/develop/src/cli/test/support/fixtures/templates/fastapi) zawiera tę konfigurację i jej ręczny odpowiednik, a testy sprawdzają, że dają tę samą konfigurację i te same diagnostyki. W praktyce:
+
+- **Komunikaty nazywają warstwy ról**, na przykład `Layer "domain.service" imports "src.orders.router" from outer layer "domain.router"`.
+- **Rola, której nie ma żaden pakiet, to pusta warstwa.** Warstwa roli, do której nie pasuje żaden moduł, dostaje błąd INW006 o pustej warstwie jak każda inna warstwa, więc wymieniaj tylko role, które może mieć każdy pakiet danego rodzaju; opcjonalne mogą trafić do `allow`. Błąd wskazuje wpis, który niesie szablon, i nazywa rolę.
+- **W modułach wpisu z szablonem używaj `*`, nie `**`.** `src.*` daje `src.*.models`, które pasuje tylko do `models` samej domeny, więc `src/orders/service/models.py` zostaje w roli `service`. Przy `src.**` wzorzec `src.**.models` pasuje też do tego pliku, który przechodzi wtedy do roli `models`, bo wygrywa najgłębszy ostatni dosłowny segment ([Selektory](#selectors)).
+- **Błędy konfiguracji nazywają wpis albo klucz szablonu**: `tool.inwards.layers[1].template` dla nieznanego szablonu albo takiego bez ról, `tool.inwards.templates.fastapi-domain.roles[2]` dla błędnej roli. Problem, który widać dopiero po rozwinięciu, na przykład zajęta już nazwa warstwy roli, nazywa rozwiniętą warstwę.
+
+Szablon, z którego nikt nie korzysta, jest dozwolony. [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
 
 ### `cycles` { #cycles }
 

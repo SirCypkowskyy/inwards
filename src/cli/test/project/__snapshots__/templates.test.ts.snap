@@ -1,0 +1,12 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the template expands to the hand-written config both give the same diagnostics, clean and with violations 1`] = `
+[
+  "INW007 src/orders/helpers.py: "helpers.py" is not an allowed member of package "src.orders".",
+  "INW006 src/orders/helpers.py: "src.orders.helpers" belongs to no layer, so no layer rule checks its imports.",
+  "INW003 src/orders/helpers.py: Context "orders" imports "src.users.utils" from context "users", but "src.users.utils" isn't one of its public modules.",
+  "INW001 src/orders/schemas.py: Layer "domain.schemas" imports "src.orders.models.Order" from sibling layer "domain.models". Allowed direction: core <- domain.constants | domain.config <- domain.exceptions | domain.utils <- domain.models | domain.schemas <- domain.service <- domain.dependencies <- domain.router <- app.",
+  "INW001 src/orders/service.py: Layer "domain.service" imports "src.orders.router" from outer layer "domain.router". Allowed direction: core <- domain.constants | domain.config <- domain.exceptions | domain.utils <- domain.models | domain.schemas <- domain.service <- domain.dependencies <- domain.router <- app.",
+  "INW003 src/orders/service.py: Context "orders" imports "src.users.models.User" from context "users", but "src.users.models" isn't one of its public modules.",
+]
+`;

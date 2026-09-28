@@ -14,9 +14,11 @@ import process from "node:process";
 import { CONTEXT_KEYS } from "../../src/config/contexts.ts";
 import { CONFIG_DEFAULTS } from "../../src/config/defaults.ts";
 import { DEFAULT_GENERATED } from "../../src/config/generated.ts";
-import { LAYER_KEYS, parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
+import { LAYER_KEYS } from "../../src/config/layers.ts";
+import { parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
 import { OPTION_KEYS, RULE_KEYS } from "../../src/config/rule-settings.ts";
 import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/shape.ts";
+import { TEMPLATE_KEYS } from "../../src/config/templates.ts";
 import { RULES } from "../../src/meta/registry.ts";
 import {
   fileSchemaErrors,
@@ -36,13 +38,16 @@ const REFERENCE_ANCHOR = /guides\/configuration\/#(?<anchor>[a-z-]+)\)/gu;
 const INWARDS_TABLE = /\[\s*tool\.inwards/u;
 
 /**
- * Follows a `$ref` (also one wrapped in `allOf`) to its definition.
+ * Follows a `$ref` (also one wrapped in `allOf`, or the first of an `anyOf`) to its definition.
  *
  * @param node - a schema node.
  * @returns the definition it points to, or the node itself.
  */
 function deref(node: Schema): Schema {
-  const ref = node.$ref ?? node.allOf?.find((part) => part.$ref !== undefined)?.$ref;
+  const ref =
+    node.$ref ??
+    node.allOf?.find((part) => part.$ref !== undefined)?.$ref ??
+    node.anyOf?.find((part) => part.$ref !== undefined)?.$ref;
   const name = ref?.split("/").at(-1);
   return name === undefined ? node : (schema.definitions?.[name] ?? node);
 }
@@ -107,6 +112,8 @@ describe("the schema and the parser agree", () => {
     expect(keysOf(schema.properties?.["rules"] ?? {})).toEqual([...RULE_KEYS, ...tables].sort());
     const options = schema.definitions?.["ruleOptions"] ?? {};
     expect(keysOf(options)).toEqual([...OPTION_KEYS].sort());
+    const template = schema.properties?.["templates"]?.additionalProperties;
+    expect(keysOf(typeof template === "object" ? template : {})).toEqual([...TEMPLATE_KEYS].sort());
   });
 
   test("on the rule codes, taken from the registry", () => {

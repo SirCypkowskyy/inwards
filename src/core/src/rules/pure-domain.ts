@@ -9,7 +9,7 @@
  * third-party otherwise. The longest matching entry decides, `allow` on a
  * tie; with no match, a third-party import passes only when the layer sets
  * no `allow-libraries`, and stdlib always passes. The innermost of two or
- * more layers denies `DEFAULT_DENY` unless it sets `deny-libraries`, and
+ * more layers (every sibling of the lowest rank) denies `DEFAULT_DENY` unless it sets `deny-libraries`, and
  * `extend-deny-libraries` adds to whichever of the two applies (#155). On
  * any other layer without `deny-libraries` it adds to an empty list.
  *
@@ -18,12 +18,12 @@
  * and its fix points at another package rather than at a port (#203). The
  * check itself is the same; `allow-libraries` covers both.
  */
-import type { LayerSpec } from "../config/parse.ts";
+import type { LayerSpec } from "../config/layers.ts";
 import type { Diagnostic, Fix, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ModuleLookup } from "../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../meta/registry.ts";
 import { STDLIB } from "../python/stdlib.ts";
-import { layerIndexOf, portHome } from "./shared/layer-ownership.ts";
+import { layerIndexOf, portHome, rankOf } from "./shared/layer-ownership.ts";
 
 /** Frameworks, database and network clients, and stdlib I/O: what the domain gets by default. */
 const DEFAULT_DENY: readonly string[] = [
@@ -90,7 +90,7 @@ function longest(entries: readonly string[], target: string): string | undefined
  */
 function denial(layers: readonly LayerSpec[], i: number, target: string): string | undefined {
   const layer = layers[i];
-  const inner = i === 0 && layers.length > 1;
+  const inner = rankOf(layers, i) === 0 && layers.length > 1;
   const base = layer?.denyLibraries ?? (inner ? DEFAULT_DENY : []);
   const deny = longest([...base, ...(layer?.extendDenyLibraries ?? [])], target);
   const allow = longest(layer?.allowLibraries ?? [], target);

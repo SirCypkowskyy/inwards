@@ -64,3 +64,57 @@ function firstSpan(text: string, spellings: readonly string[]): Span {
   const column = (before.at(-1)?.length ?? 0) + 1;
   return { line, column, endLine: line, endColumn: column + found.spelling.length };
 }
+
+/** A layer entry a template expanded: the module entry as written, and the role added to it. */
+export interface TemplateRole {
+  /** The entry of the layer that carries the template, e.g. `src.*`. */
+  base: string;
+  /** The role, e.g. `utils` or `api.v1`. */
+  role: string;
+}
+
+/**
+ * Tells whether a layer entry came from a template's roles: it isn't spelled
+ * in the text, but a shorter entry it extends is.
+ * ponytail: text search for the longest quoted prefix; carry the origin on LayerSpec if two templates ever share a base.
+ *
+ * @param text - the pyproject.toml text.
+ * @param entry - a layer entry, e.g. `src.*.utils`.
+ * @returns the base entry and the role, or undefined when the entry is written out or nothing matches.
+ */
+export function templateRole(text: string, entry: string): TemplateRole | undefined {
+  if (quoted(text, entry)) {
+    return undefined;
+  }
+  const segments = entry.split(".");
+  for (let k = segments.length - 1; k > 0; k -= 1) {
+    const base = segments.slice(0, k).join(".");
+    if (quoted(text, base)) {
+      return { base, role: segments.slice(k).join(".") };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Locates a layer entry for a diagnostic span: its own text, or, for an entry
+ * a template expanded, the entry that carries the template.
+ *
+ * @param text - the pyproject.toml text.
+ * @param entry - a layer entry.
+ * @returns the span of the entry, or of the template's base entry.
+ */
+export function entrySpan(text: string, entry: string): Span {
+  return spanOf(text, templateRole(text, entry)?.base ?? entry);
+}
+
+/**
+ * Tells whether a value is written in the text as a quoted TOML string.
+ *
+ * @param text - the pyproject.toml text.
+ * @param value - the string to look for.
+ * @returns true when `"value"` or `'value'` occurs.
+ */
+function quoted(text: string, value: string): boolean {
+  return text.includes(`"${value}"`) || text.includes(`'${value}'`);
+}

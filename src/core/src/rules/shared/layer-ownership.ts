@@ -3,9 +3,14 @@
  * INW005, INW006 and INW011 all ask these questions, so the answers live here
  * rather than in any one rule. The fix steps that replace an outward import
  * with a port are here too, since INW001 and INW011 give the same advice.
+ *
+ * Layers are ordered by rank, which is their index unless the config has
+ * independent siblings (ADR-036): an import into a sibling of the same rank
+ * counts as outward too.
  */
 import { matchEntry, topPackageOf } from "../../config/layer-selector.ts";
-import type { InwardsConfig, LayerSpec } from "../../config/parse.ts";
+import type { LayerSpec } from "../../config/layers.ts";
+import type { InwardsConfig } from "../../config/parse.ts";
 import type { ImportRef, SourceFile } from "../../contracts/records.ts";
 
 /** Which layer owns a module, through which entry, and how deep it matched. */
@@ -120,24 +125,39 @@ export function portHome(file: SourceFile, layers: readonly LayerSpec[]): string
   return isPackage ? `\`${home}\` (for example \`${home}.ports\`)` : `\`${home}\``;
 }
 
-/** An import that points from an inner layer to an outer one. */
+/**
+ * Gives a layer's place in the order: its rank when the config has siblings,
+ * else its index.
+ *
+ * @param layers - the configured layers, innermost first.
+ * @param index - the layer's index.
+ * @returns the rank; layers of one rank are independent siblings.
+ */
+export function rankOf(layers: readonly LayerSpec[], index: number): number {
+  return layers[index]?.rank ?? index;
+}
+
+/** An import that points from an inner layer to an outer one, or to a sibling. */
 export interface OutwardImport<R extends ImportRef> {
   ref: R;
   /** The inner layer the importing file belongs to. */
   source: LayerSpec;
-  /** The outer layer the import reaches. */
+  /** The outer or sibling layer the import reaches. */
   target: LayerSpec;
+  /** How the diagnostic names the target: `outer layer` or `sibling layer`. */
+  relation: "outer layer" | "sibling layer";
 }
 
 /**
  * Picks the imports that point outward, the check INW001 and INW011 share.
- * Imports of the same layer, of inner layers, and of modules outside every
- * layer are allowed. A file that belongs to no layer is not checked at all.
+ * Imports of the same layer, of layers of a lower rank, and of modules outside
+ * every layer are allowed; an import of a sibling of the same rank is not. A
+ * file that belongs to no layer is not checked at all.
  *
  * @param file - the file the imports come from.
  * @param imports - the imports found in that file.
  * @param layers - the configured layers, innermost first.
- * @returns each import that reaches an outer layer, with both layers.
+ * @returns each import that reaches an outer or sibling layer, with both layers.
  */
 export function outwardImports<R extends ImportRef>(
   file: SourceFile,
@@ -153,21 +173,29 @@ export function outwardImports<R extends ImportRef>(
   for (const ref of imports) {
     const to = layerIndexOf(ref.target, layers);
     const target = layers[to];
-    if (target && to > from) {
-      out.push({ ref, source, target });
+    const rank = rankOf(layers, to);
+    if (target && to !== from && rank >= rankOf(layers, from)) {
+      const relation = rank === rankOf(layers, from) ? "sibling layer" : "outer layer";
+      out.push({ ref, source, target, relation });
     }
   }
   return out;
 }
 
 /**
- * Names the allowed dependency direction for a diagnostic message.
+ * Names the allowed dependency direction for a diagnostic message, siblings
+ * joined by `|`.
  *
  * @param layers - the configured layers, innermost first.
- * @returns e.g. `domain <- application <- infrastructure`.
+ * @returns e.g. `domain <- application <- infrastructure`, or `a <- b | c <- d`.
  */
 export function allowedDirection(layers: readonly LayerSpec[]): string {
-  return layers.map((l) => l.name).join(" <- ");
+  const ranks: string[][] = [];
+  layers.forEach((layer, i) => {
+    const rank = rankOf(layers, i);
+    ranks[rank] = [...(ranks[rank] ?? []), layer.name];
+  });
+  return ranks.map((names) => names.join(" | ")).join(" <- ");
 }
 
 /**
