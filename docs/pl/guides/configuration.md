@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: c3aac2c48c3aae8d09cb93b20a87e3ff62639ac195da1918d9cbd559d4893f85
+source_hash: 55ca55193fc94a786e78446a0b030a52f80e22d988715bc8f99b9344bf333f49
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -25,6 +25,8 @@ Nieznany klucz, zły typ albo zła wartość to błąd konfiguracji: `inwards ch
 
 JSON Schema dla `[tool.inwards]` jest opublikowany pod adresem <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. Ten adres śledzi gałąź `develop`, tak jak ta dokumentacja. Żeby przypiąć schemat do wydania, którego używasz, weź plik `inwards-tool-schema.json` dołączony do każdego [wydania na GitHubie](https://github.com/SirCypkowskyy/inwards/releases).
 
+Edytory, które biorą schemat `pyproject.toml` z [SchemaStore](https://www.schemastore.org/), będą podpowiadać i sprawdzać `[tool.inwards]` bez żadnej konfiguracji, gdy SchemaStore przyjmie schemat Inwards ([SchemaStore#6427](https://github.com/SchemaStore/schemastore/pull/6427), [#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Do tego czasu ustaw go ręcznie.
+
 Edytory korzystające z [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML w VS Code i inne) przypisują schematy do całych plików: Taplo pomija `keys` reguły, gdy wybiera schemat, więc sam schemat tabeli byłby sprawdzany względem całego `pyproject.toml`. Zamiast niego użyj zbudowanego z niego schematu całego pliku, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, który sprawdza `[tool.inwards]` i zostawia wszystkie inne tabele w spokoju. Plik `.taplo.toml` obok `pyproject.toml`:
 
 ```toml title=".taplo.toml"
@@ -35,7 +37,7 @@ include = ["**/pyproject.toml"]
 path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
 
-To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane, dopóki schemat Inwards nie trafi do schematu SchemaStore ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Wydania dołączają go jako `inwards-pyproject-schema.json`.
+To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane. Gdy SchemaStore będzie miał schemat Inwards, usuń tę regułę i zostaw cały plik schematowi SchemaStore. Wydania dołączają go jako `inwards-pyproject-schema.json`.
 
 Schemat sprawdza strukturę: klucze, ich typy, dozwolone wartości, kody reguł i kształt nazw oraz wzorców. Inwards sprawdza więcej, gdy wczytuje konfigurację:
 

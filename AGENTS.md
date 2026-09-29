@@ -306,6 +306,11 @@ PR description is its body. Commits inside a branch can say anything.
   3. Wait for release-please to update its release PR, check the changelog,
      and merge it (`gh pr merge N --merge --admin`: it gets no CI run).
   4. Publish the draft release, then resume merging into `develop`.
+  5. If `schema/tool-inwards.schema.json` changed since the last release,
+     open a SchemaStore PR that copies it into
+     `src/schemas/json/partial-inwards.json` (keep its `$id` and update the
+     copy date in `$comment`) and adjusts `src/test/pyproject/inwards.toml`
+     (#192).
 
   Don't promote without releasing, and never merge a release PR that isn't
   right after a promotion. Before merging anything into `develop`, check that
