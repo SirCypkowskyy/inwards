@@ -32,7 +32,7 @@ shop/domain/order.py:6:50: <b class="inw-code">INW001</b> Layer "domain" imports
   docs: https://sircypkowskyy.github.io/inwards/rules/INW001/
 
 Found 1 violation in 1 file (63.7 ms).</code></pre>
-<figcaption>A real run of Inwards 0.4.0 on the scaffold's example app, 2026-09-29.</figcaption>
+<figcaption>A real run of Inwards 0.4.0 on the scaffold's example app with one bad import added, 2026-09-29. Exit code 1.</figcaption>
 </figure>
 
 <div class="inw-premises" markdown>

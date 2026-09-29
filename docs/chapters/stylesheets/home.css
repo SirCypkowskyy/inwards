@@ -290,6 +290,13 @@
   margin: 0;
 }
 
+/* Drawn at 380 units and never scaled up, so its labels stay near body
+   size on every screen. (The diagrams layer can't set this: the theme's
+   unlayered svg rules would win.) */
+.md-typeset .inw-premise #homepage-loop {
+  max-width: 380px;
+}
+
 .md-typeset .inw-premises .inw-premise .highlight code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -315,6 +322,7 @@
    chart and takes the figure's width. */
 .md-typeset .inw-chart :is(.md-typeset__scrollwrap, .md-typeset__table) {
   display: block;
+  padding: 0;
   margin: 0;
 }
 
@@ -327,6 +335,7 @@
 }
 
 .md-typeset .inw-chart thead th {
+  background: none;
   padding: 0 0 0.4rem;
   font-weight: 400;
   color: var(--inw-graphite);

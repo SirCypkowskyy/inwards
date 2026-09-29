@@ -21,7 +21,7 @@
     max-width: 380px;
     height: auto;
     font-family: var(--md-text-font-family, sans-serif);
-    font-size: 14px;
+    font-size: 15px;
   }
 
   /* Nodes in Paper 2 with ink labels; the hook, which is Inwards, in Hunk;
@@ -78,7 +78,7 @@
 
   #homepage-loop .hl-edge-label {
     fill: var(--md-default-fg-color--light);
-    font-size: 13px;
+    font-size: 14px;
     text-anchor: start;
   }
 

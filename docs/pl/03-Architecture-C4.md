@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c536764e0a091b447f4b0f65a80fa412b334ec08c8b7be9078ae33c7eb920b5f
+source_hash: f0fb35e28f73a86a9dc5248e9e52fdbc6fab0ab7766829b76d8bd17b94b2e80b
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -20,7 +20,7 @@ flowchart TB
     dev(["Programista<br/><small>pisze i przegląda kod</small>"])
     agent(["Agent kodujący AI<br/><small>Claude Code, Aider, Copilot, Codex</small>"])
 
-    inwards["<b>Inwards</b><br/><small>Sprawdza importy w kodzie Pythona<br/>względem zadeklarowanych warstw architektury</small>"]
+    inwards["<b>Inwards</b><br/><small>Sprawdza importy Pythona<br/>względem zadeklarowanych warstw</small>"]
 
     repo[("Kod w Pythonie<br/><small>*.py + pyproject.toml</small>")]
     editor["VS Code<br/><small>pokazuje diagnostyki</small>"]

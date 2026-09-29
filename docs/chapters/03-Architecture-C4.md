@@ -15,7 +15,7 @@ flowchart TB
     dev(["Developer<br/><small>writes and reviews code</small>"])
     agent(["AI coding agent<br/><small>Claude Code, Aider, Copilot, Codex</small>"])
 
-    inwards["<b>Inwards</b><br/><small>Checks imports in a Python codebase<br/>against declared architecture layers</small>"]
+    inwards["<b>Inwards</b><br/><small>Checks Python imports<br/>against declared layers</small>"]
 
     repo[("Python codebase<br/><small>*.py + pyproject.toml</small>")]
     editor["VS Code<br/><small>shows diagnostics</small>"]

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: 36b7c3f0812e8dabab2d99579de1ae38aab3ae06dccc4e886f831671f18f87f3
+source_hash: c7609ef23de83819c01d0fd2fdab36124a3785ae97fdaac05994594697a5b598
 template: home.html
 hide:
   - navigation
@@ -34,7 +34,7 @@ shop/domain/order.py:6:50: <b class="inw-code">INW001</b> Layer "domain" imports
   docs: https://sircypkowskyy.github.io/inwards/rules/INW001/
 
 Found 1 violation in 1 file (63.7 ms).</code></pre>
-<figcaption>Prawdziwe uruchomienie Inwards 0.4.0 na przykładowym pakiecie ze scaffoldu, 2026-09-29.</figcaption>
+<figcaption>Prawdziwe uruchomienie Inwards 0.4.0 na przykładowym pakiecie ze scaffoldu z jednym dodanym błędnym importem, 2026-09-29. Kod wyjścia 1.</figcaption>
 </figure>
 
 <div class="inw-premises" markdown>
