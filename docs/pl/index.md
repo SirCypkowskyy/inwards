@@ -1,18 +1,16 @@
 ---
 source: docs/chapters/index.md
-source_hash: dffb9bf402180ee3569e70030098d7d5a3f70a34840ae34438e635032e14e83d
+source_hash: 36b7c3f0812e8dabab2d99579de1ae38aab3ae06dccc4e886f831671f18f87f3
 template: home.html
 hide:
   - navigation
   - toc
+  - footer
 ---
 
 <div class="inw-hero" markdown>
 
-# Inwards { #inwards }
-
-Reguły architektury dla Pythona, na tyle szybkie, że można je uruchamiać po każdej edycji agenta AI.
-{ .inw-lede }
+# <span class="inw-sr-only">Inwards: </span>Reguły architektury dla Pythona, na tyle szybkie, że można je uruchamiać po każdej edycji agenta AI. { #inwards .inw-lede }
 
 Deklarujesz warstwy w `pyproject.toml`. Gdy import wskazuje w złą stronę, `inwards check` podaje linię i mówi agentowi, jak to naprawić.
 
@@ -36,7 +34,7 @@ shop/domain/order.py:6:50: <b class="inw-code">INW001</b> Layer "domain" imports
   docs: https://sircypkowskyy.github.io/inwards/rules/INW001/
 
 Found 1 violation in 1 file (63.7 ms).</code></pre>
-<figcaption>Prawdziwe uruchomienie Inwards 0.4.0 na przykładowym pakiecie z <code>inwards init --scaffold</code>, z jednym dodanym błędnym importem, 2026-09-29. Kod wyjścia 1.</figcaption>
+<figcaption>Prawdziwe uruchomienie Inwards 0.4.0 na przykładowym pakiecie ze scaffoldu, 2026-09-29.</figcaption>
 </figure>
 
 <div class="inw-premises" markdown>
@@ -45,7 +43,7 @@ Found 1 violation in 1 file (63.7 ms).</code></pre>
 
 ## Twoja architektura jako reguły { #your-architecture-as-rules }
 
-`inwards init --style layered|clean|hexagonal` zapisuje warstwy w `pyproject.toml`, od najbardziej wewnętrznej. [INW001](rules/INW001.md) pilnuje kierunku, a każda diagnostyka ma kroki naprawy. [Konfiguracja](guides/configuration.md)
+[Warstwy](guides/configuration.md) trafiają do `pyproject.toml`, od najbardziej wewnętrznej. [INW001](rules/INW001.md) pilnuje kierunku; każda diagnostyka ma kroki naprawy.
 
 ```toml
 [tool.inwards]
@@ -65,10 +63,10 @@ layers = [
 
 ## Wbudowane w pętlę agenta { #built-into-the-agent-loop }
 
-Sprawdzenie po każdej edycji, Stop gate nad wszystkim, co sesja zmieniła (także edycje przez Bash i commity), config guard, który odrzuca edycje reguł, i eskalacja do ciebie po [`escalate-after`](guides/configuration.md#escalate-after) próbach (domyślnie 3). [Jak działa pętla](04-AI-Integration.md#where-inwards-sits-in-the-agent-loop)
+[Sprawdzenie po każdej edycji](04-AI-Integration.md#where-inwards-sits-in-the-agent-loop), Stop gate nad całą sesją (także edycje przez Bash), config guard na reguły i eskalacja do ciebie po [`escalate-after`](guides/configuration.md#escalate-after) próbach.
 
 <div class="homepage-loop-wrap">
-<svg id="homepage-loop" viewBox="0 0 820 160" role="img"
+<svg id="homepage-loop" viewBox="0 0 380 290" role="img"
      aria-label="Agent edytuje plik, potem hook uruchamia inwards check. Przy naruszeniu agent dostaje kroki naprawy i wraca do edycji. Gdy jest czysto, agent pracuje dalej.">
   <defs>
     <marker id="hl-arrow" viewBox="0 0 10 10" refX="9" refY="5"
@@ -78,28 +76,29 @@ Sprawdzenie po każdej edycji, Stop gate nad wszystkim, co sesja zmieniła (tak�
   </defs>
 
   <path id="hl-edge-to-hook" class="hl-edge" marker-end="url(#hl-arrow)"
-        d="M170,50 H330" />
+        d="M95,60 V112" />
   <path id="hl-edge-violation" class="hl-edge hl-edge-dashed" marker-end="url(#hl-arrow)"
-        d="M400,70 C400,110 250,110 170,70" />
-  <text class="hl-edge-label" x="285" y="122">naruszenie + kroki naprawy</text>
+        d="M180,148 C262,148 262,35 188,35" />
+  <text class="hl-edge-label hl-edge-label--side" x="252" y="86">naruszenie</text>
+  <text class="hl-edge-label hl-edge-label--side" x="252" y="104">+ kroki naprawy</text>
   <path id="hl-edge-clean" class="hl-edge" marker-end="url(#hl-arrow)"
-        d="M480,50 H610" />
-  <text class="hl-edge-label" x="545" y="40">czysto</text>
+        d="M95,176 V222" />
+  <text class="hl-edge-label hl-edge-label--side" x="105" y="203">czysto</text>
 
   <g id="hl-agent" class="hl-node" tabindex="0">
-    <rect x="20" y="20" width="150" height="60" rx="6" />
-    <text x="95" y="50">Agent edytuje plik</text>
+    <rect x="10" y="10" width="170" height="50" rx="6" />
+    <text x="95" y="35">Agent edytuje plik</text>
   </g>
 
   <g id="hl-hook" class="hl-node hl-node--inwards" tabindex="0">
-    <rect x="340" y="20" width="140" height="60" rx="6" />
-    <text x="410" y="42">Hook uruchamia</text>
-    <text x="410" y="60">inwards check</text>
+    <rect x="10" y="120" width="170" height="56" rx="6" />
+    <text x="95" y="139">Hook uruchamia</text>
+    <text x="95" y="158">inwards check</text>
   </g>
 
   <g id="hl-outcomes" class="hl-node hl-node--end">
-    <rect x="620" y="20" width="180" height="60" rx="6" />
-    <text x="710" y="50">Agent pracuje dalej</text>
+    <rect x="10" y="230" width="170" height="50" rx="6" />
+    <text x="95" y="255">Agent pracuje dalej</text>
   </g>
 </svg>
 </div>
@@ -110,7 +109,7 @@ Sprawdzenie po każdej edycji, Stop gate nad wszystkim, co sesja zmieniła (tak�
 
 ## Łapie to, co robią agenci { #catches-what-agents-do }
 
-[Zmyślony moduł](04-AI-Integration.md#catching-hallucinated-modules) (INW010), import za `TYPE_CHECKING`, [import dynamiczny](rules/INW011.md) (INW011): jedno prawdziwe uruchomienie, jeden plik. Wyciszenie wymaga powodu ([INW009](rules/INW009.md)), a poluzowanie konfiguracji czy dopisanie naruszenia do baseline'u zostaje odrzucone. [Wszystkie uniki, które Inwards obsługuje](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)
+[Zmyślone moduły](04-AI-Integration.md#catching-hallucinated-modules), importy za `TYPE_CHECKING`, [importy dynamiczne](rules/INW011.md). Wyciszenie wymaga powodu ([INW009](rules/INW009.md)); [poluzowanie konfiguracji zostaje odrzucone](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
 
 ```console
 $ uv run inwards check shop/domain/dodge.py --format concise
@@ -128,21 +127,21 @@ Found 3 violations in 1 file (109.4 ms).
 
 ## Na tyle szybkie, by działać po każdej edycji { #fast-enough-for-every-edit }
 
-Od kompilacji do bajtkodu sprawdzenie jednego pliku, które uruchamia hook, mieści się w budżecie 100 ms dla p95, nawet dla pliku z 4482 liniami.
+Sprawdzenie jednego pliku, które uruchamia hook, mieści się w budżecie 100 ms dla p95, nawet dla pliku z 4482 liniami.
 
 <figure class="inw-chart" markdown>
 <table markdown>
-<thead><tr><th scope="col">Sprawdzany plik</th><th scope="col">p95 czasu rzeczywistego, budżet 100 ms</th></tr></thead>
+<thead><tr><th scope="col">Plik</th><th scope="col">p95, ze 100 ms</th></tr></thead>
 <tbody markdown>
 <tr markdown><th scope="row" markdown="span">[saleor, jeden plik](06-Constraints-and-Quality.md#measurements)</th><td><span class="inw-track" style="--v: 30"><span class="inw-bar"></span><span class="inw-val">30 ms</span></span></td></tr>
 <tr markdown><th scope="row" markdown="span">[Przykładowy pakiet ze scaffoldu](06-Constraints-and-Quality.md#spike-bytecode-and-minification)</th><td><span class="inw-track" style="--v: 39.5"><span class="inw-bar"></span><span class="inw-val">39.5 ms</span></span></td></tr>
 <tr markdown><th scope="row" markdown="span">[polar, plik z 4482 liniami](06-Constraints-and-Quality.md#measurements)</th><td><span class="inw-track" style="--v: 90"><span class="inw-bar"></span><span class="inw-val inw-val--in">90 ms</span></span></td></tr>
 </tbody>
 </table>
-<figcaption markdown="span">`inwards check <file>`, ze startem procesu, jeden wątek, zmierzone 2026-09-26. Pasek kończy się na budżecie 100 ms.</figcaption>
+<figcaption markdown="span">`inwards check <file>` ze startem procesu, jeden wątek, 2026-09-26.</figcaption>
 </figure>
 
-Zimne pełne sprawdzenie czyta [syntetyczne repozytorium z 496 000 linii](06-Constraints-and-Quality.md#measurements) w około 0,4 s, a 848 000 linii saleora w około 1,8 s, na jednym rdzeniu. Prescan przeoczył [0 importów w 6543 plikach](06-Constraints-and-Quality.md#results) z pięciu serwisów open source.
+Zimne pełne sprawdzenie, jeden rdzeń: [496 000 linii w 0,4 s](06-Constraints-and-Quality.md#measurements), 848 000 linii saleora w 1,8 s. Przeoczenia prescanu: [0 w 6543 plikach](06-Constraints-and-Quality.md#results).
 
 </div>
 
@@ -150,7 +149,7 @@ Zimne pełne sprawdzenie czyta [syntetyczne repozytorium z 496 000 linii](06-Con
 
 ## Szybki start { #quickstart }
 
-1. Zainstaluj Inwards jako zależność deweloperską albo pobierz plik binarny według [instrukcji instalacji](guides/install.md#from-a-release).
+1. Zainstaluj albo [pobierz plik binarny](guides/install.md#from-a-release).
 
     === "uv"
 
@@ -164,7 +163,7 @@ Zimne pełne sprawdzenie czyta [syntetyczne repozytorium z 496 000 linii](06-Con
         pip install inwards
         ```
 
-2. Zainstaluj hooki Claude Code. W nowym projekcie dodaj `--style clean --scaffold`, żeby dostać warstwy i przykładowy pakiet.
+2. Dodaj hooki Claude Code. Nowy projekt? Dodaj `--style clean --scaffold`.
 
     === "uv"
 
@@ -178,7 +177,7 @@ Zimne pełne sprawdzenie czyta [syntetyczne repozytorium z 496 000 linii](06-Con
         inwards init --agent claude
         ```
 
-3. Sprawdź cały projekt.
+3. Sprawdź projekt.
 
     === "uv"
 
@@ -192,23 +191,23 @@ Zimne pełne sprawdzenie czyta [syntetyczne repozytorium z 496 000 linii](06-Con
         inwards check
         ```
 
-Inni agenci: [OpenCode](guides/opencode.md), [Aider](guides/aider.md), a Codex, Cursor i pozostali przez [`AGENTS.md`](guides/agents-md.md).
+Inni agenci: [OpenCode](guides/opencode.md), [Aider](guides/aider.md), [`AGENTS.md`](guides/agents-md.md).
 
 </div>
 
 <nav class="inw-entries" aria-label="Dokumentacja" markdown>
 
 [Zacznij](guides/install.md)
-: Zainstaluj, potem podłącz swojego agenta.
+: Instalacja i podłączenie agenta.
 
 [Reguły](rules/index.md)
-: Co wyłapuje każdy kod i jak to naprawić.
+: Każdy kod i jego naprawa.
 
 [Jak działa z agentami](04-AI-Integration.md)
-: Hooki, Stop gate i config guard.
+: Hooki i Stop gate.
 
 [Architektura i decyzje](03-Architecture-C4.md)
-: Widoki C4 i [wszystkie decyzje](05-ADR.md).
+: Widoki C4 i [decyzje](05-ADR.md).
 
 </nav>
 

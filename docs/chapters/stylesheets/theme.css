@@ -68,9 +68,14 @@
   line-gap-override: 0%;
 }
 
-/* Colour tokens. Six named colours, each with a light and a dark value.
-   Hunk is the one accent (links, current nav item, focus, primary actions);
-   Removed and Added are diff law, for violations and passes only. */
+/* Colour tokens. Six named colours, each with a light and a dark value:
+   Paper, Ink, Graphite, Hunk, Removed and Added. Hunk is the one accent
+   (links, current nav item, focus, primary actions); Removed and Added are
+   diff law, for violations and passes only. The rest are tones of those six,
+   written out rather than mixed so each contrast ratio in docs/DESIGN.md is
+   exact: paper-2 (code and admonition surface) and rule (hairlines) from
+   Paper and Graphite, hunk-strong (hover), on-hunk (text on a Hunk fill),
+   and the two diff tints. */
 :root,
 [data-md-color-scheme="default"] {
   --inw-paper: rgb(255 255 255);

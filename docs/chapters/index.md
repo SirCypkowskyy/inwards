@@ -3,14 +3,12 @@ template: home.html
 hide:
   - navigation
   - toc
+  - footer
 ---
 
 <div class="inw-hero" markdown>
 
-# Inwards
-
-Architecture rules for Python, fast enough to run after every edit an AI agent makes.
-{ .inw-lede }
+# <span class="inw-sr-only">Inwards: </span>Architecture rules for Python, fast enough to run after every edit an AI agent makes. { #inwards .inw-lede }
 
 You declare the layers in `pyproject.toml`. When an import points the wrong way, `inwards check` names the line and tells the agent how to fix it.
 
@@ -34,7 +32,7 @@ shop/domain/order.py:6:50: <b class="inw-code">INW001</b> Layer "domain" imports
   docs: https://sircypkowskyy.github.io/inwards/rules/INW001/
 
 Found 1 violation in 1 file (63.7 ms).</code></pre>
-<figcaption>A real run of Inwards 0.4.0 on the example app from <code>inwards init --scaffold</code>, with one bad import added, on 2026-09-29. Exit code 1.</figcaption>
+<figcaption>A real run of Inwards 0.4.0 on the scaffold's example app, 2026-09-29.</figcaption>
 </figure>
 
 <div class="inw-premises" markdown>
@@ -43,7 +41,7 @@ Found 1 violation in 1 file (63.7 ms).</code></pre>
 
 ## Your architecture, as rules
 
-`inwards init --style layered|clean|hexagonal` writes the layers into `pyproject.toml`, innermost first. [INW001](rules/INW001.md) enforces the direction, and every diagnostic carries its fix steps. [Configuration](guides/configuration.md)
+[Layers](guides/configuration.md) go in `pyproject.toml`, innermost first. [INW001](rules/INW001.md) enforces the direction; every diagnostic carries fix steps.
 
 ```toml
 [tool.inwards]
@@ -63,10 +61,10 @@ layers = [
 
 ## Built into the agent loop
 
-A check after each edit, a Stop gate over everything the session changed (Bash edits and commits too), a config guard that refuses edits to the rules, and escalation to you after [`escalate-after`](guides/configuration.md#escalate-after) attempts (3 by default). [How the loop works](04-AI-Integration.md#where-inwards-sits-in-the-agent-loop)
+[A check after each edit](04-AI-Integration.md#where-inwards-sits-in-the-agent-loop), a Stop gate over the whole session (Bash edits too), a config guard on the rules, and escalation to you after [`escalate-after`](guides/configuration.md#escalate-after) tries.
 
 <div class="homepage-loop-wrap">
-<svg id="homepage-loop" viewBox="0 0 820 160" role="img"
+<svg id="homepage-loop" viewBox="0 0 380 290" role="img"
      aria-label="Agent edits a file, then the hook runs inwards check. On a violation, the agent gets fix steps and loops back. When clean, the agent continues.">
   <defs>
     <marker id="hl-arrow" viewBox="0 0 10 10" refX="9" refY="5"
@@ -76,28 +74,29 @@ A check after each edit, a Stop gate over everything the session changed (Bash e
   </defs>
 
   <path id="hl-edge-to-hook" class="hl-edge" marker-end="url(#hl-arrow)"
-        d="M170,50 H330" />
+        d="M95,60 V112" />
   <path id="hl-edge-violation" class="hl-edge hl-edge-dashed" marker-end="url(#hl-arrow)"
-        d="M400,70 C400,110 250,110 170,70" />
-  <text class="hl-edge-label" x="285" y="122">violation + fix steps</text>
+        d="M180,148 C262,148 262,35 188,35" />
+  <text class="hl-edge-label hl-edge-label--side" x="252" y="86">violation</text>
+  <text class="hl-edge-label hl-edge-label--side" x="252" y="104">+ fix steps</text>
   <path id="hl-edge-clean" class="hl-edge" marker-end="url(#hl-arrow)"
-        d="M480,50 H610" />
-  <text class="hl-edge-label" x="545" y="40">clean</text>
+        d="M95,176 V222" />
+  <text class="hl-edge-label hl-edge-label--side" x="105" y="203">clean</text>
 
   <g id="hl-agent" class="hl-node" tabindex="0">
-    <rect x="20" y="20" width="150" height="60" rx="6" />
-    <text x="95" y="50">Agent edits a file</text>
+    <rect x="10" y="10" width="170" height="50" rx="6" />
+    <text x="95" y="35">Agent edits a file</text>
   </g>
 
   <g id="hl-hook" class="hl-node hl-node--inwards" tabindex="0">
-    <rect x="340" y="20" width="140" height="60" rx="6" />
-    <text x="410" y="42">Hook runs</text>
-    <text x="410" y="60">inwards check</text>
+    <rect x="10" y="120" width="170" height="56" rx="6" />
+    <text x="95" y="139">Hook runs</text>
+    <text x="95" y="158">inwards check</text>
   </g>
 
   <g id="hl-outcomes" class="hl-node hl-node--end">
-    <rect x="620" y="20" width="180" height="60" rx="6" />
-    <text x="710" y="50">Agent continues</text>
+    <rect x="10" y="230" width="170" height="50" rx="6" />
+    <text x="95" y="255">Agent continues</text>
   </g>
 </svg>
 </div>
@@ -108,7 +107,7 @@ A check after each edit, a Stop gate over everything the session changed (Bash e
 
 ## Catches what agents do
 
-A [hallucinated module](04-AI-Integration.md#catching-hallucinated-modules) (INW010), an import behind `TYPE_CHECKING`, a [dynamic import](rules/INW011.md) (INW011): one real run, one file. Suppressions need a reason ([INW009](rules/INW009.md)), and loosening the config or baselining a violation is refused. [Every dodge Inwards covers](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)
+[Hallucinated modules](04-AI-Integration.md#catching-hallucinated-modules), imports behind `TYPE_CHECKING`, [dynamic imports](rules/INW011.md). Suppressions need a reason ([INW009](rules/INW009.md)); [loosening the config is refused](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
 
 ```console
 $ uv run inwards check shop/domain/dodge.py --format concise
@@ -126,21 +125,21 @@ Found 3 violations in 1 file (109.4 ms).
 
 ## Fast enough for every edit
 
-Since bytecode compilation, the one-file check a hook runs stays under its 100 ms p95 budget, even on a 4,482-line file.
+The one-file check a hook runs stays under its 100 ms p95 budget, even on a 4,482-line file.
 
 <figure class="inw-chart" markdown>
 <table markdown>
-<thead><tr><th scope="col">File checked</th><th scope="col">p95 wall time, budget 100 ms</th></tr></thead>
+<thead><tr><th scope="col">File</th><th scope="col">p95, of 100 ms</th></tr></thead>
 <tbody markdown>
 <tr markdown><th scope="row" markdown="span">[saleor, one file](06-Constraints-and-Quality.md#measurements)</th><td><span class="inw-track" style="--v: 30"><span class="inw-bar"></span><span class="inw-val">30 ms</span></span></td></tr>
 <tr markdown><th scope="row" markdown="span">[The scaffold's example app](06-Constraints-and-Quality.md#spike-bytecode-and-minification)</th><td><span class="inw-track" style="--v: 39.5"><span class="inw-bar"></span><span class="inw-val">39.5 ms</span></span></td></tr>
 <tr markdown><th scope="row" markdown="span">[polar, a 4,482-line file](06-Constraints-and-Quality.md#measurements)</th><td><span class="inw-track" style="--v: 90"><span class="inw-bar"></span><span class="inw-val inw-val--in">90 ms</span></span></td></tr>
 </tbody>
 </table>
-<figcaption markdown="span">`inwards check <file>`, process start included, one thread, measured on 2026-09-26. The bar ends at the 100 ms budget.</figcaption>
+<figcaption markdown="span">`inwards check <file>` with process start, one thread, 2026-09-26.</figcaption>
 </figure>
 
-A cold full check reads the [496,000-line synthetic repo](06-Constraints-and-Quality.md#measurements) in about 0.4 s and saleor's 848,000 lines in about 1.8 s, on one core. The prescan missed [0 imports in 6,543 files](06-Constraints-and-Quality.md#results) from five open-source services.
+Cold full check, one core: [496,000 lines in 0.4 s](06-Constraints-and-Quality.md#measurements), saleor's 848,000 in 1.8 s. Prescan misses: [0 in 6,543 files](06-Constraints-and-Quality.md#results).
 
 </div>
 
@@ -148,7 +147,7 @@ A cold full check reads the [496,000-line synthetic repo](06-Constraints-and-Qua
 
 ## Quickstart
 
-1. Install Inwards as a dev dependency, or take a binary from the [install guide](guides/install.md#from-a-release).
+1. Install it, or [take a binary](guides/install.md#from-a-release).
 
     === "uv"
 
@@ -162,7 +161,7 @@ A cold full check reads the [496,000-line synthetic repo](06-Constraints-and-Qua
         pip install inwards
         ```
 
-2. Install the Claude Code hooks. On a new project, add `--style clean --scaffold` for the layers and an example package.
+2. Add the Claude Code hooks. New project? Add `--style clean --scaffold`.
 
     === "uv"
 
@@ -176,7 +175,7 @@ A cold full check reads the [496,000-line synthetic repo](06-Constraints-and-Qua
         inwards init --agent claude
         ```
 
-3. Check the whole project.
+3. Check the project.
 
     === "uv"
 
@@ -190,23 +189,23 @@ A cold full check reads the [496,000-line synthetic repo](06-Constraints-and-Qua
         inwards check
         ```
 
-Other agents: [OpenCode](guides/opencode.md), [Aider](guides/aider.md), and Codex, Cursor and the rest through [`AGENTS.md`](guides/agents-md.md).
+Other agents: [OpenCode](guides/opencode.md), [Aider](guides/aider.md), [`AGENTS.md`](guides/agents-md.md).
 
 </div>
 
 <nav class="inw-entries" aria-label="Documentation" markdown>
 
 [Get started](guides/install.md)
-: Install, then connect your agent.
+: Install and connect your agent.
 
 [Rules](rules/index.md)
-: What each code catches, and the fix.
+: Each code and its fix.
 
 [How it works with agents](04-AI-Integration.md)
-: Hooks, the Stop gate and the config guard.
+: Hooks and the Stop gate.
 
 [Architecture and decisions](03-Architecture-C4.md)
-: The C4 views and [every decision](05-ADR.md).
+: C4 views and [decisions](05-ADR.md).
 
 </nav>
 

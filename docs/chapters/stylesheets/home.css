@@ -90,14 +90,15 @@
   display: none;
 }
 
-.md-typeset .inw-hero h1 {
-  display: flex;
-  gap: 0.4em;
-  align-items: center;
-  margin: 0 0 0.6rem;
-  font-size: 1em;
-  font-weight: 700;
-  color: var(--inw-hunk);
+/* The product name is in the header and the title; the h1 reads it to
+   screen readers and shows the value proposition. */
+.md-typeset .inw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .md-typeset .inw-hero .inw-lede {
@@ -283,11 +284,10 @@
   margin: 0;
 }
 
-/* The loop diagram is wide and keeps legible text only at full width. */
 .md-typeset .inw-premise > .homepage-loop-wrap {
-  grid-column: 1 / -1;
-  max-width: 48rem;
-  margin: 1.2rem 0 0;
+  grid-row: 1 / span 3;
+  grid-column: 2;
+  margin: 0;
 }
 
 .md-typeset .inw-premises .inw-premise .highlight code {
@@ -335,6 +335,7 @@
 
 .md-typeset .inw-chart tbody th {
   width: 38%;
+  background: none;
   padding: 0.5rem 1rem 0.5rem 0;
   font-weight: 400;
   text-align: left;
@@ -374,7 +375,7 @@
 
 /* A bar too long for the label beside it takes the label inside. */
 .md-typeset .inw-val--in {
-  right: 0.5rem;
+  right: calc((100 - var(--v)) * 1% + 0.4rem);
   left: auto;
   color: var(--inw-on-hunk);
 }
@@ -460,7 +461,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .md-typeset .inw-premise > .highlight {
+  .md-typeset .inw-premise > :is(.highlight, .homepage-loop-wrap) {
     grid-row: auto;
     grid-column: 1;
     margin-top: 0.8rem;
