@@ -1,0 +1,39 @@
+{#-
+  The home page layout (issue #177), picked by `template: home.html` in the
+  front matter of docs/chapters/index.md and docs/pl/index.md. Zensical
+  honours that key, so no homepage check in main.html is needed.
+
+  It changes one thing: the page content is wrapped in `.inw-home`, which
+  scopes the home styles in stylesheets/extra.css. All copy stays in the two
+  index.md files so the Polish page translates it. The comment below is the
+  direction contract impeccable's new-work step records; the issue asks for
+  it to ship in the built index.html so a reviewer can grep for it.
+-#}
+{% extends "main.html" %}
+{% block content %}
+<!--
+  DIRECTION CONTRACT (impeccable new-work, issue #177)
+  THESIS: The home page is a code review of one agent edit: a comment anchored to the exact line and column
+    that broke the architecture, with the fix steps under it. It refuses the dev-tool default of a dark hero,
+    a slogan and a terminal screenshot beside it.
+  OWN-WORLD: White paper and slate ink (dark: slate paper, pale ink), one cyan-blue Hunk accent for links,
+    the current nav item, focus and primary actions. Red and green are diff law: red marks a violation,
+    green a pass, never decoration. Atkinson Hyperlegible Next for text, Atkinson Hyperlegible Mono for code.
+    Gutters with real line numbers, 1px rules, 6px radii, no cards, no shadow outside the header.
+  STORY: A Python engineer sees an agent's bad import flagged at 6:50 with four fix steps, believes the check
+    is fast (chapter 6's numbers against the 100 ms budget) and hard to dodge (real INW010/INW001/INW011 lines),
+    and copies three commands.
+  FIRST VIEWPORT: Left-aligned. "Inwards" as h1, the 15-word value proposition at display size, one supporting
+    sentence, Get started (filled Hunk) and Browse the rules (outlined) side by side. Below them at full
+    content width, the review pane: a path bar, lines 3 to 6 of shop/domain/order.py with line 6 in the
+    removed tint and column 50 underlined, then the real `inwards check` output. At 390 px the pane starts
+    at line 5 and the first diagnostic line is above the fold.
+  FORM: Unified diff and code review, candidate 6 of 7 on the grounded list; seed key 23558c32.
+    Signature motion: the agent-loop diagram plays one review cycle (edit, check, violation, fix, clean) once.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict,
+    DESIGN.md, and every shipping raster carrying its provenance
+-->
+<div class="inw-home">
+  {{ super() }}
+</div>
+{% endblock %}

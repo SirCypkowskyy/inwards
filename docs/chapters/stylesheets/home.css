@@ -1,0 +1,516 @@
+/* fallow-ignore-file unused-file */
+/* Loaded via docs/zensical.toml's extra_css, a TOML config fallow's JS
+   import graph can't trace.
+
+/* The home page (issue #177): overrides/home.html wraps its content in
+   .inw-home, so nothing here reaches another page. docs/DESIGN.md has the
+   layout. Not layered, unlike the diagrams above: these rules restyle
+   elements the theme already styles (headings, pre, lists), and the theme's
+   unlayered rules would beat any layer. */
+
+/* The loop plays one review cycle once on load: edit to hook, violation
+   back to the agent, hook again, clean. No fill mode, so hover, focus and
+   tap highlighting take over afterwards; theme.css stops it under
+   prefers-reduced-motion. */
+@keyframes hl-cycle-to-hook {
+  0%,
+  6%,
+  26%,
+  46%,
+  64%,
+  100% {
+    stroke: var(--md-default-fg-color--light);
+  }
+
+  10%,
+  22%,
+  50%,
+  60% {
+    stroke: var(--md-accent-fg-color);
+  }
+}
+
+@keyframes hl-cycle-violation {
+  0%,
+  24%,
+  44%,
+  100% {
+    stroke: var(--md-default-fg-color--light);
+  }
+
+  28%,
+  40% {
+    stroke: var(--inw-removed);
+  }
+}
+
+@keyframes hl-cycle-clean {
+  0%,
+  62%,
+  100% {
+    stroke: var(--md-default-fg-color--light);
+  }
+
+  66%,
+  92% {
+    stroke: var(--inw-added);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .inw-home #hl-edge-to-hook {
+    animation: hl-cycle-to-hook 5s cubic-bezier(0.16, 1, 0.3, 1) 0.8s 1;
+  }
+
+  .inw-home #hl-edge-violation {
+    animation: hl-cycle-violation 5s cubic-bezier(0.16, 1, 0.3, 1) 0.8s 1;
+  }
+
+  .inw-home #hl-edge-clean {
+    animation: hl-cycle-clean 5s cubic-bezier(0.16, 1, 0.3, 1) 0.8s 1;
+  }
+}
+
+.md-typeset .inw-home {
+  --inw-gap: 4.5rem;
+}
+
+.md-typeset .inw-home :is(p, ul, ol, dl) {
+  max-width: 36em;
+}
+
+/* Hero. */
+.md-typeset .inw-hero {
+  padding-top: 0.4rem;
+}
+
+/* The pane is a picture of a run, not a snippet to paste: the quickstart
+   has the commands with copy buttons. */
+.md-typeset .inw-review :is(.md-clipboard, .md-code__nav) {
+  display: none;
+}
+
+.md-typeset .inw-hero h1 {
+  display: flex;
+  gap: 0.4em;
+  align-items: center;
+  margin: 0 0 0.6rem;
+  font-size: 1em;
+  font-weight: 700;
+  color: var(--inw-hunk);
+}
+
+.md-typeset .inw-hero .inw-lede {
+  max-width: 17em;
+  margin: 0 0 1rem;
+  font-size: clamp(1.55rem, 1rem + 3.2vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  color: var(--inw-ink);
+  text-wrap: balance;
+}
+
+.md-typeset .inw-hero .inw-lede + p {
+  max-width: 34em;
+  font-size: 1.1em;
+  color: var(--inw-graphite);
+}
+
+.md-typeset .inw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.4rem 0 0;
+}
+
+.md-typeset .inw-actions .md-button {
+  margin: 0;
+}
+
+/* The review pane: a file path bar, the hunk with real line numbers, the
+   flagged line in the Removed tint, then the output under it. */
+/* The theme centres figures in a flex column; these two read left. */
+.md-typeset .inw-review,
+.md-typeset .inw-chart {
+  display: block;
+  text-align: left;
+}
+
+.md-typeset .inw-review {
+  max-width: none;
+  margin: 2rem 0 0;
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-align: left;
+  background-color: var(--inw-paper);
+  border: 1px solid var(--inw-rule);
+  border-radius: 6px;
+}
+
+.md-typeset .inw-review__path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  justify-content: space-between;
+  padding: 0.45rem 0.8rem;
+  font-family: var(--md-code-font-family);
+  font-size: 0.95em;
+  color: var(--inw-graphite);
+  background-color: var(--inw-paper-2);
+  border-bottom: 1px solid var(--inw-rule);
+}
+
+.md-typeset .inw-review__path span:first-child {
+  font-weight: 700;
+  color: var(--inw-ink);
+}
+
+.md-typeset .inw-review pre {
+  margin: 0;
+}
+
+.md-typeset .inw-review pre > code {
+  display: block;
+  padding: 0.5rem 0;
+  font-size: 1em;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.md-typeset .inw-review pre.inw-review__hunk > code {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--inw-rule);
+}
+
+/* A wrapped line continues after the gutter, not under the number. */
+.md-typeset .inw-line {
+  display: block;
+  min-height: 1.6em;
+  padding-left: 4.8em;
+  text-indent: -4.8em;
+}
+
+.md-typeset .inw-line--bad {
+  background-color: var(--inw-removed-tint);
+}
+
+.md-typeset .inw-ln {
+  display: inline-block;
+  width: 3.2em;
+  padding-right: 0.8em;
+  margin-right: 0.8em;
+  color: var(--inw-graphite);
+  text-indent: 0;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid var(--inw-rule);
+}
+
+.md-typeset .inw-line--bad .inw-ln {
+  font-weight: 700;
+  color: var(--inw-removed);
+}
+
+.md-typeset .inw-flag {
+  text-decoration: underline wavy var(--inw-removed);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
+}
+
+.md-typeset .inw-review pre.inw-review__out > code {
+  padding: 0.6rem 0.8rem 0.8rem 4.6em;
+  text-indent: 0;
+}
+
+.md-typeset .inw-prompt {
+  color: var(--inw-graphite);
+}
+
+.md-typeset .inw-code {
+  color: var(--inw-removed);
+}
+
+/* Captions stay upright: the home page loads no italic face. */
+.md-typeset .inw-home figcaption {
+  font-style: normal;
+}
+
+.md-typeset .inw-review figcaption {
+  max-width: none;
+  padding: 0.5rem 0.8rem;
+  margin: 0;
+  font-family: var(--md-text-font-family);
+  font-size: 0.95em;
+  color: var(--inw-graphite);
+  text-align: left;
+  border-top: 1px solid var(--inw-rule);
+}
+
+/* Premises: each one a row, the words on the left and the artifact on the
+   right, aligned to the same two columns as the review pane above. */
+.md-typeset .inw-premises {
+  margin-top: var(--inw-gap);
+}
+
+.md-typeset .inw-premise {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 0.4rem 2.4rem;
+  align-items: start;
+  padding: 2rem 0;
+  border-top: 1px solid var(--inw-rule);
+}
+
+.md-typeset .inw-premise > h2 {
+  grid-column: 1;
+  margin: 0;
+  font-size: 1.44em;
+}
+
+.md-typeset .inw-premises .inw-premise > p {
+  grid-column: 1;
+  margin: 0;
+}
+
+.md-typeset .inw-premise > .highlight {
+  grid-row: 1 / span 3;
+  grid-column: 2;
+  margin: 0;
+}
+
+/* The loop diagram is wide and keeps legible text only at full width. */
+.md-typeset .inw-premise > .homepage-loop-wrap {
+  grid-column: 1 / -1;
+  max-width: 48rem;
+  margin: 1.2rem 0 0;
+}
+
+.md-typeset .inw-premises .inw-premise .highlight code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Performance. */
+.md-typeset .inw-speed,
+.md-typeset .inw-start {
+  margin-top: var(--inw-gap);
+}
+
+.md-typeset .inw-speed > h2,
+.md-typeset .inw-start > h2 {
+  margin-top: 0;
+}
+
+.md-typeset .inw-chart {
+  max-width: 44rem;
+  margin: 1.4rem 0 1.2rem;
+}
+
+/* The theme wraps every table in an inline-block scroller; this one is a
+   chart and takes the figure's width. */
+.md-typeset .inw-chart :is(.md-typeset__scrollwrap, .md-typeset__table) {
+  display: block;
+  margin: 0;
+}
+
+.md-typeset .inw-chart table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.md-typeset .inw-chart thead th {
+  padding: 0 0 0.4rem;
+  font-weight: 400;
+  color: var(--inw-graphite);
+  text-align: left;
+}
+
+.md-typeset .inw-chart tbody th {
+  width: 38%;
+  padding: 0.5rem 1rem 0.5rem 0;
+  font-weight: 400;
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* Each track is the 0 to 100 ms budget, ending in an ink tick; the bar
+   is the measured p95. */
+.md-typeset .inw-chart td {
+  padding: 0.5rem 0;
+  vertical-align: middle;
+}
+
+.md-typeset .inw-track {
+  position: relative;
+  display: block;
+  height: 1.4rem;
+  background-color: var(--inw-rule);
+  box-shadow: inset -2px 0 0 var(--inw-ink);
+}
+
+.md-typeset .inw-bar {
+  display: block;
+  width: calc(var(--v) * 1%);
+  height: 100%;
+  background-color: var(--inw-hunk);
+}
+
+.md-typeset .inw-val {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--v, 0) * 1% + 0.4rem);
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+/* A bar too long for the label beside it takes the label inside. */
+.md-typeset .inw-val--in {
+  right: 0.5rem;
+  left: auto;
+  color: var(--inw-on-hunk);
+}
+
+.md-typeset .inw-chart figcaption {
+  max-width: none;
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--inw-graphite);
+  text-align: left;
+}
+
+/* Quickstart: a real sequence, so the numbers stay. */
+.md-typeset .inw-start > ol {
+  max-width: 44rem;
+  padding: 0;
+  margin-left: 0;
+  list-style: none;
+  counter-reset: inw-step;
+}
+
+.md-typeset .inw-start > ol > li {
+  position: relative;
+  padding-left: 2.6em;
+  margin: 0 0 1.4rem;
+  counter-increment: inw-step;
+}
+
+.md-typeset .inw-start > ol > li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 1.7em;
+  height: 1.7em;
+  font-weight: 700;
+  color: var(--inw-hunk);
+  content: counter(inw-step);
+  border: 1px solid var(--inw-hunk);
+  border-radius: 50%;
+}
+
+/* Entry points: four links on one rule, not cards. */
+.md-typeset .inw-entries {
+  margin-top: var(--inw-gap);
+  border-top: 1px solid var(--inw-rule);
+}
+
+.md-typeset .inw-entries dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 2rem;
+  max-width: none;
+  margin: 0;
+  padding-top: 1.4rem;
+}
+
+.md-typeset .inw-entries dt {
+  grid-row: 1;
+  margin: 0;
+  font-weight: 700;
+}
+
+.md-typeset .inw-entries dd {
+  grid-row: 2;
+  margin: 0.2rem 0 0;
+  color: var(--inw-graphite);
+}
+
+.md-typeset .inw-status {
+  margin: 2.4rem 0 1rem;
+  font-size: 0.9em;
+  color: var(--inw-graphite);
+}
+
+@media screen and (max-width: 59.9844em) {
+  .md-typeset .inw-home {
+    --inw-gap: 3rem;
+  }
+
+  .md-typeset .inw-premise {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .md-typeset .inw-premise > .highlight {
+    grid-row: auto;
+    grid-column: 1;
+    margin-top: 0.8rem;
+  }
+
+  .md-typeset .inw-entries dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .md-typeset .inw-entries dt,
+  .md-typeset .inw-entries dd {
+    grid-row: auto;
+  }
+
+  .md-typeset .inw-entries dd {
+    margin-bottom: 1rem;
+  }
+}
+
+@media screen and (max-width: 44.9844em) {
+  .md-typeset .inw-hero {
+    padding-top: 0;
+  }
+
+  .md-typeset .inw-hero .inw-lede + p {
+    font-size: 1em;
+  }
+
+  .md-typeset .inw-actions {
+    margin-top: 1rem;
+  }
+
+  .md-typeset .inw-review {
+    margin-top: 1.2rem;
+  }
+
+  .md-typeset .inw-line--far {
+    display: none;
+  }
+
+  .md-typeset .inw-review pre.inw-review__hunk > code {
+    font-size: 0.95em;
+  }
+
+  .md-typeset .inw-review pre.inw-review__out > code {
+    padding-left: 0.8rem;
+  }
+
+  .md-typeset .inw-chart tbody th {
+    width: 42%;
+  }
+}
