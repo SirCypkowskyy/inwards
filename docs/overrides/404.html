@@ -1,0 +1,17 @@
+{#-
+  The 404 page (issue #177). The theme's version is a bare "404 - Not
+  found" heading; this one says what happened and offers the two pages most
+  visitors want, the home page and the rules index (a rule URL from an old
+  diagnostic is the likeliest way to land here). The Polish site gets Polish
+  text; both configs share this template, so the language picks the copy.
+-#}
+{% extends "main.html" %}
+{% block content %}
+  {% set pl = config.theme.language == "pl" %}
+  <h1>{{ "Nie ma tu takiej strony" if pl else "There is no page here" }}</h1>
+  <p>{{ "Adres mógł się zmienić albo zawiera literówkę. Strony reguł mają adresy rules/INW001/, rules/FAPI001/ i tak dalej." if pl else "The address may have changed or has a typo. Rule pages live at rules/INW001/, rules/FAPI001/ and so on." }}</p>
+  <p class="inw-actions">
+    <a class="md-button md-button--primary" href="{{ nav.homepage.url | url }}">{{ "Strona główna" if pl else "Home page" }}</a>
+    <a class="md-button" href="{{ 'rules/' | url }}">{{ "Wszystkie reguły" if pl else "All rules" }}</a>
+  </p>
+{% endblock %}

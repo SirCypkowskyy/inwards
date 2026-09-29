@@ -22,19 +22,45 @@
     min-width: 720px;
     height: auto;
     font-family: var(--md-text-font-family, sans-serif);
-    font-size: 13px;
+    font-size: 14px;
   }
 
+  /* Nodes in Paper 2 with ink labels; the hook, which is Inwards, in Hunk;
+     the end state outlined in Added, since it is the pass. */
   #homepage-loop .hl-node rect {
-    fill: var(--md-primary-fg-color);
-    stroke: var(--md-primary-fg-color--dark);
-    stroke-width: 1.5;
+    fill: var(--inw-paper-2, var(--md-default-bg-color));
+    stroke: var(--md-default-fg-color--light);
+    stroke-width: 1;
   }
 
   #homepage-loop .hl-node text {
-    fill: var(--md-primary-bg-color);
+    fill: var(--md-default-fg-color);
     text-anchor: middle;
     dominant-baseline: middle;
+  }
+
+  #homepage-loop .hl-node--inwards rect {
+    fill: var(--md-primary-fg-color);
+    stroke: var(--md-primary-fg-color);
+  }
+
+  #homepage-loop .hl-node--inwards text {
+    fill: var(--md-primary-bg-color);
+    font-weight: 700;
+  }
+
+  #homepage-loop .hl-node--end rect {
+    stroke: var(--inw-added, var(--md-default-fg-color--light));
+    stroke-width: 1.5;
+  }
+
+  #homepage-loop .hl-node:focus-visible {
+    outline: none;
+  }
+
+  #homepage-loop .hl-node:focus-visible rect {
+    stroke: var(--md-default-fg-color);
+    stroke-width: 2.5;
   }
 
   #homepage-loop .hl-edge {
