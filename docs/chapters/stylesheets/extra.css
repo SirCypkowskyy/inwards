@@ -146,7 +146,7 @@
   }
 
   #quadrant-chart .qc-point circle {
-    fill: var(--md-accent-fg-color);
+    fill: var(--md-default-fg-color--light);
   }
 
   #quadrant-chart .qc-point-target circle {

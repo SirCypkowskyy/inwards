@@ -8,9 +8,9 @@
 
    Why this file is not in a cascade layer: the theme's own CSS is unlayered,
    and unlayered rules beat every layer whatever their specificity, so a
-   layered token or override would lose to the theme. New components that the
-   theme never styles (the home page, the diagrams) live in layers in
-   extra.css instead. */
+   layered token or override would lose to the theme. The diagrams, which
+   the theme never styles, stay in a layer in extra.css; the home page,
+   which restyles theme elements, is unlayered in home.css. */
 
 /* Fonts. Atkinson Hyperlegible Next and Mono, SIL OFL 1.1 (licences in
    assets/fonts/), variable weight 200 to 800. Each file is the google/fonts
