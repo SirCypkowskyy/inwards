@@ -68,17 +68,17 @@ Two things the synthetic repo didn't show. `inwards check` on polar's `subscript
 
 | Scenario | Result | Budget | Status |
 |---|---|---|---|
-| Cold full run, naive full parse (first design) | 7.5 s | < 1 s | :x: rejected, led to ADR-004 |
+| Cold full run, naive full parse (first design) | 7.5 s | < 1 s | :material-close-circle: rejected, led to ADR-004 |
 | Cold full run, import skeleton | 0.63 to 1.17 s (runs across two sessions) | < 1 s | :material-alert: at the edge |
 | Warm full run, extraction cache ([#56](https://github.com/SirCypkowskyy/inwards/issues/56)) | p50 0.46 s, against 1.25 s uncached in the same run (3.0 times faster, machine under load) | n/a | |
 | Cold whole-project check with the import cycle search ([#54](https://github.com/SirCypkowskyy/inwards/issues/54), `cycles = ["modules"]`), 8 alternating runs each with `INWARDS_NO_CACHE=1`, load average about 1.1 | median 1.51 s, against 1.35 s for the same check without it; most modules sit in cyclic groups, and every file in them is confirmed (a full parse of each would take about 7 s) | < 1 s | :material-alert: over budget on this machine with or without the search; the 0.40 to 0.44 s spot check below was on a quiet machine |
-| Single file, wall time incl. process start (30 runs) | p50 48.6 ms, p95 80.4 ms | p95 < 100 ms | :white_check_mark: with little headroom |
+| Single file, wall time incl. process start (30 runs) | p50 48.6 ms, p95 80.4 ms | p95 < 100 ms | :material-check-circle: with little headroom |
 | Single file, engine time reported by the CLI | 16 to 30 ms | n/a | |
 | `inwards --version` (process start only) | about 10 ms | n/a | |
-| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter). Since #44 the index reads nothing up front: building it takes 17 to 21 ms, listing the 2,100 modules 25 to 32 ms, and the importers read the files they need, 0.53 to 0.71 s in total (0.58 to 0.66 s for the eager index it replaced) | < 1 s | :white_check_mark: |
-| Prescan refusals on the CPython 3.14 stdlib | 8.3 % of 1,921 files | lower is faster | :white_check_mark: |
-| Prescan missed imports on the same corpus | 0 | 0 | :white_check_mark: |
-| Prescan missed imports on the real-repo corpus (6,543 files, five services) | 0 | 0 | :white_check_mark: |
+| Module index + importers of one module, cold, one core (2,100 files, fresh process) | 0.1 s index + 0.65 to 0.74 s for the importers (684 files mention `m0`: the synthetic names are the worst case for the text filter). Since #44 the index reads nothing up front: building it takes 17 to 21 ms, listing the 2,100 modules 25 to 32 ms, and the importers read the files they need, 0.53 to 0.71 s in total (0.58 to 0.66 s for the eager index it replaced) | < 1 s | :material-check-circle: |
+| Prescan refusals on the CPython 3.14 stdlib | 8.3 % of 1,921 files | lower is faster | :material-check-circle: |
+| Prescan missed imports on the same corpus | 0 | 0 | :material-check-circle: |
+| Prescan missed imports on the real-repo corpus (6,543 files, five services) | 0 | 0 | :material-check-circle: |
 | Peak memory, full synthetic run | about 120 MB RSS | n/a | |
 | Binary size, Linux x64 | 82 MB | n/a | :material-alert: large |
 
@@ -123,15 +123,15 @@ config:
   theme: base
   themeVariables:
     pieSectionTextColor: "#ffffff"
-    pieLegendTextColor: "#607d8b"
+    pieTitleTextColor: "#6b7580"
     pieStrokeColor: "#ffffff"
     pieOpacity: "1"
-    pie1: "#4527a0"
-    pie2: "#673ab7"
-    pie3: "#7e57c2"
-    pie4: "#37474f"
-    pie5: "#455a64"
-    pie6: "#546e7a"
+    pie1: "#084e65"
+    pie2: "#0b6784"
+    pie3: "#2f7f99"
+    pie4: "#3e4852"
+    pie5: "#56616c"
+    pie6: "#6b7580"
 ---
 pie showData
     title One-file check, about 25 ms of work (engine + start-up)
@@ -152,9 +152,9 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 | Step | Expected effect | Targets |
 |---|---|---|
 | Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Removes ~20 ms of WASM and runtime start-up from every hook call | Single-file p95 |
-| :white_check_mark: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), done | Measured: start-up 22 → 10 ms, hook call about 45% faster, 2.5 MB more per binary (see the spike above) | Single-file p95 |
+| :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), done | Measured: start-up 22 → 10 ms, hook call about 45% faster, 2.5 MB more per binary (see the spike above) | Single-file p95 |
 | Worker pool, one parser per core ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Near-linear speed-up on the cold full run on a multi-core machine | Cold full run |
-| :white_check_mark: Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), done for `inwards check` and `inwards baseline` | Measured: a warm full check 3.0 times faster (0.46 s against 1.25 s p50, 12 runs each on this laptop under load), 27% slower while it fills. The hooks don't use it ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Warm full run |
+| :material-check-circle: Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), done for `inwards check` and `inwards baseline` | Measured: a warm full check 3.0 times faster (0.46 s against 1.25 s p50, 12 runs each on this laptop under load), 27% slower while it fills. The hooks don't use it ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Warm full run |
 | Replace `descendantsOfType` with a tree cursor walk on the full-parse path ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)) | Profiling showed 1.2 s spent there on the naive design | Refused files and confirmations |
 
 ### Reproduce
