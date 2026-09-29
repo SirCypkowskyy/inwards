@@ -11,3 +11,8 @@ __pycache__/
 # Written by bench/compare.ts and bench/corpus.ts.
 bench-result.json
 corpus-result.json
+
+# impeccable design tooling (issue #177): local config and review output
+**/.impeccable/config.local.json
+**/.impeccable/review/
+**/.impeccable/mocks/

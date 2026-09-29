@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 334a62ccf73f16a848a6193b3297392e624dfacf6e91775a212f97dfb88e0904
+source_hash: 09cbc76715516ae4114b5c9548aa7f6001e612c8097ea1dddbdc06dbad67d981
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -208,22 +208,22 @@ Model pod presją zakończenia zadania spróbuje najtańszej rzeczy, która zmie
 
 | Obejście | Przykład | Odpowiedź Inwards | Stan |
 |---|---|---|---|
-| Schowanie importu w funkcji | `def save(): from shop.infrastructure import db` | Importy są znajdowane w dowolnym miejscu drzewa | :white_check_mark: |
-| Schowanie go pod `TYPE_CHECKING` | `if TYPE_CHECKING: from shop.infrastructure...` | Też jest sprawdzany. Jeśli sygnatura w domenie zawiera typ z infrastruktury, domeny nie da się zrozumieć ani ponownie użyć bez niego, niezależnie od tego, czy import się wykonuje | :white_check_mark: |
-| Import pakietu zamiast modułu | `from shop import infrastructure` | Rozwiązywany do `shop.infrastructure` | :white_check_mark: |
-| Import względny | `from ..infrastructure import db` | Rozwiązywany względem pakietu pliku | :white_check_mark: |
-| Nowy kod poza wszystkimi warstwami | Utworzenie `shop/persistence/` i import z domeny | INW006: import jest błędem; nowy pakiet dostaje ostrzeżenie | :white_check_mark: |
-| Przeniesienie warstwy | `git mv shop/domain shop/core`, więc prefiks do niczego nie pasuje | INW006: prefiks, który na początku sesji pasował do modułów, a teraz nie pasuje do żadnego, oblewa Stop gate | :white_check_mark: |
-| Kod tam, gdzie nie należy | Nowy `helpers.py` obok `service.py`, pakiet `services/`, `test_x.py` w aplikacji albo `rm service.py` przez Bash | `Write`, który utworzyłby plik, jest odrzucany, zanim plik powstanie, a plik utworzony w inny sposób INW007 blokuje; INW008 nowe od początku sesji oblewa Stop gate ([Kształt pakietu](guides/package-shape.md)) | :white_check_mark: |
-| Biblioteka zamiast warstwy | `from sqlalchemy.orm import Session` w domenie zamiast importu `shop.infrastructure` | INW005: najbardziej wewnętrzna warstwa domyślnie nie może importować frameworków, klientów baz danych ani sieci, ani operacji wejścia-wyjścia z biblioteki standardowej, a każda warstwa może dopuszczać albo zabraniać bibliotek ([Biblioteki w warstwach](guides/libraries.md)) | :white_check_mark: |
-| Import dynamiczny | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 zgłasza dosłowny cel, który sięga do warstwy zewnętrznej, także przez aliasy takie jak `from importlib import import_module as im`. Wyliczany cel (`import_module(f"shop.{name}.db")`, `exec(code)`) jest zgłaszany jako niesprawdzalny w każdej warstwie poza najbardziej zewnętrzną; poprawka każe użyć literału albo przenieść loader do najbardziej zewnętrznej warstwy | :white_check_mark: |
-| Wyciszenie | `# inwards: ignore[INW001] reason="legacy"` przy imporcie | Wyciszenie wymaga kodu i powodu (inaczej INW009) i jest liczone w każdym raporcie. Przy `agent-suppressions = "deny"`, domyślnym, hooki pomijają wyciszenie, którego nie było w pliku na starcie sesji, więc jego naruszenie nadal blokuje edycję i Stop gate; skopiowanie, przeniesienie albo rozszerzenie istniejącego wyciszenia też liczy się jako nowe ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) | :white_check_mark: |
-| Poluzowanie konfiguracji | Przeniesienie `shop.infrastructure` do warstwy domeny | Config guard w `PreToolUse` odrzuca edycję; `sed -i` przez Bash oblewa Stop gate; ludzi obejmuje CODEOWNERS | :white_check_mark: |
-| Wyłączenie reguły | `ignore = ["INW001"]` albo `severity = { INW001 = "warning" }` w `[tool.inwards.rules]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate. INW000 i sprawdzenie sesji pod kątem przeniesienia warstwy pomijają tabelę, więc nawet `ignore = ["INW006"]` ustawione przez użytkownika nie otwiera tej drogi | :white_check_mark: |
-| Uznanie brakującego modułu za generowany | `generated = ["*"]` albo wzorzec, który obejmuje zmyśloną nazwę, w `[tool.inwards]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate, a wzorzec złożony z samych symboli wieloznacznych to błąd konfiguracji. Domyślna lista (`*_pb2`, `*_pb2_grpc`, `_version`) przepuszcza jednak przez INW010 zmyśloną nazwę tej postaci ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)) | :white_check_mark: |
-| Dopisanie naruszenia do baseline'u | Dodanie własnego naruszenia do `inwards-baseline.json` albo uruchomienie `inwards baseline` | Config guard odrzuca edycje pliku i to polecenie, także za `uvx` albo `env`; baseline zmieniony przez Bash oblewa Stop gate, który wtedy nie stosuje żadnego baseline'u | :white_check_mark: |
-| Wyłączenie Inwards | Usunięcie `.inwards/`, usunięcie hooków, ustawienie `disableAllHooks` | Config guard odrzuca edycje `.inwards/` i plików ustawień, które zawierają hooki albo by je wyłączyły; `permissions.deny` go wspiera | :white_check_mark: |
-| Skopiowanie kodu | Wklejenie klasy SQL do `shop/domain/` | Poza zakresem. Duplikacja to sprawa przeglądu kodu i innych narzędzi | :x: |
+| Schowanie importu w funkcji | `def save(): from shop.infrastructure import db` | Importy są znajdowane w dowolnym miejscu drzewa | :material-check-circle: |
+| Schowanie go pod `TYPE_CHECKING` | `if TYPE_CHECKING: from shop.infrastructure...` | Też jest sprawdzany. Jeśli sygnatura w domenie zawiera typ z infrastruktury, domeny nie da się zrozumieć ani ponownie użyć bez niego, niezależnie od tego, czy import się wykonuje | :material-check-circle: |
+| Import pakietu zamiast modułu | `from shop import infrastructure` | Rozwiązywany do `shop.infrastructure` | :material-check-circle: |
+| Import względny | `from ..infrastructure import db` | Rozwiązywany względem pakietu pliku | :material-check-circle: |
+| Nowy kod poza wszystkimi warstwami | Utworzenie `shop/persistence/` i import z domeny | INW006: import jest błędem; nowy pakiet dostaje ostrzeżenie | :material-check-circle: |
+| Przeniesienie warstwy | `git mv shop/domain shop/core`, więc prefiks do niczego nie pasuje | INW006: prefiks, który na początku sesji pasował do modułów, a teraz nie pasuje do żadnego, oblewa Stop gate | :material-check-circle: |
+| Kod tam, gdzie nie należy | Nowy `helpers.py` obok `service.py`, pakiet `services/`, `test_x.py` w aplikacji albo `rm service.py` przez Bash | `Write`, który utworzyłby plik, jest odrzucany, zanim plik powstanie, a plik utworzony w inny sposób INW007 blokuje; INW008 nowe od początku sesji oblewa Stop gate ([Kształt pakietu](guides/package-shape.md)) | :material-check-circle: |
+| Biblioteka zamiast warstwy | `from sqlalchemy.orm import Session` w domenie zamiast importu `shop.infrastructure` | INW005: najbardziej wewnętrzna warstwa domyślnie nie może importować frameworków, klientów baz danych ani sieci, ani operacji wejścia-wyjścia z biblioteki standardowej, a każda warstwa może dopuszczać albo zabraniać bibliotek ([Biblioteki w warstwach](guides/libraries.md)) | :material-check-circle: |
+| Import dynamiczny | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 zgłasza dosłowny cel, który sięga do warstwy zewnętrznej, także przez aliasy takie jak `from importlib import import_module as im`. Wyliczany cel (`import_module(f"shop.{name}.db")`, `exec(code)`) jest zgłaszany jako niesprawdzalny w każdej warstwie poza najbardziej zewnętrzną; poprawka każe użyć literału albo przenieść loader do najbardziej zewnętrznej warstwy | :material-check-circle: |
+| Wyciszenie | `# inwards: ignore[INW001] reason="legacy"` przy imporcie | Wyciszenie wymaga kodu i powodu (inaczej INW009) i jest liczone w każdym raporcie. Przy `agent-suppressions = "deny"`, domyślnym, hooki pomijają wyciszenie, którego nie było w pliku na starcie sesji, więc jego naruszenie nadal blokuje edycję i Stop gate; skopiowanie, przeniesienie albo rozszerzenie istniejącego wyciszenia też liczy się jako nowe ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) | :material-check-circle: |
+| Poluzowanie konfiguracji | Przeniesienie `shop.infrastructure` do warstwy domeny | Config guard w `PreToolUse` odrzuca edycję; `sed -i` przez Bash oblewa Stop gate; ludzi obejmuje CODEOWNERS | :material-check-circle: |
+| Wyłączenie reguły | `ignore = ["INW001"]` albo `severity = { INW001 = "warning" }` w `[tool.inwards.rules]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate. INW000 i sprawdzenie sesji pod kątem przeniesienia warstwy pomijają tabelę, więc nawet `ignore = ["INW006"]` ustawione przez użytkownika nie otwiera tej drogi | :material-check-circle: |
+| Uznanie brakującego modułu za generowany | `generated = ["*"]` albo wzorzec, który obejmuje zmyśloną nazwę, w `[tool.inwards]` | To część `[tool.inwards]`, więc działa ten sam config guard i Stop gate, a wzorzec złożony z samych symboli wieloznacznych to błąd konfiguracji. Domyślna lista (`*_pb2`, `*_pb2_grpc`, `_version`) przepuszcza jednak przez INW010 zmyśloną nazwę tej postaci ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)) | :material-check-circle: |
+| Dopisanie naruszenia do baseline'u | Dodanie własnego naruszenia do `inwards-baseline.json` albo uruchomienie `inwards baseline` | Config guard odrzuca edycje pliku i to polecenie, także za `uvx` albo `env`; baseline zmieniony przez Bash oblewa Stop gate, który wtedy nie stosuje żadnego baseline'u | :material-check-circle: |
+| Wyłączenie Inwards | Usunięcie `.inwards/`, usunięcie hooków, ustawienie `disableAllHooks` | Config guard odrzuca edycje `.inwards/` i plików ustawień, które zawierają hooki albo by je wyłączyły; `permissions.deny` go wspiera | :material-check-circle: |
+| Skopiowanie kodu | Wklejenie klasy SQL do `shop/domain/` | Poza zakresem. Duplikacja to sprawa przeglądu kodu i innych narzędzi | :material-close-circle: |
 
 Najważniejszy jest config guard. Agent, który może edytować reguły, nie jest przez nie ograniczony. Przy `PreToolUse` `inwards hook claude-code` przygląda się wywołaniu narzędzia, zanim się ono wykona:
 
@@ -250,12 +250,12 @@ Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. D
 
 ```mermaid
 flowchart LR
-    brief["🧭 Instrukcja<br/><small>inwards context / MCP</small>"] --> write["✍️ Agent pisze kod"]
-    write --> check["⚡ Sprawdzenie po edycji<br/><small>hook PostToolUse</small>"]
+    brief["Instrukcja<br/><small>inwards context / MCP</small>"] --> write["Agent pisze kod"]
+    write --> check["Sprawdzenie po edycji<br/><small>hook PostToolUse</small>"]
     check -- "naruszenie + kroki" --> write
-    check -- "czysto" --> gate["🚦 Stop gate<br/><small>co zmieniła sesja</small>"]
+    check -- "czysto" --> gate["Stop gate<br/><small>co zmieniła sesja</small>"]
     gate -- "naruszenie" --> write
-    gate -- "czysto" --> pr["📬 Pull request<br/><small>CI + SARIF</small>"]
+    gate -- "czysto" --> pr["Pull request<br/><small>CI + SARIF</small>"]
 ```
 
 Każdy etap wyłapuje to, co przepuścił poprzedni, i każdy kosztuje więcej niż poprzedni.

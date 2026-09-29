@@ -1,0 +1,16 @@
+{#-
+  Every page (issue #177). Extends the theme's base.html through its
+  `extrahead` block only, to preload the one body font file every English
+  and Polish page needs (Atkinson Hyperlegible Next, upright). The
+  @font-face rules live in stylesheets/theme.css; theme.font = false in both
+  configs turns off the theme's Google Fonts request.
+
+  The Polish site reaches the English site's assets through "../", and its
+  extra_css entry already says so ("../stylesheets/theme.css"), so the
+  prefix is taken from there instead of a second setting that could drift.
+-#}
+{% extends "base.html" %}
+{% block extrahead %}
+  {%- set root = config.extra_css | first | replace("stylesheets/theme.css", "") %}
+  <link rel="preload" href="{{ (root ~ 'assets/fonts/atkinson-next-normal.woff2') | url }}" as="font" type="font/woff2" crossorigin>
+{% endblock %}

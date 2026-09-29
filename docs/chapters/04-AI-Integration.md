@@ -203,22 +203,22 @@ A model under pressure to finish will try the cheapest thing that turns the chec
 
 | Evasion | Example | Inwards' answer | Status |
 |---|---|---|---|
-| Hide the import in a function | `def save(): from shop.infrastructure import db` | Imports are found anywhere in the tree | :white_check_mark: |
-| Hide it behind `TYPE_CHECKING` | `if TYPE_CHECKING: from shop.infrastructure...` | Checked too. If a domain signature mentions an infrastructure type, the domain can't be understood or reused without it, whether or not the import runs | :white_check_mark: |
-| Import the package, not the module | `from shop import infrastructure` | Resolved to `shop.infrastructure` | :white_check_mark: |
-| Use a relative import | `from ..infrastructure import db` | Resolved against the file's package | :white_check_mark: |
-| Put new code outside every layer | Create `shop/persistence/` and import it from the domain | INW006: the import is an error; the new package gets a warning | :white_check_mark: |
-| Move a layer away | `git mv shop/domain shop/core`, so the prefix matches nothing | INW006: a prefix that matched modules at session start and matches none now fails the Stop gate | :white_check_mark: |
-| Put code where it doesn't belong | A new `helpers.py` next to `service.py`, a `services/` package, `test_x.py` in the app, or `rm service.py` through Bash | A `Write` that would create the file is denied before it exists, and INW007 blocks a file created any other way; INW008 new since session start fails the Stop gate ([Package shape](guides/package-shape.md)) | :white_check_mark: |
-| Use a library instead of the layer | `from sqlalchemy.orm import Session` in the domain, instead of importing `shop.infrastructure` | INW005: the innermost layer may not import frameworks, database or network clients, or stdlib I/O by default, and each layer can allow or deny libraries ([Libraries per layer](guides/libraries.md)) | :white_check_mark: |
-| Import dynamically | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 reports a literal target that reaches an outer layer, through aliases such as `from importlib import import_module as im`. A computed target (`import_module(f"shop.{name}.db")`, `exec(code)`) is reported as unverifiable in every layer but the outermost; the fix says to use a literal or move the loader to the outermost layer | :white_check_mark: |
-| Suppress it | `# inwards: ignore[INW001] reason="legacy"` on the import | A suppression needs a code and a reason (INW009 otherwise) and is counted in every report. With `agent-suppressions = "deny"`, the default, the hooks ignore one that wasn't in the file at session start, so its violation still blocks the edit and the Stop gate; copying, moving or widening an existing one counts as new too ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) | :white_check_mark: |
-| Loosen the config | Move `shop.infrastructure` into the domain layer | The `PreToolUse` config guard denies the edit; a `sed -i` through Bash fails the Stop gate; CODEOWNERS covers humans | :white_check_mark: |
-| Turn the rule off | `ignore = ["INW001"]` or `severity = { INW001 = "warning" }` in `[tool.inwards.rules]` | Part of `[tool.inwards]`, so the same guard and Stop gate apply. INW000 and the session check against moving a layer away ignore the table, so even a user's `ignore = ["INW006"]` doesn't open that door | :white_check_mark: |
-| Call the missing module generated | `generated = ["*"]`, or a pattern that covers the hallucinated name, in `[tool.inwards]` | Part of `[tool.inwards]`, so the same guard and Stop gate apply, and a pattern made only of wildcards is a config error. The default list (`*_pb2`, `*_pb2_grpc`, `_version`) does let a hallucinated name of that form pass INW010 ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)) | :white_check_mark: |
-| Baseline the violation | Add its own violation to `inwards-baseline.json`, or run `inwards baseline` | The config guard denies edits to the file and the command, also behind `uvx` or `env`; a baseline changed through Bash fails the Stop gate, which then applies no baseline at all | :white_check_mark: |
-| Turn Inwards off | Delete `.inwards/`, remove the hooks, set `disableAllHooks` | The config guard denies edits to `.inwards/` and to settings files that hold the hooks or would disable them; `permissions.deny` backs it up | :white_check_mark: |
-| Copy the code over | Paste the SQL class into `shop/domain/` | Out of scope. Duplication is for review and other tools | :x: |
+| Hide the import in a function | `def save(): from shop.infrastructure import db` | Imports are found anywhere in the tree | :material-check-circle: |
+| Hide it behind `TYPE_CHECKING` | `if TYPE_CHECKING: from shop.infrastructure...` | Checked too. If a domain signature mentions an infrastructure type, the domain can't be understood or reused without it, whether or not the import runs | :material-check-circle: |
+| Import the package, not the module | `from shop import infrastructure` | Resolved to `shop.infrastructure` | :material-check-circle: |
+| Use a relative import | `from ..infrastructure import db` | Resolved against the file's package | :material-check-circle: |
+| Put new code outside every layer | Create `shop/persistence/` and import it from the domain | INW006: the import is an error; the new package gets a warning | :material-check-circle: |
+| Move a layer away | `git mv shop/domain shop/core`, so the prefix matches nothing | INW006: a prefix that matched modules at session start and matches none now fails the Stop gate | :material-check-circle: |
+| Put code where it doesn't belong | A new `helpers.py` next to `service.py`, a `services/` package, `test_x.py` in the app, or `rm service.py` through Bash | A `Write` that would create the file is denied before it exists, and INW007 blocks a file created any other way; INW008 new since session start fails the Stop gate ([Package shape](guides/package-shape.md)) | :material-check-circle: |
+| Use a library instead of the layer | `from sqlalchemy.orm import Session` in the domain, instead of importing `shop.infrastructure` | INW005: the innermost layer may not import frameworks, database or network clients, or stdlib I/O by default, and each layer can allow or deny libraries ([Libraries per layer](guides/libraries.md)) | :material-check-circle: |
+| Import dynamically | `importlib.import_module("shop.infrastructure.db")`, `exec("from shop.infrastructure import db")` | INW011 reports a literal target that reaches an outer layer, through aliases such as `from importlib import import_module as im`. A computed target (`import_module(f"shop.{name}.db")`, `exec(code)`) is reported as unverifiable in every layer but the outermost; the fix says to use a literal or move the loader to the outermost layer | :material-check-circle: |
+| Suppress it | `# inwards: ignore[INW001] reason="legacy"` on the import | A suppression needs a code and a reason (INW009 otherwise) and is counted in every report. With `agent-suppressions = "deny"`, the default, the hooks ignore one that wasn't in the file at session start, so its violation still blocks the edit and the Stop gate; copying, moving or widening an existing one counts as new too ([ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)) | :material-check-circle: |
+| Loosen the config | Move `shop.infrastructure` into the domain layer | The `PreToolUse` config guard denies the edit; a `sed -i` through Bash fails the Stop gate; CODEOWNERS covers humans | :material-check-circle: |
+| Turn the rule off | `ignore = ["INW001"]` or `severity = { INW001 = "warning" }` in `[tool.inwards.rules]` | Part of `[tool.inwards]`, so the same guard and Stop gate apply. INW000 and the session check against moving a layer away ignore the table, so even a user's `ignore = ["INW006"]` doesn't open that door | :material-check-circle: |
+| Call the missing module generated | `generated = ["*"]`, or a pattern that covers the hallucinated name, in `[tool.inwards]` | Part of `[tool.inwards]`, so the same guard and Stop gate apply, and a pattern made only of wildcards is a config error. The default list (`*_pb2`, `*_pb2_grpc`, `_version`) does let a hallucinated name of that form pass INW010 ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)) | :material-check-circle: |
+| Baseline the violation | Add its own violation to `inwards-baseline.json`, or run `inwards baseline` | The config guard denies edits to the file and the command, also behind `uvx` or `env`; a baseline changed through Bash fails the Stop gate, which then applies no baseline at all | :material-check-circle: |
+| Turn Inwards off | Delete `.inwards/`, remove the hooks, set `disableAllHooks` | The config guard denies edits to `.inwards/` and to settings files that hold the hooks or would disable them; `permissions.deny` backs it up | :material-check-circle: |
+| Copy the code over | Paste the SQL class into `shop/domain/` | Out of scope. Duplication is for review and other tools | :material-close-circle: |
 
 The config guard matters most. An agent that can edit the rules isn't constrained by them. On `PreToolUse`, `inwards hook claude-code` looks at the tool call before it runs:
 
@@ -245,12 +245,12 @@ Fixing a violation costs a retry. Avoiding it costs nothing. Two features move I
 
 ```mermaid
 flowchart LR
-    brief["🧭 Brief<br/><small>inwards context / MCP</small>"] --> write["✍️ Agent writes code"]
-    write --> check["⚡ Per-edit check<br/><small>PostToolUse hook</small>"]
+    brief["Brief<br/><small>inwards context / MCP</small>"] --> write["Agent writes code"]
+    write --> check["Per-edit check<br/><small>PostToolUse hook</small>"]
     check -- "violation + steps" --> write
-    check -- "clean" --> gate["🚦 Stop gate<br/><small>what the session changed</small>"]
+    check -- "clean" --> gate["Stop gate<br/><small>what the session changed</small>"]
     gate -- "violation" --> write
-    gate -- "clean" --> pr["📬 Pull request<br/><small>CI + SARIF</small>"]
+    gate -- "clean" --> pr["Pull request<br/><small>CI + SARIF</small>"]
 ```
 
 Each stage catches what the stage before it missed, and each one costs more than the one before.

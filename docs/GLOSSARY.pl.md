@@ -85,6 +85,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | adapter | adapter |
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
+| agent loop | pętla agenta |
 | architecture linter | linter architektury |
 | architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
@@ -93,6 +94,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | bytecode | bajtkod |
 | check (the act of running `inwards check`) | sprawdzenie |
 | whole-project check | sprawdzenie całego projektu |
+| one-file check (what the hook runs) | sprawdzenie jednego pliku |
+| full check (every file) | pełne sprawdzenie |
+| quickstart (home page) | szybki start |
 | clean (no violations) | czysty (projekt, plik) |
 | code scanning | code scanning (GitHub) |
 | composition root | korzeń kompozycji (composition root) |

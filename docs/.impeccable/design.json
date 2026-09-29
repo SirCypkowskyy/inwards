@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T10:39:40+00:00",
+  "title": "Design System: Inwards docs",
+  "extensions": {
+    "colorMeta": {
+      "hunk": {
+        "role": "primary",
+        "displayName": "Hunk",
+        "canonical": "rgb(11 103 132)",
+        "tonalRamp": [
+          "oklch(15% 0.053 226.5)",
+          "oklch(25% 0.089 226.5)",
+          "oklch(35% 0.089 226.5)",
+          "oklch(48% 0.089 226.5)",
+          "oklch(60% 0.089 226.5)",
+          "oklch(72% 0.089 226.5)",
+          "oklch(84% 0.089 226.5)",
+          "oklch(95% 0.053 226.5)"
+        ]
+      },
+      "hunk-dark": {
+        "role": "primary",
+        "displayName": "Hunk (dark scheme)",
+        "canonical": "rgb(94 194 223)"
+      },
+      "hunk-strong": {
+        "role": "primary",
+        "displayName": "Hunk strong (hover)",
+        "canonical": "rgb(8 78 101)"
+      },
+      "hunk-strong-dark": {
+        "role": "primary",
+        "displayName": "Hunk strong (dark scheme)",
+        "canonical": "rgb(147 216 236)"
+      },
+      "on-hunk": {
+        "role": "primary",
+        "displayName": "On Hunk",
+        "canonical": "rgb(255 255 255)"
+      },
+      "on-hunk-dark": {
+        "role": "primary",
+        "displayName": "On Hunk (dark scheme)",
+        "canonical": "rgb(12 26 32)"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "rgb(255 255 255)"
+      },
+      "paper-dark": {
+        "role": "neutral",
+        "displayName": "Paper (dark scheme)",
+        "canonical": "rgb(21 25 30)"
+      },
+      "paper-2": {
+        "role": "neutral",
+        "displayName": "Paper 2",
+        "canonical": "rgb(243 245 247)"
+      },
+      "paper-2-dark": {
+        "role": "neutral",
+        "displayName": "Paper 2 (dark scheme)",
+        "canonical": "rgb(28 33 39)"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "rgb(27 34 41)",
+        "tonalRamp": [
+          "rgb(27 34 41)",
+          "rgb(46 53 61)",
+          "rgb(62 72 82)",
+          "rgb(86 97 108)",
+          "rgb(107 117 128)",
+          "rgb(155 166 177)",
+          "rgb(223 227 232)",
+          "rgb(243 245 247)"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Ink (dark scheme)",
+        "canonical": "rgb(226 230 234)"
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "rgb(86 97 108)",
+        "tonalRamp": [
+          "oklch(15% 0.013 248.3)",
+          "oklch(25% 0.022 248.3)",
+          "oklch(35% 0.022 248.3)",
+          "oklch(48% 0.022 248.3)",
+          "oklch(60% 0.022 248.3)",
+          "oklch(72% 0.022 248.3)",
+          "oklch(84% 0.022 248.3)",
+          "oklch(95% 0.013 248.3)"
+        ]
+      },
+      "graphite-dark": {
+        "role": "neutral",
+        "displayName": "Graphite (dark scheme)",
+        "canonical": "rgb(155 166 177)"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "rgb(223 227 232)"
+      },
+      "rule-dark": {
+        "role": "neutral",
+        "displayName": "Rule (dark scheme)",
+        "canonical": "rgb(46 53 61)"
+      },
+      "removed": {
+        "role": "error",
+        "displayName": "Removed",
+        "canonical": "rgb(179 38 30)",
+        "tonalRamp": [
+          "oklch(15% 0.107 28.7)",
+          "oklch(25% 0.178 28.7)",
+          "oklch(35% 0.178 28.7)",
+          "oklch(48% 0.178 28.7)",
+          "oklch(60% 0.178 28.7)",
+          "oklch(72% 0.178 28.7)",
+          "oklch(84% 0.178 28.7)",
+          "oklch(95% 0.107 28.7)"
+        ]
+      },
+      "removed-dark": {
+        "role": "error",
+        "displayName": "Removed (dark scheme)",
+        "canonical": "rgb(255 139 128)"
+      },
+      "removed-tint": {
+        "role": "error",
+        "displayName": "Removed tint",
+        "canonical": "rgb(253 236 235)"
+      },
+      "removed-tint-dark": {
+        "role": "error",
+        "displayName": "Removed tint (dark scheme)",
+        "canonical": "rgb(58 31 34)"
+      },
+      "added": {
+        "role": "success",
+        "displayName": "Added",
+        "canonical": "rgb(29 122 62)",
+        "tonalRamp": [
+          "oklch(15% 0.076 150.5)",
+          "oklch(25% 0.126 150.5)",
+          "oklch(35% 0.126 150.5)",
+          "oklch(48% 0.126 150.5)",
+          "oklch(60% 0.126 150.5)",
+          "oklch(72% 0.126 150.5)",
+          "oklch(84% 0.126 150.5)",
+          "oklch(95% 0.076 150.5)"
+        ]
+      },
+      "added-dark": {
+        "role": "success",
+        "displayName": "Added (dark scheme)",
+        "canonical": "rgb(108 212 143)"
+      },
+      "added-tint": {
+        "role": "success",
+        "displayName": "Added tint",
+        "canonical": "rgb(232 245 236)"
+      },
+      "added-tint-dark": {
+        "role": "success",
+        "displayName": "Added tint (dark scheme)",
+        "canonical": "rgb(23 48 37)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The home page value proposition only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page h1."
+      },
+      "headline-sm": {
+        "displayName": "Headline small",
+        "purpose": "h2 and home premise headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "h3."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All prose, 17px, measure 34em."
+      },
+      "body-sm": {
+        "displayName": "Body small",
+        "purpose": "Admonitions, tables (tabular figures), content-tab labels."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Sidebar and top tabs."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Code, commands, paths, rule codes, keys."
+      }
+    },
+    "shadows": [
+      {
+        "name": "header-rule",
+        "value": "0 1px 0 var(--inw-rule)",
+        "purpose": "Header bottom edge at rest; the tab bar uses it inset."
+      },
+      {
+        "name": "header-scrolled",
+        "value": "0 1px 0 var(--inw-rule), 0 0.05rem 0.4rem color-mix(in srgb, var(--inw-ink) 8%, transparent)",
+        "purpose": "Header after the page scrolls under it (--md-shadow-z1)."
+      },
+      {
+        "name": "floating-panel",
+        "value": "0 0.1rem 0.6rem color-mix(in srgb, var(--inw-ink) 12%, transparent)",
+        "purpose": "Language menu and tooltips (--md-shadow-z2)."
+      },
+      {
+        "name": "theme-z3",
+        "value": "0 0.2rem 1rem color-mix(in srgb, var(--inw-ink) 16%, transparent)",
+        "purpose": "Mapped so the theme's own uses stay in palette; not used by Inwards components."
+      },
+      {
+        "name": "keycap",
+        "value": "0 0 0 1px var(--inw-rule), 0 0.1rem 0 var(--inw-graphite)",
+        "purpose": "<kbd> only; the one zero-blur shadow, not reused elsewhere."
+      },
+      {
+        "name": "budget-tick",
+        "value": "inset -2px 0 0 var(--inw-ink)",
+        "purpose": "The 100 ms end mark of the home chart track; a mark, not depth."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ui-transition",
+        "value": "150ms",
+        "purpose": "Colour, background and border transitions on links, buttons, tabs and nav items."
+      },
+      {
+        "name": "ease-review-cycle",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The agent-loop diagram's one review cycle."
+      },
+      {
+        "name": "review-cycle",
+        "value": "5s, delay 0.8s, 1 iteration, no fill mode",
+        "purpose": "Home page agent loop: edit to hook, violation (Removed), hook, clean (Added), once on load."
+      },
+      {
+        "name": "edge-flow",
+        "value": "0.6s linear infinite, stroke-dasharray 6 4",
+        "purpose": "Diagram edges of a hovered or focused node; only with prefers-reduced-motion: no-preference."
+      },
+      {
+        "name": "button-press",
+        "value": "translateY(1px)",
+        "purpose": "Button :active."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition-duration: 0s; animation-duration: 0s; animation-iteration-count: 1; scroll-behavior: auto",
+        "purpose": "Global reset in theme.css under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "home-single-column",
+        "value": "59.9844em",
+        "purpose": "Below 960px: premises and entry links go to one column, section gap 3rem."
+      },
+      {
+        "name": "home-compact",
+        "value": "44.9844em",
+        "purpose": "Below 720px: review pane hides lines 3 and 4, hero tightens."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action per view: Hunk fill, On Hunk text.",
+      "html": "<a class=\"ds-btn ds-btn-primary\" href=\"#\">Get started</a>",
+      "css": ".ds-btn { display: inline-block; padding: 0.55em 1.3em; font: 700 15px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; text-decoration: none; border: 1px solid; border-radius: 6px; transition: background-color 150ms, border-color 150ms, color 150ms; } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; } .ds-btn-primary { color: var(--inw-on-hunk, #ffffff); background: var(--inw-hunk, #0b6784); border-color: var(--inw-hunk, #0b6784); } .ds-btn-primary:hover, .ds-btn-primary:focus-visible { background: var(--inw-hunk-strong, #084e65); border-color: var(--inw-hunk-strong, #084e65); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Every secondary action: Ink text, 1px Graphite border.",
+      "html": "<a class=\"ds-btn ds-btn-outline\" href=\"#\">Browse the rules</a>",
+      "css": ".ds-btn { display: inline-block; padding: 0.55em 1.3em; font: 700 15px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; text-decoration: none; border: 1px solid; border-radius: 6px; transition: background-color 150ms, border-color 150ms, color 150ms; } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; } .ds-btn-outline { color: var(--inw-ink, #1b2229); background: transparent; border-color: var(--inw-graphite, #56616c); } .ds-btn-outline:hover, .ds-btn-outline:focus-visible { background: var(--inw-paper-2, #f3f5f7); border-color: var(--inw-ink, #1b2229); }"
+    },
+    {
+      "name": "Admonition",
+      "kind": "card",
+      "refersTo": "admonition",
+      "description": "Paper 2, 1px Rule all round, 6px corners; the icon colour alone carries the kind.",
+      "html": "<div class=\"ds-adm ds-adm-note\"><p class=\"ds-adm-title\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M12 11v6M12 7.5v.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>Note</p><p>Rule pages live at rules/INW001/ and are a CLI contract.</p></div>",
+      "css": ".ds-adm { --ds-icon: var(--inw-graphite, #56616c); padding: 0.4rem 0.8rem; font: 400 16px/1.6 \"Atkinson Hyperlegible Next\", Arial, sans-serif; color: var(--inw-ink, #1b2229); background: var(--inw-paper-2, #f3f5f7); border: 1px solid var(--inw-rule, #dfe3e8); border-radius: 6px; } .ds-adm-note { --ds-icon: var(--inw-hunk, #0b6784); } .ds-adm-title { display: flex; gap: 0.5em; align-items: center; margin: 0.2em 0; font-weight: 700; } .ds-adm-title svg { color: var(--ds-icon); } .ds-adm p { margin: 0.4em 0; }"
+    },
+    {
+      "name": "Content Tabs",
+      "kind": "nav",
+      "refersTo": "tab-label",
+      "description": "Graphite labels, Ink on hover, a Hunk bar under the active one.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab is-active\" role=\"tab\" aria-selected=\"true\">uv</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">pip</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 1.2em; border-bottom: 1px solid var(--inw-rule, #dfe3e8); } .ds-tab { padding: 0.5em 0; font: 700 16px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; color: var(--inw-graphite, #56616c); background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; transition: color 150ms; } .ds-tab:hover { color: var(--inw-ink, #1b2229); } .ds-tab.is-active { color: var(--inw-ink, #1b2229); border-bottom-color: var(--inw-hunk, #0b6784); } .ds-tab:focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; }"
+    },
+    {
+      "name": "Table",
+      "kind": "custom",
+      "refersTo": "table",
+      "description": "1px Rule border, 6px corners, Paper 2 header row, tabular figures.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>File</th><th>p95</th></tr></thead><tbody><tr><td>saleor, one file</td><td>30 ms</td></tr><tr><td>polar, 4,482 lines</td><td>90 ms</td></tr></tbody></table>",
+      "css": ".ds-table { border-collapse: separate; border-spacing: 0; font: 400 16px/1.5 \"Atkinson Hyperlegible Next\", Arial, sans-serif; font-variant-numeric: tabular-nums; color: var(--inw-ink, #1b2229); border: 1px solid var(--inw-rule, #dfe3e8); border-radius: 6px; overflow: hidden; } .ds-table th { font-weight: 700; text-align: left; background: var(--inw-paper-2, #f3f5f7); } .ds-table th, .ds-table td { padding: 0.6em 1em; border-bottom: 1px solid var(--inw-rule, #dfe3e8); } .ds-table tr:last-child td { border-bottom: 0; }"
+    },
+    {
+      "name": "Code Block",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "Ink on Paper 2 in Atkinson Hyperlegible Mono; syntax colours from the palette only.",
+      "html": "<pre class=\"ds-code\"><code><span class=\"ds-k\">[tool.inwards]</span>\nroot = <span class=\"ds-s\">\".\"</span>\n<span class=\"ds-c\"># innermost first</span>\nlayers = [{ name = <span class=\"ds-s\">\"domain\"</span> }]</code></pre>",
+      "css": ".ds-code { margin: 0; padding: 0.8em 1em; font: 400 15px/1.55 \"Atkinson Hyperlegible Mono\", \"Courier New\", monospace; color: var(--inw-ink, #1b2229); background: var(--inw-paper-2, #f3f5f7); border: 1px solid var(--inw-rule, #dfe3e8); border-radius: 6px; overflow-x: auto; } .ds-k { color: var(--inw-hunk, #0b6784); } .ds-s { color: var(--inw-added, #1d7a3e); } .ds-c { color: var(--inw-graphite, #56616c); }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "The current page in Hunk at 700 on a 10% Hunk tint; every other item Ink.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">INW000 unsupported-encoding</a><a href=\"#\" aria-current=\"page\">INW001 layer-dependency</a><a href=\"#\">INW002 context-independence</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; font: 400 15px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; } .ds-nav a { padding: 0.3em 0.6em; color: var(--inw-ink, #1b2229); text-decoration: none; border-radius: 4px; transition: color 150ms, background-color 150ms; } .ds-nav a:hover { color: var(--inw-hunk, #0b6784); } .ds-nav a[aria-current] { font-weight: 700; color: var(--inw-hunk, #0b6784); background: color-mix(in srgb, var(--inw-hunk, #0b6784) 10%, transparent); } .ds-nav a:focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; }"
+    },
+    {
+      "name": "Review Pane",
+      "kind": "custom",
+      "refersTo": "code-block",
+      "description": "Signature: a path bar, real line numbers in a gutter, the flagged line in the Removed tint with a wavy underline at the reported column, the real output under it.",
+      "html": "<figure class=\"ds-review\"><div class=\"ds-review-path\"><b>shop/domain/order.py</b><span>1 line added</span></div><pre class=\"ds-review-hunk\"><code><span class=\"ds-line\"><span class=\"ds-ln\">5</span>from dataclasses import dataclass</span><span class=\"ds-line ds-bad\"><span class=\"ds-ln\">6</span>from shop.infrastructure.in_memory_orders import <span class=\"ds-flag\">InMemoryOrderRepository</span></span></code></pre><pre class=\"ds-review-out\"><code><span class=\"ds-prompt\">$ uv run inwards check shop/domain/order.py</span>\nshop/domain/order.py:6:50: <b class=\"ds-rc\">INW001</b> Layer \"domain\" imports from outer layer \"infrastructure\".</code></pre></figure>",
+      "css": ".ds-review { margin: 0; overflow: hidden; font: 400 15px/1.6 \"Atkinson Hyperlegible Mono\", \"Courier New\", monospace; color: var(--inw-ink, #1b2229); background: var(--inw-paper, #ffffff); border: 1px solid var(--inw-rule, #dfe3e8); border-radius: 6px; } .ds-review-path { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0.8rem; color: var(--inw-graphite, #56616c); background: var(--inw-paper-2, #f3f5f7); border-bottom: 1px solid var(--inw-rule, #dfe3e8); } .ds-review-path b { color: var(--inw-ink, #1b2229); } .ds-review pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; } .ds-review-hunk { padding: 0.5rem 0; border-bottom: 1px solid var(--inw-rule, #dfe3e8); } .ds-line { display: block; padding-left: 4.8em; text-indent: -4.8em; } .ds-bad { background: var(--inw-removed-tint, #fdeceb); } .ds-ln { display: inline-block; width: 3.2em; padding-right: 0.8em; margin-right: 0.8em; text-indent: 0; text-align: right; color: var(--inw-graphite, #56616c); border-right: 1px solid var(--inw-rule, #dfe3e8); user-select: none; } .ds-bad .ds-ln { font-weight: 700; color: var(--inw-removed, #b3261e); } .ds-flag { text-decoration: underline wavy var(--inw-removed, #b3261e); text-decoration-thickness: 1.5px; text-underline-offset: 0.25em; } .ds-review-out { padding: 0.6rem 0.8rem; } .ds-prompt { color: var(--inw-graphite, #56616c); } .ds-rc { color: var(--inw-removed, #b3261e); }"
+    },
+    {
+      "name": "Budget Bar",
+      "kind": "custom",
+      "refersTo": "table",
+      "description": "Signature: a 0 to 100 ms track on Rule ending in a 2px Ink tick, the measured p95 as a Hunk bar.",
+      "html": "<div class=\"ds-track\" style=\"--v: 39.5\"><span class=\"ds-bar\"></span><span class=\"ds-val\">39.5 ms</span></div>",
+      "css": ".ds-track { position: relative; width: 320px; height: 28px; background: var(--inw-rule, #dfe3e8); box-shadow: inset -2px 0 0 var(--inw-ink, #1b2229); font: 700 16px/1 \"Atkinson Hyperlegible Next\", Arial, sans-serif; font-variant-numeric: tabular-nums; color: var(--inw-ink, #1b2229); } .ds-bar { display: block; width: calc(var(--v) * 1%); height: 100%; background: var(--inw-hunk, #0b6784); } .ds-val { position: absolute; top: 50%; left: calc(var(--v) * 1% + 0.4rem); transform: translateY(-50%); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Code Review",
+    "overview": "The site reads like a review of one agent edit: white paper, slate ink, a gutter of real line numbers, 1px rules and one cyan-blue accent that marks where to look. Red and green keep the meaning they have in a diff. Nothing on the page is decoration that a reviewer would not see in a pull request.\n\nTwo modes share one identity. The home page (`docs/chapters/index.md` through `overrides/home.html`) is in **persuade mode**: a display-size value proposition, two actions, then the review pane that shows a real `inwards check` run against a flagged line. Every other page is in **read mode**: a 17px body at about 72 characters a line, headings on a 1.2 ratio, code and tables at full column width, and colour only where it carries a state. Density is that of a reference manual: an engineer comes back to `rules/INWxxx/` from a diagnostic and has to find the fix in seconds.",
+    "keyCharacteristics": [
+      "One accent (Hunk) for links, the current nav item, focus and the primary action; nothing else is coloured for emphasis.",
+      "Red (Removed) and green (Added) are diff law: violations and passes, never decoration.",
+      "Flat surfaces separated by 1px rules and a second paper tone; the only soft shadow belongs to the header and floating panels.",
+      "One type family in two cuts: Atkinson Hyperlegible Next for text and display, Atkinson Hyperlegible Mono for code.",
+      "6px corners on every block, 4px on inline code and keys.",
+      "Motion only where it explains the product: the agent-loop diagram plays one cycle once."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Hunk is the only colour that means \"look here or act here\". If a new element wants attention and is not a link, the current location, focus or the primary action, it stays ink.",
+        "section": "colors"
+      },
+      {
+        "name": "The Diff Law Rule",
+        "body": "Removed means a violation and Added means a pass. Neither appears as a brand colour, a highlight or a decorative fill, and a red or green element must be explainable as one or the other.",
+        "section": "colors"
+      },
+      {
+        "name": "The Written-Out Tone Rule",
+        "body": "A new tone is added to `theme.css` as a literal value in both schemes with its contrast ratio recorded here, never as a runtime `color-mix()` of text that needs to pass contrast. Alpha mixes are for tints behind ink only.",
+        "section": "colors"
+      },
+      {
+        "name": "The 1.2 Ladder Rule",
+        "body": "Heading sizes come from body × 1.2ⁿ (1.2, 1.44, 1.728). The display clamp is the only size outside the ladder, and it belongs to the home page hero.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Means Machine Rule",
+        "body": "Monospace sets only what a machine reads or prints: code, commands, file paths, rule codes, keys. Labels, captions and headings stay in the text face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Rule Over Shadow Rule",
+        "body": "A new surface is separated by a 1px Rule border or a Paper 2 fill. A shadow is allowed only when the element floats above the page and disappears again (a menu, a tooltip, the scrolled header).",
+        "section": "elevation"
+      },
+      {
+        "name": "The Theme-Through-Tokens Rule",
+        "body": "Colour a new component, chart or diagram through `var(--inw-*)` or `var(--md-*)`; a literal colour is allowed only where the renderer cannot read a custom property (Mermaid `themeVariables`), and then it is a value from this file.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** use Hunk for exactly four jobs: links, the current nav item, focus and the primary action (plus the subject node or bar of a diagram).",
+      "**Do** keep red and green for violations and passes; a flagged line gets the Removed tint, a pass the Added colour.",
+      "**Do** separate surfaces with a 1px Rule or a Paper 2 fill, with 6px corners on blocks and 4px on inline code.",
+      "**Do** keep prose at 34em (about 72 characters) and let code, tables and diagrams take the full column.",
+      "**Do** take heading sizes from the 1.2 ladder and reserve the display clamp for the home hero.",
+      "**Do** show real output: real line numbers, real diagnostics, measured numbers linked to where they were measured.",
+      "**Do** add every new tone to `theme.css` in both schemes and record its contrast ratio here.",
+      "**Do** stop all motion under `prefers-reduced-motion` and keep UI transitions at 150ms.",
+      "**Do** check the Zensical overrides table after every Zensical upgrade."
+    ],
+    "donts": [
+      "**Don't** use stock Material or Zensical deep purple, amber or Inter.",
+      "**Don't** use warm cream paper with a serif and a terracotta accent.",
+      "**Don't** use near-black with one neon accent.",
+      "**Don't** use purple-to-blue gradients or gradient text.",
+      "**Don't** use glassmorphism as decoration.",
+      "**Don't** lay out a grid of same-size cards, each an icon, a heading and a line of text; the home page's entry links sit on one rule for this reason.",
+      "**Don't** build a big-number three-stats hero; numbers go in a chart or a sentence with a link.",
+      "**Don't** put ALL-CAPS eyebrow labels over headings.",
+      "**Don't** number sections that are not a sequence; the quickstart's counters are the one real sequence.",
+      "**Don't** set monospace on text that is not code, a path, a command or a key.",
+      "**Don't** use hard offset shadows; the `<kbd>` keycap edge is the one zero-blur shadow and stays on `<kbd>`.",
+      "**Don't** append arrows to links.",
+      "**Don't** add a coloured side border to admonitions or any other block.",
+      "**Don't** put a cascade layer around rules that restyle theme classes; they would lose to Zensical's unlayered CSS.",
+      "**Don't** style Mermaid with CSS selectors; use `--md-mermaid-*` or `themeVariables`.",
+      "**Don't** change a page URL to fit the navigation; `rules/INWxxx/` is a CLI contract."
+    ]
+  }
+}

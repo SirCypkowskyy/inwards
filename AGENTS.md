@@ -363,6 +363,12 @@ English stays the source of truth; the changelog isn't translated.
   both sites with the two builds in `docs/zensical.pl.toml`'s header and a
   static server on `docs/site/`.
 
+## Docs design
+
+Read `docs/PRODUCT.md` and `docs/DESIGN.md` before changing any docs
+template, CSS, JS or diagram. A PR that changes a token or a component
+updates `DESIGN.md` (and `docs/.impeccable/design.json`) in the same PR.
+
 ## Finishing a piece of work
 
 Before you hand back or merge, update the docs and the issues. Work is not
