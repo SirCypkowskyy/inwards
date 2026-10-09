@@ -50,7 +50,8 @@ type RuleCode =
   | "FAPI003"
   | "FAPI005"
   | "FAPI006"
-  | "FAPI007";
+  | "FAPI007"
+  | "FAPI008";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -217,6 +218,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "A dependency with yield re-raises what its except clauses catch, so an error in the endpoint is not hidden from the server.",
     docs: page("FAPI007"),
+  },
+  FAPI008: {
+    code: "FAPI008",
+    name: "duplicate-operation-id",
+    severity: "error",
+    default: "off",
+    summary:
+      "No two path operations of one FastAPI app share an explicit operation_id, so generated clients get one method per operation.",
+    docs: page("FAPI008"),
   },
 };
 

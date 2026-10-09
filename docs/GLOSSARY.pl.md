@@ -178,6 +178,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | event handler (`on_event`, FAPI006) | handler zdarzeń |
 | yield dependency (FAPI007) | zależność z `yield` |
 | swallow an exception (FAPI007) | połykać wyjątek |
+| operation id (`operation_id`, FAPI008) | identyfikator operacji (`operation_id`) |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |

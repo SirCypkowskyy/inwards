@@ -1,6 +1,6 @@
 /**
  * @file Runs the FAPI rules for a check: builds the FastAPI model once, reads
- * the checked files through it, and hands each one its FAPI001 to FAPI007
+ * the checked files through it, and hands each one its FAPI001 to FAPI008
  * findings before its suppression comments apply. The project lookups
  * (`FastApiProject`: handlers, classes, the app and router graph) are shared
  * by the rules and read the rest of the project only when a rule asks. With
@@ -23,6 +23,10 @@ import { type RuleOptions, ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
+import {
+  checkFileOperationIds,
+  checkGraphOperationIds,
+} from "../rules/fastapi/duplicate-operation-id.ts";
 import { checkLifespan } from "../rules/fastapi/lifespan-events.ts";
 import { FastApiModel } from "../rules/fastapi/model.ts";
 import { FastApiProject } from "../rules/fastapi/project.ts";
@@ -64,7 +68,7 @@ export function fastApiFindings(
 ): FastApiFound {
   const { rules } = config;
   const on = rulesOn(rules);
-  if (!(on.wiring || on.shadow || on.lifespan || on.yields || endpointRulesOn(rules))) {
+  if (!(on.wiring || on.shadow || on.lifespan || on.yields || on.ids || endpointRulesOn(rules))) {
     return NONE;
   }
   const model = new FastApiModel(parser, project);
@@ -104,6 +108,7 @@ interface RulesOn {
   readonly shadow: boolean;
   readonly lifespan: boolean;
   readonly yields: boolean;
+  readonly ids: boolean;
 }
 
 /**
@@ -111,7 +116,7 @@ interface RulesOn {
  * are read by `endpointRulesOn` and `checkEndpoints`.
  *
  * @param rules - the project's `[tool.inwards.rules]`, if any.
- * @returns whether each of FAPI003 and FAPI005 to FAPI007 reports.
+ * @returns whether each of FAPI003 and FAPI005 to FAPI008 reports.
  */
 function rulesOn(rules: InwardsConfig["rules"]): RulesOn {
   return {
@@ -119,6 +124,7 @@ function rulesOn(rules: InwardsConfig["rules"]): RulesOn {
     shadow: ruleLevel("FAPI005", rules) !== "off",
     lifespan: ruleLevel("FAPI006", rules) !== "off",
     yields: ruleLevel("FAPI007", rules) !== "off",
+    ids: ruleLevel("FAPI008", rules) !== "off",
   };
 }
 
@@ -138,7 +144,7 @@ interface FileChecks {
  * @param file.m - its FastAPI records.
  * @param file.scope - this check's FastAPI lookups.
  * @param checks - which rules run, and in which mode.
- * @param checks.on - which of FAPI003 and FAPI005 to FAPI007 are on.
+ * @param checks.on - which of FAPI003 and FAPI005 to FAPI008 are on.
  * @param checks.edit - true for a per-edit check, which leaves the cross-file findings out.
  * @param checks.rules - the project's `[tool.inwards.rules]`, for FAPI001 and FAPI002.
  * @param checks.settings - FAPI003's options.
@@ -152,6 +158,7 @@ function fileFindings(
     ...(on.wiring ? checkFileWiring(m, src, settings) : []),
     ...checkEndpoints(src, m, scope, rules),
     ...(on.shadow && edit ? checkFileShadowing(m, src, scope) : []),
+    ...(on.ids && edit ? checkFileOperationIds(m, src, scope) : []),
     ...(on.lifespan ? checkLifespan(m, src, scope) : []),
   ];
 }
@@ -202,7 +209,8 @@ function unseen(
 
 /**
  * Finds the FAPI findings that need the whole project's graph: FAPI003's
- * unmounted routers and cycles, FAPI005's shadowing across routers. A per-edit check builds the graph only for a rule the edited
+ * unmounted routers and cycles, FAPI005's shadowing and FAPI008's repeated ids
+ * across routers. A per-edit check builds the graph only for a rule the edited
  * file suppresses, and its findings are then dropped after the suppressions.
  *
  * @param scope - the check's FastAPI lookups.
@@ -233,6 +241,10 @@ function graphFindings(
     })
   ) {
     extra.push(...unseen(checkGraphShadowing(scope, checked), found));
+  }
+  const operations = own.some(({ m }) => m.operations.length > 0);
+  if (wants(own, { on: on.ids, edit, code: "FAPI008", present: operations })) {
+    extra.push(...unseen(checkGraphOperationIds(scope, checked), found));
   }
   return extra;
 }

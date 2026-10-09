@@ -1,6 +1,6 @@
 /**
  * @file The FastAPI rule family's registration (#186, ADR-036): FAPI001 to
- * FAPI007 (FAPI004 is reserved) are registered opt-in, SARIF lists them as disabled,
+ * FAPI008 (FAPI004 is reserved) are registered opt-in, SARIF lists them as disabled,
  * `extend-select` turns one on, an inline suppression names them like any
  * INW code, and an unknown FAPI code is a config error and an INW009 error.
  * A suppression is checked against a finding built here; the rules' own
@@ -19,7 +19,7 @@ layers = [
   { name = "api", modules = ["shop.api"] },
 ]
 `;
-const FAPI = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007"];
+const FAPI = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008"];
 const REASON = 'reason="documented in the gateway"';
 
 /**
@@ -58,6 +58,7 @@ describe("the FAPI codes", () => {
       "route-shadowing",
       "lifespan-events",
       "yield-dependency-swallows",
+      "duplicate-operation-id",
     ]);
   });
 
@@ -127,6 +128,6 @@ describe("an inline suppression of a FAPI code", () => {
     );
     expect([d?.code, d?.severity]).toEqual(["INW009", "error"]);
     expect(d?.message).toContain("FAPI999 is not a rule this Inwards knows");
-    expect(d?.message).toContain("FAPI003, FAPI005, FAPI006, FAPI007.");
+    expect(d?.message).toContain("FAPI003, FAPI005, FAPI006, FAPI007, FAPI008.");
   });
 });

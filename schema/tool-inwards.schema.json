@@ -186,7 +186,8 @@
         "FAPI003",
         "FAPI005",
         "FAPI006",
-        "FAPI007"
+        "FAPI007",
+        "FAPI008"
       ]
     },
     "layer": {
@@ -452,6 +453,9 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "yield-dependency-swallows": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "duplicate-operation-id": {
           "$ref": "#/definitions/ruleOptions"
         }
       }
