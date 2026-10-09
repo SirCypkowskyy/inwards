@@ -30,13 +30,13 @@ The `FAPI` family checks FastAPI applications across files: which router the app
 | [FAPI006](FAPI006.md) | `lifespan-events` | A deprecated `on_event` handler or `on_startup=` (a warning), and one next to a `lifespan=` that makes FastAPI ignore it (an error) | opt-in, error | yes |
 | [FAPI007](FAPI007.md) | `yield-dependency-swallows` | A dependency with `yield` whose `except` clause around it doesn't re-raise, so the endpoint's error is hidden | opt-in, error | yes |
 | [FAPI008](FAPI008.md) | `duplicate-operation-id` | Two path operations of one app with the same literal `operation_id` | opt-in, error | yes |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: the dependency is called at import time instead of being passed | opt-in, error | yes |
 
-Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
+One code is reserved and not registered (an unknown code is still a config error):
 
 | Code | Name | Issue | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
 
 The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.
 

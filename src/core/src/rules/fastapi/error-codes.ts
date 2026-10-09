@@ -16,6 +16,7 @@
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { DEPENDS } from "./extract.ts";
 import { ownNodes } from "./function-body.ts";
 import type { FastApiProject, Lineage } from "./project.ts";
 import { statusCode } from "./status.ts";
@@ -48,14 +49,6 @@ const HTTP_EXCEPTIONS: ReadonlySet<string> = new Set([
   "fastapi.HTTPException",
   "fastapi.exceptions.HTTPException",
   "starlette.exceptions.HTTPException",
-]);
-
-/** The names `Depends` and `Security` are imported under. */
-const DEPENDS: ReadonlySet<string> = new Set([
-  "fastapi.Depends",
-  "fastapi.Security",
-  "fastapi.params.Depends",
-  "fastapi.params.Security",
 ]);
 
 /** A response class: anything FastAPI or Starlette exports whose name ends in `Response`. */

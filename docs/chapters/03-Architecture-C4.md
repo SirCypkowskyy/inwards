@@ -363,8 +363,9 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | FAPI006 | `lifespan-events` | Opt-in. A deprecated startup or shutdown event: `@app.on_event(...)`, `add_event_handler` or `on_startup=` / `on_shutdown=` (a warning), and the same on an app, or a router an app includes, that sets `lifespan=`, where FastAPI never runs the handler (an error). The receiver is resolved across files through the model. The per-edit hook doesn't walk up the router graph, so a router's handler stays a warning there | :material-check-circle: |
 | FAPI007 | `yield-dependency-swallows` | Opt-in. A first-party generator function with a `yield` inside a `try` whose `except` clause doesn't raise on every path, so an error from the endpoint is hidden from the server. One function at a time, with no model and no call graph; context managers and fixtures are skipped. The finding is on the `except` line | :material-check-circle: |
 | FAPI008 | `duplicate-operation-id` | Opt-in. A path operation whose literal `operation_id=` an earlier operation of the same app already uses, across the routers the app includes (the route lists FAPI005 reads). The same id on two apps is fine; ids that aren't literals are skipped. The per-edit hook reports only the one-router cases | :material-check-circle: |
+| FAPI009 | `depends-called` | Opt-in. `Depends(f(...))` or `Security(f(...))`, in a default or in `Annotated[...]`, where `f` is a first-party generator, an `async def` or a function that returns only plain values; a factory that returns a function passes. The callee is resolved in the same file or one hop through the index | :material-check-circle: |
 
-The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go. FAPI009 is planned ([rules index](rules/index.md#fastapi)).
+The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go ([rules index](rules/index.md#fastapi)).
 
 ## Code map
 
@@ -408,9 +409,9 @@ src/
 │   │   │                                #   undocumented-error-response.ts with error-codes.ts and
 │   │   │                                #   placement.ts (FAPI002), route-shadowing.ts (FAPI005),
 │   │   │                                #   lifespan-events.ts (FAPI006), yield-dependency-swallows.ts
-│   │   │                                #   (FAPI007) and function-body.ts (a function's own yield,
-│   │   │                                #   return and try statements), duplicate-operation-id.ts
-│   │   │                                #   (FAPI008)
+│   │   │                                #   (FAPI007), duplicate-operation-id.ts (FAPI008),
+│   │   │                                #   depends-called.ts (FAPI009), function-body.ts (a
+│   │   │                                #   function's own yield, return and try statements)
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on

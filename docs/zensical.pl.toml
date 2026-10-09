@@ -68,6 +68,7 @@ nav = [
     { "FAPI006 lifespan-events" = "rules/FAPI006.md" },
     { "FAPI007 yield-dependency-swallows" = "rules/FAPI007.md" },
     { "FAPI008 duplicate-operation-id" = "rules/FAPI008.md" },
+    { "FAPI009 depends-called" = "rules/FAPI009.md" },
   ] },
   { "Jak to działa" = [
     { "Integracja z AI" = "04-AI-Integration.md" },

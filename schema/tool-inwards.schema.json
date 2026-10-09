@@ -187,7 +187,8 @@
         "FAPI005",
         "FAPI006",
         "FAPI007",
-        "FAPI008"
+        "FAPI008",
+        "FAPI009"
       ]
     },
     "layer": {
@@ -456,6 +457,9 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "duplicate-operation-id": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "depends-called": {
           "$ref": "#/definitions/ruleOptions"
         }
       }

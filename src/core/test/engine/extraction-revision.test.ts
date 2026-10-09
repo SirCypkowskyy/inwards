@@ -32,7 +32,7 @@ const RECORDED: Readonly<Record<string, string>> = {
   "6": "9f22ad48d84883dd4aaf7136335904e39f2d42e93fecb88170f4079dec64ca86",
   "7": "931cd761ebcd6b86c53caaf98a19604088a205af7ce8a63f18df6964fa27dd93",
   "8": "32e3d2765af38274a7aba14551b66ddccba78d1026b60fd35fbe4d45590f6cd3",
-  "9": "e52e95c8ea20f9d36055256d55aec178e483d86551f3111100c2fc929d7cb431",
+  "9": "a71180345970a321c08dd5223e414d92c3144ca21ca98c84298c5c42b39220ef",
 };
 
 test("the extraction revision changes with the code it describes", () => {

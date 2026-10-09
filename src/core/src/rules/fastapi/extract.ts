@@ -13,6 +13,7 @@ import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { constructorHandlers, handlerOf } from "./handlers.ts";
 import type {
   Context,
+  DependencyUse,
   EventHandlerUse,
   ExceptionHandler,
   FastApiFile,
@@ -28,6 +29,14 @@ const CONSTRUCTORS: ReadonlyMap<string, "app" | "router"> = new Map([
   ["fastapi.applications.FastAPI", "app"],
   ["fastapi.APIRouter", "router"],
   ["fastapi.routing.APIRouter", "router"],
+]);
+
+/** The names `Depends` and `Security` are imported under. */
+export const DEPENDS: ReadonlySet<string> = new Set([
+  "fastapi.Depends",
+  "fastapi.Security",
+  "fastapi.params.Depends",
+  "fastapi.params.Security",
 ]);
 
 /** The path operation decorators named after one HTTP method. */
@@ -50,6 +59,7 @@ interface Found {
   readonly wiring: Wiring[];
   readonly handlers: ExceptionHandler[];
   readonly events: EventHandlerUse[];
+  readonly dependencies: DependencyUse[];
 }
 
 /**
@@ -88,11 +98,17 @@ export function extract(root: Node, context: Context): FastApiFile {
     wiring: [],
     handlers: objects.flatMap((o) => constructorHandlers(o, context)),
     events: [],
+    dependencies: [],
   };
   for (const call of root.descendantsOfType("call")) {
-    record(call, context, found);
+    const dependency = dependencyOf(call, context.qualify);
+    if (dependency === null) {
+      record(call, context, found);
+    } else {
+      found.dependencies.push(dependency);
+    }
   }
-  const { operations, wiring, handlers, events } = found;
+  const { operations, wiring, handlers, events, dependencies } = found;
   return {
     path: file.path,
     module: file.module,
@@ -101,6 +117,7 @@ export function extract(root: Node, context: Context): FastApiFile {
     wiring,
     handlers,
     events,
+    dependencies,
   };
 }
 
@@ -263,6 +280,27 @@ function eventOf(
     receiver,
     via,
     event: event ? valueFrom(event, qualify) : null,
+  };
+}
+
+/**
+ * Reads a `Depends(...)` or `Security(...)` call.
+ *
+ * @param call - a `call` node.
+ * @param qualify - qualifies a name through the file's imports.
+ * @returns the call, its dependency argument and how that reads; null for any other call.
+ */
+function dependencyOf(call: Node, qualify: Qualify): DependencyUse | null {
+  const fn = call.childForFieldName("function");
+  const callee = fn ? qualify(fn) : null;
+  if (callee === null || !DEPENDS.has(callee)) {
+    return null;
+  }
+  const argument = argumentAt(call, 0, "dependency");
+  return {
+    ...callSyntax(call, qualify),
+    argument,
+    target: argument ? valueFrom(argument, qualify) : null,
   };
 }
 

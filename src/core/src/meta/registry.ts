@@ -51,7 +51,8 @@ type RuleCode =
   | "FAPI005"
   | "FAPI006"
   | "FAPI007"
-  | "FAPI008";
+  | "FAPI008"
+  | "FAPI009";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -227,6 +228,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "No two path operations of one FastAPI app share an explicit operation_id, so generated clients get one method per operation.",
     docs: page("FAPI008"),
+  },
+  FAPI009: {
+    code: "FAPI009",
+    name: "depends-called",
+    severity: "error",
+    default: "off",
+    summary:
+      "Depends and Security get the dependency function, not the result of calling it at import time.",
+    docs: page("FAPI009"),
   },
 };
 

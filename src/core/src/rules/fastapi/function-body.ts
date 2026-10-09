@@ -32,3 +32,23 @@ export function ownNodes(fn: Node, types: ReadonlySet<string>): Node[] {
   }
   return found;
 }
+
+/**
+ * Tells whether a function is a generator: it has a `yield` of its own.
+ *
+ * @param fn - a `function_definition` node.
+ * @returns true for a generator or async generator function.
+ */
+export function isGenerator(fn: Node): boolean {
+  return ownNodes(fn, new Set(["yield"])).length > 0;
+}
+
+/**
+ * Tells whether a function is declared `async`.
+ *
+ * @param fn - a `function_definition` node.
+ * @returns true for `async def`.
+ */
+export function isAsync(fn: Node): boolean {
+  return fn.child(0)?.type === "async";
+}

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: f181f6ff430af944c56453fa927672a9574a7b756f703a93393510d1f8c6b6c6
+source_hash: 0fd5f6ed89eea24b77cc0f531e92fea8ffcee622f0270b6833aef6e5684cf4a9
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -35,13 +35,13 @@ Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikac
 | [FAPI006](FAPI006.md) | `lifespan-events` | Przestarzały handler `on_event` albo `on_startup=` (ostrzeżenie) oraz taki obok `lifespan=`, przez który FastAPI go pomija (błąd) | opt-in, błąd | tak |
 | [FAPI007](FAPI007.md) | `yield-dependency-swallows` | Zależność z `yield`, której klauzula `except` wokół niego nie rzuca wyjątku ponownie, więc błąd endpointu jest ukryty | opt-in, błąd | tak |
 | [FAPI008](FAPI008.md) | `duplicate-operation-id` | Dwie operacje ścieżki jednej aplikacji z tym samym literalnym `operation_id` | opt-in, błąd | tak |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: zależność jest wywoływana przy imporcie zamiast zostać przekazana | opt-in, błąd | tak |
 
-Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
+Jeden kod jest zarezerwowany i niezarejestrowany (nieznany kod nadal jest błędem konfiguracji):
 
 | Kod | Nazwa | Zgłoszenie | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |
 
 [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia każdą regułę razem z resztą projektu.
 

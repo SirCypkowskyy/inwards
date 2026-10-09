@@ -1,6 +1,6 @@
 /**
  * @file Runs the FAPI rules for a check: builds the FastAPI model once, reads
- * the checked files through it, and hands each one its FAPI001 to FAPI008
+ * the checked files through it, and hands each one its FAPI001 to FAPI009
  * findings before its suppression comments apply. The project lookups
  * (`FastApiProject`: handlers, classes, the app and router graph) are shared
  * by the rules and read the rest of the project only when a rule asks. With
@@ -23,6 +23,7 @@ import { type RuleOptions, ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
+import { checkDependsCalled } from "../rules/fastapi/depends-called.ts";
 import {
   checkFileOperationIds,
   checkGraphOperationIds,
@@ -68,7 +69,17 @@ export function fastApiFindings(
 ): FastApiFound {
   const { rules } = config;
   const on = rulesOn(rules);
-  if (!(on.wiring || on.shadow || on.lifespan || on.yields || on.ids || endpointRulesOn(rules))) {
+  if (
+    !(
+      on.wiring ||
+      on.shadow ||
+      on.lifespan ||
+      on.yields ||
+      on.ids ||
+      on.called ||
+      endpointRulesOn(rules)
+    )
+  ) {
     return NONE;
   }
   const model = new FastApiModel(parser, project);
@@ -109,6 +120,7 @@ interface RulesOn {
   readonly lifespan: boolean;
   readonly yields: boolean;
   readonly ids: boolean;
+  readonly called: boolean;
 }
 
 /**
@@ -116,7 +128,7 @@ interface RulesOn {
  * are read by `endpointRulesOn` and `checkEndpoints`.
  *
  * @param rules - the project's `[tool.inwards.rules]`, if any.
- * @returns whether each of FAPI003 and FAPI005 to FAPI008 reports.
+ * @returns whether each of FAPI003 and FAPI005 to FAPI009 reports.
  */
 function rulesOn(rules: InwardsConfig["rules"]): RulesOn {
   return {
@@ -125,6 +137,7 @@ function rulesOn(rules: InwardsConfig["rules"]): RulesOn {
     lifespan: ruleLevel("FAPI006", rules) !== "off",
     yields: ruleLevel("FAPI007", rules) !== "off",
     ids: ruleLevel("FAPI008", rules) !== "off",
+    called: ruleLevel("FAPI009", rules) !== "off",
   };
 }
 
@@ -144,7 +157,7 @@ interface FileChecks {
  * @param file.m - its FastAPI records.
  * @param file.scope - this check's FastAPI lookups.
  * @param checks - which rules run, and in which mode.
- * @param checks.on - which of FAPI003 and FAPI005 to FAPI008 are on.
+ * @param checks.on - which of FAPI003 and FAPI005 to FAPI009 are on.
  * @param checks.edit - true for a per-edit check, which leaves the cross-file findings out.
  * @param checks.rules - the project's `[tool.inwards.rules]`, for FAPI001 and FAPI002.
  * @param checks.settings - FAPI003's options.
@@ -160,6 +173,7 @@ function fileFindings(
     ...(on.shadow && edit ? checkFileShadowing(m, src, scope) : []),
     ...(on.ids && edit ? checkFileOperationIds(m, src, scope) : []),
     ...(on.lifespan ? checkLifespan(m, src, scope) : []),
+    ...(on.called ? checkDependsCalled(m, src, scope) : []),
   ];
 }
 

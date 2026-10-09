@@ -80,6 +80,14 @@ export interface EventHandlerUse extends CallSyntax {
   readonly event: Value | null;
 }
 
+/** A `Depends(...)` or `Security(...)` call, wherever it is written. */
+export interface DependencyUse extends CallSyntax {
+  /** The dependency argument: the first positional one or `dependency=`, or null for `Depends()`. */
+  readonly argument: Node | null;
+  /** The argument as the model reads it. */
+  readonly target: Value | null;
+}
+
 /** What one file holds, as the FAPI rules see it. */
 export interface FastApiFile {
   readonly path: string;
@@ -89,6 +97,7 @@ export interface FastApiFile {
   readonly wiring: readonly Wiring[];
   readonly handlers: readonly ExceptionHandler[];
   readonly events: readonly EventHandlerUse[];
+  readonly dependencies: readonly DependencyUse[];
 }
 
 /** What reading one file needs besides its tree. */
