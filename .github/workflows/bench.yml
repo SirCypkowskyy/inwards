@@ -27,7 +27,10 @@ jobs:
       - name: Check out the base branch
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: git worktree add "$RUNNER_TEMP/base" "$BASE"
+        # Persistent runner: a previous job's worktree is registered but its directory is gone.
+        run: |
+          git worktree prune
+          git worktree add "$RUNNER_TEMP/base" "$BASE"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: ${{ runner.temp }}/base/.bun-version
