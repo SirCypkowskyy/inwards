@@ -59,6 +59,7 @@ nav = [
     { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },
+    { "FAPI005 route-shadowing" = "rules/FAPI005.md" },
   ] },
   { "How it works" = [
     { "AI integration" = "04-AI-Integration.md" },

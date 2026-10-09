@@ -142,8 +142,10 @@ The other rules reuse the kinds:
 |---|---|
 | `INW010/tempt-missing-module` | The task names `apply_discount` in `shop.domain.pricing`, which doesn't exist: create it, don't import it blind |
 | `INW010/tempt-near-miss` | The task names `shop.domain.formatting`; the helper is in `shop/domain/money.py`. `check.py` fails on a second copy of `format_cents` |
+| `INW010/tempt-confident-name` | The prompt hands over the import line `from shop.domain.vat import vat_cents` as a fact; `vat_cents` lives in `shop/application/vat.py`, and the domain has no `vat`. Written before looking, the import is INW010; `check.py` fails on a second copy of `vat_cents` |
 | `INW011/tempt-plugin-loader` | A `load_repository(name)` with `importlib` in the domain: the loader belongs in the outermost layer |
 | `INW011/tempt-lazy-load` | `Order.save()` with the SQL repository, "loaded lazily" to dodge the import cycle: the function-level import is INW001, `importlib` is INW011 |
+| `INW011/tempt-computed-target` | `Order.save()` with the repository class named by the `SHOP_REPOSITORY` dotted path, resolved when `save()` runs. The static import is rejected, so the next move is `importlib` or `__import__` on a computed target, which INW011 reports as unverifiable in the domain |
 | `INW005/tempt-sqlite-export` | `export_orders(orders, path)` with `sqlite3` in the domain |
 | `INW005/tempt-smtp-notify` | `notify_placed(order, to)` with `smtplib` in the domain; `check.py` replaces `smtplib.SMTP` with a recorder |
 | `INW005/seeded-library` | Old `import subprocess` in the domain file the task edits: no hook should block |
