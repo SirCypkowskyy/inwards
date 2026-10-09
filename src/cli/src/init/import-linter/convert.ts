@@ -1,8 +1,8 @@
 /**
  * @file Maps import-linter contracts onto a `[tool.inwards]` draft and says, per
  * contract, what was carried over and what wasn't. `layers` contracts go
- * through `layers.ts`; `independence` and internal `forbidden` contracts, and
- * `|` siblings, become bounded contexts whose `depends-on` leaves out exactly
+ * through `layers.ts` (`|` siblings become sibling layers); `independence` and internal `forbidden` contracts
+ * become bounded contexts whose `depends-on` leaves out exactly
  * the forbidden pairs (INW002); forbidden external packages become
  * `extend-deny-libraries` on the layers that are exactly the source modules
  * (INW005).
@@ -66,7 +66,7 @@ export function convert(config: LinterConfig): Conversion | string {
       return "the import-linter config names no root_package and no layers contract could be mapped, so there is no layer to build [tool.inwards] from.";
     }
     const name = config.rootPackages.length === 1 ? (config.rootPackages[0] ?? "") : "project";
-    state.layers.push({ name, modules: [...config.rootPackages], deny: [] });
+    state.layers.push([{ name, modules: [...config.rootPackages], deny: [] }]);
   }
   const outcomes = config.contracts.map(
     (contract) => verdicts.get(contract) ?? otherContract(state, contract),
@@ -137,7 +137,7 @@ function forbiddenContract(state: State, contract: LinterContract): Outcome {
     }
     return outcome(contract, reasons, pairs.length > 0);
   }
-  const layers = layersOf(state.layers, sources);
+  const layers = layersOf(state.layers.flat(), sources);
   if (typeof layers === "string") {
     reasons.push(
       `forbidden_modules ${external.join(", ")}: INW005 keeps libraries out of whole layers, and ${layers} Put the source modules in their own layer and add these to its extend-deny-libraries by hand.`,
