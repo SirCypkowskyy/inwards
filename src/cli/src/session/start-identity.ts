@@ -164,7 +164,8 @@ function startPath(scope: Scope, project: string, file: string): string | undefi
     const root = ancestors.reverse().find((dir) => samePath(realDir(scope, dir), project));
     const rel = root === undefined ? undefined : posix(relative(root, file));
     const link = scope.probe.isLink(file) !== false;
-    const direct = rel !== undefined && !link && samePath(scope.probe.realpath(file), join(project, rel));
+    const direct =
+      rel !== undefined && !link && samePath(scope.probe.realpath(file), join(project, rel));
     scope.startPaths.set(file, direct ? rel : undefined);
   }
   return scope.startPaths.get(file);
