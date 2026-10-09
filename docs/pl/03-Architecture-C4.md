@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: f0fb35e28f73a86a9dc5248e9e52fdbc6fab0ab7766829b76d8bd17b94b2e80b
+source_hash: 02fbc9ce0da83b84f0e58cdb51711455f6b7321795b3c092e5fca5b34b1fdabe
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -364,6 +364,7 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI w schemacie bez metadanych OpenAPI, których wymaga projekt: podsumowania albo docstringu, modelu odpowiedzi, jawnego kodu statusu dla `POST` i `DELETE`, pola `description` w każdym wpisie `responses=`, a opcjonalnie tagów i `operation_id`. Jedna diagnostyka na endpoint, na dekoratorze | :material-check-circle: |
 | FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI: rzucony albo zwrócony w endpoincie, w funkcjach pomocniczych i zależnościach z tego samego pliku albo importowanych, do `max-depth` wywołań, albo z własnego wyjątku, który handler aplikacji zamienia na kod. Liczą się deklaracje na dekoratorze, routerze, dołączeniach nad nim i aplikacji; wszystko, czego Inwards nie umie odczytać, ucisza regułę | :material-check-circle: |
 | FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :material-check-circle: |
+| FAPI005 | `route-shadowing` | Opt-in. Operacja ścieżki, na którą wcześniejsza z tą samą metodą już odpowiada: `/users/{id}` nad `/users/me` albo ta sama metoda i ścieżka dwa razy, na jednym routerze albo między routerami, które aplikacja dołącza z literalnymi prefiksami (pełne ścieżki, w kolejności, w jakiej FastAPI trzyma trasy). Wszystko, co nie jest literałem (ścieżka, lista metod, prefiks), jest pomijane. Hook edycji zgłasza tylko przypadki z jednego routera; te między routerami czekają na Stop gate | :material-check-circle: |
 
 Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI005–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
 
