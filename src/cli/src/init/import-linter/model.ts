@@ -26,7 +26,8 @@ export interface DraftContext {
 
 /** The `[tool.inwards]` table the conversion arrived at. */
 export interface Draft {
-  layers: DraftLayer[];
+  /** The places in the order, innermost first; a place of two or more layers is a sibling group. */
+  layers: DraftLayer[][];
   contexts: DraftContext[];
   /** Modules left out of INW006's warning (`exhaustive_ignores`). */
   ignore: string[];
@@ -48,7 +49,8 @@ export type Pair = readonly [from: string, to: string];
 /** Everything the contracts add up to while they are converted. */
 export interface State {
   config: LinterConfig;
-  layers: DraftLayer[];
+  /** The places in the order, innermost first; a place of two or more layers is a sibling group. */
+  layers: DraftLayer[][];
   /** The shape of the layers contract the layers came from. */
   shape: string | undefined;
   pairs: Pair[];
