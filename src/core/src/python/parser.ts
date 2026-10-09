@@ -60,11 +60,76 @@ export async function createPythonParser(wasm: GrammarBinaries): Promise<Parser>
  * @throws {Error} when tree-sitter returns no tree.
  */
 export function parsePython(parser: Parser, text: string): Tree {
-  const tree = parser.parse(text);
+  const tree = parser.parse(flattenCommentRuns(text));
   if (!tree) {
     throw new Error("tree-sitter returned no tree");
   }
   return tree;
+}
+
+/** Consecutive comment-only lines from which `flattenCommentRuns` blanks them. */
+const COMMENT_RUN_MIN = 16;
+const COMMENT_ONLY_LINE = /^[ \t\f]*#/u;
+
+/**
+ * Blanks long runs of comment-only lines, so tree-sitter-python parses them in
+ * linear time.
+ *
+ * The grammar's scanner looks past every comment line to the end of the run
+ * of comments to settle the next indentation, then rewinds and does it again
+ * for the next line, so a run of N lines costs N times its length: 520 lines
+ * of 1,900 characters take about 4 s, and 20,000 short ones about 3 minutes
+ * (#168). Blank lines are scanned once, so a run of at least
+ * `COMMENT_RUN_MIN` comment-only lines is replaced by spaces of the same
+ * length. Rows and columns do not move, and a comment-only line never changes
+ * what Python reads. A line that mentions `inwards` stays, because the
+ * suppression comments are read from the tree (`commentsIn`), and so does
+ * every shorter run. Text inside a multi-line string that looks like such a
+ * run is blanked too, which no rule can see, since none reads such a string.
+ *
+ * @param text - normalised file text.
+ * @returns the text with long comment runs blanked, or `text` itself when it holds none.
+ */
+export function flattenCommentRuns(text: string): string {
+  if (!text.includes("#")) {
+    return text;
+  }
+  const lines = text.split("\n");
+  let runStart = 0;
+  let blanked = false;
+  for (let i = 0; i <= lines.length; i += 1) {
+    if (isPlainComment(lines[i])) {
+      continue;
+    }
+    if (i - runStart >= COMMENT_RUN_MIN) {
+      for (let j = runStart; j < i; j += 1) {
+        lines[j] = blankLine(lines[j] ?? "");
+      }
+      blanked = true;
+    }
+    runStart = i + 1;
+  }
+  return blanked ? lines.join("\n") : text;
+}
+
+/**
+ * Tells whether a row is a comment-only line that can be blanked.
+ *
+ * @param line - one row of source, or undefined past the end.
+ * @returns true for a line that starts with `#` and does not mention `inwards`.
+ */
+function isPlainComment(line: string | undefined): boolean {
+  return line !== undefined && COMMENT_ONLY_LINE.test(line) && !line.includes("inwards");
+}
+
+/**
+ * Replaces a row with spaces of the same length, keeping a CRLF's `\r`.
+ *
+ * @param line - one row of source.
+ * @returns the blank row.
+ */
+function blankLine(line: string): string {
+  return line.endsWith("\r") ? `${" ".repeat(line.length - 1)}\r` : " ".repeat(line.length);
 }
 
 const LEADING_BOM = /^\uFEFF/u;
