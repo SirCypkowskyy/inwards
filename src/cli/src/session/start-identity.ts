@@ -13,7 +13,7 @@
  * invocation, so nothing leaks between runs. The filesystem comes in through
  * the `PathProbe` contract.
  */
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, normalize, relative, resolve } from "node:path";
 import { posix } from "../paths/lexical.ts";
 import type { PathProbe } from "../platform/contracts.ts";
 import type { Check, Start } from "./contracts.ts";
@@ -116,6 +116,18 @@ export function createStartIdentity(
 }
 
 /**
+ * Compares two paths by their normalised text, so a probe answering with
+ * forward slashes (a stand-in, or a Windows API) still equals a joined path.
+ *
+ * @param a - a path, or undefined when it does not exist.
+ * @param b - the path to compare with.
+ * @returns true when both are the same text after normalisation.
+ */
+function samePath(a: string | undefined, b: string): boolean {
+  return a !== undefined && normalize(a) === normalize(b);
+}
+
+/**
  * Resolves a directory, memoised.
  *
  * @param scope - the invocation's probe and caches.
@@ -149,10 +161,11 @@ function startPath(scope: Scope, project: string, file: string): string | undefi
     for (let dir = dirname(file); ancestors.at(-1) !== dir; dir = dirname(dir)) {
       ancestors.push(dir);
     }
-    const root = ancestors.reverse().find((dir) => realDir(scope, dir) === project);
+    const root = ancestors.reverse().find((dir) => samePath(realDir(scope, dir), project));
     const rel = root === undefined ? undefined : posix(relative(root, file));
     const link = scope.probe.isLink(file) !== false;
-    const direct = rel !== undefined && !link && scope.probe.realpath(file) === join(project, rel);
+    const direct =
+      rel !== undefined && !link && samePath(scope.probe.realpath(file), join(project, rel));
     scope.startPaths.set(file, direct ? rel : undefined);
   }
   return scope.startPaths.get(file);
