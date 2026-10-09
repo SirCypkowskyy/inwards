@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 55ca55193fc94a786e78446a0b030a52f80e22d988715bc8f99b9344bf333f49
+source_hash: aba775b28635ba81c23f84ad20e536f542c502d9303b2099fc26e5089be7c38d
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -263,7 +263,7 @@ Każdy kontekst ma:
 
 - `name`: niepusty tekst, z rozróżnianiem wielkości liter, unikalny wśród kontekstów.
 - `modules`: prefiksy modułów, które kontekst posiada, razem ze wszystkim pod nimi. To dosłowne nazwy z kropkami; gwiazdki są błędem konfiguracji. Gdy do modułu pasują prefiksy kilku kontekstów, wygrywa najdłuższy, więc kolejność tabel nigdy nie ma znaczenia. Ten sam prefiks w dwóch kontekstach to błąd konfiguracji.
-- `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu.
+- `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu. Wpis z wiodącym `=` jest dokładny: `public = ["=shop.billing", "shop.billing.models"]` otwiera fasadę pakietu `shop.billing` (jego `__init__`) oraz `shop.billing.models` ze wszystkim pod nim, ale nie `shop.billing._invoices` ani żadnego innego podmodułu. Moduł po `=` to zwykła nazwa z kropkami i obowiązuje go ta sama zasada przynależności.
 - `depends-on` (domyślnie `[]`): konteksty, z których ten może importować. Zależność jest bezpośrednia: nie przechodzi dalej i nie działa w drugą stronę. Nazwa może wskazywać kontekst zadeklarowany niżej. Własna nazwa kontekstu, nieznana nazwa i powtórzona nazwa to błędy konfiguracji.
 - `template`: [szablon](#templates), którego nazwy `public`, pod każdym z `modules` kontekstu, dołączają do jego listy `public`.
 

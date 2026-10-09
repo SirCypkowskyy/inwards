@@ -1,13 +1,14 @@
 /**
  * @file INW003 public-api-only: code outside a bounded context imports only
  * the context's public modules (ADR-030). A module is public when it lies at
- * or under one of the context's `public` prefixes. The rule covers callers in
- * other contexts and callers in no context, but not an import INW002 already
+ * or under one of the context's `public` prefixes, or is the module of an
+ * exact `=` entry (a package facade, without what lies under it). The rule
+ * covers callers in other contexts and callers in no context, but not an import INW002 already
  * reports: when the dependency isn't declared at all, which module it goes
  * through is beside the point. The fix names the public module that already
  * exposes the imported name, when one does.
  */
-import { type ContextSpec, contextOf } from "../config/contexts.ts";
+import { type ContextSpec, contextOf, isPublicModule, publicModule } from "../config/contexts.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ModuleLookup } from "../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../meta/registry.ts";
@@ -97,7 +98,7 @@ function breachOf(
   if (defer && source !== undefined && !source.dependsOn.includes(target.name)) {
     return undefined; // INW002: the dependency itself isn't declared
   }
-  const open = target.public.some((prefix) => module === prefix || module.startsWith(`${prefix}.`));
+  const open = isPublicModule(target, module);
   return open ? undefined : { ref, source, target, module };
 }
 
@@ -113,7 +114,8 @@ function breachOf(
 function fixFor(breach: Breach, project: PublicLookup): Diagnostic["fix"] {
   const { ref, target, module } = breach;
   const name = ref.target.startsWith(`${module}.`) ? ref.target.slice(module.length + 1) : "";
-  const home = name === "" ? undefined : target.public.find((p) => project.exposes(p, name));
+  const homes = target.public.map(publicModule);
+  const home = name === "" ? undefined : homes.find((p) => project.exposes(p, name));
   const keep =
     "Do not reach the module another way (through a function-level import, TYPE_CHECKING or importlib); Inwards checks those too.";
   if (home !== undefined) {
@@ -137,12 +139,12 @@ function fixFor(breach: Breach, project: PublicLookup): Diagnostic["fix"] {
       ],
     };
   }
-  const listed = target.public.map((p) => `\`${p}\``).join(", ");
+  const listed = homes.map((p) => `\`${p}\``).join(", ");
   return {
     summary: `Go through a public module of "${target.name}": ${listed}.`,
     steps: [
       `Replace \`${ref.statement}\` with an import from ${listed}. ${keep}`,
-      `If none of them exposes what you need, re-export it from one (for example \`from ${module} import ...\` in \`${target.public[0] ?? ""}\`), then import it from there.`,
+      `If none of them exposes what you need, re-export it from one (for example \`from ${module} import ...\` in \`${homes[0] ?? ""}\`), then import it from there.`,
     ],
   };
 }
