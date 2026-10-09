@@ -16,7 +16,7 @@ concurrency:
 jobs:
   bench:
     name: Performance against the base branch
-    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
+    runs-on: [self-hosted, linux, ARM64, inwards] # dellpromaxgb10, ops/runner
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -35,16 +35,16 @@ jobs:
         working-directory: ${{ runner.temp }}/base
         run: |
           bun install --frozen-lockfile
-          bun run scripts/build-binaries.ts bun-linux-x64
-          cp dist/inwards-linux-x64 "$RUNNER_TEMP/base-inwards"
+          bun run scripts/build-binaries.ts bun-linux-arm64
+          cp dist/inwards-linux-arm64 "$RUNNER_TEMP/base-inwards"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
       - name: Build the PR's binary
         run: |
           bun install --frozen-lockfile
-          bun run scripts/build-binaries.ts bun-linux-x64
-          cp dist/inwards-linux-x64 "$RUNNER_TEMP/head-inwards"
+          bun run scripts/build-binaries.ts bun-linux-arm64
+          cp dist/inwards-linux-arm64 "$RUNNER_TEMP/head-inwards"
       - name: Synthetic repo (2,100 files)
         run: python3 bench/generate.py "$RUNNER_TEMP/inwards-bench"
       - name: Compare

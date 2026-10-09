@@ -29,7 +29,7 @@ concurrency:
 jobs:
   corpus:
     name: Real-repo corpus
-    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
+    runs-on: [self-hosted, linux, ARM64, inwards] # dellpromaxgb10, ops/runner
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -40,11 +40,11 @@ jobs:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       - name: Build the binary
-        run: bun run scripts/build-binaries.ts bun-linux-x64
+        run: bun run scripts/build-binaries.ts bun-linux-arm64
       - name: Fetch the corpus, run the prescan test, time the checks
         shell: bash
         run: |
-          bun run bench/corpus.ts --bin dist/inwards-linux-x64 --dir "$RUNNER_TEMP/corpus" \
+          bun run bench/corpus.ts --bin dist/inwards-linux-arm64 --dir "$RUNNER_TEMP/corpus" \
             --out corpus-result.json | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
