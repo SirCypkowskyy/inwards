@@ -51,7 +51,7 @@ function findings(cwd: string): string[] {
 // What lint-imports reported in each project, as the Inwards finding that stands for it.
 const PROJECTS: Record<string, string[]> = {
   // mypackage.low -> mypackage.high; mypackage.blue -> mypackage.green.
-  layers: ["INW001 mypackage/low.py:1", "INW002 mypackage/blue.py:1"],
+  layers: ["INW001 mypackage/blue.py:1", "INW001 mypackage/low.py:1"],
   // mypackage.foo.low -> mypackage.foo.high; mypackage.foo.extra is not a layer (exhaustive).
   // mypackage.bar has no (medium) layer, which the report points out.
   containers: [

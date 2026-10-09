@@ -95,7 +95,7 @@ function converted(deps: AppDeps, file: string | undefined): Converted | string 
   const project = dirname(found.path);
   const path = join(project, "pyproject.toml");
   const text = io.probe.kind(path) === "file" ? io.read.text(path) : undefined;
-  const first = found.config.rootPackages[0] ?? conversion.draft.layers[0]?.modules[0] ?? "";
+  const first = found.config.rootPackages[0] ?? conversion.draft.layers[0]?.[0]?.modules[0] ?? "";
   const root = sourceRoot({ ...io, toml: deps.init.toml }, project, first, text ?? "");
   const table = renderToml(conversion.draft, { source: basename(found.path), root });
   const check = parsed(table);
