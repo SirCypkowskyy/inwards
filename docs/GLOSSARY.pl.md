@@ -174,6 +174,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | include a router (`include_router`) | dołączać router, dołączenie |
 | unmounted router (FAPI003) | niepodpięty router |
 | shadowed route (FAPI005) | przesłonięta trasa |
+| lifespan (FastAPI, FAPI006) | lifespan (menedżer kontekstu cyklu życia aplikacji) |
+| event handler (`on_event`, FAPI006) | handler zdarzeń |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |

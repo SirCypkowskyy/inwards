@@ -67,7 +67,8 @@
         "FAPI001",
         "FAPI002",
         "FAPI003",
-        "FAPI005"
+        "FAPI005",
+        "FAPI006"
       ]
     },
     "layer": {
@@ -348,6 +349,9 @@
           "$ref": "#/definitions/routerWiringOptions"
         },
         "route-shadowing": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "lifespan-events": {
           "$ref": "#/definitions/ruleOptions"
         }
       }

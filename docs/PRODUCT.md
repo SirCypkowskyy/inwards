@@ -58,8 +58,8 @@ and no fix steps. Chapter 2 names speed as the moat against import-linter.
 
 ## Capabilities and Constraints
 
-- Rules INW000 to INW011 and FAPI001 to FAPI003, each with a page at
-  `rules/<CODE>/`. Those URLs are printed by the CLI and are a contract.
+- Rules INW000 to INW011 and FAPI001 to FAPI006 (FAPI004 is unused), each
+  with a page at `rules/<CODE>/`. Those URLs are printed by the CLI and are a contract.
 - The docs site is Zensical (0.0.65), extended only through `custom_dir`
   overrides, `extra_css` and `extra_javascript`; no JS framework, no build
   step beyond Zensical.

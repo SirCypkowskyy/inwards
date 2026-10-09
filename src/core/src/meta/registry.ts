@@ -48,7 +48,8 @@ type RuleCode =
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
-  | "FAPI005";
+  | "FAPI005"
+  | "FAPI006";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -197,6 +198,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "No FastAPI path operation is shadowed by an earlier one with the same method, so every route can be reached.",
     docs: page("FAPI005"),
+  },
+  FAPI006: {
+    code: "FAPI006",
+    name: "lifespan-events",
+    severity: "error",
+    default: "off",
+    summary:
+      "FastAPI apps use a lifespan context manager, not the deprecated on_event handlers, and never both, so every startup and shutdown handler runs.",
+    docs: page("FAPI006"),
   },
 };
 

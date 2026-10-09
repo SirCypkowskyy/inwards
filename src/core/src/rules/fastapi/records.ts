@@ -71,6 +71,15 @@ export interface ExceptionHandler {
   readonly node: Node;
 }
 
+/** An `on_event` decorator or an `add_event_handler` call: the deprecated startup and shutdown hooks. */
+export interface EventHandlerUse extends CallSyntax {
+  /** The qualified name of the app or router it is registered on. */
+  readonly receiver: string;
+  readonly via: "on_event" | "add_event_handler";
+  /** The event argument (`"startup"` or `"shutdown"`), or null when the call doesn't give one. */
+  readonly event: Value | null;
+}
+
 /** What one file holds, as the FAPI rules see it. */
 export interface FastApiFile {
   readonly path: string;
@@ -79,6 +88,7 @@ export interface FastApiFile {
   readonly operations: readonly PathOperation[];
   readonly wiring: readonly Wiring[];
   readonly handlers: readonly ExceptionHandler[];
+  readonly events: readonly EventHandlerUse[];
 }
 
 /** What reading one file needs besides its tree. */

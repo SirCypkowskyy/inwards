@@ -1,9 +1,9 @@
 /**
  * @file Runs the FAPI rules for a check: builds the FastAPI model once, reads
- * the checked files through it, and hands each one its FAPI001, FAPI002 and
- * FAPI003 findings before its suppression comments apply. The project lookups
+ * the checked files through it, and hands each one its FAPI001 to FAPI006
+ * findings before its suppression comments apply. The project lookups
  * (`FastApiProject`: handlers, classes, the app and router graph) are shared
- * by all three and read the rest of the project only when a rule asks. With
+ * by the rules and read the rest of the project only when a rule asks. With
  * every FAPI rule off, nothing is read or parsed; a file that doesn't mention
  * FastAPI is never parsed for them, and neither is one INW000 refuses.
  *
@@ -21,6 +21,7 @@ import { type RuleOptions, ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
+import { checkLifespan } from "../rules/fastapi/lifespan-events.ts";
 import { FastApiModel } from "../rules/fastapi/model.ts";
 import { FastApiProject } from "../rules/fastapi/project.ts";
 import type { FastApiFile } from "../rules/fastapi/records.ts";
@@ -59,9 +60,8 @@ export function fastApiFindings(
   { config, edit }: { config: InwardsConfig; edit: boolean },
 ): FastApiFound {
   const { rules } = config;
-  const wiringOn = ruleLevel("FAPI003", rules) !== "off";
-  const shadowOn = ruleLevel("FAPI005", rules) !== "off";
-  if (!(wiringOn || shadowOn || endpointRulesOn(rules))) {
+  const on = rulesOn(rules);
+  if (!(on.wiring || on.shadow || on.lifespan || endpointRulesOn(rules))) {
     return NONE;
   }
   const model = new FastApiModel(parser, project);
@@ -79,14 +79,9 @@ export function fastApiFindings(
     const found = new Map<string, Diagnostic[]>();
     const settings = rules?.options?.["router-wiring"] ?? {};
     for (const { src, m } of own) {
-      const wiring = wiringOn ? checkFileWiring(m, src, settings) : [];
-      const shadowing = shadowOn && edit ? checkFileShadowing(m, src, scope) : [];
-      found.set(src.path, [...wiring, ...checkEndpoints(src, m, scope, rules), ...shadowing]);
+      found.set(src.path, fileFindings({ src, m, scope }, { on, edit, rules, settings }));
     }
-    const extra = graphFindings(scope, own, { edit, wiringOn, shadowOn, settings }, found);
-    if (extra.length === 0) {
-      return { found, hidden: new Set() };
-    }
+    const extra = graphFindings(scope, own, { edit, on, settings }, found);
     for (const d of extra) {
       found.set(d.file, [...(found.get(d.file) ?? []), d]);
     }
@@ -96,11 +91,66 @@ export function fastApiFindings(
   }
 }
 
+/** Which FAPI rules are on. */
+interface RulesOn {
+  readonly wiring: boolean;
+  readonly shadow: boolean;
+  readonly lifespan: boolean;
+}
+
+/**
+ * Reads which FAPI rules `[tool.inwards.rules]` turns on. FAPI001 and FAPI002
+ * are read by `endpointRulesOn` and `checkEndpoints`.
+ *
+ * @param rules - the project's `[tool.inwards.rules]`, if any.
+ * @returns whether each of FAPI003 and FAPI005 and FAPI006 report.
+ */
+function rulesOn(rules: InwardsConfig["rules"]): RulesOn {
+  return {
+    wiring: ruleLevel("FAPI003", rules) !== "off",
+    shadow: ruleLevel("FAPI005", rules) !== "off",
+    lifespan: ruleLevel("FAPI006", rules) !== "off",
+  };
+}
+
+/** What the one-file checks of a FAPI rule need besides the file. */
+interface FileChecks {
+  readonly on: RulesOn;
+  readonly edit: boolean;
+  readonly rules: InwardsConfig["rules"];
+  readonly settings: RuleOptions;
+}
+
+/**
+ * Runs the FAPI rules that read one file (and the lookups it asks for).
+ *
+ * @param file - the checked file, its FastAPI records and the check's lookups.
+ * @param file.src - the file, with normalised text.
+ * @param file.m - its FastAPI records.
+ * @param file.scope - this check's FastAPI lookups.
+ * @param checks - which rules run, and in which mode.
+ * @param checks.on - which of FAPI003 and FAPI005 and FAPI006 are on.
+ * @param checks.edit - true for a per-edit check, which leaves the cross-file findings out.
+ * @param checks.rules - the project's `[tool.inwards.rules]`, for FAPI001 and FAPI002.
+ * @param checks.settings - FAPI003's options.
+ * @returns the file's findings before suppressions.
+ */
+function fileFindings(
+  { src, m, scope }: { src: SourceFile; m: FastApiFile; scope: FastApiProject },
+  { on, edit, rules, settings }: FileChecks,
+): Diagnostic[] {
+  return [
+    ...(on.wiring ? checkFileWiring(m, src, settings) : []),
+    ...checkEndpoints(src, m, scope, rules),
+    ...(on.shadow && edit ? checkFileShadowing(m, src, scope) : []),
+    ...(on.lifespan ? checkLifespan(m, src, scope) : []),
+  ];
+}
+
 /** What decides which whole-project FAPI rules run in a check. */
 interface GraphRules {
   readonly edit: boolean;
-  readonly wiringOn: boolean;
-  readonly shadowOn: boolean;
+  readonly on: RulesOn;
   readonly settings: RuleOptions;
 }
 
@@ -127,10 +177,24 @@ function wants(
 }
 
 /**
+ * Drops the graph findings a one-file check already reported.
+ *
+ * @param graph - findings from the whole-project check.
+ * @param found - the one-file findings so far, by file.
+ * @returns the graph findings that are new.
+ */
+function unseen(
+  graph: readonly Diagnostic[],
+  found: ReadonlyMap<string, Diagnostic[]>,
+): Diagnostic[] {
+  const seen = new Set([...found.values()].flat().map((d) => `${d.file}:${d.line}:${d.code}`));
+  return graph.filter((d) => !seen.has(`${d.file}:${d.line}:${d.code}`));
+}
+
+/**
  * Finds the FAPI findings that need the whole project's graph: FAPI003's
- * unmounted routers and cycles, FAPI005's shadowing across routers. A
- * per-edit check builds the graph only for a rule the edited file suppresses,
- * and its findings are then dropped after the suppressions.
+ * unmounted routers and cycles, FAPI005's shadowing across routers. A per-edit check builds the graph only for a rule the edited
+ * file suppresses, and its findings are then dropped after the suppressions.
  *
  * @param scope - the check's FastAPI lookups.
  * @param own - the checked files that mention FastAPI.
@@ -144,27 +208,22 @@ function graphFindings(
   rules: GraphRules,
   found: ReadonlyMap<string, Diagnostic[]>,
 ): Diagnostic[] {
-  const { edit, wiringOn, shadowOn, settings } = rules;
+  const { edit, on, settings } = rules;
   const checked = new Map(own.map(({ src }) => [src.path, src]));
   const extra: Diagnostic[] = [];
   const wired = own.some(({ m }) => m.objects.length > 0 || m.wiring.length > 0);
-  if (wants(own, { on: wiringOn, edit, code: "FAPI003", present: wired })) {
+  if (wants(own, { on: on.wiring, edit, code: "FAPI003", present: wired })) {
     extra.push(...checkGraphWiring(scope.graph(), checked, settings));
   }
   if (
     wants(own, {
-      on: shadowOn,
+      on: on.shadow,
       edit,
       code: "FAPI005",
       present: own.some(({ m }) => m.operations.length > 0),
     })
   ) {
-    const seen = new Set([...found.values()].flat().map((d) => `${d.file}:${d.line}:${d.code}`));
-    extra.push(
-      ...checkGraphShadowing(scope, checked).filter(
-        (d) => !seen.has(`${d.file}:${d.line}:${d.code}`),
-      ),
-    );
+    extra.push(...unseen(checkGraphShadowing(scope, checked), found));
   }
   return extra;
 }
