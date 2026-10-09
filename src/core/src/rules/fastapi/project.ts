@@ -106,6 +106,16 @@ export class FastApiProject {
   }
 
   /**
+   * Every FastAPI file of the project, read once, for the rules that need to
+   * know which file a graph record came from.
+   *
+   * @returns the records of every project file that mentions FastAPI.
+   */
+  fastApiFiles(): readonly FastApiFile[] {
+    return this.projectFiles();
+  }
+
+  /**
    * Resolves a qualified name through the model, once per name.
    *
    * @param qualified - a qualified name.

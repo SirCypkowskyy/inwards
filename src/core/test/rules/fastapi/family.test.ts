@@ -1,6 +1,6 @@
 /**
  * @file The FastAPI rule family's registration (#186, ADR-036): FAPI001 to
- * FAPI003 are registered opt-in, SARIF lists them as disabled,
+ * FAPI005 (FAPI004 is reserved) are registered opt-in, SARIF lists them as disabled,
  * `extend-select` turns one on, an inline suppression names them like any
  * INW code, and an unknown FAPI code is a config error and an INW009 error.
  * A suppression is checked against a finding built here; the rules' own
@@ -19,7 +19,7 @@ layers = [
   { name = "api", modules = ["shop.api"] },
 ]
 `;
-const FAPI = ["FAPI001", "FAPI002", "FAPI003"];
+const FAPI = ["FAPI001", "FAPI002", "FAPI003", "FAPI005"];
 const REASON = 'reason="documented in the gateway"';
 
 /**
@@ -55,6 +55,7 @@ describe("the FAPI codes", () => {
       "endpoint-metadata",
       "undocumented-error-response",
       "router-wiring",
+      "route-shadowing",
     ]);
   });
 
@@ -68,9 +69,9 @@ describe("the FAPI codes", () => {
   });
 
   test("are off unless extend-select turns one on", () => {
-    expect(FAPI.map((code) => ruleLevel(code, undefined))).toEqual(["off", "off", "off"]);
+    expect(FAPI.map((code) => ruleLevel(code, undefined))).toEqual(["off", "off", "off", "off"]);
     const on = config('extend-select = ["FAPI001"]').rules;
-    expect(FAPI.map((code) => ruleLevel(code, on))).toEqual([undefined, "off", "off"]);
+    expect(FAPI.map((code) => ruleLevel(code, on))).toEqual([undefined, "off", "off", "off"]);
   });
 
   test("take an options table by rule name", () => {
@@ -122,6 +123,6 @@ describe("an inline suppression of a FAPI code", () => {
     );
     expect([d?.code, d?.severity]).toEqual(["INW009", "error"]);
     expect(d?.message).toContain("FAPI999 is not a rule this Inwards knows");
-    expect(d?.message).toContain("INW011, FAPI001, FAPI002, FAPI003.");
+    expect(d?.message).toContain("INW011, FAPI001, FAPI002, FAPI003, FAPI005.");
   });
 });
