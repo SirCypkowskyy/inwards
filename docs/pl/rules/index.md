@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 1754ae25d28e98c4ac120cfc6f41174570cc8f2446d527150f0ecde70bc2abfb
+source_hash: f1eb2a756c80a1197855586584f5fdef43c4f7842fd7ace6edbe3df81b14def5
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -33,13 +33,13 @@ Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikac
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
 | [FAPI005](FAPI005.md) | `route-shadowing` | Operacja ścieżki, na którą wcześniejsza z tą samą metodą już odpowiada: `/users/{id}` nad `/users/me` albo ta sama metoda i ścieżka dwa razy | opt-in, błąd | tak |
 | [FAPI006](FAPI006.md) | `lifespan-events` | Przestarzały handler `on_event` albo `on_startup=` (ostrzeżenie) oraz taki obok `lifespan=`, przez który FastAPI go pomija (błąd) | opt-in, błąd | tak |
+| [FAPI007](FAPI007.md) | `yield-dependency-swallows` | Zależność z `yield`, której klauzula `except` wokół niego nie rzuca wyjątku ponownie, więc błąd endpointu jest ukryty | opt-in, błąd | tak |
 
 Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
 
 | Kod | Nazwa | Zgłoszenie | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
-| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planowana |
 | FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planowana |
 | FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |
 

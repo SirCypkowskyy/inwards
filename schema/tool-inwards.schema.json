@@ -185,7 +185,8 @@
         "FAPI002",
         "FAPI003",
         "FAPI005",
-        "FAPI006"
+        "FAPI006",
+        "FAPI007"
       ]
     },
     "layer": {
@@ -448,6 +449,9 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "lifespan-events": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "yield-dependency-swallows": {
           "$ref": "#/definitions/ruleOptions"
         }
       }

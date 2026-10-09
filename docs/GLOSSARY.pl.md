@@ -176,6 +176,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | shadowed route (FAPI005) | przesłonięta trasa |
 | lifespan (FastAPI, FAPI006) | lifespan (menedżer kontekstu cyklu życia aplikacji) |
 | event handler (`on_event`, FAPI006) | handler zdarzeń |
+| yield dependency (FAPI007) | zależność z `yield` |
+| swallow an exception (FAPI007) | połykać wyjątek |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |

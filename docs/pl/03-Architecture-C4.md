@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 3a33308fe96bb1ac2fcceb55badfa3af933ffd62f1c3484795b8bb32d5e025e3
+source_hash: d7b62ecaa8b2e7ebc417fcef98e02df550ccd715ac862e00ab54223275b46c10
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -366,8 +366,9 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :material-check-circle: |
 | FAPI005 | `route-shadowing` | Opt-in. Operacja ścieżki, na którą wcześniejsza z tą samą metodą już odpowiada: `/users/{id}` nad `/users/me` albo ta sama metoda i ścieżka dwa razy, na jednym routerze albo między routerami, które aplikacja dołącza z literalnymi prefiksami (pełne ścieżki, w kolejności, w jakiej FastAPI trzyma trasy). Wszystko, co nie jest literałem (ścieżka, lista metod, prefiks), jest pomijane. Hook edycji zgłasza tylko przypadki z jednego routera; te między routerami czekają na Stop gate | :material-check-circle: |
 | FAPI006 | `lifespan-events` | Opt-in. Przestarzałe zdarzenie startu lub zamknięcia: `@app.on_event(...)`, `add_event_handler` albo `on_startup=` / `on_shutdown=` (ostrzeżenie) oraz to samo na aplikacji, albo na routerze dołączanym przez aplikację, która ustawia `lifespan=`, gdzie FastAPI nigdy nie uruchomi handlera (błąd). Odbiorca jest rozwiązywany między plikami przez model. Hook edycji nie wchodzi w górę grafu routerów, więc handler routera zostaje tam ostrzeżeniem | :material-check-circle: |
+| FAPI007 | `yield-dependency-swallows` | Opt-in. Funkcja generatora z kodu projektu, w której `yield` stoi w `try` z klauzulą `except` niezgłaszającą wyjątku na każdej ścieżce, więc błąd z endpointu jest ukryty przed serwerem. Jedna funkcja naraz, bez modelu i bez grafu wywołań; menedżery kontekstu i fixtures są pomijane. Zgłoszenie stoi na linii `except` | :material-check-circle: |
 
-Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI007–FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
+Reguły FAPI ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) czytają jeden wspólny model, `rules/fastapi/model.ts`: aplikacje i routery, operacje ścieżek, krawędzie `include_router` i `mount` oraz handlery wyjątków, z jednego parsowania każdego pliku, który wspomina FastAPI, z nazwami rozwiązywanymi między plikami przez `ProjectIndex`. FAPI004 jest nieużywany: spike [#185](https://github.com/SirCypkowskyy/inwards/issues/185) wypadł na nie. FAPI008 i FAPI009 są planowane ([indeks reguł](rules/index.md#fastapi)).
 
 ## Mapa kodu { #code-map }
 
@@ -410,7 +411,9 @@ src/
 │   │   │                                #   (FAPI003), endpoint-metadata.ts (FAPI001),
 │   │   │                                #   undocumented-error-response.ts with error-codes.ts and
 │   │   │                                #   placement.ts (FAPI002), route-shadowing.ts (FAPI005),
-│   │   │                                #   lifespan-events.ts (FAPI006)
+│   │   │                                #   lifespan-events.ts (FAPI006), yield-dependency-swallows.ts
+│   │   │                                #   (FAPI007) and function-body.ts (a function's own yield,
+│   │   │                                #   return and try statements)
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on

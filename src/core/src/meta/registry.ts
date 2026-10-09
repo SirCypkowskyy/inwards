@@ -49,7 +49,8 @@ type RuleCode =
   | "FAPI002"
   | "FAPI003"
   | "FAPI005"
-  | "FAPI006";
+  | "FAPI006"
+  | "FAPI007";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -207,6 +208,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "FastAPI apps use a lifespan context manager, not the deprecated on_event handlers, and never both, so every startup and shutdown handler runs.",
     docs: page("FAPI006"),
+  },
+  FAPI007: {
+    code: "FAPI007",
+    name: "yield-dependency-swallows",
+    severity: "error",
+    default: "off",
+    summary:
+      "A dependency with yield re-raises what its except clauses catch, so an error in the endpoint is not hidden from the server.",
+    docs: page("FAPI007"),
   },
 };
 

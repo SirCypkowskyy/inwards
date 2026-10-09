@@ -1,11 +1,13 @@
 /**
  * @file Runs the FAPI rules for a check: builds the FastAPI model once, reads
- * the checked files through it, and hands each one its FAPI001 to FAPI006
+ * the checked files through it, and hands each one its FAPI001 to FAPI007
  * findings before its suppression comments apply. The project lookups
  * (`FastApiProject`: handlers, classes, the app and router graph) are shared
  * by the rules and read the rest of the project only when a rule asks. With
  * every FAPI rule off, nothing is read or parsed; a file that doesn't mention
- * FastAPI is never parsed for them, and neither is one INW000 refuses.
+ * FastAPI is never parsed for them, and neither is one INW000 refuses. FAPI007
+ * is the exception: it reads any file that spells both `yield` and `except`,
+ * since a dependency module needn't import FastAPI.
  *
  * A per-edit check (the PostToolUse hook, the editor) keeps only FAPI003's
  * one-file findings: wiring a new router into the app is a second edit, so the
@@ -27,6 +29,7 @@ import { FastApiProject } from "../rules/fastapi/project.ts";
 import type { FastApiFile } from "../rules/fastapi/records.ts";
 import { checkFileShadowing, checkGraphShadowing } from "../rules/fastapi/route-shadowing.ts";
 import { checkFileWiring, checkGraphWiring } from "../rules/fastapi/router-wiring.ts";
+import { checkYieldSwallows } from "../rules/fastapi/yield-dependency-swallows.ts";
 import { mentionsSuppression } from "../rules/suppression-comment.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 import type { Confirmed } from "./stages.ts";
@@ -61,7 +64,7 @@ export function fastApiFindings(
 ): FastApiFound {
   const { rules } = config;
   const on = rulesOn(rules);
-  if (!(on.wiring || on.shadow || on.lifespan || endpointRulesOn(rules))) {
+  if (!(on.wiring || on.shadow || on.lifespan || on.yields || endpointRulesOn(rules))) {
     return NONE;
   }
   const model = new FastApiModel(parser, project);
@@ -81,6 +84,10 @@ export function fastApiFindings(
     for (const { src, m } of own) {
       found.set(src.path, fileFindings({ src, m, scope }, { on, edit, rules, settings }));
     }
+    for (const src of on.yields ? files.filter((file) => !checkEncoding(file)) : []) {
+      const swallows = checkYieldSwallows(parser, src);
+      found.set(src.path, [...(found.get(src.path) ?? []), ...swallows]);
+    }
     const extra = graphFindings(scope, own, { edit, on, settings }, found);
     for (const d of extra) {
       found.set(d.file, [...(found.get(d.file) ?? []), d]);
@@ -96,6 +103,7 @@ interface RulesOn {
   readonly wiring: boolean;
   readonly shadow: boolean;
   readonly lifespan: boolean;
+  readonly yields: boolean;
 }
 
 /**
@@ -103,13 +111,14 @@ interface RulesOn {
  * are read by `endpointRulesOn` and `checkEndpoints`.
  *
  * @param rules - the project's `[tool.inwards.rules]`, if any.
- * @returns whether each of FAPI003 and FAPI005 and FAPI006 report.
+ * @returns whether each of FAPI003 and FAPI005 to FAPI007 reports.
  */
 function rulesOn(rules: InwardsConfig["rules"]): RulesOn {
   return {
     wiring: ruleLevel("FAPI003", rules) !== "off",
     shadow: ruleLevel("FAPI005", rules) !== "off",
     lifespan: ruleLevel("FAPI006", rules) !== "off",
+    yields: ruleLevel("FAPI007", rules) !== "off",
   };
 }
 
@@ -129,7 +138,7 @@ interface FileChecks {
  * @param file.m - its FastAPI records.
  * @param file.scope - this check's FastAPI lookups.
  * @param checks - which rules run, and in which mode.
- * @param checks.on - which of FAPI003 and FAPI005 and FAPI006 are on.
+ * @param checks.on - which of FAPI003 and FAPI005 to FAPI007 are on.
  * @param checks.edit - true for a per-edit check, which leaves the cross-file findings out.
  * @param checks.rules - the project's `[tool.inwards.rules]`, for FAPI001 and FAPI002.
  * @param checks.settings - FAPI003's options.
