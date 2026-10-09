@@ -184,3 +184,20 @@ over the host and, with it, these runners and the PAT. What limits the damage:
 jobs that hold write tokens, OIDC or secrets stay on GitHub-hosted runners;
 job containers are unprivileged, deleted after each job and cut off from the
 host and the LAN; the PAT covers this one repository.
+
+## Current setup: dellpromaxgb10 (since 2026-10-09)
+
+The repository is public, so the irysek slots above refuse to register
+(`runner.sh` only serves private repositories) and no longer apply. Jobs now run
+on `inwards-dell-1`, a persistent runner in the LXD VM `inwards-runner-1` on
+`dellpromaxgb10` (aarch64, 4 CPUs, 8 GiB; labels `self-hosted, Linux, ARM64, inwards`),
+so the self-hosted jobs build and test `linux-arm64` binaries.
+
+- Fork pull requests need approval for every outside contributor
+  (Settings > Actions > General). Never relax that while this runner is attached.
+- Jobs holding secrets, OIDC or write tokens stay on GitHub-hosted runners.
+- Service inside the VM: `actions.runner.SirCypkowskyy-inwards.inwards-dell-1`.
+  Reach it with `ssh cyprian@dellpromaxgb10 sudo lxc exec inwards-runner-1 -- bash`.
+- The VM autostarts with the host. The node key of `dellpromaxgb10` expired on
+  2026-10-06 and cut it off the tailnet; disable key expiry for it in the
+  Tailscale admin console.
