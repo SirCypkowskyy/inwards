@@ -161,7 +161,7 @@ export class Engine {
     const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
     const confirmed = withFound(
       withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
-      thinEndpointFindings(this.parser, src, this.config),
+      thinEndpointFindings(this.parser, src, this.config, project),
     );
     const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
     return applyRules(kept, this.config.rules);

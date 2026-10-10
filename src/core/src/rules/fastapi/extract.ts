@@ -65,25 +65,6 @@ interface Found {
 }
 
 /**
- * Lists a module's top-level functions, decorated or not.
- *
- * @param root - the module node.
- * @returns each function's `function_definition` node by name.
- */
-export function moduleFunctions(root: Node): Map<string, Node> {
-  const functions = new Map<string, Node>();
-  for (const child of namedChildren(root)) {
-    const fn =
-      child.type === "decorated_definition" ? child.childForFieldName("definition") : child;
-    const name = fn?.type === "function_definition" ? fn.childForFieldName("name") : null;
-    if (fn && name) {
-      functions.set(identifierName(name), fn);
-    }
-  }
-  return functions;
-}
-
-/**
  * Extracts one file's records from its tree, in two walks: assignments for
  * the objects, then calls for the operations, the wiring and the handlers.
  *

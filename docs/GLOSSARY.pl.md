@@ -189,6 +189,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | HTTP endpoint, thin endpoint (INW012) | endpoint HTTP, cienki endpoint |
 | guard (`if <cond>: raise HTTPException(...)`, INW012) | warunek ochronny (guard) |
 | signal, threshold (INW012) | sygnał, próg |
+| route registration (`add_api_route`, `Route`, INW012), registered handler | rejestracja trasy, zarejestrowany handler |
+| re-export (`from .views import f` in `__init__.py`) | reeksport |
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |

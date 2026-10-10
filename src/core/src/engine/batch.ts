@@ -214,7 +214,7 @@ function finish(
     }
     const extra = withFound(
       withFastApi(confirmed, src, wired),
-      thinEndpointFindings(steps.parser, src, config),
+      thinEndpointFindings(steps.parser, src, config, project),
     );
     const own = steps.suppressIn(src, extra);
     suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));

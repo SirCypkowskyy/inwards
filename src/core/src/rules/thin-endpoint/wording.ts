@@ -1,8 +1,9 @@
 /**
- * @file The words of an INW012 finding: how its message lists calls, where
- * it says the work should go (the `delegate-to` targets and their layers),
- * and the fix steps built from the signals an endpoint tripped. Plain
- * strings from what `check.ts` measured; it reads no syntax.
+ * @file The words of an INW012 finding: how its message lists calls and
+ * the helpers it counted, where it says the work should go (the
+ * `delegate-to` targets and their layers), and the fix steps built from the
+ * signals an endpoint tripped. Plain strings from what `check.ts` measured;
+ * it reads no syntax.
  */
 import type { LayerSpec } from "../../config/layers.ts";
 import type { Fix } from "../../contracts/records.ts";
@@ -28,15 +29,25 @@ export interface Tripped {
 }
 
 /**
+ * Keeps the first `MAX_NAMED` items of a list and counts the rest.
+ *
+ * @param items - the words to list.
+ * @returns e.g. the first six, then "3 more".
+ */
+function capped(items: readonly string[]): string[] {
+  const named = items.slice(0, MAX_NAMED);
+  const more = items.length - named.length;
+  return more > 0 ? [...named, `${more} more`] : named;
+}
+
+/**
  * Quotes calls for a message, at most `MAX_NAMED` of them.
  *
  * @param texts - the callees as written.
  * @returns e.g. "`db.execute` and `httpx.post`", or "... and 3 more".
  */
 function quoted(texts: readonly string[]): string {
-  const named = texts.slice(0, MAX_NAMED).map((t) => `\`${t}\``);
-  const more = texts.length - named.length;
-  return joined(more > 0 ? [...named, `${more} more`] : named);
+  return joined(capped(texts.map((t) => `\`${t}\``)));
 }
 
 /**
@@ -47,9 +58,66 @@ function quoted(texts: readonly string[]): string {
  * @returns e.g. "`db.execute`, `httpx.post`", or "..., 3 more".
  */
 export function listed(texts: readonly string[]): string {
-  const named = texts.slice(0, MAX_NAMED).map((t) => `\`${t}\``);
-  const more = texts.length - named.length;
-  return [...named, ...(more > 0 ? [`${more} more`] : [])].join(", ");
+  return capped(texts.map((t) => `\`${t}\``)).join(", ");
+}
+
+/** Where one counted body lives, for the message and the fix. */
+export interface BodySpan {
+  /** The helper's name; undefined for the endpoint's own body. */
+  readonly helper: string | undefined;
+  /** The `def` line, 1-based. */
+  readonly line: number;
+  /** The first and last line of its counted statements, 1-based; 0 when there are none. */
+  readonly lines: readonly [number, number];
+}
+
+/**
+ * Names the helpers whose bodies a finding counted, for the end of its message.
+ *
+ * @param spans - the endpoint's own body first, then its helpers'.
+ * @param path - the helpers' file when it isn't the finding's, else undefined.
+ * @returns e.g. ", counting the same-module helper `_impl` (line 30)", or "" without helpers.
+ */
+export function helperText(spans: readonly BodySpan[], path: string | undefined): string {
+  const helpers = spans.flatMap(({ helper, line }) =>
+    helper === undefined
+      ? []
+      : [`\`${helper}\` (${path === undefined ? "" : `${path}, `}line ${line})`],
+  );
+  if (helpers.length === 0) {
+    return "";
+  }
+  const noun = helpers.length === 1 ? "helper" : "helpers";
+  return `, counting the same-module ${noun} ${joined(capped(helpers))}`;
+}
+
+/**
+ * Names a range of lines.
+ *
+ * @param lines - the first and last line, 1-based.
+ * @returns "line 4" or "lines 4 to 9".
+ */
+function range(lines: readonly [number, number]): string {
+  const [first, last] = lines;
+  return first === last ? `line ${first}` : `lines ${first} to ${last}`;
+}
+
+/**
+ * Says which lines hold the logic to move: the endpoint's own, then each helper's.
+ *
+ * @param spans - the endpoint's own body first, then its helpers'.
+ * @param path - the endpoint's file when it isn't the finding's, else undefined.
+ * @returns e.g. "lines 13 to 14, and `_impl` at lines 18 to 29".
+ */
+function linesText(spans: readonly BodySpan[], path: string | undefined): string {
+  const [own, ...helpers] = spans;
+  const ownText =
+    own && own.lines[0] > 0 ? [`${path === undefined ? "" : `${path}, `}${range(own.lines)}`] : [];
+  const helperTexts = helpers
+    .filter(({ lines }) => lines[0] > 0)
+    .map(({ helper, lines }) => `\`${helper ?? ""}\` at ${range(lines)}`);
+  const joinedHelpers = helperTexts.length === 0 ? [] : [joined(helperTexts)];
+  return [...ownText, ...joinedHelpers].join(", and ");
 }
 
 /**
@@ -79,17 +147,18 @@ export function targetText(targets: readonly string[], layers: readonly LayerSpe
  * @param name - the endpoint's name, which the summary quotes.
  * @param tripped - what it tripped.
  * @param where - where the work goes, as `targetText` names it.
- * @param lines - the first and last line of its counted statements.
+ * @param body - where its own body and its helpers' live.
+ * @param body.spans - its own body first, then its helpers'.
+ * @param body.path - the endpoint's file when it isn't the finding's, else undefined.
  * @returns the summary and the steps.
  */
 export function fixFor(
   name: string,
   tripped: Tripped,
   where: string,
-  lines: readonly [number, number],
+  { spans, path }: { spans: readonly BodySpan[]; path: string | undefined },
 ): Fix {
-  const [first, last] = lines;
-  const span = first === last ? `line ${first}` : `lines ${first} to ${last}`;
+  const span = linesText(spans, path);
   const steps = [
     ...(tripped.logic
       ? [
@@ -112,7 +181,7 @@ export function fixFor(
         ]
       : []),
     "In the endpoint keep only: read the request, call the use case, map its errors to `HTTPException`, and return the response model.",
-    "Don't move the code into a helper function in the same module to get under the limits: the work would still live in the HTTP layer.",
+    "Don't move the code into a helper function in the same module: INW012 counts a helper's body as the endpoint's, and the work would still live in the HTTP layer.",
   ];
   return {
     summary: `Move the work out of \`${name}\` into ${where}, and keep the endpoint to HTTP.`,

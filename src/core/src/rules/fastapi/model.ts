@@ -14,10 +14,11 @@
 import type { Node, Parser, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
+import { moduleFunctions } from "../../python/nodes.ts";
 import { importedNames, normalizeSource, parsePython } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { type ModuleDefinitions, moduleDefinitions } from "./definitions.ts";
-import { extract, moduleFunctions } from "./extract.ts";
+import { extract } from "./extract.ts";
 import type { FastApiFile, FastApiObject } from "./records.ts";
 
 /** The text pre-filter: a file that spells none of these holds no FastAPI object or wiring. */
