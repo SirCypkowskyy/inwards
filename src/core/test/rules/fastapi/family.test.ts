@@ -1,6 +1,6 @@
 /**
  * @file The FastAPI rule family's registration (#186, ADR-036): FAPI001 to
- * FAPI005 (FAPI004 is reserved) are registered opt-in, SARIF lists them as disabled,
+ * FAPI009 (FAPI004 is reserved) are registered opt-in, SARIF lists them as disabled,
  * `extend-select` turns one on, an inline suppression names them like any
  * INW code, and an unknown FAPI code is a config error and an INW009 error.
  * A suppression is checked against a finding built here; the rules' own
@@ -19,7 +19,16 @@ layers = [
   { name = "api", modules = ["shop.api"] },
 ]
 `;
-const FAPI = ["FAPI001", "FAPI002", "FAPI003", "FAPI005"];
+const FAPI = [
+  "FAPI001",
+  "FAPI002",
+  "FAPI003",
+  "FAPI005",
+  "FAPI006",
+  "FAPI007",
+  "FAPI008",
+  "FAPI009",
+];
 const REASON = 'reason="documented in the gateway"';
 
 /**
@@ -56,6 +65,10 @@ describe("the FAPI codes", () => {
       "undocumented-error-response",
       "router-wiring",
       "route-shadowing",
+      "lifespan-events",
+      "yield-dependency-swallows",
+      "duplicate-operation-id",
+      "depends-called",
     ]);
   });
 
@@ -69,9 +82,11 @@ describe("the FAPI codes", () => {
   });
 
   test("are off unless extend-select turns one on", () => {
-    expect(FAPI.map((code) => ruleLevel(code, undefined))).toEqual(["off", "off", "off", "off"]);
+    expect(FAPI.map((code) => ruleLevel(code, undefined))).toEqual(FAPI.map(() => "off"));
     const on = config('extend-select = ["FAPI001"]').rules;
-    expect(FAPI.map((code) => ruleLevel(code, on))).toEqual([undefined, "off", "off", "off"]);
+    expect(FAPI.map((code) => ruleLevel(code, on))).toEqual(
+      FAPI.map((code) => (code === "FAPI001" ? undefined : "off")),
+    );
   });
 
   test("take an options table by rule name", () => {
@@ -123,6 +138,6 @@ describe("an inline suppression of a FAPI code", () => {
     );
     expect([d?.code, d?.severity]).toEqual(["INW009", "error"]);
     expect(d?.message).toContain("FAPI999 is not a rule this Inwards knows");
-    expect(d?.message).toContain("INW011, FAPI001, FAPI002, FAPI003, FAPI005.");
+    expect(d?.message).toContain("FAPI003, FAPI005, FAPI006, FAPI007, FAPI008, FAPI009.");
   });
 });

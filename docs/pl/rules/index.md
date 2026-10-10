@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 2ba1d4eb2fdb954a9496c977bfbe570f65435890a2a59a9ccf696d0a19dff98e
+source_hash: 0fd5f6ed89eea24b77cc0f531e92fea8ffcee622f0270b6833aef6e5684cf4a9
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -32,16 +32,16 @@ Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikac
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu (rzucony bezpośrednio, w funkcji pomocniczej albo zależności, albo przez handler wyjątków aplikacji) niezadeklarowany w `responses=` | opt-in, błąd | tak |
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
 | [FAPI005](FAPI005.md) | `route-shadowing` | Operacja ścieżki, na którą wcześniejsza z tą samą metodą już odpowiada: `/users/{id}` nad `/users/me` albo ta sama metoda i ścieżka dwa razy | opt-in, błąd | tak |
+| [FAPI006](FAPI006.md) | `lifespan-events` | Przestarzały handler `on_event` albo `on_startup=` (ostrzeżenie) oraz taki obok `lifespan=`, przez który FastAPI go pomija (błąd) | opt-in, błąd | tak |
+| [FAPI007](FAPI007.md) | `yield-dependency-swallows` | Zależność z `yield`, której klauzula `except` wokół niego nie rzuca wyjątku ponownie, więc błąd endpointu jest ukryty | opt-in, błąd | tak |
+| [FAPI008](FAPI008.md) | `duplicate-operation-id` | Dwie operacje ścieżki jednej aplikacji z tym samym literalnym `operation_id` | opt-in, błąd | tak |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: zależność jest wywoływana przy imporcie zamiast zostać przekazana | opt-in, błąd | tak |
 
-Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
+Jeden kod jest zarezerwowany i niezarejestrowany (nieznany kod nadal jest błędem konfiguracji):
 
 | Kod | Nazwa | Zgłoszenie | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
-| FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planowana |
-| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planowana |
-| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planowana |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |
 
 [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia każdą regułę razem z resztą projektu.
 

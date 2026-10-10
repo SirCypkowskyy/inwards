@@ -48,7 +48,11 @@ type RuleCode =
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
-  | "FAPI005";
+  | "FAPI005"
+  | "FAPI006"
+  | "FAPI007"
+  | "FAPI008"
+  | "FAPI009";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -197,6 +201,42 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "No FastAPI path operation is shadowed by an earlier one with the same method, so every route can be reached.",
     docs: page("FAPI005"),
+  },
+  FAPI006: {
+    code: "FAPI006",
+    name: "lifespan-events",
+    severity: "error",
+    default: "off",
+    summary:
+      "FastAPI apps use a lifespan context manager, not the deprecated on_event handlers, and never both, so every startup and shutdown handler runs.",
+    docs: page("FAPI006"),
+  },
+  FAPI007: {
+    code: "FAPI007",
+    name: "yield-dependency-swallows",
+    severity: "error",
+    default: "off",
+    summary:
+      "A dependency with yield re-raises what its except clauses catch, so an error in the endpoint is not hidden from the server.",
+    docs: page("FAPI007"),
+  },
+  FAPI008: {
+    code: "FAPI008",
+    name: "duplicate-operation-id",
+    severity: "error",
+    default: "off",
+    summary:
+      "No two path operations of one FastAPI app share an explicit operation_id, so generated clients get one method per operation.",
+    docs: page("FAPI008"),
+  },
+  FAPI009: {
+    code: "FAPI009",
+    name: "depends-called",
+    severity: "error",
+    default: "off",
+    summary:
+      "Depends and Security get the dependency function, not the result of calling it at import time.",
+    docs: page("FAPI009"),
   },
 };
 
