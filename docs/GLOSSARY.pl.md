@@ -86,6 +86,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | health check | health-check | "aplikacja health-check" |
 | harness (agent harness: Copilot, Local in VS Code), matcher (hook) | harness (harnessu), matcher (matchera) | |
 | Problems panel (VS Code) | panel Problems | |
+| runtimepath, quickfix (Neovim) | runtimepath, quickfix | "w swoim runtimepath", "w oknie quickfix" |
 
 ## Fixed Polish terms
 
@@ -207,6 +208,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
+| inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |
+| guarded role (INW015's `role`), build an adapter | chroniona rola, budować adapter |
 | pre-release | wersja przedpremierowa (pre-release) |
 | probe (the file system) | sondować, sondowanie |
 | promotion (PR `develop` → `main`) | promocja |
@@ -279,6 +282,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | file watcher (editor) | obserwator plików |
 | cloud agent (Copilot, formerly coding agent) | agent w chmurze (cloud agent) |
 | setup steps (`copilot-setup-steps.yml`) | kroki przygotowania |
+| project root (the directory an editor starts a language server in), root marker | katalog główny projektu, znacznik katalogu głównego |
+| dev extension (Zed) | rozszerzenie deweloperskie (dev extension) |
+| headless (an editor run without its UI) | bez interfejsu (headless) |
 | whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
 | MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |
 | tool (MCP) | narzędzie |
