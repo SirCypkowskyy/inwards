@@ -16,6 +16,8 @@
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { DEPENDS } from "./extract.ts";
+import { ownNodes } from "./function-body.ts";
 import type { FastApiProject, Lineage } from "./project.ts";
 import { statusCode } from "./status.ts";
 import { type Qualify, type Value, valueFrom } from "./values.ts";
@@ -49,19 +51,8 @@ const HTTP_EXCEPTIONS: ReadonlySet<string> = new Set([
   "starlette.exceptions.HTTPException",
 ]);
 
-/** The names `Depends` and `Security` are imported under. */
-const DEPENDS: ReadonlySet<string> = new Set([
-  "fastapi.Depends",
-  "fastapi.Security",
-  "fastapi.params.Depends",
-  "fastapi.params.Security",
-]);
-
 /** A response class: anything FastAPI or Starlette exports whose name ends in `Response`. */
 const RESPONSE_CLASS = /^(?:fastapi|starlette)(?:\.responses)?\.\w*Response$/u;
-
-/** Nodes whose bodies run in another scope, so a `raise` there isn't the function's. */
-const SCOPES: ReadonlySet<string> = new Set(["function_definition", "class_definition", "lambda"]);
 
 /** The node types the walk reads. */
 const READ: ReadonlySet<string> = new Set(["raise_statement", "return_statement", "call"]);
@@ -99,8 +90,7 @@ export class CodeWalk {
     this.active.add(frame.node.id);
     try {
       const found: CodeSource[] = [];
-      const body = frame.node.childForFieldName("body");
-      for (const node of body ? ownNodes(body) : []) {
+      for (const node of ownNodes(frame.node, READ)) {
         const sources =
           node.type === "call"
             ? this.called(node, frame, depth)
@@ -363,27 +353,6 @@ export class CodeWalk {
     }
     return caught;
   }
-}
-
-/**
- * Lists the nodes of a function body the walk reads, leaving out nested
- * functions, classes and lambdas.
- *
- * @param body - the function's body.
- * @returns its `raise` and `return` statements and its calls, in source order.
- */
-function ownNodes(body: Node): Node[] {
-  const found: Node[] = [];
-  const stack = [body];
-  for (let node = stack.pop(); node; node = stack.pop()) {
-    if (READ.has(node.type)) {
-      found.push(node);
-    }
-    if (!SCOPES.has(node.type)) {
-      stack.push(...namedChildren(node).reverse());
-    }
-  }
-  return found;
 }
 
 /**

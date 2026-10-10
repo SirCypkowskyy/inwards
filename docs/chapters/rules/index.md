@@ -27,16 +27,16 @@ The `FAPI` family checks FastAPI applications across files: which router the app
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | A path operation that can produce an error status code (raised directly, in a helper or dependency, or through an app's exception handler) its `responses=` doesn't declare | opt-in, error | yes |
 | [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` with routes that no app includes, routers that include each other in a cycle, or an `include_router` above the included router's routes | opt-in, error | yes |
 | [FAPI005](FAPI005.md) | `route-shadowing` | A path operation that an earlier one with the same method already answers: `/users/{id}` above `/users/me`, or the same method and path twice | opt-in, error | yes |
+| [FAPI006](FAPI006.md) | `lifespan-events` | A deprecated `on_event` handler or `on_startup=` (a warning), and one next to a `lifespan=` that makes FastAPI ignore it (an error) | opt-in, error | yes |
+| [FAPI007](FAPI007.md) | `yield-dependency-swallows` | A dependency with `yield` whose `except` clause around it doesn't re-raise, so the endpoint's error is hidden | opt-in, error | yes |
+| [FAPI008](FAPI008.md) | `duplicate-operation-id` | Two path operations of one app with the same literal `operation_id` | opt-in, error | yes |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: the dependency is called at import time instead of being passed | opt-in, error | yes |
 
-Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
+One code is reserved and not registered (an unknown code is still a config error):
 
 | Code | Name | Issue | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
-| FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planned |
-| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planned |
-| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planned |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
 
 The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.
 

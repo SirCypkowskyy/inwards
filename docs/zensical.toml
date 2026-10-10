@@ -60,6 +60,10 @@ nav = [
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },
     { "FAPI005 route-shadowing" = "rules/FAPI005.md" },
+    { "FAPI006 lifespan-events" = "rules/FAPI006.md" },
+    { "FAPI007 yield-dependency-swallows" = "rules/FAPI007.md" },
+    { "FAPI008 duplicate-operation-id" = "rules/FAPI008.md" },
+    { "FAPI009 depends-called" = "rules/FAPI009.md" },
   ] },
   { "How it works" = [
     { "AI integration" = "04-AI-Integration.md" },

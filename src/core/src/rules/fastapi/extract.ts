@@ -13,6 +13,8 @@ import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { constructorHandlers, handlerOf } from "./handlers.ts";
 import type {
   Context,
+  DependencyUse,
+  EventHandlerUse,
   ExceptionHandler,
   FastApiFile,
   FastApiObject,
@@ -27,6 +29,14 @@ const CONSTRUCTORS: ReadonlyMap<string, "app" | "router"> = new Map([
   ["fastapi.applications.FastAPI", "app"],
   ["fastapi.APIRouter", "router"],
   ["fastapi.routing.APIRouter", "router"],
+]);
+
+/** The names `Depends` and `Security` are imported under. */
+export const DEPENDS: ReadonlySet<string> = new Set([
+  "fastapi.Depends",
+  "fastapi.Security",
+  "fastapi.params.Depends",
+  "fastapi.params.Security",
 ]);
 
 /** The path operation decorators named after one HTTP method. */
@@ -48,6 +58,8 @@ interface Found {
   readonly operations: PathOperation[];
   readonly wiring: Wiring[];
   readonly handlers: ExceptionHandler[];
+  readonly events: EventHandlerUse[];
+  readonly dependencies: DependencyUse[];
 }
 
 /**
@@ -85,12 +97,28 @@ export function extract(root: Node, context: Context): FastApiFile {
     operations: [],
     wiring: [],
     handlers: objects.flatMap((o) => constructorHandlers(o, context)),
+    events: [],
+    dependencies: [],
   };
   for (const call of root.descendantsOfType("call")) {
-    record(call, context, found);
+    const dependency = dependencyOf(call, context.qualify);
+    if (dependency === null) {
+      record(call, context, found);
+    } else {
+      found.dependencies.push(dependency);
+    }
   }
-  const { operations, wiring, handlers } = found;
-  return { path: file.path, module: file.module, objects, operations, wiring, handlers };
+  const { operations, wiring, handlers, events, dependencies } = found;
+  return {
+    path: file.path,
+    module: file.module,
+    objects,
+    operations,
+    wiring,
+    handlers,
+    events,
+    dependencies,
+  };
 }
 
 /**
@@ -125,6 +153,8 @@ function record(call: Node, context: Context, found: Found): void {
     const handler = argumentAt(call, 1, "handler");
     const via = "add_exception_handler";
     found.handlers.push(handlerOf({ app, via, node: call, exception, handler }, context));
+  } else if (method === "on_event" || method === "add_event_handler") {
+    found.events.push(eventOf(call, { via: method, receiver: app }, context.qualify));
   } else if (method === "include_router" || method === "mount") {
     found.wiring.push(wiringOf(call, method, app, context.qualify));
   }
@@ -227,6 +257,51 @@ function methodsOf(methods: Argument | undefined): readonly string[] | "unknown"
   const items = value.kind === "list" ? value.items : [];
   const names = items.flatMap((item) => (item.kind === "str" ? [item.value.toLowerCase()] : []));
   return value.kind === "list" && names.length === items.length ? names : "unknown";
+}
+
+/**
+ * Reads an `on_event(...)` decorator or `add_event_handler(...)` call.
+ *
+ * @param call - the `call` node.
+ * @param on - what the call is.
+ * @param on.via - `on_event` or `add_event_handler`.
+ * @param on.receiver - the qualified app or router it is called on.
+ * @param qualify - qualifies a name through the file's imports.
+ * @returns the registration, with its event argument as the model reads it.
+ */
+function eventOf(
+  call: Node,
+  { via, receiver }: { via: EventHandlerUse["via"]; receiver: string },
+  qualify: Qualify,
+): EventHandlerUse {
+  const event = argumentAt(call, 0, "event_type");
+  return {
+    ...callSyntax(call, qualify),
+    receiver,
+    via,
+    event: event ? valueFrom(event, qualify) : null,
+  };
+}
+
+/**
+ * Reads a `Depends(...)` or `Security(...)` call.
+ *
+ * @param call - a `call` node.
+ * @param qualify - qualifies a name through the file's imports.
+ * @returns the call, its dependency argument and how that reads; null for any other call.
+ */
+function dependencyOf(call: Node, qualify: Qualify): DependencyUse | null {
+  const fn = call.childForFieldName("function");
+  const callee = fn ? qualify(fn) : null;
+  if (callee === null || !DEPENDS.has(callee)) {
+    return null;
+  }
+  const argument = argumentAt(call, 0, "dependency");
+  return {
+    ...callSyntax(call, qualify),
+    argument,
+    target: argument ? valueFrom(argument, qualify) : null,
+  };
 }
 
 /**

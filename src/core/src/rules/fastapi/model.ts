@@ -21,7 +21,8 @@ import type { FastApiFile, FastApiObject } from "./records.ts";
 import { type Qualify, qualifierFor } from "./values.ts";
 
 /** The text pre-filter: a file that spells none of these holds no FastAPI object or wiring. */
-const MENTIONS = /fastapi|FastAPI|APIRouter|include_router|exception_handler/u;
+const MENTIONS =
+  /fastapi|FastAPI|APIRouter|include_router|exception_handler|on_event|add_event_handler/u;
 
 /** How many re-exports `resolve` follows before it gives up (a re-export cycle ends here). */
 const MAX_HOPS = 8;
@@ -59,7 +60,7 @@ interface Parsed {
  * Tells whether a file may hold FastAPI objects or wiring, before any parse.
  *
  * @param text - the file's text.
- * @returns true when it mentions `fastapi`, `FastAPI`, `APIRouter`, `include_router` or `exception_handler`.
+ * @returns true when it mentions `fastapi`, `FastAPI`, `APIRouter`, `include_router`, `exception_handler`, `on_event` or `add_event_handler`.
  */
 export function mentionsFastApi(text: string): boolean {
   return MENTIONS.test(text);
