@@ -1,0 +1,15 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW015 construct-only-in the fix names the composition root and the port 1`] = `
+{
+  "steps": [
+    "Delete \`from app.adapters.outbound.sql import SqlRepo\`.",
+    "Type this module against the port the adapter implements (the abstract class or Protocol the inner layer owns), not against the adapter.",
+    "Receive the implementation through a constructor or function parameter; in a FastAPI route or dependency, through \`Depends()\` on a provider whose return type is the port.",
+    "Build the adapter in \`app.di\` or \`app.main\` and pass it in from there.",
+    "If this module needs the adapter only in annotations, use the port there too; an import under \`if TYPE_CHECKING:\` isn't reported, but it still ties the module to the adapter.",
+    "Don't re-export the adapter from another module to get around this: Inwards follows re-exports to the class.",
+  ],
+  "summary": "Take the port as a parameter instead of importing \`app.adapters.outbound.sql\`, and let \`app.di\` or \`app.main\` build the adapter.",
+}
+`;

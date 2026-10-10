@@ -47,6 +47,7 @@ type RuleCode =
   | "INW011"
   | "INW012"
   | "INW013"
+  | "INW015"
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
@@ -187,6 +188,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "An async def makes no synchronous database, cache or cloud call: a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
     docs: page("INW013"),
+  },
+  // Opt-in, the role rule that keeps adapters in the composition root (#296).
+  INW015: {
+    code: "INW015",
+    name: "construct-only-in",
+    severity: "error",
+    default: "off",
+    summary:
+      "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
+    docs: page("INW015"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.
