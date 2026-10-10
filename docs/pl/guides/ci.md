@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: c09d548d224c6107645342f89faf5f8b9fdba7a02c73f6ae27aee18ed9c1c1f1
+source_hash: d2dcfae464310cc6e68c7dd17fafd4248edab0efd0fabb0cc566c77945b9d634
 ---
 
 # GitHub Actions { #github-actions }
@@ -107,10 +107,10 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 
 ## Wątki { #threads }
 
-`inwards check` i `inwards baseline` parsują duży projekt w kilku wątkach: od 1000 plików, po jednym wątku na 500 plików, do połowy rdzeni runnera ponad dwa i najwyżej 4. Reguły nadal działają w jednym wątku w kolejności plików, więc wynik jest taki sam przy dowolnej liczbie wątków. Na serwisie Django z 4324 plikami zimne sprawdzenie skróciło się z 1,48 s do 0,98 s przy czterech wątkach na 10-rdzeniowym laptopie arm64 z macOS. Na Linuksie zysk jest mniejszy, a 4-rdzeniowy runner, taki jak hostowany `ubuntu-latest` GitHuba, zostaje przy jednym wątku, bo więcej wątków spowalniało tam sprawdzenie ([rozdział 6](../06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Każdy wątek trzyma własną kopię parsera, około 40 do 50 MB.
+`inwards check` i `inwards baseline` parsują duży projekt w kilku wątkach: od 1000 plików, po jednym wątku na 500 plików, do połowy rdzeni runnera ponad dwa i najwyżej 4. Reguły nadal działają w jednym wątku w kolejności plików, więc wynik jest taki sam przy dowolnej liczbie wątków. Na serwisie Django z 4324 plikami zimne sprawdzenie skróciło się z 1,48 s w jednym wątku do 0,87 s przy czterech wątkach na 10-rdzeniowym laptopie arm64 z macOS ([#281](https://github.com/SirCypkowskyy/inwards/issues/281) skróciło czytanie przed parsowaniem). Na Linuksie zysk jest mniejszy, a 4-rdzeniowy runner, taki jak hostowany `ubuntu-latest` GitHuba, zostaje przy jednym wątku, bo więcej wątków spowalniało tam sprawdzenie ([rozdział 6](../06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Każdy wątek trzyma własną kopię parsera, około 40 do 50 MB.
 
 - `INWARDS_THREADS=1` trzyma sprawdzenie w jednym wątku, na runnerze z małą ilością pamięci albo przy pomiarze, który ma używać jednego rdzenia.
-- `INWARDS_THREADS=N` pozwala na najwyżej N wątków, także ponad domyślny limit. W naszych pomiarach osiem nie było szybsze od czterech, bo czytanie plików i reguły się nie rozkładają.
+- `INWARDS_THREADS=N` pozwala na najwyżej N wątków, także ponad domyślny limit. W naszych pomiarach osiem nie było szybsze od czterech, bo reguły się nie rozkładają.
 - Hooki Claude Code sprawdzają po kilka plików naraz i nigdy nie uruchamiają wątków.
 
 ## Dostępność code scanning { #code-scanning-availability }

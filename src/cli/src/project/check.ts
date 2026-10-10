@@ -6,6 +6,7 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import {
+  type Checked,
   checkLinks,
   checkNestedProjects,
   checkPrefixes,
@@ -14,11 +15,11 @@ import {
   checkSelectors,
   type Diagnostic,
   Engine,
+  type GrammarBinaries,
   type InwardsConfig,
   type ListDir,
   layerPackages,
   membersFrom,
-  moduleNameFor,
   type PathKind,
   type ProjectFiles,
   type ProjectIndex,
@@ -29,13 +30,14 @@ import {
   rootPathOf,
   type SourceFile,
 } from "@inwards/core";
-import { isInside, posix } from "../paths/lexical.ts";
+import { posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
-import type { ProjectIo } from "./contracts.ts";
+import type { ExtractionPool, ProjectIo } from "./contracts.ts";
 import { layerLinks, linksUnder } from "./links.ts";
-import { checkOnThreads } from "./threads.ts";
+import { atOrInside, type PlannedFile, planSources, readSources } from "./sources.ts";
+import { checkOnThreads, openPool } from "./threads.ts";
 import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
@@ -53,6 +55,8 @@ interface Project {
   layerDirs: string[];
   /** Probes the other uv workspace members' import roots and the project's site-packages, for namespace package portions. */
   portions: ((rel: string) => ReturnType<PathKind>) | undefined;
+  /** The grammars the engine loaded, for worker threads. */
+  wasm: GrammarBinaries;
 }
 
 /**
@@ -103,6 +107,7 @@ async function openProject(
     realRoot: io.probe.realpath(lexicalRoot) ?? lexicalRoot,
     layerDirs: layerDirs(io.probe, configPath, config),
     portions: otherPortions(io, dir),
+    wasm,
   };
 }
 
@@ -131,75 +136,6 @@ export function layerDirs(
     const real = probe.realpath(dir);
     return real === undefined ? [] : [...new Set([dir, real])];
   });
-}
-
-/**
- * Reads the Python files under the targets, once per module name they have.
- * Files outside the config root are dropped: they have no module name in the
- * project, and `notCheckedOf` tells the user about a named path that lost all
- * of them. A file reached through an alias and through its real path gets one
- * entry per distinct (module, real file), so it is never reported twice.
- *
- * @param io - walks the targets and reads the files.
- * @param project - the loaded project.
- * @param what - which files, and how to name and read them.
- * @param what.targets - absolute files or directories; undefined means the config root.
- * @param what.base - directory that report paths are made relative to.
- * @param what.texts - content to check instead of what is on disk, by absolute path.
- * @param what.exclude - directories whose files another config checks (uv workspace members).
- * @returns the source files, with forward-slash paths on every OS, and the
- *   walked paths that gave at least one of them.
- */
-function loadSources(
-  io: ProjectIo,
-  project: Project,
-  {
-    targets,
-    base,
-    texts,
-    exclude,
-  }: {
-    targets: string[] | undefined;
-    base: string;
-    texts: ReadonlyMap<string, string> | undefined;
-    exclude: readonly string[];
-  },
-): { files: SourceFile[]; loaded: string[] } {
-  const { lexicalRoot, realRoot } = project;
-  const files: SourceFile[] = [];
-  const loaded: string[] = [];
-  const seen = new Set<string>();
-  for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
-    const resolved = io.probe.realpath(abs);
-    const names = moduleNames(abs, resolved, lexicalRoot, realRoot);
-    if (names.length === 0 || exclude.some((dir) => atOrInside(dir, abs))) {
-      continue; // outside the root, or a workspace member's own config checks it: not read at all
-    }
-    loaded.push(abs);
-    const text = texts?.get(abs) ?? io.read.text(abs);
-    const real = resolved ?? abs;
-    for (const { rel, shown } of names) {
-      const named = moduleNameFor(rel);
-      // Keyed on the real file too: order.py and order.pyi are one module, two files.
-      const key = `${named.module}\u0000${real}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        files.push({ path: posix(relative(base, shown)), text, ...named });
-      }
-    }
-  }
-  return { files, loaded };
-}
-
-/**
- * Tells whether a path is a directory or lies below it, by the text alone.
- *
- * @param dir - the directory.
- * @param path - the path to test.
- * @returns true when `path` is `dir` or inside it.
- */
-function atOrInside(dir: string, path: string): boolean {
-  return path === dir || isInside(dir, path);
 }
 
 /**
@@ -258,6 +194,60 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
     listDir: (rel: string): ReturnType<ListDir> => io.read.list(join(root, rel)),
     ...(project.portions ? { portions: project.portions } : {}),
   };
+}
+
+/** What `checkPlanned` gives back to `runCheck`. */
+interface CheckedFiles {
+  files: SourceFile[];
+  accepted: ReadonlyMap<string, number> | undefined;
+  listing: ProjectFiles;
+  checked: Checked;
+}
+
+/**
+ * Reads the planned files and runs the engine over them, on the pool's
+ * threads too when there is a pool.
+ *
+ * @param io - reads the files, the baseline and the project.
+ * @param project - the loaded project.
+ * @param pool - the worker threads from `openPool`, or undefined; the caller closes it.
+ * @param run - what to read and how to check it.
+ * @param run.planned - the files from `planSources`.
+ * @param run.count - how many source files they give.
+ * @param run.texts - content to check instead of what is on disk, by absolute path.
+ * @param run.baseline - false to report violations the baseline accepts.
+ * @param run.absent - top-level module names the index treats as missing.
+ * @param run.whole - true for a whole-project run.
+ * @param run.edit - true for a per-edit check.
+ * @returns the source files, the baseline's accepted copies, the listing the
+ *   index was built on, and the engine's findings.
+ * @throws {ConfigError} when the baseline is invalid.
+ * @throws when a file can't be read.
+ */
+async function checkPlanned(
+  io: ProjectIo,
+  project: Project,
+  pool: ExtractionPool | undefined,
+  run: {
+    planned: readonly PlannedFile[];
+    count: number;
+    texts: ReadonlyMap<string, string> | undefined;
+    baseline: boolean;
+    absent: readonly string[];
+    whole: boolean;
+    edit: boolean;
+  },
+): Promise<CheckedFiles> {
+  const files = await readSources(io, run.planned, run.count, run.texts);
+  // Read first: the engine skips the confirming parse where the baseline accepts everything.
+  const accepted = run.baseline
+    ? readBaseline(io, project.configPath, project.config.rules)
+    : undefined;
+  const listing = hideTopLevel(projectFiles(io, project), run.absent);
+  const index = project.engine.index(listing);
+  const options = { whole: run.whole, edit: run.edit };
+  const checked = await checkOnThreads(project.engine, pool, { files, index, accepted, options });
+  return { files, accepted, listing, checked };
 }
 
 /**
@@ -330,15 +320,22 @@ export async function runCheck(
 ): Promise<Report> {
   const started = io.clock.elapsed();
   const project = await openProject(io, configPath, cache, config);
-  const { files, loaded } = loadSources(io, project, { targets, base, texts, exclude });
-  // Read first: the engine skips the confirming parse where the baseline accepts everything.
-  const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
-  const listing = hideTopLevel(projectFiles(io, project), absent);
-  const index = project.engine.index(listing);
+  const { planned, count } = planSources(io, project, { targets, base, exclude });
   // A whole-project run also looks for import cycles (INW004), which one file can't show.
   const whole = targets === undefined;
-  const run = { files, index, accepted, options: { whole, edit } };
-  const { diagnostics, suppressed } = await checkOnThreads(io, project.engine, threads, run);
+  // Started before the reads, so the workers load the grammar meanwhile (#281).
+  const pool = openPool(io, project.wasm, threads, count);
+  const { files, accepted, listing, checked } = await checkPlanned(io, project, pool, {
+    planned,
+    count,
+    texts,
+    baseline,
+    absent,
+    whole,
+    edit,
+  }).finally(() => pool?.close());
+  const { diagnostics, suppressed } = checked;
+  const loaded = planned.map(({ abs }) => abs);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -411,36 +408,4 @@ function requiredAround(
 export async function indexProject(io: ProjectIo, configPath: string): Promise<ProjectIndex> {
   const project = await openProject(io, configPath);
   return project.engine.index(projectFiles(io, project));
-}
-
-/**
- * Lists every module name Python could import a file by.
- * Python names a module after the path it was imported through, so a file
- * reached through a symlinked alias has two names: the alias path and the
- * real path. Both are checked, so an alias can't hide a file from its layer.
- * Names that fall outside the config root are dropped.
- *
- * @param abs - the file as found.
- * @param real - its real path, or undefined when it can't be resolved.
- * @param lexicalRoot - the config root as written.
- * @param realRoot - the config root with symlinks resolved.
- * @returns each name as a root-relative path, with the path to show for it.
- */
-function moduleNames(
-  abs: string,
-  real: string | undefined,
-  lexicalRoot: string,
-  realRoot: string,
-): { rel: string; shown: string }[] {
-  const names: { rel: string; shown: string }[] = [];
-  if (isInside(lexicalRoot, abs)) {
-    names.push({ rel: relative(lexicalRoot, abs), shown: abs });
-  }
-  if (real !== undefined && isInside(realRoot, real)) {
-    const rel = relative(realRoot, real);
-    if (!names.some((n) => n.rel === rel)) {
-      names.push({ rel, shown: real });
-    }
-  }
-  return names;
 }

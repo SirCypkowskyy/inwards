@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: bc1350441a3eaa8f2064a99b03f1f4281fde3e9408cbaf025dd508327ee5e6d7
+source_hash: 0ba3e05c167c000dc4d1bae3ed18e87f55f241ca4d2faf945699e0cdd497b9a7
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -30,7 +30,7 @@ Uszeregowane. Gdy dwa cele są w konflikcie, wygrywa wyższy.
 | 2 | :material-lightning-bolt: **Opóźnienie w pętli agenta** | Hook sprawdza jeden edytowany plik | p95 < 100 ms czasu rzeczywistego, łącznie ze startem procesu |
 | 3 | :material-robot-outline: **Wyniki, na podstawie których agent może działać** | Agent dostaje INW001 | Naprawia naruszenie w ramach jednej ponownej próby w ≥ 80 % przypadków (mierzone z design partnerami, zobacz [rozdział 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministyczność** | To samo repozytorium, ta sama konfiguracja, dwa uruchomienia | Identyczne diagnostyki w identycznej kolejności. Zmieniają się tylko pola czasu w podsumowaniu (`durationMs`) |
-| 5 | :material-timer-sand: **Przepustowość dla całego repozytorium** | CI sprawdza na zimno repozytorium z 500 tys. linii | 0,44 s dla syntetycznego repozytorium z 496 000 linii i 0,98 s dla 848 000 linii saleora przy czterech wątkach ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)). Cel < 300 ms z wątkami i pamięcią podręczną |
+| 5 | :material-timer-sand: **Przepustowość dla całego repozytorium** | CI sprawdza na zimno repozytorium z 500 tys. linii | 0,33 s dla syntetycznego repozytorium z 496 000 linii i 0,87 s dla 848 000 linii saleora przy czterech wątkach ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [#281](https://github.com/SirCypkowskyy/inwards/issues/281)). Cel < 300 ms z wątkami i pamięcią podręczną |
 | 6 | :material-package-variant: **Łatwość wdrożenia** | Nowy zespół, istniejący kod | Jedno polecenie podłącza agenta (`inwards init`). Stop gate sprawdza tylko to, co zmieniła sesja, a w zmienionym pliku tylko to, co jest nowe od początku sesji, więc stare naruszenia nie blokują; resztę obejmie baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) |
 
 Poprawność celowo stoi wyżej niż szybkość. Zabezpieczenie, które czasem milczy, uczy agenta, że zły ruch jest w porządku, a to gorsze niż brak zabezpieczenia.
@@ -234,6 +234,40 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
     Każdy wątek uruchamia własną maszynę wirtualną JavaScriptu, a jej kompilator JIT i odśmiecacz działają w osobnych wątkach, więc wątek na rdzeń głodzi wątek główny. Przy dwóch wątkach domyślnie na tym runnerze zadanie benchmarku nadal mierzyło pełne sprawdzenie repozytorium syntetycznego o 19% wolniejsze. Teraz domyślnie jest połowa rdzeni ponad dwa, najwyżej 4: jeden wątek na 4 rdzeniach, trzy na 8 i cztery od 10, jak na laptopie wyżej.
 - **Niezmierzone:** hostowany 4-rdzeniowy runner `ubuntu-latest` GitHuba i Windows.
 
+### Szeregowa część pełnego uruchomienia { #the-serial-part-of-a-full-run }
+
+Przy czterech wątkach saleor spędzał mniej więcej jedną trzecią zimnego sprawdzenia w wątku głównym, zanim ruszył silnik: na przejściu drzewa, ustalaniu rzeczywistych ścieżek i czytaniu plików. [#281](https://github.com/SirCypkowskyy/inwards/issues/281) skróciło tę część. Wynik jest identyczny co do bajtu, a przejście drzewa znajduje te same pliki pod tymi samymi nazwami modułów.
+
+**Co się zmieniło.**
+
+- **Jedna rzeczywista ścieżka na katalog, nie dwie na plik.** Przejście drzewa ustala `realpath` każdego katalogu i każdego dowiązania symbolicznego. Zwykły plik dostaje rzeczywistą ścieżkę swojego katalogu i nazwę, którą zwrócił `readdir`: plik, który nie jest dowiązaniem, nie dokłada żadnego dowiązania, więc `realpath` powtórzyłby tylko to, co przejście już ustaliło. Sprawdzenie używa potem tych ścieżek zamiast ustalać każdy plik jeszcze raz. Na saleorze przejście drzewa skróciło się z około 114 ms do 30 ms, a druga runda `realpath` (około 75 ms) zniknęła.
+- **Pliki są czytane jedną partią.** Sprawdzenie 1000 plików lub więcej prosi o wszystkie pliki naraz (`fs.promises.readFile`), więc odczyty czekają na dysk razem: 4324 pliki saleora w około 55 ms zamiast 90 ms. Mniejsze sprawdzenie i każdy hook czytają pliki po kolei, jak dotąd.
+- **Workery startują przed czytaniem.** Sprawdzenie liczy pliki, zanim je przeczyta, więc pula startuje pierwsza i workery ładują gramatykę, gdy wątek główny czyta.
+- **Każdy worker trzyma dwie partie.** Worker, który skończył partię, czekał dotąd, aż wątek główny, zajęty własną partią, wróci do pętli zdarzeń i wyśle mu następną. Teraz następna już czeka w jego kolejce.
+
+**Metoda.** Jak dla wątków roboczych wyżej: plik binarny darwin-arm64, 11 uruchomień na kompilację po jednej rozgrzewce, w rotacyjnej kolejności, z `INWARDS_NO_CACHE=1`, a JSON każdego uruchomienia porównany z pozostałymi. Bazy to jednowątkowa baza z #61 (`73936df`) i `develop` przed tą zmianą (`3dc5489`, cztery wątki). Na tym samym laptopie pracowali inni agenci (średnie obciążenie od 5 do 11).
+
+| Repozytorium | Pliki | Baza #61 (jeden wątek) | `develop` (cztery wątki) | Teraz (cztery wątki) | Teraz (jeden wątek) |
+|---|--:|--:|--:|--:|--:|
+| saleor | 4324 | 1,59 s | 1,09 s | 0,87 s | 1,31 s |
+| polar | 1831 | 0,79 s | 0,57 s | 0,47 s | 0,67 s |
+| Syntetyczne (`bench/generate.py`) | 2100 | 0,51 s | 0,43 s | 0,33 s | 0,40 s |
+| Syntetyczne w trybie starszego kodu (`--legacy`) | 2101 | 2,47 s | 1,23 s | 1,03 s | 2,34 s |
+
+Baza z #61 mierzyła na saleorze od 1,48 do 1,62 s w sześciu sesjach tego dnia, a ta zmiana od 0,74 do 0,87 s przy czterech wątkach: od 1,83× do 2,00×, z medianą 1,93×. Dwukrotne przyspieszenie, o które prosiło #281, jest więc na granicy, a nie wyraźnie osiągnięte. Wszystkie uruchomienia każdej kompilacji dały ten sam JSON.
+
+**Każda zmiana osobno.** Kompilacje, z których każda pomija jedną zmianę, na saleorze, po 11 uruchomień (średnie obciążenie od 7 do 16): wszystkie cztery 744 ms; bez rzeczywistych ścieżek z przejścia drzewa 861 ms, bez czytania partią 812 ms, z pulą startowaną po czytaniu 776 ms, z jedną partią na workera 794 ms.
+
+**Co się nie opłaciło i zostało usunięte.**
+
+- *Listowanie dowiązań w warstwach, gdy odczyty czekają.* macOS szereguje wywołania systemu plików: przejście po dowiązaniach trwało w trakcie odczytów od 76 do 102 ms zamiast 21 ms po nich, a suma się nie zmieniła.
+- *Uruchamianie workerów na plikach w miarę ich czytania.* Wolne workery liczyły szkielety każdej porcji 256 plików zaraz po jej przeczytaniu, a wywołanie silnika używało odpowiedzi na identyczne zadania. Saleor 775 → 792 ms, polar 475 → 478 ms, repozytoria syntetyczne w granicach 1%: żaden zysk wart drugiej kolejki w puli.
+- *Mniej wywołań `realpath` na katalogach.* Przejście drzewa ogranicza `readdir`: 23 ms z nimi i bez nich.
+
+**Linux.** Plik binarny linux-arm64 w kontenerze Ubuntu 24.04 na tym samym laptopie, po siedem uruchomień. Przypięty do czterech rdzeni, gdzie domyślnie działa jeden wątek, nic się nie zmieniło: saleor 1,24 s przed i po, polar 0,68 s, repozytorium syntetyczne 0,42 s, w trybie starszego kodu 2,27 s. Linux tanio odpowiada na `realpath` i odczyty plików ze swoich pamięci podręcznych, więc usunięta szeregowa część była kosztem macOS. Przypięty do ośmiu rdzeni (trzy wątki) saleor przyspieszył z 0,92 do 0,87 s, a repozytorium w trybie starszego kodu z 1,43 do 1,37 s. Trzykrotne przyspieszenie na 4 vCPU, o które prosiło #61, pozostaje poza zasięgiem: maszyna z 4 rdzeniami zostaje przy jednym wątku, a ten wątek spędza czas na parsowaniu i regułach.
+
+**Co zostaje w wątku głównym.** Zmierzone ze źródeł na saleorze przy czterech wątkach: około 45 ms na przejście drzewa i nazwanie plików, 70 ms na ich przeczytanie, potem silnik: 260 ms na partię szkieletów (dzieloną z workerami), 127 ms na skany, 135 ms na partię pełnych parsowań (dzieloną), 60 ms na potwierdzenia i raport oraz 33 ms na kontrole całego uruchomienia. Skany i potwierdzenia to reguły, które z założenia zostają w jednym wątku ([ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)).
+
 ### Plan poprawy wydajności { #performance-roadmap }
 
 | Krok | Oczekiwany efekt | Na co wpływa |
@@ -241,6 +275,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 | :material-check-circle: `inwards daemon`: stały proces dla każdego projektu, z którym PostToolUse łączy się przez lokalne gniazdo, z powrotem do jednorazowego uruchomienia; serwer języka zostaje osobnym procesem, `inwards server` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)), zrobione | Zmierzone ([wyżej](#the-hook-daemon)): p95 PostToolUse 39,3 → 16,2 ms dla pliku z 13 liniami, 79,0 → 36,8 ms dla pliku z 4492 liniami edytowanego przed każdym wywołaniem | p95 dla jednego pliku |
 | :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), zrobione | Zmierzone: start 22 → 10 ms, wywołanie hooka około 45% szybsze, 2,5 MB więcej na plik binarny (zobacz eksperyment wyżej) | p95 dla jednego pliku |
 | :material-check-circle: Wątki robocze dla zimnego pełnego uruchomienia ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)), zrobione | Zmierzone przy czterech wątkach (zobacz sekcję wyżej): saleor 1,48 → 0,98 s, polar 0,80 → 0,55 s, repozytorium syntetyczne 0,52 → 0,44 s, syntetyczne w trybie starszego kodu 2,34 → 1,14 s. Daleko do oczekiwanego trzykrotnego przyspieszenia, bo czytanie plików i reguły zostają w jednym wątku | Zimne pełne uruchomienie |
+| :material-check-circle: Tańsza szeregowa część pełnego uruchomienia: rzeczywiste ścieżki per katalog, czytanie jedną partią, workery startowane przed czytaniem, dwie partie na workera ([#281](https://github.com/SirCypkowskyy/inwards/issues/281)), zrobione | Zmierzone przy czterech wątkach ([wyżej](#the-serial-part-of-a-full-run)): saleor 1,09 → 0,87 s, od 1,8 do 2,0× szybciej niż jeden wątek przed #61. Bez zmian na Linuksie z czterema rdzeniami | Zimne pełne uruchomienie |
 | :material-check-circle: Pamięć podręczna list importów po hashu zawartości (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), zrobione dla `inwards check` i `inwards baseline` | Zmierzone: ciepłe pełne sprawdzenie 3,0 raza szybsze (0,46 s wobec 1,25 s p50, po 12 uruchomień na tym laptopie pod obciążeniem), o 27% wolniejsze, gdy pamięć podręczna się wypełnia. Hooki z niej nie korzystają ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Ciepłe pełne uruchomienie |
 | :material-check-circle: Przejście kursorem po drzewie zamiast `descendantsOfType` na ścieżce pełnego parsowania ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)), zrobione | Zmierzone na 2100 syntetycznych plikach, na zimno, po 10 naprzemiennych uruchomień: o 13% szybciej, gdy każdy plik wymaga potwierdzenia (3,34 → 2,90 s p50), o 10% szybciej, gdy prescan odrzuca każdy plik (3,13 → 2,80 s). Odczyt importów i komentarzy wyciszających z 1059 plików biblioteki standardowej spadł z około 560 ms do 125 ms. Hook dla jednego pliku i czyste pełne sprawdzenie się nie zmieniają | Odrzucone pliki i potwierdzenia |
 

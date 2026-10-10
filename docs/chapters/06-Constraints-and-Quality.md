@@ -25,7 +25,7 @@ Ranked. When two goals conflict, the higher one wins.
 | 2 | :material-lightning-bolt: **Agent-loop latency** | A hook checks one edited file | p95 < 100 ms wall time, process start included |
 | 3 | :material-robot-outline: **Actionable for agents** | An agent gets INW001 | It fixes the violation within one retry in ≥ 80 % of cases (measured with design partners, see [chapter 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministic** | Same repo, same config, two runs | Identical diagnostics in identical order. Only the timing fields in the summary (`durationMs`) change |
-| 5 | :material-timer-sand: **Full-repo throughput** | CI checks a 500k-line repo cold | 0.44 s for the 496,000-line synthetic repo and 0.98 s for saleor's 848,000 lines with four threads ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)). Target < 300 ms with threads and cache |
+| 5 | :material-timer-sand: **Full-repo throughput** | CI checks a 500k-line repo cold | 0.33 s for the 496,000-line synthetic repo and 0.87 s for saleor's 848,000 lines with four threads ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [#281](https://github.com/SirCypkowskyy/inwards/issues/281)). Target < 300 ms with threads and cache |
 | 6 | :material-package-variant: **Easy to adopt** | New team, existing codebase | One command wires in the agent (`inwards init`). The Stop gate checks only what a session changed, and in a changed file only what is new since the session started, so old violations don't block; the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) will cover the rest |
 
 Correctness sits above speed on purpose. A guardrail that sometimes stays silent teaches the agent that the wrong move is fine, and that's worse than no guardrail.
@@ -229,6 +229,40 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
     Each thread runs its own JavaScript VM, and its JIT compiler and garbage collector run on threads of their own, so a thread per core starves the main thread. With two threads as the default on that runner, the bench job still measured the synthetic full check 19% slower. The default is now half of the cores beyond two, at most 4: one thread on 4 cores, three on 8 and four from 10, as on the laptop above.
 - **Not measured:** GitHub's hosted 4-vCPU `ubuntu-latest` runner and Windows.
 
+### The serial part of a full run
+
+With four threads, saleor spent about a third of a cold check on the main thread before the engine started: walking the tree, resolving real paths and reading files. [#281](https://github.com/SirCypkowskyy/inwards/issues/281) cut that part. The output is the same byte for byte, and the walk finds the same files under the same module names.
+
+**What changed.**
+
+- **One real path per directory, not two per file.** The walk resolves each directory and each symlink with `realpath`. A plain file gets its directory's real path plus the name `readdir` gave it: a file that isn't a symlink adds no link, so `realpath` would only repeat what the walk already resolved. The check then reuses those real paths instead of resolving every file again. On saleor, the walk went from about 114 ms to 30 ms and the second round of `realpath` (about 75 ms) is gone.
+- **The files are read in one batch.** A check of 1,000 files or more asks for every file at once (`fs.promises.readFile`), so the reads wait on the disk together: 4,324 saleor files in about 55 ms instead of 90 ms. A smaller check, and every hook, reads one file after another as before.
+- **The workers start before the reads.** The check counts its files before it reads them, so the pool starts first and the workers load the grammar while the main thread reads.
+- **Each worker holds two batches.** A worker that finished a batch used to wait until the main thread, busy with a batch of its own, got back to its event loop to send the next one. Now the next one is already queued.
+
+**Method.** As for the worker threads above: the darwin-arm64 binary, 11 runs per build after one warm-up, in rotating order, with `INWARDS_NO_CACHE=1`, every run's JSON compared with the others. The bases are #61's single-threaded base (`73936df`) and `develop` before this change (`3dc5489`, four threads). Other agents were working on the same laptop (load average 5 to 11).
+
+| Repo | Files | #61 base (one thread) | `develop` (four threads) | Now (four threads) | Now (one thread) |
+|---|--:|--:|--:|--:|--:|
+| saleor | 4,324 | 1.59 s | 1.09 s | 0.87 s | 1.31 s |
+| polar | 1,831 | 0.79 s | 0.57 s | 0.47 s | 0.67 s |
+| Synthetic (`bench/generate.py`) | 2,100 | 0.51 s | 0.43 s | 0.33 s | 0.40 s |
+| Synthetic legacy (`--legacy`) | 2,101 | 2.47 s | 1.23 s | 1.03 s | 2.34 s |
+
+The #61 base measured 1.48 to 1.62 s on saleor across six sessions that day, and this change 0.74 to 0.87 s with four threads: 1.83× to 2.00×, with a median of 1.93×. That puts the 2× #281 asked for at the edge rather than clearly met. All runs of every build gave the same JSON.
+
+**Each change on its own.** Builds that each leave one change out, on saleor, 11 runs each (load average 7 to 16): all four 744 ms; without the walk's real paths 861 ms, without the batch read 812 ms, with the pool started after the reads 776 ms, with one batch per worker 794 ms.
+
+**What didn't pay, and was dropped.**
+
+- *Listing the layer links while the reads wait.* macOS serialises the file system calls: the links walk took 76 to 102 ms during the reads instead of 21 ms after them, and the sum didn't change.
+- *Starting the workers on the files as they are read.* Idle workers ran the skeleton jobs of each 256-file chunk as it came in, and the engine's call reused the answers to identical jobs. Saleor 775 → 792 ms, polar 475 → 478 ms, the synthetic repos within 1%: no gain worth a second queue in the pool.
+- *Fewer `realpath` calls on directories.* The walk is bound by `readdir`: 23 ms with or without them.
+
+**Linux.** The linux-arm64 binary in an Ubuntu 24.04 container on the same laptop, seven runs each. Pinned to four cores, where the default is one thread, nothing changed: saleor 1.24 s before and after, polar 0.68 s, the synthetic repo 0.42 s, the legacy one 2.27 s. Linux answers `realpath` and file reads from its caches cheaply, so the serial part this removed was a macOS cost. Pinned to eight cores (three threads), saleor went from 0.92 to 0.87 s and the legacy repo from 1.43 to 1.37 s. The 3× on 4 vCPU that #61 asked for stays out of reach: a 4-core machine keeps one thread, and that thread spends its time in the parse and the rules.
+
+**What stays on the main thread.** Timed from source on saleor with four threads: about 45 ms to walk and name the files, 70 ms to read them, then the engine: 260 ms for the skeleton batch (shared with the workers), 127 ms for the scans, 135 ms for the full-parse batch (shared), 60 ms to confirm and report and 33 ms for the whole-run checks. The scans and the confirmations are the rules, which stay on one thread by design ([ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)).
+
 ### Performance roadmap
 
 | Step | Expected effect | Targets |
@@ -236,6 +270,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 | :material-check-circle: `inwards daemon`: a resident process per project that PostToolUse reaches through a local socket, with fallback to a one-shot run; the language server stays a separate process, `inwards server` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)), done | Measured ([above](#the-hook-daemon)): PostToolUse p95 39.3 → 16.2 ms for a 13-line file, 79.0 → 36.8 ms for a 4,492-line file edited before every call | Single-file p95 |
 | :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), done | Measured: start-up 22 → 10 ms, hook call about 45% faster, 2.5 MB more per binary (see the spike above) | Single-file p95 |
 | :material-check-circle: Worker threads for a cold full run ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)), done | Measured with four threads (see the section above): saleor 1.48 → 0.98 s, polar 0.80 → 0.55 s, the synthetic repo 0.52 → 0.44 s, the legacy one 2.34 → 1.14 s. Short of the 3× hoped for, because reading the files and the rules stay on one thread | Cold full run |
+| :material-check-circle: Cheaper serial part of a full run: real paths per directory, one batch read, workers started before the reads, two batches per worker ([#281](https://github.com/SirCypkowskyy/inwards/issues/281)), done | Measured with four threads ([above](#the-serial-part-of-a-full-run)): saleor 1.09 → 0.87 s, 1.8 to 2.0× faster than one thread before #61. No change on Linux with four cores | Cold full run |
 | :material-check-circle: Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), done for `inwards check` and `inwards baseline` | Measured: a warm full check 3.0 times faster (0.46 s against 1.25 s p50, 12 runs each on this laptop under load), 27% slower while it fills. The hooks don't use it ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Warm full run |
 | :material-check-circle: Tree-cursor walk instead of `descendantsOfType` on the full-parse path ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)), done | Measured on 2,100 synthetic files, cold, 10 alternating runs each: 13% faster when every file needs a confirmation (3.34 → 2.90 s p50), 10% faster when the prescan refuses every file (3.13 → 2.80 s). Reading the imports and suppression comments of the 1,059 stdlib files went from about 560 ms to 125 ms. The one-file hook and the clean full check don't change | Refused files and confirmations |
 

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 1069e0aa9c6b4b96c57f41081cd1e4434be1583a4a88308d683f4da3aeeb7b59
+source_hash: ec2062f928341b44e986f479a5631c9c5554aa28cd1a0e739b205b704ea20b31
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1175,3 +1175,5 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - *Każdy worker sprawdza wycinek plików:* zrównolegla też reguły, ale skrót baseline'u, znaleziska FastAPI obejmujące wiele plików, ostrzeżenia o pakietach bez warstwy i cykle importów potrzebują wszystkich plików, a każdy worker budowałby z dysku własny indeks modułów. Decyzje w jednym wątku zostawiają kolejność wyniku i reguły pierwszeństwa tam, gdzie są.
 - *Workery czytają też pliki:* przeniosłoby do puli ćwierć czasu idącą na czytanie, ale wątek główny i tak potrzebuje każdego tekstu dla reguł, a nazwy modułów biorą się z rzeczywistych ścieżek, którymi zarządzają kontrole tożsamości w CLI.
 - *Domyślnie więcej wątków:* na obciążonym 10-rdzeniowym laptopie osiem wątków było wolniejsze niż cztery na saleorze (1,04 wobec 0,98 s) i repozytorium syntetycznym, a szybsze tylko na repozytorium w trybie starszego kodu (1,03 wobec 1,14 s).
+
+**Poprawka · 2026-10-10 · [#281](https://github.com/SirCypkowskyy/inwards/issues/281).** Szeregowa część przed silnikiem potaniała, a żadna decyzja nie opuściła wątku głównego. Przejście drzewa daje każdemu plikowi rzeczywistą ścieżkę, którą już ustaliło dla jego katalogu, więc sprawdzenie wywołuje `realpath` raz na katalog i dowiązanie symboliczne zamiast dwa razy na plik. Sprawdzenie 1000 plików lub więcej najpierw liczy pliki, uruchamia pulę, a potem czyta wszystkie pliki jedną partią, gdy workery ładują gramatykę. Każdy worker trzyma dwie partie, więc nie czeka, aż wątek główny skończy własną, żeby dostać następną. Zimne sprawdzenie saleora przy czterech wątkach skróciło się z 1,09 do 0,87 s, wobec 1,48 s w jednym wątku przed #61 ([rozdział 6](06-Constraints-and-Quality.md#the-serial-part-of-a-full-run)). Alternatywa *Workery czytają też pliki* pozostaje odrzucona: wariant, w którym wolne workery parsowały każdą porcję plików zaraz po przeczytaniu, a silnik używał odpowiedzi na identyczne zadania, nie był szybszy. Na Linuksie zmiana nie przyspieszyła niczego na czterech rdzeniach i przyspieszyła o 5% na ośmiu, bo Linux tanio ustala ścieżki i czyta pliki ze swoich pamięci podręcznych.

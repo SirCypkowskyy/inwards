@@ -75,6 +75,15 @@ export interface FileReader {
    */
   text: (path: string) => string;
   /**
+   * Reads many files as UTF-8 text, several at a time, for a check of a large
+   * project (#281): the reads wait on the disk together instead of in turn.
+   *
+   * @param paths - the files.
+   * @returns their texts, in the order of `paths`.
+   * @throws (as a rejected promise) when any file is missing or unreadable.
+   */
+  texts: (paths: readonly string[]) => Promise<string[]>;
+  /**
    * Reads a file's bytes.
    *
    * @param path - the file.
@@ -95,6 +104,14 @@ export interface FileReader {
   list: (dir: string) => DirEntry[] | undefined;
 }
 
+/** A file the walk found, with its real path. */
+export interface WalkedFile {
+  /** The file as reached, possibly through a symlinked directory. */
+  path: string;
+  /** Its real path; undefined only for a named file that doesn't resolve. */
+  real: string | undefined;
+}
+
 /** Walking a tree for files, with the CLI's skip and symlink rules (see `adapters/file-walk.ts`). */
 export interface FileWalker {
   /**
@@ -105,6 +122,15 @@ export interface FileWalker {
    * @returns unique paths, sorted.
    */
   pythonFiles: (paths: string[], open?: readonly string[]) => string[];
+  /**
+   * Lists the Python files under each path as `pythonFiles` does, each with
+   * its real path, which the walk has resolved already (#281).
+   *
+   * @param paths - files or directories.
+   * @param open - directories walked without the skip rules (layer packages).
+   * @returns unique files, sorted by path.
+   */
+  pythonSources: (paths: string[], open?: readonly string[]) => WalkedFile[];
   /**
    * Lists the files under each path whose name matches.
    *

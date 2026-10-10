@@ -1,14 +1,14 @@
 /**
  * @file The `ExtractionPool` contract on Bun worker threads (#61): starts the
- * workers, hands each one a batch of extraction jobs at a time until none
- * are left, works through batches on the calling thread too while it would
+ * workers, keeps two batches of extraction jobs queued at each until none
+ * are left (#281), works through batches on the calling thread too while it would
  * otherwise wait, and puts every answer back at its job's place, so the
  * order the threads finish in never shows. A worker runs this same program
  * (`main.ts` sends a worker thread to `serveExtractions`), so the compiled
  * binary needs nothing else on disk. Once the queue is empty, the calling
  * thread also takes over batches the workers still hold, so a slow or stuck
  * worker never makes a call wait longer than this thread alone would. A
- * worker that dies or answers with an error is retired and its batch goes
+ * worker that dies or answers with an error is retired and its batches go
  * back in the queue; a job no thread could answer stays unanswered, and the
  * engine computes it itself, so its error surfaces there as without the
  * pool. The pool never decides anything about a file.
@@ -24,6 +24,13 @@ import { isExtraction, isRecord } from "./extraction-entry.ts";
 
 /** Jobs per message: big enough that posting is cheap, small enough to share the tail. */
 const BATCH_SIZE = 24;
+/**
+ * Batches a worker holds at once. With one, a worker that finishes waits
+ * idle until this thread, busy with a batch of its own, gets back to the
+ * event loop and feeds it; with two, the next one is already in its queue
+ * (#281).
+ */
+const IN_FLIGHT = 2;
 
 /** A run of consecutive jobs sent as one message. */
 interface Batch {
@@ -33,11 +40,11 @@ interface Batch {
   jobs: ExtractionJob[];
 }
 
-/** One worker thread and the batch it is working on, if any. */
+/** One worker thread and the batches it holds. */
 interface Slot {
   worker: Worker;
-  /** The batch it was sent last, until it answers; undefined while idle. */
-  batch: Batch | undefined;
+  /** The batches it was sent and hasn't answered, oldest first; empty while idle. */
+  batches: Batch[];
   /** False once it failed: it gets no more batches. */
   alive: boolean;
 }
@@ -104,7 +111,7 @@ function startWorker(entry: string, wasm: GrammarBinaries): Slot | undefined {
     const worker = new Worker(entry);
     worker.unref();
     worker.postMessage({ wasm });
-    return { worker, batch: undefined, alive: true };
+    return { worker, batches: [], alive: true };
   } catch {
     return undefined;
   }
@@ -198,54 +205,60 @@ class WorkerPool implements ExtractionPool {
   }
 
   /**
-   * Gives an idle worker the next batch, if any.
+   * Tops a worker up to `IN_FLIGHT` batches from the front of the queue.
    *
-   * @param slot - the worker that has just become idle.
+   * @param slot - a worker that is idle or has just answered.
    */
   private feed(slot: Slot): void {
-    slot.batch = undefined;
     const { call } = this;
-    const batch = call !== undefined && slot.alive ? call.queue.shift() : undefined;
-    if (call !== undefined && batch !== undefined) {
-      slot.batch = batch;
-      call.pending += 1;
-      slot.worker.postMessage({ id: batch.id, jobs: batch.jobs });
+    if (call !== undefined && slot.alive) {
+      for (const batch of call.queue.splice(0, Math.max(IN_FLIGHT - slot.batches.length, 0))) {
+        slot.batches.push(batch);
+        call.pending += 1;
+        slot.worker.postMessage({ id: batch.id, jobs: batch.jobs });
+      }
     }
     this.settle();
   }
 
   /**
-   * Records a worker's answer to its batch and feeds it the next one. An
-   * error answer retires the worker and puts the batch back in the queue.
+   * Records a worker's answer to one of its batches and tops it up. An
+   * error answer retires the worker and puts its batches back in the queue.
    *
    * @param slot - the worker that answered.
    * @param data - its message.
    */
   private answered(slot: Slot, data: unknown): void {
     const { call } = this;
-    const { batch } = slot;
-    if (call === undefined || batch === undefined || !isRecord(data) || data["id"] !== batch.id) {
+    const at = isRecord(data) ? slot.batches.findIndex((held) => held.id === data["id"]) : -1;
+    const batch = slot.batches[at];
+    if (call === undefined || batch === undefined || !isRecord(data)) {
+      return; // a batch this thread took over meanwhile, or no call at all
+    }
+    if (!record(call, batch, data["answers"])) {
+      this.failed(slot); // puts back every batch it holds, this one included
       return;
     }
+    slot.batches.splice(at, 1);
     call.pending -= 1;
-    if (!record(call, batch, data["answers"])) {
-      slot.alive = false;
-      this.requeue(call, batch);
-    }
     this.feed(slot);
   }
 
   /**
-   * Retires a worker that crashed and puts its batch back in the queue.
+   * Retires a worker that crashed or answered wrongly, and puts the batches
+   * it holds back at the front of the queue, in order.
    *
    * @param slot - the worker that failed.
    */
   private failed(slot: Slot): void {
     slot.alive = false;
     const { call } = this;
-    if (call !== undefined && slot.batch !== undefined) {
-      call.pending -= 1;
-      this.requeue(call, slot.batch);
+    const held = slot.batches.splice(0);
+    if (call !== undefined) {
+      call.pending -= held.length;
+      for (const batch of held.reverse()) {
+        this.requeue(call, batch);
+      }
     }
     this.feed(slot);
   }
@@ -325,13 +338,16 @@ class WorkerPool implements ExtractionPool {
     if (queued !== undefined) {
       return queued;
     }
-    const holder = this.slots.find((slot) => slot.batch !== undefined);
-    const held = holder?.batch;
-    if (holder === undefined || held === undefined) {
+    // The newest batch of the worker holding the most: the one least likely to have started.
+    const holder = this.slots.reduce<Slot | undefined>(
+      (most, slot) => (slot.batches.length > (most?.batches.length ?? 0) ? slot : most),
+      undefined,
+    );
+    const held = holder?.batches.pop();
+    if (held === undefined) {
       return undefined;
     }
-    holder.batch = undefined; // its late answer no longer matches, and it can take new work
-    call.pending -= 1;
+    call.pending -= 1; // the worker's late answer no longer matches any batch it holds
     return held;
   }
 }
