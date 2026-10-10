@@ -76,12 +76,12 @@
 }
 
 .md-typeset .inw-home :is(p, ul, ol, dl) {
-  max-width: 36em;
+  max-inline-size: 36em;
 }
 
 /* Hero. */
 .md-typeset .inw-hero {
-  padding-top: 0.4rem;
+  padding-block-start: 0.4rem;
 }
 
 /* The pane is a picture of a run, not a snippet to paste: the quickstart
@@ -94,15 +94,15 @@
    screen readers and shows the value proposition. */
 .md-typeset .inw-sr-only {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inline-size: 1px;
+  block-size: 1px;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
 }
 
 .md-typeset .inw-hero .inw-lede {
-  max-width: 17em;
+  max-inline-size: 17em;
   margin: 0 0 1rem;
   font-size: clamp(1.55rem, 1rem + 3.2vw, 3.2rem);
   font-weight: 800;
@@ -113,7 +113,7 @@
 }
 
 .md-typeset .inw-hero .inw-lede + p {
-  max-width: 34em;
+  max-inline-size: 34em;
   font-size: 1.1em;
   color: var(--inw-graphite);
 }
@@ -139,7 +139,7 @@
 }
 
 .md-typeset .inw-review {
-  max-width: none;
+  max-inline-size: none;
   margin: 2rem 0 0;
   overflow: hidden;
   font-size: 0.75rem;
@@ -159,7 +159,7 @@
   font-size: 0.95em;
   color: var(--inw-graphite);
   background-color: var(--inw-paper-2);
-  border-bottom: 1px solid var(--inw-rule);
+  border-block-end: 1px solid var(--inw-rule);
 }
 
 .md-typeset .inw-review__path span:first-child {
@@ -185,14 +185,14 @@
 
 .md-typeset .inw-review pre.inw-review__hunk > code {
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--inw-rule);
+  border-block-end: 1px solid var(--inw-rule);
 }
 
 /* A wrapped line continues after the gutter, not under the number. */
 .md-typeset .inw-line {
   display: block;
-  min-height: 1.6em;
-  padding-left: 4.8em;
+  min-block-size: 1.6em;
+  padding-inline-start: 4.8em;
   text-indent: -4.8em;
 }
 
@@ -202,14 +202,14 @@
 
 .md-typeset .inw-ln {
   display: inline-block;
-  width: 3.2em;
-  padding-right: 0.8em;
-  margin-right: 0.8em;
+  inline-size: 3.2em;
+  padding-inline-end: 0.8em;
+  margin-inline-end: 0.8em;
   color: var(--inw-graphite);
   text-indent: 0;
   text-align: right;
   user-select: none;
-  border-right: 1px solid var(--inw-rule);
+  border-inline-end: 1px solid var(--inw-rule);
 }
 
 .md-typeset .inw-line--bad .inw-ln {
@@ -242,20 +242,20 @@
 }
 
 .md-typeset .inw-review figcaption {
-  max-width: none;
+  max-inline-size: none;
   padding: 0.5rem 0.8rem;
   margin: 0;
   font-family: var(--md-text-font-family);
   font-size: 0.95em;
   color: var(--inw-graphite);
   text-align: left;
-  border-top: 1px solid var(--inw-rule);
+  border-block-start: 1px solid var(--inw-rule);
 }
 
 /* Premises: each one a row, the words on the left and the artifact on the
    right, aligned to the same two columns as the review pane above. */
 .md-typeset .inw-premises {
-  margin-top: var(--inw-gap);
+  margin-block-start: var(--inw-gap);
 }
 
 .md-typeset .inw-premise {
@@ -264,7 +264,7 @@
   gap: 0.4rem 2.4rem;
   align-items: start;
   padding: 2rem 0;
-  border-top: 1px solid var(--inw-rule);
+  border-block-start: 1px solid var(--inw-rule);
 }
 
 .md-typeset .inw-premise > h2 {
@@ -294,7 +294,7 @@
    size on every screen. (The diagrams layer can't set this: the theme's
    unlayered svg rules would win.) */
 .md-typeset .inw-premise #homepage-loop {
-  max-width: 380px;
+  max-inline-size: 380px;
 }
 
 .md-typeset .inw-premises .inw-premise .highlight code {
@@ -305,16 +305,16 @@
 /* Performance. */
 .md-typeset .inw-speed,
 .md-typeset .inw-start {
-  margin-top: var(--inw-gap);
+  margin-block-start: var(--inw-gap);
 }
 
 .md-typeset .inw-speed > h2,
 .md-typeset .inw-start > h2 {
-  margin-top: 0;
+  margin-block-start: 0;
 }
 
 .md-typeset .inw-chart {
-  max-width: 44rem;
+  max-inline-size: 44rem;
   margin: 1.4rem 0 1.2rem;
 }
 
@@ -328,7 +328,7 @@
 
 .md-typeset .inw-chart table {
   display: table;
-  width: 100%;
+  inline-size: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
@@ -343,7 +343,7 @@
 }
 
 .md-typeset .inw-chart tbody th {
-  width: 38%;
+  inline-size: 38%;
   background: none;
   padding: 0.5rem 1rem 0.5rem 0;
   font-weight: 400;
@@ -361,22 +361,22 @@
 .md-typeset .inw-track {
   position: relative;
   display: block;
-  height: 1.4rem;
+  block-size: 1.4rem;
   background-color: var(--inw-rule);
   box-shadow: inset -2px 0 0 var(--inw-ink);
 }
 
 .md-typeset .inw-bar {
   display: block;
-  width: calc(var(--v) * 1%);
-  height: 100%;
+  inline-size: calc(var(--v) * 1%);
+  block-size: 100%;
   background-color: var(--inw-hunk);
 }
 
 .md-typeset .inw-val {
   position: absolute;
-  top: 50%;
-  left: calc(var(--v, 0) * 1% + 0.4rem);
+  inset-block-start: 50%;
+  inset-inline-start: calc(var(--v, 0) * 1% + 0.4rem);
   font-weight: 700;
   line-height: 1;
   transform: translateY(-50%);
@@ -384,13 +384,13 @@
 
 /* A bar too long for the label beside it takes the label inside. */
 .md-typeset .inw-val--in {
-  right: calc((100 - var(--v)) * 1% + 0.4rem);
-  left: auto;
+  inset-inline-end: calc((100 - var(--v)) * 1% + 0.4rem);
+  inset-inline-start: auto;
   color: var(--inw-on-hunk);
 }
 
 .md-typeset .inw-chart figcaption {
-  max-width: none;
+  max-inline-size: none;
   margin: 0.4rem 0 0;
   font-size: 0.8rem;
   color: var(--inw-graphite);
@@ -399,28 +399,28 @@
 
 /* Quickstart: a real sequence, so the numbers stay. */
 .md-typeset .inw-start > ol {
-  max-width: 44rem;
+  max-inline-size: 44rem;
   padding: 0;
-  margin-left: 0;
+  margin-inline-start: 0;
   list-style: none;
   counter-reset: inw-step;
 }
 
 .md-typeset .inw-start > ol > li {
   position: relative;
-  padding-left: 2.6em;
+  padding-inline-start: 2.6em;
   margin: 0 0 1.4rem;
   counter-increment: inw-step;
 }
 
 .md-typeset .inw-start > ol > li::before {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset-block-start: 0;
+  inset-inline-start: 0;
   display: grid;
   place-items: center;
-  width: 1.7em;
-  height: 1.7em;
+  inline-size: 1.7em;
+  block-size: 1.7em;
   font-weight: 700;
   color: var(--inw-hunk);
   content: counter(inw-step);
@@ -430,17 +430,17 @@
 
 /* Entry points: four links on one rule, not cards. */
 .md-typeset .inw-entries {
-  margin-top: var(--inw-gap);
-  border-top: 1px solid var(--inw-rule);
+  margin-block-start: var(--inw-gap);
+  border-block-start: 1px solid var(--inw-rule);
 }
 
 .md-typeset .inw-entries dl {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0 2rem;
-  max-width: none;
+  max-inline-size: none;
   margin: 0;
-  padding-top: 1.4rem;
+  padding-block-start: 1.4rem;
 }
 
 .md-typeset .inw-entries dt {
@@ -473,7 +473,7 @@
   .md-typeset .inw-premise > :is(.highlight, .homepage-loop-wrap) {
     grid-row: auto;
     grid-column: 1;
-    margin-top: 0.8rem;
+    margin-block-start: 0.8rem;
   }
 
   .md-typeset .inw-entries dl {
@@ -487,13 +487,13 @@
   }
 
   .md-typeset .inw-entries dd {
-    margin-bottom: 1rem;
+    margin-block-end: 1rem;
   }
 }
 
 @media screen and (max-width: 44.9844em) {
   .md-typeset .inw-hero {
-    padding-top: 0;
+    padding-block-start: 0;
   }
 
   .md-typeset .inw-hero .inw-lede + p {
@@ -501,11 +501,11 @@
   }
 
   .md-typeset .inw-actions {
-    margin-top: 1rem;
+    margin-block-start: 1rem;
   }
 
   .md-typeset .inw-review {
-    margin-top: 1.2rem;
+    margin-block-start: 1.2rem;
   }
 
   .md-typeset .inw-line--far {
@@ -517,10 +517,10 @@
   }
 
   .md-typeset .inw-review pre.inw-review__out > code {
-    padding-left: 0.8rem;
+    padding-inline-start: 0.8rem;
   }
 
   .md-typeset .inw-chart tbody th {
-    width: 42%;
+    inline-size: 42%;
   }
 }

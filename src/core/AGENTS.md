@@ -39,7 +39,12 @@ Enforced by:
   below it, never each other. A file in a new folder matches no zone, and
   fallow fails (`requireAllFiles`) until the folder gets a zone and rules.
   The forbidden-call list (`Bun.*`, `process.*`, `fs.*`, `console.*`, ...)
-  covers every core zone.
+  covers every core zone. fallow judges an adapter's import of
+  `@inwards/core` by the zone of the module behind `index.ts`, so the
+  adapter zones allow every zone `index.ts` re-exports from; when `index.ts`
+  starts re-exporting from another zone, add it to those lists. The rule
+  pack `.fallow-core-api.jsonc` refuses an adapter's direct import of a
+  module under `src/core/src/`.
 - **Biome** (`biome.jsonc`): no Node or Bun modules, no `process.env`, and
   no `process`, `Bun`, `Deno`, `fetch`, `performance`, `Date`, `globalThis`,
   `global` or `Function` globals: the engine reads no clock and reaches

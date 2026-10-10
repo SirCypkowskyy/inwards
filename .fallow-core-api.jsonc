@@ -1,0 +1,61 @@
+{
+  // Loaded by .fallowrc.jsonc "rulePacks". Adapters reach the engine through
+  // its barrel only: `@inwards/core` (src/core/src/index.ts). Since fallow
+  // 3.31 the boundary rules judge an import through the barrel by the zone of
+  // the module behind it, so they can't tell it from a direct import of that
+  // module (#262). These rules refuse the direct import instead.
+  //
+  // fallow matches the raw specifier by prefix, segment by segment, and takes
+  // no globs, so each rule lists the relative paths from every folder depth
+  // that has adapter files. A file one level deeper than these needs one more
+  // entry.
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/rule-pack-schema.json",
+  "version": 1,
+  "name": "core-api",
+  "rules": [
+    {
+      "id": "src-adapters",
+      "kind": "banned-import",
+      "files": ["src/cli/**", "src/vscode-extension/**"],
+      "specifiers": [
+        "@inwards/core/*",
+        "../../core/src/*",
+        "../../../core/src/*",
+        "../../../../core/src/*",
+        "../../../../../core/src/*"
+      ],
+      "message": "Import the engine as `@inwards/core`, not a module under src/core/src/.",
+      "severity": "error"
+    },
+    {
+      // eval/ is not a workspace package, so it imports the barrel by path
+      // (`../src/core/src/index.ts`); everything else under src/core/src/ is
+      // refused, one folder at a time.
+      "id": "eval",
+      "kind": "banned-import",
+      "files": ["eval/**"],
+      "specifiers": [
+        "../src/core/src/baseline/*",
+        "../src/core/src/config/*",
+        "../src/core/src/contracts/*",
+        "../src/core/src/engine/*",
+        "../src/core/src/lookup/*",
+        "../src/core/src/meta/*",
+        "../src/core/src/python/*",
+        "../src/core/src/report/*",
+        "../src/core/src/rules/*",
+        "../../src/core/src/baseline/*",
+        "../../src/core/src/config/*",
+        "../../src/core/src/contracts/*",
+        "../../src/core/src/engine/*",
+        "../../src/core/src/lookup/*",
+        "../../src/core/src/meta/*",
+        "../../src/core/src/python/*",
+        "../../src/core/src/report/*",
+        "../../src/core/src/rules/*"
+      ],
+      "message": "Import the engine through src/core/src/index.ts, not a module behind it.",
+      "severity": "error"
+    }
+  ]
+}
