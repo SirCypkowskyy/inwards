@@ -190,7 +190,11 @@ class PostNotFound(NotFound):
     ],
     [
       "posts.service",
-      `"""The posts domain's business logic. It keeps posts in memory, so the example needs no database."""
+      `"""The posts domain's business logic. It keeps posts in memory, so the example needs no database.
+
+The endpoints are async def, so a database here goes through an AsyncSession and is awaited;
+a sync Session blocks the event loop (INW013) unless the endpoints become plain def.
+"""
 
 from dataclasses import asdict
 
