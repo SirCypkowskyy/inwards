@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 5246f7564334fa60fa075301dd01b79f5c8f70d7a01c01f509a30b822d7ecfeb
+source_hash: 2b618c82c15396c47966d93d4b6da9da63a782d8da4adeffcd6b00c5a54bace2
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -136,32 +136,7 @@ inwards --version
 
 ## W edytorze { #in-your-editor }
 
-`inwards server` to serwer języka przez stdio. Edytor z klientem LSP uruchamia go i pokazuje dla każdego pliku w obszarze roboczym to, co zgłasza dla niego `inwards check`: dokument, w którym piszesz, jest sprawdzany przy każdej zmianie, a cały obszar roboczy ponownie przy każdym zapisie i za każdym razem, gdy pliki powstają albo znikają. Każdy folder obszaru roboczego używa własnego `[tool.inwards]`, tak jak `inwards check` uruchomione w tym folderze ([ADR-041](../05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). Wskaż edytorowi plik binarny:
-
-=== "Neovim 0.11+"
-
-    ```lua title="init.lua"
-    vim.lsp.config("inwards", {
-      cmd = { "inwards", "server" },
-      filetypes = { "python" },
-      root_markers = { "pyproject.toml" },
-    })
-    vim.lsp.enable("inwards")
-    ```
-
-=== "Helix"
-
-    ```toml title="~/.config/helix/languages.toml"
-    [language-server.inwards]
-    command = "inwards"
-    args = ["server"]
-
-    [[language]]
-    name = "python"
-    language-servers = ["ruff", "inwards"]   # keep the servers you already use in this list
-    ```
-
-Z uv użyj jako komendy `uv run inwards server`, żeby każdy projekt dostał własną wersję. Testy sterują plikiem binarnym przez stdio tak, jak robią to te edytory; żadnego z nich nie sprawdzono jeszcze ręcznie.
+`inwards server` to serwer języka przez stdio. Edytor z klientem LSP uruchamia go i pokazuje dla każdego pliku w obszarze roboczym to, co zgłasza dla niego `inwards check`: dokument, w którym piszesz, jest sprawdzany przy każdej zmianie, a cały obszar roboczy ponownie przy każdym zapisie i za każdym razem, gdy pliki powstają albo znikają. Każdy folder obszaru roboczego używa własnego `[tool.inwards]`, tak jak `inwards check` uruchomione w tym folderze ([ADR-041](../05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). VS Code ma rozszerzenie (niżej); [Neovim, Zed i Helix](editors.md) uruchamiają plik binarny z własnej konfiguracji.
 
 ### VS Code { #vs-code }
 
