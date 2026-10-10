@@ -246,6 +246,27 @@ describe("inwards daemon", () => {
     expect(third.stdout).toContain("already running");
   });
 
+  test("status says why the last start failed (#275)", () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    const files = place(root);
+    mkdirSync(dirname(files.failed), { recursive: true });
+    writeFileSync(
+      files.failed,
+      toLine({
+        protocol: PROTOCOL,
+        at: "2026-10-10T12:00:00.000Z",
+        why: "no private directory for the socket",
+        pid: 77,
+      }),
+    );
+    const shown = status(root);
+    expect(shown.code).toBe(1);
+    expect(shown.stderr).toContain("not running");
+    expect(shown.stderr).toContain(
+      "the last start (pid 77, 2026-10-10T12:00:00.000Z) couldn't listen: no private directory for the socket.",
+    );
+  });
+
   test("an idle daemon exits and removes its record and lock", async () => {
     const root = project({ "pyproject.toml": LAYERS, ...FILES });
     const child = await startDaemon(root, 1);
