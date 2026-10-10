@@ -1,12 +1,14 @@
 /**
  * @file The exception handlers an app registers, as the FastAPI model records
  * them: from `@app.exception_handler(X)`, `app.add_exception_handler(X, h)`
- * and `FastAPI(exception_handlers={X: h})`, with the literal status codes of
- * the responses each handler returns. A handler defined in another file is
+ * and `FastAPI(exception_handlers={X: h})`, also when the table comes through
+ * a name or a `**kwargs` splat, with the literal status codes of the
+ * responses each handler returns. A handler defined in another file is
  * recorded by name only; `model.ts` resolves it.
  */
 import type { Node } from "web-tree-sitter";
 import { identifierName, integerLiteral, keywordOf, namedChildren } from "../../python/nodes.ts";
+import { dictKeys, dictsOf, entryOf, splattedDicts } from "./kwargs.ts";
 import type { Context, ExceptionHandler, FastApiObject, Registration } from "./records.ts";
 import { valueFrom } from "./values.ts";
 
@@ -43,23 +45,56 @@ export function handlerOf(registration: Registration, context: Context): Excepti
 }
 
 /**
- * Reads `FastAPI(exception_handlers={X: handler, ...})`.
+ * Reads the handlers an app's constructor registers: `exception_handlers=`
+ * given as a dict or a name bound to one, and an `"exception_handlers"` entry
+ * in a dict splatted into the call (`FastAPI(**kwargs)`, #242), followed
+ * through `kwargs.ts`. A table Inwards can't read gives one handler whose
+ * exception is unknown, so the app's handlers count as unknown.
  *
  * @param object - an app or router.
  * @param context - the file, its qualifier and its functions.
- * @returns one handler per dict entry, none for a router or without the keyword.
+ * @returns one handler per table entry, none for a router or an app without tables.
  */
 export function constructorHandlers(object: FastApiObject, context: Context): ExceptionHandler[] {
-  const dict = object.kind === "app" ? object.keywords.get("exception_handlers")?.node : undefined;
-  const pairs = dict?.type === "dictionary" ? namedChildren(dict) : [];
-  return pairs.flatMap((pair) => {
-    const exception = pair.childForFieldName("key");
-    const handler = pair.childForFieldName("value");
-    const via = "exception_handlers";
-    return pair.type === "pair"
-      ? [handlerOf({ app: object.name, via, node: object.node, exception, handler }, context)]
-      : [];
+  if (object.kind !== "app") {
+    return [];
+  }
+  const keyword = object.keywords.get("exception_handlers")?.node;
+  const tables: (Node | null)[] = keyword ? (dictsOf(keyword) ?? [null]) : [];
+  for (const dict of splattedDicts(object.node) ?? [null]) {
+    const entry = dict === null ? null : entryOf(dict, "exception_handlers");
+    if (dict === null || dictKeys(dict) === null) {
+      tables.push(null);
+    } else if (entry) {
+      tables.push(...(dictsOf(entry) ?? [null]));
+    }
+  }
+  const via: ExceptionHandler["via"] = "exception_handlers";
+  const unknown = { app: object.name, via, node: object.node, exception: null, handler: null };
+  return tables.flatMap((table) => {
+    const entries = table ? namedChildren(table).filter((c) => c.type !== "comment") : [];
+    return table === null || entries.some((pair) => pair.type !== "pair")
+      ? [handlerOf(unknown, context)]
+      : entries.map((pair) => {
+          const node = table.id === keyword?.id ? object.node : pair;
+          const exception = pair.childForFieldName("key");
+          const handler = pair.childForFieldName("value");
+          return handlerOf({ app: object.name, via, node, exception, handler }, context);
+        });
   });
+}
+
+/**
+ * Tells whether the `**` splats of an app's constructor set nothing but
+ * `exception_handlers`, which `constructorHandlers` reads: the app's other
+ * keywords are then all written out, and the splat hides nothing.
+ *
+ * @param call - the `FastAPI(...)` call.
+ * @returns true when every dict the splats can hold has only that key.
+ */
+export function splatsOnlyHandlers(call: Node): boolean {
+  const dicts = splattedDicts(call);
+  return dicts?.every((dict) => dictKeys(dict)?.every((k) => k === "exception_handlers")) === true;
 }
 
 /**

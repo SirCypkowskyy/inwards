@@ -358,6 +358,14 @@
       "description": "Signature: a 0 to 100 ms track on Rule ending in a 2px Ink tick, the measured p95 as a Hunk bar.",
       "html": "<div class=\"ds-track\" style=\"--v: 39.5\"><span class=\"ds-bar\"></span><span class=\"ds-val\">39.5 ms</span></div>",
       "css": ".ds-track { position: relative; width: 320px; height: 28px; background: var(--inw-rule, #dfe3e8); box-shadow: inset -2px 0 0 var(--inw-ink, #1b2229); font: 700 16px/1 \"Atkinson Hyperlegible Next\", Arial, sans-serif; font-variant-numeric: tabular-nums; color: var(--inw-ink, #1b2229); } .ds-bar { display: block; width: calc(var(--v) * 1%); height: 100%; background: var(--inw-hunk, #0b6784); } .ds-val { position: absolute; top: 50%; left: calc(var(--v) * 1% + 0.4rem); transform: translateY(-50%); }"
+    },
+    {
+      "name": "Rule Browser",
+      "kind": "custom",
+      "refersTo": "filter-control",
+      "description": "The filterable rule list on rules/: labelled selects and a search box with a 1px Graphite edge, then the docs table; each rule's name cell holds the name, what it flags and its default in Graphite.",
+      "html": "<label class=\"ds-field\"><span>Status</span><select><option>Any</option><option>stable (16)</option></select></label>",
+      "css": ".ds-field { display: grid; gap: 0.2rem; width: 12rem; font: 400 16px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; } .ds-field span { color: var(--inw-graphite, #56616c); font-weight: 600; } .ds-field select { min-height: 2.2em; padding: 0.35em 0.6em; border: 1px solid var(--inw-graphite, #56616c); border-radius: 6px; background: var(--inw-paper, #fff); color: var(--inw-ink, #1b2229); font: inherit; }"
     }
   ],
   "narrative": {

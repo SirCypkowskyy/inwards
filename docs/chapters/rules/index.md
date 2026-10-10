@@ -2,6 +2,12 @@
 
 Every diagnostic Inwards prints links to its rule's page here: the `docs:` line of the text output, the `docs` field of the JSON output, `helpUri` in SARIF and the code link in the editor. Each page says what the rule flags, why it matters when an AI agent writes the code, a flagged and a fixed example, how to fix a finding, how to configure the rule, and what it doesn't catch yet.
 
+Search the rules, filter them by category, status or autofix, sort them by code, name or status, and page through them. The address bar keeps the view, so a link opens the same list. A category includes its sub-categories: `imports` also lists the rules filed under `imports › layers`.
+
+<div class="inw-rules" data-inwards-rules="rules.json"></div>
+
+<div class="inw-rules-fallback" markdown>
+
 | Code | Name | What it flags | Default | Inline suppression |
 |---|---|---|---|---|
 | [INW000](INW000.md) | `unsupported-encoding` | A declared source encoding under which a comment can be a real import | error | no |
@@ -17,9 +23,13 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | error | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | error | yes |
 
+</div>
+
 ## FastAPI rules { #fastapi }
 
 The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do.
+
+<div class="inw-rules-fallback" markdown>
 
 | Code | Name | What it flags | Default | Inline suppression |
 |---|---|---|---|---|
@@ -31,6 +41,8 @@ The `FAPI` family checks FastAPI applications across files: which router the app
 | [FAPI007](FAPI007.md) | `yield-dependency-swallows` | A dependency with `yield` whose `except` clause around it doesn't re-raise, so the endpoint's error is hidden | opt-in, error | yes |
 | [FAPI008](FAPI008.md) | `duplicate-operation-id` | Two path operations of one app with the same literal `operation_id` | opt-in, error | yes |
 | [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: the dependency is called at import time instead of being passed | opt-in, error | yes |
+
+</div>
 
 One code is reserved and not registered (an unknown code is still a config error):
 
@@ -81,4 +93,4 @@ Rules that point at a line of Python can be suppressed this way: INW001, INW002,
 
 ## Page format
 
-Each rule page starts with front matter in the [OKF](https://okf.md/spec/) format: `type: rule`, `title`, `description`, `resource` (the rule's source file), `tags` (the category, parent first), `timestamp` (when the rule shipped), `status`, and the Inwards fields `code`, `name`, `severity`, `suppressible`, `autofix` and `related_issues`. A test checks that every registered rule has a page and every page names a registered rule. The flagged and fixed examples run as tests too, against the output shown on the page.
+Each rule page starts with front matter in the [OKF](https://okf.md/spec/) format: `type: rule`, `title`, `description`, `resource` (the rule's source file), `tags` (the category, parent first), `timestamp` (when the rule shipped), `status`, and the Inwards fields `code`, `name`, `severity`, `suppressible`, `autofix` and `related_issues`. Every page also has the sections What it does, Why is this bad, Example (a flagged and a fixed code block) and Fix safety, and a row in a table on this page. `uv run scripts/check-rule-pages.py` checks all of that in both languages, in CI too, and writes the `rules.json` the list above reads; after changing a rule page or a row here, run it with `--write`. A test checks that every registered rule has a page and every page names a registered rule. The flagged and fixed examples run as tests too, against the output shown on the page.

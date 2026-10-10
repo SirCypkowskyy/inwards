@@ -15,6 +15,14 @@ const REPO = resolve(import.meta.dir, "../../..");
 const SRC = join(REPO, "src/core/src");
 const BIOME = join(REPO, "node_modules/.bin/biome");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
+/**
+ * Timeout for the tests that start Biome once per probe. They take about
+ * 250 ms on CI, but a slow self-hosted runner took 5.7 s for the first one
+ * (its neighbours ran 6 to 8 times slower than usual too), past Bun's 5 s
+ * default. Each probe is a cold Biome start, so the time follows the runner,
+ * not the engine's code.
+ */
+const BIOME_PROBE_TIMEOUT_MS = 30_000;
 /** The extension of a single-module rule. */
 const TS_SUFFIX = /\.ts$/u;
 
@@ -105,54 +113,62 @@ function lintAs(path: string, text: string): { code: number | null; out: string 
 }
 
 describe("no I/O in the engine", () => {
-  test("a core module can't import a Node module or use the process global", () => {
-    for (const folder of ["rules", "engine", "lookup"]) {
-      const imports = lintAs(
-        `src/core/src/${folder}/probe.ts`,
-        'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',
-      );
-      expect(imports.code).not.toBe(0);
-      expect(imports.out).toContain("noNodejsModules");
-      const global = lintAs(
-        `src/core/src/${folder}/probe.ts`,
-        "/** Reads. */\nexport const cwd = (): string => process.cwd();\n",
-      );
-      expect(global.code).not.toBe(0);
-      expect(global.out).toContain("noRestrictedGlobals");
-    }
-  });
+  test(
+    "a core module can't import a Node module or use the process global",
+    () => {
+      for (const folder of ["rules", "engine", "lookup"]) {
+        const imports = lintAs(
+          `src/core/src/${folder}/probe.ts`,
+          'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',
+        );
+        expect(imports.code).not.toBe(0);
+        expect(imports.out).toContain("noNodejsModules");
+        const global = lintAs(
+          `src/core/src/${folder}/probe.ts`,
+          "/** Reads. */\nexport const cwd = (): string => process.cwd();\n",
+        );
+        expect(global.code).not.toBe(0);
+        expect(global.out).toContain("noRestrictedGlobals");
+      }
+    },
+    BIOME_PROBE_TIMEOUT_MS,
+  );
 
-  test("a core module can't reach the network or read the clock", () => {
-    const probes: [string, string][] = [
-      [
-        '/** Fetches. */\nexport const load = (): Promise<Response> => fetch("https://x");\n',
-        "noRestrictedGlobals",
-      ],
-      ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "noRestrictedGlobals"],
-      ["/** Stamps. */\nexport const now = (): string => Date();\n", "noRestrictedGlobals"],
-      [
-        "const D = Date;\n\n/** Stamps. */\nexport const now = (): unknown => new D();\n",
-        "noRestrictedGlobals",
-      ],
-      [
-        "/** Stamps. */\nexport const now = (): number => Date.parse(new Date(Date.now()).toISOString());\n",
-        "noRestrictedGlobals",
-      ],
-      [
-        '/** Stamps. */\nexport const now = (): unknown => (globalThis as Record<string, unknown>)["Date"];\n',
-        "noRestrictedGlobals",
-      ],
-      [
-        '/** Escapes. */\nexport const g = (): unknown => Function("return this")();\n',
-        "noRestrictedGlobals",
-      ],
-    ];
-    for (const [text, rule] of probes) {
-      const result = lintAs("src/core/src/rules/probe.ts", text);
-      expect(result.code).not.toBe(0);
-      expect(result.out).toContain(rule);
-    }
-  });
+  test(
+    "a core module can't reach the network or read the clock",
+    () => {
+      const probes: [string, string][] = [
+        [
+          '/** Fetches. */\nexport const load = (): Promise<Response> => fetch("https://x");\n',
+          "noRestrictedGlobals",
+        ],
+        ["/** Stamps. */\nexport const now = (): number => Date.now();\n", "noRestrictedGlobals"],
+        ["/** Stamps. */\nexport const now = (): string => Date();\n", "noRestrictedGlobals"],
+        [
+          "const D = Date;\n\n/** Stamps. */\nexport const now = (): unknown => new D();\n",
+          "noRestrictedGlobals",
+        ],
+        [
+          "/** Stamps. */\nexport const now = (): number => Date.parse(new Date(Date.now()).toISOString());\n",
+          "noRestrictedGlobals",
+        ],
+        [
+          '/** Stamps. */\nexport const now = (): unknown => (globalThis as Record<string, unknown>)["Date"];\n',
+          "noRestrictedGlobals",
+        ],
+        [
+          '/** Escapes. */\nexport const g = (): unknown => Function("return this")();\n',
+          "noRestrictedGlobals",
+        ],
+      ];
+      for (const [text, rule] of probes) {
+        const result = lintAs("src/core/src/rules/probe.ts", text);
+        expect(result.code).not.toBe(0);
+        expect(result.out).toContain(rule);
+      }
+    },
+    BIOME_PROBE_TIMEOUT_MS,
+  );
 });
 
 describe("zones, as fallow applies them", () => {

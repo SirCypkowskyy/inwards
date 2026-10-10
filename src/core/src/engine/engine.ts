@@ -8,6 +8,7 @@
 import type { Parser } from "web-tree-sitter";
 import { acceptedModules } from "../baseline/accepted.ts";
 import type { InwardsConfig } from "../config/parse.ts";
+import { type LibraryDeny, libraryDenies } from "../config/rule-options.ts";
 import { applyRules, ruleLevel } from "../config/rule-settings.ts";
 import type {
   Diagnostic,
@@ -32,7 +33,7 @@ import {
 import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
 import { checkPublicApi } from "../rules/public-api-only.ts";
-import { checkLibraries } from "../rules/pure-domain.ts";
+import { checkLibraries, coversModule, type LibraryInputs } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
 import {
@@ -55,8 +56,8 @@ export class Engine {
   private readonly parser: Parser;
   private readonly config: InwardsConfig;
   private readonly extractor: Extractor;
-  /** The top-level import packages of the uv workspace's members (INW005's wording). */
-  private readonly workspace: ReadonlySet<string>;
+  /** INW005's inputs beyond the layers: the uv workspace's member packages (its wording) and `deny`. */
+  private readonly libraryInputs: { workspace: ReadonlySet<string>; deny: readonly LibraryDeny[] };
 
   /**
    * Stores a ready parser, a validated config and the extraction helper.
@@ -76,7 +77,8 @@ export class Engine {
     this.parser = parser;
     this.config = config;
     this.extractor = new Extractor(parser, options.cache);
-    this.workspace = options.workspacePackages ?? new Set();
+    const deny = libraryDenies(config.rules?.options?.["pure-domain"]);
+    this.libraryInputs = { workspace: options.workspacePackages ?? new Set(), deny };
   }
 
   /**
@@ -129,7 +131,8 @@ export class Engine {
    * besides its shape, it gets at most an INW006 warning naming its package.
    * With contexts, every file is parsed, since any of them may import a
    * context (INW002, INW003); outside the layers it gets that warning and
-   * the context rules.
+   * the context rules. A file that INW005's `deny` option covers is parsed
+   * too, layer or not (#219).
    *
    * Inline suppression comments then hide the findings they cover and add
    * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).
@@ -159,7 +162,7 @@ export class Engine {
    */
   private scan(src: SourceFile, project: ProjectIndex): Scan {
     const layered = this.layered(src);
-    if (!(layered || this.config.contexts)) {
+    if (!(layered || this.config.contexts || coversModule(this.libraryInputs.deny, src.module))) {
       const warning = unassignedWarning(src, this.config, indexEvidence(project));
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
@@ -184,6 +187,16 @@ export class Engine {
    */
   private layered(src: SourceFile): boolean {
     return layerIndexOf(src.module, this.config.layers) !== -1;
+  }
+
+  /**
+   * Gathers what INW005 needs besides the file and the layers.
+   *
+   * @param project - the module index, for first-party lookups.
+   * @returns the lookup, the uv workspace's member packages and `deny`.
+   */
+  private librariesIn(project: ProjectIndex): LibraryInputs {
+    return { ownerOf: project.ownerOf, ...this.libraryInputs };
   }
 
   /**
@@ -248,7 +261,8 @@ export class Engine {
    * reaches no other rule. An outward import gets INW001 alone, even when its
    * module doesn't exist either. INW002 is independent of the layer rules: an
    * import can break a layer and a context boundary at once. A file outside
-   * every layer gets only INW002 and its unassigned-package warning.
+   * every layer gets only INW002, INW003, INW005's prefix denies and its
+   * unassigned-package warning.
    *
    * @param file - the source file.
    * @param imports - its imports.
@@ -265,9 +279,11 @@ export class Engine {
       ...checkContextDependencies(file, imports, contexts, project.ownerOf),
       ...checkPublicApi(file, imports, project, { contexts, defer: this.defersToInw002() }),
     ];
+    const resolved = imports.filter((ref) => ref.target !== "");
+    const libraries = checkLibraries(file, resolved, layers, this.librariesIn(project));
     if (!this.layered(file)) {
       const warning = unassignedWarning(file, this.config, indexEvidence(project));
-      return warning ? [warning, ...across] : across;
+      return [...(warning ? [warning] : []), ...libraries, ...across];
     }
     // INW001's fix deletes an outward import; "create the module" would contradict it.
     const outward = new Set(outwardImports(file, imports, layers).map((o) => o.ref));
@@ -277,14 +293,10 @@ export class Engine {
       project,
       this.config,
     );
-    const resolved = imports.filter((ref) => ref.target !== "");
     const existing = resolved.filter((ref) => !unknown.missing.has(ref));
     return [
       ...checkLayers(file, resolved, layers),
-      ...checkLibraries(file, resolved, layers, {
-        ownerOf: project.ownerOf,
-        workspace: this.workspace,
-      }),
+      ...libraries,
       ...checkUnassignedImports(file, existing, layers, {
         ownerOf: project.ownerOf,
         evidence: indexEvidence(project),
@@ -320,14 +332,11 @@ export class Engine {
       found.push(
         ...checkContextDependencies(file, readable, contexts, project.ownerOf),
         ...checkPublicApi(file, readable, project, { contexts, defer: this.defersToInw002() }),
+        ...checkLibraries(file, readable, layers, this.librariesIn(project)),
       );
       if (this.layered(file)) {
         found.push(
           ...checkDynamicImports(file, refs, layers),
-          ...checkLibraries(file, readable, layers, {
-            ownerOf: project.ownerOf,
-            workspace: this.workspace,
-          }),
           ...checkUnassignedImports(file, readable, layers, {
             ownerOf: project.ownerOf,
             evidence: indexEvidence(project),
