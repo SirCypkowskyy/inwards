@@ -1,13 +1,14 @@
 /**
  * @file Runs the per-file content rules for the engine: INW012
- * `thin-endpoint` (through `thin-endpoint.ts`), INW013 `async-blocking` and
- * INW014 `ports-abstract` and INW015 `construct-only-in`. Each decides
- * whether a file needs it at all and parses the file itself, and only one
- * whose text may hold a finding; their findings join the file's others
- * before the suppression comments apply. All but INW014 may read another
- * first-party module through the project index. It also decides that an
- * outward import INW001 reports gets INW001 alone, not INW015 as well. No
- * I/O: the caller supplies the file and the project index.
+ * `thin-endpoint` (through `thin-endpoint.ts`), INW013 `async-blocking`,
+ * INW014 `ports-abstract`, INW015 `construct-only-in` and INW016
+ * `orm-naming` (through `orm-naming.ts`). Each decides whether a file needs
+ * it at all and parses the file itself, and only one whose text may hold a
+ * finding; their findings join the file's others before the suppression
+ * comments apply. INW012, INW013 and INW015 may read another first-party
+ * module through the project index. It also decides that an outward import
+ * INW001 reports gets INW001 alone, not INW015 as well. No I/O: the caller
+ * supplies the file and the project index.
  */
 import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
@@ -19,6 +20,7 @@ import { checkConstructOnlyIn } from "../rules/construct-only-in/check.ts";
 import { checkPortsAbstract } from "../rules/ports-abstract/check.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { ormNamingFindings } from "./orm-naming.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 /**
@@ -106,7 +108,7 @@ function constructOnlyInFindings(
 }
 
 /**
- * Finds the content rules' findings in a file: INW012's, INW013's, INW014's, then INW015's.
+ * Finds the content rules' findings in a file: INW012's, INW013's, INW014's, INW015's, then INW016's.
  *
  * @param parser - parser with the Python grammar loaded.
  * @param src - the source file, with normalised text.
@@ -125,5 +127,6 @@ export function contentFindings(
     ...asyncBlockingFindings(parser, src, config, project),
     ...portsAbstractFindings(parser, src, config),
     ...constructOnlyInFindings(parser, src, config, project),
+    ...ormNamingFindings(parser, src, config),
   ];
 }

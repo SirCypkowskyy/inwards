@@ -225,6 +225,20 @@
       "url": "INW015/"
     },
     {
+      "code": "INW016",
+      "name": "orm-naming",
+      "title": "INW016 orm-naming",
+      "summary": "Nazwa tabeli, która nie jest w lower_case_snake i w liczbie pojedynczej, albo kolumna daty i czasu bez `_at` lub `_date`; uruchomienie dla całego projektu wymaga też konwencji nazw w `MetaData`",
+      "description": "Nazwy tabel ORM oraz nazwy kolumn daty i czasu trzymają się schematu projektu, domyślnie tabele w lower_case_snake i w liczbie pojedynczej, _at dla daty z czasem i _date dla samej daty, a modele SQLAlchemy mają konwencję nazw w MetaData.",
+      "category": ["naming", "roles"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, błąd",
+      "url": "INW016/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

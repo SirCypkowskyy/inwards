@@ -8,9 +8,8 @@
  * rule reads its own with typed defaults. This module only validates, apart
  * from `stringList` and `libraryDenies`, which read a list back with its type.
  */
-
-import { delegateTargets } from "./delegate-targets.ts";
 import { isSelector, selectorProblem } from "./layer-selector.ts";
+import { boolean, isStringList, listMatching, listOf, oneOf, suffix } from "./option-parsers.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 /**
@@ -56,64 +55,6 @@ const MAX_DEPTH = 8;
 /** An entrypoint: a dotted module, a colon, and a name, e.g. `app.main:app`. */
 const ENTRYPOINT =
   /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*:[\p{XID_Start}_]\p{XID_Continue}*$/u;
-
-/**
- * Tells whether a raw value is a list of strings.
- *
- * @param value - a raw TOML value.
- * @returns true for an array whose entries are all strings, empty included.
- */
-function isStringList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((e) => typeof e === "string");
-}
-
-/**
- * Parses `true` or `false`.
- *
- * @param value - the raw value.
- * @param where - the key's dotted path.
- * @returns the value, unchanged.
- * @throws {ConfigError} for anything else.
- */
-function boolean(value: unknown, where: string): boolean {
-  if (typeof value !== "boolean") {
-    throw new ConfigError(`${where} must be true or false.`);
-  }
-  return value;
-}
-
-/**
- * Makes a parser for one of a few literal values.
- *
- * @param values - the allowed values.
- * @returns the parser.
- */
-function oneOf(values: readonly (string | boolean)[]): OptionParser {
-  return (value: unknown, where: string): OptionValue => {
-    if (!((typeof value === "string" || typeof value === "boolean") && values.includes(value))) {
-      const listed = values.map((v) => JSON.stringify(v)).join(", ");
-      throw new ConfigError(`${where} must be one of ${listed}.`);
-    }
-    return value;
-  };
-}
-
-/**
- * Makes a parser for a list of distinct strings drawn from a fixed set, empty included.
- *
- * @param values - the allowed entries.
- * @returns the parser.
- */
-function listOf(values: readonly string[]): OptionParser {
-  return (value: unknown, where: string): OptionValue => {
-    const ok = isStringList(value) && value.every((e) => values.includes(e));
-    if (!ok || new Set(value).size !== value.length) {
-      const listed = values.map((v) => `"${v}"`).join(", ");
-      throw new ConfigError(`${where} must be a list of distinct entries from ${listed}.`);
-    }
-    return value;
-  };
-}
 
 /**
  * Parses an integer from 0 to `MAX_DEPTH`.
@@ -207,19 +148,46 @@ function limit(value: unknown, where: string): number | false {
 }
 
 /**
- * Makes a parser for a list of strings that each match a pattern, empty included.
+ * Parses INW012's `delegate-to`: a non-empty list of layer names or module
+ * prefixes and selectors. Which entries name a layer is known only once the
+ * layers are parsed, so `delegateProblem` checks the rest then.
  *
- * @param pattern - what every entry must match.
- * @param example - how the message describes a good entry.
- * @returns the parser.
+ * @param value - the raw list.
+ * @param where - the key's dotted path.
+ * @returns the entries as written.
+ * @throws {ConfigError} when the list is empty or holds a blank or non-string entry.
  */
-function listMatching(pattern: RegExp, example: string): OptionParser {
-  return (value: unknown, where: string): OptionValue => {
-    if (!(isStringList(value) && value.every((e) => pattern.test(e)))) {
-      throw new ConfigError(`${where} must be a list of ${example}.`);
+function delegateTargets(value: unknown, where: string): string[] {
+  if (!(isStringList(value) && value.length > 0 && value.every((e) => e.trim() !== ""))) {
+    throw new ConfigError(
+      `${where} must be a non-empty list of layer names or module prefixes and selectors, such as ["application"] or ["shop.*.service"].`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Checks the `delegate-to` entries that name no layer: each must then be a
+ * module prefix or selector, as in `layers[].modules`.
+ *
+ * @param entries - the entries as parsed.
+ * @param layerNames - the names of the configured layers.
+ * @returns the error message for the first bad entry, or undefined when all are fine.
+ */
+export function delegateProblem(
+  entries: readonly string[],
+  layerNames: ReadonlySet<string>,
+): string | undefined {
+  for (const entry of entries) {
+    let problem = isSelector(entry) ? selectorProblem(entry) : undefined;
+    if (!(layerNames.has(entry) || isSelector(entry) || isDottedName(entry))) {
+      problem = "it names no layer and isn't a dotted module name";
     }
-    return value;
-  };
+    if (problem !== undefined && !layerNames.has(entry)) {
+      return `tool.inwards.rules.thin-endpoint.delegate-to: "${entry}" is not a layer name, module prefix or selector: ${problem}.`;
+    }
+  }
+  return undefined;
 }
 
 /** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's bases and decorators. */
@@ -310,6 +278,13 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "allow-decorators": namePatterns,
   },
   "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
+  "orm-naming": {
+    "table-name": oneOf(["snake", "snake_singular", false]),
+    "datetime-suffix": suffix,
+    "date-suffix": suffix,
+    "allow-tables": listMatching(/\S/u, 'table names such as "news" or "user_settings"'),
+    "require-naming-convention": boolean,
+  },
   "router-wiring": {
     entrypoints,
     "allow-unmounted": moduleEntries,

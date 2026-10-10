@@ -1,0 +1,21 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW016 orm-naming the fix renames through a migration 1`] = `
+[
+  {
+    "steps": [
+      "Change the name where it is written to "post": \`__tablename__\`, the first argument of \`Table(...)\`, or \`db_table\`.",
+      "If the table already exists, add a migration that renames it, such as Alembic's \`op.rename_table("posts", "post")\`, and update raw SQL that names it.",
+      "If "posts" is singular in fact (a mass noun such as "news"), ask the user to add it to \`allow-tables\` in [tool.inwards.rules.orm-naming]. Don't edit [tool.inwards] yourself.",
+    ],
+    "summary": "Rename the table "posts" to "post".",
+  },
+  {
+    "steps": [
+      "Rename it where it is declared, and every attribute access, query and serializer that uses it.",
+      "If the column already exists, add a migration that renames it, such as Alembic's \`op.alter_column(<table>, "created", new_column_name="created_at")\`.",
+    ],
+    "summary": "Rename the column \`created\` to \`created_at\`.",
+  },
+]
+`;

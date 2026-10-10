@@ -31,32 +31,11 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule. */
+/** Codes of every registered rule: INW000 to INW016, and the FAPI family without FAPI004. */
 type RuleCode =
-  | "INW000"
-  | "INW001"
-  | "INW002"
-  | "INW003"
-  | "INW004"
-  | "INW005"
-  | "INW006"
-  | "INW007"
-  | "INW008"
-  | "INW009"
-  | "INW010"
-  | "INW011"
-  | "INW012"
-  | "INW013"
-  | "INW014"
-  | "INW015"
-  | "FAPI001"
-  | "FAPI002"
-  | "FAPI003"
-  | "FAPI005"
-  | "FAPI006"
-  | "FAPI007"
-  | "FAPI008"
-  | "FAPI009";
+  | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
+  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6}`
+  | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -209,6 +188,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
     docs: page("INW015"),
+  },
+  // Opt-in, one of #98's role-scoped content rules (#297).
+  INW016: {
+    code: "INW016",
+    name: "orm-naming",
+    severity: "error",
+    default: "off",
+    summary:
+      "ORM table names and the names of datetime and date columns follow the project's scheme: lower_case_snake singular tables, _at for datetimes, _date for dates.",
+    docs: page("INW016"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.

@@ -15,7 +15,6 @@ import { VERSION } from "../meta/product.ts";
 import { type ContextSpec, parseContexts } from "./contexts.ts";
 import { type CycleMode, parseCycles } from "./cycles.ts";
 import { CONFIG_DEFAULTS } from "./defaults.ts";
-import { delegateProblem } from "./delegate-targets.ts";
 import { parseGenerated } from "./generated.ts";
 import {
   type AgentSuppressions,
@@ -24,7 +23,7 @@ import {
   stopGateKey,
 } from "./hook-keys.ts";
 import { isModuleList, type LayerSpec, parseLayers } from "./layers.ts";
-import { stringList } from "./rule-options.ts";
+import { delegateProblem, stringList } from "./rule-options.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
 import { parseTemplates, withContextTemplates, withShapeTemplates } from "./templates.ts";

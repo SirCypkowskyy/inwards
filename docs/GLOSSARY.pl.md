@@ -63,8 +63,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW014, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW016, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
+| Naming styles | lower_case_snake, snake case, camel case | INW016's table and column schemes |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
 | File and config names | `pyproject.toml`, `[tool.inwards]`, `AGENTS.md`, `escalate-after`, ... | |
@@ -84,6 +85,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | worker, worker pool | worker (workera, workery), pula workerów | |
 | catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
 | health check | health-check | "aplikacja health-check" |
+| harness (agent harness: Copilot, Local in VS Code), matcher (hook) | harness (harnessu), matcher (matchera) | |
+| Problems panel (VS Code) | panel Problems | |
 | runtimepath, quickfix (Neovim) | runtimepath, quickfix | "w swoim runtimepath", "w oknie quickfix" |
 
 ## Fixed Polish terms
@@ -203,6 +206,12 @@ baseline'u); multi-word names are left uninflected where possible.
 | async client, sync client | klient asynchroniczny, klient synchroniczny |
 | re-export (`from .views import f` in `__init__.py`) | reeksport |
 | one hop (INW013, following a call into a sync helper) | jeden krok (w głąb funkcji pomocniczej) |
+| table name, column name (INW016) | nazwa tabeli, nazwa kolumny |
+| naming convention (`MetaData(naming_convention=...)`, INW016) | konwencja nazw |
+| constraint (unique, check, foreign key, primary key) | ograniczenie (unikalności, check, klucza obcego, klucza głównego) |
+| singular, plural | liczba pojedyncza, liczba mnoga |
+| mass noun | rzeczownik niepoliczalny |
+| migration (Alembic) | migracja |
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
@@ -285,6 +294,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | platform package (one VSIX per platform) | pakiet dla platformy |
 | thin client | cienki klient |
 | file watcher (editor) | obserwator plików |
+| cloud agent (Copilot, formerly coding agent) | agent w chmurze (cloud agent) |
+| setup steps (`copilot-setup-steps.yml`) | kroki przygotowania |
 | project root (the directory an editor starts a language server in), root marker | katalog główny projektu, znacznik katalogu głównego |
 | dev extension (Zed) | rozszerzenie deweloperskie (dev extension) |
 | headless (an editor run without its UI) | bez interfejsu (headless) |
