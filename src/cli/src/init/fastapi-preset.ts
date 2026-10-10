@@ -1,8 +1,9 @@
 /**
  * @file The `fastapi` preset of `inwards init --style`: the
  * fastapi-best-practices layout, with every domain package layered by one
- * template on a kernel of shared modules, and the FastAPI rules turned on as
- * warnings. It also words the Ruff config that init prints beside the
+ * template on a kernel of shared modules, and the FastAPI rules and INW012
+ * (endpoints hand their work to the domain's service) turned on as warnings.
+ * It also words the Ruff config that init prints beside the
  * preset and never writes. Pure data; the example's modules are
  * `fastapi.ts`'s.
  */
@@ -70,13 +71,28 @@ export const FASTAPI: Style = {
     why: "Domains may use each other's public modules without declaring it; INW003 keeps them to those.",
   },
   optIn: {
-    codes: ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009"],
-    why: "The FastAPI rules, as warnings to start with: make them errors once the project is clean.",
+    codes: [
+      "FAPI001",
+      "FAPI002",
+      "FAPI003",
+      "FAPI005",
+      "FAPI006",
+      "FAPI007",
+      "FAPI008",
+      "FAPI009",
+      "INW012",
+    ],
+    why: "The FastAPI rules and thin endpoints (INW012), as warnings to start with: make them errors once the project is clean.",
     options: [
       {
         rule: "undocumented-error-response",
         why: "Leave raises in the endpoint itself to Ruff's FAST004.",
         lines: ["report-direct-raises = false"],
+      },
+      {
+        rule: "thin-endpoint",
+        why: "An endpoint hands its work to its domain's service module.",
+        lines: ['delegate-to = ["domain.service"]'],
       },
     ],
   },
