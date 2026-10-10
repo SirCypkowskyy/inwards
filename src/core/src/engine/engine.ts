@@ -148,7 +148,7 @@ export class Engine {
    * dropped, the rest get their configured severity (see `applyRules`).
    *
    * FAPI001 and FAPI002 run only when on and the text mentions FastAPI, and
-   * INW012 and INW013 only when on for the file's module and the text may
+   * INW012, INW013 and INW014 only when on for the file's module and the text may
    * hold a finding (`engine/content-rules.ts`).
    *
    * @param file - the source file as read by the adapter.

@@ -42,6 +42,7 @@ const RECORDED: Readonly<Record<string, string>> = {
   "14": "f1ec25a062423754b42a1c40f6af407ac1b86d943497de4df9756e9c1765cdd2",
   "15": "92d37ca8993e40ab7c0bfc5abf846c85f8d0bb7c7d1904f643509a69867a08a1",
   "16": "9c2b33839bdedcf5363caab703528b970b413cbc613a9faa4650ac27cd391dd1",
+  "17": "1c202fe103ee76673d04edb818c36be825433f9112893619ccc7e21ea992b70d",
 };
 
 test("the extraction revision changes with the code it describes", () => {

@@ -215,6 +215,13 @@ baseline'u); multi-word names are left uninflected where possible.
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
+| port module (INW014) | moduł portu |
+| abstract base class, ABC (`abc.ABC`) | abstrakcyjna klasa bazowa, ABC |
+| Protocol (`typing.Protocol`) | Protocol (protokół strukturalny) |
+| abstract method, method body (INW014) | metoda abstrakcyjna, ciało metody |
+| implementation (of a port) | implementacja (portu) |
+| DTO, value object | DTO, obiekt wartości |
+| test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
 | inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |
 | guarded role (INW015's `role`), build an adapter | chroniona rola, budować adapter |
 | pre-release | wersja przedpremierowa (pre-release) |

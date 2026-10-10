@@ -190,7 +190,7 @@ export function delegateProblem(
   return undefined;
 }
 
-/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types. */
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's bases and decorators. */
 const namePatterns = listMatching(
   NAME_PATTERN,
   'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
@@ -271,6 +271,11 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "extend-blocking-types": namePatterns,
     "follow-modules": (value: unknown, where: string): string[] =>
       moduleEntries(value, where, true),
+  },
+  "ports-abstract": {
+    "allow-bases": namePatterns,
+    "extend-allow-bases": namePatterns,
+    "allow-decorators": namePatterns,
   },
   "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
   "orm-naming": {

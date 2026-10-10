@@ -197,6 +197,20 @@
       "url": "INW013/"
     },
     {
+      "code": "INW014",
+      "name": "ports-abstract",
+      "title": "INW014 ports-abstract",
+      "summary": "Klasa w module portu, która nie jest ABC ani Protocol, albo metoda portu, której ciało wykonuje pracę",
+      "description": "Moduł portu zawiera tylko klasy ABC i Protocol, których metody nie mają ciała; implementacje należą do adapterów.",
+      "category": ["ports", "roles"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, błąd",
+      "url": "INW014/"
+    },
+    {
       "code": "INW015",
       "name": "construct-only-in",
       "title": "INW015 construct-only-in",

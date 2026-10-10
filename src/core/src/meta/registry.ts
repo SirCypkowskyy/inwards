@@ -31,32 +31,11 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule. */
+/** Codes of every registered rule: INW000 to INW016, and the FAPI family without FAPI004. */
 type RuleCode =
-  | "INW000"
-  | "INW001"
-  | "INW002"
-  | "INW003"
-  | "INW004"
-  | "INW005"
-  | "INW006"
-  | "INW007"
-  | "INW008"
-  | "INW009"
-  | "INW010"
-  | "INW011"
-  | "INW012"
-  | "INW013"
-  | "INW015"
-  | "INW016"
-  | "FAPI001"
-  | "FAPI002"
-  | "FAPI003"
-  | "FAPI005"
-  | "FAPI006"
-  | "FAPI007"
-  | "FAPI008"
-  | "FAPI009";
+  | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
+  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6}`
+  | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -189,6 +168,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "An async def makes no synchronous database, cache or cloud call: a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
     docs: page("INW013"),
+  },
+  // Opt-in, a role-scoped content rule from #98 (#295).
+  INW014: {
+    code: "INW014",
+    name: "ports-abstract",
+    severity: "error",
+    default: "off",
+    summary:
+      "A port module holds only ABCs and Protocols whose methods have no body; implementations live in adapters.",
+    docs: page("INW014"),
   },
   // Opt-in, the role rule that keeps adapters in the composition root (#296).
   INW015: {
