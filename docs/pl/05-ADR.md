@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: d147cfbd80af10610ba81f5a5f30562a75c6b75ccd7d6fdf68aaa45b139ab58f
+source_hash: dde0dfd002cc894e3ba352c7c2ed54031120d66e2bc55276cc73d71a9568bfdf
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -49,8 +49,9 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :material-check-circle: Przyjęty |
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
 | [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję | :material-check-circle: Przyjęty |
-| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia | :material-check-circle: Przyjęty |
+| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia | :material-check-circle: Przyjęty, rozszerzenie przełączone w [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` odpowiada sprawdzeniem `inwards check`, na tekstach nałożonych na dysk | :material-check-circle: Przyjęty |
+| [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1253,3 +1254,35 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - *Model językowy do czytania opisu:* Inwards nie ma sieci ani modelu, a odpowiedź powinna być za każdym razem taka sama.
 - *Strony reguł jako zasoby MCP:* klienci podsuwają modelowi narzędzia pewniej niż zasoby, a zgłoszenie prosiło o narzędzie. Zasoby mogą przyjść później.
 - *`explain_rule` z opublikowanej strony:* wymaga sieci, a strona mogłaby opisywać inną wersję niż ta w pliku binarnym.
+
+## ADR-043: Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę { #adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform }
+
+**Stan:** Przyjęty · 2026-10-10 · [#64](https://github.com/SirCypkowskyy/inwards/issues/64) · domyka [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)
+
+**Kontekst.** [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) przeniósł serwer języka do pliku binarnego i zamroził serwer Node rozszerzenia do czasu, aż rozszerzenie zacznie uruchamiać `inwards server`. Do tego rozszerzenie potrzebuje pliku wykonywalnego `inwards` dla platformy użytkownika. `cd.yml` już teraz kompiluje sześć plików binarnych na jednym runnerze, uruchamia każdy na jego własnym systemie i dołącza je razem z `SHA256SUMS` do szkicu wydania na GitHubie ([#14](https://github.com/SirCypkowskyy/inwards/issues/14)). Repozytorium jest prywatne, więc pobranie pliku z wydania wymaga zalogowania do GitHuba. Od VS Code 1.61 Marketplace serwuje pakiet zbudowany dla platformy użytkownika, `vsce package --target` buduje taki pakiet, a Open VSX też je serwuje.
+
+**Decyzja.**
+
+- **Jeden VSIX na platformę, z plikiem binarnym tej platformy w środku.** `src/vscode-extension/scripts/package-target.ts` kopiuje każdy plik binarny z wydania do `bin/` (`bin/inwards.exe` na Windows) i uruchamia `vsce package --target` dla `linux-x64`, `linux-arm64`, `alpine-x64` (plik binarny dla musl), `darwin-x64`, `darwin-arm64` i `win32-x64`. Siódmy, uniwersalny VSIX nie ma pliku binarnego; rejestry serwują go na każdą inną platformę (Windows na Arm, 32-bitowy Linux na Arm, Alpine na arm64), gdzie rozszerzenie potrzebuje `inwards` w `PATH` albo ustawienia `inwards.path`. Pole `files` w `package.json` wylicza, co trafia do pakietu, więc nic innego się nie dostanie.
+- **Który plik binarny rusza.** `inwards.path`, jeśli jest ustawione, w przeciwnym razie dołączony plik binarny, a na końcu `inwards` z `PATH`. Ustawiona ścieżka, pod którą nic nie ma, to błąd; rozszerzenie nigdy nie podstawia w jej miejsce innego pliku binarnego w innej wersji. Sama nazwa w ustawieniu jest szukana w `PATH`, ścieżka względna liczy się od pierwszego folderu obszaru roboczego, a `~` i `${workspaceFolder}` są rozwijane. Na Windows liczy się tylko `.exe`, bo Node nie uruchomi `.cmd` ani `.bat` bez powłoki.
+- **`inwards.path` to ustawienie ograniczone.** W niezaufanym obszarze roboczym VS Code przekazuje rozszerzeniu tylko wartość ustawioną przez samego użytkownika, więc sklonowane repozytorium nie może wybrać programu, który rozszerzenie uruchomi.
+- **Brak pliku binarnego to komunikat, a nie awaria.** Rozszerzenie mówi, czego szukało, proponuje ustawienie i przewodnik instalacji, i czeka, aż zmieni się ustawienie albo ktoś uruchomi **Inwards: Restart Server**. `inwards.enable` wyłącza serwer.
+- **Publikacja to osobny workflow.** `vscode-publish.yml` rusza, gdy zostanie opublikowane pełne wydanie (gdy właściciel ustawi zmienną `VSCODE_PUBLISH`), pobiera siedem plików VSIX z wydania, sprawdza je względem `SHA256SUMS` i wersji z taga, i wysyła je przez `vsce publish` i `ovsx publish`. Każde zadanie trzyma jeden token z własnego środowiska i biegnie na runnerach hostowanych przez GitHub. Wersje przedpremierowe nigdy nie trafiają do rejestrów: oba przyjmują tylko `X.Y.Z`, a VSIX kandydata do wydania ma już wersję docelową.
+- **Serwer Node rozszerzenia znika** razem z testami, strefą fallow i testem CLI, który porównywał jego przejście po plikach z przejściem CLI. Rozszerzenie zależy tylko od `vscode-languageclient`.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Instalacja z Marketplace albo Open VSX działa bez instalowania czegokolwiek innego i bez sieci przy starcie, a serwer ma zawsze wersję rozszerzenia.
+- :material-plus-circle-outline: Rozszerzenie nie ma kodu do pobierania ani sum kontrolnych. Dołączony plik binarny to plik z wydania: macierz weryfikacji w `cd.yml` porównuje oba bajt po bajcie na każdym systemie i uruchamia ten dołączony, a `SHA256SUMS` obejmuje każdy VSIX.
+- :material-plus-circle-outline: VS Code, Neovim i Helix uruchamiają ten sam serwer, więc ograniczenia starego serwera (tylko konfiguracja pierwszego folderu obszaru roboczego, same INW007 i INW008 dla nieotwartych plików) znikają.
+- :material-minus-circle-outline: VSIX dla platformy ma około 27 MB (skompresowany plik binarny o rozmiarze 65 MB), wobec 139 KB samego klienta, a każde wydanie niesie siedem plików VSIX, razem około 165 MB.
+- :material-minus-circle-outline: Dołączony plik binarny idzie za wersją rozszerzenia. Projekt, który przypina inną wersję przez `uv add --dev inwards`, ustawia `inwards.path` na plik binarny ze swojego środowiska wirtualnego.
+- :material-minus-circle-outline: Reguły ścieżek Windows (`.exe`, ukośniki wsteczne, spacje, wpisy `PATH` w cudzysłowach) mają testy jednostkowe z semantyką ścieżek Windows na każdym systemie; samo rozszerzenie nie startowało jeszcze na Windows, więc przed pierwszym wydaniem musi przejść pełna macierz testów i ręczna instalacja.
+- :material-minus-circle-outline: Wysyłka do Marketplace używa tokenu PAT, a Azure DevOps wycofuje tokeny globalne 1 grudnia 2026; przejście na Microsoft Entra ID (`vsce publish --azure-credential`) to dalsza praca.
+
+**Alternatywy.**
+
+- *Pobieranie pliku binarnego przy pierwszym starcie z wydania na GitHubie o wersji rozszerzenia, sprawdzane względem `SHA256SUMS`:* jeden mały VSIX, ale pliki prywatnego repozytorium wymagają tokenu, każdy pierwszy start potrzebuje sieci (proxy, maszyny bez dostępu do sieci), a rozszerzenie niosłoby kod do pobierania, sum kontrolnych i przechowywania. Sumy kontrolne pochodziłyby też z tego samego miejsca co plik binarny.
+- *Jeden VSIX ze wszystkimi sześcioma plikami binarnymi:* każdy użytkownik pobiera około 160 MB, żeby używać jednego z nich.
+- *Tylko `inwards` z `PATH` albo ze środowiska wirtualnego projektu:* po instalacji rozszerzenie nie robiłoby nic, dopóki użytkownik nie zainstaluje też pliku binarnego. Zostaje jako ścieżka zapasowa.
+- *Zachowanie serwera Node jako zapasu:* dwa serwery, które się nie zgadzają, czyli dokładnie to, co ADR-041 miał zakończyć.

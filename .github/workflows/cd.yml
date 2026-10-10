@@ -54,12 +54,14 @@ jobs:
       - run: bun test
       - name: Compile every target with Bun
         run: bun run scripts/build-binaries.ts
-      - name: Build VS Code extension (.vsix)
+      # One VSIX per VS Code platform with that platform's binary in bin/, and a
+      # universal one without a binary for the rest (ADR-043). vscode-publish.yml
+      # uploads these same files to the Marketplace and Open VSX.
+      - name: Build the VS Code extensions (.vsix per platform, plus universal)
         working-directory: src/vscode-extension
         run: |
           bun run build
-          bun x vsce package --no-dependencies --allow-missing-repository \
-            -o "../../dist/inwards-vscode-${GITHUB_REF_NAME}.vsix"
+          bun run scripts/package-target.ts all ../../dist ../../dist "$GITHUB_REF_NAME"
       - name: Wrap each binary in a platform wheel (uv add / uvx)
         run: |
           python3 scripts/build-wheels.py dist "$GITHUB_REF_NAME"
@@ -111,11 +113,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-26.04, bin: inwards-linux-x64 }
-          - { os: ubuntu-24.04-arm, bin: inwards-linux-arm64 }
-          - { os: macos-latest, bin: inwards-darwin-arm64 }
-          - { os: macos-15-intel, bin: inwards-darwin-x64 }
-          - { os: windows-latest, bin: inwards-windows-x64.exe }
+          - { os: ubuntu-26.04, bin: inwards-linux-x64, vsix: linux-x64 }
+          - { os: ubuntu-24.04-arm, bin: inwards-linux-arm64, vsix: linux-arm64 }
+          - { os: macos-latest, bin: inwards-darwin-arm64, vsix: darwin-arm64 }
+          - { os: macos-15-intel, bin: inwards-darwin-x64, vsix: darwin-x64 }
+          - { os: windows-latest, bin: inwards-windows-x64.exe, vsix: win32-x64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -129,6 +131,15 @@ jobs:
           chmod +x "dist/${{ matrix.bin }}"
           "dist/${{ matrix.bin }}" --version
           "dist/${{ matrix.bin }}" check --format json
+      - name: The platform VSIX bundles this binary, and it runs from there
+        shell: bash
+        run: |
+          python="${{ runner.os == 'Windows' && 'python' || 'python3' }}"
+          "$python" -m zipfile -e "dist/inwards-vscode-${{ matrix.vsix }}-${GITHUB_REF_NAME}.vsix" vsix
+          bin=vsix/extension/bin/inwards; [ -f "$bin.exe" ] && bin="$bin.exe"
+          cmp "$bin" "dist/${{ matrix.bin }}"
+          chmod +x "$bin" # Python's zipfile drops the mode; VS Code's installer keeps it
+          "$bin" --version
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: The wheel installs with uvx and runs
         shell: bash
@@ -185,7 +196,7 @@ jobs:
         with:
           name: inwards-${{ github.ref_name }}
           path: dist
-      - name: Draft release with binaries, wheels, .vsix and SHA256SUMS
+      - name: Draft release with binaries, wheels, VSIX files and SHA256SUMS
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

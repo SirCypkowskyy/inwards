@@ -1,13 +1,13 @@
 # Install Inwards
 
 !!! info "Verified 2026-09-25"
-    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works.
+    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works. The VS Code extension on 2026-10-10: a platform VSIX installed in VS Code 1.141 on macOS (arm64) showed INW007, checked with `src/vscode-extension/scripts/try-in-vscode.ts`; Linux and Windows are still open.
 
 Inwards is one executable with no runtime to install. The latest release is the pre-release v0.1.0-rc.1; the first full release comes with a later milestone. You can also build from source.
 
 ## From a release
 
-Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (`.vsix`) and `SHA256SUMS`. Build attestations are added once the repository is public.
+Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (a `.vsix` per platform, [below](#vs-code)) and `SHA256SUMS`. Build attestations are added once the repository is public.
 
 | Platform | File |
 |---|---|
@@ -158,7 +158,36 @@ inwards --version
 
 With uv, use `uv run inwards server` as the command, so each project gets its own version. The tests drive the binary over stdio as these editors do; neither editor has been tried by hand yet.
 
-The VS Code extension (the `.vsix` on each release) still runs its own server, which shows only INW007 and INW008 for files you haven't opened; it switches to `inwards server` with [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
+### VS Code
+
+The extension is a thin client: it starts `inwards server` and shows what it reports ([ADR-043](../05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)). Each platform's package carries that platform's `inwards` binary, so nothing else needs installing.
+
+| Platform | VS Code target | File on a release |
+|---|---|---|
+| Linux x64 | `linux-x64` | `inwards-vscode-linux-x64-<tag>.vsix` |
+| Linux arm64 | `linux-arm64` | `inwards-vscode-linux-arm64-<tag>.vsix` |
+| Alpine x64 | `alpine-x64` | `inwards-vscode-alpine-x64-<tag>.vsix` |
+| macOS Apple silicon | `darwin-arm64` | `inwards-vscode-darwin-arm64-<tag>.vsix` |
+| macOS Intel | `darwin-x64` | `inwards-vscode-darwin-x64-<tag>.vsix` |
+| Windows x64 | `win32-x64` | `inwards-vscode-win32-x64-<tag>.vsix` |
+| anything else | | `inwards-vscode-universal-<tag>.vsix`, no binary: put `inwards` on `PATH` or set `inwards.path` |
+
+`.github/workflows/vscode-publish.yml` uploads these files to the Visual Studio Marketplace and Open VSX (for VSCodium, Cursor and other editors that use it) when the owner publishes a full release; the extension is on neither registry yet. Until then, install the file for your platform from a release made after v0.1.0-rc.1 (that pre-release still has the old single `.vsix` with its own server):
+
+```sh
+code --install-extension inwards-vscode-darwin-arm64-vX.Y.Z.vsix
+```
+
+Settings:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `inwards.enable` | `true` | Run the checks. Off stops the language server. |
+| `inwards.path` | `""` | The `inwards` executable to start. Empty: the bundled binary, else `inwards` on `PATH`. A bare name is looked up on `PATH`, a relative path resolves against the first workspace folder, and `~` and `${workspaceFolder}` are expanded. On Windows it must be an `.exe`. |
+
+A change to either setting restarts the server, and so does **Inwards: Restart Server** in the command palette. To run the version a project pins with `uv add --dev inwards`, set `inwards.path` in the workspace settings to `${workspaceFolder}/.venv/bin/inwards` (`${workspaceFolder}\.venv\Scripts\inwards.exe` on Windows). In an untrusted workspace, VS Code ignores the workspace's value of `inwards.path`, so a cloned repository can't choose the program the extension starts; trust the folder or set the path in your user settings.
+
+When no binary is found (a set `inwards.path` that points at nothing, or the universal package with nothing on `PATH`), the extension says so, with buttons to the setting and to this page, and starts nothing. The **Inwards** channel in the Output panel shows what the server writes to stderr.
 
 ## Configure the layers
 

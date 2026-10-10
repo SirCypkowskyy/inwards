@@ -1,9 +1,10 @@
 /**
- * @file The extension's boundaries (#176), as fallow applies them: the client
- * and the server each sit in their own zone, the client imports nothing of
- * ours, the server reaches only the engine's public API, and a file in a new
- * source folder has no zone, so fallow reports it until it gets one. The
- * answers come from `fallow guard`, not from re-reading the config.
+ * @file The extension's boundaries (#176, ADR-043), as fallow applies them:
+ * the client sits in its own zone and imports nothing of ours (the checking
+ * happens in the `inwards` binary it starts), the tests and build scripts may
+ * reach only the client, and a file in a new source folder has no zone, so
+ * fallow reports it until it gets one. The answers come from `fallow guard`,
+ * not from re-reading the config; the manifest check reads `package.json`.
  */
 import { expect, setDefaultTimeout, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -11,10 +12,6 @@ import { join, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
-/** A re-export's source in index.ts: its top folder and the next path segment. */
-const REEXPORT = /from "\.\/(?<top>[^/"]+)\/(?<next>[^/"]+)/gu;
-/** A TypeScript file suffix. */
-const TS_SUFFIX = /\.ts$/u;
 
 // Every test here starts `fallow guard` cold. A hosted ubuntu-24.04 runner
 // took more than Bun's 5 s default for one call.
@@ -61,44 +58,30 @@ function reachable(file: Guarded): string[] {
 }
 
 test("the client imports nothing of ours", () => {
-  const client = guard("src/vscode-extension/src/client/extension.ts");
-  expect(client.zone?.name).toBe("vscode-client");
-  expect(reachable(client)).toEqual([]);
+  for (const path of ["extension.ts", "binary.ts", "selector.ts"]) {
+    const client = guard(`src/vscode-extension/src/client/${path}`);
+    expect(client.zone?.name).toBe("vscode-client");
+    expect(reachable(client)).toEqual([]);
+  }
 });
 
-/**
- * Lists the zones behind the engine's barrel: core-api itself and the zone of
- * every module `src/core/src/index.ts` re-exports from. fallow judges an
- * import through the barrel by the zone of the module behind it, so an
- * adapter that may use the public API is allowed exactly these.
- *
- * @returns the zone names, sorted.
- */
-function publicApiZones(): string[] {
-  const index = readFileSync(join(REPO, "src/core/src/index.ts"), "utf8");
-  const zones = new Set(["core-api"]);
-  for (const match of index.matchAll(REEXPORT)) {
-    const top = match.groups?.["top"];
-    const next = match.groups?.["next"];
-    if (top === "rules" && next !== undefined) {
-      zones.add(
-        next === "shared" ? "core-rules-shared" : `core-rule-${next.replace(TS_SUFFIX, "")}`,
-      );
-    } else if (top !== undefined) {
-      zones.add(`core-${top}`);
-    }
+test("the tests and build scripts reach the client only", () => {
+  for (const path of ["test/packaged.test.ts", "scripts/package-target.ts"]) {
+    const dev = guard(`src/vscode-extension/${path}`);
+    expect(dev.zone?.name).toBe("vscode-dev");
+    expect(reachable(dev)).toEqual(["vscode-client"]);
   }
-  return [...zones].sort();
-}
+});
 
-test("the server reaches only the engine's public API", () => {
-  const server = guard("src/vscode-extension/src/server/server.ts");
-  expect(server.zone?.name).toBe("vscode-server");
-  expect(reachable(server)).toEqual(publicApiZones());
+test("the shipped extension depends on the language client alone, not the engine", () => {
+  const manifest: { dependencies: Record<string, string> } = JSON.parse(
+    readFileSync(join(REPO, "src/vscode-extension/package.json"), "utf8"),
+  );
+  expect(Object.keys(manifest.dependencies)).toEqual(["vscode-languageclient"]);
 });
 
 test("a file in a new source folder has no zone, so fallow reports it", () => {
-  const fresh = guard("src/vscode-extension/src/new-folder/module.ts");
+  const fresh = guard("src/vscode-extension/src/server/server.ts");
   expect(fresh.zone).toBeNull();
   expect(fresh.boundary.coverage_required).toBe(true);
 });

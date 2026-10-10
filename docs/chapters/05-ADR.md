@@ -44,8 +44,9 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :material-check-circle: Accepted |
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-check-circle: Accepted |
 | [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Worker threads parse a large full check; the main thread keeps every decision | :material-check-circle: Accepted |
-| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted |
+| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted, the extension switched in [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk | :material-check-circle: Accepted |
+| [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | The VS Code extension bundles the binary, one VSIX per platform | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1248,3 +1249,35 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - *A model to read the description:* Inwards has no network and no model, and an answer should be the same every time.
 - *Rule pages as MCP resources:* clients surface tools to the model more reliably than resources, and the issue asked for a tool. Resources can come later.
 - *Serving `explain_rule` from the published site:* needs the network, and the page could describe another version than the binary's.
+
+## ADR-043: The VS Code extension bundles the binary, one VSIX per platform
+
+**Status:** Accepted · 2026-10-10 · [#64](https://github.com/SirCypkowskyy/inwards/issues/64) · completes [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)
+
+**Context.** [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) moved the language server into the binary and left the extension's Node server frozen until the extension could start `inwards server`. To do that, the extension needs an `inwards` executable for the user's platform. `cd.yml` already cross-compiles six binaries on one runner, runs each on its own OS, and attaches them with `SHA256SUMS` to a draft GitHub Release ([#14](https://github.com/SirCypkowskyy/inwards/issues/14)). The repository is private, so downloading a release asset takes a GitHub login. Since VS Code 1.61 the Marketplace serves the package built for the user's platform, `vsce package --target` builds one, and Open VSX serves them too.
+
+**Decision.**
+
+- **One VSIX per platform, with that platform's binary inside.** `src/vscode-extension/scripts/package-target.ts` copies each release binary into `bin/` (`bin/inwards.exe` on Windows) and runs `vsce package --target` for `linux-x64`, `linux-arm64`, `alpine-x64` (the musl binary), `darwin-x64`, `darwin-arm64` and `win32-x64`. A seventh, universal VSIX has no binary; the registries serve it to every other platform (Windows on Arm, 32-bit Arm Linux, Alpine on arm64), where the extension needs `inwards` on `PATH` or the `inwards.path` setting. `package.json`'s `files` lists what ships, so nothing else gets in.
+- **Which binary runs.** `inwards.path` if set, else the bundled binary, else `inwards` on `PATH`. A set path that points at nothing is an error, never replaced by another binary of a different version. A bare name in the setting is looked up on `PATH`, a relative path resolves against the first workspace folder, and `~` and `${workspaceFolder}` are expanded. On Windows only an `.exe` counts, since Node can't start a `.cmd` or `.bat` without a shell.
+- **`inwards.path` is a restricted setting.** In an untrusted workspace VS Code hands the extension only the user's own value, so a cloned repository can't choose the program the extension starts.
+- **No binary is a message, not a crash.** The extension says what it looked for, offers the setting and the install guide, and stays idle until a setting changes or **Inwards: Restart Server** runs. `inwards.enable` turns the server off.
+- **Publishing is its own workflow.** `vscode-publish.yml` starts when a full release is published (once the owner sets the `VSCODE_PUBLISH` variable), downloads the release's seven VSIX files, checks them against `SHA256SUMS` and the tag's version, and uploads them with `vsce publish` and `ovsx publish`, each job holding one token from its own environment, on GitHub-hosted runners. Pre-releases never go to the registries: both take only `X.Y.Z`, and a release candidate's VSIX already carries the final version.
+- **The extension's Node server is gone,** with its tests, its fallow zone and the CLI test that compared its file walk with the CLI's. The extension depends on `vscode-languageclient` alone.
+
+**Consequences.**
+
+- :material-plus-circle-outline: An install from the Marketplace or Open VSX works with nothing else installed and no network at start-up, and the server is always the extension's own version.
+- :material-plus-circle-outline: The extension carries no download or checksum code. The bundled binary is the release binary: `cd.yml`'s verify matrix compares the two byte for byte on each OS and runs the bundled one, and `SHA256SUMS` covers every VSIX.
+- :material-plus-circle-outline: VS Code, Neovim and Helix run the same server, so the old server's limits (the first workspace folder's config only, INW007 and INW008 alone for unopened files) are gone.
+- :material-minus-circle-outline: A platform VSIX is about 27 MB (a 65 MB binary, compressed), against 139 KB for the client alone, and each release carries seven VSIX files, about 165 MB.
+- :material-minus-circle-outline: The bundled binary follows the extension's version. A project that pins another version with `uv add --dev inwards` sets `inwards.path` to its virtualenv's binary.
+- :material-minus-circle-outline: The Windows rules for paths (`.exe`, backslashes, spaces, quoted `PATH` entries) are unit-tested with Windows path semantics on any OS; the extension itself hasn't started on Windows yet, so the full test matrix and a manual install run before the first release.
+- :material-minus-circle-outline: The Marketplace upload uses a personal access token, and Azure DevOps retires global tokens on 1 December 2026; switching to Microsoft Entra ID (`vsce publish --azure-credential`) is follow-up work.
+
+**Alternatives.**
+
+- *Download the binary at first start from the GitHub Release that matches the extension's version, checked against `SHA256SUMS`:* one small VSIX, but a private repository's assets need a token, every first start needs the network (proxies, offline machines), and the extension would carry download, checksum and storage code. The checksums would also come from the same place as the binary.
+- *One VSIX with all six binaries:* every user downloads about 160 MB to use one of them.
+- *Only `inwards` from `PATH` or the project's virtualenv:* the extension would do nothing after install until the user also installs the binary. It stays as the fallback.
+- *Keep the Node server as a fallback:* two servers that disagree, which is what ADR-041 set out to end.
