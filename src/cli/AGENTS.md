@@ -118,7 +118,8 @@ A module-level `Map` or array that grows at run time is a bug.
 - **Something an editor shows.** The policy goes in `lsp/` (which check runs
   when, what a document shows), the protocol in `adapters/lsp-connection.ts`.
   Test it over stdio with `test/support/lsp-client.ts`, which drives the
-  compiled binary in CI. The extension's own server is frozen until #64.
+  compiled binary in CI. The VS Code extension starts this server and has
+  none of its own (ADR-043).
 - **A new MCP tool.** The policy goes in `mcp/` (a module per tool, plus
   its arguments in `mcp/contracts.ts` and its entry in `mcp/tools.ts`), the
   Zod schema and registration in `adapters/mcp-connection.ts`. Test it with

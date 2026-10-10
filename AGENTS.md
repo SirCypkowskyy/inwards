@@ -19,8 +19,8 @@ import them.
 - `src/cli`: the command line and the Claude Code hook adapter. Feature
   folders with the I/O behind contracts, wired in `main.ts`. Guide:
   [`src/cli/AGENTS.md`](src/cli/AGENTS.md).
-- `src/vscode-extension`: the editor adapter, a VS Code client and a
-  language server in separate folders. Guide:
+- `src/vscode-extension`: the editor adapter, a thin VS Code client that
+  starts `inwards server` from the CLI (ADR-043). Guide:
   [`src/vscode-extension/AGENTS.md`](src/vscode-extension/AGENTS.md).
 
 Where to start:
@@ -29,8 +29,8 @@ Where to start:
   the rule's docs page goes in `docs/chapters/rules/` and `docs/pl/rules/`.
 - **A new hook event or CLI command**: `src/cli/AGENTS.md`, "Where new code
   goes".
-- **Something the editor shows or a new extension setting**:
-  `src/vscode-extension/AGENTS.md`.
+- **Something the editor shows**: the CLI's server, `src/cli/AGENTS.md`;
+  **a new extension setting**: `src/vscode-extension/AGENTS.md`.
 - **A docs change**: "Polish docs" below; the English page and its Polish
   translation change in the same PR.
 
