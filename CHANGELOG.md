@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.5.0](https://github.com/SirCypkowskyy/inwards/compare/v0.4.0...v0.5.0) (2026-10-10)
+
+
+### Added
+
+* **cli:** add `inwards mcp`, an MCP server for checking code before it is written ([#307](https://github.com/SirCypkowskyy/inwards/issues/307)) ([2c15753](https://github.com/SirCypkowskyy/inwards/commit/2c15753a3fe4683d38a62ad0b9ec0db5daccbb01)), closes [#65](https://github.com/SirCypkowskyy/inwards/issues/65)
+* **cli:** add `inwards server`, a language server over stdio in the binary ([#300](https://github.com/SirCypkowskyy/inwards/issues/300)) ([d170ae5](https://github.com/SirCypkowskyy/inwards/commit/d170ae5978f807ea13cec8742603adcd2a6be383)), closes [#63](https://github.com/SirCypkowskyy/inwards/issues/63)
+* **cli:** add the fastapi preset to inwards init --style ([#269](https://github.com/SirCypkowskyy/inwards/issues/269)) ([77cb4a0](https://github.com/SirCypkowskyy/inwards/commit/77cb4a0b31667d06de72400af2a69d8af8c98b13)), closes [#238](https://github.com/SirCypkowskyy/inwards/issues/238)
+* **cli:** map import-linter | siblings to sibling layer groups ([#254](https://github.com/SirCypkowskyy/inwards/issues/254)) ([d2ecd05](https://github.com/SirCypkowskyy/inwards/commit/d2ecd053064b85e5eafb7f323c68802035ac7913))
+* **cli:** serve PostToolUse from a resident inwards daemon ([#274](https://github.com/SirCypkowskyy/inwards/issues/274)) ([05b7186](https://github.com/SirCypkowskyy/inwards/commit/05b7186ebfdde00b107f8b219b25c423bfd8168f)), closes [#60](https://github.com/SirCypkowskyy/inwards/issues/60)
+* **cli:** turn on INW012 thin-endpoint in the fastapi preset ([#283](https://github.com/SirCypkowskyy/inwards/issues/283)) ([08ad7c4](https://github.com/SirCypkowskyy/inwards/commit/08ad7c49feacf8fa6941af567a6ca57fb31ad52b)), closes [#272](https://github.com/SirCypkowskyy/inwards/issues/272)
+* **cli:** turn on INW013 async-blocking in the fastapi preset ([#303](https://github.com/SirCypkowskyy/inwards/issues/303)) ([b3a030c](https://github.com/SirCypkowskyy/inwards/commit/b3a030c7481a851f0daf01c3e654201fba96ac8e)), closes [#302](https://github.com/SirCypkowskyy/inwards/issues/302)
+* **rules:** add FAPI005 route-shadowing ([#256](https://github.com/SirCypkowskyy/inwards/issues/256)) ([bbefe6e](https://github.com/SirCypkowskyy/inwards/commit/bbefe6eff0bb5f904185d825b030f5f36da4f0a8))
+* **rules:** add FAPI006 to FAPI009 (lifespan-events, yield-dependency-swallows, duplicate-operation-id, depends-called) ([#260](https://github.com/SirCypkowskyy/inwards/issues/260)) ([ce385f8](https://github.com/SirCypkowskyy/inwards/commit/ce385f8dd6f2a337d3fdd79282908d63faf0f9e6)), closes [#225](https://github.com/SirCypkowskyy/inwards/issues/225) [#226](https://github.com/SirCypkowskyy/inwards/issues/226) [#227](https://github.com/SirCypkowskyy/inwards/issues/227) [#228](https://github.com/SirCypkowskyy/inwards/issues/228)
+* **rules:** add INW012 thin-endpoint for FastAPI endpoints and custom decorators ([#273](https://github.com/SirCypkowskyy/inwards/issues/273)) ([c9eb992](https://github.com/SirCypkowskyy/inwards/commit/c9eb99216403fe5e2c09cfe9b6f8e1b6c6f06c11)), closes [#182](https://github.com/SirCypkowskyy/inwards/issues/182)
+* **rules:** add INW013 async-blocking for sync database, cache and cloud calls in async def ([#301](https://github.com/SirCypkowskyy/inwards/issues/301)) ([a8ef8ce](https://github.com/SirCypkowskyy/inwards/commit/a8ef8cef2a41fe21b210d14a832a207ebace5cac)), closes [#98](https://github.com/SirCypkowskyy/inwards/issues/98) [#293](https://github.com/SirCypkowskyy/inwards/issues/293)
+* **rules:** count same-module helpers and registered routes in INW012 ([#287](https://github.com/SirCypkowskyy/inwards/issues/287)) ([4db9576](https://github.com/SirCypkowskyy/inwards/commit/4db95767f19fb4c5b0266fa810b5829aa220c306)), closes [#271](https://github.com/SirCypkowskyy/inwards/issues/271)
+* **rules:** deny a library to a module prefix with INW005's deny option ([#245](https://github.com/SirCypkowskyy/inwards/issues/245)) ([6efa426](https://github.com/SirCypkowskyy/inwards/commit/6efa4269e4f212a216f58c9c551881a530faee09)), closes [#219](https://github.com/SirCypkowskyy/inwards/issues/219)
+* **rules:** follow INW013 one hop into first-party sync helpers ([#304](https://github.com/SirCypkowskyy/inwards/issues/304)) ([214e95b](https://github.com/SirCypkowskyy/inwards/commit/214e95b95b038df36d0d31b185e277aa06f30708)), closes [#98](https://github.com/SirCypkowskyy/inwards/issues/98) [#294](https://github.com/SirCypkowskyy/inwards/issues/294)
+* **rules:** let a context's public list open a package facade with =pkg ([#259](https://github.com/SirCypkowskyy/inwards/issues/259)) ([79a2413](https://github.com/SirCypkowskyy/inwards/commit/79a241371e69943f0cb031d3bc5d6eda2b2894aa))
+* **rules:** name the concrete delegate-to module in INW012 fixes ([#288](https://github.com/SirCypkowskyy/inwards/issues/288)) ([337fc66](https://github.com/SirCypkowskyy/inwards/commit/337fc66629996091ecdfb9f52e216804d28d54df))
+* **rules:** read looped and splatted FAPI002 handler registrations, scope them per app ([#264](https://github.com/SirCypkowskyy/inwards/issues/264)) ([f2c266b](https://github.com/SirCypkowskyy/inwards/commit/f2c266b3019446dab7163ce84780b04fbd540641)), closes [#242](https://github.com/SirCypkowskyy/inwards/issues/242)
+* **rules:** recognise Flask, Litestar and Django endpoints in INW012 ([#291](https://github.com/SirCypkowskyy/inwards/issues/291)) ([e4d188b](https://github.com/SirCypkowskyy/inwards/commit/e4d188bb8f52a5f9c5e5279245e9a967afa7b952)), closes [#270](https://github.com/SirCypkowskyy/inwards/issues/270)
+* **vscode:** start the bundled `inwards server` and publish to the Marketplace and Open VSX ([#306](https://github.com/SirCypkowskyy/inwards/issues/306)) ([0bda609](https://github.com/SirCypkowskyy/inwards/commit/0bda6093fe961ba1d699ae45a1a75f6d9c115589)), closes [#64](https://github.com/SirCypkowskyy/inwards/issues/64)
+
+
+### Fixed
+
+* **cli:** don't let a reused pid keep a dead daemon's lock ([#285](https://github.com/SirCypkowskyy/inwards/issues/285)) ([363b6c1](https://github.com/SirCypkowskyy/inwards/commit/363b6c1dff183cb05fff0fd61363c66a14343a75)), closes [#276](https://github.com/SirCypkowskyy/inwards/issues/276)
+* **cli:** keep a hung git call from blocking the daemon's queue ([#290](https://github.com/SirCypkowskyy/inwards/issues/290)) ([ec2bd65](https://github.com/SirCypkowskyy/inwards/commit/ec2bd65bd38731676a82ad30a3497384b9ac180c)), closes [#277](https://github.com/SirCypkowskyy/inwards/issues/277)
+* **cli:** make SessionStart start-content copies on Windows ([#253](https://github.com/SirCypkowskyy/inwards/issues/253)) ([1d976eb](https://github.com/SirCypkowskyy/inwards/commit/1d976eb4b86367593fdade9e1896da74ab0a00bb))
+* **cli:** stop starting a daemon on every edit when none can listen ([#289](https://github.com/SirCypkowskyy/inwards/issues/289)) ([b6358f9](https://github.com/SirCypkowskyy/inwards/commit/b6358f989542a52a759eb04a5535491a0aceab70)), closes [#275](https://github.com/SirCypkowskyy/inwards/issues/275)
+
+
+### Changed
+
+* **cli:** cut the serial part of a cold full check ([#292](https://github.com/SirCypkowskyy/inwards/issues/292)) ([c3ef8f3](https://github.com/SirCypkowskyy/inwards/commit/c3ef8f305fa6faa90b30096697800eeeb20e2de1)), closes [#281](https://github.com/SirCypkowskyy/inwards/issues/281)
+* **cli:** parse large full checks on worker threads ([#282](https://github.com/SirCypkowskyy/inwards/issues/282)) ([3dc5489](https://github.com/SirCypkowskyy/inwards/commit/3dc54899c28709275a1bdbe210d9028ce82b23d0)), closes [#61](https://github.com/SirCypkowskyy/inwards/issues/61)
+* **core:** blank long runs of comment lines before the full parse ([#255](https://github.com/SirCypkowskyy/inwards/issues/255)) ([2fd428c](https://github.com/SirCypkowskyy/inwards/commit/2fd428cf09929f7472157706fa37afdf5099f602))
+* **core:** parse the hook's second check of a file incrementally ([#299](https://github.com/SirCypkowskyy/inwards/issues/299)) ([5411f97](https://github.com/SirCypkowskyy/inwards/commit/5411f97425ee8c6c65cf6fc21393315d05f696e2)), closes [#122](https://github.com/SirCypkowskyy/inwards/issues/122)
+* **core:** read imports and suppression comments without walking the whole tree ([#268](https://github.com/SirCypkowskyy/inwards/issues/268)) ([5bfad70](https://github.com/SirCypkowskyy/inwards/commit/5bfad70b4e1c0e033278418458608e2a396b4c02)), closes [#62](https://github.com/SirCypkowskyy/inwards/issues/62)
+
+
+### Documentation
+
+* decide the resident process design in ADR-039 ([#263](https://github.com/SirCypkowskyy/inwards/issues/263)) ([73936df](https://github.com/SirCypkowskyy/inwards/commit/73936df6ec7dcb908ef96cd415b027350691619b)), closes [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
+* give the docs site its own identity and a home page built on a real run ([#250](https://github.com/SirCypkowskyy/inwards/issues/250)) ([dc93f8a](https://github.com/SirCypkowskyy/inwards/commit/dc93f8a70d1db10e8c157372cbc0511657909c32))
+* point editor completion at SchemaStore and add the schema sync step ([#249](https://github.com/SirCypkowskyy/inwards/issues/249)) ([9c0bc74](https://github.com/SirCypkowskyy/inwards/commit/9c0bc74dafe1e0ca83b79e875f37f3544cf0aec1))
+* **rules:** validate rule pages and add a filterable rule list ([#265](https://github.com/SirCypkowskyy/inwards/issues/265)) ([df00f56](https://github.com/SirCypkowskyy/inwards/commit/df00f56d022784923cab4b6c2e3adaea5c368c0e)), closes [#145](https://github.com/SirCypkowskyy/inwards/issues/145)
+
 ## [0.4.0](https://github.com/SirCypkowskyy/inwards/compare/v0.3.1...v0.4.0) (2026-09-28)
 
 
