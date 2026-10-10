@@ -84,6 +84,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | worker, worker pool | worker (workera, workery), pula workerów | |
 | catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
 | health check | health-check | "aplikacja health-check" |
+| harness (agent harness: Copilot, Local in VS Code), matcher (hook) | harness (harnessu), matcher (matchera) | |
+| Problems panel (VS Code) | panel Problems | |
 
 ## Fixed Polish terms
 
@@ -275,6 +277,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | platform package (one VSIX per platform) | pakiet dla platformy |
 | thin client | cienki klient |
 | file watcher (editor) | obserwator plików |
+| cloud agent (Copilot, formerly coding agent) | agent w chmurze (cloud agent) |
+| setup steps (`copilot-setup-steps.yml`) | kroki przygotowania |
 | whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
 | MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |
 | tool (MCP) | narzędzie |

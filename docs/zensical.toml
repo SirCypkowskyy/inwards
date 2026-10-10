@@ -38,6 +38,7 @@ nav = [
     { "Claude Code" = "guides/claude-code.md" },
     { "OpenCode" = "guides/opencode.md" },
     { "Aider" = "guides/aider.md" },
+    { "GitHub Copilot" = "guides/copilot.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
     { "MCP server" = "guides/mcp.md" },
     { "GitHub Actions" = "guides/ci.md" },

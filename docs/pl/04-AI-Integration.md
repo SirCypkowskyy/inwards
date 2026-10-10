@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: d311f9ba983864e1f16e00044da0d84c620c8d2e8a76383a890c90ffdc0e2907
+source_hash: 9a2786a394ce1f9324750375587a72cf2c43d3c925f49998d38e590c0bb27d28
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -132,9 +132,9 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
 === ":material-microsoft-visual-studio-code: Copilot (VS Code)"
 
-    W trybie agenta Copilot może czytać diagnostyki obszaru roboczego publikowane przez rozszerzenia. Z zainstalowanym rozszerzeniem Inwards naruszenie warstwy pojawia się w panelu Problems jak każdy inny błąd, a agent widzi je bez hooka.
+    Copilot nie ma hooka, z którego Inwards mógłby skorzystać. W VS Code rozszerzenie umieszcza każde naruszenie w panelu Problems, a agent widzi je, gdy czyta ten panel (narzędzie `#read/problems`) albo uruchamia sprawdzenie, o które prosi `AGENTS.md`. `inwards mcp` daje mu [narzędzia MCP](guides/mcp.md).
 
-    Dla agenta kodującego Copilot, który pracuje nad pull requestami na GitHubie, egzekwowanie odbywa się w CI. Dodaj `inwards check --format sarif` do workflow i zainstaluj plik binarny w `.github/workflows/copilot-setup-steps.yml`, żeby agent mógł go uruchomić przed pushem.
+    Agent Copilota w chmurze (cloud agent), który pracuje na GitHubie i otwiera pull requesty, czyta ten sam `AGENTS.md`, dostaje Inwards z `.github/workflows/copilot-setup-steps.yml`, a warstw pilnuje sprawdzenie w CI na jego pull requeście. [Poradnik GitHub Copilot](guides/copilot.md) opisuje konfigurację obu.
 
 === ":material-file-document-edit-outline: Codex, Cursor i inni"
 
