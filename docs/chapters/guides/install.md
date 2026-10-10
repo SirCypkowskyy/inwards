@@ -208,6 +208,8 @@ Seven presets exist, each listed innermost first. `inwards init --list-styles` p
 
 Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer. In `hexagonal`, the inbound and outbound adapters share one place in the order, so neither may import the other.
 
+`clean` and `hexagonal` also turn on [INW014](../rules/INW014.md) with `extend-select`, as a warning through a `[tool.inwards.rules.severity]` line: a module in `application/ports/` may hold only ABCs and Protocols, and a method there only a docstring, `...`, `pass` or `raise NotImplementedError`. The rule's default scope, every module with a `ports` segment, already covers that package, so the preset sets no options. The scaffold's `OrderRepository` is a Protocol and passes. A concrete class or a method that does work in `application/ports/orders.py` gets a warning whose fix names the adapter layer, `infrastructure` in `clean` and `outbound` in `hexagonal`.
+
 The last four presets keep packages apart with [contexts](configuration.md#contexts), and describe the packages with a [template](configuration.md#templates):
 
 - **`vertical-slices`** puts one package per feature under `app.features`, on a shared kernel `app.shared`. Each slice is a context: it imports another slice only when its `depends-on` names it ([INW002](../rules/INW002.md)), and then only that slice's `api` module ([INW003](../rules/INW003.md)), as does code outside every slice, such as `bootstrap.py`.

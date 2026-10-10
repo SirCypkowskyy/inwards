@@ -125,6 +125,17 @@ export const BOOTSTRAP: StyleLayer = {
 };
 
 /**
+ * INW014 for the presets with an `application/ports/` package (clean,
+ * hexagonal): its default scope, every module with a `ports` segment, already
+ * covers that package, so it needs no options table.
+ */
+export const PORTS_ABSTRACT: StyleOptIn = {
+  codes: ["INW014"],
+  why: "Port modules hold only ABCs and Protocols (INW014), as a warning to start with: make it an error once the project is clean.",
+  options: [],
+};
+
+/**
  * Words the next step for the order example: run its composition root.
  *
  * @param pkg - the project's import package.
