@@ -541,8 +541,8 @@ public = ["router", "service", "schemas", "dependencies", "constants", "exceptio
 [tool.inwards.rules]
 # Domains may use each other's public modules without declaring it; INW003 keeps them to those.
 ignore = ["INW002"]
-# The FastAPI rules and thin endpoints (INW012), as warnings to start with: make them errors once the project is clean.
-extend-select = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009", "INW012"]
+# The FastAPI rules, thin endpoints (INW012) and no blocking calls in async def (INW013), as warnings to start with: make them errors once the project is clean.
+extend-select = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009", "INW012", "INW013"]
 
 # Delete a line to report that rule at its own severity, an error for most findings.
 [tool.inwards.rules.severity]
@@ -555,6 +555,7 @@ FAPI007 = "warning"
 FAPI008 = "warning"
 FAPI009 = "warning"
 INW012 = "warning"
+INW013 = "warning"
 
 # Leave raises in the endpoint itself to Ruff's FAST004.
 [tool.inwards.rules.undocumented-error-response]
@@ -672,7 +673,7 @@ fastapi: fastapi-best-practices: one package per domain on a kernel of shared mo
   8. main                 shop.main            the app: includes each domain's router
   Each domain is a context: other domains and main.py may import only its public modules.
   Turns off INW002. Domains may use each other's public modules without declaring it; INW003 keeps them to those.
-  Turns on FAPI001, FAPI002, FAPI003, FAPI005, FAPI006, FAPI007, FAPI008, FAPI009, INW012 as warnings.
+  Turns on FAPI001, FAPI002, FAPI003, FAPI005, FAPI006, FAPI007, FAPI008, FAPI009, INW012, INW013 as warnings.
   Gap: a router may use the models directly instead of going through the service.
   Shapes, with --scaffold:
     shop    requires main.py; allows */, config.py, database.py, exceptions.py, models.py, pagination.py, __main__.py, _version.py: domain packages, the kernel's shared modules and the app only; anything else is an error

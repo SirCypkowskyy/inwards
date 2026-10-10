@@ -1,8 +1,9 @@
 /**
  * @file The `fastapi` preset of `inwards init --style`: the
  * fastapi-best-practices layout, with every domain package layered by one
- * template on a kernel of shared modules, and the FastAPI rules and INW012
- * (endpoints hand their work to the domain's service) turned on as warnings.
+ * template on a kernel of shared modules, and the FastAPI rules, INW012
+ * (endpoints hand their work to the domain's service) and INW013 (no
+ * blocking call in an `async def`) turned on as warnings.
  * It also words the Ruff config that init prints beside the
  * preset and never writes. Pure data; the example's modules are
  * `fastapi.ts`'s.
@@ -81,8 +82,9 @@ export const FASTAPI: Style = {
       "FAPI008",
       "FAPI009",
       "INW012",
+      "INW013",
     ],
-    why: "The FastAPI rules and thin endpoints (INW012), as warnings to start with: make them errors once the project is clean.",
+    why: "The FastAPI rules, thin endpoints (INW012) and no blocking calls in async def (INW013), as warnings to start with: make them errors once the project is clean.",
     options: [
       {
         rule: "undocumented-error-response",
