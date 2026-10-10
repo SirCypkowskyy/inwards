@@ -108,6 +108,49 @@ async function inw012(body: string, options = "", path?: string): Promise<string
 
 const TAIL = "Endpoints parse the request, call one use case, and shape the response.";
 
+/** A fat endpoint in a package-per-domain layout, as the \`fastapi\` preset scaffolds it. */
+const DOMAIN_ROUTER = `from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/{post_id}/words")
+async def count_words(post_id: int) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for word in str(post_id).split():
+        counts[word] = counts.get(word, 0) + 1
+    return counts
+`;
+
+/**
+ * Checks \`DOMAIN_ROUTER\` as \`src/posts/router.py\`, with selector layers
+ * per domain like the \`fastapi\` preset's template, and one \`delegate-to\` entry.
+ *
+ * @param delegate - the \`delegate-to\` entry: a layer name or a selector.
+ * @returns the INW012 finding.
+ */
+async function perDomain(delegate: string): Promise<Diagnostic | undefined> {
+  const config = `[tool.inwards]
+layers = [
+  { name = "domain.service", modules = ["src.*.service"] },
+  { name = "domain.router", modules = ["src.*.router"] },
+]
+
+[tool.inwards.rules]
+extend-select = ["INW012"]
+
+[tool.inwards.rules.thin-endpoint]
+delegate-to = ["${delegate}"]
+`;
+  const path = "src/posts/router.py";
+  const engine = await Engine.create(grammars(), parseConfig(config));
+  const [found] = engine.checkFiles(
+    [file(path, DOMAIN_ROUTER)],
+    indexOn(new Map([[path, "file"]]), new Map([[path, DOMAIN_ROUTER]])),
+  );
+  return found;
+}
+
 describe("INW012 thin-endpoint", () => {
   test("is off by default", async () => {
     expect((await check(FAT, "")).filter((d) => d.code === "INW012")).toEqual([]);
@@ -280,6 +323,25 @@ async def direct(body: OrderIn):
       "and no call into the `application` layer (`shop.application`).",
     );
     expect(found?.fix).toMatchSnapshot();
+  });
+
+  test("the fix names the concrete module a selector target or layer has for the endpoint's package", async () => {
+    const layer = await perDomain("domain.service");
+    expect(layer?.message).toContain(
+      "and no call into the `domain.service` layer (`src.posts.service`).",
+    );
+    expect(layer?.fix?.summary).toBe(
+      "Move the work out of `count_words` into the `domain.service` layer (`src.posts.service`), and keep the endpoint to HTTP.",
+    );
+    expect(layer?.fix?.steps[0]).toContain(
+      "into a function in the `domain.service` layer (`src.posts.service`) that",
+    );
+    expect((await perDomain("src.*.service"))?.fix?.summary).toBe(
+      "Move the work out of `count_words` into `src.posts.service` (a module matching `src.*.service`), and keep the endpoint to HTTP.",
+    );
+    expect((await perDomain("lib.*.service"))?.fix?.summary).toBe(
+      "Move the work out of `count_words` into a module matching `lib.*.service`, and keep the endpoint to HTTP.",
+    );
   });
 
   test("a custom decorator marks an endpoint", async () => {
