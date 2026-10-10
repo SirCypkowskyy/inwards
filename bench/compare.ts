@@ -15,9 +15,10 @@
  *   Python file, which the config guard and the shape guard (#96) both see;
  * - full: a cold `inwards check` of the whole repo, with `INWARDS_NO_CACHE=1`
  *   for both binaries, so the gate compares the work itself (#56);
- * - large file: the PostToolUse hook on a 4,500-line module with two old
+ * - large file: the PostToolUse hook on a 4,482-line module with two old
  *   violations, changed before every run, in a project of its own
- *   (`large-file.ts`, #122), with its p95 against the 100 ms budget.
+ *   (`large-file.ts`, #122). A head-only table adds the head through its
+ *   daemon, with each p95 against its target (100 ms, 50 ms).
  *
  * With 12 full runs, the "p95" column is the slowest run.
  *
@@ -42,13 +43,11 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { daemonHook, daemonMarkdown } from "./daemon.ts";
-import { largeHook } from "./large-file.ts";
+import { largeHook, largeMarkdown } from "./large-file.ts";
 import { alternate, judge, ms, summarise, timeRun, type Verdict } from "./timing.ts";
 
 const DEFAULTS = { hookRuns: 40, fullRuns: 12, warmup: 2, threshold: 0.2 };
 const PERCENT = 100;
-/** The quality goal for a hook on one edited file: p95 under 100 ms (chapter 6). */
-const HOOK_BUDGET_MS = 100;
 
 /**
  * Renders the verdicts as a Markdown table.
@@ -278,10 +277,9 @@ function main(): number {
     judge("hook (one file)", hook, threshold),
     judge("pre-write (new file)", pre, threshold),
     judge("full check", full, threshold),
-    judge("hook (4,500-line file)", large, threshold),
+    judge("hook (4,500-line file)", large.oneShot, threshold),
   ];
-  const largeP95 = summarise(large.head).p95;
-  const budget = `Head's hook on the 4,500-line file, p95 against the ${HOOK_BUDGET_MS} ms budget: ${largeP95 < HOOK_BUDGET_MS ? "met" : "**missed**"}.`;
+  const budget = largeMarkdown(large.daemon);
   const cache = cacheModes(binaries.head, repo, { measured: fullRuns, warmup: 1 });
   const daemon = daemonHook(binaries.head, repo, payload, {
     measured: hookRuns,

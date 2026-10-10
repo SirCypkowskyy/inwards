@@ -4,14 +4,16 @@
  * `subscription/service.py` that first went over the 100 ms budget. It builds
  * its own small project in a temporary directory (the synthetic repo must
  * stay clean), commits it, starts a session so both violations are old, and
- * times the base and the head one-shot in alternation, changing the file
- * before every run as an agent's edit does. Owns nothing the other metrics
+ * times the base and the head one-shot in alternation, then the head
+ * one-shot and through its daemon, changing the file before every run as an
+ * agent's edit does. Owns nothing the other metrics
  * use; `compare.ts` gates it like them.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { alternate, type Samples, timeRun } from "./timing.ts";
+import { type DaemonSamples, daemonHook } from "./daemon.ts";
+import { alternate, ms, type Samples, summarise, timeRun } from "./timing.ts";
 
 /** The edited module, relative to the project. */
 const MODULE = "shop/domain/service.py";
@@ -21,8 +23,9 @@ const CLASSES = 58;
 const EDITED = /^EDITED = \d+$/mu;
 
 /**
- * Writes the large module: two outward imports at the top (two INW001
- * violations, as in polar's file), then classes whose methods hold loops,
+ * Writes the large module: a docstring that makes the prescan refuse the
+ * file, two outward imports (two INW001 violations), as in polar's file,
+ * then classes whose methods hold loops,
  * f-strings, decorators and an import inside a function, with a constant in
  * the middle that the timed runs rewrite.
  *
@@ -30,7 +33,11 @@ const EDITED = /^EDITED = \d+$/mu;
  */
 export function largeModule(): string {
   const head = [
-    '"""A large domain service, generated for the benchmark."""',
+    '"""A large domain service, generated for the benchmark.',
+    "",
+    "Like polar's file, this docstring mentions an import, so the prescan",
+    "refuses the file and both checks of the hook parse all of it.",
+    '"""',
     "from __future__ import annotations",
     "",
     "import dataclasses",
@@ -139,23 +146,30 @@ function largeProject(head: string): string {
   return dir;
 }
 
+/** The large-file case's samples: base and head one-shot, and the head through its daemon. */
+export interface LargeSamples {
+  oneShot: Samples;
+  daemon: DaemonSamples;
+}
+
 /**
- * Times the PostToolUse hook on the large module, base and head one-shot in
- * alternation, with the module changed before every run.
+ * Times the PostToolUse hook on the large module with the module changed
+ * before every run: base and head one-shot in alternation, then the head
+ * one-shot and through `inwards daemon` in alternation.
  *
  * @param binaries - the two builds to compare.
  * @param binaries.base - the base branch's executable.
  * @param binaries.head - the head branch's executable.
  * @param runs - how many runs.
- * @param runs.measured - measured runs per binary.
- * @param runs.warmup - unmeasured runs per binary before those.
+ * @param runs.measured - measured runs per binary and per mode.
+ * @param runs.warmup - unmeasured runs before those.
  * @returns the samples.
- * @throws {Error} when the project can't be built or a run fails.
+ * @throws {Error} when the project can't be built, the daemon doesn't start or a run fails.
  */
 export function largeHook(
   binaries: { base: string; head: string },
   runs: { measured: number; warmup: number },
-): Samples {
+): LargeSamples {
   const dir = largeProject(binaries.head);
   const file = join(dir, MODULE);
   const text = largeModule();
@@ -167,21 +181,53 @@ export function largeHook(
     tool_input: { file_path: file },
   });
   let edit = 0;
+  /** Rewrites the module's constant, so every run checks a changed file. */
+  function before(): void {
+    edit += 1;
+    writeFileSync(file, text.replace(EDITED, `EDITED = ${edit}`));
+  }
   try {
-    return alternate(
+    const oneShot = alternate(
       binaries,
-      {
-        argv: ["hook", "claude-code"],
-        cwd: dir,
-        stdin: payload,
-        before: (): void => {
-          edit += 1;
-          writeFileSync(file, text.replace(EDITED, `EDITED = ${edit}`));
-        },
-      },
+      { argv: ["hook", "claude-code"], cwd: dir, stdin: payload, before },
       runs,
     );
+    return { oneShot, daemon: daemonHook(binaries.head, dir, payload, { ...runs, before }) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** The quality goal for a hook on one edited file: p95 under 100 ms (chapter 6). */
+const HOOK_BUDGET_MS = 100;
+/** #60's target for a hook through the daemon: p95 under 50 ms. */
+const DAEMON_TARGET_MS = 50;
+
+/**
+ * Renders the head's hook on the large module, one-shot and through the
+ * daemon, against the budget and the daemon's target.
+ *
+ * @param samples - the head one-shot and through the daemon, in alternation.
+ * @returns a table with a verdict per row.
+ */
+export function largeMarkdown(samples: DaemonSamples): string {
+  return [
+    "| PostToolUse hook on the 4,482-line file (head) | p50 / p95 (ms) | p95 target |",
+    "|---|---|---|",
+    row("one-shot", samples.oneShot, HOOK_BUDGET_MS),
+    row("through the daemon", samples.daemon, DAEMON_TARGET_MS),
+  ].join("\n");
+}
+
+/**
+ * Renders one row of the large-file table.
+ *
+ * @param mode - one-shot or through the daemon.
+ * @param xs - its samples, in milliseconds.
+ * @param limit - the p95 it must stay under, in milliseconds.
+ * @returns the Markdown row.
+ */
+function row(mode: string, xs: readonly number[], limit: number): string {
+  const { p50, p95 } = summarise(xs);
+  return `| ${mode} | ${ms(p50)} / ${ms(p95)} | ${limit} ms: ${p95 < limit ? "met" : "**missed**"} |`;
 }

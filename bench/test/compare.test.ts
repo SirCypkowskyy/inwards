@@ -52,5 +52,7 @@ describe("bench compare", () => {
     expect(text.split("\n").length).toBeWithin(4400, 4600);
     expect(text.match(/^EDITED = 0$/gmu)).toHaveLength(1);
     expect(text).toContain("from shop.infrastructure.db import Session, engine");
+    // A docstring line that mentions an import makes the prescan refuse the file, as polar's does.
+    expect(text).toContain("this docstring mentions an import");
   });
 });
