@@ -6,7 +6,7 @@
  * does listen removes the note. Unix only: Windows listens on a named pipe and
  * has no socket directory.
  */
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -77,6 +77,12 @@ function unusableDirs(root: string): string[] {
 }
 
 describe.skipIf(process.platform === "win32")("no usable socket directory (#275)", () => {
+  // `serve` moves into the state directory; the other test files expect the repository.
+  const cwd = process.cwd();
+  afterEach(() => {
+    process.chdir(cwd);
+  });
+
   test("the daemon fails, leaves a note and releases its lock; hooks back off", async () => {
     const root = tempDir("inwards-host-");
     const place = daemonPlace({ stateHome: join(root, "state") }, "/project");
