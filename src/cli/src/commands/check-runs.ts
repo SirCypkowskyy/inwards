@@ -10,6 +10,7 @@ import { ConfigError, type Report } from "@inwards/core";
 import { shownReport } from "../paths/display.ts";
 import { posix } from "../paths/lexical.ts";
 import type { CheckPlan, CheckUnit } from "../project/routing.ts";
+import { threadLimit } from "../project/threads.ts";
 import type { AppDeps } from "./deps.ts";
 
 /** One config's check, with what it was asked to check. */
@@ -105,8 +106,13 @@ async function checkUnit(
   { cache, several }: { cache: boolean; several: boolean },
 ): Promise<Report | undefined> {
   const { cwd } = deps.io.runtime;
+  const threads = threadLimit(deps.io.runtime);
   try {
-    return await deps.check(unit.config, unit.targets, cwd, { cache, exclude: unit.exclude });
+    return await deps.check(unit.config, unit.targets, cwd, {
+      cache,
+      exclude: unit.exclude,
+      threads,
+    });
   } catch (err) {
     if (!(several && err instanceof ConfigError)) {
       throw err;

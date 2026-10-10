@@ -6,7 +6,7 @@
  * builds each request's runtime with `runtimeFrom` from the variables the
  * hook sent (`RUNTIME_ENV`).
  */
-import { homedir } from "node:os";
+import { availableParallelism, homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import process from "node:process";
 import type { Clock, Runtime } from "../platform/contracts.ts";
@@ -90,6 +90,8 @@ export function runtimeFrom(
     forceColor: Boolean(env["FORCE_COLOR"]),
     noColor: Boolean(env["NO_COLOR"]),
     noCache: Boolean(env["INWARDS_NO_CACHE"]),
+    threads: env["INWARDS_THREADS"] || undefined,
+    cores: availableParallelism(),
     home,
     // The XDG spec says a relative value is invalid and must be ignored.
     stateHome: isAbsolute(xdgState) ? xdgState : join(home, ".local", "state"),

@@ -1,6 +1,8 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
 source_hash: 85edf3c30d9512a27099beed3a9277bb92daa3c537b9587e98b4b81ddce204dd
+
+source_hash: 89032b1a878441454ee09188b4d11e361b1ffbdb0ccc8dc62b0e6bfd50ac5f9e
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -30,7 +32,7 @@ Uszeregowane. Gdy dwa cele są w konflikcie, wygrywa wyższy.
 | 2 | :material-lightning-bolt: **Opóźnienie w pętli agenta** | Hook sprawdza jeden edytowany plik | p95 < 100 ms czasu rzeczywistego, łącznie ze startem procesu |
 | 3 | :material-robot-outline: **Wyniki, na podstawie których agent może działać** | Agent dostaje INW001 | Naprawia naruszenie w ramach jednej ponownej próby w ≥ 80 % przypadków (mierzone z design partnerami, zobacz [rozdział 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministyczność** | To samo repozytorium, ta sama konfiguracja, dwa uruchomienia | Identyczne diagnostyki w identycznej kolejności. Zmieniają się tylko pola czasu w podsumowaniu (`durationMs`) |
-| 5 | :material-timer-sand: **Przepustowość dla całego repozytorium** | CI sprawdza na zimno repozytorium z 500 tys. linii | Dziś około 1 s na jednym rdzeniu. Cel < 300 ms z workerami i pamięcią podręczną |
+| 5 | :material-timer-sand: **Przepustowość dla całego repozytorium** | CI sprawdza na zimno repozytorium z 500 tys. linii | 0,44 s dla syntetycznego repozytorium z 496 000 linii i 0,98 s dla 848 000 linii saleora przy czterech wątkach ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)). Cel < 300 ms z wątkami i pamięcią podręczną |
 | 6 | :material-package-variant: **Łatwość wdrożenia** | Nowy zespół, istniejący kod | Jedno polecenie podłącza agenta (`inwards init`). Stop gate sprawdza tylko to, co zmieniła sesja, a w zmienionym pliku tylko to, co jest nowe od początku sesji, więc stare naruszenia nie blokują; resztę obejmie baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) |
 
 Poprawność celowo stoi wyżej niż szybkość. Zabezpieczenie, które czasem milczy, uczy agenta, że zły ruch jest w porządku, a to gorsze niż brak zabezpieczenia.
@@ -39,7 +41,7 @@ Poprawność celowo stoi wyżej niż szybkość. Zabezpieczenie, które czasem m
 
 Wszystkie liczby pochodzą ze scaffoldu w tym repozytorium. Nic tu nie jest prognozą. Zmierzono je w M0; wyrywkowe sprawdzenie niżej pokazuje, jak się od tego czasu zmieniły.
 
-**Środowisko.** Laptop, Bun 1.4.2, `inwards-linux-x64` zbudowany przez `scripts/build-binaries.ts`. Wszystko działa w jednym wątku, bo silnik nie ma jeszcze puli workerów. Laptop był w zwykłym użyciu desktopowym (średnie obciążenie około 2–3), więc to liczby realistyczne, a nie najlepszy możliwy przypadek.
+**Środowisko.** Laptop, Bun 1.4.2, `inwards-linux-x64` zbudowany przez `scripts/build-binaries.ts`. Wszystko działało w jednym wątku; wątki robocze doszły później ([#61](#worker-threads-for-a-full-run)). Laptop był w zwykłym użyciu desktopowym (średnie obciążenie około 2–3), więc to liczby realistyczne, a nie najlepszy możliwy przypadek.
 
 **Syntetyczne repozytorium.** 2100 plików Pythona, 496 000 linii, 8,0 MB, cztery warstwy z ośmioma importami własnego kodu i czterdziestoma małymi funkcjami na moduł. `bench/generate.py` odtwarza je dokładnie (stałe ziarno losowości). Z `--legacy` dodaje zewnętrzną warstwę `legacy`, którą importuje każdy moduł, więc każdy z 2000 modułów ma jedno naruszenie: to starszy kod, dla którego model kosztów z [rozdziału 3](03-Architecture-C4.md) mierzy czas z pełnym baseline'em.
 
@@ -202,13 +204,35 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 - **Pamięć.** Daemon zajmował 188 MB RSS po 206 uruchomieniach hooka na obu plikach.
 - **Niezmierzone tutaj:** nazwane potoki na Windows. CI uruchamia testy daemona na Linuksie w każdym PR; wiersze Windows i macOS uruchamiają je tylko w ręcznej pełnej macierzy przed wydaniem.
 
+### Wątki robocze dla pełnego uruchomienia { #worker-threads-for-a-full-run }
+
+[#61](https://github.com/SirCypkowskyy/inwards/issues/61) rozłożyło zimne pełne sprawdzenie na kilka wątków. Decyzję i odrzucone możliwości opisuje [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision).
+
+**Co działa gdzie.** `inwards check` i `inwards baseline` uruchamiają wątki robocze, gdy czytają 1000 plików lub więcej: jeden wątek na 500 plików, do `INWARDS_THREADS`, a bez niej do liczby rdzeni, najwyżej 4. Wątek główny liczy się jako jeden z nich. Workery robią tylko to, o czym decyduje tekst pliku: test na loader, szkielet importów oraz importy i komentarze wyciszające z pełnego parsowania. Wątek główny przechodzi drzewo, czyta pliki, uruchamia wszystkie reguły w kolejności plików i sam parsuje nieliczne pliki z importami dynamicznymi. Wynik jest identyczny co do bajtu przy dowolnej liczbie wątków, a `INWARDS_THREADS=1` trzyma całe sprawdzenie w jednym wątku.
+
+**Metoda.** Plik binarny darwin-arm64 zbudowany przez `scripts/build-binaries.ts`, bazowa kompilacja z `develop` (`73936df`) wobec tej, na laptopie z Apple M1 Pro z 10 rdzeniami. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 4 do 7: bardziej ufaj proporcjom niż milisekundom. Każdy przypadek uruchomiono 11 razy po jednej rozgrzewce, każdy raz na rundę w zmiennej kolejności, z `INWARDS_NO_CACHE=1`; JSON z każdego uruchomienia musiał się zgadzać z bazową kompilacją. Prawdziwe repozytoria są sprawdzane z warstwami z korpusu (`bench/corpus.json`). Szczytowe RSS to `/usr/bin/time -l`, po trzy uruchomienia.
+
+| Repozytorium | Pliki | Baza | Jeden wątek | Cztery wątki (domyślnie) | Osiem wątków |
+|---|--:|--:|--:|--:|--:|
+| saleor | 4324 | 1,48 s | 1,43 s | 0,98 s (1,51×) | 1,04 s |
+| polar | 1831 | 0,80 s | 0,76 s | 0,55 s (1,45×) | 0,55 s |
+| Syntetyczne (`bench/generate.py`) | 2100 | 0,52 s | 0,49 s | 0,44 s (1,17×) | 0,48 s |
+| Syntetyczne w trybie starszego kodu (`--legacy`, każdy moduł wymaga potwierdzenia) | 2101 | 2,34 s | 2,31 s | 1,14 s (2,04×) | 1,03 s |
+
+- **Jeden wątek też przyspieszył**, o 2% do 5%: sprawdzenie ustala teraz rzeczywistą ścieżkę każdego pliku raz zamiast dwa razy.
+- **Parsowanie się skaluje, reszta nie.** Przy czterech wątkach saleor spędza mniej więcej jedną trzecią czasu na przejściu drzewa, ustalaniu rzeczywistych ścieżek i czytaniu plików, zanim ruszy silnik, potem około 120 ms na regułach i 100 ms na potwierdzeniach i raporcie, wszystko w wątku głównym. Najwięcej zyskuje repozytorium w trybie starszego kodu, w którym każdy moduł wymaga pełnego parsowania.
+- **Więcej wątków szybko przestaje się opłacać.** Każdy worker sam kompiluje gramatykę i rozgrzewa swój JIT, a obciążona maszyna ma mniej wolnych rdzeni, niż podaje. Poniżej 1000 plików wątki kosztują mniej więcej tyle, ile oszczędzają: 537 plików saleora trwało 207 ms w jednym wątku i 218 ms w trzech.
+- **Pamięć.** Szczytowe RSS saleora wzrosło z około 360 MB w jednym wątku do około 520 MB przy czterech i 615 MB przy ośmiu.
+- **Pamięć podręczna i hooki.** Sprawdzenie z ciepłą pamięcią podręczną się nie zmieniło (0,95 → 0,91 s na saleorze), uruchomienie, które wypełnia pustą pamięć podręczną, przyspieszyło (2,6 → 2,05 s), a `bench/compare.ts` zmierzył hook i sprawdzenie PreToolUse nowego pliku w granicach 3% od bazy, pełne sprawdzenie o 20,5% szybsze.
+- **Niezmierzone:** 4-rdzeniowy runner `ubuntu-latest`, o którym mówi zgłoszenie, i Windows. Zadanie benchmarku w CI działa na 20-rdzeniowym runnerze ARM64, gdzie pełne sprawdzenie też używa czterech wątków.
+
 ### Plan poprawy wydajności { #performance-roadmap }
 
 | Krok | Oczekiwany efekt | Na co wpływa |
 |---|---|---|
 | :material-check-circle: `inwards daemon`: stały proces dla każdego projektu, z którym PostToolUse łączy się przez lokalne gniazdo, z powrotem do jednorazowego uruchomienia; serwer języka zostaje osobnym procesem, `inwards server` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)), zrobione | Zmierzone ([wyżej](#the-hook-daemon)): p95 PostToolUse 39,3 → 16,2 ms dla pliku z 13 liniami, 79,0 → 36,8 ms dla pliku z 4492 liniami edytowanego przed każdym wywołaniem | p95 dla jednego pliku |
 | :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), zrobione | Zmierzone: start 22 → 10 ms, wywołanie hooka około 45% szybsze, 2,5 MB więcej na plik binarny (zobacz eksperyment wyżej) | p95 dla jednego pliku |
-| Pula workerów, jeden parser na rdzeń ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Niemal liniowe przyspieszenie zimnego pełnego uruchomienia na maszynie wielordzeniowej | Zimne pełne uruchomienie |
+| :material-check-circle: Wątki robocze dla zimnego pełnego uruchomienia ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)), zrobione | Zmierzone przy czterech wątkach (zobacz sekcję wyżej): saleor 1,48 → 0,98 s, polar 0,80 → 0,55 s, repozytorium syntetyczne 0,52 → 0,44 s, syntetyczne w trybie starszego kodu 2,34 → 1,14 s. Daleko do oczekiwanego trzykrotnego przyspieszenia, bo czytanie plików i reguły zostają w jednym wątku | Zimne pełne uruchomienie |
 | :material-check-circle: Pamięć podręczna list importów po hashu zawartości (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), zrobione dla `inwards check` i `inwards baseline` | Zmierzone: ciepłe pełne sprawdzenie 3,0 raza szybsze (0,46 s wobec 1,25 s p50, po 12 uruchomień na tym laptopie pod obciążeniem), o 27% wolniejsze, gdy pamięć podręczna się wypełnia. Hooki z niej nie korzystają ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Ciepłe pełne uruchomienie |
 | :material-check-circle: Przejście kursorem po drzewie zamiast `descendantsOfType` na ścieżce pełnego parsowania ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)), zrobione | Zmierzone na 2100 syntetycznych plikach, na zimno, po 10 naprzemiennych uruchomień: o 13% szybciej, gdy każdy plik wymaga potwierdzenia (3,34 → 2,90 s p50), o 10% szybciej, gdy prescan odrzuca każdy plik (3,13 → 2,80 s). Odczyt importów i komentarzy wyciszających z 1059 plików biblioteki standardowej spadł z około 560 ms do 125 ms. Hook dla jednego pliku i czyste pełne sprawdzenie się nie zmieniają | Odrzucone pliki i potwierdzenia |
 
@@ -216,7 +240,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 
 ```sh
 bun install
-bun test                                                    # 607 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
+bun test                                                    # 2,500+ tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms

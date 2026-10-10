@@ -8,13 +8,13 @@
  * in-memory caches.
  */
 import { resolve } from "node:path";
-import type { ExtractionCache, Report } from "@inwards/core";
+import type { ExtractionCache, GrammarBinaries, Report } from "@inwards/core";
 import type { AppDeps, DaemonDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
-import type { ProjectIo } from "../project/contracts.ts";
+import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
 import { createRunLog } from "../runlog/record.ts";
 import type { CheckRunner } from "../session/contracts.ts";
 import { nodeBaselineWriter } from "./baseline-files.ts";
@@ -22,6 +22,7 @@ import { nodeDaemonHost } from "./daemon-host.ts";
 import { nodeDaemonLink } from "./daemon-link.ts";
 import { nodeExportFiles } from "./export-files.ts";
 import { fileExtractionCache } from "./extraction-cache.ts";
+import { startExtractionPool } from "./extraction-pool.ts";
 import { nodeFileWalker } from "./file-walk.ts";
 import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { nodeGit } from "./git.ts";
@@ -54,22 +55,38 @@ export function nodePlatform(): Platform {
 
 /**
  * What a check reads on the real process: the platform, the grammars, the
- * extraction cache (used only by the runs that ask for it) and TOML parsing.
+ * extraction cache (used only by the runs that ask for it), TOML parsing,
+ * and, given the program a worker thread runs, the extraction pool (#61).
  *
  * @param io - the platform.
+ * @param workerEntry - the program worker threads run (`main.ts`'s own URL); none: no pool.
  * @returns the project I/O.
  */
-export function nodeProjectIo(io: Platform): ProjectIo {
-  return { ...io, grammars: loadGrammars, extractionCache: fileExtractionCache, toml: parseToml };
+export function nodeProjectIo(io: Platform, workerEntry?: string): ProjectIo {
+  const project = {
+    ...io,
+    grammars: loadGrammars,
+    extractionCache: fileExtractionCache,
+    toml: parseToml,
+  };
+  return workerEntry === undefined
+    ? project
+    : {
+        ...project,
+        extractionPool: (wasm: GrammarBinaries, size: number): ExtractionPool =>
+          startExtractionPool(workerEntry, wasm, size),
+      };
 }
 
 /**
  * Builds one invocation's dependencies from the real adapters. Called once
  * per process; a test can call it again for an independent invocation.
  *
+ * @param workerEntry - the program worker threads run, for a check of many
+ *   files (`main.ts` passes its own URL); without it every check runs in one thread.
  * @returns the dependencies, with a fresh run log.
  */
-export function compose(): AppDeps {
+export function compose(workerEntry?: string): AppDeps {
   const io = nodePlatform();
   const project = nodeProjectIo(io);
   const entry = resolve(import.meta.dir, "../main.ts");

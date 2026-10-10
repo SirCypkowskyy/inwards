@@ -6,16 +6,15 @@
  * per config and call `checkFile` or `checkFiles`.
  */
 import type { Parser } from "web-tree-sitter";
-import { acceptedModules } from "../baseline/accepted.ts";
 import type { InwardsConfig } from "../config/parse.ts";
 import { type LibraryDeny, libraryDenies } from "../config/rule-options.ts";
 import { applyRules, ruleLevel } from "../config/rule-settings.ts";
 import type {
   Diagnostic,
+  ExtractionBatch,
   ExtractionCache,
   ImportRef,
   SourceFile,
-  Suppressed,
 } from "../contracts/records.ts";
 import type { ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import {
@@ -25,11 +24,7 @@ import {
   parsePython,
 } from "../python/parser.ts";
 import { checkContextDependencies } from "../rules/context-independence.ts";
-import {
-  checkDynamicImports,
-  extractDynamicImports,
-  mentionsDynamicImport,
-} from "../rules/dynamic-import/imports.ts";
+import { checkDynamicImports, extractDynamicImports } from "../rules/dynamic-import/imports.ts";
 import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
 import { checkPublicApi } from "../rules/public-api-only.ts";
@@ -43,11 +38,24 @@ import {
 } from "../rules/unassigned-module/imports.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
-import { type Collected, projectCycles } from "./cycles.ts";
+import {
+  type CheckOptions,
+  checkAll,
+  checkAllWith,
+  type FileSteps,
+  type Suppressing,
+} from "./batch.ts";
 import { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
-import { type Checked, type Confirmed, keptOnce, ordered, type Scan, withFound } from "./stages.ts";
+import {
+  type Checked,
+  type Confirmed,
+  ordered,
+  type Route,
+  type Scan,
+  withFound,
+} from "./stages.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 export type { Checked } from "./stages.ts";
@@ -167,22 +175,54 @@ export class Engine {
    * @returns the findings so far, and what the full parse would still have to do.
    */
   private scan(src: SourceFile, project: ProjectIndex): Scan {
-    const layered = this.layered(src);
-    if (!(layered || this.config.contexts || coversModule(this.libraryInputs.deny, src.module))) {
+    const route = this.route(src);
+    if (route.kind === "outside") {
       const warning = unassignedWarning(src, this.config, indexEvidence(project));
       return { found: warning ? [warning] : [], exact: true, dynamic: false };
     }
-    const unreadable = checkEncoding(src);
-    if (unreadable) {
-      return { found: [unreadable], exact: true, dynamic: false };
+    if (route.kind === "unreadable") {
+      return { found: [route.found], exact: true, dynamic: false };
     }
-    const dynamic = mentionsDynamicImport(src.text);
-    // A file with a suppression comment gets the full parse, which also reads the comments.
-    const fast = dynamic || mentionsSuppression(src.text) ? null : this.extractor.skeleton(src);
+    const { dynamic } = route;
+    const fast = route.skeleton ? this.extractor.skeleton(src) : null;
     const found = fast ? this.importFindings(src, fast, project) : null;
     // Outside every layer, the unassigned-package warning needs no confirmation.
-    const unsettled = layered ? found : found?.filter((d) => d.code !== "INW006");
+    const unsettled = this.layered(src) ? found : found?.filter((d) => d.code !== "INW006");
     return { found, exact: unsettled?.length === 0, dynamic, ...(fast ? { imports: fast } : {}) };
+  }
+
+  /**
+   * Decides how `scan` reads a file, from its module and text alone: not at
+   * all (outside every layer, with no contexts and no `deny` covering it),
+   * not at all because its encoding can't be read (INW000), or with the
+   * prescan unless a loader or a suppression comment sends it to the full parse.
+   *
+   * @param src - the source file, with normalised text.
+   * @returns the route, with the INW000 finding or what the read needs.
+   */
+  private route(src: SourceFile): Route {
+    if (this.outside(src)) {
+      return { kind: "outside" };
+    }
+    const unreadable = checkEncoding(src);
+    if (unreadable) {
+      return { kind: "unreadable", found: unreadable };
+    }
+    const dynamic = this.extractor.mentionsLoader(src);
+    // A file with a suppression comment gets the full parse, which also reads the comments.
+    return { kind: "read", dynamic, skeleton: !(dynamic || mentionsSuppression(src.text)) };
+  }
+
+  /**
+   * Tells whether the scan leaves a file unread: outside every layer, with
+   * no contexts declared and no `deny` of INW005 covering it.
+   *
+   * @param src - the source file.
+   * @returns true when only its unassigned-package warning can apply.
+   */
+  private outside(src: SourceFile): boolean {
+    const { contexts } = this.config;
+    return !(this.layered(src) || contexts || coversModule(this.libraryInputs.deny, src.module));
   }
 
   /**
@@ -224,10 +264,7 @@ export class Engine {
    * @param confirmed - its confirmed findings, and its comments if the full parse read them.
    * @returns the findings left, INW009 included, and the ones suppressed.
    */
-  private suppressIn(
-    src: SourceFile,
-    confirmed: Confirmed,
-  ): { kept: Diagnostic[]; suppressed: Suppressed[] } {
+  private suppressIn(src: SourceFile, confirmed: Confirmed): Suppressing {
     const found = [...shapeFindings(src, this.config), ...confirmed.found];
     // Read the comments here, through the cache, rather than let suppress() parse.
     const needed =
@@ -418,58 +455,53 @@ export class Engine {
     files: Iterable<SourceFile>,
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
-    { whole = false, edit = false }: { whole?: boolean; edit?: boolean } = {},
+    options: { whole?: boolean; edit?: boolean } = {},
   ): Checked {
-    const { rules } = this.config;
-    const scanned = [...files].map((file) => {
-      const src = { ...file, text: normalizeSource(file.text) };
-      return { src, scan: this.scan(src, project) };
-    });
-    const hidden = accepted
-      ? acceptedModules(
-          scanned.map(({ src, scan }) => ({
-            module: src.module,
-            found: scan.found && applyRules(scan.found, rules),
-          })),
-          accepted,
-        )
-      : new Set<string>();
-    const all: Diagnostic[] = [];
-    const suppressed: Suppressed[] = [];
-    const warned = new Set<string>();
-    const collected: Collected[] = [];
-    const sources = scanned.map(({ src }) => src);
-    const wired = fastApiFindings(this.parser, project, sources, { config: this.config, edit });
-    for (const { src, scan } of scanned) {
-      const skip = hidden.has(src.module);
-      const confirmed = this.confirm(src, scan, project, skip);
-      const imports = confirmed.imports ?? scan.imports;
-      if (imports !== undefined) {
-        collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
-      }
-      const extra = withFound(
-        withFastApi(confirmed, src, wired),
-        thinEndpointFindings(this.parser, src, this.config),
-      );
-      const own = this.suppressIn(src, extra);
-      suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
-      all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
-    }
-    if (whole) {
-      all.push(
-        ...projectCycles(collected, {
-          modes: this.config.cycles,
-          contexts: this.config.contexts ?? [],
-          fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
-            this.extractor.importsUpTo(file, lastLine),
-        }),
-      );
-    }
+    return checkAll(this.steps(), files, project, { accepted, ...options });
+  }
+
+  /**
+   * `check`, with the parsing handed to `extract` in two batches (#61):
+   * first the text tests and import skeletons the scans will read, then the
+   * full parses the confirmations and suppression comments will need (see
+   * `checkAllWith`). The result is what `check` returns; a job the batch
+   * leaves unanswered, or a batch that fails, is computed here as `check`
+   * would, and any error it meets surfaces as it would there.
+   *
+   * @param files - the source files to check.
+   * @param project - the project's module index (see `index`).
+   * @param options - what `check` takes besides the files and the index.
+   * @param options.accepted - accepted copies by baseline key, when a baseline applies.
+   * @param options.whole - true for a whole-project run.
+   * @param options.edit - true for a per-edit check.
+   * @param extract - runs extraction jobs elsewhere, such as on worker threads.
+   * @returns what `check` returns for the same arguments.
+   */
+  checkWith(
+    files: Iterable<SourceFile>,
+    project: ProjectIndex,
+    options: CheckOptions,
+    extract: ExtractionBatch,
+  ): Promise<Checked> {
+    return checkAllWith(this.steps(), files, project, { ...options, extract });
+  }
+
+  /**
+   * Hands the per-file steps to `batch.ts`, which orders them over many files.
+   *
+   * @returns the engine's config, parser and extractor, and its steps bound to it.
+   */
+  private steps(): FileSteps {
     return {
-      diagnostics: applyRules(all, rules),
-      suppressed: suppressed.flatMap(({ diagnostic, reason }) =>
-        applyRules([diagnostic], rules).map((d) => ({ diagnostic: d, reason })),
-      ),
+      config: this.config,
+      parser: this.parser,
+      extractor: this.extractor,
+      scan: (src: SourceFile, project: ProjectIndex): Scan => this.scan(src, project),
+      reads: (src: SourceFile): boolean => !this.outside(src) && checkEncoding(src) === null,
+      confirm: (src: SourceFile, scan: Scan, project: ProjectIndex, skip: boolean): Confirmed =>
+        this.confirm(src, scan, project, skip),
+      suppressIn: (src: SourceFile, confirmed: Confirmed): Suppressing =>
+        this.suppressIn(src, confirmed),
     };
   }
 }

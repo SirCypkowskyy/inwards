@@ -9,6 +9,7 @@ import { print } from "../platform/print.ts";
 import { BASELINE_FILE, writeBaseline } from "../project/baseline.ts";
 import { diskCacheWanted } from "../project/check.ts";
 import { commandConfig } from "../project/config-discovery.ts";
+import { threadLimit } from "../project/threads.ts";
 import type { AppDeps } from "./deps.ts";
 
 /**
@@ -35,6 +36,7 @@ export async function baselineCommand(
   const report = await deps.check(configPath, undefined, io.runtime.cwd, {
     baseline: false,
     cache: diskCacheWanted(io.runtime, noCache),
+    threads: threadLimit(io.runtime),
   });
   // The check has parsed the config already, so this can't throw.
   const { rules } = parseConfig(io.read.text(configPath));

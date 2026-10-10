@@ -5,21 +5,32 @@
  * `ExtractionCache` when it holds it, else from a parse, and is stored back.
  * Dynamic imports (INW011) are never cached: whether an imported `eval` could
  * be the builtin depends on other files. Without a cache, every call parses,
- * exactly as before. This module only extracts; the engine keeps every
- * decision (which files get the prescan, confirmation, baseline shortcuts).
+ * exactly as before. Extractions computed elsewhere (a worker pool, #61) are
+ * preloaded per source file and read before the cache. This module only
+ * extracts; the engine keeps every decision (which files get the prescan,
+ * confirmation, baseline shortcuts).
  */
 import type { Parser, Tree } from "web-tree-sitter";
 import type {
   CachedExtraction,
+  ExtractionAnswer,
+  ExtractionBatch,
   ExtractionCache,
   ExtractionIdentity,
+  ExtractionJob,
   ImportRef,
   SourceFile,
   SuppressionComment,
 } from "../contracts/records.ts";
-import { extractImports, parsePython } from "../python/parser.ts";
+import {
+  createPythonParser,
+  extractImports,
+  type GrammarBinaries,
+  parsePython,
+} from "../python/parser.ts";
 import { skeletonImports } from "../python/prescan.ts";
-import { commentsIn } from "../rules/suppression-comment.ts";
+import { mentionsDynamicImport } from "../rules/dynamic-import/imports.ts";
+import { commentsIn, mentionsSuppression } from "../rules/suppression-comment.ts";
 
 /**
  * The extraction revision: part of every cache identity. Bump it whenever
@@ -28,7 +39,7 @@ import { commentsIn } from "../rules/suppression-comment.ts";
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "11";
+export const EXTRACTION_REVISION = "12";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {
@@ -36,10 +47,67 @@ export interface FullExtraction {
   comments: SuppressionComment[];
 }
 
+/**
+ * Runs one extraction job: the same computation the engine does when it
+ * extracts a file itself, so a worker's answer can stand in for it. A
+ * `"skeleton"` job first tests the text for a loader, as the engine's scan
+ * does, and reads the skeleton only when neither a loader nor a suppression
+ * comment sends the file to the full parse.
+ *
+ * @param parser - parser with the Python grammar loaded.
+ * @param job - the file, with normalised text, and what to read out of it.
+ * @returns the extraction, and for a `"skeleton"` job the loader test's answer.
+ */
+function extractJob(parser: Parser, job: ExtractionJob): ExtractionAnswer {
+  if (job.want === "full") {
+    const { imports, comments } = fullExtraction(parser, job.file);
+    return { extraction: { full: imports, comments } };
+  }
+  const dynamic = mentionsDynamicImport(job.file.text);
+  if (dynamic || mentionsSuppression(job.file.text)) {
+    return { extraction: {}, dynamic };
+  }
+  return { extraction: { skeleton: skeletonImports(parser, job.file) ?? "refused" }, dynamic };
+}
+
+/**
+ * Loads the grammar for a thread or process that runs extraction jobs and
+ * nothing else (#61): the worker side of an `ExtractionBatch`.
+ *
+ * @param wasm - the tree-sitter runtime and Python grammar as WASM bytes.
+ * @returns a function that runs one job, as `extractJob` does.
+ */
+export async function createExtractionWorker(
+  wasm: GrammarBinaries,
+): Promise<(job: ExtractionJob) => ExtractionAnswer> {
+  const parser = await createPythonParser(wasm);
+  return (job: ExtractionJob): ExtractionAnswer => extractJob(parser, job);
+}
+
+/**
+ * Parses a whole file for its static imports and suppression comments.
+ *
+ * @param parser - parser with the Python grammar loaded.
+ * @param src - the source file, with normalised text.
+ * @returns the imports and comments.
+ */
+function fullExtraction(parser: Parser, src: SourceFile): FullExtraction {
+  const tree = parsePython(parser, src.text);
+  try {
+    return { imports: extractImports(tree, src), comments: commentsIn(tree) };
+  } finally {
+    tree.delete(); // WASM memory is not garbage collected
+  }
+}
+
 /** Reads imports and comments out of files, through a cache when there is one. */
 export class Extractor {
   private readonly parser: Parser;
   private readonly cache: ExtractionCache | undefined;
+  /** Extractions computed elsewhere for this run's source files, read before the cache. */
+  private readonly preloaded = new WeakMap<SourceFile, CachedExtraction>();
+  /** The loader test's answers computed elsewhere, by source file. */
+  private readonly loaders = new WeakMap<SourceFile, boolean>();
 
   /**
    * Keeps the parser and the optional cache.
@@ -80,12 +148,89 @@ export class Extractor {
     if (known?.full !== undefined && known.comments !== undefined) {
       return { imports: known.full, comments: known.comments };
     }
-    const tree = parsePython(this.parser, src.text);
-    try {
-      return this.fromTree(src, tree, known);
-    } finally {
-      tree.delete(); // WASM memory is not garbage collected
+    const { imports, comments } = fullExtraction(this.parser, src);
+    // A component the cache already held wins, as `fromTree` keeps it.
+    const found = { imports: known?.full ?? imports, comments: known?.comments ?? comments };
+    this.store(src, known, { full: found.imports, comments: found.comments });
+    return found;
+  }
+
+  /**
+   * Tells whether a file's extraction already holds a component, from a
+   * preload or the cache, so nobody needs to compute it. What the cache
+   * holds is kept with the preloads, since the check looks it up again.
+   *
+   * @param src - the source file, with normalised text.
+   * @param want - the component: the skeleton, or the full parse's imports and comments.
+   * @returns true when it is known.
+   */
+  private holds(src: SourceFile, want: ExtractionJob["want"]): boolean {
+    const known = this.lookup(src);
+    if (known !== undefined && !this.preloaded.has(src)) {
+      this.preloaded.set(src, known); // the check reads it next: no second trip to the cache
     }
+    return want === "skeleton"
+      ? known?.skeleton !== undefined
+      : known?.full !== undefined && known.comments !== undefined;
+  }
+
+  /**
+   * Keeps what was computed elsewhere for one source file of this run, and
+   * stores any new extraction in the cache too, as if the engine had computed it.
+   *
+   * @param src - the source file, with normalised text: the same object the engine checks.
+   * @param answer - the components computed, and the loader test's answer if it ran.
+   */
+  private preload(src: SourceFile, answer: ExtractionAnswer): void {
+    if (answer.dynamic !== undefined) {
+      this.loaders.set(src, answer.dynamic);
+    }
+    if (Object.keys(answer.extraction).length === 0) {
+      return;
+    }
+    const known = this.lookup(src);
+    const merged = { ...known, ...answer.extraction };
+    this.preloaded.set(src, merged);
+    this.cache?.set(identityOf(src), merged);
+  }
+
+  /**
+   * Hands the files whose extraction lacks a component to `extract` and
+   * preloads the answers. A failed batch is ignored: the engine computes
+   * what it needs itself, and any error it meets then surfaces as without
+   * the batch.
+   *
+   * @param sources - the source files, with normalised text.
+   * @param want - the component to compute.
+   * @param extract - runs extraction jobs elsewhere.
+   */
+  async prefetch(
+    sources: readonly SourceFile[],
+    want: ExtractionJob["want"],
+    extract: ExtractionBatch,
+  ): Promise<void> {
+    const jobs = sources.filter((file) => !this.holds(file, want)).map((file) => ({ file, want }));
+    if (jobs.length === 0) {
+      return;
+    }
+    const answers = await extract(jobs).catch((): readonly undefined[] => []);
+    jobs.forEach(({ file }, n) => {
+      const answer = answers[n];
+      if (answer !== undefined) {
+        this.preload(file, answer);
+      }
+    });
+  }
+
+  /**
+   * Tells whether a file's text names a loader (`mentionsDynamicImport`),
+   * from a preloaded answer when there is one.
+   *
+   * @param src - the source file, with normalised text.
+   * @returns true when the file may hold a dynamic import.
+   */
+  mentionsLoader(src: SourceFile): boolean {
+    return this.loaders.get(src) ?? mentionsDynamicImport(src.text);
   }
 
   /**
@@ -150,7 +295,7 @@ export class Extractor {
    * @returns what the cache holds, or undefined without a cache or on a miss.
    */
   private lookup(src: SourceFile): CachedExtraction | undefined {
-    return this.cache?.get(identityOf(src));
+    return this.preloaded.get(src) ?? this.cache?.get(identityOf(src));
   }
 
   /**
@@ -165,7 +310,11 @@ export class Extractor {
     known: CachedExtraction | undefined,
     extra: CachedExtraction,
   ): void {
-    this.cache?.set(identityOf(src), { ...known, ...extra });
+    const merged = { ...known, ...extra };
+    if (this.preloaded.has(src)) {
+      this.preloaded.set(src, merged);
+    }
+    this.cache?.set(identityOf(src), merged);
   }
 }
 

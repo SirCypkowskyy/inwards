@@ -175,6 +175,10 @@ export interface Runtime {
   noColor: boolean;
   /** `INWARDS_NO_CACHE` is set to a non-empty value: `check` and `baseline` skip the disk cache. */
   noCache: boolean;
+  /** `INWARDS_THREADS` as set: how many threads may parse a full check (#61). */
+  threads: string | undefined;
+  /** How many threads can run at once (`os.availableParallelism()`). */
+  cores: number;
   /** The user's home directory. */
   home: string;
   /**

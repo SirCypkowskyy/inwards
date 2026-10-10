@@ -35,6 +35,7 @@ import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
 import { layerLinks, linksUnder } from "./links.ts";
+import { checkOnThreads } from "./threads.ts";
 import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
@@ -169,13 +170,14 @@ function loadSources(
   const loaded: string[] = [];
   const seen = new Set<string>();
   for (const abs of io.walk.pythonFiles(targets ?? [lexicalRoot], project.layerDirs)) {
-    const names = moduleNames(io.probe, abs, lexicalRoot, realRoot);
+    const resolved = io.probe.realpath(abs);
+    const names = moduleNames(abs, resolved, lexicalRoot, realRoot);
     if (names.length === 0 || exclude.some((dir) => atOrInside(dir, abs))) {
       continue; // outside the root, or a workspace member's own config checks it: not read at all
     }
     loaded.push(abs);
     const text = texts?.get(abs) ?? io.read.text(abs);
-    const real = io.probe.realpath(abs) ?? abs;
+    const real = resolved ?? abs;
     for (const { rel, shown } of names) {
       const named = moduleNameFor(rel);
       // Keyed on the real file too: order.py and order.pyi are one module, two files.
@@ -293,6 +295,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  *   config checks them: the uv workspace members under a workspace root's config (#57).
  * @param options.absent - top-level module names the index treats as missing: those
  *   new since the session start, for the Stop gate's check of a file as it was then (#86).
+ * @param options.threads - how many threads may parse (`threadLimit`, for `inwards check`
+ *   and `inwards baseline`); the result is the same with any number (#61).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -310,6 +314,7 @@ export async function runCheck(
     config,
     exclude = [],
     absent = [],
+    threads = 1,
   }: {
     base: string;
     baseline?: boolean | undefined;
@@ -320,6 +325,7 @@ export async function runCheck(
     config?: InwardsConfig | undefined;
     exclude?: readonly string[] | undefined;
     absent?: readonly string[] | undefined;
+    threads?: number | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
@@ -331,10 +337,8 @@ export async function runCheck(
   const index = project.engine.index(listing);
   // A whole-project run also looks for import cycles (INW004), which one file can't show.
   const whole = targets === undefined;
-  const { diagnostics, suppressed } = project.engine.check(files, index, accepted, {
-    whole,
-    edit,
-  });
+  const run = { files, index, accepted, options: { whole, edit } };
+  const { diagnostics, suppressed } = await checkOnThreads(io, project.engine, threads, run);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
     const modules = new Set(files.map((file) => file.module));
@@ -416,15 +420,15 @@ export async function indexProject(io: ProjectIo, configPath: string): Promise<P
  * real path. Both are checked, so an alias can't hide a file from its layer.
  * Names that fall outside the config root are dropped.
  *
- * @param probe - resolves real paths.
  * @param abs - the file as found.
+ * @param real - its real path, or undefined when it can't be resolved.
  * @param lexicalRoot - the config root as written.
  * @param realRoot - the config root with symlinks resolved.
  * @returns each name as a root-relative path, with the path to show for it.
  */
 function moduleNames(
-  probe: Pick<PathProbe, "realpath">,
   abs: string,
+  real: string | undefined,
   lexicalRoot: string,
   realRoot: string,
 ): { rel: string; shown: string }[] {
@@ -432,7 +436,6 @@ function moduleNames(
   if (isInside(lexicalRoot, abs)) {
     names.push({ rel: relative(lexicalRoot, abs), shown: abs });
   }
-  const real = probe.realpath(abs);
   if (real !== undefined && isInside(realRoot, real)) {
     const rel = relative(realRoot, real);
     if (!names.some((n) => n.rel === rel)) {

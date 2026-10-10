@@ -21,8 +21,11 @@ export { ConfigError } from "./config/toml.ts";
 export type {
   CachedExtraction,
   Diagnostic,
+  ExtractionAnswer,
+  ExtractionBatch,
   ExtractionCache,
   ExtractionIdentity,
+  ExtractionJob,
   Fix,
   ImportRef,
   Severity,
@@ -32,6 +35,7 @@ export type {
   SuppressionComment,
 } from "./contracts/records.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
+export { createExtractionWorker } from "./engine/extraction.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";
 export { type PathKind, topLevelModules } from "./lookup/module-lookup.ts";
 export type { ProjectFiles, ProjectIndex } from "./lookup/project-index.ts";
