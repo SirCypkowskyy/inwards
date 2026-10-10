@@ -14,7 +14,9 @@
  * every user, nobody can take the name first. The record and the lock are
  * owner-only files under the user's state directory; the lock holds the pid
  * and a random token, which the daemon's status answer repeats, so a pid
- * the OS reused can't keep a dead daemon's lock (#276).
+ * the OS reused can't keep a dead daemon's lock (#276). A daemon that can't
+ * listen leaves a note beside them, which keeps hooks from starting another
+ * for a while (#275); one that listens removes it.
  */
 import { randomBytes } from "node:crypto";
 import { lstatSync, mkdirSync, rmSync } from "node:fs";
@@ -24,7 +26,7 @@ import { dirname, isAbsolute, join } from "node:path";
 import process from "node:process";
 import type { DaemonHost, LineHandler, ServeOptions, ServeResult } from "../daemon/contracts.ts";
 import type { DaemonPlace } from "../daemon/protocol.ts";
-import { publishRecord, releaseLock, removeIfOwn, takeLock } from "./daemon-files.ts";
+import { noteFailure, publishRecord, releaseLock, removeIfOwn, takeLock } from "./daemon-files.ts";
 import { isEmitter } from "./daemon-link.ts";
 import { RequestLoop } from "./daemon-loop.ts";
 
@@ -42,24 +44,35 @@ const TOKEN_BYTES = 16;
 /**
  * Builds the daemon's side on the real process.
  *
+ * @param dirs - lists the socket directory candidates in order; the tests
+ *   pass unusable ones (#275).
  * @returns the host, whose `serve` listens on a socket or named pipe.
  */
-export function nodeDaemonHost(): DaemonHost {
-  return { serve };
+export function nodeDaemonHost(dirs: () => string[] = socketDirs): DaemonHost {
+  return {
+    serve: (
+      place: DaemonPlace,
+      handler: LineHandler,
+      options: ServeOptions,
+    ): Promise<ServeResult> => serve(place, handler, options, dirs),
+  };
 }
 
 /**
  * Serves a project until stopped (see `DaemonHost.serve`).
  *
- * @param place - the project, the key and the record and lock paths.
+ * @param place - the project, the key and the paths of its files.
  * @param handler - answers request lines.
- * @param options - the idle limit, how to write the record and how to check a lock's holder.
+ * @param options - the idle limit, how to write the record and the note of a
+ *   failed start, and how to check a lock's holder.
+ * @param dirs - lists the socket directory candidates.
  * @returns how serving ended.
  */
 async function serve(
   place: DaemonPlace,
   handler: LineHandler,
   options: ServeOptions,
+  dirs: () => string[],
 ): Promise<ServeResult> {
   mkdirSync(dirname(place.record), { recursive: true, mode: PRIVATE_DIR });
   // Every request brings its own working directory. Leaving the project's
@@ -70,20 +83,19 @@ async function serve(
   if (holder !== undefined) {
     return { kind: "running", pid: holder };
   }
-  const endpoint = pickEndpoint(place.key);
+  const endpoint = pickEndpoint(place.key, dirs);
   if (endpoint === undefined) {
-    releaseLock(place.lock, token);
-    return { kind: "failed", why: "no private directory for the socket" };
+    return failed(place, token, options, "no private directory for the socket");
   }
   const loop = new RequestLoop(handler, options.idleMs);
   const server = createServer(loop.accept);
   try {
     await listen(server, endpoint);
   } catch (err) {
-    releaseLock(place.lock, token);
-    return { kind: "failed", why: err instanceof Error ? err.message : String(err) };
+    return failed(place, token, options, err instanceof Error ? err.message : String(err));
   }
   publishRecord(place.record, options.record(endpoint, token));
+  rmSync(place.failed, { force: true });
   await loop.run(server);
   if (process.platform !== "win32") {
     rmSync(endpoint, { force: true });
@@ -91,6 +103,27 @@ async function serve(
   removeIfOwn(place.record);
   releaseLock(place.lock, token);
   return { kind: "served" };
+}
+
+/**
+ * Ends a start that couldn't listen: writes the note that holds hooks back,
+ * then releases the lock, so a hook that finds no lock already sees the note.
+ *
+ * @param place - the project's daemon files.
+ * @param token - this daemon's lock token.
+ * @param options - builds the note.
+ * @param why - why it couldn't listen.
+ * @returns the failed result.
+ */
+function failed(
+  place: DaemonPlace,
+  token: string,
+  options: ServeOptions,
+  why: string,
+): ServeResult {
+  noteFailure(place.failed, options.failure(why));
+  releaseLock(place.lock, token);
+  return { kind: "failed", why };
 }
 
 /**
@@ -120,14 +153,15 @@ function listen(server: Server, endpoint: string): Promise<void> {
  * usable private directory.
  *
  * @param key - the project's key.
+ * @param dirs - lists the socket directory candidates.
  * @returns the endpoint, or undefined when no directory is private and short enough.
  */
-function pickEndpoint(key: string): string | undefined {
+function pickEndpoint(key: string, dirs: () => string[]): string | undefined {
   const name = `${key}-${randomBytes(RANDOM_BYTES).toString("hex")}`;
   if (process.platform === "win32") {
     return `\\\\.\\pipe\\inwards-${name}`;
   }
-  for (const dir of socketDirs()) {
+  for (const dir of dirs()) {
     const path = join(dir, name);
     if (Buffer.byteLength(path) <= MAX_SOCKET_PATH && privateDir(dir)) {
       return path;

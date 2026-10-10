@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: d7a312323205f989ba22a83eb5df87a8760e1c543bc79ade1c70da2f32cf25ee
+source_hash: 1069e0aa9c6b4b96c57f41081cd1e4434be1583a4a88308d683f4da3aeeb7b59
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1142,6 +1142,8 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - **`inwards daemon --idle SECONDS`** ustawia limit bezczynności, domyślnie 600; testy używają krótkich.
 
 **Poprawka · 2026-10-10 · [#276](https://github.com/SirCypkowskyy/inwards/issues/276).** Sam pid nie mówi, kto trzyma blokadę: daemon zabity bez sprzątania (SIGKILL, awaria, restart) zostawia swoją blokadę, a gdy system da ten pid innemu procesowi, każdy kolejny daemon ustępował i każdy PostToolUse działał jednorazowo. Blokada trzyma teraz pid i 32 losowe cyfry szesnastkowe, a odpowiedź na `inwards daemon status` je powtarza. Daemon, który zastanie blokadę, przejmuje ją, gdy jej pid nie istnieje albo jest jego własny, a gdy blokada ma ponad 10 sekund, także wtedy, gdy daemon pod adresem z zapisu nie odpowie tym pidem i tokenem. Młodszą blokadę uznaje za zajętą, bo jej daemon może jeszcze zaczynać nasłuchiwać. Sprawdzenie korzysta tylko z gniazda i wieku pliku, więc działa tak samo na Linuksie, macOS i Windows, a Stop gate nadal od niego nie zależy.
+
+**Poprawka · 2026-10-10 · [#275](https://github.com/SirCypkowskyy/inwards/issues/275).** Daemon, który nie może nasłuchiwać (żaden katalog na gniazdo nie jest prywatny dla użytkownika, każda ścieżka gniazda przekroczyłaby 104 bajty albo nasłuchiwanie się nie udaje), kończy działanie, a następny PostToolUse nie znajdował zapisu i uruchamiał kolejnego, więc każda edycja płaciła za proces, który od razu się kończył. Teraz daemon przed zwolnieniem blokady zapisuje obok zapisu plik `daemons/<hash>.failed` (tylko dla właściciela, przez plik tymczasowy i zmianę nazwy) z czasem, przyczyną i swoim pidem. Hook, który uruchomiłby daemona, nie uruchamia żadnego, dopóki ta notatka ma mniej niż 5 minut, więc seria edycji uruchamia co najwyżej jednego daemona na 5 minut. Daemon, który nasłuchuje, usuwa notatkę, a `inwards daemon status` pokazuje ją, gdy nic nie działa. Notatka z datą ponad 5 minut w przyszłości (zegar cofnięto) nie wstrzymuje hooków.
 
 ## ADR-040: Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję { #adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision }
 
