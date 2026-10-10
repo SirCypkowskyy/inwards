@@ -126,6 +126,8 @@
       { "name": "core-rule-thin-endpoint", "patterns": ["src/core/src/rules/thin-endpoint/**"] },
       // INW013 async-blocking (#293): the first of #98's role-scoped content rules.
       { "name": "core-rule-async-blocking", "patterns": ["src/core/src/rules/async-blocking/**"] },
+      // INW016 orm-naming (#297): table and timestamp column names, from #98.
+      { "name": "core-rule-orm-naming", "patterns": ["src/core/src/rules/orm-naming/**"] },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -303,6 +305,10 @@
         ]
       },
       {
+        "from": "core-rule-orm-naming",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
+      },
+      {
         "from": "core-rule-thin-endpoint",
         "allow": [
           "core-contracts",
@@ -337,6 +343,7 @@
           "core-rule-fastapi",
           "core-rule-thin-endpoint",
           "core-rule-async-blocking",
+          "core-rule-orm-naming",
           "core-baseline"
         ]
       },
@@ -391,6 +398,7 @@
           "core-rule-fastapi",
           "core-rule-thin-endpoint",
           "core-rule-async-blocking",
+          "core-rule-orm-naming",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -844,6 +852,10 @@
         },
         {
           "from": "core-rule-async-blocking",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-orm-naming",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

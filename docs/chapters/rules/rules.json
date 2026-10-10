@@ -197,6 +197,20 @@
       "url": "INW013/"
     },
     {
+      "code": "INW016",
+      "name": "orm-naming",
+      "title": "INW016 orm-naming",
+      "summary": "A table name that isn't lower_case_snake and singular, or a datetime or date column without `_at` or `_date`; a whole-project run also wants a `MetaData` naming convention",
+      "description": "ORM table names and the names of datetime and date columns follow the project's scheme, by default lower_case_snake singular tables, _at for datetimes and _date for dates, and SQLAlchemy models get a MetaData naming convention.",
+      "category": ["naming", "roles"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, error",
+      "url": "INW016/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

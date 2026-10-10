@@ -2,7 +2,7 @@
  * @file Checking many files at once: the order the engine's per-file steps run
  * in over a whole list, and what only the whole list decides (the baseline
  * shortcut, FastAPI's cross-file findings, one unassigned-package warning per
- * package, import cycles). `checkAllWith` is the same run with the parsing
+ * package, import cycles, INW016's naming convention). `checkAllWith` is the same run with the parsing
  * handed to an `ExtractionBatch` first (#61), such as worker threads. The
  * rules and their precedence stay in `engine.ts`; this module only orders
  * the steps the engine hands it.
@@ -23,6 +23,7 @@ import { contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import type { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
+import { ormConventionFindings } from "./orm-naming.ts";
 import {
   type Checked,
   type Confirmed,
@@ -228,6 +229,7 @@ function finish(
         fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
           steps.extractor.importsUpTo(file, lastLine),
       }),
+      ...ormConventionFindings(steps.parser, sources, config),
     );
   }
   return {
