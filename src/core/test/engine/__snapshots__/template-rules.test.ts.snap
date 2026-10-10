@@ -1,0 +1,11 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`template rules give the diagnostics of the hand-written selector config 1`] = `
+[
+  "INW012 src/orders/router.py:12 warning \`get_item\` is an HTTP endpoint with 4 statements (max 2) and a direct call to \`db.execute\`. Endpoints parse the request, call one use case, and shape the response.",
+  "INW012 src/users/router.py:12 warning \`get_item\` is an HTTP endpoint with 4 statements (max 2) and a direct call to \`db.execute\`. Endpoints parse the request, call one use case, and shape the response.",
+  "INW013 src/orders/router.py:13 error \`db.execute\` talks to the database through a synchronous SQLAlchemy \`Session\` inside \`async def get_item\`. That blocks the event loop, and every other request on this worker, until the database answers.",
+  "INW013 src/users/router.py:13 error \`db.execute\` talks to the database through a synchronous SQLAlchemy \`Session\` inside \`async def get_item\`. That blocks the event loop, and every other request on this worker, until the database answers.",
+  "INW016 src/orders/models.py:9 warning Table name "Orders" isn't lower_case_snake: "orders".",
+]
+`;

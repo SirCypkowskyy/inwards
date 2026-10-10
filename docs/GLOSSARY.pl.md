@@ -168,6 +168,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | sibling (module, package; import-linter's layers) | moduł sąsiedni, sąsiedni pakiet |
 | sibling layers (a nested array in `layers`, `a \| b` in a template's roles) | warstwy sąsiednie |
 | template (`[tool.inwards.templates]`); role (a template's `roles`) | szablon; rola |
+| a template's rules (`[tool.inwards.templates.<name>.rules]`); the top-level table (`[tool.inwards.rules]` and its options tables) | reguły szablonu, reguły dla roli; tabela najwyższego poziomu |
 | rank (of a layer among siblings) | miejsce (w kolejności warstw) |
 | cache (uv's, bunx's) | pamięć podręczna (uv, bunx) |
 | dev dependency | zależność deweloperska |
