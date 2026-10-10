@@ -183,6 +183,20 @@
       "url": "INW012/"
     },
     {
+      "code": "INW013",
+      "name": "async-blocking",
+      "title": "INW013 async-blocking",
+      "summary": "Synchroniczne wywołanie bazy danych, cache'u albo chmury wewnątrz `async def`: synchroniczny `Session` SQLAlchemy, `redis.Redis`, boto3 albo blokujący sterownik",
+      "description": "Funkcja async def nie wykonuje synchronicznych wywołań bazy danych, cache'u ani chmury; synchroniczny Session SQLAlchemy, redis.Redis, boto3 albo blokujący sterownik zatrzymuje pętlę zdarzeń.",
+      "category": ["async", "roles"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, błąd",
+      "url": "INW013/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

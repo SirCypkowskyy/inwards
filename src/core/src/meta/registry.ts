@@ -46,6 +46,7 @@ type RuleCode =
   | "INW010"
   | "INW011"
   | "INW012"
+  | "INW013"
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
@@ -176,6 +177,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "An HTTP endpoint reads the request, calls one use case and shapes the response; the logic, queries and outgoing calls live in other layers.",
     docs: page("INW012"),
+  },
+  // Opt-in, the first of #98's role-scoped content rules (#293).
+  INW013: {
+    code: "INW013",
+    name: "async-blocking",
+    severity: "error",
+    default: "off",
+    summary:
+      "An async def makes no synchronous database, cache or cloud call: a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
+    docs: page("INW013"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.
