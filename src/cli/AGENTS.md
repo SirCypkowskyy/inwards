@@ -11,17 +11,18 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 
 | Folder | Owns | Must not |
 |---|---|---|
-| `main.ts` | argv parsing, picking a command, the process lifecycle | hold logic a test would want to call |
-| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `import-config`), and `check-runs` for a check over several configs | import `adapters/` |
-| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings`, and `protocol` (shared by all of them) | read the environment or the filesystem itself |
-| `session/` | the session record, start identity and start content, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
-| `project/` | running a check, the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots | own a filesystem walk (that is `adapters/file-walk.ts`) |
+| `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
+| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `import-config`, `daemon`), `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
+| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings` and `hook-host` (whether the agent still has Inwards wired in), and `protocol` (shared by all of them) | read the environment or the filesystem itself |
+| `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), violation fingerprints, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
+| `project/` | running a check, the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), and how many threads parse a full check (`threads`, ADR-040) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
 | `runlog/` | the run log, reading it back, stats, `--export` | keep notes in a module global |
 | `init/` | `inwards init`: agent wiring, `--style`, the scaffold plan, the report, presets, the architecture brief (`--brief`, `inwards context`), import-linter contracts as `[tool.inwards]` (`import-linter/`, for `inwards import-config`) | write files itself (`InitFiles` does) |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
-| `platform/` | the contracts for everything outside the process, and `print()` | implement any of them |
+| `daemon/` | the hook daemon's side of ADR-039: the `inwards-daemon/1` wire format and the daemon's file names (`protocol`), the hook's side (`viaDaemon` and `askDaemon` in `client`), the request handler (`server`), the caches kept between requests (`memory`), and the `DaemonLink` and `DaemonHost` contracts | do I/O (the socket, the record and the lock are `adapters/daemon-*.ts`) |
+| `platform/` | the contracts for everything outside the process, `print()`, and `time.ts`, the one place that may name `Date` to parse a recorded timestamp | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
-| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML; `compose.ts` wires them into `AppDeps` | hold policy |
+| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), and the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`); `compose.ts` wires them into `AppDeps` | hold policy |
 
 ## Dependency rules
 
@@ -33,8 +34,10 @@ narrowest `Pick<>` they need, so a signature says what it touches.
 
 Imports go downwards only: `platform`, `json` and `paths` are leaves, then
 `project`, then `session`, then `runlog`, then `claude-code` and `init`,
-then `commands`. Only `main.ts` imports `adapters/`. `eval/` may import
-`claude-code/protocol.ts` and nothing else.
+then `commands`. `daemon/` sits beside them, below `commands/`, and imports
+only `platform` and `json` (and the engine's API); `commands/` and the
+`daemon-*` adapters use it. Only `main.ts` imports `adapters/`. `eval/` may
+import `claude-code/protocol.ts` and nothing else.
 
 Enforced by:
 
@@ -74,6 +77,13 @@ several invocations in one process. Mutable state is made per invocation:
 - `createStartLookups` for start identity and start content caches (shared by
   the suppression and old-error checks of one hook run);
 - `createRunLog` for what the handlers noted.
+
+The hook daemon (ADR-039) is the one long-lived exception, and it is still
+an object, not a global: `nodeDaemon` in `adapters/compose.ts` makes its
+caches (`daemonExtractionCache` and `commitKeyedGit` from `daemon/memory.ts`)
+once per invocation, so they live as long as the daemon, and every request
+it serves gets its own runtime, clock, streams and run log, as a one-shot
+hook would.
 
 A module-level `Map` or array that grows at run time is a bug.
 

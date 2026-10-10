@@ -4,7 +4,7 @@
  * `inwards-daemon/1`. It names the daemon's files (the record and the lock
  * under the user's state directory) and builds and validates every value that
  * crosses the socket or the record. Pure: no I/O; the adapter
- * (`adapters/daemon.ts`) moves the lines and the files.
+ * (`adapters/daemon-link.ts` and `daemon-host.ts`) move the lines and the files.
  */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -65,6 +65,8 @@ export interface DaemonStatus {
   requests: number;
   /** How long it waits without a request before it exits, in milliseconds. */
   idleMs: number;
+  /** The random token in the lock it holds, which proves that a lock naming its pid is its own (#276). */
+  token: string;
 }
 
 /** What the daemon sends back: a hook run's output, an error, its status, or that it stopped. */
@@ -223,7 +225,7 @@ function parseStatus(value: unknown): DaemonStatus | undefined {
   if (!isRecord(value)) {
     return undefined;
   }
-  const { pid, project, endpoint, version, started, requests, idleMs } = value;
+  const { pid, project, endpoint, version, started, requests, idleMs, token } = value;
   if (
     typeof pid === "number" &&
     typeof project === "string" &&
@@ -231,9 +233,10 @@ function parseStatus(value: unknown): DaemonStatus | undefined {
     typeof version === "string" &&
     typeof started === "string" &&
     typeof requests === "number" &&
-    typeof idleMs === "number"
+    typeof idleMs === "number" &&
+    typeof token === "string"
   ) {
-    return { pid, project, endpoint, version, started, requests, idleMs };
+    return { pid, project, endpoint, version, started, requests, idleMs, token };
   }
   return undefined;
 }
