@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: 1d42f7524068cc03a7b6fb7f2f869595b36cb684ffab7ab4e286ae1bcd6ba698
+source_hash: f39ccbf32b0b59d8bd1d381c5cb725b31bf0d95b79a5b0a7343335ca1eae8a28
 ---
 
 # GitHub Actions { #github-actions }
@@ -107,7 +107,7 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 
 ## Wątki { #threads }
 
-`inwards check` i `inwards baseline` parsują duży projekt w kilku wątkach: od 1000 plików, po jednym wątku na 500 plików, do połowy rdzeni runnera i najwyżej 4. Reguły nadal działają w jednym wątku w kolejności plików, więc wynik jest taki sam przy dowolnej liczbie wątków. Na serwisie Django z 4324 plikami zimne sprawdzenie skróciło się z 1,48 s do 0,98 s przy czterech wątkach na 10-rdzeniowym Macu. Na Linuksie zysk jest mniejszy, a 4-rdzeniowy runner dostaje dwa wątki, które pomagają głównie repozytorium, w którym wiele plików wymaga pełnego parsowania ([rozdział 6](../06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Każdy wątek trzyma własną kopię parsera, około 40 do 50 MB.
+`inwards check` i `inwards baseline` parsują duży projekt w kilku wątkach: od 1000 plików, po jednym wątku na 500 plików, do połowy rdzeni runnera ponad dwa i najwyżej 4. Reguły nadal działają w jednym wątku w kolejności plików, więc wynik jest taki sam przy dowolnej liczbie wątków. Na serwisie Django z 4324 plikami zimne sprawdzenie skróciło się z 1,48 s do 0,98 s przy czterech wątkach na 10-rdzeniowym Macu. Na Linuksie zysk jest mniejszy, a 4-rdzeniowy runner, taki jak hostowany `ubuntu-latest` GitHuba, zostaje przy jednym wątku, bo więcej wątków spowalniało tam sprawdzenie ([rozdział 6](../06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Każdy wątek trzyma własną kopię parsera, około 40 do 50 MB.
 
 - `INWARDS_THREADS=1` trzyma sprawdzenie w jednym wątku, na runnerze z małą ilością pamięci albo przy pomiarze, który ma używać jednego rdzenia.
 - `INWARDS_THREADS=N` pozwala na najwyżej N wątków, także ponad domyślny limit. W naszych pomiarach osiem nie było szybsze od czterech, bo czytanie plików i reguły się nie rozkładają.

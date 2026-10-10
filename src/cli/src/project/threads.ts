@@ -1,7 +1,7 @@
 /**
  * @file How many threads parse a full check (#61), and running the engine on
  * them. `INWARDS_THREADS` sets the count (1: the main thread alone, no
- * workers), else half the cores up to a cap; a check of fewer files
+ * workers), else half the cores beyond two, up to a cap; a check of fewer files
  * than the threshold stays on the main thread, where starting workers would
  * cost more than they save. The main thread parses too, so a pool has one
  * worker fewer than there are threads. No I/O and no thread of its own: the
@@ -24,12 +24,14 @@ import type { ProjectIo } from "./contracts.ts";
  */
 export const DEFAULT_MAX_THREADS = 4;
 /**
- * Cores per thread by default. Each thread runs its own JavaScript VM, whose
- * JIT compiler and garbage collector run on threads of their own: on four
- * Linux cores, four parsing threads made the synthetic repo's check 60%
- * slower, two kept it even (chapter 6).
+ * Cores per thread by default, and the cores left out first. Each thread
+ * runs its own JavaScript VM, whose JIT compiler and garbage collector run on
+ * threads of their own: on four Linux cores, four parsing threads made the
+ * synthetic repo's check 60% slower, and two made the CI bench job's 19%
+ * slower (chapter 6). So a 4-core machine keeps one thread.
  */
 const CORES_PER_THREAD = 2;
+const RESERVED_CORES = 2;
 /** A check of fewer files than this runs on the main thread alone. */
 export const MIN_PARALLEL_FILES = 1000;
 /** Each thread gets at least this many files, so a check just over the threshold starts few. */
@@ -39,8 +41,9 @@ const WHOLE_NUMBER = /^\d+$/u;
 
 /**
  * Reads how many threads may parse a full check: `INWARDS_THREADS` when it
- * is a whole number, else half the cores up to `DEFAULT_MAX_THREADS`. One
- * or fewer means the main thread alone.
+ * is a whole number, else half of the cores beyond two, up to
+ * `DEFAULT_MAX_THREADS`: one on 4 cores, three on 8, four from 10. One or
+ * fewer means the main thread alone.
  *
  * @param runtime - `threads` (`INWARDS_THREADS` as set) and `cores`.
  * @returns the limit, 0 or more.
@@ -50,7 +53,8 @@ export function threadLimit(runtime: Pick<Runtime, "threads" | "cores">): number
   if (setting !== undefined && WHOLE_NUMBER.test(setting)) {
     return Number(setting);
   }
-  return Math.min(Math.floor(runtime.cores / CORES_PER_THREAD), DEFAULT_MAX_THREADS);
+  const spare = Math.max(runtime.cores - RESERVED_CORES, 0);
+  return Math.min(Math.floor(spare / CORES_PER_THREAD), DEFAULT_MAX_THREADS);
 }
 
 /**
