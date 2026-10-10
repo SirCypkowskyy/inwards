@@ -30,7 +30,6 @@ import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { budgetedGit, nodeGit } from "./git.ts";
 import { loadGrammars } from "./grammars.ts";
 import { nodeInitFiles } from "./init-files.ts";
-import { serveLsp } from "./lsp-connection.ts";
 import { terminalPicker } from "./picker.ts";
 import { readRuntime, runtimeFrom, systemClock } from "./runtime.ts";
 import { nodeStateFiles } from "./state-files.ts";
@@ -121,7 +120,9 @@ export function compose(workerEntry?: string): AppDeps {
  * keeps what it extracted from each text in memory for as long as the server
  * runs (the daemon's cache, ADR-039). The check gets no worker pool, so a
  * keystroke never starts a thread, and streams whose stdout writes to stderr,
- * since stdout carries the protocol.
+ * since stdout carries the protocol. The connection and its protocol library
+ * load only when `inwards server` runs: imported at start-up, they cost every
+ * hook call about 5 ms (the bench's pre-write case, 11.3 to 16.6 ms p50).
  *
  * @param io - the server's own platform.
  * @returns the language server's dependencies.
@@ -134,7 +135,11 @@ function nodeLsp(io: Platform): LspDeps {
     extractionCache: (): ExtractionCache => extractions,
   };
   return {
-    serve: serveLsp,
+    serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
+      // A split chunk in the binary, loaded on use (as the init picker is, ADR-020).
+      const { serveLsp } = await import("./lsp-connection.ts");
+      return await serveLsp(build);
+    },
     check: (
       configPath: string,
       targets: string[] | undefined,
