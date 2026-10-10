@@ -62,6 +62,17 @@ interface Call {
 /** Runs one job on the calling thread. */
 type LocalRun = (job: ExtractionJob) => ExtractionAnswer;
 
+/** What `startExtractionPool` takes besides the workers' program, grammars and count. */
+export interface ExtractionPoolOptions {
+  /**
+   * This thread's own parser, for the batches it takes while it waits; it
+   * defaults to one made from the grammars. A promise that settles to
+   * undefined keeps this thread off the queue, so the workers answer every
+   * job (#319: a test that must see the workers' answers).
+   */
+  readonly local?: Promise<LocalRun | undefined>;
+}
+
 /**
  * Lets the event loop deliver the workers' answers before this thread takes
  * its next batch.
@@ -135,9 +146,15 @@ class WorkerPool implements ExtractionPool {
    * @param entry - the program the workers run.
    * @param wasm - the grammars every worker loads.
    * @param size - how many workers to start.
+   * @param local - this thread's own parser, settling to undefined when it has none.
    */
-  constructor(entry: string, wasm: GrammarBinaries, size: number) {
-    this.local = createExtractionWorker(wasm).catch(() => undefined);
+  constructor(
+    entry: string,
+    wasm: GrammarBinaries,
+    size: number,
+    local: Promise<LocalRun | undefined>,
+  ) {
+    this.local = local;
     this.slots = Array.from({ length: size }, () => startWorker(entry, wasm)).filter(
       (slot: Slot | undefined): slot is Slot => slot !== undefined,
     );
@@ -358,12 +375,21 @@ class WorkerPool implements ExtractionPool {
  * @param entry - the program the workers run: `main.ts`, or the compiled binary's own entry.
  * @param wasm - the grammars every worker loads; this thread has loaded them already.
  * @param size - how many workers to start.
+ * @param options - this thread's parser, when it isn't the default one.
+ * @param options.local - this thread's own parser; settling to undefined keeps this thread off the queue.
  * @returns the pool, its workers loading the grammar.
  */
 export function startExtractionPool(
   entry: string,
   wasm: GrammarBinaries,
   size: number,
+  options: ExtractionPoolOptions = {},
 ): ExtractionPool {
-  return new WorkerPool(entry, wasm, size);
+  const local = options.local ?? createExtractionWorker(wasm);
+  return new WorkerPool(
+    entry,
+    wasm,
+    size,
+    local.catch(() => undefined),
+  );
 }
