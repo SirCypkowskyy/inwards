@@ -9,7 +9,7 @@
   }
 
   .homepage-loop-wrap {
-    max-width: 100%;
+    max-inline-size: 100%;
     overflow-x: auto;
   }
 
@@ -17,9 +17,9 @@
      at its natural text size and never needs the wrapper to scroll. */
   #homepage-loop {
     display: block;
-    width: 100%;
-    max-width: 380px;
-    height: auto;
+    inline-size: 100%;
+    max-inline-size: 380px;
+    block-size: auto;
     font-family: var(--md-text-font-family, sans-serif);
     font-size: 15px;
   }
@@ -109,14 +109,14 @@
      Plain CSS custom properties on a hand-authored SVG don't have that
      problem, the same reasoning that already applies to #homepage-loop. */
   .quadrant-chart-wrap {
-    max-width: 100%;
+    max-inline-size: 100%;
     overflow-x: auto;
   }
 
   #quadrant-chart {
-    width: 100%;
-    min-width: 600px;
-    height: auto;
+    inline-size: 100%;
+    min-inline-size: 600px;
+    block-size: auto;
     font-family: var(--md-text-font-family, sans-serif);
   }
 
