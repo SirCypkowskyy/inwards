@@ -24,7 +24,15 @@
   // of 0 disables the limit in fallow 3.28.0 (#176).
   "duplicates": { "threshold": 3, "mode": "mild", "minTokens": 50, "minLines": 5 },
   // Dev and optional dependencies nobody uses fail like the rest (default: warn).
-  "rules": { "unused-dev-dependencies": "error", "unused-optional-dependencies": "error" },
+  // A rule-pack finding fails the run too (default: warn).
+  "rules": {
+    "unused-dev-dependencies": "error",
+    "unused-optional-dependencies": "error",
+    "policy-violation": "error"
+  },
+  // Adapters import the engine as `@inwards/core`, never a module under
+  // src/core/src/ by path; see the comment above the CLI's boundary rules.
+  "rulePacks": [".fallow-core-api.jsonc"],
   // importersOf: only tests call it; the Stop gate checks the whole project
   // instead (#139). Drop it once a rule or command uses it. (checkFiles, index
   // and modules no longer need an exception: fallow now sees their callers.)
@@ -346,22 +354,105 @@
           "core-report"
         ]
       },
-      // The CLI reaches the engine through `@inwards/core` (index.ts) only, and
-      // its folders depend downwards: pure leaves (platform, json, paths), then
+      // Adapters reach the engine through `@inwards/core` (index.ts) only.
+      // fallow 3.31 judges a named import through that barrel by the zone of
+      // the module that declares the symbol, so every adapter rule that allows
+      // core-api also allows the twelve zones index.ts re-exports from
+      // (contracts to report below). A zone index.ts starts re-exporting from
+      // goes into each of those lists. The allow lists can't tell the barrel
+      // from a direct import of an internal module, so .fallow-core-api.jsonc
+      // (rulePacks above) refuses the direct one (#262).
+      //
+      // The CLI's folders depend downwards: pure leaves (platform, json, paths), then
       // project, session, runlog, then claude-code and init, then commands.
       // Only adapters/ implements the platform contracts, and only main.ts
       // (through adapters/compose.ts) wires adapters in (#176).
       { "from": "cli-platform", "allow": [] },
       { "from": "cli-json", "allow": [] },
-      { "from": "cli-paths", "allow": ["core-api", "cli-platform"] },
-      { "from": "cli-project", "allow": ["core-api", "cli-platform", "cli-json", "cli-paths"] },
+      {
+        "from": "cli-paths",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform"
+        ]
+      },
+      {
+        "from": "cli-project",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths"
+        ]
+      },
       {
         "from": "cli-session",
-        "allow": ["core-api", "cli-platform", "cli-json", "cli-paths", "cli-project"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project"
+        ]
       },
       {
         "from": "cli-runlog",
-        "allow": ["core-api", "cli-platform", "cli-json", "cli-paths", "cli-project", "cli-session"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-session"
+        ]
       },
       {
         "from": "cli-protocol",
@@ -371,6 +462,18 @@
         "from": "cli-claude-code",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-json",
           "cli-paths",
@@ -384,6 +487,18 @@
         "from": "cli-init",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-json",
           "cli-paths",
@@ -396,6 +511,18 @@
         "from": "cli-commands",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-json",
           "cli-paths",
@@ -411,6 +538,18 @@
         "from": "cli-adapters",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-paths",
           "cli-project",
@@ -422,12 +561,42 @@
       },
       {
         "from": "cli-main",
-        "allow": ["core-api", "cli-adapters", "cli-commands", "cli-init", "cli-platform"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-adapters",
+          "cli-commands",
+          "cli-init",
+          "cli-platform"
+        ]
       },
       {
         "from": "cli-test",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-main",
           "cli-adapters",
           "cli-commands",
@@ -445,18 +614,89 @@
       // The client talks to VS Code and the server only; the server reaches the
       // engine through `@inwards/core`; neither imports the other.
       { "from": "vscode-client", "allow": [] },
-      { "from": "vscode-server", "allow": ["core-api"] },
+      {
+        "from": "vscode-server",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report"
+        ]
+      },
       // The extension's tests and build scripts exercise both sides.
-      { "from": "vscode-dev", "allow": ["core-api", "vscode-client", "vscode-server"] },
+      {
+        "from": "vscode-dev",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "vscode-client",
+          "vscode-server"
+        ]
+      },
       // The one test that builds the module index through both adapters (#44).
       {
         "from": "adapter-parity",
-        "allow": ["core-api", "cli-adapters", "cli-project", "vscode-server"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-adapters",
+          "cli-project",
+          "vscode-server"
+        ]
       },
       { "from": "scripts", "allow": [] },
       // The eval harness reads layers the way the CLI does, through the public API,
       // and recognises config guard denials by the CLI's own ASK_USER text.
-      { "from": "eval", "allow": ["core-api", "cli-protocol"] },
+      {
+        "from": "eval",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-protocol"
+        ]
+      },
       // The bench runs binaries as processes and imports nothing of ours.
       { "from": "bench", "allow": [] },
       // The npm placeholder ships alone and imports nothing.

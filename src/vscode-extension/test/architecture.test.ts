@@ -6,10 +6,15 @@
  * answers come from `fallow guard`, not from re-reading the config.
  */
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
+/** A re-export's source in index.ts: its top folder and the next path segment. */
+const REEXPORT = /from "\.\/(?<top>[^/"]+)\/(?<next>[^/"]+)/gu;
+/** A TypeScript file suffix. */
+const TS_SUFFIX = /\.ts$/u;
 
 /** What `fallow guard --format json` says about one file. */
 interface Guarded {
@@ -57,10 +62,35 @@ test("the client imports nothing of ours", () => {
   expect(reachable(client)).toEqual([]);
 });
 
+/**
+ * Lists the zones behind the engine's barrel: core-api itself and the zone of
+ * every module `src/core/src/index.ts` re-exports from. fallow judges an
+ * import through the barrel by the zone of the module behind it, so an
+ * adapter that may use the public API is allowed exactly these.
+ *
+ * @returns the zone names, sorted.
+ */
+function publicApiZones(): string[] {
+  const index = readFileSync(join(REPO, "src/core/src/index.ts"), "utf8");
+  const zones = new Set(["core-api"]);
+  for (const match of index.matchAll(REEXPORT)) {
+    const top = match.groups?.["top"];
+    const next = match.groups?.["next"];
+    if (top === "rules" && next !== undefined) {
+      zones.add(
+        next === "shared" ? "core-rules-shared" : `core-rule-${next.replace(TS_SUFFIX, "")}`,
+      );
+    } else if (top !== undefined) {
+      zones.add(`core-${top}`);
+    }
+  }
+  return [...zones].sort();
+}
+
 test("the server reaches only the engine's public API", () => {
   const server = guard("src/vscode-extension/src/server/server.ts");
   expect(server.zone?.name).toBe("vscode-server");
-  expect(reachable(server)).toEqual(["core-api"]);
+  expect(reachable(server)).toEqual(publicApiZones());
 });
 
 test("a file in a new source folder has no zone, so fallow reports it", () => {
