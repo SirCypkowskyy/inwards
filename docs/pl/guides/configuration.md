@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: cc1bcfd0a2777986bf577b986c164e3aceff6f5d32b46821d87eeaab2628c509
+source_hash: d8ec85db7533bd071587bec1fe24bafefbfd671628f0b75722feabc567b40f88
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -216,7 +216,7 @@ Które reguły zgłaszają i jak głośno:
 - `select`: zgłaszają tylko te reguły, także reguły opt-in. Musi zawierać co najmniej jeden kod.
 - `extend-select`: te reguły też zgłaszają, obok `select` albo reguł domyślnie włączonych. Włącza [reguły opt-in](../rules/index.md#opt-in-rules).
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
-- `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
+- `severity`: tabela kodu reguły na `"error"` albo `"warning"`. Wszystkie cztery klucze przyjmują kody reguł, takie jak `"INW001"`. Nazwa reguły w ich miejscu, na przykład `"layer-dependency"`, to błąd konfiguracji, który podaje kod do wpisania.
 - `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`ports-abstract`](../rules/INW014.md#configuration), [`construct-only-in`](../rules/INW015.md#configuration), [`orm-naming`](../rules/INW016.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie. [Szablon](#template-rules) może też włączyć reguły opt-in dla jednej ze swoich ról, co dodaje się do tych tabel.
 - `[tool.inwards.rules.pure-domain]` przyjmuje też `deny`, listę tabel z `modules` (prefiksy albo selektory, jak wyżej) i `libraries` (nazwy importu, jak w `deny-libraries` warstwy). Moduły, do których pasuje wpis, nie mogą importować jego bibliotek, niezależnie od tego, czy należą do warstwy, a `allow-libraries` warstwy tego nie znosi ([INW005](../rules/INW005.md), [przewodnik po bibliotekach](libraries.md#prefix-deny)). Służy do pakietu, który nie jest całą warstwą, na przykład do kontraktu import-lintera „`mypackage.one` nie może importować `django`”.
 

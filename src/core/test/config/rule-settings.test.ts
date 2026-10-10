@@ -91,6 +91,15 @@ describe("[tool.inwards.rules] parsing", () => {
   });
 
   test.each([
+    ['ignore = ["layer-dependency"]', "in tool.inwards.rules.ignore is a rule name", "INW001"],
+    ['select = ["import-cycles"]', "in tool.inwards.rules.select is a rule name", "INW004"],
+    ['severity = { layer-dependency = "warning" }', "rules.severity is a rule name", "INW001"],
+  ])("a rule name where a code belongs names the code: %s", (rules, where, code) => {
+    expect(() => withRules(rules)).toThrow(where);
+    expect(() => withRules(rules)).toThrow(`not a code: did you mean "${code}"?`);
+  });
+
+  test.each([
     ['ignore = ["INW000"]', "can't list INW000"],
     ['severity = { INW000 = "warning" }', "can't list INW000"],
     ['select = "INW001"', "must be a list of rule codes"],

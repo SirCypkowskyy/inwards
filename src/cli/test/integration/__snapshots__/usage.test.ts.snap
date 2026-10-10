@@ -1,0 +1,298 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`--help prints the overview with every style 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"inwards <version>
+
+Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
+                     [--config pyproject.toml] [--log] [--no-cache]
+                     (PATHS: those files only; whole-project checks such as dead layer
+                     prefixes, import cycles and symlinks in layers run without PATHS)
+       inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
+       inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi
+                    [--scaffold] [--package NAME] [--agent ...] [--dry-run]
+       inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
+       inwards init --brief [--dry-run]
+       inwards init --list-styles [--package NAME]
+                    (--list-styles: the presets; --brief: also the architecture brief in AGENTS.md)
+       inwards context [--config pyproject.toml] [--write]
+                       (the architecture brief; --write: into AGENTS.md)
+       inwards import-config [FILE] [--write]
+                             (import-linter contracts as [tool.inwards]; --write: into pyproject.toml)
+       inwards stats [DIR] [--format text|json] [--export FILE [--redact]]
+                     (hypothesis numbers from the run logs)
+       inwards hook claude-code    (reads a Claude Code hook payload on stdin)
+       inwards daemon [status|stop] [--idle SECONDS]    (keeps PostToolUse warm; hooks start it)
+       inwards server [--stdio]    (the language server, LSP over stdio; editors start it)
+       inwards mcp    (the MCP server over stdio; agents' MCP clients start it)
+
+Run inwards COMMAND --help for one command's options.
+Checks Python imports against the layers declared in [tool.inwards].
+"
+,
+}
+`;
+
+exports[`check --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
+                     [--config pyproject.toml] [--log] [--no-cache]
+
+Checks Python imports against the layers declared in [tool.inwards].
+
+PATHS: check those files or directories only; whole-project checks such as
+dead layer prefixes, import cycles and symlinks in layers run without PATHS.
+--format: text (default), concise, json (inwards/diagnostics@1) or sarif.
+--max-diagnostics N: print at most N findings (not with sarif).
+--config FILE: the pyproject.toml to read, instead of the nearest one with [tool.inwards].
+--log: append this run to .inwards/runs.jsonl even when the run log is off.
+--no-cache: parse every file again instead of reusing the extraction cache.
+
+Exit codes: 0 clean or warnings only, 1 errors, 2 usage or config error.
+"
+,
+}
+`;
+
+exports[`baseline --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards baseline [--config pyproject.toml] [--no-cache]
+
+Records today's violations in inwards-baseline.json next to the config, so check
+reports only new ones.
+
+--config FILE: the pyproject.toml to read, instead of the nearest one with [tool.inwards].
+--no-cache: parse every file again instead of reusing the extraction cache.
+"
+,
+}
+`;
+
+exports[`init --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi
+                    [--scaffold] [--package NAME] [--agent ...] [--dry-run]
+       inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
+       inwards init --brief [--dry-run]
+       inwards init --list-styles [--package NAME]
+
+Sets Inwards up: a preset's [tool.inwards], an example scaffold and an agent's wiring.
+On a terminal with no flags it asks; elsewhere it needs --style, --agent or --brief.
+
+--style: write that preset's [tool.inwards] (--list-styles describes each one).
+--scaffold: also write the preset's example package; --package NAME names it.
+--agent: wire the hook (claude), the plugin (opencode), the lint command (aider)
+or the instructions (agents-md); --launcher sets the command that runs inwards.
+--brief: also write the architecture brief into AGENTS.md.
+--dry-run: print the changes instead of writing them.
+"
+,
+}
+`;
+
+exports[`context --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards context [--config pyproject.toml] [--write]
+
+Prints the architecture brief for agents, built from [tool.inwards].
+
+--config FILE: the pyproject.toml to read, instead of the nearest one with [tool.inwards].
+--write: write it into AGENTS.md instead of printing it.
+"
+,
+}
+`;
+
+exports[`import-config --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards import-config [FILE] [--write]
+
+Converts import-linter contracts into a [tool.inwards] table and prints it.
+
+FILE: the import-linter config (.importlinter, setup.cfg or pyproject.toml);
+without it, the first one found in the working directory.
+--write: append the table to the pyproject.toml beside FILE.
+"
+,
+}
+`;
+
+exports[`stats --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards stats [DIR] [--format text|json] [--export FILE [--redact]]
+
+Summarises the run logs of the project in DIR (default: the working directory).
+
+--format: text (default) or json.
+--export FILE: write the merged run log to FILE; --redact replaces its paths and
+fingerprints with keyed hashes.
+"
+,
+}
+`;
+
+exports[`hook --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards hook claude-code
+
+Runs one Claude Code hook: reads its JSON payload on stdin.
+Claude Code runs it; inwards init --agent claude wires it in.
+"
+,
+}
+`;
+
+exports[`daemon --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards daemon [status|stop] [--idle SECONDS]
+
+Keeps the engine warm for the PostToolUse hook, for the project in the working directory.
+Hooks start it, and it exits after --idle SECONDS without a request (default 600).
+
+status: say whether this project's daemon is running.
+stop: stop it.
+"
+,
+}
+`;
+
+exports[`server --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards server [--stdio]
+
+Runs the language server over stdio. Editors start it; --stdio is accepted and changes nothing.
+"
+,
+}
+`;
+
+exports[`mcp --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards mcp
+
+Runs the MCP server over stdio. Agents' MCP clients start it.
+"
+,
+}
+`;
+
+exports[`a usage mistake is one line, exit 2: inwards check --bogus 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards check: unknown option --bogus. Run inwards check --help for its options.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a usage mistake is one line, exit 2: inwards -x 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards: unknown option -x. Run inwards --help for the options.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a usage mistake is one line, exit 2: inwards init -hx 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards init: unknown option -x. Run inwards init --help for its options.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a usage mistake is one line, exit 2: inwards check --format 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards check: Option '--format <value>' argument missing. Run inwards check --help for its options.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a usage mistake is one line, exit 2: inwards check --log=yes 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards check: Option '--log' does not take an argument. Run inwards check --help for its options.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a usage mistake is one line, exit 2: inwards frobnicate 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards: unknown command "frobnicate". Run inwards --help for the commands.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a missing config suggests inwards init 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"No pyproject.toml with [tool.inwards] found. Run inwards init to set one up, or pass --config FILE.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`a rule name where a code belongs suggests the code 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"config error: "layer-dependency" in tool.inwards.rules.ignore is a rule name, not a code: did you mean "INW001"?
+"
+,
+  "stdout": "",
+}
+`;

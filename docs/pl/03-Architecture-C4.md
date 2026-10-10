@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 46816811482a4684314de425c9026f86db5bc4f7dc7c890e3c64ff3a824431be
+source_hash: d991c400515c535af125cd8559abb0352ad63f33612bba6888536462e6833759
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -222,7 +222,7 @@ flowchart LR
     cache["Pamięć podręczna po hashu zawartości<br/><small>.inwards/cache</small>"] --> eng
 ```
 
-Kody wyjścia są takie jak w Ruffie: `0` czysto (ostrzeżenia dozwolone), `1` znaleziono błędy, `2` błąd użycia albo konfiguracji. Agenci i skrypty CI mogą rozgałęziać się na tej podstawie bez parsowania wyjścia. W raporcie JSON `summary.violations` liczy błędy, a `summary.warnings` ostrzeżenia. Uruchomienie dla całego projektu (bez argumentów ścieżek) sprawdza też każdy prefiks warstwy i selektor kształtu względem znalezionych modułów (INW006, INW007) oraz wymagane elementy każdego pakietu z kształtem (INW008).
+Kody wyjścia są takie jak w Ruffie: `0` czysto (ostrzeżenia dozwolone), `1` znaleziono błędy, `2` błąd użycia albo konfiguracji. Agenci i skrypty CI mogą rozgałęziać się na tej podstawie bez parsowania wyjścia. W raporcie JSON `summary.violations` liczy błędy, a `summary.warnings` ostrzeżenia. `inwards --help` wymienia wszystkie polecenia, a `inwards COMMAND --help` wypisuje opcje jednego polecenia, oba na stdout z kodem `0`; nieznane polecenie albo opcja, albo opcja bez wartości, to jedna linia na stderr z kodem `2`. Uruchomienie dla całego projektu (bez argumentów ścieżek) sprawdza też każdy prefiks warstwy i selektor kształtu względem znalezionych modułów (INW006, INW007) oraz wymagane elementy każdego pakietu z kształtem (INW008).
 
 Pozostałe polecenia korzystają z tych samych elementów:
 
