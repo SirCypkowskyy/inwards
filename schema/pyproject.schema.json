@@ -71,6 +71,7 @@
         "INW011",
         "INW012",
         "INW013",
+        "INW015",
         "INW016",
         "FAPI001",
         "FAPI002",
@@ -355,6 +356,9 @@
         },
         "async-blocking": {
           "$ref": "#/definitions/asyncBlockingOptions"
+        },
+        "construct-only-in": {
+          "$ref": "#/definitions/constructOnlyInOptions"
         },
         "orm-naming": {
           "$ref": "#/definitions/ormNamingOptions"
@@ -696,6 +700,38 @@
             "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
           },
           "default": []
+        }
+      }
+    },
+    "constructOnlyInOptions": {
+      "description": "INW015 construct-only-in's options, [tool.inwards.rules.construct-only-in]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "INW015 construct-only-in's options, [tool.inwards.rules.construct-only-in]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW015/)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role"
+      ],
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "role": {
+          "description": "The guarded modules, such as the outbound adapters, as module prefixes or selectors as in layers[].modules. Only the role itself and allowed-in may import them at runtime or build their classes.",
+          "markdownDescription": "The guarded modules, such as the outbound adapters, as module prefixes or selectors as in layers[].modules. Only the role itself and allowed-in may import them at runtime or build their classes.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW015/)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "allowed-in": {
+          "description": "The composition root: the modules, as prefixes or selectors, that may import the role and build its classes, such as app.di and app.main. Unset means only the role itself may.",
+          "markdownDescription": "The composition root: the modules, as prefixes or selectors, that may import the role and build its classes, such as app.di and app.main. Unset means only the role itself may.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW015/)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
         }
       }
     },

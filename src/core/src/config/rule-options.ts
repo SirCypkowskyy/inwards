@@ -73,8 +73,8 @@ function depth(value: unknown, where: string): number {
 
 /**
  * Parses a non-empty list of module prefixes or selectors, checked like
- * `layers[].modules`: `modules` in every table, and FAPI003's `allow-unmounted`.
- * INW013's `follow-modules` may be empty.
+ * `layers[].modules`: `modules` in every table, FAPI003's `allow-unmounted`,
+ * INW015's `role` and `allowed-in`. INW013's `follow-modules` may be empty.
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
@@ -272,6 +272,7 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "follow-modules": (value: unknown, where: string): string[] =>
       moduleEntries(value, where, true),
   },
+  "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
   "orm-naming": {
     "table-name": oneOf(["snake", "snake_singular", false]),
     "datetime-suffix": suffix,
@@ -352,12 +353,6 @@ export function stringList(value: OptionValue | undefined): readonly string[] | 
   if (typeof value !== "object") {
     return undefined;
   }
-  const strings: string[] = [];
-  for (const entry of value) {
-    if (typeof entry !== "string") {
-      return undefined;
-    }
-    strings.push(entry);
-  }
-  return strings;
+  const strings = [...value].filter((entry): entry is string => typeof entry === "string");
+  return strings.length === value.length ? strings : undefined;
 }

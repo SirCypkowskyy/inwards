@@ -197,6 +197,20 @@
       "url": "INW013/"
     },
     {
+      "code": "INW015",
+      "name": "construct-only-in",
+      "title": "INW015 construct-only-in",
+      "summary": "A module outside the composition root that imports an outbound adapter, or another guarded role, at runtime, or builds one of its classes",
+      "description": "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
+      "category": ["roles", "ports-and-adapters"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, error",
+      "url": "INW015/"
+    },
+    {
       "code": "INW016",
       "name": "orm-naming",
       "title": "INW016 orm-naming",

@@ -29,6 +29,7 @@ import inw010 from "../../../../docs/chapters/rules/INW010.md" with { type: "tex
 import inw011 from "../../../../docs/chapters/rules/INW011.md" with { type: "text" };
 import inw012 from "../../../../docs/chapters/rules/INW012.md" with { type: "text" };
 import inw013 from "../../../../docs/chapters/rules/INW013.md" with { type: "text" };
+import inw015 from "../../../../docs/chapters/rules/INW015.md" with { type: "text" };
 import inw016 from "../../../../docs/chapters/rules/INW016.md" with { type: "text" };
 
 /** Every rule page's Markdown, by rule code; a test checks it lists every registered rule. */
@@ -56,6 +57,7 @@ export const RULE_PAGES: ReadonlyMap<string, string> = new Map(
     INW011: inw011,
     INW012: inw012,
     INW013: inw013,
+    INW015: inw015,
     INW016: inw016,
   }),
 );
