@@ -281,7 +281,14 @@
       },
       {
         "from": "core-rule-thin-endpoint",
-        "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
       },
       { "from": "core-baseline", "allow": ["core-contracts"] },
       {
