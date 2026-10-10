@@ -127,9 +127,9 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
 === ":material-microsoft-visual-studio-code: Copilot (VS Code)"
 
-    In agent mode, Copilot can read the workspace diagnostics that extensions publish. With the Inwards extension installed, a layer violation shows up in the Problems panel like any other error, and the agent sees it without a hook.
+    Copilot has no hook Inwards can use. In VS Code, the extension puts every violation in the Problems panel, and the agent sees them when it reads that panel (the `#read/problems` tool) or runs the check that `AGENTS.md` asks for. `inwards mcp` gives it the [MCP tools](guides/mcp.md).
 
-    For the Copilot coding agent that works on GitHub pull requests, enforcement happens in CI. Add `inwards check --format sarif` to the workflow and install the binary in `.github/workflows/copilot-setup-steps.yml` so the agent can run it before pushing.
+    The Copilot cloud agent, which works on GitHub and opens pull requests, reads the same `AGENTS.md`, gets Inwards from `.github/workflows/copilot-setup-steps.yml`, and is held to the layers by the CI check on its pull request. The [GitHub Copilot guide](guides/copilot.md) has the setup for both.
 
 === ":material-file-document-edit-outline: Codex, Cursor and others"
 
