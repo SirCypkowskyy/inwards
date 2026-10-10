@@ -73,17 +73,25 @@ export function answered(answer: DaemonAnswer): AskResult {
  *
  * @param result - what `ask` returns.
  * @param record - the record text, if any.
+ * @param files - the daemon files by path, read before `record`; tests add
+ *   the note of a failed start here.
  * @returns the link, the lines it was asked to send and the projects it was told to start.
  */
 export function fakeLink(
   result: AskResult,
   record: string | undefined = RECORD,
+  files: Map<string, string> = new Map(),
 ): { link: DaemonLink; sent: string[]; started: string[] } {
   const sent: string[] = [];
   const started: string[] = [];
   const link: DaemonLink = {
     identity: (): string => SELF.identity,
-    readRecord: (): string | undefined => record,
+    readRecord(path: string): string | undefined {
+      if (files.has(path)) {
+        return files.get(path);
+      }
+      return path === PLACE.failed ? undefined : record;
+    },
     ask: (_endpoint: string, line: string): Promise<AskResult> => {
       sent.push(line);
       return Promise.resolve(result);

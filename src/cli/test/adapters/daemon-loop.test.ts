@@ -61,26 +61,16 @@ describe("the daemon's queue (#277)", () => {
       },
     };
     let endpoint = "";
-    // The socket goes in a short private directory of this test's own.
-    const runtimeDir = process.env["XDG_RUNTIME_DIR"];
-    process.env["XDG_RUNTIME_DIR"] = sockets;
-    const serving = nodeDaemonHost().serve(place, handler, {
+    const serving = nodeDaemonHost(() => [sockets]).serve(place, handler, {
       idleMs: 60_000,
       record: (at: string): string => {
         endpoint = at;
         return "{}\n";
       },
+      failure: (why: string): string => why,
       holds: (): Promise<boolean> => Promise.resolve(false),
     });
-    try {
-      await until(() => endpoint !== "");
-    } finally {
-      if (runtimeDir === undefined) {
-        delete process.env["XDG_RUNTIME_DIR"];
-      } else {
-        process.env["XDG_RUNTIME_DIR"] = runtimeDir;
-      }
-    }
+    await until(() => endpoint !== "");
     const { ask } = nodeDaemonLink("");
     const stuck = ask(endpoint, "stuck\n", LIMITS);
     await until(() => seen.includes("stuck"));

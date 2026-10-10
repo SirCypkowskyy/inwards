@@ -1,7 +1,7 @@
 /**
  * @file What the daemon feature needs from outside the process: a local socket
  * (or a named pipe) to listen on and to ask through, the daemon's record and
- * lock files, the running executable's identity, and a way to start
+ * lock files and the note of a failed start, the running executable's identity, and a way to start
  * `inwards daemon` in the background. `adapters/daemon-link.ts` and
  * `adapters/daemon-host.ts` implement them; `main.ts` wires them in. Types only.
  */
@@ -27,9 +27,9 @@ export interface DaemonLink {
    */
   identity: () => string | undefined;
   /**
-   * Reads a daemon record.
+   * Reads one of the daemon's files: its record, or the note of a failed start.
    *
-   * @param path - the record (`DaemonPlace.record`).
+   * @param path - `DaemonPlace.record` or `DaemonPlace.failed`.
    * @returns its text, or undefined when there is none or it can't be read.
    */
   readRecord: (path: string) => string | undefined;
@@ -69,7 +69,10 @@ export type ServeResult =
   | { kind: "served" }
   /** Another live daemon holds the project's lock. */
   | { kind: "running"; pid: number }
-  /** It couldn't listen: no private directory for the socket, or the listen failed. */
+  /**
+   * It couldn't listen: no private directory for the socket, or the listen
+   * failed. The note of a failed start is written.
+   */
   | { kind: "failed"; why: string };
 
 /** What a daemon's lock file names. */
@@ -92,6 +95,14 @@ export interface ServeOptions {
    * @returns the record's text.
    */
   record: (endpoint: string, token: string) => string;
+  /**
+   * Builds the note of a failed start, written to `DaemonPlace.failed` when
+   * the daemon can't listen, so hooks stop starting one for a while (#275).
+   *
+   * @param why - why it couldn't listen.
+   * @returns the note's text.
+   */
+  failure: (why: string) => string;
   /**
    * Asks the project's daemon whether it holds a lock that a live process
    * still names, so a pid the OS gave to another process doesn't keep a dead
@@ -131,7 +142,8 @@ export interface DaemonHost {
    * Serves a project until stopped. Takes the lock (exclusively, with a fresh
    * random token; a lock whose holder is gone, or whose live pid doesn't
    * prove it holds it, is removed and taken again, once), listens on a fresh
-   * endpoint, publishes the record, then hands each request line to the
+   * endpoint, publishes the record and removes the note of an earlier failed
+   * start (or, when it can't listen, writes one), then hands each request line to the
    * handler, one at a time in arrival order (an urgent one at once, see
    * `LineHandler.urgent`). Once stopping, it drops the requests still
    * waiting, whose hooks then run in their own process. It stops when the handler says

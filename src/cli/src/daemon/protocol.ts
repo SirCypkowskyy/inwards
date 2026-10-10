@@ -1,9 +1,9 @@
 /**
  * @file The wire format between `inwards hook claude-code` and `inwards daemon`
  * (ADR-039): one connection per request and one line of JSON each way, tagged
- * `inwards-daemon/1`. It names the daemon's files (the record and the lock
- * under the user's state directory) and builds and validates every value that
- * crosses the socket or the record. Pure: no I/O; the adapter
+ * `inwards-daemon/1`. It names the daemon's files (the record, the lock and
+ * the note of a failed start under the user's state directory) and builds and
+ * validates every value that crosses the socket or those files. Pure: no I/O; the adapter
  * (`adapters/daemon-link.ts` and `daemon-host.ts`) move the lines and the files.
  */
 import { createHash } from "node:crypto";
@@ -87,6 +87,20 @@ export interface DaemonRecord extends Stamp {
   started: string;
 }
 
+/**
+ * The note a daemon leaves when it can't listen, so hooks don't start another
+ * one on every edit (#275).
+ */
+export interface DaemonFailure {
+  protocol: string;
+  /** When the start failed, ISO 8601. */
+  at: string;
+  /** Why it couldn't listen. */
+  why: string;
+  /** The daemon's pid. */
+  pid: number;
+}
+
 /** Where a project's daemon keeps its files. */
 export interface DaemonPlace {
   /** The real project root. */
@@ -97,6 +111,8 @@ export interface DaemonPlace {
   record: string;
   /** `<state home>/inwards/daemons/<key>.lock`, held by the running daemon. */
   lock: string;
+  /** `<state home>/inwards/daemons/<key>.failed`, the note of the last failed start (#275). */
+  failed: string;
 }
 
 /**
@@ -104,12 +120,18 @@ export interface DaemonPlace {
  *
  * @param runtime - the user's state directory.
  * @param project - the real project root.
- * @returns the key, the record and the lock.
+ * @returns the key, the record, the lock and the note of a failed start.
  */
 export function daemonPlace(runtime: Pick<Runtime, "stateHome">, project: string): DaemonPlace {
   const key = createHash("sha256").update(project).digest("hex").slice(0, KEY_LENGTH);
   const dir = join(runtime.stateHome, "inwards", "daemons");
-  return { project, key, record: join(dir, `${key}.json`), lock: join(dir, `${key}.lock`) };
+  return {
+    project,
+    key,
+    record: join(dir, `${key}.json`),
+    lock: join(dir, `${key}.lock`),
+    failed: join(dir, `${key}.failed`),
+  };
 }
 
 /**
@@ -268,12 +290,30 @@ export function parseRecord(text: string | undefined): DaemonRecord | undefined 
 }
 
 /**
+ * Reads the note of a failed start.
+ *
+ * @param text - the note's text, or undefined when there is none.
+ * @returns the note, or undefined when missing, torn or of another protocol.
+ */
+export function parseFailure(text: string | undefined): DaemonFailure | undefined {
+  const value = text === undefined ? undefined : parseJson(text);
+  if (!isRecord(value) || value["protocol"] !== PROTOCOL) {
+    return undefined;
+  }
+  const { at, why, pid } = value;
+  if (typeof at === "string" && typeof why === "string" && typeof pid === "number") {
+    return { protocol: PROTOCOL, at, why, pid };
+  }
+  return undefined;
+}
+
+/**
  * Writes one value as one line of JSON, newline included.
  *
- * @param value - a request, an answer or a record.
+ * @param value - a request, an answer, a record or the note of a failed start.
  * @returns the JSON text and a newline.
  */
-export function toLine(value: DaemonRequest | DaemonAnswer | DaemonRecord): string {
+export function toLine(value: DaemonRequest | DaemonAnswer | DaemonRecord | DaemonFailure): string {
   return `${JSON.stringify(value)}\n`;
 }
 
