@@ -86,6 +86,41 @@ describe("which imports stay inside the public modules", () => {
   });
 });
 
+describe("an exact entry opens a package without its submodules", () => {
+  const Facade = { public: { billing: ["=shop.billing", "shop.billing.api"] } };
+
+  test("the package facade passes, and so does a public prefix", async () => {
+    const { check }: ContextFixture = await contextFixture(Facade);
+    // The fixture's layers don't cover billing's __init__, so INW006 may speak; INW003 must not.
+    for (const text of [
+      "from shop.billing import issue_invoice\n",
+      "import shop.billing\n",
+      "from shop.billing.api import total\n",
+    ]) {
+      expect(codes(check(PLACE, text))).not.toContain("INW003");
+    }
+  });
+
+  test("a submodule the exact entry doesn't name is internal", async () => {
+    const { check }: ContextFixture = await contextFixture(Facade);
+    const [found] = check(PLACE, "from shop.billing.app.charge import refund\n");
+    expect(found?.code).toBe("INW003");
+    expect(found?.message).toContain('"shop.billing.app.charge" isn\'t one of its public modules');
+    expect(codes(check(PLACE, "from shop.billing import app\n"))).toEqual(["INW003"]);
+  });
+
+  test("the fix points at the facade when it exposes the name", async () => {
+    const texts = new Map([
+      ["shop/billing/__init__.py", "from shop.billing.app.charge import refund\n"],
+    ]);
+    const { check }: ContextFixture = await contextFixture({ ...Facade, texts });
+    const [found] = check(PLACE, "from shop.billing.app.charge import refund\n");
+    expect(found?.fix?.summary).toBe(
+      'Import "refund" from "shop.billing", the public module of "billing" that exposes it.',
+    );
+  });
+});
+
 describe("what else counts", () => {
   test("a caller outside every layer and every context is held to them too", async () => {
     const { check }: ContextFixture = await contextFixture(API_ONLY);

@@ -181,6 +181,28 @@ describe("public entries belong to their own context", () => {
     ).toContain("tool.inwards.contexts[0].public[0]");
   });
 
+  test("an exact entry with = is kept, and its ownership is checked without the =", () => {
+    const parsed = contexts(
+      '[[tool.inwards.contexts]]\nname = "orders"\nmodules = ["shop.orders"]\npublic = ["=shop.orders", "shop.orders.api"]\n',
+    );
+    expect(parsed?.[0]?.public).toEqual(["=shop.orders", "shop.orders.api"]);
+    expect(
+      error(
+        '[[tool.inwards.contexts]]\nname = "orders"\nmodules = ["shop.orders"]\npublic = ["=shop.billing"]\n',
+      ),
+    ).toContain("tool.inwards.contexts[0].public[0]");
+  });
+
+  test("an = with no dotted name after it is rejected", () => {
+    for (const bad of ["=", "=shop.*", "==shop.orders"]) {
+      expect(
+        error(
+          `[[tool.inwards.contexts]]\nname = "orders"\nmodules = ["shop.orders"]\npublic = ["${bad}"]\n`,
+        ),
+      ).toContain("tool.inwards.contexts[0].public[0]");
+    }
+  });
+
   test("an entry another context owns more specifically is rejected", () => {
     const message = error(`
 [[tool.inwards.contexts]]

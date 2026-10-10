@@ -137,6 +137,11 @@
       "type": "string",
       "pattern": "^[^.\\s*?\\[\\]/\\\\-]+(\\.[^.\\s*?\\[\\]/\\\\-]+)*$"
     },
+    "publicEntry": {
+      "description": "A public entry: a dotted module prefix such as shop.billing.api, or, with a leading =, that module alone without what lies under it, such as =shop.billing.",
+      "type": "string",
+      "pattern": "^=?[^.\\s*?\\[\\]/\\\\-]+(\\.[^.\\s*?\\[\\]/\\\\-]+)*$"
+    },
     "selector": {
       "description": "A package selector: a.b (exact), a.* (one level) or a.** (any depth).",
       "type": "string",
@@ -544,11 +549,11 @@
           }
         },
         "public": {
-          "description": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context.",
-          "markdownDescription": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
+          "description": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context. Write =name to open that module alone, not what lies under it (a package facade).",
+          "markdownDescription": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context. Write =name to open that module alone, not what lies under it (a package facade).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/dottedName"
+            "$ref": "#/definitions/publicEntry"
           },
           "default": []
         },
