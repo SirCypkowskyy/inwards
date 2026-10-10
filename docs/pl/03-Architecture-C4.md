@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 9f6da89dd2607e0829a7b6d261d907484e1b12aa09c34a8a4c0d00efcd567adf
+source_hash: d054edaed32f2d1060c14280c6a74e9d776b467ebce87f2a274c2f523d76a231
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -23,7 +23,7 @@ flowchart TB
     inwards["<b>Inwards</b><br/><small>Sprawdza importy Pythona<br/>względem zadeklarowanych warstw</small>"]
 
     repo[("Kod w Pythonie<br/><small>*.py + pyproject.toml</small>")]
-    editor["VS Code<br/><small>pokazuje diagnostyki</small>"]
+    editor["Edytor<br/><small>VS Code, Neovim, Helix: pokazuje diagnostyki</small>"]
     ci["Runner CI<br/><small>GitHub Actions</small>"]
     scanning["GitHub code scanning<br/><small>przyjmuje SARIF</small>"]
 
@@ -55,7 +55,8 @@ flowchart TB
 
     subgraph dist["Inwards"]
         cli["<b>inwards CLI</b><br/><small>TypeScript, kompilowany przez bun build --compile<br/>jeden plik binarny na OS/architekturę</small>"]
-        lsp["<b>Serwer języka</b><br/><small>TypeScript na Node, dołączony do rozszerzenia</small>"]
+        server["<b>inwards server</b><br/><small>LSP przez stdio, w pliku binarnym CLI</small>"]
+        lsp["<b>Serwer języka rozszerzenia</b><br/><small>TypeScript na Node, dołączony do rozszerzenia<br/>do #64</small>"]
         ext["<b>Rozszerzenie VS Code</b><br/><small>klient LSP, uruchamia serwer</small>"]
         core["<b>Silnik</b> @inwards/core<br/><small>biblioteka TypeScript + tree-sitter WASM<br/>bez operacji wejścia-wyjścia</small>"]
         hooks["<b>Zestaw dla agentów</b><br/><small>inwards init --agent: hooki,<br/>sekcja AGENTS.md, lint-cmd dla aidera</small>"]
@@ -66,10 +67,13 @@ flowchart TB
     config[("pyproject.toml<br/><small>[tool.inwards]</small>")]
     src[("Źródła w Pythonie")]
     vscode["VS Code"]
+    other["Neovim, Helix, ..."]
 
     agent -- "hook uruchamia" --> cli
     hooks -. "instaluje hooki dla" .-> agent
-    dev --> vscode --> ext -- "stdio / IPC" --> lsp
+    dev --> vscode --> ext -- "IPC" --> lsp
+    dev --> other -- "stdio" --> server
+    cli -- "uruchamia" --> server
     cli -- "zawiera" --> core
     lsp -- "dołącza" --> core
     cli -- "czyta" --> config
@@ -85,8 +89,9 @@ flowchart TB
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
 | **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012 |
-| **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon` |
-| **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
+| **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server` |
+| **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
+| **Serwer języka rozszerzenia** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: do czasu, gdy [#64](https://github.com/SirCypkowskyy/inwards/issues/64) przełączy rozszerzenie na `inwards server`: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` dla `claude`, `aider` i `agents-md` |
 | **Stan sesji i run log** | Pliki JSON i JSON Lines, tylko lokalnie | `.inwards/state/`, `.inwards/runs.jsonl` | :material-check-circle: (run log opcjonalny, [rozdział 8](08-Run-Log.md)) |
@@ -326,7 +331,8 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 ## Znane ograniczenia { #known-limitations }
 
 - Jeden `root` na konfigurację. W monorepo każdy pakiet Pythona ma własne `[tool.inwards]`. `inwards check` w katalogu głównym workspace'u uv sprawdza każdego członka jego własną konfiguracją, a wskazane ścieżki kieruje do najbliższej konfiguracji; hook i Stop gate wybierają najbliższą konfigurację dla każdego pliku ([ADR-035](05-ADR.md#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config)). Wykrywane są tylko workspace'y uv: inne układy monorepo potrzebują osobnego uruchomienia na konfigurację albo wskazanych ścieżek. Globy członków dopasowują `*` tylko wewnątrz jednego segmentu, a `inwards baseline` bierze jedną konfigurację na uruchomienie.
-- Serwer języka czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu obszaru roboczego i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu. Konfigurację czyta ponownie, gdy zmienia się `pyproject.toml` ([#163](https://github.com/SirCypkowskyy/inwards/issues/163)); klient, który nie potrafi obserwować plików, czyta ją ponownie dopiero wtedy, gdy sam zapisze `pyproject.toml`. Błąd konfiguracji wyskakuje raz jako komunikat i zostaje na `pyproject.toml`, dopóki go nie poprawisz, a do tego czasu sprawdzanie jest wyłączone. `pyproject.toml`, którego nie da się odczytać, też jest błędem konfiguracji, tak jak w CLI; gdy w ogóle nie jest plikiem, pojawia się tylko komunikat. Ta diagnostyka trafia na właściwy wiersz tylko przy niepoprawnym TOML-u; przy każdym innym błędzie (na przykład nieznanym kodzie reguły) stoi w pierwszym wierszu, bo sprawdzenia konfiguracji wskazują klucz, a nie jego wiersz.
+- `inwards server` pokazuje to, co zgłasza `inwards check`, gdy pliki są zapisane. Dopóki dokument ma niezapisane zmiany, pokazuje ten dokument sprawdzony osobno oraz to, co ostatni przebieg całego projektu znalazł w nim, a czego jeden plik nie pokaże (cykle, routery FastAPI, których nie dołącza żadna aplikacja); diagnostyki innych plików zależne od niezapisanego tekstu oraz niezapisane edycje `pyproject.toml` albo baseline'u liczą się od następnego zapisu. Dwa foldery obszaru roboczego, których konfiguracje obejmują ten sam plik, pokazują jego diagnostyki dwa razy. Każdy zapis kosztuje sprawdzenie całego projektu (154 ms dla 2100 plików po rozgrzaniu, [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). Ograniczenia poniżej, które wymieniają serwer języka, dotyczą serwera rozszerzenia, dopóki [#64](https://github.com/SirCypkowskyy/inwards/issues/64) nie przełączy go na `inwards server`.
+- Serwer języka rozszerzenia czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu obszaru roboczego i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu. Konfigurację czyta ponownie, gdy zmienia się `pyproject.toml` ([#163](https://github.com/SirCypkowskyy/inwards/issues/163)); klient, który nie potrafi obserwować plików, czyta ją ponownie dopiero wtedy, gdy sam zapisze `pyproject.toml`. Błąd konfiguracji wyskakuje raz jako komunikat i zostaje na `pyproject.toml`, dopóki go nie poprawisz, a do tego czasu sprawdzanie jest wyłączone. `pyproject.toml`, którego nie da się odczytać, też jest błędem konfiguracji, tak jak w CLI; gdy w ogóle nie jest plikiem, pojawia się tylko komunikat. Ta diagnostyka trafia na właściwy wiersz tylko przy niepoprawnym TOML-u; przy każdym innym błędzie (na przykład nieznanym kodzie reguły) stoi w pierwszym wierszu, bo sprawdzenia konfiguracji wskazują klucz, a nie jego wiersz.
 - Niejawne pakiety przestrzeni nazw (bez `__init__.py`) są nazywane, a ich importy względne rozwiązywane tak jak w Pythonie. Moduł, którego brakuje pod takim pakietem, przechodzi INW010, gdy ma go inny członek workspace'u uv (w swoim `src/`, a bez niego w katalogu członka), gdy ma go site-packages katalogu `.venv` projektu albo gdy leży bezpośrednio w pakiecie wymienionym w `namespace-packages` ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). Środowisko wirtualne w innym miejscu nie jest widoczne. Serwer języka nie zagląda do innych członków ani do środowiska wirtualnego.
 - Przynależność do warstwy wynika tylko z prefiksu modułu. Wzorce glob (`shop.*.domain`) dla pionowych wycinków przyjdą ze schematem konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51), [ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
 - Dowiązania symboliczne w warstwie, które wskazują poza katalog `root` albo do innej warstwy, zgłasza INW006 w miejscu dowiązania: robi to `inwards check` całego projektu, a dla dowiązań utworzonych w trakcie sesji także Stop gate ([ADR-013](05-ADR.md#adr-013-real-paths-for-the-boundary-import-paths-for-module-names)). Serwer języka i `inwards check` ze ścieżkami jako argumentami ich nie zgłaszają, a katalog z danymi dowiązany do pakietu warstwy spoza `root` też jest zgłaszany.
@@ -431,7 +437,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook, daemon: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, hook, daemon, server: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
@@ -441,18 +447,22 @@ src/
 │   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
 │   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
 │   │   │                  #   the in-memory caches
+│   │   ├── lsp/           # inwards server: when to check what (session.ts), the whole pass
+│   │   │                  #   and the one-document check (checks.ts), what each file shows
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
-│   │                      #   the grammars, the picker, the daemon's socket and files;
+│   │                      #   the grammars, the picker, the daemon's socket and files,
+│   │                      #   the LSP connection over stdio (lsp-connection.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
 └── vscode-extension/
     ├── src/
     │   ├── client/        # extension.ts (activation, starts the server), selector.ts
-    │   └── server/        # server.ts (LSP), workspace.ts (INW007/INW008 pass), config-file.ts
+    │   └── server/        # server.ts (LSP), workspace.ts (INW007/INW008 pass), config-file.ts;
+    │                      #   frozen until #64 replaces it with inwards server
     ├── scripts/           # copy-wasm.ts: grammars next to dist/server.js
     └── test/              # LSP harness and tests, packaged.test.ts on the built dist/
 ```

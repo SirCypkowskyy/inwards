@@ -8,6 +8,11 @@ engine as `inwards check`. It is two programs in two processes: a thin
 client that VS Code loads, and a language server (LSP) that wraps
 `@inwards/core`. Both run on Node, bundled to CommonJS.
 
+The language server in `src/server/` is frozen (ADR-041): `inwards server`
+in the CLI (`src/cli/src/lsp/`) replaces it, and #64 switches the client to
+start that binary and deletes this one. Put changes to what an editor shows
+in the CLI's server; fix only real bugs here.
+
 ## Folders
 
 | Folder | Owns | Must not |

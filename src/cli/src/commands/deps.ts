@@ -1,8 +1,8 @@
 /**
  * @file What the CLI's commands are given: everything the hook handlers get, plus
  * the storage only some commands write (the baseline, the export), a TOML
- * parser for the uv workspace, and the daemon's socket and per-request
- * wiring (ADR-039). `main.ts`
+ * parser for the uv workspace, the daemon's socket and per-request
+ * wiring (ADR-039), and the language server's connection and check (ADR-041). `main.ts`
  * builds one `AppDeps` per invocation from the adapters; commands never
  * import an adapter themselves.
  */
@@ -10,6 +10,8 @@ import type { HookDeps } from "../claude-code/protocol.ts";
 import type { DaemonHost, DaemonLink } from "../daemon/contracts.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
 import type { InitDeps } from "../init/contracts.ts";
+import type { ServerCheck } from "../lsp/checks.ts";
+import type { Editor, LanguageServer } from "../lsp/contracts.ts";
 import type { BaselineWriter } from "../project/contracts.ts";
 import type { ExportFiles } from "../runlog/contracts.ts";
 
@@ -34,10 +36,25 @@ export interface DaemonDeps {
   };
 }
 
+/** What `inwards server` needs: the LSP connection and a warm check. */
+export interface LspDeps {
+  /**
+   * Serves LSP over stdio until the editor ends the session.
+   *
+   * @param build - makes the server's policy, given what it sends to the editor.
+   * @returns the exit code, once the editor sends `exit`.
+   */
+  serve: (build: (editor: Editor) => LanguageServer) => Promise<number>;
+  /** Runs a check with the server's in-memory extraction cache, on one thread. */
+  check: ServerCheck;
+}
+
 /** One invocation's dependencies. */
 export interface AppDeps extends HookDeps {
   /** The resident process for PostToolUse (`inwards daemon`). */
   daemon: DaemonDeps;
+  /** The language server (`inwards server`). */
+  lsp: LspDeps;
   /** Replaces `inwards-baseline.json`. */
   baselines: BaselineWriter;
   /** Keeps the export key and writes the export. */

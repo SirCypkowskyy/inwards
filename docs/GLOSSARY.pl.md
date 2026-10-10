@@ -256,3 +256,6 @@ baseline'u); multi-word names are left uninflected where possible.
 | workspace (uv) | workspace (uv) |
 | workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |
+| workspace folder (editor) | folder obszaru roboczego |
+| file watcher (editor) | obserwator plików |
+| whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |

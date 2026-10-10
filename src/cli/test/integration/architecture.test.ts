@@ -42,6 +42,7 @@ const POLICY = [
   "daemon",
   "init",
   "json",
+  "lsp",
   "paths",
   "platform",
   "project",

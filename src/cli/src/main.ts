@@ -21,6 +21,7 @@ import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
+import { serverCommand } from "./commands/server.ts";
 import { statsCommand } from "./commands/stats.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import { initMain } from "./init/style.ts";
@@ -42,6 +43,7 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
        inwards daemon [status|stop] [--idle SECONDS]   (keeps PostToolUse warm; hooks start it)
+       inwards server [--stdio]    (the language server, LSP over stdio; editors start it)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
 
@@ -80,6 +82,10 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       brief: { type: "boolean" },
       write: { type: "boolean" },
       idle: { type: "string" },
+      // LSP's conventional server arguments (#63): stdio is the only transport,
+      // and vscode-languageserver reads --clientProcessId from argv itself.
+      stdio: { type: "boolean" },
+      clientProcessId: { type: "string" },
     },
   });
 
@@ -97,10 +103,19 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
 }
 
 /** The commands besides `check`. */
-type SetupCommand = "hook" | "daemon" | "init" | "baseline" | "stats" | "context" | "import-config";
+type SetupCommand =
+  | "hook"
+  | "daemon"
+  | "server"
+  | "init"
+  | "baseline"
+  | "stats"
+  | "context"
+  | "import-config";
 const SETUP_COMMANDS: readonly string[] = [
   "hook",
   "daemon",
+  "server",
   "init",
   "baseline",
   "stats",
@@ -112,14 +127,14 @@ const SETUP_COMMANDS: readonly string[] = [
  * Tells whether a positional names one of the commands besides `check`.
  *
  * @param command - the first positional.
- * @returns true for hook, daemon, init, baseline, stats, context or import-config.
+ * @returns true for hook, daemon, server, init, baseline, stats, context or import-config.
  */
 function isSetupCommand(command: string | undefined): command is SetupCommand {
   return command !== undefined && SETUP_COMMANDS.includes(command);
 }
 
 /**
- * Runs the commands besides `check`: the hook, `daemon`, `init`, `baseline`, `stats`,
+ * Runs the commands besides `check`: the hook, `daemon`, `server`, `init`, `baseline`, `stats`,
  * `context` and `import-config`.
  *
  * @param deps - this invocation's dependencies.
@@ -162,6 +177,9 @@ async function setupCommand(
   }
   if (command === "daemon") {
     return await daemonCommand(deps, paths, values.idle, USAGE);
+  }
+  if (command === "server") {
+    return await serverCommand(deps, paths, USAGE);
   }
   if (command === "context") {
     return paths.length === 0

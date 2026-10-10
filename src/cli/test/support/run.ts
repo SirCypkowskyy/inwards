@@ -21,7 +21,8 @@ export const CLAUDE_USER_DIR: string = tempDir("inwards-claude-user-");
 // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
 // CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code,
 // and INWARDS_RUN_LOG so a developer's own setting can't change the results.
-const ENV: Record<string, string | undefined> = {
+/** The environment every CLI run in the tests gets. */
+export const TEST_ENV: Record<string, string | undefined> = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(
       ([name]) => name !== "CLAUDE_PROJECT_DIR" && name !== "INWARDS_RUN_LOG",
@@ -65,7 +66,7 @@ export function inwards(
   const p = Bun.spawnSync([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: opts.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
-    env: { ...ENV, ...opts.env },
+    env: { ...TEST_ENV, ...opts.env },
     ...(opts.timeout === undefined ? {} : { timeout: opts.timeout }),
   });
   return { code: p.exitCode, stdout: p.stdout.toString(), stderr: p.stderr.toString() };
@@ -107,7 +108,7 @@ export async function inwardsAsync(
     stdin: new TextEncoder().encode(opts.stdin),
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...ENV, ...opts.env },
+    env: { ...TEST_ENV, ...opts.env },
   });
   const [stdout, stderr, code] = await Promise.all([
     new Response(p.stdout).text(),

@@ -5,13 +5,15 @@
  * invocations in one process. This is the only place the adapters meet. It
  * also builds each request the daemon serves (`nodeDaemon`): the same
  * adapters, with the request's runtime, buffered streams and the daemon's
- * in-memory caches.
+ * in-memory caches; and the language server's connection and warm check
+ * (`nodeLsp`), whose stdout belongs to the protocol.
  */
 import { resolve } from "node:path";
 import type { ExtractionCache, GrammarBinaries, Report } from "@inwards/core";
-import type { AppDeps, DaemonDeps } from "../commands/deps.ts";
+import type { AppDeps, DaemonDeps, LspDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
+import type { ServerCheck } from "../lsp/checks.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
 import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
@@ -28,6 +30,7 @@ import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { budgetedGit, nodeGit } from "./git.ts";
 import { loadGrammars } from "./grammars.ts";
 import { nodeInitFiles } from "./init-files.ts";
+import { serveLsp } from "./lsp-connection.ts";
 import { terminalPicker } from "./picker.ts";
 import { readRuntime, runtimeFrom, systemClock } from "./runtime.ts";
 import { nodeStateFiles } from "./state-files.ts";
@@ -109,6 +112,35 @@ export function compose(workerEntry?: string): AppDeps {
     },
     toml: parseToml,
     daemon: nodeDaemon(io, entry),
+    lsp: nodeLsp(io),
+  };
+}
+
+/**
+ * The language server on the real process: LSP over stdio, and a check that
+ * keeps what it extracted from each text in memory for as long as the server
+ * runs (the daemon's cache, ADR-039). The check gets no worker pool, so a
+ * keystroke never starts a thread, and streams whose stdout writes to stderr,
+ * since stdout carries the protocol.
+ *
+ * @param io - the server's own platform.
+ * @returns the language server's dependencies.
+ */
+function nodeLsp(io: Platform): LspDeps {
+  const extractions = daemonExtractionCache();
+  const streams: Streams = { ...io.streams, out: io.streams.err };
+  const files = {
+    ...nodeProjectIo({ ...io, streams }),
+    extractionCache: (): ExtractionCache => extractions,
+  };
+  return {
+    serve: serveLsp,
+    check: (
+      configPath: string,
+      targets: string[] | undefined,
+      base: string,
+      options: Parameters<ServerCheck>[3],
+    ): Promise<Report> => runCheck(files, configPath, targets, { ...options, base, cache: true }),
   };
 }
 

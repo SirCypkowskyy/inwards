@@ -24,8 +24,8 @@ platforms and platform wheels for `uv add`; see the
 | Path | What lives there |
 |---|---|
 | `src/core/` | The engine. TypeScript + web-tree-sitter (WASM). No I/O. |
-| `src/cli/` | `inwards` command, compiled to one binary with `bun build --compile`. |
-| `src/vscode-extension/` | LSP server + client. Uses the same engine as the CLI. |
+| `src/cli/` | `inwards` command, compiled to one binary with `bun build --compile`; `inwards server` is its language server. |
+| `src/vscode-extension/` | LSP client + its own Node server until it switches to `inwards server` (#64). Same engine as the CLI. |
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
 | `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
 | `examples/broken-app/` | One deliberate INW001 violation; `sarif.yml` expects it and annotates PRs with it. |

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: c997616902203ea190bb5f837ce15d6642795d6f6281d5705b88bbd04a513698
+source_hash: f804e56bed1f7ef2e70f26cd158ba5d4f482d423f07d73c14fcda4f5d5c8029a
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -147,7 +147,7 @@ Model C4 (C4 model)
 :   Cztery poziomy diagramów architektury według Simona Browna: kontekst, kontenery, komponenty, kod. Ta dokumentacja używa pierwszych trzech.
 
 LSP
-:   Language Server Protocol. Przez niego rozszerzenie VS Code dostaje diagnostyki z serwera języka Inwards. `inwards server` będzie go obsługiwać przez stdio z pliku binarnego, dla każdego edytora ([#63](https://github.com/SirCypkowskyy/inwards/issues/63)).
+:   Language Server Protocol. Przez niego rozszerzenie VS Code dostaje diagnostyki z serwera języka Inwards. `inwards server` obsługuje go przez stdio z pliku binarnego, dla każdego edytora; rozszerzenie przełączy się na niego w [#64](https://github.com/SirCypkowskyy/inwards/issues/64). Zobacz [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches).
 
 MCP
 :   Model Context Protocol. Pozwala agentowi AI wywoływać zewnętrzne narzędzia. `inwards mcp` jest planowane ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)).

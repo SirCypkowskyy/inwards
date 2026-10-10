@@ -1,0 +1,17 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`inwards server publishes what inwards check reports on examples/ 1`] = `
+[
+  {
+    "code": "INW001",
+    "end": "3:40",
+    "file": "examples/broken-app/shop/domain/order.py",
+    "message": 
+"Layer "domain" imports "shop.infrastructure.db.save" from outer layer "infrastructure". Allowed direction: domain <- infrastructure.
+Depend on an abstraction owned by "domain" instead of "shop.infrastructure.db.save"."
+,
+    "severity": "error",
+    "start": "3:36",
+  },
+]
+`;
