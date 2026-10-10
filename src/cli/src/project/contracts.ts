@@ -1,10 +1,10 @@
 /**
  * @file What the project feature needs from outside, besides the shared platform
  * contracts: the tree-sitter binaries for the engine, the extraction cache on
- * disk, worker threads for a large check, and a safe way to replace a
- * baseline file. Types only.
+ * disk, the last full parse kept for an incremental one, worker threads for
+ * a large check, and a safe way to replace a baseline file. Types only.
  */
-import type { ExtractionBatch, ExtractionCache, GrammarBinaries } from "@inwards/core";
+import type { ExtractionBatch, ExtractionCache, GrammarBinaries, TreeReuse } from "@inwards/core";
 import type { Clock, FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 
 /** Replacing a committed file in place without writing through a planted symlink. */
@@ -58,6 +58,13 @@ export interface ProjectIo {
    * @returns the pool.
    */
   extractionPool?: (wasm: GrammarBinaries, size: number) => ExtractionPool;
+  /**
+   * The last full parse, which every check of this invocation (the daemon's
+   * whole life) shares, so a file parsed again parses only what changed:
+   * the hook checks the edited file as it is now and as it was at session
+   * start (#122). Absent: every full parse starts from scratch.
+   */
+  reuse?: TreeReuse;
   /**
    * Parses TOML, for the uv workspace's pyproject.toml files (INW005's wording, #203).
    *

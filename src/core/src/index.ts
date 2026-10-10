@@ -43,6 +43,7 @@ export { DOCS_BASE, VERSION } from "./meta/product.ts";
 export { RULES } from "./meta/registry.ts";
 export { moduleNameFor } from "./python/module-names.ts";
 export { extractImports, type GrammarBinaries } from "./python/parser.ts";
+export { createTreeReuse, type TreeReuse } from "./python/reparse.ts";
 export { type Format, type RenderOptions, type Report, render } from "./report/render.ts";
 export { checkLayers } from "./rules/layer-dependency.ts";
 export {
