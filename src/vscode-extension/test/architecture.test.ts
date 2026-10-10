@@ -5,7 +5,7 @@
  * source folder has no zone, so fallow reports it until it gets one. The
  * answers come from `fallow guard`, not from re-reading the config.
  */
-import { expect, test } from "bun:test";
+import { expect, setDefaultTimeout, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -15,6 +15,10 @@ const FALLOW = join(REPO, "node_modules/.bin/fallow");
 const REEXPORT = /from "\.\/(?<top>[^/"]+)\/(?<next>[^/"]+)/gu;
 /** A TypeScript file suffix. */
 const TS_SUFFIX = /\.ts$/u;
+
+// Every test here starts `fallow guard` cold. A hosted ubuntu-24.04 runner
+// took more than Bun's 5 s default for one call.
+setDefaultTimeout(30_000);
 
 /** What `fallow guard --format json` says about one file. */
 interface Guarded {
