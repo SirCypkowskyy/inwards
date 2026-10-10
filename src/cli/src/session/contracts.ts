@@ -69,7 +69,8 @@ export interface Check {
  *   of the disk's, whether the extraction cache on disk may be used (never by a
  *   hook), a config to use instead of the one in `configPath`, and the
  *   directories another config checks (`exclude`, uv workspace members), and
- *   top-level names to treat as missing (`absent`, for a session-start check).
+ *   top-level names to treat as missing (`absent`, for a session-start check),
+ *   and how many threads may parse (`threads`, #61).
  * @returns the report.
  */
 export type CheckRunner = (
@@ -85,5 +86,6 @@ export type CheckRunner = (
     config?: InwardsConfig | undefined;
     exclude?: readonly string[];
     absent?: readonly string[] | undefined;
+    threads?: number;
   },
 ) => Promise<Report>;

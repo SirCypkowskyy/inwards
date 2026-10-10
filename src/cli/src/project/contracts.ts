@@ -1,9 +1,10 @@
 /**
  * @file What the project feature needs from outside, besides the shared platform
  * contracts: the tree-sitter binaries for the engine, the extraction cache on
- * disk, and a safe way to replace a baseline file. Types only.
+ * disk, worker threads for a large check, and a safe way to replace a
+ * baseline file. Types only.
  */
-import type { ExtractionCache, GrammarBinaries } from "@inwards/core";
+import type { ExtractionBatch, ExtractionCache, GrammarBinaries } from "@inwards/core";
 import type { Clock, FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
 
 /** Replacing a committed file in place without writing through a planted symlink. */
@@ -16,6 +17,14 @@ export interface BaselineWriter {
    * @throws {ConfigError} when the path can't be replaced (e.g. it is a directory).
    */
   replace: (path: string, text: string) => void;
+}
+
+/** Worker threads that run the engine's extraction jobs for one check (#61). */
+export interface ExtractionPool {
+  /** Runs jobs on the workers and the calling thread; a job no thread could run gets no answer. */
+  extract: ExtractionBatch;
+  /** Stops every worker. Called once, when the check is done or has failed. */
+  close: () => void;
 }
 
 /** Everything `runCheck` and the index read. */
@@ -39,6 +48,16 @@ export interface ProjectIo {
    * @returns the cache, or undefined when it can't be used safely.
    */
   extractionCache?: (project: string, wasm: GrammarBinaries) => ExtractionCache | undefined;
+  /**
+   * Starts worker threads for a check of many files (`inwards check` and
+   * `inwards baseline`); absent where no worker can be started, such as in
+   * the tests that build the I/O themselves.
+   *
+   * @param wasm - the grammars, which every worker loads.
+   * @param size - how many workers to start, besides the calling thread.
+   * @returns the pool.
+   */
+  extractionPool?: (wasm: GrammarBinaries, size: number) => ExtractionPool;
   /**
    * Parses TOML, for the uv workspace's pyproject.toml files (INW005's wording, #203).
    *

@@ -4,12 +4,15 @@
  * environment once, has `adapters/compose.ts` build one invocation's
  * `AppDeps` from the real adapters, parses argv, and hands off to a command
  * (`commands/`). Nothing below it imports a concrete adapter; everything
- * receives what it needs as parameters.
+ * receives what it needs as parameters. Run as a worker thread (a large
+ * check's extraction pool, #61), it serves extraction jobs instead.
  */
 import process from "node:process";
 import { parseArgs } from "node:util";
+import { isMainThread } from "node:worker_threads";
 import { ConfigError, VERSION } from "@inwards/core";
 import { compose } from "./adapters/compose.ts";
+import { serveExtractions } from "./adapters/extraction-worker.ts";
 import { processStreams } from "./adapters/stdio.ts";
 import { baselineCommand } from "./commands/baseline.ts";
 import { checkCommand } from "./commands/check.ts";
@@ -223,21 +226,25 @@ function ignoreClosedPipe(err: Error & { code?: string }): void {
     throw err;
   }
 }
-process.stdout.on("error", ignoreClosedPipe);
-process.stderr.on("error", ignoreClosedPipe);
+if (isMainThread) {
+  process.stdout.on("error", ignoreClosedPipe);
+  process.stderr.on("error", ignoreClosedPipe);
 
-// exitCode, not exit(): Node-style exit() may drop writes still queued for a
-// pipe, and a hook's stderr is the whole message to the agent.
-main(compose(), process.argv.slice(2)).then(
-  (code: number) => {
-    process.exitCode = code;
-  },
-  (err: unknown) => {
-    const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
-    process.exitCode = print(
-      processStreams,
-      err instanceof ConfigError ? `config error: ${err.message}` : detail,
-      2,
-    );
-  },
-);
+  // exitCode, not exit(): Node-style exit() may drop writes still queued for a
+  // pipe, and a hook's stderr is the whole message to the agent.
+  main(compose(import.meta.url), process.argv.slice(2)).then(
+    (code: number) => {
+      process.exitCode = code;
+    },
+    (err: unknown) => {
+      const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+      process.exitCode = print(
+        processStreams,
+        err instanceof ConfigError ? `config error: ${err.message}` : detail,
+        2,
+      );
+    },
+  );
+} else {
+  serveExtractions();
+}

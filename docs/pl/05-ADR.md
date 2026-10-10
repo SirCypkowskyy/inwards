@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3082cdac3a8e88d524423b06e8dc9bf9409a6f0933acfcc5d991ab8a8a68bbbe
+source_hash: 19efda7336421e6f74868b78e9621d1ecf62d11d5c09b60b783d550730f2ee62
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -48,6 +48,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :material-check-circle: Przyjęty |
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :material-check-circle: Przyjęty |
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
+| [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1139,3 +1140,34 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - **Przy uruchomieniu ze źródeł** tożsamość programu to tożsamość Buna i `main.ts`; edycja innego pliku źródłowego nie czyni daemona nieaktualnym. Po takiej edycji uruchom `inwards daemon stop`; skompilowany plik binarny nie ma tej luki.
 - **Daemon odrzuca wszystko poza danymi PostToolUse** dla `hook claude-code`, więc proces, który się z nim połączy, nie dostanie od niego także werdyktu Stop gate.
 - **`inwards daemon --idle SECONDS`** ustawia limit bezczynności, domyślnie 600; testy używają krótkich.
+
+## ADR-040: Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję { #adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision }
+
+**Stan:** Przyjęty · 2026-10-10 · [#61](https://github.com/SirCypkowskyy/inwards/issues/61)
+
+**Kontekst.** Zimne `inwards check` działa na jednym rdzeniu: 1,48 s dla 4324 plików saleora i 2,34 s dla syntetycznego repozytorium w trybie starszego kodu, w którym każdy moduł wymaga parsowania potwierdzającego (p50 na 10-rdzeniowym laptopie). Runnery CI mają kilka rdzeni. Profile zimnego uruchomienia pokazują, na co idzie czas w saleorze: mniej więcej jedna trzecia na parsowanie szkieletu importów przez prescan i testy tekstu przed nim, ćwierć na pełne parsowania potwierdzające znaleziska, ćwierć na przejście drzewa, ustalanie rzeczywistych ścieżek i czytanie plików, a reszta na reguły, indeks modułów i start. Tylko parsowanie zależy wyłącznie od tekstu pliku. [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) umieścił już pulę workerów w procesie samego pełnego uruchomienia, nigdy w daemonie hooków.
+
+**Decyzja.**
+
+- **Wątki, nie procesy.** CLI uruchamia wątki robocze Buna, a każdy z nich wykonuje punkt wejścia samego pliku binarnego: `main.ts` widzi, że nie jest wątkiem głównym, i zamiast parsować argv obsługuje zadania ekstrakcji. Skompilowany plik wykonywalny nie potrzebuje drugiego punktu wejścia ani niczego na dysku. Każdy worker wczytuje gramatykę z bajtów, które przysyła mu wątek główny.
+- **Jednostką pracy jest zadanie ekstrakcji.** `ExtractionJob` to plik źródłowy i to, co z niego wydobyć: szkielet (razem z testem na loader, który decyduje, czy szkielet w ogóle się czyta) albo importy i komentarze wyciszające z pełnego parsowania. Odpowiedź to ten sam rekord, który trzyma pamięć podręczna ekstrakcji ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)), więc nie może zawierać niczego, czego nie mogłaby zawierać pamięć podręczna. `createExtractionWorker` wykonuje zadania tym samym kodem, którego używa silnik.
+- **Silnik pyta dwa razy, potem sprawdza jak dotąd.** `Engine.checkWith` przekazuje partii zadania szkieletu dla każdego pliku, który czyta skan, skanuje, ustala, które pliki sparsują potwierdzenia i komentarze wyciszające, przekazuje je, a potem sprawdza każdy plik po kolei dokładnie tak, jak `Engine.check`, czytając wcześniej wczytane odpowiedzi przed pamięcią podręczną. Reguły, pierwszeństwo, skrót baseline'u, importy dynamiczne (ich odczyt zależy od innych plików), znaleziska FastAPI obejmujące wiele plików i cykle importów zostają w wątku głównym.
+- **Odpowiedzi to podpowiedzi, nigdy wyniki.** Zadanie, na które pula nie odpowie, odpowiedź w złym kształcie albo partia, która się nie powiedzie, silnik liczy sam, jak bez puli, więc każdy błąd pojawia się tak jak dziś. Worker, który padnie albo odpowie błędem, zostaje wycofany, a jego partia wraca do kolejki.
+- **Wątek główny też parsuje.** Gdy workery pracują, wątek główny bierze partie z końca kolejki, więc pula N wątków uruchamia N-1 workerów.
+- **Kiedy.** Wątki uruchamiają tylko `inwards check` i `inwards baseline`, i tylko dla 1000 plików lub więcej, po jednym wątku na 500 plików, do limitu. Limitem jest `INWARDS_THREADS`, a bez niej połowa rdzeni ponad dwa, najwyżej 4: jeden wątek na 4 rdzeniach, trzy na 8, cztery od 10. Każdy wątek uruchamia własną maszynę wirtualną JavaScriptu, której kompilator JIT i odśmiecacz potrzebują własnych rdzeni. `INWARDS_THREADS=1` trzyma sprawdzenie w jednym wątku. To zmienna środowiskowa, a nie klucz `[tool.inwards]`, bo zmienia szybkość, nigdy wyniki.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Zimne pełne sprawdzenia, p50 z czterema wątkami w porównaniu z bazową kompilacją: saleor 1,48 → 0,98 s, polar 0,80 → 0,55 s, repozytorium syntetyczne 0,52 → 0,44 s, syntetyczne repozytorium w trybie starszego kodu 2,34 → 1,14 s ([rozdział 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Wynik jest identyczny co do bajtu; test porównuje przez CLI jeden wątek z czterema, a testy silnika porównują `checkWith` z `check` na każdej ścieżce przez silnik.
+- :material-plus-circle-outline: Silnik zostaje czysty. Port to funkcja z zadań w odpowiedzi; wątki są adapterem CLI.
+- :material-minus-circle-outline: Daleko do trzykrotnego przyspieszenia, o które prosił [#61](https://github.com/SirCypkowskyy/inwards/issues/61). Przejście drzewa, ustalanie rzeczywistych ścieżek, czytanie plików i reguły zostają w wątku głównym: z czterema wątkami saleor spędza mniej więcej jedną trzecią czasu, zanim silnik w ogóle ruszy. Osiem wątków było wolniejsze niż cztery na saleorze i repozytorium syntetycznym.
+- :material-minus-circle-outline: Każdy worker trzyma własne środowisko WASM i gramatykę: szczytowe RSS saleora rośnie z około 360 MB do około 520 MB przy czterech wątkach i 615 MB przy ośmiu.
+- :material-minus-circle-outline: Na Linuksie zysk jest mniejszy. Kontener na tym samym laptopie, przypięty do czterech rdzeni, sprawdzał repozytorium syntetyczne o 60% wolniej przy czterech wątkach, a przy dwóch tak samo jak w jednym; przy ośmiu rdzeniach repozytorium w trybie starszego kodu trwało 1,23 s w czterech wątkach wobec 2,30 s w jednym ([rozdział 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Na 4-rdzeniowym runnerze linuksowym zadania benchmarku cztery wątki spowolniły pełne sprawdzenie repozytorium syntetycznego o 59%, a dwa o 19%, więc maszyna z 4 rdzeniami zostaje przy jednym wątku, a trzykrotne przyspieszenie na 4 vCPU, o którym mówiło #61, jest w ten sposób nieosiągalne.
+- :material-minus-circle-outline: Worker sam kompiluje gramatykę i rozgrzewa swój JIT, więc poniżej około 1000 plików wątki kosztują więcej, niż oszczędzają. Repozytorium, które wymaga wielu parsowań potwierdzających, zyskałoby wcześniej; próg liczy pliki, bo pracy nie znamy, dopóki nie przejdą skany.
+
+**Alternatywy.**
+
+- *Procesy potomne pliku binarnego:* każdy płaci za start procesu (około 15 ms) oprócz gramatyki, a zadania szłyby przez potoki jako JSON zamiast klonu strukturalnego.
+- *Każdy worker sprawdza wycinek plików:* zrównolegla też reguły, ale skrót baseline'u, znaleziska FastAPI obejmujące wiele plików, ostrzeżenia o pakietach bez warstwy i cykle importów potrzebują wszystkich plików, a każdy worker budowałby z dysku własny indeks modułów. Decyzje w jednym wątku zostawiają kolejność wyniku i reguły pierwszeństwa tam, gdzie są.
+- *Workery czytają też pliki:* przeniosłoby do puli ćwierć czasu idącą na czytanie, ale wątek główny i tak potrzebuje każdego tekstu dla reguł, a nazwy modułów biorą się z rzeczywistych ścieżek, którymi zarządzają kontrole tożsamości w CLI.
+- *Domyślnie więcej wątków:* na obciążonym 10-rdzeniowym laptopie osiem wątków było wolniejsze niż cztery na saleorze (1,04 wobec 0,98 s) i repozytorium syntetycznym, a szybsze tylko na repozytorium w trybie starszego kodu (1,03 wobec 1,14 s).

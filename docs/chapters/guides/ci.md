@@ -100,6 +100,14 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 - **It stays small.** A run prunes each of the cache's 256 parts when it first writes there, and again whenever its own writes take the part past 512 KB: entries older than 30 days go, then the oldest ones until the part is under the limit. That keeps a namespace (one folder under `.inwards/cache`) near 128 MB at most. An Inwards version whose extraction rules changed gives every file a new key in the same namespace, so the old entries age out or are pushed out. A new cache format or new grammars start a new namespace; the old folder is no longer read and stays until you delete it.
 - **Nothing to configure.** Delete `.inwards/cache` whenever you like. `inwards init` already adds `.inwards/` to `.gitignore`.
 
+## Threads
+
+`inwards check` and `inwards baseline` parse a large project on several threads: from 1,000 files on, one thread per 500 files, up to half of the runner's cores beyond two and at most 4. The rules still run on one thread in file order, so the output is the same with any number of threads. On a 4,324-file Django service a cold check went from 1.48 s to 0.98 s with four threads on a 10-core arm64 macOS laptop. On Linux the gain is smaller, and a 4-core runner, such as GitHub's hosted `ubuntu-latest`, keeps one thread, because more made the check slower there ([chapter 6](../06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Each thread holds its own copy of the parser, about 40 to 50 MB.
+
+- `INWARDS_THREADS=1` keeps the check on one thread, for a runner short of memory or a measurement that should use one core.
+- `INWARDS_THREADS=N` allows up to N threads, past the default cap too. Eight were no faster than four in our measurements, because reading the files and the rules don't spread.
+- The Claude Code hooks check a few files at a time and never start threads.
+
 ## Code scanning availability
 
 Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it, as this repository does while it is private (`continue-on-error: ${{ github.event.repository.private }}`).

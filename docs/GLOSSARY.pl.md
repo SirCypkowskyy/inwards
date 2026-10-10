@@ -105,6 +105,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | code scanning | code scanning (GitHub) |
 | composition root | korzeń kompozycji (composition root) |
 | cold / warm run | zimne / ciepłe uruchomienie |
+| thread, worker thread (ADR-040) | wątek, wątek roboczy (worker); the main thread: wątek główny |
+| extraction job | zadanie ekstrakcji |
 | corpus | korpus |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |

@@ -1,7 +1,8 @@
 /**
  * @file The shape of one entry of the extraction cache on disk (#56), and
  * the checks a parsed entry must pass before it is used. Anything that fails
- * them is a miss, so a corrupt or hand-edited file can't crash a check.
+ * them is a miss, so a corrupt or hand-edited file can't crash a check. The
+ * worker pool (#61) checks its workers' answers with the same guards.
  */
 import type { CachedExtraction, ImportRef, SuppressionComment } from "@inwards/core";
 
@@ -36,10 +37,10 @@ export function isEntry(value: unknown): value is Entry {
 /**
  * Tells whether a parsed value holds well-formed components.
  *
- * @param value - the entry's `value`.
+ * @param value - the entry's `value`, or a worker's answer.
  * @returns true when every present component has its shape.
  */
-function isExtraction(value: unknown): value is CachedExtraction {
+export function isExtraction(value: unknown): value is CachedExtraction {
   if (!isRecord(value)) {
     return false;
   }
@@ -120,9 +121,9 @@ function isStringList(value: unknown): value is string[] {
 /**
  * Tells whether a parsed value is a JSON object.
  *
- * @param value - any parsed JSON value.
+ * @param value - any parsed JSON value, or a message from a worker.
  * @returns true for a non-null, non-array object.
  */
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

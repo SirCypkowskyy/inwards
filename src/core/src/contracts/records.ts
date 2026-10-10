@@ -112,6 +112,43 @@ export interface CachedExtraction {
 }
 
 /**
+ * One unit of work that needs nothing but a file's text (#61): its import
+ * skeleton, or its full parse's static imports and suppression comments.
+ * Plain data, so an adapter can hand it to another thread or process and
+ * run it there with `createExtractionWorker`.
+ */
+export interface ExtractionJob {
+  /** The source file, with normalised text. */
+  file: SourceFile;
+  /**
+   * `"skeleton"` for the scan's text tests and the prescan, `"full"` for the
+   * full parse's imports and comments.
+   */
+  want: "skeleton" | "full";
+}
+
+/** What running an `ExtractionJob` gives, in the extraction cache's terms. */
+export interface ExtractionAnswer {
+  /** The components computed; empty for a skeleton job whose file goes to the full parse. */
+  extraction: CachedExtraction;
+  /** For a `"skeleton"` job: whether the text names a loader, which sends it to the full parse (INW011). */
+  dynamic?: boolean;
+}
+
+/**
+ * Runs extraction jobs somewhere else, such as a pool of worker threads.
+ * Each answer is what the engine would have computed itself; an undefined
+ * answer (a job that wasn't run, or failed) leaves the job to the engine,
+ * which then computes it as it would have without the batch.
+ *
+ * @param jobs - the jobs, in the engine's order.
+ * @returns one answer per job, in the same order.
+ */
+export type ExtractionBatch = (
+  jobs: readonly ExtractionJob[],
+) => Promise<readonly (ExtractionAnswer | undefined)[]>;
+
+/**
  * Where an adapter keeps extractions between checks. Synchronous, and
  * allowed to forget: `get` returns undefined for anything missing, stale or
  * unreadable, and `set` may drop an entry. It is acceleration, never a source

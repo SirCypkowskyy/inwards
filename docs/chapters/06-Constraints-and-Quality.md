@@ -25,7 +25,7 @@ Ranked. When two goals conflict, the higher one wins.
 | 2 | :material-lightning-bolt: **Agent-loop latency** | A hook checks one edited file | p95 < 100 ms wall time, process start included |
 | 3 | :material-robot-outline: **Actionable for agents** | An agent gets INW001 | It fixes the violation within one retry in ≥ 80 % of cases (measured with design partners, see [chapter 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministic** | Same repo, same config, two runs | Identical diagnostics in identical order. Only the timing fields in the summary (`durationMs`) change |
-| 5 | :material-timer-sand: **Full-repo throughput** | CI checks a 500k-line repo cold | About 1 s today on one core. Target < 300 ms with workers and cache |
+| 5 | :material-timer-sand: **Full-repo throughput** | CI checks a 500k-line repo cold | 0.44 s for the 496,000-line synthetic repo and 0.98 s for saleor's 848,000 lines with four threads ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)). Target < 300 ms with threads and cache |
 | 6 | :material-package-variant: **Easy to adopt** | New team, existing codebase | One command wires in the agent (`inwards init`). The Stop gate checks only what a session changed, and in a changed file only what is new since the session started, so old violations don't block; the baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) will cover the rest |
 
 Correctness sits above speed on purpose. A guardrail that sometimes stays silent teaches the agent that the wrong move is fine, and that's worse than no guardrail.
@@ -34,7 +34,7 @@ Correctness sits above speed on purpose. A guardrail that sometimes stays silent
 
 All numbers come from the scaffold in this repository. Nothing here is projected. They were measured during M0; the spot check below shows how they have moved since.
 
-**Setup.** A laptop, Bun 1.4.2, `inwards-linux-x64` built by `scripts/build-binaries.ts`. Everything runs on one thread, since the engine has no worker pool yet. The laptop was in normal desktop use (load average around 2 to 3), so these are realistic numbers rather than best-case ones.
+**Setup.** A laptop, Bun 1.4.2, `inwards-linux-x64` built by `scripts/build-binaries.ts`. Everything ran on one thread; the worker threads came later ([#61](#worker-threads-for-a-full-run)). The laptop was in normal desktop use (load average around 2 to 3), so these are realistic numbers rather than best-case ones.
 
 **Synthetic repo.** 2,100 Python files, 496,000 lines, 8.0 MB, four layers with eight first-party imports and forty small functions per module. `bench/generate.py` rebuilds it exactly (fixed random seed). With `--legacy` it adds an outer `legacy` layer that every module imports, so each of the 2,000 modules has one violation: the legacy codebase that [chapter 3](03-Architecture-C4.md)'s cost model times with a full baseline.
 
@@ -197,13 +197,45 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 - **Memory.** The daemon held 188 MB of RSS after 206 hook runs over both files.
 - **Not measured here:** Windows named pipes. CI runs the daemon's tests on Linux for every PR; the Windows and macOS rows run them only in the manual full matrix before a release.
 
+### Worker threads for a full run
+
+[#61](https://github.com/SirCypkowskyy/inwards/issues/61) spread a cold full check over several threads. The decision and its alternatives are [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision).
+
+**What runs where.** `inwards check` and `inwards baseline` start worker threads when they read 1,000 files or more: one thread per 500 files, up to `INWARDS_THREADS` or, unset, half of the cores beyond two, at most 4 (Linux below). The main thread counts as one of them. Workers do only what a file's text decides: the loader test, the import skeleton and the full parse's imports and suppression comments. The main thread walks the tree, reads the files, runs every rule in file order and parses the few files with dynamic imports itself. The output is the same byte for byte with any number of threads, and `INWARDS_THREADS=1` keeps the whole check on one thread.
+
+**Method.** The darwin-arm64 binary built by `scripts/build-binaries.ts`, the base build from `develop` (`73936df`) against this one, on an arm64 macOS laptop with 10 cores. Other agents were working on the machine, so the load average was 4 to 7: trust the ratios more than the milliseconds. Each case ran 11 times after one warm-up, every case once per round in rotating order, with `INWARDS_NO_CACHE=1`; each run's JSON had to match the base build's. The real repos are checked with the corpus layering (`bench/corpus.json`). Peak RSS is `/usr/bin/time -l`, three runs each.
+
+| Repo | Files | Base | One thread | Four threads (default) | Eight threads |
+|---|--:|--:|--:|--:|--:|
+| saleor | 4,324 | 1.48 s | 1.43 s | 0.98 s (1.51×) | 1.04 s |
+| polar | 1,831 | 0.80 s | 0.76 s | 0.55 s (1.45×) | 0.55 s |
+| Synthetic (`bench/generate.py`) | 2,100 | 0.52 s | 0.49 s | 0.44 s (1.17×) | 0.48 s |
+| Synthetic legacy (`--legacy`, every module confirms) | 2,101 | 2.34 s | 2.31 s | 1.14 s (2.04×) | 1.03 s |
+
+- **One thread got faster too**, by 2% to 5%: the check now resolves each file's real path once instead of twice.
+- **Parsing scales; the rest doesn't.** With four threads, saleor spends about a third of its time walking the tree, resolving real paths and reading files before the engine starts, then about 120 ms in the rules and 100 ms confirming and reporting, all on the main thread. The legacy repo, where every module needs a full parse, gains the most.
+- **More threads stop paying early.** Each worker compiles the grammar and warms its JIT up on its own, and a loaded machine has fewer free cores than it reports. Below 1,000 files the threads cost about as much as they save: 537 saleor files took 207 ms on one thread and 218 ms on three.
+- **Memory.** Saleor's peak RSS went from about 360 MB on one thread to about 520 MB with four and 615 MB with eight.
+- **The cache and the hooks.** A warm-cache check didn't change (0.95 → 0.91 s on saleor), the run that fills an empty cache got faster (2.6 → 2.05 s), and `bench/compare.ts` measured the hook and the pre-write guard within 3% of the base, the full check 20.5% faster.
+- **Linux, and why the default leaves cores free.** The first CI run of the bench job, on a Linux arm64 runner that reports 4 cores, measured the synthetic repo's full check 59% slower with four threads. The linux-arm64 binary in an Ubuntu 24.04 container on the same laptop, pinned to four or eight cores (`--cpuset-cpus`), five runs each, gave these medians:
+
+    | Cores | Repo | 1 thread | 2 | 3 | 4 |
+    |--:|---|--:|--:|--:|--:|
+    | 4 | synthetic | 0.42 s | 0.44 s | 0.53 s | 0.67 s |
+    | 4 | synthetic legacy | 2.28 s | 2.33 s (1.67 to 2.34) | 1.54 s | 1.77 s |
+    | 8 | synthetic | 0.42 s | 0.38 s | 0.40 s | 0.44 s |
+    | 8 | synthetic legacy | 2.30 s | 1.68 s | 1.38 s | 1.23 s |
+
+    Each thread runs its own JavaScript VM, and its JIT compiler and garbage collector run on threads of their own, so a thread per core starves the main thread. With two threads as the default on that runner, the bench job still measured the synthetic full check 19% slower. The default is now half of the cores beyond two, at most 4: one thread on 4 cores, three on 8 and four from 10, as on the laptop above.
+- **Not measured:** GitHub's hosted 4-vCPU `ubuntu-latest` runner and Windows.
+
 ### Performance roadmap
 
 | Step | Expected effect | Targets |
 |---|---|---|
 | :material-check-circle: `inwards daemon`: a resident process per project that PostToolUse reaches through a local socket, with fallback to a one-shot run; the language server stays a separate process, `inwards server` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)), done | Measured ([above](#the-hook-daemon)): PostToolUse p95 39.3 → 16.2 ms for a 13-line file, 79.0 → 36.8 ms for a 4,492-line file edited before every call | Single-file p95 |
 | :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), done | Measured: start-up 22 → 10 ms, hook call about 45% faster, 2.5 MB more per binary (see the spike above) | Single-file p95 |
-| Worker pool, one parser per core ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Near-linear speed-up on the cold full run on a multi-core machine | Cold full run |
+| :material-check-circle: Worker threads for a cold full run ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)), done | Measured with four threads (see the section above): saleor 1.48 → 0.98 s, polar 0.80 → 0.55 s, the synthetic repo 0.52 → 0.44 s, the legacy one 2.34 → 1.14 s. Short of the 3× hoped for, because reading the files and the rules stay on one thread | Cold full run |
 | :material-check-circle: Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), done for `inwards check` and `inwards baseline` | Measured: a warm full check 3.0 times faster (0.46 s against 1.25 s p50, 12 runs each on this laptop under load), 27% slower while it fills. The hooks don't use it ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Warm full run |
 | :material-check-circle: Tree-cursor walk instead of `descendantsOfType` on the full-parse path ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)), done | Measured on 2,100 synthetic files, cold, 10 alternating runs each: 13% faster when every file needs a confirmation (3.34 → 2.90 s p50), 10% faster when the prescan refuses every file (3.13 → 2.80 s). Reading the imports and suppression comments of the 1,059 stdlib files went from about 560 ms to 125 ms. The one-file hook and the clean full check don't change | Refused files and confirmations |
 
@@ -211,7 +243,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 ```sh
 bun install
-bun test                                                    # 607 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
+bun test                                                    # 2,500+ tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms

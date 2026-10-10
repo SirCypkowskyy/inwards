@@ -43,6 +43,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :material-check-circle: Accepted |
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :material-check-circle: Accepted |
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-check-circle: Accepted |
+| [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Worker threads parse a large full check; the main thread keeps every decision | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1134,3 +1135,34 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - **Run from source,** the executable's identity is Bun's and `main.ts`'s; an edit to another source file doesn't make the daemon stale. `inwards daemon stop` after such an edit; the compiled binary has no such gap.
 - **The daemon refuses anything but a PostToolUse payload** for `hook claude-code`, so a process that connects to it can't get a Stop gate verdict from it either.
 - **`inwards daemon --idle SECONDS`** sets the idle limit, 600 by default; the tests use short ones.
+
+## ADR-040: Worker threads parse a large full check; the main thread keeps every decision
+
+**Status:** Accepted · 2026-10-10 · [#61](https://github.com/SirCypkowskyy/inwards/issues/61)
+
+**Context.** A cold `inwards check` runs on one core: 1.48 s for saleor's 4,324 files, 2.34 s for the synthetic legacy repo whose every module needs a confirming full parse (p50 on a 10-core laptop). CI runners have several cores. Profiles of a cold run show where the time goes on saleor: about a third in the prescan's skeleton parse and the text tests before it, a quarter in full parses that confirm findings, a quarter in walking the tree, resolving real paths and reading files, and the rest in the rules, the module index and start-up. Only the parsing depends on nothing but a file's text. [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) already put the pool in the full run's own process, never in the hook daemon.
+
+**Decision.**
+
+- **Threads, not processes.** The CLI starts Bun worker threads, each running the binary's own entry: `main.ts` sees it isn't the main thread and serves extraction jobs instead of parsing argv. The compiled executable needs no second entry point and nothing on disk. Each worker loads the grammar from the bytes the main thread sends it.
+- **The unit of work is an extraction job.** `ExtractionJob` is a source file and what to extract: the skeleton (with the loader test that decides whether the skeleton is read at all) or the full parse's imports and suppression comments. The answer is the extraction cache's own record ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)), so it can't hold anything the cache couldn't. `createExtractionWorker` runs jobs with the code the engine uses itself.
+- **The engine asks twice, then checks as before.** `Engine.checkWith` hands the batch the skeleton jobs of every file the scan reads, scans, works out which files the confirmations and suppression comments will parse, hands those over, and then checks every file in order exactly as `Engine.check` does, reading the preloaded answers before the cache. Rules, precedence, the baseline shortcut, dynamic imports (whose reading depends on other files), FastAPI's cross-file findings and import cycles stay on the main thread.
+- **Answers are hints, never results.** A job the pool doesn't answer, a malformed answer or a batch that fails is computed by the engine as without the pool, so any error surfaces as it does today. A worker that dies or answers with an error is retired and its batch goes back in the queue.
+- **The main thread parses too.** While the workers run, the main thread takes batches from the back of the queue, so a pool of N threads starts N-1 workers.
+- **When.** Only `inwards check` and `inwards baseline` start workers, and only for 1,000 files or more, with one thread per 500 files up to the limit. The limit is `INWARDS_THREADS`, else half of the cores beyond two, at most 4: one thread on 4 cores, three on 8, four from 10. Each thread runs its own JavaScript VM, whose JIT compiler and garbage collector need cores of their own. `INWARDS_THREADS=1` keeps a check on one thread. It is an environment variable, not a `[tool.inwards]` key, because it changes speed, never results.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Cold full checks, p50 with four threads against the base build: saleor 1.48 → 0.98 s, polar 0.80 → 0.55 s, the synthetic repo 0.52 → 0.44 s, the synthetic legacy repo 2.34 → 1.14 s ([chapter 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). The output is byte for byte the same; a test compares one thread with four through the CLI, and the engine's tests compare `checkWith` with `check` on every path through the engine.
+- :material-plus-circle-outline: The engine stays pure. The port is a function from jobs to answers; the threads are the CLI's adapter.
+- :material-minus-circle-outline: Short of the 3× [#61](https://github.com/SirCypkowskyy/inwards/issues/61) asked for. Walking the tree, resolving real paths, reading the files and the rules stay on the main thread: with four threads, saleor spends about a third of its time before the engine starts. Eight threads were slower than four on saleor and the synthetic repo.
+- :material-minus-circle-outline: Each worker holds its own WASM runtime and grammar: saleor's peak RSS goes from about 360 MB to about 520 MB with four threads and 615 MB with eight.
+- :material-minus-circle-outline: On Linux the gain is smaller. Pinned to four cores, a container on the same laptop ran the synthetic repo 60% slower with four threads, and about as fast with two as with one; with eight cores, the legacy repo took 1.23 s on four threads against 2.30 s on one ([chapter 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). On the bench job's 4-core Linux runner, four threads made the synthetic repo's full check 59% slower and two 19% slower, so a 4-core machine keeps one thread, and the 3× on 4 vCPU that #61 named isn't possible this way.
+- :material-minus-circle-outline: A worker compiles the grammar and warms up its JIT on its own, so below about 1,000 files the threads cost more than they save. A repo that needs many confirming parses would gain earlier; the threshold counts files because the work isn't known until the scans run.
+
+**Alternatives.**
+
+- *Child processes of the binary:* each pays process start-up (about 15 ms) on top of the grammar, and the jobs would travel through pipes as JSON instead of a structured clone.
+- *Each worker checks a slice of the files:* parallelises the rules too, but the baseline shortcut, FastAPI's cross-file findings, the unassigned-package warnings and import cycles need every file, and each worker would build its own module index from the disk. Keeping the decisions on one thread keeps the output order and the precedence rules where they are.
+- *Workers read the files too:* would move the quarter spent reading into the pool, but the main thread needs every text for the rules anyway, and the module names come from real paths that the CLI's identity checks own.
+- *More threads by default:* on a loaded 10-core laptop, eight threads were slower than four on saleor (1.04 against 0.98 s) and the synthetic repo, and faster only on the legacy repo (1.03 against 1.14 s).
