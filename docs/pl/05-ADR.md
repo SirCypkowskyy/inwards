@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 6ba5b7143e5fcebfc263117cbc9d8b272822c84f304eabed671b4e039df2de3e
+source_hash: 7169f0bcced974580d00634efc9d17e3dadc8f4040f273d997b9ff1a7754611d
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -16,7 +16,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Konfiguracja mieszka w `pyproject.toml` | :material-check-circle: Przyjęty |
 | [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :material-check-circle: Przyjęty, od [#44](03-Architecture-C4.md#c3-components-of-the-engine) adapter dostarcza indeks modułów przez port ProjectFiles |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi | :material-check-circle: Przyjęty |
-| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6) |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6); nazwę `inwards server` i jego miejsce obok daemona hooków ustala [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Sprawdzaj importy, gdziekolwiek się pojawią | :material-check-circle: Przyjęty |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Dokumentacja budowana Zensicalem, serwowana przez Cloudflare Workers | :material-swap-horizontal: Hosting zastąpiony przez 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Zmiana nazwy ze Stratum na Inwards | :material-check-circle: Przyjęty |
@@ -41,11 +41,13 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :material-check-circle: Przyjęty |
 | [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :material-check-circle: Przyjęty |
 | [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :material-check-circle: Przyjęty |
+| [033](#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) | OpenCode przez plugin, który uruchamia hook Claude Code | :material-check-circle: Przyjęty |
 | [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji | :material-check-circle: Przyjęty |
 | [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :material-check-circle: Przyjęty |
 | [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie | :material-check-circle: Przyjęty |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :material-check-circle: Przyjęty |
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :material-check-circle: Przyjęty |
+| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -175,7 +177,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 ## ADR-008: Serwer języka na Node wewnątrz rozszerzenia, na razie { #adr-008-language-server-on-node-inside-the-extension-for-now }
 
-**Stan:** Przyjęty, do ponownej oceny w M6 (v0.6) · 2026-09-25
+**Stan:** Przyjęty, do ponownej oceny w M6 (v0.6) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) zostawia `inwards server` dla serwera języka i daje hookom osobny `inwards daemon`
 
 **Kontekst.** Ruff i ty dostarczają swój serwer języka w tym samym pliku binarnym (`ruff server`). Dzięki temu każdy edytor obsługujący LSP (Neovim, Zed, Helix) dostaje serwer za darmo. Scaffold Inwards zamiast tego dołącza serwer LSP na Node do rozszerzenia VS Code, obok plików gramatyk.
 
@@ -1074,3 +1076,56 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - *Czytać transkrypt Claude Code i odrzucać start zapisany po pierwszym użyciu narzędzia w sesji:* `transcript_path` w ładunku Stop pochodzi od Claude Code, ale format transkryptu nie jest publicznym kontraktem, plik bywa duży, agent może go zapisać tak samo, a OpenCode go nie ma.
 - *Znacznik poza projektem przy pierwszym wywołaniu narzędzia w PreToolUse:* to samo polecenie Bash, które usuwa stan, może usunąć znacznik przed odtworzeniem.
 - *Podpisywać zapis startu:* klucz leżałby tam, gdzie użytkownik agenta może go odczytać.
+
+## ADR-039: Daemon hooków dla każdego projektu, osobno od serwera języka { #adr-039-a-hook-daemon-per-project-separate-from-the-language-server }
+
+**Stan:** Przyjęty · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
+
+**Kontekst.** Zaplanowane są trzy długo działające procesy: proces, który trzyma silnik w gotowości dla hooków ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)), serwer języka w pliku binarnym ([#63](https://github.com/SirCypkowskyy/inwards/issues/63), [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)) i serwer MCP ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)). Rozdział 6 nazywał proces hooków `inwards server`, czyli tak, jak ADR-008 nazywa serwer języka, a backlog nazywał go `inwards daemon`. Otwarte było też pytanie, czy jeden proces może obsługiwać i edytor, i hooki.
+
+Dziś CLI uruchamia jedno polecenie na proces. `main.ts` raz buduje `AppDeps`, `runCheck` przy każdym wywołaniu czyta konfigurację i tworzy `Engine`, a środowisko WASM i gramatyka wczytują się raz na proces (obietnica na poziomie modułu w `python/parser.ts`). Serwer języka w VS Code już jest stałym procesem: to proces Node, który rozszerzenie uruchamia przez IPC i który trzyma silnik, indeks modułów i pamięciową pamięć podręczną ekstrakcji, dopóki okno jest otwarte.
+
+Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-process)) uruchamiał prawdziwą obsługę hooka na ciepło za gniazdem uniksowym i porównywał ją z jednorazowymi uruchomieniami pliku binarnego darwin-arm64, na macOS, przy średnim obciążeniu od 5 do 7. Wyniki:
+
+- **Start klienta to podłoga.** `inwards --version` trwa 15,5 ms (p50), a każde wywołanie hooka uruchamia proces, zanim o cokolwiek zapyta.
+- **Daemon opłaca się przy PostToolUse.** Jednorazowo, p50 / p95: 46,6 / 50,2 ms dla pliku z 13 liniami i 119,9 / 151,6 ms dla pliku z 4492 liniami i dwoma naruszeniami. Ta sama obsługa na ciepło, bez zmian w kodzie: 32,3 / 35,2 i 91,1 / 97,7 ms. Z dwiema pamięciami podręcznymi w pamięci: 17,2 / 19,8 i 18,2 / 19,7 ms, a 47,6 / 50,1 ms (jednorazowo 117,5 / 122,8), gdy duży plik zmienia się przed każdym wywołaniem.
+- **Jedno wywołanie gita kosztuje tyle, co start procesu.** Jedno `git cat-file blob`, które czyta tekst pliku ze startu sesji, żeby oddzielić stare naruszenia od nowych, trwa około 15 ms, a każdy PostToolUse sprawdza plik dwa razy: taki, jaki jest teraz, i taki, jaki był na starcie sesji. Dla dużego pliku to 30 ms za każdym razem, na ciepło.
+- **Pozostałe zdarzenia nie zyskują.** PreToolUse trwa jednorazowo 16,8 ms, tuż przy podłodze 15,5 ms. Stop trwa 141 ms, raz na turę.
+
+**Decyzja.**
+
+- **Osobne procesy, jeden plik binarny.** `inwards server` to serwer języka: LSP przez stdio, uruchamiany i zatrzymywany przez edytor, jeden na obszar roboczy, sprawdza niezapisany tekst z edytora. `inwards daemon` obsługuje hooki: jeden na użytkownika i projekt, uruchamia go hook, znika po 10 minutach bez żądania, sprawdza to, co jest na dysku. `inwards mcp` to serwer MCP przez stdio, uruchamiany przez klienta MCP. Wszystkie trzy korzystają z jednego modułu ciepłego silnika w CLI i nigdy ze sobą nie rozmawiają.
+- **Przez daemona idzie tylko PostToolUse.** SessionStart, PreToolUse i Stop zawsze działają we własnym procesie hooka. PreToolUse nie wczytuje gramatyki, więc nic by nie zyskał. Stop to egzekwowanie reguł i ustala, co sesja zmieniła, z manifestu startowego, a nie tylko z edycji zapisanych przez PostToolUse. Daemon, który odpowiada źle (błąd, nieaktualna wersja albo proces podstawiony przez agenta), może opóźnić zgłoszenie do Stop, ale nie może go przepuścić.
+- **Ta sama obsługa, platforma na żądanie.** Daemon uruchamia dzisiejsze `hookClaudeCode` z `Runtime` zbudowanym z katalogu roboczego i środowiska klienta oraz z `Streams`, które zbierają wyjście. Klient wypisuje stdout i stderr i kończy się kodem wyjścia daemona. Testy przepuszczają fixture'y E2E hooka obiema drogami, a wyniki muszą się zgadzać.
+- **Trzyma tylko to, co identyfikuje jego treść.** Między żądaniami daemon trzyma gramatykę, pamięć podręczną ekstrakcji z kluczem jak w [ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) (skrót tekstu, nazwa modułu, flaga pakietu, rewizja ekstrakcji; kilka tekstów na moduł, bo w użyciu są i tekst ze startu, i tekst po edycji; najwyżej 5000 wpisów i około 32 MB, jak w serwerze języka) oraz tekst ze startu sesji czytany z gita, z kluczem: repozytorium, commit startowy i ścieżka. Konfiguracja, baseline, lista plików i stan sesji są czytane od nowa przy każdym żądaniu, tak jak przy jednorazowym uruchomieniu, więc żadna zmiana konfiguracji, checkout ani nowy baseline nie zostawi go z nieaktualnymi danymi. Ciepłe sprawdzenie pliku z 13 liniami, razem z konfiguracją i indeksem modułów, trwało w eksperymencie 0,8 ms. Nic nie trafia na dysk: hooki nadal nie czytają żadnej pamięci podręcznej, którą agent może zapisać.
+- **Transport.** `node:net` po obu stronach: gniazdo domeny uniksowej na Linuksie i macOS, nazwany potok na Windows. Gniazdo leży w katalogu, który może otworzyć tylko użytkownik: `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie `$TMPDIR/inwards-<uid>/`, w ostateczności `/tmp/inwards-<uid>/`, tworzonym z uprawnieniami 0700 i używanym tylko, dopóki jest prawdziwym katalogiem należącym do użytkownika z tymi uprawnieniami. Nazwa to 16 cyfr szesnastkowych skrótu prawdziwej ścieżki projektu i 8 losowych, co mieści ścieżkę w limicie 104 bajtów na macOS; potok nazywa się `\\.\pipe\inwards-<skrót>-<losowe>`. Gdy daemon już nasłuchuje, zapisuje `daemons/<skrót>.json` w katalogu stanu z [ADR-038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) (uprawnienia 0600, przez plik tymczasowy i zmianę nazwy): protokół, wersję Inwards, tożsamość pliku wykonywalnego, pid i adres. Nazwy potoków na Windows mają jedną przestrzeń dla wszystkich użytkowników, więc losowa część nie pozwala innemu użytkownikowi zająć nazwy wcześniej.
+- **Ramkowanie.** Jedno żądanie na połączenie, jedna linia JSON w każdą stronę. Żądanie niesie `protocol: "inwards-daemon/1"`, wersję, tożsamość pliku wykonywalnego (ścieżkę, rozmiar i czas modyfikacji), `argv` (obsługiwane jest tylko `hook claude-code`), katalog roboczy, zmienne środowiska, które czyta `Runtime`, i dane wejściowe hooka. Odpowiedź niesie kod wyjścia, stdout i stderr albo `error` (`stale`, `protocol`, `too-large`). Danych wejściowych powyżej 16 MB klient nie wysyła; hook działa wtedy jednorazowo.
+- **Nieaktualność.** Każda różnica w protokole, wersji albo tożsamości pliku wykonywalnego daje `stale`: daemon kończy pracę, a klient uruchamia sprawdzenie jednorazowo i startuje nowego daemona. Daemon przy każdym żądaniu sprawdza też własny plik wykonywalny, na wypadek aktualizacji, która podmieniła plik w miejscu. Klient i daemon to zawsze ta sama wersja, więc nie ma zgodności między wersjami do utrzymywania.
+- **Start, wyścigi i powrót do jednorazowego uruchomienia.** Hook, który nie znajdzie daemona, nie połączy się w ciągu 100 ms albo dostanie `stale`, działa jednorazowo, więc odpowiada nie później niż dziś, a potem uruchamia `inwards daemon` w tle. Dwa hooki, które startują daemona jednocześnie, rozstrzyga plik blokady tworzony na wyłączność obok zapisu, z pidem w środku; przegrany kończy pracę, a blokadę, której pid już nie istnieje, usuwa się i próbuje raz jeszcze. Adresy są losowe, więc dwa daemony nigdy nie walczą o tę samą ścieżkę. Po wysłaniu żądania klient czeka na odpowiedź tak długo, jak pozwala limit czasu samego hooka: równoległe uruchomienie hooka zapisałoby edycję dwa razy. Połączenie zamknięte bez odpowiedzi kończy się jednorazowym uruchomieniem, a #60 zapisuje edycje z kluczem `tool_use_id`, żeby ta powtórka nie policzyła edycji dwa razy.
+- **Jedno żądanie naraz.** Daemon obsługuje żądania w kolejności nadejścia, tak jak serwer języka szereguje przeładowania: równoległe wywołania narzędzi zapisują ten sam stan sesji.
+- **Wyłączniki.** `INWARDS_DAEMON=0` sprawia, że każdy hook działa jednorazowo. Daemon jest wyłączony, gdy ustawione jest `CI`, a testy działają z wyłączonym daemonem, z wyjątkiem jego własnych testów. To nie jest klucz `[tool.inwards]`: zmienia szybkość, nigdy wyniki.
+- **Pełne sprawdzenia zostają jednorazowe.** `inwards check`, `inwards baseline` i pula workerów ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) działają we własnym procesie; daemon obsługuje sprawdzenia jednego pliku i nie trzyma workerów.
+- **Nazwy.** `inwards server` (jak `ruff server` i `ty server`), `inwards daemon` z `inwards daemon status` i `inwards daemon stop` dla bieżącego projektu oraz `inwards mcp`. Rozdział 6 i ADR-008 używają tych nazw.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: W eksperymencie p95 PostToolUse spadło z 50,2 do 19,8 ms dla małego pliku i z 122,8 do 50,1 ms dla pliku z 4492 liniami edytowanego przed każdym wywołaniem. Cel #60, p95 poniżej 50 ms, jest spełniony dla małego pliku i na granicy dla dużego. Na linuksowym laptopie z eksperymentu z bajtkodem w rozdziale 6 `inwards --version` trwało 10,5 ms, a nie 15,5.
+- :material-plus-circle-outline: Przy okazji JIT jest rozgrzany: jednorazowe sprawdzenie dużego pliku trwało 70,8 ms, to samo na ciepło 30 ms.
+- :material-plus-circle-outline: Stop gate i guardy zachowują swój model zaufania. Zepsuty albo podstawiony daemon kosztuje opóźnienie i wczesną informację zwrotną, a nie przeoczone naruszenie przy Stop.
+- :material-plus-circle-outline: Jeden moduł ciepłego silnika obsługuje trzy procesy, a serwer języka przechodzi do pliku binarnego (#63, #64) z kodem pamięci podręcznej, który ma dziś.
+- :material-minus-circle-outline: Każdy projekt z daemonem zajmuje od 150 do 210 MB RSS (serwer z eksperymentu, uruchamiany ze źródeł) przez maksymalnie 10 minut po ostatniej edycji. Pięć sesji agentów w pięciu repozytoriach to pięć daemonów.
+- :material-minus-circle-outline: Każde wywołanie hooka nadal uruchamia proces Buna, tu około 15 ms. Usunąć to mógłby tylko klient napisany w innym języku.
+- :material-minus-circle-outline: Użytkownik, a więc i agent, może połączyć się z daemonem, zatrzymać go albo wskazać w zapisie własny proces. Połączenie nie daje nic, czego nie daje samo `inwards`; podstawiony proces może zmienić tylko to, co mówi PostToolUse, zanim Stop sprawdzi wszystko ponownie.
+- :material-minus-circle-outline: Nazwane potoki nie zostały zmierzone: eksperyment działał na macOS. #60 musi pokazać przechodzący wiersz Windows (ręczne uruchomienie pełnej macierzy), zanim zostanie scalone.
+- :material-minus-circle-outline: Druga ścieżka kodu dla PostToolUse. Przepuszczanie fixture'ów E2E obiema drogami utrzymuje je zgodne.
+
+**Alternatywy.**
+
+- *Jeden proces dla edytora i hooków,* czyli serwer języka, który nasłuchuje też na hooki, albo jeden daemon na projekt z `inwards server` jako pośrednikiem stdio. Czasy życia się różnią: okno edytora kontra sesja agenta, a agenci często działają bez otwartego edytora, więc hooki nie mogą na nim polegać. Dane wejściowe się różnią: niezapisane bufory kontra dysk i stan sesji. Pośrednik dodaje skok przez gniazdo przy każdym naciśnięciu klawisza dla serwera, który i tak działa stale, awaria zabiera oba procesy, a kilka okien na jednym repozytorium musiałoby wybrać właściciela.
+- *Każde zdarzenie hooka przez daemona:* PreToolUse zyskałby około 1 ms, a werdykt Stop gate pochodziłby z procesu, który agent może podmienić.
+- *Bez daemona, szybsze jednorazowe uruchomienie:* bajtkod już skrócił start o połowę ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). Zostaje start procesu, wczytanie WASM i gramatyki oraz zimny JIT (27,7 ms jednorazowo wobec 0,8 ms na ciepło dla małego pliku), a do tego praca, którą między procesami dałoby się ponownie wykorzystać tylko przez pliki, które agent może zapisać.
+- *Silnik dla każdej konfiguracji, aktualizowany przez obserwatory plików:* oszczędza ponowne czytanie konfiguracji, które kosztuje dużo poniżej milisekundy, a nieaktualność zamienia w problem poprawności (przegapione zdarzenie, sieciowy system plików).
+- *TCP na localhost:* może się połączyć każdy lokalny użytkownik, port trzeba wybrać i ogłosić, a Windows może zapytać o zaporę.
+- *Ramkowanie LSP, JSON-RPC albo HTTP przez gniazdo:* obsługują identyfikatory żądań, powiadomienia i routing; jedno żądanie na połączenie nie potrzebuje żadnego z nich.
+- *Mały natywny klient jako polecenie hooka:* usunąłby większość podłogi 15 ms, ale dodaje drugi zestaw narzędzi i drugi plik binarny na platformę, wbrew [ADR-003](#adr-003-ship-a-bun-single-file-executable). Warto do tego wrócić, jeśli benchmark na Linuksie nie zmieści się w 50 ms.
+- *Inne nazwy:* `inwards serve` różni się od `server` jedną literą i kojarzy się z podglądem dokumentacji; `inwards lsp` zrywa z Ruffem i ty, których polecenia użytkownicy spróbują najpierw; jedno `inwards server` z trybami `--stdio` i `--socket` ukrywa, że oba procesy mają innych właścicieli i inne czasy życia.
