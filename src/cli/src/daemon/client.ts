@@ -33,8 +33,14 @@ const CONNECT_MS = 100;
  * the edit twice; the edit's `tool_use_id` makes that harmless (#60).
  */
 const ANSWER_MS = 45_000;
-/** How long `inwards daemon status` and `stop` wait. */
+/** How long `inwards daemon status` and `stop` wait for the connection. */
 const COMMAND_MS = 5000;
+/**
+ * How long `inwards daemon status` and `stop` wait for the answer. They skip
+ * the queue, but can't be read while a hook run holds the daemon's thread,
+ * which its git budget (5 s) bounds (#277).
+ */
+const COMMAND_ANSWER_MS = 15_000;
 
 /** What came of trying the daemon. */
 export type Forwarded =
@@ -138,7 +144,7 @@ export async function askDaemon(
   const request = toLine({ protocol: PROTOCOL, version, identity: link.identity() ?? "", op });
   const result = await link.ask(record.endpoint, request, {
     connectMs: COMMAND_MS,
-    answerMs: COMMAND_MS,
+    answerMs: COMMAND_ANSWER_MS,
   });
   return { record, answer: result.kind === "answer" ? parseAnswer(result.line) : undefined };
 }

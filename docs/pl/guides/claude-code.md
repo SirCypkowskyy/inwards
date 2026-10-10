@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: cff0e891e1cbadd35c8691836ba056e41f6c34fba81dd6524fa5052ed45fba05
+source_hash: c6fe0add78fd43df25a68f9c662386ced31bb40c60056c5f4133f238e18e6467
 ---
 
 # Claude Code { #claude-code }
@@ -55,7 +55,7 @@ inwards daemon stop     # stop it; the next edit starts a new one
 inwards daemon          # run it in the foreground (--idle SECONDS sets the idle limit)
 ```
 
-`INWARDS_DAEMON=0` w środowisku, w którym działa Claude Code, go wyłącza i każdy hook działa we własnym procesie. Jest wyłączony, gdy ustawiono `CI`, chyba że `INWARDS_DAEMON=1`. Jego zapis jest w `$XDG_STATE_HOME/inwards/daemons/` (domyślnie `~/.local/state/inwards/daemons/`), a gniazdo w `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie w `$TMPDIR/inwards-<uid>/`; oba może czytać tylko ty. Projekt opisuje [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+`INWARDS_DAEMON=0` w środowisku, w którym działa Claude Code, go wyłącza i każdy hook działa we własnym procesie. Jest wyłączony, gdy ustawiono `CI`, chyba że `INWARDS_DAEMON=1`. Jego zapis jest w `$XDG_STATE_HOME/inwards/daemons/` (domyślnie `~/.local/state/inwards/daemons/`), a gniazdo w `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie w `$TMPDIR/inwards-<uid>/`; oba może czytać tylko ty. W daemonie wywołania gita jednego PostToolUse mają wspólny limit 5 sekund, więc zawieszony git kosztuje ten hook porównanie ze stanem z początku sesji, zamiast blokować każdą kolejną edycję; Stop gate uruchamia gita bez limitu. Projekt opisuje [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
 
 ## Rozwiązywanie problemów { #troubleshooting }
 

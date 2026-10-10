@@ -92,21 +92,22 @@ const TMP = tempDir("inwards-e2e-");
  * Runs the CLI without blocking, so several copies can run at once.
  *
  * @param args - CLI arguments.
- * @param opts - working directory and stdin text.
+ * @param opts - working directory, stdin text and extra environment.
  * @param opts.cwd - the directory to run in.
  * @param opts.stdin - text to pipe to stdin.
+ * @param opts.env - variables added to the test environment.
  * @returns the exit code and captured output, once the process ends.
  */
 export async function inwardsAsync(
   args: string[],
-  opts: { cwd: string; stdin: string },
+  opts: { cwd: string; stdin: string; env?: Record<string, string> },
 ): Promise<RunResult> {
   const p = Bun.spawn([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: new TextEncoder().encode(opts.stdin),
     stdout: "pipe",
     stderr: "pipe",
-    env: ENV,
+    env: { ...ENV, ...opts.env },
   });
   const [stdout, stderr, code] = await Promise.all([
     new Response(p.stdout).text(),

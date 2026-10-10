@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: d7a312323205f989ba22a83eb5df87a8760e1c543bc79ade1c70da2f32cf25ee
+source_hash: a5988bb29d34e7403713a4297a767e5ba804e2f37e7620619de4314a50ca2196
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1142,6 +1142,8 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - **`inwards daemon --idle SECONDS`** ustawia limit bezczynności, domyślnie 600; testy używają krótkich.
 
 **Poprawka · 2026-10-10 · [#276](https://github.com/SirCypkowskyy/inwards/issues/276).** Sam pid nie mówi, kto trzyma blokadę: daemon zabity bez sprzątania (SIGKILL, awaria, restart) zostawia swoją blokadę, a gdy system da ten pid innemu procesowi, każdy kolejny daemon ustępował i każdy PostToolUse działał jednorazowo. Blokada trzyma teraz pid i 32 losowe cyfry szesnastkowe, a odpowiedź na `inwards daemon status` je powtarza. Daemon, który zastanie blokadę, przejmuje ją, gdy jej pid nie istnieje albo jest jego własny, a gdy blokada ma ponad 10 sekund, także wtedy, gdy daemon pod adresem z zapisu nie odpowie tym pidem i tokenem. Młodszą blokadę uznaje za zajętą, bo jej daemon może jeszcze zaczynać nasłuchiwać. Sprawdzenie korzysta tylko z gniazda i wieku pliku, więc działa tak samo na Linuksie, macOS i Windows, a Stop gate nadal od niego nie zależy.
+
+**Poprawka · 2026-10-10 · [#277](https://github.com/SirCypkowskyy/inwards/issues/277).** Praca hooka jest synchroniczna, a git działał przez `spawnSync` bez limitu, więc jedno zawieszone wywołanie gita (sieciowy system plików, blokada trzymana przez inny proces gita) blokowało kolejkę daemona: kolejne hooki PostToolUse czekały swoje 45 s, zanim uruchomiły się jednorazowo, a `inwards daemon stop` czekał za nimi. Teraz wszystkie wywołania gita w jednym żądaniu daemona mają wspólny budżet 5 sekund. Wywołanie, które by go przekroczyło, jest zabijane sygnałem SIGKILL (SIGTERM można zignorować, a `spawnSync` wraca dopiero po zakończeniu procesu potomnego), wywołanie po jego wyczerpaniu w ogóle się nie zaczyna, a oba odpowiadają „nie ma”, jak nieudane wywołanie. Odpowiedź po przekroczeniu czasu nigdy nie trafia do pamięci podręcznej. Jednorazowy hook i Stop gate nadal uruchamiają gita bez limitu. `status` i `stop` omijają kolejkę: daemon odpowiada na nie, gdy tylko je przeczyta, co uruchomienie hooka opóźnia najwyżej o swój budżet gita i własną pracę, a klient czeka na tę odpowiedź 15 s zamiast 5. Gdy daemon się zatrzymuje, porzuca żądania, które jeszcze czekają w kolejce, a ich hooki działają jednorazowo. Żądanie, które wyczerpie budżet, nie kończy daemona: nowy trafiłby na tego samego zawieszonego gita, a nic, co trzyma, nie pochodzi z nieudanych wywołań.
 
 ## ADR-040: Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję { #adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision }
 

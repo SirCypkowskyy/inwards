@@ -22,7 +22,8 @@ export interface DaemonDeps {
   /**
    * Builds the dependencies for one hook request the daemon serves: a runtime
    * from the request's working directory and environment, streams that
-   * collect the output, and the daemon's content-keyed caches.
+   * collect the output, and the daemon's content-keyed caches. Called just
+   * before the request runs: it starts the request's git budget (#277).
    *
    * @param request - the hook request.
    * @returns the request's dependencies, and what its streams collected.

@@ -50,7 +50,7 @@ inwards daemon stop     # stop it; the next edit starts a new one
 inwards daemon          # run it in the foreground (--idle SECONDS sets the idle limit)
 ```
 
-`INWARDS_DAEMON=0` in the environment Claude Code runs in turns it off, and every hook runs in its own process. It is off when `CI` is set, unless `INWARDS_DAEMON=1`. Its record is in `$XDG_STATE_HOME/inwards/daemons/` (`~/.local/state/inwards/daemons/` by default) and its socket in `$XDG_RUNTIME_DIR/inwards/`, else `$TMPDIR/inwards-<uid>/`, both readable only by you. [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) has the design.
+`INWARDS_DAEMON=0` in the environment Claude Code runs in turns it off, and every hook runs in its own process. It is off when `CI` is set, unless `INWARDS_DAEMON=1`. Its record is in `$XDG_STATE_HOME/inwards/daemons/` (`~/.local/state/inwards/daemons/` by default) and its socket in `$XDG_RUNTIME_DIR/inwards/`, else `$TMPDIR/inwards-<uid>/`, both readable only by you. Inside the daemon, the git calls of one PostToolUse share a 5-second limit, so a git that hangs costs that hook its session-start comparison instead of blocking every later edit; the Stop gate runs git without a limit. [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) has the design.
 
 ## Troubleshooting
 

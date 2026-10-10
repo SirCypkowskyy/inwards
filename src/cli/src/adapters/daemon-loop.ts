@@ -2,7 +2,9 @@
  * @file The daemon's request loop (ADR-039): read one line from each
  * connection, answer the lines one at a time in arrival order, and stop when
  * the handler says so, after the idle limit, or on SIGINT or SIGTERM. Parallel
- * tool calls write the same session state, so requests never overlap. What a
+ * tool calls write the same session state, so hook runs never overlap; a
+ * `status` or `stop` request skips the queue, and once stopping, the
+ * requests still waiting are dropped so their hooks run one-shot (#277). What a
  * line means is the handler's (`daemon/server.ts`); `daemon-host.ts` owns
  * the server and the files around it.
  */
@@ -56,7 +58,13 @@ export class RequestLoop {
     this.#waiting.add(socket);
     readLine(socket, this.#handler.tooLarge, (request: string) => {
       this.#waiting.delete(socket);
-      this.#enqueue(socket, request);
+      if (this.#handler.urgent(request)) {
+        this.#pending += 1;
+        clearTimeout(this.#idle);
+        this.#answer(socket, request).catch(() => undefined);
+      } else {
+        this.#enqueue(socket, request);
+      }
     });
   };
 
@@ -101,7 +109,25 @@ export class RequestLoop {
   #enqueue(socket: Socket, request: string): void {
     this.#pending += 1;
     clearTimeout(this.#idle);
-    this.#queue = this.#queue.then(() => this.#answer(socket, request));
+    this.#queue = this.#queue.then(() => this.#answerInTurn(socket, request));
+  }
+
+  /**
+   * Answers a queued request when its turn comes, or drops it when the loop
+   * is stopping: the hook sees the connection close and runs in its own
+   * process, which is faster than waiting for a daemon that is going away.
+   *
+   * @param socket - the connection to answer on.
+   * @param request - the line, without its newline.
+   * @returns once it is answered or dropped.
+   */
+  async #answerInTurn(socket: Socket, request: string): Promise<void> {
+    if (this.#stopping) {
+      this.#pending -= 1;
+      socket.destroy();
+      return;
+    }
+    await this.#answer(socket, request);
   }
 
   /**
