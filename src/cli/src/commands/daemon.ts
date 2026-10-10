@@ -9,7 +9,8 @@
  */
 import { ConfigError, VERSION } from "@inwards/core";
 import { hookProject } from "../claude-code/protocol.ts";
-import { askDaemon } from "../daemon/client.ts";
+import { askDaemon, holdsLock } from "../daemon/client.ts";
+import type { LockHolder } from "../daemon/contracts.ts";
 import { daemonPlace, type HookRequest, PROTOCOL, toLine } from "../daemon/protocol.ts";
 import { createHandler, type HookOutcome } from "../daemon/server.ts";
 import { print } from "../platform/print.ts";
@@ -93,19 +94,30 @@ async function serveDaemon(
   const started = io.clock.now();
   const place = daemonPlace(io.runtime, project);
   let endpoint = "";
+  let token = "";
   const handler = createHandler(
     {
       version: VERSION,
       identity,
       currentIdentity: daemon.link.identity,
-      status: () => ({ pid: io.runtime.pid, project, endpoint, version: VERSION, started, idleMs }),
+      status: () => ({
+        pid: io.runtime.pid,
+        project,
+        endpoint,
+        version: VERSION,
+        started,
+        idleMs,
+        token,
+      }),
     },
     (request: HookRequest): Promise<HookOutcome> => runRequest(daemon, request, usage),
   );
   const result = await daemon.host.serve(place, handler, {
     idleMs,
-    record: (at: string): string => {
+    holds: (holder: LockHolder): Promise<boolean> => holdsLock(daemon.link, place, holder, VERSION),
+    record: (at: string, lock: string): string => {
       endpoint = at;
+      token = lock;
       io.streams.err(`inwards daemon: serving ${project} at ${at}\n`);
       return toLine({
         protocol: PROTOCOL,

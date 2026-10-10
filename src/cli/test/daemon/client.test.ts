@@ -6,10 +6,11 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { askDaemon, viaDaemon } from "../../src/daemon/client.ts";
-import type { AskResult } from "../../src/daemon/contracts.ts";
+import { askDaemon, holdsLock, viaDaemon } from "../../src/daemon/client.ts";
+import type { AskResult, LockHolder } from "../../src/daemon/contracts.ts";
 import {
   type DaemonAnswer,
+  type DaemonStatus,
   daemonEnabled,
   MAX_PAYLOAD_BYTES,
   PROTOCOL,
@@ -160,5 +161,52 @@ describe("the hook's side", () => {
     expect(record?.endpoint).toBe("/run/inwards/abc");
     expect(answer).toEqual({ protocol: PROTOCOL, stopped: true });
     expect(JSON.parse(sent[0] ?? "")).toMatchObject({ op: "stop", version: SELF.version });
+  });
+});
+
+/** What the lock names in the lock-check tests. */
+const HOLDER: LockHolder = { pid: 42, token: "ab12" };
+
+/**
+ * Builds a status answer.
+ *
+ * @param patch - fields to replace.
+ * @returns a status answer for `HOLDER`'s daemon.
+ */
+function statusAnswer(patch: Partial<DaemonStatus> = {}): AskResult {
+  return answered({
+    protocol: PROTOCOL,
+    status: {
+      pid: HOLDER.pid,
+      project: "/project",
+      endpoint: "/run/inwards/abc",
+      version: SELF.version,
+      started: "2026-10-10T00:00:00.000Z",
+      requests: 0,
+      idleMs: 600_000,
+      token: HOLDER.token,
+      ...patch,
+    },
+  });
+}
+
+describe("a starting daemon's lock check (#276)", () => {
+  test("the lock is held when the daemon at the record repeats its pid and token", async () => {
+    const { link, sent } = fakeLink(statusAnswer());
+    expect(await holdsLock(link, PLACE, HOLDER, SELF.version)).toBe(true);
+    expect(JSON.parse(sent[0] ?? "")).toMatchObject({ op: "status", version: SELF.version });
+  });
+
+  test.each<[string, AskResult, string, LockHolder]>([
+    ["no record", statusAnswer(), "", HOLDER],
+    ["nothing listening at the record", { kind: "unreachable" }, RECORD, HOLDER],
+    ["no answer", { kind: "lost" }, RECORD, HOLDER],
+    ["a stale daemon", answered({ protocol: PROTOCOL, error: "stale" }), RECORD, HOLDER],
+    ["a daemon with another pid", statusAnswer({ pid: 7 }), RECORD, HOLDER],
+    ["a daemon with another token", statusAnswer({ token: "cd34" }), RECORD, HOLDER],
+    ["a lock without a token", statusAnswer({ token: "" }), RECORD, { pid: 42, token: "" }],
+  ])("%s: the lock is stale", async (_, result, record, holder) => {
+    const { link } = fakeLink(result, record);
+    expect(await holdsLock(link, PLACE, holder, SELF.version)).toBe(false);
   });
 });

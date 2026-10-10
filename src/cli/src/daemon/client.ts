@@ -2,14 +2,15 @@
  * @file The hook's side of the daemon (ADR-039): send a PostToolUse payload to
  * the project's `inwards daemon` and write back what it answered, or say
  * that the hook must run in its own process and whether to start a daemon
- * afterwards. Also the requests behind `inwards daemon status` and `stop`.
+ * afterwards. Also the requests behind `inwards daemon status` and `stop`,
+ * and the one a starting daemon sends to learn whether a lock is really held.
  * The socket, the record file and starting a process are behind
  * `DaemonLink`; this module decides what to send and what an answer means.
  * It never decides a hook's result itself: either the daemon ran the same
  * handler, or the caller runs it here.
  */
 import type { Clock, PathProbe, Runtime, StateFiles, Streams } from "../platform/contracts.ts";
-import type { DaemonLink } from "./contracts.ts";
+import type { DaemonLink, LockHolder } from "./contracts.ts";
 import {
   type DaemonAnswer,
   type DaemonPlace,
@@ -140,4 +141,46 @@ export async function askDaemon(
     answerMs: COMMAND_MS,
   });
   return { record, answer: result.kind === "answer" ? parseAnswer(result.line) : undefined };
+}
+
+/**
+ * Asks the project's daemon whether it holds a lock, for a daemon that is
+ * starting and finds the lock naming a live pid. Only an answer that repeats
+ * the lock's pid and token counts: the OS may have given a dead daemon's pid
+ * to any other process, which can't answer at the record's endpoint (#276).
+ * The answer may wait behind a hook run, so it gets the hook's own limit.
+ *
+ * @param link - the socket, the record and the executable's identity.
+ * @param place - the project's daemon files.
+ * @param holder - the pid and token in the lock.
+ * @param version - this build's Inwards version.
+ * @returns true only when the daemon at the record's endpoint is the lock's holder.
+ */
+export async function holdsLock(
+  link: DaemonLink,
+  place: DaemonPlace,
+  holder: LockHolder,
+  version: string,
+): Promise<boolean> {
+  const record = parseRecord(link.readRecord(place.record));
+  if (record === undefined || holder.token === "") {
+    return false;
+  }
+  const request = toLine({
+    protocol: PROTOCOL,
+    version,
+    identity: link.identity() ?? "",
+    op: "status",
+  });
+  const result = await link.ask(record.endpoint, request, {
+    connectMs: COMMAND_MS,
+    answerMs: ANSWER_MS,
+  });
+  const answer = result.kind === "answer" ? parseAnswer(result.line) : undefined;
+  return (
+    answer !== undefined &&
+    "status" in answer &&
+    answer.status.pid === holder.pid &&
+    answer.status.token === holder.token
+  );
 }

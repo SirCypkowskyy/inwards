@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 19efda7336421e6f74868b78e9621d1ecf62d11d5c09b60b783d550730f2ee62
+source_hash: d7a312323205f989ba22a83eb5df87a8760e1c543bc79ade1c70da2f32cf25ee
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1140,6 +1140,8 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - **Przy uruchomieniu ze źródeł** tożsamość programu to tożsamość Buna i `main.ts`; edycja innego pliku źródłowego nie czyni daemona nieaktualnym. Po takiej edycji uruchom `inwards daemon stop`; skompilowany plik binarny nie ma tej luki.
 - **Daemon odrzuca wszystko poza danymi PostToolUse** dla `hook claude-code`, więc proces, który się z nim połączy, nie dostanie od niego także werdyktu Stop gate.
 - **`inwards daemon --idle SECONDS`** ustawia limit bezczynności, domyślnie 600; testy używają krótkich.
+
+**Poprawka · 2026-10-10 · [#276](https://github.com/SirCypkowskyy/inwards/issues/276).** Sam pid nie mówi, kto trzyma blokadę: daemon zabity bez sprzątania (SIGKILL, awaria, restart) zostawia swoją blokadę, a gdy system da ten pid innemu procesowi, każdy kolejny daemon ustępował i każdy PostToolUse działał jednorazowo. Blokada trzyma teraz pid i 32 losowe cyfry szesnastkowe, a odpowiedź na `inwards daemon status` je powtarza. Daemon, który zastanie blokadę, przejmuje ją, gdy jej pid nie istnieje albo jest jego własny, a gdy blokada ma ponad 10 sekund, także wtedy, gdy daemon pod adresem z zapisu nie odpowie tym pidem i tokenem. Młodszą blokadę uznaje za zajętą, bo jej daemon może jeszcze zaczynać nasłuchiwać. Sprawdzenie korzysta tylko z gniazda i wieku pliku, więc działa tak samo na Linuksie, macOS i Windows, a Stop gate nadal od niego nie zależy.
 
 ## ADR-040: Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję { #adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision }
 

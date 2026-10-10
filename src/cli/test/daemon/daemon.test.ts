@@ -2,17 +2,27 @@
  * @file `inwards daemon` as a real process (ADR-039): every recorded hook
  * fixture gives the same exit code and output through the daemon as in the
  * hook's own process; a hook with no daemon runs one-shot and starts one; a
- * second daemon for the same project steps aside; an idle daemon exits and
+ * second daemon for the same project steps aside, but a lock left by a dead
+ * daemon whose pid now names another process doesn't stop one; an idle daemon exits and
  * cleans up; and `status` and `stop` report what runs. Every daemon these
  * tests start is stopped in `afterAll`, and each has a short idle limit as a
  * second guard, so none outlives the run.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import process from "node:process";
-import { daemonPlace } from "../../src/daemon/protocol.ts";
+import { daemonPlace, PROTOCOL, toLine } from "../../src/daemon/protocol.ts";
 import { CMD, inwards, LAYERS, payload, project, type RunResult } from "../support/run.ts";
 import { STATE_HOME } from "../support/temp.ts";
 
@@ -204,6 +214,36 @@ describe("inwards daemon", () => {
     const second = inwards(["daemon", "--idle", "5"], { cwd: root, env: ON });
     expect(second.code).toBe(0);
     expect(second.stdout).toContain("already running");
+  });
+
+  test("a dead daemon's lock naming a live process that isn't a daemon doesn't stop a new one (#276)", async () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    const files = place(root);
+    mkdirSync(dirname(files.lock), { recursive: true });
+    // The OS gave the dead daemon's pid to this test, and its record names an
+    // endpoint nobody listens on. A lock with only the pid, as builds before
+    // #276 wrote, kept every later daemon out.
+    writeFileSync(files.lock, String(process.pid));
+    const minuteAgo = Date.now() / 1000 - 60;
+    utimesSync(files.lock, minuteAgo, minuteAgo);
+    writeFileSync(
+      files.record,
+      toLine({
+        protocol: PROTOCOL,
+        version: "0.0.0",
+        identity: "gone",
+        pid: process.pid,
+        endpoint: join(RUNTIME_DIR, "gone"),
+        project: realpathSync(root),
+        started: "2026-10-10T00:00:00.000Z",
+      }),
+    );
+    await startDaemon(root);
+    expect(status(root).stdout).not.toContain(`pid ${process.pid},`);
+    // The new daemon's lock proves itself over its socket, so a third one still steps aside.
+    utimesSync(files.lock, minuteAgo, minuteAgo);
+    const third = inwards(["daemon", "--idle", "5"], { cwd: root, env: ON });
+    expect(third.stdout).toContain("already running");
   });
 
   test("an idle daemon exits and removes its record and lock", async () => {

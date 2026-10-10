@@ -36,6 +36,7 @@ function handler(identity: () => string | undefined = (): string => SELF.identit
         version: SELF.version,
         started: "t",
         idleMs: 600_000,
+        token: "ab12",
       }),
     },
     (r: HookRequest): Promise<HookOutcome> => {
