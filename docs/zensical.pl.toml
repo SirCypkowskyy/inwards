@@ -26,11 +26,13 @@ extra_css = [
   "../stylesheets/theme.css",
   "../stylesheets/extra.css",
   "../stylesheets/home.css",
+  "../stylesheets/rules.css",
 ]
 
 extra_javascript = [
   "../javascripts/homepage-loop.mjs",
   "../javascripts/language-switch.mjs",
+  "../javascripts/rule-index.mjs",
 ]
 
 nav = [

@@ -193,6 +193,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule | reguła |
 | rule catalogue | katalog reguł |
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
+| rule list, rule browser (the filterable list on `rules/`) | lista reguł |
+| category, sub-category (a rule page's `tags`) | kategoria, podkategoria |
+| autofix (the rule list's filter and column; the key stays `autofix`) | poprawka automatyczna |
+| rule status: stable, in review, in development, backlog | stabilna, w przeglądzie, w rozwoju, w planach |
+| rules per page, page (pagination) | reguł na stronie, strona |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
 | matched prefix (of a layer selector) | dopasowany prefiks |

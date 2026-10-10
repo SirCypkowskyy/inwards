@@ -122,6 +122,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
       - name: Every page under docs/chapters and docs/pl is in its nav
         run: uv run scripts/check-docs-nav.py
+      # Before --mark-stale, which edits Polish pages; also fails on a stale rules.json.
+      - name: Every rule page meets the page contract (#49, #145)
+        run: uv run scripts/check-rule-pages.py
       # Fails on a missing Polish page; a stale one is a warning and gets a banner.
       - name: Every English page has a Polish translation
         run: uv run scripts/check-docs-translation.py --mark-stale
