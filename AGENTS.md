@@ -19,8 +19,8 @@ import them.
 - `src/cli`: the command line and the Claude Code hook adapter. Feature
   folders with the I/O behind contracts, wired in `main.ts`. Guide:
   [`src/cli/AGENTS.md`](src/cli/AGENTS.md).
-- `src/vscode-extension`: the editor adapter, a VS Code client and a
-  language server in separate folders. Guide:
+- `src/vscode-extension`: the editor adapter, a thin VS Code client that
+  starts `inwards server` from the CLI (ADR-043). Guide:
   [`src/vscode-extension/AGENTS.md`](src/vscode-extension/AGENTS.md).
 
 Where to start:
@@ -29,8 +29,8 @@ Where to start:
   the rule's docs page goes in `docs/chapters/rules/` and `docs/pl/rules/`.
 - **A new hook event or CLI command**: `src/cli/AGENTS.md`, "Where new code
   goes".
-- **Something the editor shows or a new extension setting**:
-  `src/vscode-extension/AGENTS.md`.
+- **Something the editor shows**: the CLI's server, `src/cli/AGENTS.md`;
+  **a new extension setting**: `src/vscode-extension/AGENTS.md`.
 - **A docs change**: "Polish docs" below; the English page and its Polish
   translation change in the same PR.
 
@@ -216,6 +216,7 @@ bun run check:overviews # every module's @file overview is 2+ sentences
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
 uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
+uv run scripts/check-rule-pages.py  # rule pages follow the #49 contract; --write refreshes rules.json
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
@@ -306,6 +307,11 @@ PR description is its body. Commits inside a branch can say anything.
   3. Wait for release-please to update its release PR, check the changelog,
      and merge it (`gh pr merge N --merge --admin`: it gets no CI run).
   4. Publish the draft release, then resume merging into `develop`.
+  5. If `schema/tool-inwards.schema.json` changed since the last release,
+     open a SchemaStore PR that copies it into
+     `src/schemas/json/partial-inwards.json` (keep its `$id` and update the
+     copy date in `$comment`) and adjusts `src/test/pyproject/inwards.toml`
+     (#192).
 
   Don't promote without releasing, and never merge a release PR that isn't
   right after a promotion. Before merging anything into `develop`, check that
@@ -348,6 +354,10 @@ English stays the source of truth; the changelog isn't translated.
   terms, and the conventions (headings keep the English anchor with
   `{ #id }`, code blocks and CLI output stay verbatim, images come from
   `../assets/`). Add a missing term there in the same PR.
+- **A PR that adds or edits a rule page** reruns
+  `uv run scripts/check-rule-pages.py --write` so `rules.json` (EN and PL)
+  matches. Two such PRs conflict on it: rerun the script instead of merging
+  the file by hand.
 - **The reviewer checks the Polish diff** for meaning against the English
   change and for terminology against the glossary.
 - **CI** fails on a missing or orphaned Polish page, a committed stale
@@ -357,6 +367,12 @@ English stays the source of truth; the changelog isn't translated.
   current directory. Preview
   both sites with the two builds in `docs/zensical.pl.toml`'s header and a
   static server on `docs/site/`.
+
+## Docs design
+
+Read `docs/PRODUCT.md` and `docs/DESIGN.md` before changing any docs
+template, CSS, JS or diagram. A PR that changes a token or a component
+updates `DESIGN.md` (and `docs/.impeccable/design.json`) in the same PR.
 
 ## Finishing a piece of work
 

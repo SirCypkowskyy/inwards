@@ -1,0 +1,153 @@
+name: Publish the VS Code extension
+
+# Uploads the VSIX files of a published GitHub Release to the Visual Studio
+# Marketplace and Open VSX (ADR-043). It builds nothing: the files are the ones
+# cd.yml packaged (one per platform with its binary, plus a universal one) and
+# ran on every platform, checked here against the release's SHA256SUMS.
+#
+# - Publishing a full release (never a draft) starts it once the repository
+#   variable VSCODE_PUBLISH is `true`. Pre-releases are skipped: both registries
+#   take only X.Y.Z, and a release candidate's VSIX already carries the final
+#   version, which the full release must still be able to use.
+# - A manual run takes a tag and a registry, for a first upload or to finish a
+#   partial one (--skip-duplicate skips what is already there).
+# - Pull requests never start it. The tokens live in the `vscode-marketplace`
+#   and `open-vsx` environments, and the jobs that read them stay on
+#   GitHub-hosted runners, never the self-hosted ones (AGENTS.md).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published full release whose VSIX files to upload (v0.2.0)
+        required: true
+        type: string
+      registry:
+        description: Where to upload
+        required: true
+        type: choice
+        options: [both, marketplace, open-vsx]
+        default: both
+
+permissions: {}
+
+concurrency:
+  group: vscode-publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  # Build provenance exists once the repository is public (cd.yml).
+  ATTEST: ${{ github.event.repository.visibility == 'public' }}
+  # The publishing CLIs, pinned: they run with a registry token.
+  VSCE: "@vscode/vsce@4.0.0"
+  OVSX: "ovsx@1.2.0"
+
+jobs:
+  vsix:
+    name: Fetch the release VSIX files
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (vars.VSCODE_PUBLISH == 'true' && !github.event.release.prerelease)
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read # a private repository's release assets
+      attestations: read
+    steps:
+      - name: The tag is a published full release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag $TAG is not vX.Y.Z: pre-releases never go to the registries"
+            exit 1
+          fi
+          read -r draft pre < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease -q '"\(.isDraft) \(.isPrerelease)"') || true
+          if [ "$draft" != "false" ] || [ "$pre" != "false" ]; then
+            echo "::error::$TAG is a draft, a pre-release or has no release"
+            exit 1
+          fi
+      - name: Download the VSIX files and SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
+            --pattern '*.vsix' --pattern SHA256SUMS
+      - name: Seven VSIX files of this version, each matching SHA256SUMS
+        working-directory: dist
+        run: |
+          grep '\.vsix$' SHA256SUMS > vsix.sha256
+          sha256sum --check --strict vsix.sha256
+          # Six platforms and the universal one (scripts/package-target.ts); every file checked, none extra.
+          listed="$(wc -l < vsix.sha256)"; present="$(find . -name '*.vsix' | wc -l)"
+          if [ "$listed" != 7 ] || [ "$present" != 7 ]; then
+            echo "::error::Expected 7 VSIX files; SHA256SUMS lists $listed and the release has $present"
+            exit 1
+          fi
+          for vsix in *.vsix; do
+            version="$(python3 -c 'import json, sys, zipfile; print(json.loads(zipfile.ZipFile(sys.argv[1]).read("extension/package.json"))["version"])' "$vsix")"
+            if [ "$version" != "${TAG#v}" ]; then
+              echo "::error::$vsix holds version $version, not ${TAG#v}"
+              exit 1
+            fi
+          done
+          rm SHA256SUMS vsix.sha256
+          ls -l
+      - name: Provenance verifies
+        if: env.ATTEST == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for vsix in dist/*.vsix; do
+            gh attestation verify "$vsix" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/cd.yml" --source-ref "refs/tags/$TAG"
+          done
+      # Pinned: what it uploads is what the token-holding jobs publish.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vscode-vsix
+          path: dist/*.vsix
+          if-no-files-found: error
+
+  # The upload jobs hold a registry token, so they run nothing but a pinned
+  # download action and a pinned CLI. Each VSIX carries its own target platform
+  # in its manifest, which both registries read.
+  marketplace:
+    name: Upload to the Visual Studio Marketplace
+    needs: vsix
+    if: github.event_name == 'release' || inputs.registry != 'open-vsx'
+    runs-on: ubuntu-26.04
+    environment:
+      name: vscode-marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=inwards.inwards-vscode
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: vscode-vsix
+          path: dist
+      - name: vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes "$VSCE" publish --packagePath dist/*.vsix --skip-duplicate
+
+  open-vsx:
+    name: Upload to Open VSX
+    needs: vsix
+    if: github.event_name == 'release' || inputs.registry != 'marketplace'
+    runs-on: ubuntu-26.04
+    environment:
+      name: open-vsx
+      url: https://open-vsx.org/extension/inwards/inwards-vscode
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: vscode-vsix
+          path: dist
+      - name: ovsx publish
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx --yes "$OVSX" publish --packagePath dist/*.vsix --skip-duplicate

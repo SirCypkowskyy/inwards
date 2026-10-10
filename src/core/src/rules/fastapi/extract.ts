@@ -10,16 +10,20 @@
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { constructorHandlers, handlerOf } from "./handlers.ts";
+import type { Qualify } from "../../python/qualify.ts";
+import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./handlers.ts";
 import type {
   Context,
+  DependencyUse,
+  EventHandlerUse,
   ExceptionHandler,
   FastApiFile,
   FastApiObject,
   PathOperation,
+  Registration,
   Wiring,
 } from "./records.ts";
-import { type Argument, callSyntax, type Qualify, valueFrom } from "./values.ts";
+import { type Argument, callSyntax, valueFrom } from "./values.ts";
 
 /** The constructors the model looks for, by qualified name. */
 const CONSTRUCTORS: ReadonlyMap<string, "app" | "router"> = new Map([
@@ -27,6 +31,14 @@ const CONSTRUCTORS: ReadonlyMap<string, "app" | "router"> = new Map([
   ["fastapi.applications.FastAPI", "app"],
   ["fastapi.APIRouter", "router"],
   ["fastapi.routing.APIRouter", "router"],
+]);
+
+/** The names `Depends` and `Security` are imported under. */
+export const DEPENDS: ReadonlySet<string> = new Set([
+  "fastapi.Depends",
+  "fastapi.Security",
+  "fastapi.params.Depends",
+  "fastapi.params.Security",
 ]);
 
 /** The path operation decorators named after one HTTP method. */
@@ -48,25 +60,8 @@ interface Found {
   readonly operations: PathOperation[];
   readonly wiring: Wiring[];
   readonly handlers: ExceptionHandler[];
-}
-
-/**
- * Lists a module's top-level functions, decorated or not.
- *
- * @param root - the module node.
- * @returns each function's `function_definition` node by name.
- */
-export function moduleFunctions(root: Node): Map<string, Node> {
-  const functions = new Map<string, Node>();
-  for (const child of namedChildren(root)) {
-    const fn =
-      child.type === "decorated_definition" ? child.childForFieldName("definition") : child;
-    const name = fn?.type === "function_definition" ? fn.childForFieldName("name") : null;
-    if (fn && name) {
-      functions.set(identifierName(name), fn);
-    }
-  }
-  return functions;
+  readonly events: EventHandlerUse[];
+  readonly dependencies: DependencyUse[];
 }
 
 /**
@@ -85,12 +80,28 @@ export function extract(root: Node, context: Context): FastApiFile {
     operations: [],
     wiring: [],
     handlers: objects.flatMap((o) => constructorHandlers(o, context)),
+    events: [],
+    dependencies: [],
   };
   for (const call of root.descendantsOfType("call")) {
-    record(call, context, found);
+    const dependency = dependencyOf(call, context.qualify);
+    if (dependency === null) {
+      record(call, context, found);
+    } else {
+      found.dependencies.push(dependency);
+    }
   }
-  const { operations, wiring, handlers } = found;
-  return { path: file.path, module: file.module, objects, operations, wiring, handlers };
+  const { operations, wiring, handlers, events, dependencies } = found;
+  return {
+    path: file.path,
+    module: file.module,
+    objects,
+    operations,
+    wiring,
+    handlers,
+    events,
+    dependencies,
+  };
 }
 
 /**
@@ -113,18 +124,18 @@ function record(call: Node, context: Context, found: Found): void {
     return;
   }
   const decorated = decoratedFunction(call);
-  const exception = argumentAt(call, 0, "exc_class_or_status_code");
   if (decorated && (METHODS.has(method) || method === "api_route")) {
     found.operations.push(operationOf(call, { method, receiver: app, fn: decorated }, context));
   } else if (decorated && method === "exception_handler") {
-    const via = "decorator";
     found.handlers.push(
-      handlerOf({ app, via, node: call, exception, handler: decorated }, context),
+      ...registered({ app, via: "decorator", node: call, handler: decorated }, context),
     );
   } else if (method === "add_exception_handler") {
     const handler = argumentAt(call, 1, "handler");
     const via = "add_exception_handler";
-    found.handlers.push(handlerOf({ app, via, node: call, exception, handler }, context));
+    found.handlers.push(...registered({ app, via, node: call, handler }, context));
+  } else if (method === "on_event" || method === "add_event_handler") {
+    found.events.push(eventOf(call, { via: method, receiver: app }, context.qualify));
   } else if (method === "include_router" || method === "mount") {
     found.wiring.push(wiringOf(call, method, app, context.qualify));
   }
@@ -165,9 +176,10 @@ function objectOf(assignment: Node, context: Context): FastApiObject[] {
   }
   const local = identifierName(left);
   const topLevel = assignment.parent?.parent?.type === "module";
-  return [
-    { kind, name: `${file.module}.${local}`, local, topLevel, ...callSyntax(right, qualify) },
-  ];
+  const syntax = callSyntax(right, qualify);
+  // An app's `**kwargs` that only carries `exception_handlers` hides no other keyword (#242).
+  const splat = syntax.splat && !(kind === "app" && splatsOnlyHandlers(right));
+  return [{ kind, name: `${file.module}.${local}`, local, topLevel, ...syntax, splat }];
 }
 
 /**
@@ -230,6 +242,51 @@ function methodsOf(methods: Argument | undefined): readonly string[] | "unknown"
 }
 
 /**
+ * Reads an `on_event(...)` decorator or `add_event_handler(...)` call.
+ *
+ * @param call - the `call` node.
+ * @param on - what the call is.
+ * @param on.via - `on_event` or `add_event_handler`.
+ * @param on.receiver - the qualified app or router it is called on.
+ * @param qualify - qualifies a name through the file's imports.
+ * @returns the registration, with its event argument as the model reads it.
+ */
+function eventOf(
+  call: Node,
+  { via, receiver }: { via: EventHandlerUse["via"]; receiver: string },
+  qualify: Qualify,
+): EventHandlerUse {
+  const event = argumentAt(call, 0, "event_type");
+  return {
+    ...callSyntax(call, qualify),
+    receiver,
+    via,
+    event: event ? valueFrom(event, qualify) : null,
+  };
+}
+
+/**
+ * Reads a `Depends(...)` or `Security(...)` call.
+ *
+ * @param call - a `call` node.
+ * @param qualify - qualifies a name through the file's imports.
+ * @returns the call, its dependency argument and how that reads; null for any other call.
+ */
+function dependencyOf(call: Node, qualify: Qualify): DependencyUse | null {
+  const fn = call.childForFieldName("function");
+  const callee = fn ? qualify(fn) : null;
+  if (callee === null || !DEPENDS.has(callee)) {
+    return null;
+  }
+  const argument = argumentAt(call, 0, "dependency");
+  return {
+    ...callSyntax(call, qualify),
+    argument,
+    target: argument ? valueFrom(argument, qualify) : null,
+  };
+}
+
+/**
  * Reads an `include_router(router, prefix=...)` or `mount(path, app)` call.
  *
  * @param call - the `call` node.
@@ -249,7 +306,7 @@ function wiringOf(call: Node, method: string, receiver: string, qualify: Qualify
     receiver,
     target: target ? qualify(target) : null,
     path: path ? valueFrom(path, qualify) : null,
-    loopTargets: target ? loopItems(target, qualify) : [],
+    loopTargets: (target ? loopItems(target) : null)?.map((item) => qualify(item)) ?? [],
   };
 }
 
@@ -258,13 +315,12 @@ function wiringOf(call: Node, method: string, receiver: string, qualify: Qualify
  * when that loop encloses the name's use: `for r in [a.router, b.router]:`.
  *
  * @param target - the argument node, e.g. the identifier `r`.
- * @param qualify - qualifies a name through the file's imports.
- * @returns each item's qualified name, null for one that isn't a name; empty
- *   when the argument isn't such a loop variable.
+ * @returns the literal's item nodes, or null when the argument isn't the
+ *   variable of an enclosing loop over a list or tuple literal.
  */
-function loopItems(target: Node, qualify: Qualify): (string | null)[] {
+function loopItems(target: Node): Node[] | null {
   if (target.type !== "identifier") {
-    return [];
+    return null;
   }
   const name = identifierName(target);
   for (let at = target.parent; at !== null; at = at.parent) {
@@ -272,8 +328,27 @@ function loopItems(target: Node, qualify: Qualify): (string | null)[] {
     const right = at.childForFieldName("right");
     if (left?.type === "identifier" && identifierName(left) === name) {
       const literal = right?.type === "list" || right?.type === "tuple";
-      return literal ? namedChildren(right).map((item) => qualify(item)) : [];
+      return literal ? namedChildren(right) : null;
     }
   }
-  return [];
+  return null;
+}
+
+/**
+ * Reads a decorator or `add_exception_handler` registration. The loop
+ * variable of `for exc in [A, B]: app.add_exception_handler(exc, h)` stands
+ * for each item of the literal, as in argilla (#242), so that gives one
+ * handler per item; any other exception argument stands for itself.
+ *
+ * @param registration - the registration, its exception still to read from the call.
+ * @param context - the file, its qualifier and its functions.
+ * @returns the handler records.
+ */
+function registered(
+  registration: Omit<Registration, "exception">,
+  context: Context,
+): ExceptionHandler[] {
+  const exception = argumentAt(registration.node, 0, "exc_class_or_status_code");
+  const items = (exception ? loopItems(exception) : null) ?? [exception];
+  return items.map((one) => handlerOf({ ...registration, exception: one }, context));
 }

@@ -14,9 +14,19 @@
  * - pre-write: `inwards hook claude-code` with a PreToolUse Write of a new
  *   Python file, which the config guard and the shape guard (#96) both see;
  * - full: a cold `inwards check` of the whole repo, with `INWARDS_NO_CACHE=1`
- *   for both binaries, so the gate compares the work itself (#56).
+ *   for both binaries, so the gate compares the work itself (#56);
+ * - large file: the PostToolUse hook on a 4,482-line module with two old
+ *   violations, changed before every run, in a project of its own
+ *   (`large-file.ts`, #122). A head-only table adds the head through its
+ *   daemon, with each p95 against its target (100 ms, 50 ms).
  *
  * With 12 full runs, the "p95" column is the slowest run.
+ *
+ * The hook through the daemon (#60) gets a table of its own, head only: the
+ * same PostToolUse payload with `inwards daemon` running for the repo, against
+ * the head's one-shot hook, and the p95 against the 50 ms target. It is
+ * reported, not gated: the base branch may have no daemon to compare with.
+ * Every other metric runs with `INWARDS_DAEMON=0`, so both sides run one-shot.
  *
  * The head's extraction cache (#56) gets a table of its own, head only: the
  * full check with no cache, with an empty cache (`.inwards/cache` removed
@@ -32,91 +42,12 @@ import { arch, cpus, platform } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
-
-/** One metric's samples for both binaries, in milliseconds. */
-export interface Samples {
-  base: number[];
-  head: number[];
-}
-
-/** The outcome for one metric. */
-export interface Verdict {
-  metric: string;
-  base: { p50: number; p95: number };
-  head: { p50: number; p95: number };
-  /** Median of head[i] / base[i] over alternating pairs. */
-  ratio: number;
-  pass: boolean;
-}
+import { daemonHook, daemonMarkdown } from "./daemon.ts";
+import { largeHook, largeMarkdown } from "./large-file.ts";
+import { alternate, judge, ms, summarise, timeRun, type Verdict } from "./timing.ts";
 
 const DEFAULTS = { hookRuns: 40, fullRuns: 12, warmup: 2, threshold: 0.2 };
 const PERCENT = 100;
-const P50 = 0.5;
-const P95 = 0.95;
-
-/**
- * Takes a percentile by the nearest-rank method.
- *
- * @param samples - measurements, in any order.
- * @param p - the percentile as a fraction, e.g. 0.95.
- * @returns the value at that rank, or NaN for no samples.
- */
-export function percentile(samples: readonly number[], p: number): number {
-  if (samples.length === 0) {
-    return Number.NaN;
-  }
-  const sorted = [...samples].sort((a, b) => a - b);
-  const rank = Math.max(1, Math.ceil(p * sorted.length));
-  return sorted[rank - 1] ?? Number.NaN;
-}
-
-/**
- * Judges one metric: the head fails when it is more than `threshold` slower
- * than the base. The change is the median of the per-pair ratios: runs
- * alternate, so each head run is compared with the base run next to it, and
- * load that drifts during the job cancels out within a pair. A median of
- * pairs also shrugs off the occasional scheduling spike, which p95 doesn't.
- *
- * @param metric - the metric's name.
- * @param samples - both binaries' measurements, in run order (base[i] next to head[i]).
- * @param threshold - the allowed slowdown as a fraction, e.g. 0.2 for 20%.
- * @returns the verdict.
- */
-export function judge(metric: string, samples: Samples, threshold: number): Verdict {
-  const pairs = Math.min(samples.base.length, samples.head.length);
-  const ratios = Array.from(
-    { length: pairs },
-    (_, i) => (samples.head[i] ?? Number.NaN) / (samples.base[i] ?? Number.NaN),
-  );
-  const ratio = percentile(ratios, P50);
-  return {
-    metric,
-    base: summarise(samples.base),
-    head: summarise(samples.head),
-    ratio,
-    pass: ratio <= 1 + threshold,
-  };
-}
-
-/**
- * Takes the median and p95 of one binary's samples.
- *
- * @param samples - measurements in milliseconds.
- * @returns p50 and p95.
- */
-function summarise(samples: readonly number[]): { p50: number; p95: number } {
-  return { p50: percentile(samples, P50), p95: percentile(samples, P95) };
-}
-
-/**
- * Formats milliseconds to one decimal.
- *
- * @param x - milliseconds.
- * @returns e.g. `42.4`.
- */
-function ms(x: number): string {
-  return x.toFixed(1);
-}
 
 /**
  * Renders the verdicts as a Markdown table.
@@ -142,72 +73,6 @@ export function markdown(verdicts: readonly Verdict[], threshold: number): strin
     "",
     result,
   ].join("\n");
-}
-
-/**
- * Times one run of a command, wall clock, process start included. The
- * synthetic repo is clean, so every run must exit 0: a binary that crashes or
- * fails early would otherwise look fast.
- *
- * @param cmd - the command and its arguments.
- * @param cwd - the working directory.
- * @param stdin - text for stdin, if any.
- * @param env - variables added to the environment.
- * @returns the elapsed milliseconds.
- * @throws {Error} when the command exits non-zero or is killed by a signal.
- */
-function timeRun(
-  cmd: string[],
-  cwd: string,
-  stdin?: string,
-  env: Record<string, string> = {},
-): number {
-  const started = performance.now();
-  const run = Bun.spawnSync(cmd, {
-    cwd,
-    stdin: stdin === undefined ? "ignore" : new TextEncoder().encode(stdin),
-    env: { ...process.env, CLAUDE_PROJECT_DIR: cwd, ...env },
-  });
-  const elapsed = performance.now() - started;
-  if (run.exitCode !== 0 || run.signalCode) {
-    const how = run.signalCode ? `was killed by ${run.signalCode}` : `exited ${run.exitCode}`;
-    throw new Error(`${cmd.join(" ")} ${how}: ${run.stderr.toString()}`);
-  }
-  return elapsed;
-}
-
-/**
- * Runs both binaries alternately and collects the samples.
- *
- * @param binaries - the two builds to compare.
- * @param binaries.base - the base branch's executable.
- * @param binaries.head - the head branch's executable.
- * @param args - how to run one check.
- * @param args.argv - the arguments after the executable.
- * @param args.cwd - the working directory.
- * @param args.stdin - text for standard input, if any.
- * @param args.env - variables added to the environment.
- * @param runs - how many runs.
- * @param runs.measured - measured runs per binary.
- * @param runs.warmup - unmeasured runs per binary before those.
- * @returns the samples.
- */
-function alternate(
-  binaries: { base: string; head: string },
-  args: { argv: string[]; cwd: string; stdin?: string; env?: Record<string, string> },
-  runs: { measured: number; warmup: number },
-): Samples {
-  const samples: Samples = { base: [], head: [] };
-  for (let i = 0; i < runs.warmup + runs.measured; i += 1) {
-    const order = i % 2 === 0 ? (["base", "head"] as const) : (["head", "base"] as const);
-    for (const which of order) {
-      const elapsed = timeRun([binaries[which], ...args.argv], args.cwd, args.stdin, args.env);
-      if (i >= runs.warmup) {
-        samples[which].push(elapsed);
-      }
-    }
-  }
-  return samples;
 }
 
 /** The head's full check in each cache mode, in milliseconds. */
@@ -353,6 +218,30 @@ function readOptions(): Options | string {
 }
 
 /**
+ * Builds the two hook payloads the bench times.
+ *
+ * @param repo - the synthetic repo.
+ * @returns a PostToolUse Edit of one domain module, and a PreToolUse Write of a new one.
+ */
+function payloads(repo: string): { payload: string; preWrite: string } {
+  const payload = JSON.stringify({
+    session_id: "bench",
+    hook_event_name: "PostToolUse",
+    tool_name: "Edit",
+    cwd: repo,
+    tool_input: { file_path: join(repo, "src/shop/domain/p0/m0.py") },
+  });
+  const preWrite = JSON.stringify({
+    session_id: "bench",
+    hook_event_name: "PreToolUse",
+    tool_name: "Write",
+    cwd: repo,
+    tool_input: { file_path: join(repo, "src/shop/domain/p0/new_module.py"), content: "X = 1\n" },
+  });
+  return { payload, preWrite };
+}
+
+/**
  * Reads the options, measures, prints the table and writes the JSON result.
  *
  * @returns 0 when every metric passes, 1 otherwise, 2 for a usage error.
@@ -364,21 +253,7 @@ function main(): number {
     return 2;
   }
   const { base, head, repo, threshold, hookRuns, fullRuns } = options;
-  const file = join(repo, "src/shop/domain/p0/m0.py");
-  const payload = JSON.stringify({
-    session_id: "bench",
-    hook_event_name: "PostToolUse",
-    tool_name: "Edit",
-    cwd: repo,
-    tool_input: { file_path: file },
-  });
-  const preWrite = JSON.stringify({
-    session_id: "bench",
-    hook_event_name: "PreToolUse",
-    tool_name: "Write",
-    cwd: repo,
-    tool_input: { file_path: join(repo, "src/shop/domain/p0/new_module.py"), content: "X = 1\n" },
-  });
+  const { payload, preWrite } = payloads(repo);
   const binaries = { base: resolve(base), head: resolve(head) };
   // Every hook run appends to the "bench" session's log; start from none.
   rmSync(join(repo, ".inwards"), { recursive: true, force: true });
@@ -397,12 +272,19 @@ function main(): number {
     { argv: ["check"], cwd: repo, env: { INWARDS_NO_CACHE: "1" } },
     { measured: fullRuns, warmup: 1 },
   );
+  const large = largeHook(binaries, { measured: hookRuns, warmup: DEFAULTS.warmup });
   const verdicts = [
     judge("hook (one file)", hook, threshold),
     judge("pre-write (new file)", pre, threshold),
     judge("full check", full, threshold),
+    judge("hook (4,500-line file)", large.oneShot, threshold),
   ];
+  const budget = largeMarkdown(large.daemon);
   const cache = cacheModes(binaries.head, repo, { measured: fullRuns, warmup: 1 });
+  const daemon = daemonHook(binaries.head, repo, payload, {
+    measured: hookRuns,
+    warmup: DEFAULTS.warmup,
+  });
   const runner = {
     os: `${platform()} ${arch()}`,
     cpu: cpus()[0]?.model ?? "unknown",
@@ -411,11 +293,11 @@ function main(): number {
     bun: Bun.version,
   };
   process.stdout.write(
-    `${markdown(verdicts, threshold)}\n\n${cacheMarkdown(cache)}\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}\n`,
+    `${markdown(verdicts, threshold)}\n\n${budget}\n\n${cacheMarkdown(cache)}\n\n${daemonMarkdown(daemon)}\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}\n`,
   );
   writeFileSync(
     options.out,
-    `${JSON.stringify({ runner, threshold, verdicts, samples: { hook, full, cache } }, null, 2)}\n`,
+    `${JSON.stringify({ runner, threshold, verdicts, samples: { hook, full, large, cache, daemon } }, null, 2)}\n`,
   );
   return verdicts.every((v) => v.pass) ? 0 : 1;
 }

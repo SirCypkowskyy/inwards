@@ -1,9 +1,11 @@
 /**
  * @file The stages a file goes through in the engine, and the helpers that
- * join them. A scan holds what the prescan found, a confirmation what the
- * full parse found, and a check's result the findings to report. The helpers
- * put a full parse's findings in source order and keep each
- * unassigned-package warning once across files.
+ * join them. A route says how a scan reads a file, a scan holds what the
+ * prescan found, a confirmation what the full parse found, and a check's
+ * result the findings to report. The helpers normalise the texts, tell
+ * which scanned files will need a full parse, put a full parse's findings
+ * in source order, add the findings of rules that parse a file on their own
+ * (FAPI, INW012), and keep each unassigned-package warning once across files.
  */
 import type {
   Diagnostic,
@@ -12,7 +14,19 @@ import type {
   Suppressed,
   SuppressionComment,
 } from "../contracts/records.ts";
+import { normalizeSource } from "../python/parser.ts";
 import { mentionsSuppression } from "../rules/suppression-comment.ts";
+
+/**
+ * How a scan reads a file: not at all (outside every layer, nothing else
+ * applying), not at all because its encoding can't be read (with the INW000
+ * finding), or through the prescan (`skeleton`) or the full parse, which
+ * also looks for dynamic imports when `dynamic`.
+ */
+export type Route =
+  | { kind: "outside" }
+  | { kind: "unreadable"; found: Diagnostic }
+  | { kind: "read"; dynamic: boolean; skeleton: boolean };
 
 /** A file after the prescan, before any full parse. */
 export interface Scan {
@@ -62,7 +76,8 @@ export function ordered(
 /**
  * Keeps each warning that names no place once across files: the INW006
  * warning for an unassigned package is kept on its first file. An
- * unused-suppression warning (INW009) is each comment's own and always kept.
+ * unused-suppression warning (INW009) is each comment's own and always kept,
+ * and so is an INW012 warning, which is each endpoint's own.
  *
  * @param kept - one file's findings, after its suppressions.
  * @param warned - the warnings kept so far, by message, updated in place.
@@ -70,11 +85,58 @@ export function ordered(
  */
 export function keptOnce(kept: readonly Diagnostic[], warned: Set<string>): Diagnostic[] {
   return kept.filter((found) => {
-    if (found.severity !== "warning" || found.code === "INW009") {
+    if (found.severity !== "warning" || found.code === "INW009" || found.code === "INW012") {
       return true;
     }
     const first = !warned.has(found.message);
     warned.add(found.message);
     return first;
   });
+}
+
+/**
+ * Adds findings another stage found in a file to its confirmed ones, in source order.
+ *
+ * @param confirmed - the file's confirmed findings.
+ * @param extra - the other findings in the same file.
+ * @returns the confirmed findings with the extra ones.
+ */
+export function withFound(confirmed: Confirmed, extra: readonly Diagnostic[]): Confirmed {
+  if (extra.length === 0) {
+    return confirmed;
+  }
+  const found = [...confirmed.found, ...extra].sort(
+    (a, b) => a.line - b.line || a.column - b.column,
+  );
+  return { ...confirmed, found };
+}
+
+/**
+ * Normalises every file's text (BOM dropped, lone \r turned into \n), so
+ * reported lines and columns match what an editor shows.
+ *
+ * @param files - the source files as read.
+ * @returns new source file records with normalised text, in order.
+ */
+export function normalized(files: Iterable<SourceFile>): SourceFile[] {
+  return [...files].map((file) => ({ ...file, text: normalizeSource(file.text) }));
+}
+
+/**
+ * Tells whether finishing a scanned file will ask the extractor for a full
+ * parse: to confirm its findings (unless it has dynamic imports, whose tree
+ * the engine parses itself), or to read the suppression comments of a file
+ * the scan settled. It mirrors the engine's `confirm` and `suppressIn`; a
+ * guess that misses costs time, never results.
+ *
+ * @param src - the source file, with normalised text.
+ * @param scan - its scan.
+ * @param skip - true when the baseline shortcut skips its confirmation.
+ * @returns true when a full extraction will be wanted.
+ */
+export function wantsFull(src: SourceFile, scan: Scan, skip: boolean): boolean {
+  if (scan.found && (scan.exact || skip)) {
+    return mentionsSuppression(src.text) && !scan.found.some((d) => d.code === "INW000");
+  }
+  return !scan.dynamic;
 }

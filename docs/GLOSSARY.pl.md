@@ -63,13 +63,14 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW011, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW013, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
 | File and config names | `pyproject.toml`, `[tool.inwards]`, `AGENTS.md`, `escalate-after`, ... | |
 | Product names | Claude Code, Aider, Codex, Cursor, Copilot, Ruff, ty, mypy, import-linter, tree-sitter, Bun, Zensical, ... | |
 | Tool terms | LSP, MCP, SARIF, WASM, CI, C4, ADR, JSON | |
+| MCP tool names and their arguments | `check_files`, `explain_rule`, `where_should_this_go`, `contents`, `paths` | |
 | scaffold (the example code, also the repo's early code) | scaffold (scaffoldu) | the `--scaffold` flag's output is "przykładowy pakiet" |
 | fixture | fixture (fixture'a, fixture'y) | test and eval fixtures |
 | ruleset (GitHub) | ruleset (rulesetu) | |
@@ -77,6 +78,12 @@ baseline'u); multi-word names are left uninflected where possible.
 | loader (module loader) | loader (loadera) | |
 | launcher (`--launcher`, e.g. `uv run`) | launcher (launchera) | what starts Inwards in the project |
 | worktree (git) | worktree (worktree'a, worktree'y) | |
+| VSIX, Visual Studio Marketplace, Open VSX | VSIX (VSIX-a, pliki VSIX), Marketplace, Open VSX | the extension package and the two registries |
+| personal access token (PAT) | token PAT (tokenu PAT) | `VSCE_PAT`, `OVSX_PAT` |
+| daemon (`inwards daemon`), hook daemon | daemon (daemona, daemony), daemon hooków | the per-project process the PostToolUse hook talks to (ADR-039) |
+| worker, worker pool | worker (workera, workery), pula workerów | |
+| catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
+| health check | health-check | "aplikacja health-check" |
 
 ## Fixed Polish terms
 
@@ -85,6 +92,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | adapter | adapter |
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
+| agent loop | pętla agenta |
 | architecture linter | linter architektury |
 | architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
@@ -93,10 +101,15 @@ baseline'u); multi-word names are left uninflected where possible.
 | bytecode | bajtkod |
 | check (the act of running `inwards check`) | sprawdzenie |
 | whole-project check | sprawdzenie całego projektu |
+| one-file check (what the hook runs) | sprawdzenie jednego pliku |
+| full check (every file) | pełne sprawdzenie |
+| quickstart (home page) | szybki start |
 | clean (no violations) | czysty (projekt, plik) |
 | code scanning | code scanning (GitHub) |
 | composition root | korzeń kompozycji (composition root) |
 | cold / warm run | zimne / ciepłe uruchomienie |
+| thread, worker thread (ADR-040) | wątek, wątek roboczy (worker); the main thread: wątek główny |
+| extraction job | zadanie ekstrakcji |
 | corpus | korpus |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
@@ -136,8 +149,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | hallucinated module | zmyślony moduł |
 | hypothesis | hipoteza |
 | importers (of a module) | moduły importujące (dany moduł) |
+| incremental parse (tree-sitter, from the last tree) | przyrostowe parsowanie |
 | import skeleton | szkielet importów |
 | job (CI) | zadanie |
+| kernel (the `kernel` layer of the `fastapi` preset) | jądro (kernel) |
 | language server | serwer języka |
 | libraries per layer (INW005 guide) | biblioteki w warstwach |
 | legacy codebase, repo, violation | starszy kod, starsze repozytorium, stare naruszenie |
@@ -169,6 +184,25 @@ baseline'u); multi-word names are left uninflected where possible.
 | path operation (FastAPI) | operacja ścieżki |
 | include a router (`include_router`) | dołączać router, dołączenie |
 | unmounted router (FAPI003) | niepodpięty router |
+| shadowed route (FAPI005) | przesłonięta trasa |
+| lifespan (FastAPI, FAPI006) | lifespan (menedżer kontekstu cyklu życia aplikacji) |
+| event handler (`on_event`, FAPI006) | handler zdarzeń |
+| yield dependency (FAPI007) | zależność z `yield` |
+| swallow an exception (FAPI007) | połykać wyjątek |
+| operation id (`operation_id`, FAPI008) | identyfikator operacji (`operation_id`) |
+| HTTP endpoint, thin endpoint (INW012) | endpoint HTTP, cienki endpoint |
+| guard (`if <cond>: raise HTTPException(...)`, INW012) | warunek ochronny (guard) |
+| signal, threshold (INW012) | sygnał, próg |
+| route registration (`add_api_route`, `add_url_rule`, `Route`, `path`, INW012), registered handler | rejestracja trasy, zarejestrowany handler |
+| class-based view, view class, view base class (INW012) | widok oparty na klasie, klasa widoku, klasa bazowa widoku |
+| event loop (asyncio) | pętla zdarzeń |
+| blocking call, blocking I/O (INW013) | wywołanie blokujące, blokujące I/O |
+| blocking receiver (INW013) | blokujący odbiorca (nazwa, której metody blokują) |
+| threadpool, worker thread | pula wątków, wątek roboczy |
+| async client, sync client | klient asynchroniczny, klient synchroniczny |
+| re-export (`from .views import f` in `__init__.py`) | reeksport |
+| one hop (INW013, following a call into a sync helper) | jeden krok (w głąb funkcji pomocniczej) |
+| repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |
@@ -183,6 +217,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule | reguła |
 | rule catalogue | katalog reguł |
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
+| rule list, rule browser (the filterable list on `rules/`) | lista reguł |
+| category, sub-category (a rule page's `tags`) | kategoria, podkategoria |
+| autofix (the rule list's filter and column; the key stays `autofix`) | poprawka automatyczna |
+| rule status: stable, in review, in development, backlog | stabilna, w przeglądzie, w rozwoju, w planach |
+| rules per page, page (pagination) | reguł na stronie, strona |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
 | matched prefix (of a layer selector) | dopasowany prefiks |
@@ -195,6 +234,13 @@ baseline'u); multi-word names are left uninflected where possible.
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
 | snapshot | migawka |
 | spike | eksperyment |
+| resident process | stały proces |
+| one-shot run (a hook or check in its own process) | jednorazowe uruchomienie, jednorazowo |
+| socket, Unix domain socket | gniazdo, gniazdo uniksowe |
+| named pipe (Windows) | nazwany potok |
+| endpoint (a socket path or pipe name) | adres |
+| framing (of a protocol) | ramkowanie |
+| stale (a daemon, a build) | nieaktualny |
 | start-up (process) | start (startu) |
 | string (Python) | napis |
 | suppression, inline suppression (`# inwards: ignore[...]`) | wyciszenie, wyciszenie w linii |
@@ -203,6 +249,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | exception handler (FastAPI) | handler wyjątków |
 | helper (function) | funkcja pomocnicza |
 | inclusion (`include_router`) | dołączenie |
+| splat (`**kwargs` in a call), splatted dict | rozpakowanie, rozpakowany słownik |
+| app factory | fabryka aplikacji |
 | finding | diagnostyka (as for diagnostic) |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |
@@ -218,3 +266,19 @@ baseline'u); multi-word names are left uninflected where possible.
 | workspace (uv) | workspace (uv) |
 | workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |
+| workspace folder (editor) | folder obszaru roboczego |
+| untrusted workspace, Restricted Mode (VS Code) | niezaufany obszar roboczy, tryb ograniczony |
+| restricted setting (`restrictedConfigurations`) | ustawienie ograniczone |
+| setting (VS Code, `inwards.path`) | ustawienie |
+| registry (Marketplace, Open VSX) | rejestr |
+| environment (GitHub Actions deployments) | środowisko (GitHub Actions) |
+| platform package (one VSIX per platform) | pakiet dla platformy |
+| thin client | cienki klient |
+| file watcher (editor) | obserwator plików |
+| whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
+| MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |
+| tool (MCP) | narzędzie |
+| structured content (an MCP tool result's `structuredContent`) | treść strukturalna |
+| probe module (`where_should_this_go`) | moduł próbny |
+| protocol era, revision (MCP) | era protokołu, rewizja |
+| texts laid over the disk (`project/overlay.ts`) | teksty nałożone na dysk |

@@ -7,7 +7,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
-import type { CallSyntax, Qualify, Value } from "./values.ts";
+import type { Qualify } from "../../python/qualify.ts";
+import type { CallSyntax, Value } from "./values.ts";
 
 /** A name bound to `FastAPI(...)` or `APIRouter(...)`, with the constructor call. */
 export interface FastApiObject extends CallSyntax {
@@ -71,6 +72,23 @@ export interface ExceptionHandler {
   readonly node: Node;
 }
 
+/** An `on_event` decorator or an `add_event_handler` call: the deprecated startup and shutdown hooks. */
+export interface EventHandlerUse extends CallSyntax {
+  /** The qualified name of the app or router it is registered on. */
+  readonly receiver: string;
+  readonly via: "on_event" | "add_event_handler";
+  /** The event argument (`"startup"` or `"shutdown"`), or null when the call doesn't give one. */
+  readonly event: Value | null;
+}
+
+/** A `Depends(...)` or `Security(...)` call, wherever it is written. */
+export interface DependencyUse extends CallSyntax {
+  /** The dependency argument: the first positional one or `dependency=`, or null for `Depends()`. */
+  readonly argument: Node | null;
+  /** The argument as the model reads it. */
+  readonly target: Value | null;
+}
+
 /** What one file holds, as the FAPI rules see it. */
 export interface FastApiFile {
   readonly path: string;
@@ -79,6 +97,8 @@ export interface FastApiFile {
   readonly operations: readonly PathOperation[];
   readonly wiring: readonly Wiring[];
   readonly handlers: readonly ExceptionHandler[];
+  readonly events: readonly EventHandlerUse[];
+  readonly dependencies: readonly DependencyUse[];
 }
 
 /** What reading one file needs besides its tree. */

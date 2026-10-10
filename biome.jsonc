@@ -148,6 +148,24 @@
       "linter": { "rules": { "style": { "noMagicNumbers": "off" } } }
     },
     {
+      // The docs identity (issue #177, docs/DESIGN.md) restyles Zensical's own
+      // components. The theme's CSS is unlayered, and unlayered rules beat any
+      // cascade layer, so these two files can't sit in a layer. Each keeps one
+      // concern in one place (tokens and theme overrides; the home page), which
+      // is the short list a Zensical upgrade is checked against. The browser
+      // surfaces the issue asks for (::selection, scrollbar-color, text-wrap,
+      // user-select) are progressive: a browser without them keeps its default.
+      "includes": ["docs/chapters/stylesheets/theme.css", "docs/chapters/stylesheets/home.css"],
+      "linter": {
+        "rules": {
+          "nursery": { "useLayeredStyles": "off", "useBaseline": "off" },
+          "style": {
+            "noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 700 } }
+          }
+        }
+      }
+    },
+    {
       // Browser-only docs assets (Zensical extra_javascript): no process.stdout
       // exists in a browser, so a console warning is the only way to surface a
       // degraded state (e.g. a blocked CDN request) to someone debugging.
@@ -193,8 +211,11 @@
       "includes": [
         "src/cli/src/claude-code/**",
         "src/cli/src/commands/**",
+        "src/cli/src/daemon/**",
         "src/cli/src/init/**",
         "src/cli/src/json/**",
+        "src/cli/src/lsp/**",
+        "src/cli/src/mcp/**",
         "src/cli/src/paths/**",
         "src/cli/src/platform/**",
         "src/cli/src/project/**",

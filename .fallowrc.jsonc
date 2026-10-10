@@ -13,18 +13,31 @@
     "scripts/claude-payload-drift.ts",
     // Run by hand after a schema change; src/core/test/config/schema.test.ts runs it with --check.
     "scripts/build-pyproject-schema.ts",
-    "packaging/placeholder/npm/bin.js"
+    "packaging/placeholder/npm/bin.js",
+    // VS Code loads dist/extension.js, which `bun run build` bundles from it.
+    "src/vscode-extension/src/client/extension.ts",
+    // The manual end-to-end check of an installed extension, run by hand per OS.
+    "src/vscode-extension/scripts/try-in-vscode.ts"
   ],
   // Loaded by path, never imported: Bun.resolveSync("tree-sitter-python/...wasm")
-  // in core's tests and scripts, and the extension's scripts/copy-wasm.ts.
+  // in core's tests and scripts.
   // eslint-plugin-jsdoc is loaded by oxlint through .oxlintrc.jsonc "jsPlugins".
-  "ignoreDependencies": ["tree-sitter-python", "eslint-plugin-jsdoc"],
+  // @vscode/vsce runs as `bun x vsce` from the extension's scripts/package-target.ts.
+  "ignoreDependencies": ["tree-sitter-python", "eslint-plugin-jsdoc", "@vscode/vsce"],
   // The detector's settings, spelled out. The 3% gate is fallow's own; zero
   // clone groups is enforced by scripts/check-no-clones.ts, since a threshold
   // of 0 disables the limit in fallow 3.28.0 (#176).
   "duplicates": { "threshold": 3, "mode": "mild", "minTokens": 50, "minLines": 5 },
   // Dev and optional dependencies nobody uses fail like the rest (default: warn).
-  "rules": { "unused-dev-dependencies": "error", "unused-optional-dependencies": "error" },
+  // A rule-pack finding fails the run too (default: warn).
+  "rules": {
+    "unused-dev-dependencies": "error",
+    "unused-optional-dependencies": "error",
+    "policy-violation": "error"
+  },
+  // Adapters import the engine as `@inwards/core`, never a module under
+  // src/core/src/ by path; see the comment above the CLI's boundary rules.
+  "rulePacks": [".fallow-core-api.jsonc"],
   // importersOf: only tests call it; the Stop gate checks the whole project
   // instead (#139). Drop it once a rule or command uses it. (checkFiles, index
   // and modules no longer need an exception: fallow now sees their callers.)
@@ -109,11 +122,14 @@
       },
       // The FastAPI family (#186): the shared model now, FAPI001 to FAPI003 in #183 and #184.
       { "name": "core-rule-fastapi", "patterns": ["src/core/src/rules/fastapi/**"] },
+      // INW012 thin-endpoint (#182): framework-aware, so not part of the FastAPI family.
+      { "name": "core-rule-thin-endpoint", "patterns": ["src/core/src/rules/thin-endpoint/**"] },
+      // INW013 async-blocking (#293): the first of #98's role-scoped content rules.
+      { "name": "core-rule-async-blocking", "patterns": ["src/core/src/rules/async-blocking/**"] },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
-      { "name": "adapter-parity", "patterns": ["src/cli/test/integration/lsp-parity.test.ts"] },
       // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
       { "name": "cli-main", "patterns": ["src/cli/src/main.ts"] },
       { "name": "cli-adapters", "patterns": ["src/cli/src/adapters/**"] },
@@ -125,15 +141,20 @@
       { "name": "cli-project", "patterns": ["src/cli/src/project/**"] },
       { "name": "cli-runlog", "patterns": ["src/cli/src/runlog/**"] },
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
+      // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
+      { "name": "cli-daemon", "patterns": ["src/cli/src/daemon/**"] },
+      // The language server's policy (`inwards server`, ADR-041): when to check what.
+      { "name": "cli-lsp", "patterns": ["src/cli/src/lsp/**"] },
+      // The MCP server's policy (`inwards mcp`, ADR-043): the three tools.
+      { "name": "cli-mcp", "patterns": ["src/cli/src/mcp/**"] },
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
       { "name": "cli-test", "patterns": ["src/cli/test/**"] },
-      // The extension (#176): the VS Code client and the language server run in
-      // different processes and share nothing but the protocol. A file in a new
-      // src/ folder matches no zone, so fallow fails until it gets one.
+      // The extension (#176, ADR-043): a thin client that starts `inwards server`
+      // and shares nothing with it but the protocol. A file in a new src/ folder
+      // matches no zone, so fallow fails until it gets one.
       { "name": "vscode-client", "patterns": ["src/vscode-extension/src/client/**"] },
-      { "name": "vscode-server", "patterns": ["src/vscode-extension/src/server/**"] },
       {
         "name": "vscode-dev",
         "patterns": ["src/vscode-extension/test/**", "src/vscode-extension/scripts/**"]
@@ -155,7 +176,10 @@
       { "from": "core-config", "allow": ["core-contracts", "core-meta"] },
       { "from": "core-python", "allow": ["core-contracts"] },
       { "from": "core-lookup", "allow": ["core-contracts", "core-python"] },
-      { "from": "core-rules-shared", "allow": ["core-contracts", "core-meta", "core-config"] },
+      {
+        "from": "core-rules-shared",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python"]
+      },
       {
         "from": "core-rule-unsupported-encoding",
         "allow": [
@@ -267,6 +291,28 @@
           "core-rules-shared"
         ]
       },
+      {
+        "from": "core-rule-async-blocking",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-thin-endpoint",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
       { "from": "core-baseline", "allow": ["core-contracts"] },
       {
         "from": "core-engine",
@@ -289,6 +335,8 @@
           "core-rule-unknown-first-party",
           "core-rule-dynamic-import",
           "core-rule-fastapi",
+          "core-rule-thin-endpoint",
+          "core-rule-async-blocking",
           "core-baseline"
         ]
       },
@@ -341,27 +389,112 @@
           "core-rule-unknown-first-party",
           "core-rule-dynamic-import",
           "core-rule-fastapi",
+          "core-rule-thin-endpoint",
+          "core-rule-async-blocking",
           "core-baseline",
           "core-engine",
           "core-report"
         ]
       },
-      // The CLI reaches the engine through `@inwards/core` (index.ts) only, and
-      // its folders depend downwards: pure leaves (platform, json, paths), then
+      // Adapters reach the engine through `@inwards/core` (index.ts) only.
+      // fallow 3.31 judges a named import through that barrel by the zone of
+      // the module that declares the symbol, so every adapter rule that allows
+      // core-api also allows the twelve zones index.ts re-exports from
+      // (contracts to report below). A zone index.ts starts re-exporting from
+      // goes into each of those lists. The allow lists can't tell the barrel
+      // from a direct import of an internal module, so .fallow-core-api.jsonc
+      // (rulePacks above) refuses the direct one (#262).
+      //
+      // The CLI's folders depend downwards: pure leaves (platform, json, paths), then
       // project, session, runlog, then claude-code and init, then commands.
       // Only adapters/ implements the platform contracts, and only main.ts
       // (through adapters/compose.ts) wires adapters in (#176).
       { "from": "cli-platform", "allow": [] },
       { "from": "cli-json", "allow": [] },
-      { "from": "cli-paths", "allow": ["core-api", "cli-platform"] },
-      { "from": "cli-project", "allow": ["core-api", "cli-platform", "cli-json", "cli-paths"] },
+      {
+        "from": "cli-paths",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform"
+        ]
+      },
+      {
+        "from": "cli-project",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths"
+        ]
+      },
       {
         "from": "cli-session",
-        "allow": ["core-api", "cli-platform", "cli-json", "cli-paths", "cli-project"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project"
+        ]
       },
       {
         "from": "cli-runlog",
-        "allow": ["core-api", "cli-platform", "cli-json", "cli-paths", "cli-project", "cli-session"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-session"
+        ]
       },
       {
         "from": "cli-protocol",
@@ -371,6 +504,18 @@
         "from": "cli-claude-code",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-json",
           "cli-paths",
@@ -384,6 +529,18 @@
         "from": "cli-init",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-json",
           "cli-paths",
@@ -393,9 +550,85 @@
         ]
       },
       {
+        "from": "cli-daemon",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json"
+        ]
+      },
+      {
+        "from": "cli-lsp",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project"
+        ]
+      },
+      {
+        "from": "cli-mcp",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project"
+        ]
+      },
+      {
         "from": "cli-commands",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-json",
           "cli-paths",
@@ -404,30 +637,78 @@
           "cli-runlog",
           "cli-protocol",
           "cli-claude-code",
-          "cli-init"
+          "cli-init",
+          "cli-daemon",
+          "cli-lsp",
+          "cli-mcp"
         ]
       },
       {
         "from": "cli-adapters",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-platform",
           "cli-paths",
           "cli-project",
           "cli-session",
           "cli-runlog",
           "cli-init",
-          "cli-commands"
+          "cli-commands",
+          "cli-daemon",
+          "cli-lsp",
+          "cli-mcp"
         ]
       },
       {
         "from": "cli-main",
-        "allow": ["core-api", "cli-adapters", "cli-commands", "cli-init", "cli-platform"]
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-adapters",
+          "cli-commands",
+          "cli-init",
+          "cli-platform"
+        ]
       },
       {
         "from": "cli-test",
         "allow": [
           "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
           "cli-main",
           "cli-adapters",
           "cli-commands",
@@ -439,24 +720,38 @@
           "cli-init",
           "cli-paths",
           "cli-platform",
-          "cli-json"
+          "cli-json",
+          "cli-daemon",
+          "cli-lsp",
+          "cli-mcp"
         ]
       },
-      // The client talks to VS Code and the server only; the server reaches the
-      // engine through `@inwards/core`; neither imports the other.
+      // The client talks to VS Code and the binary only.
       { "from": "vscode-client", "allow": [] },
-      { "from": "vscode-server", "allow": ["core-api"] },
-      // The extension's tests and build scripts exercise both sides.
-      { "from": "vscode-dev", "allow": ["core-api", "vscode-client", "vscode-server"] },
-      // The one test that builds the module index through both adapters (#44).
-      {
-        "from": "adapter-parity",
-        "allow": ["core-api", "cli-adapters", "cli-project", "vscode-server"]
-      },
+      // The extension's tests and build scripts exercise the client.
+      { "from": "vscode-dev", "allow": ["vscode-client"] },
       { "from": "scripts", "allow": [] },
       // The eval harness reads layers the way the CLI does, through the public API,
       // and recognises config guard denials by the CLI's own ASK_USER text.
-      { "from": "eval", "allow": ["core-api", "cli-protocol"] },
+      {
+        "from": "eval",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-protocol"
+        ]
+      },
       // The bench runs binaries as processes and imports nothing of ours.
       { "from": "bench", "allow": [] },
       // The npm placeholder ships alone and imports nothing.
@@ -541,6 +836,14 @@
         },
         {
           "from": "core-rule-fastapi",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-thin-endpoint",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-async-blocking",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

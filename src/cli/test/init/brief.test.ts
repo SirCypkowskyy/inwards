@@ -60,6 +60,7 @@ const PRESET_PORTS: Readonly<Record<(typeof STYLE_NAMES)[number], string>> = {
   // Their layers are selectors, which name no one module.
   "bounded-contexts": "the inner layer",
   django: "the inner layer",
+  fastapi: "the inner layer",
 };
 
 /** A probe that finds nothing on disk. */
@@ -115,7 +116,7 @@ layers = [
   { name = "infrastructure", modules = ["shop.**"] },
 ]
 `;
-    const root = project({ "pyproject.toml": text, "shop/*/domain/ports.py": "" });
+    const root = project({ "pyproject.toml": text, "shop/orders/domain/ports.py": "" });
     const brief = briefFor(nodePlatform(), join(root, "pyproject.toml"), text);
     expect(brief).toContain("1. domain (`shop.*.domain`): imports no other layer");
     expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
@@ -143,6 +144,15 @@ roles = ["models | schemas", "service"]
     expect(brief).toContain("- d.schemas: no web frameworks");
   });
 
+  test("lists INW005's prefix denies after the layers (#219)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules.pure-domain]
+deny = [{ modules = ["shop.domain.pricing", "shop.*.jobs"], libraries = ["numpy", "celery"] }]
+`);
+    expect(architectureBrief({ config, style: undefined, ports: [] })).toContain(
+      "- `shop.domain.pricing`, `shop.*.jobs`: not `numpy`, `celery`",
+    );
+  });
+
   test("leaves out the rules that are turned off", () => {
     const config = parseConfig(`${LAYERS}[tool.inwards.rules]
 ignore = ["INW005"]
@@ -165,7 +175,8 @@ ignore = ["INW005"]
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
       expect(brief).toContain(`(the ${name} preset)`);
       expect(brief).toContain(`declare a \`typing.Protocol\` in ${PRESET_PORTS[name]}`);
-      expect(tokens(brief)).toBeLessThan(300);
+      // fastapi has eleven layers, nine of them the template's roles, each listing what it may import.
+      expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
     },
   );
 });

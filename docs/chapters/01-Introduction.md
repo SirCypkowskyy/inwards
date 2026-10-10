@@ -127,7 +127,7 @@ A suppression with no reason, an unknown code or a malformed comment hides nothi
 
     ---
 
-    The VS Code extension runs the same engine through LSP, so the squiggle and the CI failure never disagree.
+    The VS Code extension starts `inwards server`, which runs the same check as `inwards check`, so the squiggle and the CI failure never disagree.
 
 </div>
 
@@ -152,7 +152,7 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 !!! info "Status"
     Pre-alpha.
-    Eight rules work end to end in the CLI, the engine and the VS Code server: INW001 (layer direction), INW011 (dynamic imports), INW005 ([libraries per layer](guides/libraries.md): no frameworks or I/O in the domain by default), INW006 (code outside every layer, dead prefixes), INW010 (imports of first-party modules that don't exist), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
-    `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django` writes the layers, and `--scaffold` adds an example package that passes the check.
-    Each release is a GitHub Release with binaries for six platforms, five platform wheels and a `.vsix`. The only one so far is the pre-release v0.1.0-rc.1.
+    Eight rules work end to end in the CLI, the engine and the editor (`inwards server`): INW001 (layer direction), INW011 (dynamic imports), INW005 ([libraries per layer](guides/libraries.md): no frameworks or I/O in the domain by default), INW006 (code outside every layer, dead prefixes), INW010 (imports of first-party modules that don't exist), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
+    `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` writes the layers, and `--scaffold` adds an example package that passes the check.
+    Each release is a GitHub Release with binaries for six platforms, five platform wheels and the VS Code extension, one VSIX per platform with the binary inside. The only one so far is the pre-release v0.1.0-rc.1.
     Everything marked :material-progress-clock: in these docs is planned, not built.

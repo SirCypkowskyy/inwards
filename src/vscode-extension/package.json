@@ -4,7 +4,16 @@
   "private": true,
   "publisher": "inwards",
   "displayName": "Inwards",
-  "description": "Architecture rules for Python, live in the editor. Same engine as `inwards check`.",
+  "description": "Architecture rules for Python, live in the editor. Runs `inwards server`, the same code as `inwards check`.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SirCypkowskyy/inwards",
+    "directory": "src/vscode-extension"
+  },
+  "homepage": "https://sircypkowskyy.github.io/inwards/",
+  "bugs": {
+    "url": "https://github.com/SirCypkowskyy/inwards/issues"
+  },
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -16,35 +25,64 @@
     "workspaceContains:pyproject.toml"
   ],
   "main": "./dist/extension.js",
+  "files": [
+    "dist/extension.js",
+    "bin/",
+    "LICENSE",
+    "README.md"
+  ],
   "contributes": {
+    "commands": [
+      {
+        "command": "inwards.restartServer",
+        "title": "Restart Server",
+        "category": "Inwards"
+      }
+    ],
     "configuration": {
       "title": "Inwards",
       "properties": {
         "inwards.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Run Inwards architecture checks on Python files."
+          "description": "Run Inwards architecture checks on Python files. Turning it off stops the language server."
+        },
+        "inwards.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "The `inwards` executable to start as the language server (`inwards server`). Empty: the binary bundled with this extension, else `inwards` on `PATH`. A bare name is looked up on `PATH`; a relative path resolves against the first workspace folder; `~` and `${workspaceFolder}` are expanded. On Windows it must be an `.exe`. Example: `${workspaceFolder}/.venv/bin/inwards`, to use the version a project pins with `uv add --dev inwards`."
         }
       }
     }
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "build": "bun build src/client/extension.ts src/server/server.ts --outdir dist --entry-naming [name].[ext] --target node --format cjs --external vscode && bun run scripts/copy-wasm.ts",
-    "package": "vsce package --no-dependencies"
+    "build": "bun build src/client/extension.ts --outdir dist --entry-naming [name].[ext] --target node --format cjs --external vscode",
+    "package": "bun run scripts/package-target.ts"
   },
   "dependencies": {
-    "@inwards/core": "workspace:*",
-    "vscode-languageclient": "^10.1.2",
-    "vscode-languageserver": "^10.1.2",
-    "vscode-languageserver-textdocument": "^1.0.15",
-    "tree-sitter-python": "0.25.0",
-    "web-tree-sitter": "0.27.0"
+    "vscode-languageclient": "^10.1.2"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.19.1",
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "4.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [
+    "python",
+    "architecture",
+    "lint",
+    "layers",
+    "import-linter"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In an untrusted workspace, Inwards ignores the workspace's `inwards.path`, so a cloned repository can't choose the program it starts.",
+      "restrictedConfigurations": [
+        "inwards.path"
+      ]
+    }
+  }
 }

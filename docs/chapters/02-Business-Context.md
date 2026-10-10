@@ -70,14 +70,14 @@ Two groups of tools matter here. Fast general linters set the performance bar an
 
 | | Python | Layer model | Needs your project's Python env | Repair guidance | Agent hooks | SARIF | Editor |
 |---|:-:|:-:|:-:|---|:-:|:-:|:-:|
-| Ruff | :white_check_mark: | :x: | no (binary in a wheel) | autofix for code rules | :x: | :white_check_mark: | :white_check_mark: |
-| ty | :white_check_mark: | :x: | no (binary in a wheel) | n/a | :x: | :x: | :white_check_mark: |
-| Biome | :x: | :x: | no (binary) | autofix, plugin fixes | :x: | :white_check_mark: | :white_check_mark: |
-| React Doctor | :x: | :x: | Node via `npx` | rules taught through an agent skill | :white_check_mark: | :x: | :x: |
-| import-linter | :white_check_mark: | :white_check_mark: | yes | static text per contract | :x: | :x: | :x: |
-| pytest-archon | :white_check_mark: | :white_check_mark: | yes (code must import) | :x: | :x: | :x: | :x: |
-| Tach | :white_check_mark: | :white_check_mark: | yes (pip package, Rust extension) | :x: | :x: | :x: | ? |
-| **Inwards** (target) | :white_check_mark: | :white_check_mark: | no (binary in a wheel, or a single binary) | steps generated per violation | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Ruff | :material-check-circle: | :material-close-circle: | no (binary in a wheel) | autofix for code rules | :material-close-circle: | :material-check-circle: | :material-check-circle: |
+| ty | :material-check-circle: | :material-close-circle: | no (binary in a wheel) | n/a | :material-close-circle: | :material-close-circle: | :material-check-circle: |
+| Biome | :material-close-circle: | :material-close-circle: | no (binary) | autofix, plugin fixes | :material-close-circle: | :material-check-circle: | :material-check-circle: |
+| React Doctor | :material-close-circle: | :material-close-circle: | Node via `npx` | rules taught through an agent skill | :material-check-circle: | :material-close-circle: | :material-close-circle: |
+| import-linter | :material-check-circle: | :material-check-circle: | yes | static text per contract | :material-close-circle: | :material-close-circle: | :material-close-circle: |
+| pytest-archon | :material-check-circle: | :material-check-circle: | yes (code must import) | :material-close-circle: | :material-close-circle: | :material-close-circle: | :material-close-circle: |
+| Tach | :material-check-circle: | :material-check-circle: | yes (pip package, Rust extension) | :material-close-circle: | :material-close-circle: | :material-close-circle: | ? |
+| **Inwards** (target) | :material-check-circle: | :material-check-circle: | no (binary in a wheel, or a single binary) | steps generated per violation | :material-check-circle: | :material-check-circle: | :material-check-circle: |
 
 `?` means we couldn't verify it. "Repair guidance" is about telling the reader what to change. Autofix, where the tool rewrites the code itself, is a stronger form of it.
 
@@ -243,10 +243,10 @@ The hypothesis fails if real-world repos (not synthetic ones) push the single-fi
 
 ```mermaid
 flowchart LR
-    arch(["👷 Architect"])
-    dev(["🧑‍💻 Developer"])
-    agent(["🤖 AI agent"])
-    ci(["⚙️ CI"])
+    arch(["Architect"])
+    dev(["Developer"])
+    agent(["AI agent"])
+    ci(["CI"])
 
     subgraph S["Inwards"]
         UC1["UC1 Declare layers"]
@@ -269,13 +269,13 @@ flowchart LR
 
 | ID | Use case | Trigger | Outcome | Status |
 |---|---|---|---|---|
-| UC1 | Declare layers | Architect edits `[tool.inwards]` | Config validates, and errors name the offending key | :white_check_mark: |
-| UC2 | Check after each edit | Agent writes a `.py` file; the PostToolUse hook `inwards init --agent claude` installed checks that file | Violations go back to the agent with fix steps within 100 ms | :white_check_mark: |
-| UC3 | Gate before "done" | Agent tries to finish; the Stop gate checks every file the session changed, however it changed | The agent can't declare victory with a violation it introduced, and a legacy repo's old violations don't block it | :white_check_mark: |
-| UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :white_check_mark: `.vsix` on each release, :material-progress-clock: Marketplace |
-| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations on the pull request and in GitHub code scanning | :white_check_mark: [workflow template](guides/ci.md) and pull-request annotations, dogfooded on `examples/broken-app`; :material-progress-clock: code scanning once the repository is public |
-| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :white_check_mark: |
-| UC7 | Brief the agent up front | `inwards context --write` or `inwards init --brief` writes a summary into `AGENTS.md` (which `CLAUDE.md` can import) | The agent knows the layers before it writes the first import | :white_check_mark: opt-in, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |
+| UC1 | Declare layers | Architect edits `[tool.inwards]` | Config validates, and errors name the offending key | :material-check-circle: |
+| UC2 | Check after each edit | Agent writes a `.py` file; the PostToolUse hook `inwards init --agent claude` installed checks that file | Violations go back to the agent with fix steps within 100 ms | :material-check-circle: |
+| UC3 | Gate before "done" | Agent tries to finish; the Stop gate checks every file the session changed, however it changed | The agent can't declare victory with a violation it introduced, and a legacy repo's old violations don't block it | :material-check-circle: |
+| UC4 | See violations in the editor | Developer types | Squiggle with the same message and code as the CLI | :material-check-circle: a VSIX per platform on each release, with the binary inside; :material-progress-clock: Marketplace and Open VSX once the owner publishes |
+| UC5 | Block the pull request | CI runs `inwards check --format sarif` | Failing check plus annotations on the pull request and in GitHub code scanning | :material-check-circle: [workflow template](guides/ci.md) and pull-request annotations, dogfooded on `examples/broken-app`; :material-progress-clock: code scanning once the repository is public |
+| UC6 | Adopt on a legacy codebase | Architect runs `inwards baseline` | Existing violations are recorded and only new ones fail | :material-check-circle: |
+| UC7 | Brief the agent up front | `inwards context --write` or `inwards init --brief` writes a summary into `AGENTS.md` (which `CLAUDE.md` can import) | The agent knows the layers before it writes the first import | :material-check-circle: opt-in, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |
 
 ## Sources
 

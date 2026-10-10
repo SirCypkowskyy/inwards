@@ -45,9 +45,16 @@ type RuleCode =
   | "INW009"
   | "INW010"
   | "INW011"
+  | "INW012"
+  | "INW013"
   | "FAPI001"
   | "FAPI002"
-  | "FAPI003";
+  | "FAPI003"
+  | "FAPI005"
+  | "FAPI006"
+  | "FAPI007"
+  | "FAPI008"
+  | "FAPI009";
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -161,6 +168,26 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
       "Dynamic imports (importlib, __import__, runpy, exec) must point toward inner layers too.",
     docs: page("INW011"),
   },
+  // Opt-in, and a warning until corpus runs settle its thresholds (#182).
+  INW012: {
+    code: "INW012",
+    name: "thin-endpoint",
+    severity: "warning",
+    default: "off",
+    summary:
+      "An HTTP endpoint reads the request, calls one use case and shapes the response; the logic, queries and outgoing calls live in other layers.",
+    docs: page("INW012"),
+  },
+  // Opt-in, the first of #98's role-scoped content rules (#293).
+  INW013: {
+    code: "INW013",
+    name: "async-blocking",
+    severity: "error",
+    default: "off",
+    summary:
+      "An async def makes no synchronous database, cache or cloud call: a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
+    docs: page("INW013"),
+  },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.
   FAPI001: {
@@ -187,6 +214,51 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Every APIRouter with routes is included in an app, and no routers include each other in a cycle.",
     docs: page("FAPI003"),
+  },
+  FAPI005: {
+    code: "FAPI005",
+    name: "route-shadowing",
+    severity: "error",
+    default: "off",
+    summary:
+      "No FastAPI path operation is shadowed by an earlier one with the same method, so every route can be reached.",
+    docs: page("FAPI005"),
+  },
+  FAPI006: {
+    code: "FAPI006",
+    name: "lifespan-events",
+    severity: "error",
+    default: "off",
+    summary:
+      "FastAPI apps use a lifespan context manager, not the deprecated on_event handlers, and never both, so every startup and shutdown handler runs.",
+    docs: page("FAPI006"),
+  },
+  FAPI007: {
+    code: "FAPI007",
+    name: "yield-dependency-swallows",
+    severity: "error",
+    default: "off",
+    summary:
+      "A dependency with yield re-raises what its except clauses catch, so an error in the endpoint is not hidden from the server.",
+    docs: page("FAPI007"),
+  },
+  FAPI008: {
+    code: "FAPI008",
+    name: "duplicate-operation-id",
+    severity: "error",
+    default: "off",
+    summary:
+      "No two path operations of one FastAPI app share an explicit operation_id, so generated clients get one method per operation.",
+    docs: page("FAPI008"),
+  },
+  FAPI009: {
+    code: "FAPI009",
+    name: "depends-called",
+    severity: "error",
+    default: "off",
+    summary:
+      "Depends and Security get the dependency function, not the result of calling it at import time.",
+    docs: page("FAPI009"),
   },
 };
 

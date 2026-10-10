@@ -1,0 +1,9 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW013 async-blocking, one hop the fix names the worker thread, the async helper and the def route 1`] = `
+[
+  "Hand the function to a worker thread instead of calling it: \`await run_in_threadpool(users.create_user, ...)\` from Starlette, \`await anyio.to_thread.run_sync(users.create_user, ...)\` or \`await asyncio.to_thread(users.create_user, ...)\`.",
+  "Or make \`create_user\` an \`async def\` that uses \`AsyncSession\` from \`sqlalchemy.ext.asyncio\`, and \`await\` the call to it.",
+  "If \`create\` is a FastAPI or Starlette route or dependency, declare it with \`def\` instead: FastAPI runs a plain \`def\` in its threadpool, off the event loop.",
+]
+`;

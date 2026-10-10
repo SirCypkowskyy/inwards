@@ -1,0 +1,588 @@
+/* fallow-ignore-file unused-file */
+/* Loaded via docs/zensical.toml's extra_css, a TOML config fallow's JS
+   import graph can't trace.
+
+   The Inwards identity (issue #177, docs/DESIGN.md): fonts, colour tokens,
+   their mapping onto Zensical's --md-* custom properties, browser surfaces
+   and the restyled theme components.
+
+   Why this file is not in a cascade layer: the theme's own CSS is unlayered,
+   and unlayered rules beat every layer whatever their specificity, so a
+   layered token or override would lose to the theme. The diagrams, which
+   the theme never styles, stay in a layer in extra.css; the home page,
+   which restyles theme elements, is unlayered in home.css. */
+
+/* Fonts. Atkinson Hyperlegible Next and Mono, SIL OFL 1.1 (licences in
+   assets/fonts/), variable weight 200 to 800. Each file is the google/fonts
+   variable TTF subset to Latin-1 and Latin Extended-A, which covers
+   ą ć ę ł ń ó ś ź ż in both cases, plus general punctuation:
+     pyftsubset "AtkinsonHyperlegibleNext[wght].ttf" --flavor=woff2 \
+       --layout-features='*' --unicodes="U+0000-017F,U+02BB-02DD,U+0304,
+       U+0308,U+0328,U+0329,U+2000-206F,U+20AC,U+2122,U+2190-2193,U+2212,
+       U+2215,U+FEFF,U+FFFD" --output-file=atkinson-next-normal.woff2
+   One file per style keeps a Polish page at the same two requests as an
+   English one. */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../assets/fonts/atkinson-next-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: italic;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../assets/fonts/atkinson-next-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../assets/fonts/atkinson-mono-normal.woff2") format("woff2");
+}
+
+/* Metric-matched fallbacks, so the swap doesn't move the layout. The body
+   face's average advance equals Arial's (size-adjust 100%); the mono face is
+   5.3% wider than Courier New. Overrides are the web fonts' ascent (984/1000)
+   and descent (316/1000) divided by size-adjust. */
+@font-face {
+  font-family: "Inwards Text Fallback";
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans");
+  size-adjust: 100%;
+  ascent-override: 98.4%;
+  descent-override: 31.6%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Inwards Code Fallback";
+  src: local("Courier New"), local("Liberation Mono");
+  size-adjust: 105.3%;
+  ascent-override: 93.4%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
+/* Colour tokens. Six named colours, each with a light and a dark value:
+   Paper, Ink, Graphite, Hunk, Removed and Added. Hunk is the one accent
+   (links, current nav item, focus, primary actions); Removed and Added are
+   diff law, for violations and passes only. The rest are tones of those six,
+   written out rather than mixed so each contrast ratio in docs/DESIGN.md is
+   exact: paper-2 (code and admonition surface) and rule (hairlines) from
+   Paper and Graphite, hunk-strong (hover), on-hunk (text on a Hunk fill),
+   and the two diff tints. */
+:root,
+[data-md-color-scheme="default"] {
+  --inw-paper: rgb(255 255 255);
+  --inw-paper-2: rgb(243 245 247);
+  --inw-ink: rgb(27 34 41);
+  --inw-graphite: rgb(86 97 108);
+  --inw-rule: rgb(223 227 232);
+  --inw-hunk: rgb(11 103 132);
+  --inw-hunk-strong: rgb(8 78 101);
+  --inw-removed: rgb(179 38 30);
+  --inw-removed-tint: rgb(253 236 235);
+  --inw-added: rgb(29 122 62);
+  --inw-added-tint: rgb(232 245 236);
+  --inw-on-hunk: rgb(255 255 255);
+
+  /* The modern variant's own RGB triplets (search, dialogs). */
+  --color-foreground: 27 34 41;
+  --color-background: 255 255 255;
+  --color-background-subtle: 243 245 247;
+  --color-backdrop: 255 255 255;
+}
+
+[data-md-color-scheme="slate"] {
+  --inw-paper: rgb(21 25 30);
+  --inw-paper-2: rgb(28 33 39);
+  --inw-ink: rgb(226 230 234);
+  --inw-graphite: rgb(155 166 177);
+  --inw-rule: rgb(46 53 61);
+  --inw-hunk: rgb(94 194 223);
+  --inw-hunk-strong: rgb(147 216 236);
+  --inw-removed: rgb(255 139 128);
+  --inw-removed-tint: rgb(58 31 34);
+  --inw-added: rgb(108 212 143);
+  --inw-added-tint: rgb(23 48 37);
+  --inw-on-hunk: rgb(12 26 32);
+
+  /* The modern variant's own RGB triplets (search, dialogs). */
+  --color-foreground: 226 230 234;
+  --color-background: 21 25 30;
+  --color-background-subtle: 28 33 39;
+  --color-backdrop: 21 25 30;
+}
+
+/* The --md-* mapping. Both schemes share it; only the tokens differ. */
+:root,
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-text-font: "Atkinson Hyperlegible Next";
+  --md-code-font: "Atkinson Hyperlegible Mono";
+
+  --md-default-fg-color: var(--inw-ink);
+  --md-default-fg-color--light: var(--inw-graphite);
+  --md-default-fg-color--lighter: color-mix(in srgb, var(--inw-graphite) 55%, transparent);
+  --md-default-fg-color--lightest: color-mix(in srgb, var(--inw-graphite) 14%, transparent);
+  --md-default-bg-color: var(--inw-paper);
+  --md-default-bg-color--light: color-mix(in srgb, var(--inw-paper) 92%, transparent);
+  --md-default-bg-color--lighter: color-mix(in srgb, var(--inw-paper) 30%, transparent);
+  --md-default-bg-color--lightest: color-mix(in srgb, var(--inw-paper) 12%, transparent);
+
+  --md-primary-fg-color: var(--inw-hunk);
+  --md-primary-fg-color--light: var(--inw-hunk-strong);
+  --md-primary-fg-color--dark: var(--inw-hunk-strong);
+  --md-primary-bg-color: var(--inw-on-hunk);
+  --md-primary-bg-color--light: color-mix(in srgb, var(--inw-on-hunk) 70%, transparent);
+  --md-accent-fg-color: var(--inw-hunk);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--inw-hunk) 10%, transparent);
+  --md-accent-bg-color: var(--inw-on-hunk);
+  --md-accent-bg-color--light: color-mix(in srgb, var(--inw-on-hunk) 70%, transparent);
+
+  --md-typeset-color: var(--inw-ink);
+  --md-typeset-a-color: var(--inw-hunk);
+  --md-typeset-mark-color: color-mix(in srgb, var(--inw-hunk) 22%, transparent);
+  --md-typeset-del-color: var(--inw-removed-tint);
+  --md-typeset-ins-color: var(--inw-added-tint);
+  --md-typeset-kbd-color: var(--inw-paper);
+  --md-typeset-kbd-accent-color: var(--inw-paper);
+  --md-typeset-kbd-border-color: var(--inw-graphite);
+  --md-typeset-table-color: var(--inw-rule);
+  --md-typeset-table-color--light: color-mix(in srgb, var(--inw-paper-2) 60%, transparent);
+  --md-admonition-fg-color: var(--inw-ink);
+  --md-admonition-bg-color: var(--inw-paper-2);
+  --md-warning-fg-color: var(--inw-ink);
+  --md-warning-bg-color: var(--inw-paper-2);
+  --md-footer-fg-color: var(--inw-ink);
+  --md-footer-fg-color--light: var(--inw-graphite);
+  --md-footer-fg-color--lighter: var(--inw-graphite);
+  --md-footer-bg-color: var(--inw-paper-2);
+  --md-footer-bg-color--dark: var(--inw-paper-2);
+
+  /* Code: ink on Paper 2, with syntax colours from the palette. Keywords and
+     numbers take Hunk, strings Added; comments and punctuation Graphite. */
+  --md-code-fg-color: var(--inw-ink);
+  --md-code-bg-color: var(--inw-paper-2);
+  --md-code-bg-color--light: color-mix(in srgb, var(--inw-paper-2) 70%, transparent);
+  --md-code-bg-color--lighter: color-mix(in srgb, var(--inw-paper-2) 30%, transparent);
+  --md-code-hl-color: var(--inw-hunk);
+  --md-code-hl-color--light: color-mix(in srgb, var(--inw-hunk) 12%, transparent);
+  --md-code-hl-keyword-color: var(--inw-hunk);
+  --md-code-hl-constant-color: var(--inw-hunk);
+  --md-code-hl-number-color: var(--inw-hunk);
+  --md-code-hl-special-color: var(--inw-hunk);
+  --md-code-hl-string-color: var(--inw-added);
+  --md-code-hl-function-color: var(--inw-ink);
+  --md-code-hl-name-color: var(--inw-ink);
+  --md-code-hl-operator-color: var(--inw-graphite);
+  --md-code-hl-punctuation-color: var(--inw-graphite);
+  --md-code-hl-comment-color: var(--inw-graphite);
+  --md-code-hl-generic-color: var(--inw-graphite);
+  --md-code-hl-variable-color: var(--inw-ink);
+
+  /* Mermaid: nodes in Paper 2 with an ink label, edges in Graphite. */
+  --md-mermaid-font-family: var(--md-text-font-family);
+  --md-mermaid-edge-color: var(--inw-graphite);
+  --md-mermaid-node-bg-color: var(--inw-paper-2);
+  --md-mermaid-node-fg-color: var(--inw-ink);
+  --md-mermaid-label-bg-color: var(--inw-paper);
+  --md-mermaid-label-fg-color: var(--inw-ink);
+
+  /* Depth: one shadow, for the header and floating panels. */
+  --md-shadow-z1: 0 0.05rem 0.4rem color-mix(in srgb, var(--inw-ink) 8%, transparent);
+  --md-shadow-z2: 0 0.1rem 0.6rem color-mix(in srgb, var(--inw-ink) 12%, transparent);
+  --md-shadow-z3: 0 0.2rem 1rem color-mix(in srgb, var(--inw-ink) 16%, transparent);
+
+  caret-color: var(--inw-hunk);
+  scrollbar-color: color-mix(in srgb, var(--inw-graphite) 45%, transparent) transparent;
+}
+
+body {
+  --md-text-font-family: var(--md-text-font), "Inwards Text Fallback", system-ui, sans-serif;
+  --md-code-font-family: var(--md-code-font), "Inwards Code Fallback", ui-monospace, monospace;
+}
+
+/* Browser surfaces. */
+::selection {
+  color: var(--inw-ink);
+  background-color: color-mix(in srgb, var(--inw-hunk) 28%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--inw-hunk);
+  outline-offset: 2px;
+}
+
+.md-typeset mark,
+.md-search-result mark {
+  color: inherit;
+  background-color: var(--md-typeset-mark-color);
+  border-radius: 2px;
+}
+
+/* Type. Body 17px (0.85rem of the theme's 20px root), ratio 1.2 up to h1;
+   the display size is the home hero's only (extra.css). */
+.md-typeset {
+  font-size: 0.85rem;
+  line-height: 1.65;
+  letter-spacing: 0;
+  font-feature-settings: "kern";
+}
+
+.md-typeset :is(h1, h2, h3, h4) {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.md-typeset h1 {
+  margin: 0 0 1em;
+  font-size: 1.728em;
+  line-height: 1.2;
+}
+
+.md-typeset h2 {
+  margin: 2em 0 0.6em;
+  font-size: 1.44em;
+  line-height: 1.3;
+}
+
+.md-typeset h3 {
+  margin: 1.8em 0 0.5em;
+  font-size: 1.2em;
+  line-height: 1.3;
+}
+
+.md-typeset h4 {
+  margin: 1.6em 0 0.4em;
+  font-size: 1em;
+}
+
+/* Measure: prose stops at about 72 characters; tables, code and diagrams
+   keep the full column. */
+.md-typeset :is(p, ul, ol, dl, blockquote) {
+  max-inline-size: 34em;
+}
+
+.md-typeset :is(.admonition, details, .tabbed-set, td, th, li) :is(p, ul, ol, dl) {
+  max-inline-size: none;
+}
+
+.md-typeset a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(in srgb, var(--inw-hunk) 45%, transparent);
+  transition: text-decoration-color 150ms;
+}
+
+.md-typeset a:is(:hover, :focus-visible) {
+  color: var(--inw-hunk-strong);
+  text-decoration-color: currentcolor;
+}
+
+.md-typeset :is(table, .md-typeset__table) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Code. Atkinson Hyperlegible Mono sets 0 with a slash and gives l and I
+   distinct shapes, which is what a rule code or a module name needs. */
+.md-typeset code {
+  font-size: 0.88em;
+  border-radius: 4px;
+}
+
+.md-typeset pre > code {
+  border: 1px solid var(--inw-rule);
+  border-radius: 6px;
+  line-height: 1.55;
+}
+
+/* console blocks read like the diagnostics they show: the prompt line in
+   Graphite, output in ink (pygments' generic prompt/output tokens). */
+.md-typeset .language-console :is(.gp, .go) {
+  color: var(--inw-graphite);
+}
+
+.md-typeset .language-console .go {
+  color: var(--inw-ink);
+}
+
+.md-typeset .highlight :is(.hll) {
+  background-color: var(--md-code-hl-color--light);
+}
+
+.md-typeset .highlight .gd {
+  color: var(--inw-removed);
+  background-color: var(--inw-removed-tint);
+}
+
+.md-typeset .highlight .gi {
+  color: var(--inw-added);
+  background-color: var(--inw-added-tint);
+}
+
+.md-typeset kbd {
+  font-family: var(--md-code-font-family);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px var(--inw-rule),
+    0 0.1rem 0 var(--inw-graphite);
+}
+
+/* Admonitions and details: Paper 2, a 1px rule all round, no coloured
+   side border. The icon carries the kind: Hunk for notes, Added for tips,
+   Removed for danger, Graphite otherwise. The deploy's "Tłumaczenie może być
+   nieaktualne" banner is a warning admonition and gets the same shape. */
+.md-typeset :is(.admonition, details) {
+  --inw-adm-icon: var(--inw-graphite);
+
+  font-size: 0.8rem;
+  background-color: var(--inw-paper-2);
+  border: 1px solid var(--inw-rule);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.md-typeset :is(.admonition, details):is(.note, .info, .abstract, .question) {
+  --inw-adm-icon: var(--inw-hunk);
+}
+
+.md-typeset :is(.admonition, details):is(.tip, .success) {
+  --inw-adm-icon: var(--inw-added);
+}
+
+.md-typeset :is(.admonition, details):is(.danger, .failure, .bug) {
+  --inw-adm-icon: var(--inw-removed);
+}
+
+.md-typeset :is(.admonition, details) > :is(.admonition-title, summary) {
+  font-weight: 700;
+  background-color: transparent;
+  border: 0;
+}
+
+.md-typeset :is(.admonition, details) > :is(.admonition-title, summary)::before {
+  background-color: var(--inw-adm-icon);
+}
+
+.md-typeset details > summary::after {
+  background-color: var(--inw-graphite);
+}
+
+/* Tables. */
+.md-typeset table:not([class]) {
+  font-size: 0.8rem;
+  border: 1px solid var(--inw-rule);
+  border-radius: 6px;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--inw-paper-2);
+}
+
+.md-typeset table:not([class]) :is(td, th) {
+  padding: 0.6em 1em;
+}
+
+/* Content tabs. */
+.md-typeset .tabbed-labels > label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--inw-graphite);
+  transition: color 150ms;
+}
+
+.md-typeset .tabbed-labels > label:hover {
+  color: var(--inw-ink);
+}
+
+.md-typeset .tabbed-labels::before {
+  background: var(--inw-hunk);
+}
+
+/* Buttons: Hunk fill for the primary action, a 1px ink outline otherwise. */
+.md-typeset .md-button {
+  padding: 0.55em 1.3em;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--inw-ink);
+  background-color: transparent;
+  border: 1px solid var(--inw-graphite);
+  border-radius: 6px;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms;
+}
+
+.md-typeset .md-button:is(:hover, :focus-visible) {
+  color: var(--inw-ink);
+  background-color: var(--inw-paper-2);
+  border-color: var(--inw-ink);
+}
+
+.md-typeset .md-button--primary {
+  color: var(--inw-on-hunk);
+  background-color: var(--inw-hunk);
+  border-color: var(--inw-hunk);
+}
+
+.md-typeset .md-button--primary:is(:hover, :focus-visible) {
+  color: var(--inw-on-hunk);
+  background-color: var(--inw-hunk-strong);
+  border-color: var(--inw-hunk-strong);
+  opacity: 1;
+}
+
+.md-typeset .md-button:active {
+  transform: translateY(1px);
+}
+
+.md-typeset .md-button[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Header: paper, a 1px rule, the mark and the name as the wordmark. */
+.md-header {
+  background-color: var(--inw-paper);
+  box-shadow: 0 1px 0 var(--inw-rule);
+}
+
+.md-header--shadow {
+  box-shadow:
+    0 1px 0 var(--inw-rule),
+    var(--md-shadow-z1);
+}
+
+.md-header__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.md-header__button.md-logo svg {
+  block-size: 1.1rem;
+  inline-size: auto;
+}
+
+.md-tabs {
+  background-color: var(--inw-paper);
+  box-shadow: inset 0 -1px 0 var(--inw-rule);
+}
+
+.md-tabs__link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 1;
+  color: var(--inw-graphite);
+  transition: color 150ms;
+}
+
+.md-tabs__link:is(:hover, :focus-visible) {
+  color: var(--inw-ink);
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: var(--inw-hunk);
+}
+
+/* Sidebar: the current page in Hunk with a tint, no other colour. */
+.md-nav {
+  font-size: 0.75rem;
+}
+
+.md-nav__link {
+  transition:
+    color 150ms,
+    background-color 150ms;
+}
+
+.md-nav--primary .md-nav__item .md-nav__link--active {
+  font-weight: 700;
+  color: var(--inw-hunk);
+  background-color: var(--md-accent-fg-color--transparent);
+}
+
+.md-nav__item--section > .md-nav__link {
+  font-weight: 700;
+  color: var(--inw-ink);
+}
+
+/* The language selector and other header menus. */
+.md-select__inner {
+  background-color: var(--inw-paper);
+  border: 1px solid var(--inw-rule);
+  border-radius: 6px;
+  box-shadow: var(--md-shadow-z2);
+}
+
+.md-select__link:is(:hover, :focus-visible) {
+  color: var(--inw-hunk);
+}
+
+/* Tooltips. */
+.md-tooltip,
+.md-tooltip2__inner {
+  font-family: var(--md-text-font-family);
+  color: var(--inw-ink);
+  background-color: var(--inw-paper);
+  border: 1px solid var(--inw-rule);
+  border-radius: 6px;
+  box-shadow: var(--md-shadow-z2);
+}
+
+/* Footer. */
+.md-footer {
+  background-color: var(--inw-paper);
+  border-block-start: 1px solid var(--inw-rule);
+}
+
+.md-footer-meta {
+  background-color: var(--inw-paper-2);
+}
+
+.md-footer__link:is(:hover, :focus-visible) {
+  color: var(--inw-hunk);
+}
+
+/* The theme sets these at 0.6rem (12px on its 20px root); 13px reads
+   better beside 17px body text. */
+.md-source__repository,
+.md-footer__direction {
+  font-size: 0.65rem;
+}
+
+.md-copyright {
+  color: var(--inw-graphite);
+}
+
+/* The theme paints headings white on slate; ink is the heading colour in
+   both schemes. */
+[data-md-color-scheme="slate"] :is(h1, h2, h3, h4, h5, h6),
+[data-md-color-scheme="slate"] .md-header__title {
+  color: var(--inw-ink);
+}
+
+/* UI transitions stay between 150 and 250 ms, and stop entirely for
+   readers who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: the theme's own transitions use more specific selectors; a reduced-motion reset has to win over all of them */
+    transition-duration: 0s !important;
+    /* biome-ignore lint/complexity/noImportantStyles: as above, for animations */
+    animation-duration: 0s !important;
+    /* biome-ignore lint/complexity/noImportantStyles: as above, for looping animations */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: as above, for smooth scrolling */
+    scroll-behavior: auto !important;
+  }
+}

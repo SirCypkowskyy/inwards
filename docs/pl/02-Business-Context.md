@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/02-Business-Context.md
-source_hash: c9cc78261067375ec9f17d2209ba7a96cd8d98f3ae9f93a24bcad8c83b084ebe
+source_hash: 20e14bca91068e3b9bdf934bb5610defaf4a0cdb1c4abc33dc79c04fb477c04c
 ---
 
 # :material-chart-timeline-variant: Kontekst biznesowy { #business-context }
@@ -75,14 +75,14 @@ Liczą się tu dwie grupy narzędzi. Szybkie lintery ogólnego przeznaczenia wyz
 
 | | Python | Model warstw | Wymaga środowiska Pythona twojego projektu | Wskazówki naprawy | Hooki agentów | SARIF | Edytor |
 |---|:-:|:-:|:-:|---|:-:|:-:|:-:|
-| Ruff | :white_check_mark: | :x: | nie (plik binarny w wheelu) | autofix dla reguł kodu | :x: | :white_check_mark: | :white_check_mark: |
-| ty | :white_check_mark: | :x: | nie (plik binarny w wheelu) | nie dotyczy | :x: | :x: | :white_check_mark: |
-| Biome | :x: | :x: | nie (plik binarny) | autofix, poprawki z wtyczek | :x: | :white_check_mark: | :white_check_mark: |
-| React Doctor | :x: | :x: | Node przez `npx` | reguł uczy skill agenta | :white_check_mark: | :x: | :x: |
-| import-linter | :white_check_mark: | :white_check_mark: | tak | statyczny tekst na kontrakt | :x: | :x: | :x: |
-| pytest-archon | :white_check_mark: | :white_check_mark: | tak (kod musi się importować) | :x: | :x: | :x: | :x: |
-| Tach | :white_check_mark: | :white_check_mark: | tak (pakiet pip, rozszerzenie w Ruście) | :x: | :x: | :x: | ? |
-| **Inwards** (cel) | :white_check_mark: | :white_check_mark: | nie (plik binarny w wheelu albo pojedynczy plik binarny) | kroki generowane dla każdego naruszenia | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Ruff | :material-check-circle: | :material-close-circle: | nie (plik binarny w wheelu) | autofix dla reguł kodu | :material-close-circle: | :material-check-circle: | :material-check-circle: |
+| ty | :material-check-circle: | :material-close-circle: | nie (plik binarny w wheelu) | nie dotyczy | :material-close-circle: | :material-close-circle: | :material-check-circle: |
+| Biome | :material-close-circle: | :material-close-circle: | nie (plik binarny) | autofix, poprawki z wtyczek | :material-close-circle: | :material-check-circle: | :material-check-circle: |
+| React Doctor | :material-close-circle: | :material-close-circle: | Node przez `npx` | reguł uczy skill agenta | :material-check-circle: | :material-close-circle: | :material-close-circle: |
+| import-linter | :material-check-circle: | :material-check-circle: | tak | statyczny tekst na kontrakt | :material-close-circle: | :material-close-circle: | :material-close-circle: |
+| pytest-archon | :material-check-circle: | :material-check-circle: | tak (kod musi się importować) | :material-close-circle: | :material-close-circle: | :material-close-circle: | :material-close-circle: |
+| Tach | :material-check-circle: | :material-check-circle: | tak (pakiet pip, rozszerzenie w Ruście) | :material-close-circle: | :material-close-circle: | :material-close-circle: | ? |
+| **Inwards** (cel) | :material-check-circle: | :material-check-circle: | nie (plik binarny w wheelu albo pojedynczy plik binarny) | kroki generowane dla każdego naruszenia | :material-check-circle: | :material-check-circle: | :material-check-circle: |
 
 `?` oznacza, że nie udało nam się tego sprawdzić. „Wskazówki naprawy” to mówienie czytelnikowi, co zmienić. Autofix, w którym narzędzie samo przepisuje kod, to ich mocniejsza forma.
 
@@ -248,10 +248,10 @@ Hipoteza upada, jeśli prawdziwe repozytoria (nie syntetyczne) wypchną p95 dla 
 
 ```mermaid
 flowchart LR
-    arch(["👷 Architekt"])
-    dev(["🧑‍💻 Programista"])
-    agent(["🤖 Agent AI"])
-    ci(["⚙️ CI"])
+    arch(["Architekt"])
+    dev(["Programista"])
+    agent(["Agent AI"])
+    ci(["CI"])
 
     subgraph S["Inwards"]
         UC1["UC1 Zadeklaruj warstwy"]
@@ -274,13 +274,13 @@ flowchart LR
 
 | ID | Przypadek użycia | Wyzwalacz | Wynik | Stan |
 |---|---|---|---|---|
-| UC1 | Zadeklaruj warstwy | Architekt edytuje `[tool.inwards]` | Konfiguracja przechodzi walidację, a błędy wskazują winny klucz | :white_check_mark: |
-| UC2 | Sprawdzaj po każdej edycji | Agent zapisuje plik `.py`; hook PostToolUse zainstalowany przez `inwards init --agent claude` sprawdza ten plik | Naruszenia wracają do agenta z krokami naprawy w ciągu 100 ms | :white_check_mark: |
-| UC3 | Bramka przed „gotowe” | Agent próbuje zakończyć; Stop gate sprawdza każdy plik zmieniony w sesji, niezależnie od tego, jak go zmieniono | Agent nie może ogłosić zwycięstwa z naruszeniem, które sam wprowadził, a stare naruszenia w starszym repozytorium go nie blokują | :white_check_mark: |
-| UC4 | Zobacz naruszenia w edytorze | Programista pisze kod | Podkreślenie z tym samym komunikatem i kodem co w CLI | :white_check_mark: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace |
-| UC5 | Zablokuj pull request | CI uruchamia `inwards check --format sarif` | Nieudane sprawdzenie oraz adnotacje w pull requeście i w GitHub code scanning | :white_check_mark: [szablon workflow](guides/ci.md) i adnotacje w pull requestach, sprawdzone w praktyce (dogfooding) na `examples/broken-app`; :material-progress-clock: code scanning, gdy repozytorium stanie się publiczne |
-| UC6 | Wdróż w starszym kodzie | Architekt uruchamia `inwards baseline` | Istniejące naruszenia zostają zapisane, a sprawdzenie oblewają tylko nowe | :white_check_mark: |
-| UC7 | Poinstruuj agenta z góry | `inwards context --write` albo `inwards init --brief` zapisuje podsumowanie do `AGENTS.md` (który `CLAUDE.md` może zaimportować) | Agent zna warstwy, zanim napisze pierwszy import | :white_check_mark: opcjonalnie, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |
+| UC1 | Zadeklaruj warstwy | Architekt edytuje `[tool.inwards]` | Konfiguracja przechodzi walidację, a błędy wskazują winny klucz | :material-check-circle: |
+| UC2 | Sprawdzaj po każdej edycji | Agent zapisuje plik `.py`; hook PostToolUse zainstalowany przez `inwards init --agent claude` sprawdza ten plik | Naruszenia wracają do agenta z krokami naprawy w ciągu 100 ms | :material-check-circle: |
+| UC3 | Bramka przed „gotowe” | Agent próbuje zakończyć; Stop gate sprawdza każdy plik zmieniony w sesji, niezależnie od tego, jak go zmieniono | Agent nie może ogłosić zwycięstwa z naruszeniem, które sam wprowadził, a stare naruszenia w starszym repozytorium go nie blokują | :material-check-circle: |
+| UC4 | Zobacz naruszenia w edytorze | Programista pisze kod | Podkreślenie z tym samym komunikatem i kodem co w CLI | :material-check-circle: VSIX dla każdej platformy w każdym wydaniu, z plikiem binarnym w środku; :material-progress-clock: Marketplace i Open VSX, gdy właściciel opublikuje |
+| UC5 | Zablokuj pull request | CI uruchamia `inwards check --format sarif` | Nieudane sprawdzenie oraz adnotacje w pull requeście i w GitHub code scanning | :material-check-circle: [szablon workflow](guides/ci.md) i adnotacje w pull requestach, sprawdzone w praktyce (dogfooding) na `examples/broken-app`; :material-progress-clock: code scanning, gdy repozytorium stanie się publiczne |
+| UC6 | Wdróż w starszym kodzie | Architekt uruchamia `inwards baseline` | Istniejące naruszenia zostają zapisane, a sprawdzenie oblewają tylko nowe | :material-check-circle: |
+| UC7 | Poinstruuj agenta z góry | `inwards context --write` albo `inwards init --brief` zapisuje podsumowanie do `AGENTS.md` (który `CLAUDE.md` może zaimportować) | Agent zna warstwy, zanim napisze pierwszy import | :material-check-circle: opcjonalnie, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |
 
 ## Źródła { #sources }
 

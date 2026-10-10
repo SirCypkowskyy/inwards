@@ -1,11 +1,17 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: f94ae8e8fc4d504d026677f15b766b0c9c0f44b9770cfd87e9740fc36a30c17f
+source_hash: e7bb09506226bbb2e4fe5d642789d748c60270f840b6eae7f52a7ca2110b05e0
 ---
 
 # :material-format-list-checks: Reguły { #rules }
 
 Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia `docs:` w wyjściu tekstowym, pole `docs` w wyjściu JSON, `helpUri` w SARIF i link przy kodzie w edytorze. Każda strona mówi, co reguła zgłasza, dlaczego ma to znaczenie, gdy kod pisze agent AI, pokazuje przykład zgłoszony i poprawiony, opisuje, jak naprawić diagnostykę i jak skonfigurować regułę, oraz czego reguła jeszcze nie wyłapuje.
+
+Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki automatycznej, posortuj według kodu, nazwy albo statusu i przeglądaj je stronami. Pasek adresu zapamiętuje widok, więc link otwiera tę samą listę. Kategoria obejmuje swoje podkategorie: `imports` pokazuje też reguły z `imports › layers`.
+
+<div class="inw-rules" data-inwards-rules="rules.json"></div>
+
+<div class="inw-rules-fallback" markdown>
 
 | Kod | Nazwa | Co zgłasza | Domyślnie | Wyciszenie w linii |
 |---|---|---|---|---|
@@ -21,27 +27,35 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 | [INW009](INW009.md) | `suppression-comment` | Wyciszenie w linii, które niczego nie ukrywa albo nie pasuje do żadnej diagnostyki | błąd, nieużywane to ostrzeżenia | nie |
 | [INW010](INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | błąd | tak |
 | [INW011](INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | błąd | tak |
+| [INW012](INW012.md) | `thin-endpoint` | Endpoint HTTP, który sam wykonuje pracę: za dużo instrukcji, gałęzi albo pętli, własne wywołania bazy danych albo HTTP, albo brak wywołania warstwy, którą wskazuje `delegate-to` | opt-in, ostrzeżenie | tak |
+| [INW013](INW013.md) | `async-blocking` | Synchroniczne wywołanie bazy danych, cache'u albo chmury wewnątrz `async def`: synchroniczny `Session` SQLAlchemy, `redis.Redis`, boto3 albo blokujący sterownik | opt-in, błąd | tak |
+
+</div>
 
 ## Reguły FastAPI { #fastapi }
 
-Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa.
+Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa. W nowym projekcie [`inwards init --style fastapi`](../guides/install.md#a-new-project-start-from-a-preset) włącza je wszystkie jako ostrzeżenia.
+
+<div class="inw-rules-fallback" markdown>
 
 | Kod | Nazwa | Co zgłasza | Domyślnie | Wyciszenie w linii |
 |---|---|---|---|---|
 | [FAPI001](FAPI001.md) | `endpoint-metadata` | Operacja ścieżki bez metadanych OpenAPI, których wymaga projekt (podsumowanie, model odpowiedzi, kod statusu) | opt-in, błąd | tak |
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | Operacja ścieżki, która może zwrócić kod błędu (rzucony bezpośrednio, w funkcji pomocniczej albo zależności, albo przez handler wyjątków aplikacji) niezadeklarowany w `responses=` | opt-in, błąd | tak |
 | [FAPI003](FAPI003.md) | `router-wiring` | `APIRouter` z trasami, którego nie dołącza żadna aplikacja, routery dołączające się nawzajem w cyklu albo `include_router` nad trasami dołączanego routera | opt-in, błąd | tak |
+| [FAPI005](FAPI005.md) | `route-shadowing` | Operacja ścieżki, na którą wcześniejsza z tą samą metodą już odpowiada: `/users/{id}` nad `/users/me` albo ta sama metoda i ścieżka dwa razy | opt-in, błąd | tak |
+| [FAPI006](FAPI006.md) | `lifespan-events` | Przestarzały handler `on_event` albo `on_startup=` (ostrzeżenie) oraz taki obok `lifespan=`, przez który FastAPI go pomija (błąd) | opt-in, błąd | tak |
+| [FAPI007](FAPI007.md) | `yield-dependency-swallows` | Zależność z `yield`, której klauzula `except` wokół niego nie rzuca wyjątku ponownie, więc błąd endpointu jest ukryty | opt-in, błąd | tak |
+| [FAPI008](FAPI008.md) | `duplicate-operation-id` | Dwie operacje ścieżki jednej aplikacji z tym samym literalnym `operation_id` | opt-in, błąd | tak |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: zależność jest wywoływana przy imporcie zamiast zostać przekazana | opt-in, błąd | tak |
 
-Kody zarezerwowane dla kolejnych reguł FastAPI, jeszcze niezarejestrowane (nieznany kod nadal jest błędem konfiguracji):
+</div>
+
+Jeden kod jest zarezerwowany i niezarejestrowany (nieznany kod nadal jest błędem konfiguracji):
 
 | Kod | Nazwa | Zgłoszenie | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | nieużywany: przebieg na korpusie w spike'u wypadł na nie (precyzja 3% dla zadeklarowanych klas wyjątków, 4 prawdziwe trafienia w 25 aplikacjach dla zgłaszanych) |
-| FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planowana |
-| FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planowana |
-| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planowana |
-| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planowana |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planowana |
 
 [Katalog reguł](../03-Architecture-C4.md#rule-catalogue) w rozdziale 3 wymienia każdą regułę razem z resztą projektu.
 
@@ -63,9 +77,9 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 
 ### Reguły opt-in i opcje reguł { #opt-in-rules }
 
-Reguła, która w kolumnie Default ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone; opt-in są reguły, które oceniają kod według progów wybranych przez zespół, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
+Reguła, która w kolumnie Default ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md) i [INW013](INW013.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
 
-Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
+Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
 
 <!-- config: fragment -->
 
@@ -82,8 +96,8 @@ Tabela opcji nie włącza reguły. Tabela dla reguły wyłączonej (opt-in i nie
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW003, INW005, INW006, INW010, INW011 oraz reguły FAPI. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
+W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013 oraz reguły FAPI. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
 
 ## Format strony { #page-format }
 
-Każda strona reguły zaczyna się od front matter w formacie [OKF](https://okf.md/spec/): `type: rule`, `title`, `description`, `resource` (plik źródłowy reguły), `tags` (kategoria, najpierw nadrzędna), `timestamp` (kiedy reguła trafiła do kodu), `status` oraz pola Inwards `code`, `name`, `severity`, `suppressible`, `autofix` i `related_issues`. Test sprawdza, że każda zarejestrowana reguła ma stronę, a każda strona wskazuje zarejestrowaną regułę. Przykłady zgłoszone i poprawione też działają jako testy, sprawdzane względem wyjścia pokazanego na stronie.
+Każda strona reguły zaczyna się od front matter w formacie [OKF](https://okf.md/spec/): `type: rule`, `title`, `description`, `resource` (plik źródłowy reguły), `tags` (kategoria, najpierw nadrzędna), `timestamp` (kiedy reguła trafiła do kodu), `status` oraz pola Inwards `code`, `name`, `severity`, `suppressible`, `autofix` i `related_issues`. Każda strona ma też sekcje Co robi, Dlaczego to źle, Przykład (zgłoszony i poprawiony blok kodu) i Bezpieczeństwo poprawki oraz wiersz w tabeli na tej stronie. `uv run scripts/check-rule-pages.py` sprawdza to wszystko w obu językach, także w CI, i zapisuje plik `rules.json`, z którego czyta lista powyżej; po zmianie strony reguły albo wiersza tutaj uruchom go z `--write`. Test sprawdza, że każda zarejestrowana reguła ma stronę, a każda strona wskazuje zarejestrowaną regułę. Przykłady zgłoszone i poprawione też działają jako testy, sprawdzane względem wyjścia pokazanego na stronie.

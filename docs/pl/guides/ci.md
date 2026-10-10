@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: bc33c98e37b20db3ca8f46758f92aaafd6ce110513c734893d22f055295d1979
+source_hash: d2dcfae464310cc6e68c7dd17fafd4248edab0efd0fabb0cc566c77945b9d634
 ---
 
 # GitHub Actions { #github-actions }
@@ -104,6 +104,14 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 - **Pamięci podręcznej się ufa, nie sprawdza się jej.** Sprawdzenie z pamięcią podręczną wierzy w to, co wpis mówi o importach pliku. Każdy, kto może pisać do `.inwards/cache`, może sprawić, że przeoczy ono naruszenie, a pull request może zacommitować własne `.inwards/cache`. Tam, gdzie sprawdzenie jest bramką dla kodu, któremu nie ufasz, uruchamiaj `inwards check --no-cache` albo ustaw `INWARDS_NO_CACHE=1` dla zadania. Hooki Claude Code nigdy nie czytają pamięci podręcznej, więc pętli agenta to nie dotyczy ([ADR-031](../05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)).
 - **Pozostaje mała.** Uruchomienie przycina każdą z 256 części pamięci podręcznej przy pierwszym zapisie do niej i ponownie, gdy jego własne zapisy przekroczą w niej 512 KB: znikają wpisy starsze niż 30 dni, a potem najstarsze, aż część zmieści się w limicie. Dzięki temu przestrzeń nazw (jeden folder w `.inwards/cache`) ma najwyżej około 128 MB. Wersja Inwards ze zmienionymi regułami ekstrakcji daje każdemu plikowi nowy klucz w tej samej przestrzeni nazw, więc stare wpisy starzeją się albo są wypierane. Nowy format pamięci podręcznej albo nowe gramatyki zaczynają nową przestrzeń nazw; starego folderu nikt już nie czyta i zostaje, dopóki go nie usuniesz.
 - **Nic do konfigurowania.** `.inwards/cache` możesz usunąć, kiedy chcesz. `inwards init` już dodaje `.inwards/` do `.gitignore`.
+
+## Wątki { #threads }
+
+`inwards check` i `inwards baseline` parsują duży projekt w kilku wątkach: od 1000 plików, po jednym wątku na 500 plików, do połowy rdzeni runnera ponad dwa i najwyżej 4. Reguły nadal działają w jednym wątku w kolejności plików, więc wynik jest taki sam przy dowolnej liczbie wątków. Na serwisie Django z 4324 plikami zimne sprawdzenie skróciło się z 1,48 s w jednym wątku do 0,87 s przy czterech wątkach na 10-rdzeniowym laptopie arm64 z macOS ([#281](https://github.com/SirCypkowskyy/inwards/issues/281) skróciło czytanie przed parsowaniem). Na Linuksie zysk jest mniejszy, a 4-rdzeniowy runner, taki jak hostowany `ubuntu-latest` GitHuba, zostaje przy jednym wątku, bo więcej wątków spowalniało tam sprawdzenie ([rozdział 6](../06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). Każdy wątek trzyma własną kopię parsera, około 40 do 50 MB.
+
+- `INWARDS_THREADS=1` trzyma sprawdzenie w jednym wątku, na runnerze z małą ilością pamięci albo przy pomiarze, który ma używać jednego rdzenia.
+- `INWARDS_THREADS=N` pozwala na najwyżej N wątków, także ponad domyślny limit. W naszych pomiarach osiem nie było szybsze od czterech, bo reguły się nie rozkładają.
+- Hooki Claude Code sprawdzają po kilka plików naraz i nigdy nie uruchamiają wątków.
 
 ## Dostępność code scanning { #code-scanning-availability }
 

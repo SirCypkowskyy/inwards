@@ -117,7 +117,7 @@ describe("inwards init --style", () => {
       const run = init(root, "--style", style);
       expect(run.code).toBe(0);
       const text = readFileSync(join(root, "pyproject.toml"), "utf8");
-      expect(text).toContain('# [[tool.inwards.contexts]]\n# name = "orders"\n');
+      expect(text).toContain('# [[tool.inwards.contexts]]\n# name = "');
       expect(text).not.toContain("shape");
       expect(Object.keys(tree(root)).sort()).toEqual(Object.keys(UV_PROJECT).sort());
     },

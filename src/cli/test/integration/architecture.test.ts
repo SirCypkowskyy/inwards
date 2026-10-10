@@ -7,7 +7,7 @@
  * These tests would fail if a refactor put a cache back into a module global or
  * let a policy folder reach the filesystem directly.
  */
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import {
   copyFileSync,
   existsSync,
@@ -39,8 +39,11 @@ const FALLOW = join(REPO, "node_modules/.bin/fallow");
 const POLICY = [
   "claude-code",
   "commands",
+  "daemon",
   "init",
   "json",
+  "lsp",
+  "mcp",
   "paths",
   "platform",
   "project",
@@ -192,6 +195,10 @@ describe("the injected working directory", () => {
     expect(existsSync(join(root, "runs-export.jsonl"))).toBe(true);
   });
 });
+
+// The boundary tests start Biome or `fallow guard` cold. A hosted
+// ubuntu-24.04 runner took more than Bun's 5 s default for one of them.
+setDefaultTimeout(30_000);
 
 describe("boundaries", () => {
   test("a policy folder can't import node:fs or use the process global", () => {

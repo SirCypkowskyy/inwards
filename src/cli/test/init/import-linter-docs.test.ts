@@ -67,6 +67,20 @@ describe("import-linter's own examples", () => {
     expect(names).toEqual(Object.keys(DOC_EXAMPLES).sort());
   });
 
+  test("forbidden-2: mypackage.one and two -> django and requests convert without a skip (#219)", () => {
+    const text = readFileSync(join(FIXTURES, "docs", "forbidden-2.importlinter"), "utf8");
+    const config = readIni(text);
+    const result = typeof config === "object" ? convert(config) : config;
+    if (typeof result !== "object") {
+      throw new Error(String(result));
+    }
+    // Only ignore_imports is left: the libraries go to a prefix deny.
+    expect(result.outcomes[0]?.reasons.map((r) => r.split(" ")[0])).toEqual(["ignore_imports"]);
+    expect(result.draft.deny).toEqual([
+      { modules: ["mypackage.one", "mypackage.two"], libraries: ["django", "requests"] },
+    ]);
+  });
+
   test.each(Object.entries(DOC_EXAMPLES))(
     "%s: INI and TOML give the same valid table",
     (name, statuses) => {

@@ -9,4 +9,6 @@
 import { afterAll } from "bun:test";
 import { removeTempDirs } from "./temp.ts";
 
-afterAll(removeTempDirs);
+// Generous: removing every test's temporary tree takes more than the default
+// 5 s on the Windows runner, which reported it as a timed-out hook.
+afterAll(removeTempDirs, 60_000);

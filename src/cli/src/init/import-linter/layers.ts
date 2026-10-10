@@ -1,8 +1,8 @@
 /**
  * @file Mapping import-linter `layers` contracts onto the Inwards layer list.
  * import-linter lists layers high to low and Inwards innermost first, so the
- * order is reversed; `:` siblings share a layer, `|` siblings share one too and
- * also become forbidden pairs (contexts, in `convert.ts`), and `containers`
+ * order is reversed; `:` siblings share a layer, `|` siblings become a group of
+ * sibling layers (a nested array, ADR-036), and `containers`
  * repeat every layer in each container.
  *
  * Inwards has one layer order per config, so the first layers contract sets it
@@ -10,12 +10,11 @@
  * or agrees with the order already set. Pure: no I/O.
  */
 import {
-  everyPair,
+  type DraftLayer,
   flag,
   MODULE,
   type Outcome,
   outcome,
-  type Pair,
   type State,
   sharedReasons,
   wildcardReason,
@@ -25,13 +24,10 @@ import { optionList } from "./read.ts";
 
 /** What one layers contract expands to. */
 interface LayerPlan {
-  /** Groups of modules, innermost first. */
-  groups: string[][];
+  /** The places in the order, innermost first; a `|` line gives one layer per sibling. */
+  places: DraftLayer[][];
   /** The layer lines as written, without containers: two contracts with the same shape can share layers. */
   shape: string;
-  /** The layer names, innermost first. */
-  names: string[];
-  pairs: Pair[];
   /** `exhaustive_ignores`, as module names under each container. */
   ignore: string[];
 }
@@ -62,7 +58,6 @@ export function layersContract(state: State, contract: LinterContract): Outcome 
   if (merged !== undefined) {
     return outcome(contract, [merged], false);
   }
-  state.pairs.push(...plan.pairs);
   state.ignore.push(...plan.ignore.filter((m) => !state.ignore.includes(m)));
   return outcome(contract, [...sharedReasons(contract), ...layerReasons(contract)], true);
 }
@@ -103,26 +98,29 @@ function layerReasons(contract: LinterContract): string[] {
  * @returns undefined once merged, or why the groups can't join the list.
  */
 function mergeLayers(state: State, plan: LayerPlan): string | undefined {
-  const seen = plan.groups.flat();
+  const groups = plan.places.map((place) => place.flatMap((layer) => layer.modules));
+  const seen = groups.flat();
   if (new Set(seen).size !== seen.length) {
     return "a module appears in two of its layers.";
   }
   if (state.layers.length === 0) {
-    state.layers.push(
-      ...plan.groups.map((modules, i) => ({ name: plan.names[i] ?? "", modules, deny: [] })),
-    );
+    state.layers.push(...plan.places);
     state.shape = plan.shape;
     return undefined;
   }
-  const index = new Map(state.layers.flatMap((layer, i) => layer.modules.map((m) => [m, i])));
+  const index = new Map(
+    state.layers.flatMap((place, i) => place.flatMap((layer) => layer.modules.map((m) => [m, i]))),
+  );
   if (plan.shape === state.shape && seen.every((module) => !index.has(module))) {
-    for (const [i, modules] of plan.groups.entries()) {
-      state.layers[i]?.modules.push(...modules);
+    for (const [i, place] of plan.places.entries()) {
+      for (const [j, layer] of place.entries()) {
+        state.layers[i]?.[j]?.modules.push(...layer.modules);
+      }
     }
     return undefined;
   }
-  const ordered = plan.groups.every((group, i) => {
-    const later = plan.groups.slice(i + 1).flat();
+  const ordered = groups.every((group, i) => {
+    const later = groups.slice(i + 1).flat();
     return group.every((m) => later.every((n) => (index.get(m) ?? -1) < (index.get(n) ?? -1)));
   });
   return ordered && seen.every((module) => index.has(module))
@@ -156,26 +154,47 @@ function layerPlan(contract: LinterContract): LayerPlan | string {
   }
   const prefixes = containers.length === 0 ? [""] : containers.map((c) => `${c}.`);
   const ignores = optionList(contract.options, "exhaustive_ignores") ?? [];
+  const parts = parsed.map((layer) =>
+    layer.independent
+      ? layer.tails.map((tail) => ({
+          name: lastSegment(tail),
+          modules: prefixed([tail], prefixes),
+        }))
+      : [{ name: layerName(layer), modules: prefixed(layer.tails, prefixes) }],
+  );
+  const names = uniqueNames(parts.flat().map((part) => part.name));
+  const places = parts.map((place, i) => {
+    const before = parts.slice(0, i).reduce((count, earlier) => count + earlier.length, 0);
+    return place.map(
+      ({ modules }, j): DraftLayer => ({ name: names[before + j] ?? "", modules, deny: [] }),
+    );
+  });
   return {
-    groups: parsed.map(({ tails }) => prefixes.flatMap((p) => prefixed(tails, p))).reverse(),
-    names: uniqueNames(parsed.map(layerName).reverse()),
+    places: places.reverse(),
     shape: lines.map((line) => line.replaceAll(/[\s()]/gu, "")).join("\n"),
-    pairs: parsed
-      .filter((layer) => layer.independent)
-      .flatMap(({ tails }) => prefixes.flatMap((p) => everyPair(prefixed(tails, p)))),
     ignore: containers.flatMap((c) => ignores.map((tail) => `${c}.${tail}`)),
   };
 }
 
 /**
- * Puts module names under a container.
+ * Takes the last segment of a dotted module name.
+ *
+ * @param module - such as `mypackage.blue`.
+ * @returns such as `blue`.
+ */
+function lastSegment(module: string): string {
+  return module.split(".").at(-1) ?? module;
+}
+
+/**
+ * Puts module names under each container.
  *
  * @param tails - names relative to the container.
- * @param prefix - the container with a trailing dot, or "" for none.
- * @returns the full module names.
+ * @param prefixes - each container with a trailing dot, or [""] for none.
+ * @returns the full module names, container by container.
  */
-function prefixed(tails: readonly string[], prefix: string): string[] {
-  return tails.map((tail) => `${prefix}${tail}`);
+function prefixed(tails: readonly string[], prefixes: readonly string[]): string[] {
+  return prefixes.flatMap((prefix) => tails.map((tail) => `${prefix}${tail}`));
 }
 
 /**
@@ -195,14 +214,13 @@ function layerLine(line: string): LayerLine | string {
 }
 
 /**
- * Names an Inwards layer after its line: the last segment of each sibling.
+ * Names an Inwards layer after its line: the last segment of each module.
  *
- * @param layer - the parsed line.
- * @returns such as `high`, or `blue | green` for siblings.
+ * @param layer - the parsed line, not `|` siblings (those are a layer each).
+ * @returns such as `high`, or `yellow : purple` for `:` siblings.
  */
 function layerName(layer: LayerLine): string {
-  const last = layer.tails.map((tail) => tail.split(".").at(-1) ?? tail);
-  return last.join(layer.independent ? " | " : " : ");
+  return layer.tails.map(lastSegment).join(" : ");
 }
 
 /**

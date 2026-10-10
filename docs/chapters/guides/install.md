@@ -1,13 +1,13 @@
 # Install Inwards
 
 !!! info "Verified 2026-09-25"
-    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works.
+    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works. The VS Code extension on 2026-10-10: a platform VSIX installed in VS Code 1.141 on macOS (arm64) showed INW007, checked with `src/vscode-extension/scripts/try-in-vscode.ts`; Linux and Windows are still open.
 
 Inwards is one executable with no runtime to install. The latest release is the pre-release v0.1.0-rc.1; the first full release comes with a later milestone. You can also build from source.
 
 ## From a release
 
-Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (`.vsix`) and `SHA256SUMS`. Build attestations are added once the repository is public.
+Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (a `.vsix` per platform, [below](#vs-code)) and `SHA256SUMS`. Build attestations are added once the repository is public.
 
 | Platform | File |
 |---|---|
@@ -129,6 +129,66 @@ mkdir -p ~/.local/bin && install -m 755 dist/inwards-linux-x64 ~/.local/bin/inwa
 inwards --version
 ```
 
+## In your editor
+
+`inwards server` is a language server over stdio. An editor with an LSP client starts it and shows, for every file in the workspace, what `inwards check` reports there: the document you type in is checked on every change, and the whole workspace again on every save and whenever files are created or deleted. Each workspace folder uses its own `[tool.inwards]`, as `inwards check` run in that folder would ([ADR-041](../05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). Point the editor at the binary:
+
+=== "Neovim 0.11+"
+
+    ```lua title="init.lua"
+    vim.lsp.config("inwards", {
+      cmd = { "inwards", "server" },
+      filetypes = { "python" },
+      root_markers = { "pyproject.toml" },
+    })
+    vim.lsp.enable("inwards")
+    ```
+
+=== "Helix"
+
+    ```toml title="~/.config/helix/languages.toml"
+    [language-server.inwards]
+    command = "inwards"
+    args = ["server"]
+
+    [[language]]
+    name = "python"
+    language-servers = ["ruff", "inwards"]   # keep the servers you already use in this list
+    ```
+
+With uv, use `uv run inwards server` as the command, so each project gets its own version. The tests drive the binary over stdio as these editors do; neither editor has been tried by hand yet.
+
+### VS Code
+
+The extension is a thin client: it starts `inwards server` and shows what it reports ([ADR-043](../05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)). Each platform's package carries that platform's `inwards` binary, so nothing else needs installing.
+
+| Platform | VS Code target | File on a release |
+|---|---|---|
+| Linux x64 | `linux-x64` | `inwards-vscode-linux-x64-<tag>.vsix` |
+| Linux arm64 | `linux-arm64` | `inwards-vscode-linux-arm64-<tag>.vsix` |
+| Alpine x64 | `alpine-x64` | `inwards-vscode-alpine-x64-<tag>.vsix` |
+| macOS Apple silicon | `darwin-arm64` | `inwards-vscode-darwin-arm64-<tag>.vsix` |
+| macOS Intel | `darwin-x64` | `inwards-vscode-darwin-x64-<tag>.vsix` |
+| Windows x64 | `win32-x64` | `inwards-vscode-win32-x64-<tag>.vsix` |
+| anything else | | `inwards-vscode-universal-<tag>.vsix`, no binary: put `inwards` on `PATH` or set `inwards.path` |
+
+`.github/workflows/vscode-publish.yml` uploads these files to the Visual Studio Marketplace and Open VSX (for VSCodium, Cursor and other editors that use it) when the owner publishes a full release; the extension is on neither registry yet. Until then, install the file for your platform from a release made after v0.1.0-rc.1 (that pre-release still has the old single `.vsix` with its own server):
+
+```sh
+code --install-extension inwards-vscode-darwin-arm64-vX.Y.Z.vsix
+```
+
+Settings:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `inwards.enable` | `true` | Run the checks. Off stops the language server. |
+| `inwards.path` | `""` | The `inwards` executable to start. Empty: the bundled binary, else `inwards` on `PATH`. A bare name is looked up on `PATH`, a relative path resolves against the first workspace folder, and `~` and `${workspaceFolder}` are expanded. On Windows it must be an `.exe`. |
+
+A change to either setting restarts the server, and so does **Inwards: Restart Server** in the command palette. To run the version a project pins with `uv add --dev inwards`, set `inwards.path` in the workspace settings to `${workspaceFolder}/.venv/bin/inwards` (`${workspaceFolder}\.venv\Scripts\inwards.exe` on Windows). In an untrusted workspace, VS Code ignores the workspace's value of `inwards.path`, so a cloned repository can't choose the program the extension starts; trust the folder or set the path in your user settings.
+
+When no binary is found (a set `inwards.path` that points at nothing, or the universal package with nothing on `PATH`), the extension says so, with buttons to the setting and to this page, and starts nothing. The **Inwards** channel in the Output panel shows what the server writes to stderr.
+
 ## Configure the layers
 
 ### A new project: start from a preset
@@ -159,7 +219,7 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 
 Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
 
-Six presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
+Seven presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
 
 | Style | Layers | What it can't forbid |
 |---|---|---|
@@ -169,23 +229,25 @@ Six presets exist, each listed innermost first. `inwards init --list-styles` pri
 | `vertical-slices` | shared, features, bootstrap; each slice under `features` is a context whose public module is `api` | code only one slice uses moving into `shared` |
 | `bounded-contexts` | `app.*` with the `context` template: domain, application, infrastructure, api inside each context; bootstrap | a context's `api` re-exporting its domain entities |
 | `django` | `app.*` with the `django-app` template: models, services, views, urls inside each app; the package itself (settings, the root URLconf) | a view using the models instead of the services |
+| `fastapi` | the package itself as the kernel; `app.*` with the `fastapi-domain` template: constants, exceptions and config, then models and schemas, utils, service, dependencies, router inside each domain; `app.main` | a router using the models directly instead of going through the service |
 
 Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer. In `hexagonal`, the inbound and outbound adapters share one place in the order, so neither may import the other.
 
-The last three presets keep packages apart with [contexts](configuration.md#contexts), and describe the packages with a [template](configuration.md#templates):
+The last four presets keep packages apart with [contexts](configuration.md#contexts), and describe the packages with a [template](configuration.md#templates):
 
 - **`vertical-slices`** puts one package per feature under `app.features`, on a shared kernel `app.shared`. Each slice is a context: it imports another slice only when its `depends-on` names it ([INW002](../rules/INW002.md)), and then only that slice's `api` module ([INW003](../rules/INW003.md)), as does code outside every slice, such as `bootstrap.py`.
 - **`bounded-contexts`** layers every package directly below `app` the same way, `app.*.domain` < `app.*.application` < `app.*.infrastructure` < `app.*.api`, through one template entry. Contexts cross only through `app.<ctx>.api`, and since `api` is the outermost role, a context reaches another from its own `api`.
 - **`django`** layers every app below `app` as `models` < `services` < `views` < `urls`. The package itself is the outermost layer, for the settings, the root URLconf and app modules outside the roles, such as `admin.py` and `apps.py`. Apps are independent except through `services`: the preset turns INW002 off, so an app may use another's services without declaring it, and INW003 reports an import of any other module of another app. The innermost role gets `deny-libraries = []`, since models import `django.db`.
+- **`fastapi`** is the [fastapi-best-practices](https://github.com/zhanymkanov/fastapi-best-practices) layout. Every package below `app` is a domain, layered by the `fastapi-domain` template as `constants | exceptions | config` < `models | schemas` < `utils` < `service` < `dependencies` < `router` (`|` marks [siblings](configuration.md#sibling-layers)). The package itself is the kernel, the innermost layer, for the shared modules (`config.py`, `models.py` with the base model, `exceptions.py`, `database.py`), with `deny-libraries = []` since they import pydantic and the database client. `app.main` builds the app and is the outermost layer. Other domains and `main.py` may import a domain's `router`, `service`, `schemas`, `dependencies`, `constants` and `exceptions`, never its `models`, `config` or `utils` (INW003); like `django`, it turns INW002 off. It also turns on every shipped [FastAPI rule](../rules/index.md#fastapi), FAPI001 to FAPI003 and FAPI005 to FAPI009, with `extend-select`, as warnings through a `[tool.inwards.rules.severity]` table with one line per rule (delete a line to report that rule at its own severity), and sets FAPI002's `report-direct-raises = false` so it doesn't repeat Ruff's `FAST004`. It turns on [INW012](../rules/INW012.md) the same way, with `delegate-to = ["domain.service"]`: an endpoint that calls nothing in its domain's `service` module, or does the work itself, gets a warning whose fix names the service module of its own domain, such as `app.posts.service` for an endpoint in `app/posts/router.py`. The scaffold's `posts/router.py` passes: each endpoint calls `posts.service`, and `remove_post` gets the post through the `valid_post_id` dependency first. [INW013](../rules/INW013.md) is on as a warning too, in every module: an `async def` endpoint or dependency that calls a sync SQLAlchemy `Session`, redis-py, boto3 or a DB-API driver blocks the event loop. The scaffold keeps its posts in memory, so nothing in it blocks; with a database, await an `AsyncSession` in the `async def` endpoints, or make them plain `def`, which FastAPI runs in a threadpool. After the check, init prints the Ruff config that goes with it (`ASYNC`, `FAST`, `TID251`, with `pydantic.BaseModel` and `pydantic_settings.BaseSettings` banned outside the base module and `config.py` files); it never writes it. To get the layout exactly, with `src` as the package, run `inwards init --style fastapi --scaffold --package src` in a project without a `src/` directory.
 
-The contexts table names each package, because a context's `modules` are literal prefixes. With `--scaffold`, init writes the entry for the scaffold's `orders` package; without it, the same entry is written commented out, as the example to copy for each package the project has. A package without an entry is not kept apart.
+The contexts table names each package, because a context's `modules` are literal prefixes. With `--scaffold`, init writes the entry for the scaffold's `orders` package (`posts` in `fastapi`); without it, the same entry is written commented out, as the example to copy for each package the project has. A package without an entry is not kept apart.
 
 What `--style` writes and when it stops:
 
 - **The table:** the layers, `root` (`src` for a src layout, else `.`), `required-version`, the default `ignore` list and a comment naming the preset and the Inwards version. The package comes from `[project].name`, normalised the way uv does it (`my-app` becomes `my_app`), or from `--package`; a Python keyword can't be one. Run below the project, init uses the nearest `pyproject.toml` above and says which. Before the package exists, `root` is `src` when the build backend is uv_build or `src/` already holds Python code.
 - **It never rewrites layers.** If `[tool.inwards]` already exists, init exits 2 and writes nothing. Without a `pyproject.toml` it exits 2 and suggests `uv init --package`.
-- **`--scaffold`** writes an entity, a port (`typing.Protocol`), a use case, an adapter that implements the port, a command-line driving adapter, the composition root and one test in `tests/`. In `vertical-slices` and `bounded-contexts` they sit in an `orders` package, behind an `api.py` that re-exports what the composition root needs. `django` writes an `orders` app (models, services, views, urls), `settings.py` and the root `urls.py` instead, with no test. It never replaces anything: if a file or symlink is in the way, or a directory leads outside the project through a symlink, init exits 2, lists the paths and writes nothing. An existing `__init__.py`, such as the one uv creates, is left as it is. The files go first and `pyproject.toml` last; if a write fails, init removes what it created, so the same command can run again.
-- **Package shapes come with `--scaffold`.** The table then also gets `[[tool.inwards.shape]]` entries ([Package shape](package-shape.md)) for the scaffold's packages, so the members are constrained too, not only the imports. The package itself may hold only its layer packages, `bootstrap.py`, `__main__.py` and `_version.py` (which hatch-vcs and setuptools-scm write), and in `hexagonal` `adapters/` holds only `inbound/` and `outbound/`: a module beside them would belong to no layer, so it is an INW007 error, and the shape guard ([INW007](../rules/INW007.md)) denies the Write that would create it. In `clean` and `hexagonal`, `application/` must hold `ports/` and `use_cases/`, and anything else there is only a warning. In `vertical-slices`, `features/` holds only slice packages and each slice must have `api`; in `bounded-contexts`, each context must have its four roles; in `django`, the package must hold `settings.py` and `urls.py`, and each app its four roles, with what `startapp` writes allowed beside them. The layer packages themselves have no shape, so a new entity, adapter or use case never trips one. A required member that goes missing is an INW008 error. Without `--scaffold` no shapes are written, since they describe the scaffold's layout rather than the code a project already has. `inwards init --list-styles` shows each preset's shapes.
+- **`--scaffold`** writes an entity, a port (`typing.Protocol`), a use case, an adapter that implements the port, a command-line driving adapter, the composition root and one test in `tests/`. In `vertical-slices` and `bounded-contexts` they sit in an `orders` package, behind an `api.py` that re-exports what the composition root needs. `django` writes an `orders` app (models, services, views, urls), `settings.py` and the root `urls.py` instead, with no test. `fastapi` writes a `posts` domain with a module for every role, the kernel's `config.py`, `models.py` and `exceptions.py`, and `main.py`, which includes the router and answers the kernel's `NotFound` with 404; every endpoint declares its summary, status code, response model and error responses, so the FastAPI rules find nothing. It has no test either; `uv add fastapi uvicorn pydantic-settings` makes it run. It never replaces anything: if a file or symlink is in the way, or a directory leads outside the project through a symlink, init exits 2, lists the paths and writes nothing. An existing `__init__.py`, such as the one uv creates, is left as it is. The files go first and `pyproject.toml` last; if a write fails, init removes what it created, so the same command can run again.
+- **Package shapes come with `--scaffold`.** The table then also gets `[[tool.inwards.shape]]` entries ([Package shape](package-shape.md)) for the scaffold's packages, so the members are constrained too, not only the imports. The package itself may hold only its layer packages, `bootstrap.py`, `__main__.py` and `_version.py` (which hatch-vcs and setuptools-scm write), and in `hexagonal` `adapters/` holds only `inbound/` and `outbound/`: a module beside them would belong to no layer, so it is an INW007 error, and the shape guard ([INW007](../rules/INW007.md)) denies the Write that would create it. In `clean` and `hexagonal`, `application/` must hold `ports/` and `use_cases/`, and anything else there is only a warning. In `vertical-slices`, `features/` holds only slice packages and each slice must have `api`; in `bounded-contexts`, each context must have its four roles; in `django`, the package must hold `settings.py` and `urls.py`, and each app its four roles, with what `startapp` writes allowed beside them; in `fastapi`, the package must hold `main.py` and may hold only domains and the kernel's usual modules, and each domain must hold `__init__`, `router` and `service` and nothing outside the template's roles, an error since such a module would fall to the kernel layer. The layer packages themselves have no shape, so a new entity, adapter or use case never trips one. A required member that goes missing is an INW008 error. Without `--scaffold` no shapes are written, since they describe the scaffold's layout rather than the code a project already has. `inwards init --list-styles` shows each preset's shapes.
 - **`--dry-run`** prints every change as a diff and writes nothing. **`--agent`** combines with `--style`: `inwards init --style clean --agent claude` writes the layers and the Claude Code hooks in one run. **`--brief`** also writes the [architecture brief](agents-md.md#the-architecture-brief-opt-in) into `AGENTS.md`, naming the preset and where its ports go.
 - After writing, init runs the check in process and prints the tree above. Without `--scaffold`, each layer package is marked `(missing)` and fails the check until it has a module.
 

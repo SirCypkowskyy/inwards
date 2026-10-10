@@ -1,14 +1,15 @@
 /**
  * @file How the FastAPI model reads arguments: a literal where it is one, a
  * qualified name, a call such as `Depends(get_db)`, or `unknown`. Names are
- * qualified through the file's imports (`python/parser.ts`'s
+ * qualified through the file's imports (`python/qualify.ts`, with
  * `importedNames`), so `status.HTTP_404_NOT_FOUND` reads as
  * `fastapi.status.HTTP_404_NOT_FOUND`. Nothing here resolves a name to its
  * definition; `model.ts` does that across files.
  */
 import type { Node } from "web-tree-sitter";
 import { hasSplat, literalString } from "../../python/literals.ts";
-import { identifierName, keywordOf, namedChildren, signedInteger } from "../../python/nodes.ts";
+import { keywordOf, namedChildren, signedInteger } from "../../python/nodes.ts";
+import type { Qualify } from "../../python/qualify.ts";
 
 /**
  * An argument as written: a literal where it is one, a qualified name, a
@@ -53,47 +54,7 @@ export interface CallSyntax {
   readonly splat: boolean;
 }
 
-/** Qualifies a name or attribute node, or returns null for any other expression. */
-export type Qualify = (node: Node) => string | null;
-
 const UNKNOWN: Value = { kind: "unknown" };
-
-/**
- * Qualifies a name or an attribute through the file's imports. A name the
- * file doesn't import is its own module's: `router` in `app.routers.users`
- * is `app.routers.users.router`, and so is a builtin such as `ValueError`,
- * which then resolves to nothing.
- *
- * @param node - an expression node.
- * @param names - what each imported name refers to.
- * @param module - the file's dotted module name.
- * @returns the dotted name, or null for anything but a name or an attribute of one.
- */
-function qualifiedName(
-  node: Node,
-  names: ReadonlyMap<string, string>,
-  module: string,
-): string | null {
-  if (node.type === "identifier") {
-    const name = identifierName(node);
-    return names.get(name) ?? `${module}.${name}`;
-  }
-  const object = node.type === "attribute" ? node.childForFieldName("object") : null;
-  const attribute = node.childForFieldName("attribute");
-  const owner = object ? qualifiedName(object, names, module) : null;
-  return owner !== null && attribute ? `${owner}.${identifierName(attribute)}` : null;
-}
-
-/**
- * Makes the name qualifier for one file (see `qualifiedName`).
- *
- * @param names - what each imported name refers to.
- * @param module - the file's dotted module name.
- * @returns a function that qualifies a name or attribute node.
- */
-export function qualifierFor(names: ReadonlyMap<string, string>, module: string): Qualify {
-  return (node: Node): string | null => qualifiedName(node, names, module);
-}
 
 /**
  * Reads a call's keyword arguments and whether a splat may hide more.

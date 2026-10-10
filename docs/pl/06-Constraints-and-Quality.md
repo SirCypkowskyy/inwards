@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 57ac58d81dcf7e08b3b2d443afadf24ee4e031e0f165ec667468660ba53d4b04
+source_hash: e9f2717a006af2a5820bb1575f90ddaff350dc17c7beeafa6aceffc7dee4e1a5
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -30,7 +30,7 @@ Uszeregowane. Gdy dwa cele są w konflikcie, wygrywa wyższy.
 | 2 | :material-lightning-bolt: **Opóźnienie w pętli agenta** | Hook sprawdza jeden edytowany plik | p95 < 100 ms czasu rzeczywistego, łącznie ze startem procesu |
 | 3 | :material-robot-outline: **Wyniki, na podstawie których agent może działać** | Agent dostaje INW001 | Naprawia naruszenie w ramach jednej ponownej próby w ≥ 80 % przypadków (mierzone z design partnerami, zobacz [rozdział 2](02-Business-Context.md#the-hypothesis)) |
 | 4 | :material-repeat: **Deterministyczność** | To samo repozytorium, ta sama konfiguracja, dwa uruchomienia | Identyczne diagnostyki w identycznej kolejności. Zmieniają się tylko pola czasu w podsumowaniu (`durationMs`) |
-| 5 | :material-timer-sand: **Przepustowość dla całego repozytorium** | CI sprawdza na zimno repozytorium z 500 tys. linii | Dziś około 1 s na jednym rdzeniu. Cel < 300 ms z workerami i pamięcią podręczną |
+| 5 | :material-timer-sand: **Przepustowość dla całego repozytorium** | CI sprawdza na zimno repozytorium z 500 tys. linii | 0,33 s dla syntetycznego repozytorium z 496 000 linii i 0,87 s dla 848 000 linii saleora przy czterech wątkach ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [#281](https://github.com/SirCypkowskyy/inwards/issues/281)). Cel < 300 ms z wątkami i pamięcią podręczną |
 | 6 | :material-package-variant: **Łatwość wdrożenia** | Nowy zespół, istniejący kod | Jedno polecenie podłącza agenta (`inwards init`). Stop gate sprawdza tylko to, co zmieniła sesja, a w zmienionym pliku tylko to, co jest nowe od początku sesji, więc stare naruszenia nie blokują; resztę obejmie baseline (UC6, [#33](https://github.com/SirCypkowskyy/inwards/issues/33)) |
 
 Poprawność celowo stoi wyżej niż szybkość. Zabezpieczenie, które czasem milczy, uczy agenta, że zły ruch jest w porządku, a to gorsze niż brak zabezpieczenia.
@@ -39,13 +39,13 @@ Poprawność celowo stoi wyżej niż szybkość. Zabezpieczenie, które czasem m
 
 Wszystkie liczby pochodzą ze scaffoldu w tym repozytorium. Nic tu nie jest prognozą. Zmierzono je w M0; wyrywkowe sprawdzenie niżej pokazuje, jak się od tego czasu zmieniły.
 
-**Środowisko.** Laptop, Bun 1.4.2, `inwards-linux-x64` zbudowany przez `scripts/build-binaries.ts`. Wszystko działa w jednym wątku, bo silnik nie ma jeszcze puli workerów. Laptop był w zwykłym użyciu desktopowym (średnie obciążenie około 2–3), więc to liczby realistyczne, a nie najlepszy możliwy przypadek.
+**Środowisko.** Laptop, Bun 1.4.2, `inwards-linux-x64` zbudowany przez `scripts/build-binaries.ts`. Wszystko działało w jednym wątku; wątki robocze doszły później ([#61](#worker-threads-for-a-full-run)). Laptop był w zwykłym użyciu desktopowym (średnie obciążenie około 2–3), więc to liczby realistyczne, a nie najlepszy możliwy przypadek.
 
 **Syntetyczne repozytorium.** 2100 plików Pythona, 496 000 linii, 8,0 MB, cztery warstwy z ośmioma importami własnego kodu i czterdziestoma małymi funkcjami na moduł. `bench/generate.py` odtwarza je dokładnie (stałe ziarno losowości). Z `--legacy` dodaje zewnętrzną warstwę `legacy`, którą importuje każdy moduł, więc każdy z 2000 modułów ma jedno naruszenie: to starszy kod, dla którego model kosztów z [rozdziału 3](03-Architecture-C4.md) mierzy czas z pełnym baseline'em.
 
-**Bramka regresji.** Każdy pull request uruchamia `.github/workflows/bench.yml`. Buduje gałąź bazową i PR, uruchamia oba buildy na syntetycznym repozytorium na przemian (40 uruchomień hooka na jednym pliku, 12 pełnych sprawdzeń) i kończy się błędem, gdy PR jest o ponad 20% wolniejszy w którejkolwiek metryce albo gdy którykolwiek build zawiedzie w uruchomieniu (syntetyczne repozytorium jest czyste, więc każde uruchomienie musi skończyć się kodem 0). Każda strona jest budowana z własnym `.bun-version`, więc mierzona jest też aktualizacja Buna. Zmiana to mediana stosunków w parach, więc obciążenie, które zmienia się w trakcie zadania, znosi się w obrębie pary. Pełne sprawdzenia działają z `INWARDS_NO_CACHE=1`, więc bramka mierzy samą pracę, a nie [pamięć podręczną ekstrakcji](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read). Druga tabela, tylko dla PR i bez bramki, mierzy pełne sprawdzenie bez pamięci podręcznej, z pustą (odsuniętą przed każdym uruchomieniem) i z ciepłą. Bramka obejmuje tylko czas hooka i pełnego sprawdzenia, nie pamięć, start ani rozmiar pliku binarnego. Podsumowanie zadania pokazuje p50/p95 dla obu buildów (przy 12 pełnych uruchomieniach p95 to najwolniejsze z nich) i runner, na którym działało, a surowe próbki są zachowywane jako artefakt. Lokalnie build spowolniony o 30% nie przechodzi bramki, a dziesięć uruchomień identycznych buildów ani razu jej nie oblało (`bench/compare.ts`, `bench/test/compare.test.ts`).
+**Bramka regresji.** Każdy pull request uruchamia `.github/workflows/bench.yml`. Buduje gałąź bazową i PR, uruchamia oba buildy na syntetycznym repozytorium na przemian (40 uruchomień hooka na jednym pliku, 12 pełnych sprawdzeń) i kończy się błędem, gdy PR jest o ponad 20% wolniejszy w którejkolwiek metryce albo gdy którykolwiek build zawiedzie w uruchomieniu (syntetyczne repozytorium jest czyste, więc każde uruchomienie musi skończyć się kodem 0). Każda strona jest budowana z własnym `.bun-version`, więc mierzona jest też aktualizacja Buna. Zmiana to mediana stosunków w parach, więc obciążenie, które zmienia się w trakcie zadania, znosi się w obrębie pary. Pełne sprawdzenia działają z `INWARDS_NO_CACHE=1`, więc bramka mierzy samą pracę, a nie [pamięć podręczną ekstrakcji](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read). Czwarta metryka objęta bramką mierzy hook PostToolUse na wygenerowanym module z 4482 liniami i dwoma starymi naruszeniami, w osobnym małym projekcie, zmienianym przed każdym uruchomieniem tak, jak robi to edycja agenta (`bench/large-file.ts`, [#122](https://github.com/SirCypkowskyy/inwards/issues/122)). Jak w pliku z polara, jego docstring wspomina o imporcie, więc prescan go odrzuca i każde sprawdzenie parsuje go w całości. Tabela tylko dla PR mierzy ten sam hook jednorazowo i przez daemona, względem budżetu 100 ms i celu 50 ms. Druga tabela, tylko dla PR i bez bramki, mierzy pełne sprawdzenie bez pamięci podręcznej, z pustą (odsuniętą przed każdym uruchomieniem) i z ciepłą. Trzecia, też tylko dla PR i bez bramki, mierzy na przemian hook PostToolUse jednorazowo i przez [`inwards daemon`](#the-hook-daemon) i podaje p95 daemona względem celu 50 ms z [#60](https://github.com/SirCypkowskyy/inwards/issues/60). Wszystkie pozostałe uruchomienia ustawiają `INWARDS_DAEMON=0`, więc oba buildy działają jednorazowo. Bramka obejmuje tylko czas hooka i pełnego sprawdzenia, nie pamięć, start ani rozmiar pliku binarnego. Podsumowanie zadania pokazuje p50/p95 dla obu buildów (przy 12 pełnych uruchomieniach p95 to najwolniejsze z nich) i runner, na którym działało, a surowe próbki są zachowywane jako artefakt. Lokalnie build spowolniony o 30% nie przechodzi bramki, a dziesięć uruchomień identycznych buildów ani razu jej nie oblało (`bench/compare.ts`, `bench/test/compare.test.ts`).
 
-**Korpus prawdziwych repozytoriów.** Biblioteka standardowa i kod syntetyczny nie wyglądają jak serwis we FastAPI albo Django, więc `.github/workflows/corpus.yml` uruchamia się co noc (i przy każdym PR, który zmienia korpus albo `prescan-diff.ts`) na pięciu repozytoriach open source przypiętych do commitów w `bench/corpus.json`. `bench/corpus.ts` pobiera każde z nich płytko, tylko przypięty commit, a w trzech przypadkach tylko katalog serwisu (`backend/`, `server/`, `saleor/`; tryb sparse cone przynosi też pliki z najwyższego poziomu repozytorium), łącznie około 40 MB. Uruchamia test różnicowy prescanu na każdym pliku `.py` w checkoucie i mierzy czas skompilowanego pliku binarnego: 5 pełnych sprawdzeń i 20 uruchomień `inwards check <file>` na jednym pliku w każdym repozytorium, po jednym rozgrzewkowym przebiegu. Żadne z tych repozytoriów nie ma tabeli `[tool.inwards]`, więc manifest nadaje każdemu nasz własny podział na warstwy (zapisany do `inwards-corpus.toml` w checkoucie i przekazywany przez `--config`). Liczby naruszeń wynikają z tego podziału i nic nie mówią o samych projektach. Zadanie kończy się błędem, gdy prescan pominie import, gdy liczba plików `.py` w checkoucie różni się od manifestu (zepsute pobieranie inaczej zmniejszyłoby korpus) albo gdy `inwards check` zakończy się kodem innym niż 0 lub 1. Repozytorium, którego nie da się pobrać po trzech próbach albo którego uruchomienie zawiedzie, jest odnotowywane w wynikach i oblewa zadanie; pozostałe repozytoria nadal się uruchamiają. Tabela trafia do podsumowania zadania, a surowe próbki do artefaktu `corpus-result`.
+**Korpus prawdziwych repozytoriów.** Biblioteka standardowa i kod syntetyczny nie wyglądają jak serwis we FastAPI albo Django, więc `.github/workflows/corpus.yml` uruchamia się co noc (i przy każdym PR, który zmienia korpus albo `prescan-diff.ts`) na pięciu repozytoriach open source przypiętych do commitów w `bench/corpus.json`. `bench/corpus.ts` pobiera każde z nich płytko, tylko przypięty commit, a w trzech przypadkach tylko katalog serwisu (`backend/`, `server/`, `saleor/`; tryb sparse cone przynosi też pliki z najwyższego poziomu repozytorium), łącznie około 40 MB. Uruchamia test różnicowy prescanu na każdym pliku `.py` w checkoucie i mierzy czas skompilowanego pliku binarnego: 5 pełnych sprawdzeń i 20 uruchomień `inwards check --no-cache <file>` na jednym pliku w każdym repozytorium, po jednym rozgrzewkowym przebiegu. Uruchomienia na jednym pliku nie czytają pamięci podręcznej, tak jak hooki; do [#122](https://github.com/SirCypkowskyy/inwards/issues/122) czytały tę, którą właśnie wypełniły pełne sprawdzenia, co ukrywało parsowanie. Żadne z tych repozytoriów nie ma tabeli `[tool.inwards]`, więc manifest nadaje każdemu nasz własny podział na warstwy (zapisany do `inwards-corpus.toml` w checkoucie i przekazywany przez `--config`). Liczby naruszeń wynikają z tego podziału i nic nie mówią o samych projektach. Zadanie kończy się błędem, gdy prescan pominie import, gdy liczba plików `.py` w checkoucie różni się od manifestu (zepsute pobieranie inaczej zmniejszyłoby korpus) albo gdy `inwards check` zakończy się kodem innym niż 0 lub 1. Repozytorium, którego nie da się pobrać po trzech próbach albo którego uruchomienie zawiedzie, jest odnotowywane w wynikach i oblewa zadanie; pozostałe repozytoria nadal się uruchamiają. Tabela trafia do podsumowania zadania, a surowe próbki do artefaktu `corpus-result`.
 
 | Repozytorium | Licencja | Dlaczego jest w korpusie | Sprawdzane z warstwami |
 |---|---|---|---|
@@ -67,23 +67,23 @@ Pierwsze uruchomienie, na laptopie opisanym w sekcji Środowisko (średnie obci�
 
 Kolumna Naruszenia pochodzi z późniejszego uruchomienia (przegląd INW010 w [#45](https://github.com/SirCypkowskyy/inwards/issues/45)), już po dodaniu INW005 i INW010; liczba dla saleor obejmuje cztery zepsute importy znalezione przez INW010.
 
-Dwie rzeczy, których syntetyczne repozytorium nie pokazało. `inwards check` na pliku `subscription/service.py` z polara (4482 linie, 175 KB, dwa naruszenia) trwa tu około 125 ms, a na runnerze GitHuba (AMD EPYC 7763, 2 rdzenie) 280 ms, powyżej budżetu 100 ms; mały plik z tego samego repozytorium trwa około 55 ms. Budżet dotyczy hooka Claude Code, który uruchamia to samo sprawdzenie jednego pliku (`runCheck` na edytowanym pliku) po odczytaniu danych wejściowych, więc hook może być tylko wolniejszy. Śledzone w [#122](https://github.com/SirCypkowskyy/inwards/issues/122). Ponowne lokalne uruchomienie po kompilacji do bajtkodu ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)) skróciło każde sprawdzenie jednego pliku o 20 do 40 ms: plik z polara trwa teraz 83 / 90 ms (p50 / p95), plik z saleora 27 / 30 ms. Do tego zimne pełne sprawdzenie 848 000 linii saleora trwa 1,8 s na jednym rdzeniu (2,5 s na runnerze GitHuba), podczas gdy syntetyczne repozytorium z 496 000 linii zajmuje 0,4 s.
+Dwie rzeczy, których syntetyczne repozytorium nie pokazało. `inwards check` na pliku `subscription/service.py` z polara (4482 linie, 175 KB, dwa naruszenia) trwa tu około 125 ms, a na runnerze GitHuba (AMD EPYC 7763, 2 rdzenie) 280 ms, powyżej budżetu 100 ms; mały plik z tego samego repozytorium trwa około 55 ms. Budżet dotyczy hooka Claude Code, który uruchamia to samo sprawdzenie jednego pliku (`runCheck` na edytowanym pliku) po odczytaniu danych wejściowych, więc hook może być tylko wolniejszy. Śledzone w [#122](https://github.com/SirCypkowskyy/inwards/issues/122). Ponowne lokalne uruchomienie po kompilacji do bajtkodu ([#118](https://github.com/SirCypkowskyy/inwards/pull/118)) skróciło każde sprawdzenie jednego pliku o 20 do 40 ms: plik z polara trwa teraz 83 / 90 ms (p50 / p95), plik z saleora 27 / 30 ms. Hook na pliku z polara, który sprawdza go dwa razy, przekraczał budżet, dopóki [#122](https://github.com/SirCypkowskyy/inwards/issues/122) nie zaczęło parsować drugiego sprawdzenia przyrostowo ([niżej](#a-large-file-checked-twice)). Do tego zimne pełne sprawdzenie 848 000 linii saleora trwa 1,8 s na jednym rdzeniu (2,5 s na runnerze GitHuba), podczas gdy syntetyczne repozytorium z 496 000 linii zajmuje 0,4 s.
 
 ### Wyniki { #results }
 
 | Scenariusz | Wynik | Budżet | Stan |
 |---|---|---|---|
-| Zimne pełne uruchomienie, naiwne pełne parsowanie (pierwsze podejście) | 7,5 s | < 1 s | :x: odrzucone, doprowadziło do ADR-004 |
+| Zimne pełne uruchomienie, naiwne pełne parsowanie (pierwsze podejście) | 7,5 s | < 1 s | :material-close-circle: odrzucone, doprowadziło do ADR-004 |
 | Zimne pełne uruchomienie, szkielet importów | 0,63–1,17 s (uruchomienia z dwóch sesji) | < 1 s | :material-alert: na granicy |
 | Ciepłe pełne uruchomienie, pamięć podręczna ekstrakcji ([#56](https://github.com/SirCypkowskyy/inwards/issues/56)) | p50 0,46 s, wobec 1,25 s bez pamięci podręcznej w tym samym przebiegu (3,0 raza szybciej, maszyna pod obciążeniem) | nie dotyczy | |
 | Zimne sprawdzenie całego projektu z szukaniem cykli importów ([#54](https://github.com/SirCypkowskyy/inwards/issues/54), `cycles = ["modules"]`), po 8 naprzemiennych uruchomień z `INWARDS_NO_CACHE=1`, średnie obciążenie około 1,1 | mediana 1,51 s wobec 1,35 s dla tego samego sprawdzenia bez niego; większość modułów leży w cyklicznych grupach, a każdy plik w nich jest potwierdzany (pełne parsowanie każdego trwałoby około 7 s) | < 1 s | :material-alert: ponad budżetem na tej maszynie, z szukaniem i bez niego; sprawdzenie punktowe poniżej, 0,40 do 0,44 s, było na nieobciążonej maszynie |
-| Jeden plik, czas rzeczywisty ze startem procesu (30 uruchomień) | p50 48,6 ms, p95 80,4 ms | p95 < 100 ms | :white_check_mark: z niewielkim zapasem |
+| Jeden plik, czas rzeczywisty ze startem procesu (30 uruchomień) | p50 48,6 ms, p95 80,4 ms | p95 < 100 ms | :material-check-circle: z niewielkim zapasem |
 | Jeden plik, czas silnika zgłaszany przez CLI | 16 do 30 ms | nie dotyczy | |
 | `inwards --version` (sam start procesu) | około 10 ms | nie dotyczy | |
-| Indeks modułów + moduły importujące jeden moduł, na zimno, jeden rdzeń (2100 plików, świeży proces) | 0,1 s indeks + 0,65 do 0,74 s na moduły importujące (684 pliki wspominają `m0`: syntetyczne nazwy to najgorszy przypadek dla filtra tekstowego). Od #44 indeks niczego nie czyta z góry: jego zbudowanie trwa od 17 do 21 ms, wypisanie 2100 modułów od 25 do 32 ms, a moduły importujące czytają potrzebne im pliki, łącznie od 0,53 do 0,71 s (od 0,58 do 0,66 s dla zachłannego indeksu, który zastąpił) | < 1 s | :white_check_mark: |
-| Odmowy prescanu na bibliotece standardowej CPythona 3.14 | 8,3 % z 1921 plików | im mniej, tym szybciej | :white_check_mark: |
-| Importy pominięte przez prescan na tym samym korpusie | 0 | 0 | :white_check_mark: |
-| Importy pominięte przez prescan na korpusie prawdziwych repozytoriów (6543 pliki, pięć serwisów) | 0 | 0 | :white_check_mark: |
+| Indeks modułów + moduły importujące jeden moduł, na zimno, jeden rdzeń (2100 plików, świeży proces) | 0,1 s indeks + 0,65 do 0,74 s na moduły importujące (684 pliki wspominają `m0`: syntetyczne nazwy to najgorszy przypadek dla filtra tekstowego). Od #44 indeks niczego nie czyta z góry: jego zbudowanie trwa od 17 do 21 ms, wypisanie 2100 modułów od 25 do 32 ms, a moduły importujące czytają potrzebne im pliki, łącznie od 0,53 do 0,71 s (od 0,58 do 0,66 s dla zachłannego indeksu, który zastąpił) | < 1 s | :material-check-circle: |
+| Odmowy prescanu na bibliotece standardowej CPythona 3.14 | 8,3 % z 1921 plików | im mniej, tym szybciej | :material-check-circle: |
+| Importy pominięte przez prescan na tym samym korpusie | 0 | 0 | :material-check-circle: |
+| Importy pominięte przez prescan na korpusie prawdziwych repozytoriów (6543 pliki, pięć serwisów) | 0 | 0 | :material-check-circle: |
 | Szczytowe zużycie pamięci, pełne uruchomienie syntetyczne | około 120 MB RSS | nie dotyczy | |
 | Rozmiar pliku binarnego, Linux x64 | 82 MB | nie dotyczy | :material-alert: duży |
 
@@ -128,15 +128,15 @@ config:
   theme: base
   themeVariables:
     pieSectionTextColor: "#ffffff"
-    pieLegendTextColor: "#607d8b"
+    pieTitleTextColor: "#6b7580"
     pieStrokeColor: "#ffffff"
     pieOpacity: "1"
-    pie1: "#4527a0"
-    pie2: "#673ab7"
-    pie3: "#7e57c2"
-    pie4: "#37474f"
-    pie5: "#455a64"
-    pie6: "#546e7a"
+    pie1: "#084e65"
+    pie2: "#0b6784"
+    pie3: "#2f7f99"
+    pie4: "#3e4852"
+    pie5: "#56616c"
+    pie6: "#6b7580"
 ---
 pie showData
     title Sprawdzenie jednego pliku, około 25 ms pracy (silnik + start)
@@ -152,21 +152,161 @@ W M0 to samo sprawdzenie oznaczało około 30 ms pracy: 10 ms startu procesu, 12
 
 To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie ma dużego znaczenia. Liczy się start.
 
+### Eksperyment: stały proces { #spike-a-resident-process }
+
+[#59](https://github.com/SirCypkowskyy/inwards/issues/59) pytało, czy hooki i serwer języka powinny dzielić jeden stały proces i co hooki by na nim zyskały. Decyzja to [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+
+**Metoda.** Jeden laptop arm64 z macOS, Bun 1.4.2, `inwards-darwin-arm64` zbudowany przez `scripts/build-binaries.ts` z `aede2ab`. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 5 do 7; bardziej ufaj różnicom niż wartościom bezwzględnym. Projekt to `examples/broken-app` z dodanym wygenerowanym `shop/domain/big.py`: 4492 linie, 114 KB, dwa naruszenia INW001, blisko pliku z polara z [#122](https://github.com/SirCypkowskyy/inwards/issues/122) (4482 linie, dwa naruszenia). Dane wejściowe hooka to fixture `PostToolUse` z Claude Code skierowany na każdy z plików, po SessionStart, więc naruszenia obu plików liczą się jako stare. Każdy przypadek uruchomiono 80 razy (60 dla PreToolUse i Stop), w każdej rundzie raz, w zmieniającej się kolejności, po jednym rozgrzewkowym uruchomieniu; sprawdzenia działały z `INWARDS_NO_CACHE=1`. Stały proces to jednorazowy skrypt Buna uruchamiany ze źródeł, który obsługuje dzisiejsze `hookClaudeCode` na ciepło za gniazdem uniksowym, z `Runtime` dla każdego żądania i buforowanymi `Streams`; klient to 10-liniowy program skompilowany jak plik binarny. „Z pamięciami podręcznymi” dodaje pamięciową pamięć podręczną ekstrakcji z kluczem z treści i zachowuje na czas życia procesu odpowiedzi `git cat-file blob`, które wskazują commit.
+
+| Scenariusz | p50 | p95 |
+|---|--:|--:|
+| Pusty program skompilowany jak plik binarny | 16,6 ms | 17,4 ms |
+| `inwards --version` | 15,5 ms | 16,9 ms |
+| Klient z eksperymentu, gdy żaden daemon nie nasłuchuje | 13,1 ms | 14,1 ms |
+| `inwards check` na 13-liniowym `order.py` | 27,7 ms | 30,6 ms |
+| `inwards check` na `big.py` | 70,8 ms | 77,3 ms |
+| Te same dwa sprawdzenia na ciepło, w jednym procesie (`runCheck`, 200 uruchomień) | 0,8 / 29,8 ms | 1,4 / 31,3 ms |
+| PreToolUse, jednorazowo | 16,8 ms | 17,6 ms |
+| Stop na obu plikach, jednorazowo | 141,1 ms | 149,6 ms |
+| PostToolUse `order.py`: jednorazowo | 46,6 ms | 50,2 ms |
+| PostToolUse `order.py`: stały proces | 32,3 ms | 35,2 ms |
+| PostToolUse `order.py`: stały proces z pamięciami podręcznymi | 17,2 ms | 19,8 ms |
+| PostToolUse `big.py`: jednorazowo | 119,9 ms | 151,6 ms |
+| PostToolUse `big.py`: stały proces | 91,1 ms | 97,7 ms |
+| PostToolUse `big.py`: stały proces z pamięciami podręcznymi | 18,2 ms | 19,7 ms |
+| PostToolUse `big.py` zmieniany przed każdym wywołaniem (40 rund): jednorazowo | 117,5 ms | 122,8 ms |
+| PostToolUse `big.py` zmieniany przed każdym wywołaniem: stały proces z pamięciami podręcznymi | 47,6 ms | 50,1 ms |
+
+- **Start klienta to podłoga.** Każde wywołanie hooka uruchamia proces, tu około 15 ms, zanim w ogóle dotrze do daemona. Wykrycie, że żaden daemon nie nasłuchuje, nie kosztuje nic mierzalnego.
+- **Jedno wywołanie gita to połowa hooka dla małego pliku.** PostToolUse czyta tekst pliku ze startu sesji przez `git cat-file blob`, żeby oddzielić stare naruszenia od nowych: na tej maszynie około 15 ms na wywołanie. Daemon czyta go raz na sesję.
+- **PostToolUse sprawdza plik dwa razy,** taki, jaki jest teraz, i taki, jaki był na starcie sesji: po 30 ms dla `big.py`, na ciepło. Z pamięcią podręczną z kluczem z treści tekst ze startu jest parsowany raz na sesję; edytowany plik nadal kosztuje jedno parsowanie.
+- **Rozgrzany JIT też się liczy.** Jednorazowe sprawdzenie kosztuje o 27 ms więcej niż ciepłe dla `order.py` i o 41 ms więcej dla `big.py`. Dodatkowe 14 ms to kod parsowania i przechodzenia drzewa, którego świeży proces jeszcze nie zoptymalizował.
+- **PreToolUse nie może zyskać:** 16,8 ms wobec podłogi 15,5 ms. Stop trwa 141 ms, ale raz na turę.
+- **Pamięć.** Stałe procesy zajmowały po pomiarach 151 i 212 MB RSS.
+- **Niezmierzone:** nazwane potoki na Windows, skompilowany plik binarny jako stały proces i Linux. Skrypty eksperymentu były jednorazowe i nie ma ich w repozytorium; [#60](https://github.com/SirCypkowskyy/inwards/issues/60) dodaje daemona do zadania benchmarku.
+
+### Daemon hooków { #the-hook-daemon }
+
+[#60](https://github.com/SirCypkowskyy/inwards/issues/60) zbudowało stały proces, który mierzył eksperyment powyżej, tak jak zdecydował [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server): `inwards daemon` obsługuje PostToolUse przez gniazdo Unix (na Windows przez nazwany potok), trzyma ekstrakcje według skrótu tekstu i odpowiedzi gita według identyfikatora commita, a wszystko inne czyta od nowa przy każdym żądaniu. Samo polecenie hooka się nie zmieniło, więc każdy PostToolUse nadal uruchamia jeden proces.
+
+**Metoda.** Ten sam laptop arm64 z macOS co w eksperymencie, skompilowany `inwards-darwin-arm64` z bajtkodem, średnie obciążenie 5 do 7 od innych agentów. `examples/broken-app` w świeżym repozytorium git z wygenerowanym `shop/domain/big.py` o 4492 liniach z dwoma naruszeniami INW001, po SessionStart, więc każde znalezisko jest stare, a hook czyta tekst każdego pliku ze startu z gita. Uruchomienie jednorazowe (`INWARDS_DAEMON=0`) i przez daemona na przemian w każdej rundzie, z `INWARDS_NO_CACHE=1`; 80 rund po 2 rozgrzewkowych, 40, gdy plik zmienia się przed każdym wywołaniem.
+
+| PostToolUse | Jednorazowo p50 / p95 | Przez daemona p50 / p95 |
+|---|--:|--:|
+| `order.py`, 13 linii | 38,0 / 39,3 ms | 15,3 / 16,2 ms |
+| `big.py`, 4492 linie | 75,7 / 81,8 ms | 16,0 / 19,2 ms |
+| `big.py`, zmieniany przed każdym wywołaniem | 76,1 / 79,0 ms | 26,8 / 36,8 ms |
+
+- **Cel jest spełniony na tym laptopie.** p95 jest poniżej 50 ms w każdym przypadku, także dla dużego pliku zmienianego przed każdym wywołaniem, gdzie prototyp z eksperymentu miał 50,1 ms.
+- **Syntetyczne repozytorium zadania benchmarku** na tym samym laptopie: 23,8 / 25,3 ms jednorazowo, 14,9 / 16,5 ms przez daemona (40 uruchomień; bez sesji, więc bez odczytu z gita).
+- **Pamięć.** Daemon zajmował 188 MB RSS po 206 uruchomieniach hooka na obu plikach.
+- **Niezmierzone tutaj:** nazwane potoki na Windows. CI uruchamia testy daemona na Linuksie w każdym PR; wiersze Windows i macOS uruchamiają je tylko w ręcznej pełnej macierzy przed wydaniem.
+
+### Duży plik sprawdzany dwa razy { #a-large-file-checked-twice }
+
+[#122](https://github.com/SirCypkowskyy/inwards/issues/122) wykazało, że jednorazowy hook PostToolUse przekracza budżet 100 ms na pliku `server/polar/subscription/service.py` z polara (4482 linie, dwa naruszenia INW001). Hook sprawdza edytowany plik w obecnej postaci i drugi raz w postaci ze startu sesji, żeby odróżnić stare naruszenia od nowych, a plik z naruszeniem za każdym razem wymaga pełnego parsowania. Profil CPU jednego uruchomienia (95 ms) pokazał 43 ms w dwóch parsowaniach tree-sittera i 14 ms w `git cat-file blob`, który czyta tekst ze startu.
+
+**Co się zmieniło.** Silnik przyjmuje opcjonalny `TreeReuse` (`src/core/src/python/reparse.ts`), który trzyma ostatnie pełne parsowanie. Gdy następne pełne parsowanie dotyczy tej samej ścieżki, opisuje tree-sitterowi zmianę między dwoma tekstami jako jedną edycję (zakres między ich wspólnym prefiksem i sufiksem, w jednostkach kodu UTF-16) i parsuje od starego drzewa, więc od nowa parsowany jest tylko zmieniony fragment. CLI trzyma jeden taki obiekt na proces, a `inwards daemon` jeden na cały czas działania, więc jego następne żądanie dla tego samego pliku korzysta z poprzedniego. Jeśli nowe drzewo ma błąd składni, plik jest parsowany jeszcze raz od zera: odtwarzanie po błędzie może pójść inną drogą, gdy zaczyna od starego drzewa, i pierwsza wersja testu złapała taki przypadek. Wynik się nie zmienia: `src/core/test/python/reparse.test.ts` porównuje każdy węzeł ze świeżym parsowaniem na wybranych ręcznie edycjach i na 12 losowanych z ziarnem łańcuchach po 25 edycji, a jednorazowe uruchomienie na 655 plikach biblioteki standardowej CPythona 3.14, z czterema nałożonymi edycjami na plik i trzema ziarnami (7860 parsowań, około połowa z błędami składni), nie znalazło żadnej różnicy w drzewach, importach ani komentarzach wyciszających.
+
+**Metoda.** Laptop arm64 z macOS i 10 rdzeniami, plik binarny darwin-arm64 z `develop` (`ec2bd65`) wobec tego, oba zbudowane przez `scripts/build-binaries.ts`. Na maszynie pracowali inni agenci (średnie obciążenie 4 do 10), więc stosunkom warto ufać bardziej niż milisekundom. polar na commicie z korpusu, z podziałem na warstwy z korpusu, po SessionStart, więc oba naruszenia są stare; „zmieniony” oznacza, że przed każdym wywołaniem dodano linię. Oba buildy występują na przemian w każdej rundzie, 60 rund po 2 rozgrzewkowych (40 dla wierszy z daemonem, mierzonych build po buildzie).
+
+| polar `subscription/service.py` | Przed p50 / p95 | Po p50 / p95 |
+|---|--:|--:|
+| PostToolUse jednorazowo, plik niezmieniony od startu sesji | 99,8 / 101,8 ms | 84,6 / 87,5 ms |
+| PostToolUse jednorazowo, plik zmieniony | 99,7 / 103,9 ms | 86,5 / 88,4 ms |
+| PostToolUse przez daemona, plik zmieniony | 44,3 / 62,9 ms | 28,3 / 31,9 ms |
+| `inwards check --no-cache` na tym pliku | 60,0 / 61,6 ms | 59,2 / 61,5 ms |
+
+- **Budżet jest dotrzymany na tym laptopie** na każdej ścieżce: p95 jest poniżej 100 ms jednorazowo i poniżej 50 ms przez daemona.
+- **Drugie parsowanie kosztuje około 3 ms zamiast około 16 ms** przy edycji kilku linii, mierzone w procesie na tym samym pliku.
+- **`inwards check` jednego pliku się nie zmienia,** bo parsuje raz. Pełne sprawdzenie też nie: tam żaden plik nie jest parsowany dwa razy.
+- **Zadanie benchmarku** mierzy teraz hook na module z 4482 liniami podobnym do pliku z polara (`bench/large-file.ts`). Na tym samym laptopie, po 20 uruchomień: 102,0 / 104,1 ms przed, 84,1 / 89,1 ms po jednorazowo i 23,0 / 26,2 ms przez daemona.
+- **Na runnerze CI z Linuksem arm64** (4 rdzenie), z zadań [PR #299](https://github.com/SirCypkowskyy/inwards/pull/299): `inwards check --no-cache` na pliku z polara trwał 62 i 65 ms p50 w dwóch uruchomieniach korpusu i 128 ms w trzecim, w którym każde repozytorium działało mniej więcej dwa razy wolniej. Hook z zadania benchmarku na module z 4482 liniami przyspieszył z 117 do 101 ms p50 jednorazowo (mediana par -17%), a przez daemona trwał 19,3 / 27,4 ms. Na tym runnerze jednorazowy hook na pliku tej wielkości nadal przekracza 100 ms; przez daemona mieści się w obu celach.
+- **Co zostaje z jednorazowego hooka:** około 15 ms startu procesu, 14 ms na odczyt tekstu ze startu z gita i pierwsze pełne parsowanie.
+
+### Wątki robocze dla pełnego uruchomienia { #worker-threads-for-a-full-run }
+
+[#61](https://github.com/SirCypkowskyy/inwards/issues/61) rozłożyło zimne pełne sprawdzenie na kilka wątków. Decyzję i odrzucone możliwości opisuje [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision).
+
+**Co działa gdzie.** `inwards check` i `inwards baseline` uruchamiają wątki robocze, gdy czytają 1000 plików lub więcej: jeden wątek na 500 plików, do `INWARDS_THREADS`, a bez niej do połowy rdzeni ponad dwa, najwyżej 4 (o Linuksie niżej). Wątek główny liczy się jako jeden z nich. Workery robią tylko to, o czym decyduje tekst pliku: test na loader, szkielet importów oraz importy i komentarze wyciszające z pełnego parsowania. Wątek główny przechodzi drzewo, czyta pliki, uruchamia wszystkie reguły w kolejności plików i sam parsuje nieliczne pliki z importami dynamicznymi. Wynik jest identyczny co do bajtu przy dowolnej liczbie wątków, a `INWARDS_THREADS=1` trzyma całe sprawdzenie w jednym wątku.
+
+**Metoda.** Plik binarny darwin-arm64 zbudowany przez `scripts/build-binaries.ts`, bazowa kompilacja z `develop` (`73936df`) wobec tej, na laptopie arm64 z macOS i 10 rdzeniami. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 4 do 7: bardziej ufaj proporcjom niż milisekundom. Każdy przypadek uruchomiono 11 razy po jednej rozgrzewce, każdy raz na rundę w zmiennej kolejności, z `INWARDS_NO_CACHE=1`; JSON z każdego uruchomienia musiał się zgadzać z bazową kompilacją. Prawdziwe repozytoria są sprawdzane z warstwami z korpusu (`bench/corpus.json`). Szczytowe RSS to `/usr/bin/time -l`, po trzy uruchomienia.
+
+| Repozytorium | Pliki | Baza | Jeden wątek | Cztery wątki (domyślnie) | Osiem wątków |
+|---|--:|--:|--:|--:|--:|
+| saleor | 4324 | 1,48 s | 1,43 s | 0,98 s (1,51×) | 1,04 s |
+| polar | 1831 | 0,80 s | 0,76 s | 0,55 s (1,45×) | 0,55 s |
+| Syntetyczne (`bench/generate.py`) | 2100 | 0,52 s | 0,49 s | 0,44 s (1,17×) | 0,48 s |
+| Syntetyczne w trybie starszego kodu (`--legacy`, każdy moduł wymaga potwierdzenia) | 2101 | 2,34 s | 2,31 s | 1,14 s (2,04×) | 1,03 s |
+
+- **Jeden wątek też przyspieszył**, o 2% do 5%: sprawdzenie ustala teraz rzeczywistą ścieżkę każdego pliku raz zamiast dwa razy.
+- **Parsowanie się skaluje, reszta nie.** Przy czterech wątkach saleor spędza mniej więcej jedną trzecią czasu na przejściu drzewa, ustalaniu rzeczywistych ścieżek i czytaniu plików, zanim ruszy silnik, potem około 120 ms na regułach i 100 ms na potwierdzeniach i raporcie, wszystko w wątku głównym. Najwięcej zyskuje repozytorium w trybie starszego kodu, w którym każdy moduł wymaga pełnego parsowania.
+- **Więcej wątków szybko przestaje się opłacać.** Każdy worker sam kompiluje gramatykę i rozgrzewa swój JIT, a obciążona maszyna ma mniej wolnych rdzeni, niż podaje. Poniżej 1000 plików wątki kosztują mniej więcej tyle, ile oszczędzają: 537 plików saleora trwało 207 ms w jednym wątku i 218 ms w trzech.
+- **Pamięć.** Szczytowe RSS saleora wzrosło z około 360 MB w jednym wątku do około 520 MB przy czterech i 615 MB przy ośmiu.
+- **Pamięć podręczna i hooki.** Sprawdzenie z ciepłą pamięcią podręczną się nie zmieniło (0,95 → 0,91 s na saleorze), uruchomienie, które wypełnia pustą pamięć podręczną, przyspieszyło (2,6 → 2,05 s), a `bench/compare.ts` zmierzył hook i sprawdzenie PreToolUse nowego pliku w granicach 3% od bazy, pełne sprawdzenie o 20,5% szybsze.
+- **Linux, i dlaczego domyślnie zostają wolne rdzenie.** Pierwsze uruchomienie zadania benchmarku w CI, na runnerze Linux arm64, który podaje 4 rdzenie, zmierzyło pełne sprawdzenie repozytorium syntetycznego o 59% wolniejsze przy czterech wątkach. Plik binarny linux-arm64 w kontenerze Ubuntu 24.04 na tym samym laptopie, przypięty do czterech albo ośmiu rdzeni (`--cpuset-cpus`), po pięć uruchomień, dał takie mediany:
+
+    | Rdzenie | Repozytorium | 1 wątek | 2 | 3 | 4 |
+    |--:|---|--:|--:|--:|--:|
+    | 4 | syntetyczne | 0,42 s | 0,44 s | 0,53 s | 0,67 s |
+    | 4 | syntetyczne w trybie starszego kodu | 2,28 s | 2,33 s (1,67 do 2,34) | 1,54 s | 1,77 s |
+    | 8 | syntetyczne | 0,42 s | 0,38 s | 0,40 s | 0,44 s |
+    | 8 | syntetyczne w trybie starszego kodu | 2,30 s | 1,68 s | 1,38 s | 1,23 s |
+
+    Każdy wątek uruchamia własną maszynę wirtualną JavaScriptu, a jej kompilator JIT i odśmiecacz działają w osobnych wątkach, więc wątek na rdzeń głodzi wątek główny. Przy dwóch wątkach domyślnie na tym runnerze zadanie benchmarku nadal mierzyło pełne sprawdzenie repozytorium syntetycznego o 19% wolniejsze. Teraz domyślnie jest połowa rdzeni ponad dwa, najwyżej 4: jeden wątek na 4 rdzeniach, trzy na 8 i cztery od 10, jak na laptopie wyżej.
+- **Niezmierzone:** hostowany 4-rdzeniowy runner `ubuntu-latest` GitHuba i Windows.
+
+### Szeregowa część pełnego uruchomienia { #the-serial-part-of-a-full-run }
+
+Przy czterech wątkach saleor spędzał mniej więcej jedną trzecią zimnego sprawdzenia w wątku głównym, zanim ruszył silnik: na przejściu drzewa, ustalaniu rzeczywistych ścieżek i czytaniu plików. [#281](https://github.com/SirCypkowskyy/inwards/issues/281) skróciło tę część. Wynik jest identyczny co do bajtu, a przejście drzewa znajduje te same pliki pod tymi samymi nazwami modułów.
+
+**Co się zmieniło.**
+
+- **Jedna rzeczywista ścieżka na katalog, nie dwie na plik.** Przejście drzewa ustala `realpath` każdego katalogu i każdego dowiązania symbolicznego. Zwykły plik dostaje rzeczywistą ścieżkę swojego katalogu i nazwę, którą zwrócił `readdir`: plik, który nie jest dowiązaniem, nie dokłada żadnego dowiązania, więc `realpath` powtórzyłby tylko to, co przejście już ustaliło. Sprawdzenie używa potem tych ścieżek zamiast ustalać każdy plik jeszcze raz. Na saleorze przejście drzewa skróciło się z około 114 ms do 30 ms, a druga runda `realpath` (około 75 ms) zniknęła.
+- **Pliki są czytane jedną partią.** Sprawdzenie 1000 plików lub więcej prosi o wszystkie pliki naraz (`fs.promises.readFile`), więc odczyty czekają na dysk razem: 4324 pliki saleora w około 55 ms zamiast 90 ms. Mniejsze sprawdzenie i każdy hook czytają pliki po kolei, jak dotąd.
+- **Workery startują przed czytaniem.** Sprawdzenie liczy pliki, zanim je przeczyta, więc pula startuje pierwsza i workery ładują gramatykę, gdy wątek główny czyta.
+- **Każdy worker trzyma dwie partie.** Worker, który skończył partię, czekał dotąd, aż wątek główny, zajęty własną partią, wróci do pętli zdarzeń i wyśle mu następną. Teraz następna już czeka w jego kolejce.
+
+**Metoda.** Jak dla wątków roboczych wyżej: plik binarny darwin-arm64, 11 uruchomień na kompilację po jednej rozgrzewce, w rotacyjnej kolejności, z `INWARDS_NO_CACHE=1`, a JSON każdego uruchomienia porównany z pozostałymi. Bazy to jednowątkowa baza z #61 (`73936df`) i `develop` przed tą zmianą (`3dc5489`, cztery wątki). Na tym samym laptopie pracowali inni agenci (średnie obciążenie od 5 do 11).
+
+| Repozytorium | Pliki | Baza #61 (jeden wątek) | `develop` (cztery wątki) | Teraz (cztery wątki) | Teraz (jeden wątek) |
+|---|--:|--:|--:|--:|--:|
+| saleor | 4324 | 1,59 s | 1,09 s | 0,87 s | 1,31 s |
+| polar | 1831 | 0,79 s | 0,57 s | 0,47 s | 0,67 s |
+| Syntetyczne (`bench/generate.py`) | 2100 | 0,51 s | 0,43 s | 0,33 s | 0,40 s |
+| Syntetyczne w trybie starszego kodu (`--legacy`) | 2101 | 2,47 s | 1,23 s | 1,03 s | 2,34 s |
+
+Baza z #61 mierzyła na saleorze od 1,48 do 1,62 s w sześciu sesjach tego dnia, a ta zmiana od 0,74 do 0,87 s przy czterech wątkach: od 1,83× do 2,00×, z medianą 1,93×. Dwukrotne przyspieszenie, o które prosiło #281, jest więc na granicy, a nie wyraźnie osiągnięte. Wszystkie uruchomienia każdej kompilacji dały ten sam JSON.
+
+**Każda zmiana osobno.** Kompilacje, z których każda pomija jedną zmianę, na saleorze, po 11 uruchomień (średnie obciążenie od 7 do 16): wszystkie cztery 744 ms; bez rzeczywistych ścieżek z przejścia drzewa 861 ms, bez czytania partią 812 ms, z pulą startowaną po czytaniu 776 ms, z jedną partią na workera 794 ms.
+
+**Co się nie opłaciło i zostało usunięte.**
+
+- *Listowanie dowiązań w warstwach, gdy odczyty czekają.* macOS szereguje wywołania systemu plików: przejście po dowiązaniach trwało w trakcie odczytów od 76 do 102 ms zamiast 21 ms po nich, a suma się nie zmieniła.
+- *Uruchamianie workerów na plikach w miarę ich czytania.* Wolne workery liczyły szkielety każdej porcji 256 plików zaraz po jej przeczytaniu, a wywołanie silnika używało odpowiedzi na identyczne zadania. Saleor 775 → 792 ms, polar 475 → 478 ms, repozytoria syntetyczne w granicach 1%: żaden zysk wart drugiej kolejki w puli.
+- *Mniej wywołań `realpath` na katalogach.* Przejście drzewa ogranicza `readdir`: 23 ms z nimi i bez nich.
+
+**Linux.** Plik binarny linux-arm64 w kontenerze Ubuntu 24.04 na tym samym laptopie, po siedem uruchomień. Przypięty do czterech rdzeni, gdzie domyślnie działa jeden wątek, nic się nie zmieniło: saleor 1,24 s przed i po, polar 0,68 s, repozytorium syntetyczne 0,42 s, w trybie starszego kodu 2,27 s. Linux tanio odpowiada na `realpath` i odczyty plików ze swoich pamięci podręcznych, więc usunięta szeregowa część była kosztem macOS. Przypięty do ośmiu rdzeni (trzy wątki) saleor przyspieszył z 0,92 do 0,87 s, a repozytorium w trybie starszego kodu z 1,43 do 1,37 s. Trzykrotne przyspieszenie na 4 vCPU, o które prosiło #61, pozostaje poza zasięgiem: maszyna z 4 rdzeniami zostaje przy jednym wątku, a ten wątek spędza czas na parsowaniu i regułach.
+
+**Co zostaje w wątku głównym.** Zmierzone ze źródeł na saleorze przy czterech wątkach: około 45 ms na przejście drzewa i nazwanie plików, 70 ms na ich przeczytanie, potem silnik: 260 ms na partię szkieletów (dzieloną z workerami), 127 ms na skany, 135 ms na partię pełnych parsowań (dzieloną), 60 ms na potwierdzenia i raport oraz 33 ms na kontrole całego uruchomienia. Skany i potwierdzenia to reguły, które z założenia zostają w jednym wątku ([ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)).
+
 ### Plan poprawy wydajności { #performance-roadmap }
 
 | Krok | Oczekiwany efekt | Na co wpływa |
 |---|---|---|
-| Stały proces, z którego hooki korzystają przez lokalne gniazdo, z powrotem do jednorazowego uruchomienia (model procesu i nazwa polecenia do ustalenia w ADR, bo może go współdzielić serwer LSP; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Usuwa ~20 ms startu WASM i środowiska z każdego wywołania hooka | p95 dla jednego pliku |
-| :white_check_mark: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), zrobione | Zmierzone: start 22 → 10 ms, wywołanie hooka około 45% szybsze, 2,5 MB więcej na plik binarny (zobacz eksperyment wyżej) | p95 dla jednego pliku |
-| Pula workerów, jeden parser na rdzeń ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Niemal liniowe przyspieszenie zimnego pełnego uruchomienia na maszynie wielordzeniowej | Zimne pełne uruchomienie |
-| :white_check_mark: Pamięć podręczna list importów po hashu zawartości (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), zrobione dla `inwards check` i `inwards baseline` | Zmierzone: ciepłe pełne sprawdzenie 3,0 raza szybsze (0,46 s wobec 1,25 s p50, po 12 uruchomień na tym laptopie pod obciążeniem), o 27% wolniejsze, gdy pamięć podręczna się wypełnia. Hooki z niej nie korzystają ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Ciepłe pełne uruchomienie |
-| Zastąpienie `descendantsOfType` przejściem kursorem po drzewie na ścieżce pełnego parsowania ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)) | Profilowanie pokazało, że w naiwnym podejściu szło na to 1,2 s | Odrzucone pliki i potwierdzenia |
+| :material-check-circle: `inwards daemon`: stały proces dla każdego projektu, z którym PostToolUse łączy się przez lokalne gniazdo, z powrotem do jednorazowego uruchomienia; serwer języka zostaje osobnym procesem, `inwards server` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)), zrobione | Zmierzone ([wyżej](#the-hook-daemon)): p95 PostToolUse 39,3 → 16,2 ms dla pliku z 13 liniami, 79,0 → 36,8 ms dla pliku z 4492 liniami edytowanego przed każdym wywołaniem | p95 dla jednego pliku |
+| :material-check-circle: Przyrostowe parsowanie pliku sprawdzanego dwa razy: sprawdzenie hooka teraz i w stanie ze startu sesji, następna edycja w daemonie ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)), zrobione | Zmierzone ([wyżej](#a-large-file-checked-twice)) na pliku z polara z 4482 liniami: p95 PostToolUse 103,9 → 88,4 ms jednorazowo, 62,9 → 31,9 ms przez daemona | p95 dla jednego pliku |
+| :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), zrobione | Zmierzone: start 22 → 10 ms, wywołanie hooka około 45% szybsze, 2,5 MB więcej na plik binarny (zobacz eksperyment wyżej) | p95 dla jednego pliku |
+| :material-check-circle: Wątki robocze dla zimnego pełnego uruchomienia ([#61](https://github.com/SirCypkowskyy/inwards/issues/61), [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)), zrobione | Zmierzone przy czterech wątkach (zobacz sekcję wyżej): saleor 1,48 → 0,98 s, polar 0,80 → 0,55 s, repozytorium syntetyczne 0,52 → 0,44 s, syntetyczne w trybie starszego kodu 2,34 → 1,14 s. Daleko do oczekiwanego trzykrotnego przyspieszenia, bo czytanie plików i reguły zostają w jednym wątku | Zimne pełne uruchomienie |
+| :material-check-circle: Tańsza szeregowa część pełnego uruchomienia: rzeczywiste ścieżki per katalog, czytanie jedną partią, workery startowane przed czytaniem, dwie partie na workera ([#281](https://github.com/SirCypkowskyy/inwards/issues/281)), zrobione | Zmierzone przy czterech wątkach ([wyżej](#the-serial-part-of-a-full-run)): saleor 1,09 → 0,87 s, od 1,8 do 2,0× szybciej niż jeden wątek przed #61. Bez zmian na Linuksie z czterema rdzeniami | Zimne pełne uruchomienie |
+| :material-check-circle: Pamięć podręczna list importów po hashu zawartości (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), zrobione dla `inwards check` i `inwards baseline` | Zmierzone: ciepłe pełne sprawdzenie 3,0 raza szybsze (0,46 s wobec 1,25 s p50, po 12 uruchomień na tym laptopie pod obciążeniem), o 27% wolniejsze, gdy pamięć podręczna się wypełnia. Hooki z niej nie korzystają ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Ciepłe pełne uruchomienie |
+| :material-check-circle: Przejście kursorem po drzewie zamiast `descendantsOfType` na ścieżce pełnego parsowania ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)), zrobione | Zmierzone na 2100 syntetycznych plikach, na zimno, po 10 naprzemiennych uruchomień: o 13% szybciej, gdy każdy plik wymaga potwierdzenia (3,34 → 2,90 s p50), o 10% szybciej, gdy prescan odrzuca każdy plik (3,13 → 2,80 s). Odczyt importów i komentarzy wyciszających z 1059 plików biblioteki standardowej spadł z około 560 ms do 125 ms. Hook dla jednego pliku i czyste pełne sprawdzenie się nie zmieniają | Odrzucone pliki i potwierdzenia |
 
 ### Odtworzenie { #reproduce }
 
 ```sh
 bun install
-bun test                                                    # 607 tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
+bun test                                                    # 2,500+ tests: unit, CLI, hook, Stop gate, baseline, stats, E2E snapshots, doc snippets, bench
 bun run scripts/build-binaries.ts bun-linux-x64
 python3 bench/generate.py /tmp/inwards-bench
 (cd /tmp/inwards-bench && "$OLDPWD/dist/inwards-linux-x64" check)  # 2100 files, 0 violations, ms
@@ -191,7 +331,7 @@ Zrzuty ekranu w tej dokumentacji pochodzą ze `scripts/screenshots.py`, który n
 |---|:-:|:-:|---|
 | Astral dodaje kontrakty warstw do ty albo Ruffa | Średnie | Wysoki | Konkurować integracją z agentami i jakością poprawek, na których Astral się nie skupia. Utrzymywać format reguł na tyle prosty, żeby dało się go wyeksportować |
 | import-linter dodaje wyjście JSON i hooki dla agentów | Średnie | Średni | Utrzymać przewagę w opóźnieniu, samodzielnym pliku binarnym i poprawkach dla każdego naruszenia. Utrzymać przejście na jedno polecenie: `inwards import-config` przenosi kontrakty import-linter ([przewodnik](guides/import-linter.md)) |
-| Prawdziwe repozytoria przekraczają 100 ms p95 | Wydarzyło się: plik z polara z 4482 liniami i naruszeniami trwał 125 do 280 ms przed kompilacją do bajtkodu, a lokalnie 90 ms p95 po niej ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Wysoki | Najpierw stały proces, potem prescan w WASM napisany w Ruście albo Zigu (plan awaryjny z ADR-001) |
+| Prawdziwe repozytoria przekraczają 100 ms p95 | Wydarzyło się: plik z polara z 4482 liniami i naruszeniami trwał 125 do 280 ms przed kompilacją do bajtkodu, a jego jednorazowy hook lokalnie około 104 ms p95 po niej. Teraz 88 ms jednorazowo i 32 ms przez daemona ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | Wysoki | `inwards daemon` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)) i przyrostowe drugie parsowanie, oba zrobione; zadanie benchmarku mierzy plik tej wielkości w każdym PR. Potem prescan w WASM napisany w Ruście albo Zigu (plan awaryjny z ADR-001) |
 | Prescan pomija import w jakimś nietypowym pliku | Niskie | Wysoki | Test różnicowy w CI na bibliotece standardowej, co noc na pięciu prawdziwych serwisach; poszerzać ten korpus o repozytoria design partnerów |
 | Agenci edytują `[tool.inwards]`, żeby przejść sprawdzenie | Wysokie bez zabezpieczenia | Wysoki | Config guard w PreToolUse, porównanie konfiguracji w Stop gate, reguły `permissions.deny` z `init`, CODEOWNERS ([rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash wciąż może ominąć config guard; odtworzony start sesji wykrywa kopia zapisu startu poza projektem, chyba że agent usunie też ją, a hook Stop usunięty przez Bash jest zgłaszany dopiero przy starcie następnej sesji ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Regresje albo niekompatybilne zmiany w `--compile` Buna | Niskie | Średni | Wersja przypięta przez `.bun-version`; macierz weryfikacji w CD uruchamia każdy plik binarny |

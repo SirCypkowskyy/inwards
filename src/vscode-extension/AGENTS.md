@@ -3,80 +3,70 @@
 This guide adds to the root [`AGENTS.md`](../../AGENTS.md); its checks and
 rules still apply. Chapter 3 of the docs has the architecture in pictures.
 
-The extension shows Inwards' diagnostics in VS Code, live, with the same
-engine as `inwards check`. It is two programs in two processes: a thin
-client that VS Code loads, and a language server (LSP) that wraps
-`@inwards/core`. Both run on Node, bundled to CommonJS.
+The extension shows Inwards' diagnostics in VS Code, live. It is a thin
+client: it starts `inwards server` (the CLI's language server,
+`src/cli/src/lsp/`, ADR-041) over stdio and lets `vscode-languageclient` do
+the rest. It has no engine and no server of its own (ADR-043), so what the
+editor shows is changed in the CLI, never here.
 
 ## Folders
 
 | Folder | Owns | Must not |
 |---|---|---|
-| `src/client/` | activation (`extension.ts`): starting and stopping the server over IPC; the documents it syncs (`selector.ts`) | import the engine or the server |
-| `src/server/` | the language server (`server.ts`), the workspace pass and the index's files (`workspace.ts`), reading pyproject.toml (`config-file.ts`) | import the client or anything but `@inwards/core` of ours |
-| `scripts/` | build helpers (`copy-wasm.ts`) | ship in the VSIX |
-| `test/` | the LSP harness, server and config tests, the packaged-artifact smoke test | ship in the VSIX |
+| `src/client/` | activation, settings and the restart command (`extension.ts`); which binary to start (`binary.ts`, pure); the documents it syncs (`selector.ts`) | import anything of ours, the engine included |
+| `scripts/` | packaging one VSIX per platform with its binary (`package-target.ts`) | ship in the VSIX |
+| `test/` | the binary lookup, the boundaries, and the packaged-artifact test with its small LSP client | ship in the VSIX |
 
 ## Dependency rules
 
-The client imports `vscode` and `vscode-languageclient` only; the server
-imports `vscode-languageserver` and the engine through `@inwards/core`.
-They share nothing but the protocol. fallow enforces it (`vscode-client`,
-`vscode-server` and `vscode-dev` in `.fallowrc.jsonc`; a file in a new `src/`
-folder matches no zone and fails until it gets one), `test/architecture.test.ts`
-checks the zones through `fallow guard`, and `bun run check:cycles` covers
-this package too. Both sides are runtime
-adapters, so `node:*` modules are allowed here.
+The client imports `vscode`, `vscode-languageclient` and `node:*` only. fallow
+enforces it (`vscode-client` and `vscode-dev` in `.fallowrc.jsonc`; a file in
+a new `src/` folder matches no zone and fails until it gets one), and
+`test/architecture.test.ts` checks the zones through `fallow guard` and that
+`package.json` depends on `vscode-languageclient` alone.
 
 ## The shipped layout is a contract
 
-- `bun run build` writes `dist/extension.js` (`package.json`'s `main`),
-  `dist/server.js` (the client's `asAbsolutePath("dist/server.js")`) and both
-  grammars beside `server.js`. The build names its entries explicitly
-  (`--entry-naming [name].[ext]`); without that, Bun would write
-  `dist/client/` and `dist/server/`.
-- The server finds the grammars next to the running script
-  (`process.argv[1]`), not through `__dirname`, which Bun's bundler fixes at
-  build time to the build machine's directory.
-- `vscode` is external: VS Code provides it at run time.
-- `test/packaged.test.ts` runs the real build into an emptied `dist/`,
-  packages a VSIX with `vsce` as the release does, checks the manifest's
-  `main`, the server and both grammars are inside (and tests and guides are
-  not), and starts the server from the unpacked VSIX on Node. It needs Node
-  on PATH and fails without it. The other LSP tests bundle the server
-  themselves, so only this one catches a broken package. It deletes `dist/`
-  when done; `bun run build` makes it again.
-
-## State that lives as long as the server
-
-The server keeps the engine, the module index, the diagnostics per file,
-its file watchers and a 100 ms debounce for as long as it runs. Config
-reloads and workspace passes run one after another through `enqueue`, so a
-reload can never interleave with a pass. Without watched-file support in the
-client, every check builds a fresh index and saves of pyproject.toml re-read
-the config. These are deliberate; don't make them per request.
+- `bun run build` writes `dist/extension.js` (`package.json`'s `main`), with
+  `vscode-languageclient` bundled and `vscode` external.
+- `scripts/package-target.ts all <binaries> <out> <tag>` (cd.yml) writes one
+  VSIX per VS Code platform in its `TARGETS`, each with that platform's
+  release binary as `bin/inwards` (`bin/inwards.exe` on Windows) and its
+  execute bit, plus a universal VSIX without a binary for every other
+  platform. `vscode-publish.yml` uploads those same files.
+- The client finds the binary in this order (`binary.ts`): `inwards.path`
+  (never falling back when it is set but wrong), the bundled `bin/`, then
+  `inwards` on PATH. Nothing found is an error message with buttons to the
+  setting and the install guide, not a crash.
+- `inwards.path` is a restricted setting (`capabilities.untrustedWorkspaces`):
+  in an untrusted workspace VS Code returns only the user's value, so a cloned
+  repository can't pick the program the extension starts.
+- `test/packaged.test.ts` builds, packages this machine's platform VSIX and
+  the universal one, unpacks them, checks what ships (and that tests, sources
+  and guides don't), and drives the bundled binary over LSP until it reports a
+  violation. It bundles `INWARDS_BIN` when set (CI's compiled binary), else a
+  binary compiled from source. It deletes `dist/` when done.
 
 ## Where new code goes
 
-- **A new diagnostic source.** Engine logic goes in `src/core`; the server
-  only decides when to run it (on open and change, or in the workspace pass
-  for files nobody opened).
+- **What the editor shows.** In the CLI's server (`src/cli/src/lsp/`), with
+  its tests there.
 - **A new setting.** Declare it in `package.json` under
-  `contributes.configuration`, read it in the server, and document it in the
-  install guide (`docs/chapters/guides/install.md`), EN and PL.
-- **A new file the server reads.** Keep it in `server/`, treat an unreadable
-  file as an error rather than a missing one (#163), and add a test with the
-  harness.
+  `contributes.configuration`, read it in `extension.ts` (a change to any
+  `inwards.*` setting restarts the server), and document it in the install
+  guide (`docs/chapters/guides/install.md`, "VS Code"), EN and PL. A setting
+  that names a program or a path to run goes in `restrictedConfigurations`.
+- **A new platform.** A binary in `scripts/build-binaries.ts`, its VS Code
+  target in `TARGETS`, a row in cd.yml's verify matrix, and the VSIX count
+  in `vscode-publish.yml`.
 
-## Traps that already cost review rounds
+## Traps
 
-- **An unreadable pyproject.toml is a config error**, never "no config",
-  which would silently turn the checks off (#163).
-- **Watcher fallback.** A client without `didChangeWatchedFiles` gets no file
-  events: never keep an index across checks then.
-- **Serialized reloads.** A new async step that touches `state` goes through
-  `enqueue`, or a slow reload can publish stale findings over fresh ones.
+- **Node can't spawn a `.cmd` or `.bat` without a shell**, so on Windows the
+  lookup accepts `inwards.exe` only.
 - **Keep the package guides and tests out of the VSIX** (`.vscodeignore`).
+- **The Marketplace and Open VSX take X.Y.Z only.** Release candidates are
+  never published there; their VSIX already carries the final version.
 
 ## Local feedback
 
@@ -86,5 +76,5 @@ bun run --cwd src/vscode-extension build
 bun run check:cycles && bun run check:overviews
 ```
 
-The root checks (Biome, `lint:docs`, typecheck, fallow, the docs checks and
-`act`) are still required before a commit and a push.
+The root checks (Biome, `lint:docs`, typecheck, fallow and the docs checks)
+are still required before a commit and a push.

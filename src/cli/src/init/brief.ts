@@ -8,7 +8,13 @@
  * through the platform's probe and reader and never writes a file itself.
  */
 import { dirname, join } from "node:path";
-import { type InwardsConfig, type LayerSpec, parseConfig, ruleLevel } from "@inwards/core";
+import {
+  type InwardsConfig,
+  type LayerSpec,
+  libraryDenies,
+  parseConfig,
+  ruleLevel,
+} from "@inwards/core";
 import type { FileReader, PathProbe } from "../platform/contracts.ts";
 import type { Change } from "./contracts.ts";
 import { STYLES } from "./presets.ts";
@@ -71,6 +77,7 @@ export function architectureBrief(input: BriefInput): string {
  *
  * @param config - the parsed config.
  * @returns the lines, with a blank line first, or none when INW005 is off or nothing applies.
+ *   Layers come first, then the prefix denies of `[tool.inwards.rules.pure-domain].deny`.
  */
 function librarySection(config: InwardsConfig): string[] {
   if (ruleLevel("INW005", config.rules) === "off") {
@@ -80,6 +87,9 @@ function librarySection(config: InwardsConfig): string[] {
     const rule = libraryRule(layer, (layer.rank ?? i) === 0 && config.layers.length > 1);
     return rule === undefined ? [] : [`- ${layer.name}: ${rule}`];
   });
+  for (const { modules, libraries } of libraryDenies(config.rules?.options?.["pure-domain"])) {
+    rules.push(`- ${list(modules)}: not ${list(libraries)}`);
+  }
   return rules.length === 0 ? [] : ["", "Libraries (INW005):", ...rules];
 }
 
@@ -208,10 +218,11 @@ function portModules(
  * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured or has only selectors.
  */
 function presetPorts(style: Style, config: InwardsConfig): string | undefined {
-  if (style.example === undefined) {
+  const { example } = style;
+  if (typeof example === "function") {
     return undefined;
   }
-  const parent = style.example.port.split(".").slice(0, -1).join(".");
+  const parent = example.port.split(".").slice(0, -1).join(".");
   const owner = expandLayers(style).find(
     (layer) => parent === layer.module || parent.startsWith(`${layer.module}.`),
   );

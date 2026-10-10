@@ -22,7 +22,7 @@ concurrency:
 jobs:
   engine:
     name: Lint, typecheck, prescan
-    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
+    runs-on: [self-hosted, linux, ARM64, inwards] # dellpromaxgb10, ops/runner
     steps:
       - uses: actions/checkout@v7
       - name: Every version field matches .release-please-manifest.json
@@ -80,8 +80,8 @@ jobs:
         include: >-
           ${{ fromJSON(
             github.event_name == 'workflow_dispatch'
-            && '[{"os":"ubuntu-24.04","runner":"ubuntu-24.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"ubuntu-26.04","runner":["self-hosted","linux","x64","inwards"],"target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"macos-latest","runner":"macos-latest","target":"bun-darwin-arm64","bin":"inwards-darwin-arm64"},{"os":"windows-latest","runner":"windows-latest","target":"bun-windows-x64","bin":"inwards-windows-x64.exe"}]'
-            || '[{"os":"ubuntu-26.04","runner":["self-hosted","linux","x64","inwards"],"target":"bun-linux-x64","bin":"inwards-linux-x64"}]'
+            && '[{"os":"ubuntu-24.04","runner":"ubuntu-24.04","target":"bun-linux-x64","bin":"inwards-linux-x64"},{"os":"ubuntu-26.04","runner":["self-hosted","linux","ARM64","inwards"],"target":"bun-linux-arm64","bin":"inwards-linux-arm64"},{"os":"macos-latest","runner":"macos-latest","target":"bun-darwin-arm64","bin":"inwards-darwin-arm64"},{"os":"windows-latest","runner":"windows-latest","target":"bun-windows-x64","bin":"inwards-windows-x64.exe"}]'
+            || '[{"os":"ubuntu-26.04","runner":["self-hosted","linux","ARM64","inwards"],"target":"bun-linux-arm64","bin":"inwards-linux-arm64"}]'
           ) }}
     runs-on: ${{ matrix.runner }}
     defaults:
@@ -116,12 +116,15 @@ jobs:
 
   docs:
     name: Docs build
-    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
+    runs-on: [self-hosted, linux, ARM64, inwards] # dellpromaxgb10, ops/runner
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0 # upstream has no floating major tag
       - name: Every page under docs/chapters and docs/pl is in its nav
         run: uv run scripts/check-docs-nav.py
+      # Before --mark-stale, which edits Polish pages; also fails on a stale rules.json.
+      - name: Every rule page meets the page contract (#49, #145)
+        run: uv run scripts/check-rule-pages.py
       # Fails on a missing Polish page; a stale one is a warning and gets a banner.
       - name: Every English page has a Polish translation
         run: uv run scripts/check-docs-translation.py --mark-stale

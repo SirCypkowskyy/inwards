@@ -3,10 +3,12 @@
  * The rules (skips, symlinks, cycles, layer packages walked in full) are
  * described on `collectPythonFiles`; `collectLinks` lists the symlinks in a
  * layer package, following only those that stay in the root, for INW006 (#83, #84).
+ * The walk resolves one real path per directory and per symlink, never per
+ * plain file (#281), and hands the real paths it found to the caller.
  */
 import { type Dirent, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
-import type { FileWalker } from "../platform/contracts.ts";
+import type { FileWalker, WalkedFile } from "../platform/contracts.ts";
 
 // Only names that can never hold first-party code. `build/` or `dist/` inside a
 // package is still Python the agent can import, so those are walked.
@@ -37,6 +39,23 @@ const SKIP = new Set(["node_modules", "__pycache__"]);
  * @returns unique paths, sorted.
  */
 export function collectPythonFiles(paths: string[], open: readonly string[] = []): string[] {
+  return collectFiles(paths, isPythonFile, open).map((file) => file.path);
+}
+
+/**
+ * Lists the Python files under each path with their real paths, by the same
+ * rules as `collectPythonFiles`. A plain file's real path is its directory's
+ * real path and its name, as `readdir` spells it: a file that isn't a symlink
+ * adds no link of its own, so `realpath` would only repeat what the walk
+ * already resolved for the directory, at a system call per file. A named
+ * file, a symlink and each directory are resolved as before.
+ *
+ * @param paths - files or directories.
+ * @param open - directories walked without the skip rules (layer packages, as written and real).
+ * @returns unique paths, sorted, each with its real path (undefined for a
+ *   named file that doesn't resolve).
+ */
+export function collectPythonSources(paths: string[], open: readonly string[] = []): WalkedFile[] {
   return collectFiles(paths, isPythonFile, open);
 }
 
@@ -47,23 +66,24 @@ export function collectPythonFiles(paths: string[], open: readonly string[] = []
  * @param paths - files or directories; a file is kept as is.
  * @param match - tells whether a file name is wanted.
  * @param open - directories walked without the skip rules.
- * @returns unique paths, sorted.
+ * @returns unique paths, sorted, each with its real path.
  */
 function collectFiles(
   paths: string[],
   match: (name: string) => boolean,
   open: readonly string[] = [],
-): string[] {
-  const out = new Set<string>();
+): WalkedFile[] {
+  const out = new Map<string, string | undefined>();
   for (const p of paths) {
-    const top = statSync(p).isDirectory() ? realOrUndefined(p) : undefined;
-    if (top === undefined) {
-      out.add(p);
-    } else {
-      walk(p, out, { top, chain: new Set<string>(), match, open });
+    const isDir = statSync(p).isDirectory();
+    const real = realOrUndefined(p);
+    if (isDir && real !== undefined) {
+      walk(p, real, out, { top: real, chain: new Set<string>(), match, open });
+    } else if (!out.has(p)) {
+      out.set(p, real);
     }
   }
-  return [...out].sort();
+  return [...out.keys()].sort().map((path) => ({ path, real: out.get(path) }));
 }
 
 /** What a walk carries down the tree. */
@@ -78,14 +98,19 @@ interface WalkScope {
  * Adds every matching file below a directory to `out`, recursively.
  *
  * @param dir - the directory to walk, as reached (possibly through a symlink).
- * @param out - the collected paths, written in place.
+ * @param real - its real path, resolved by the caller.
+ * @param out - the collected paths with their real paths, written in place.
  * @param scope - the real start directory, the real paths of the directories
  *   above this one (a cycle guard, updated in place), the file-name filter and
  *   the directories walked without skips.
  */
-function walk(dir: string, out: Set<string>, scope: WalkScope): void {
-  const real = realOrUndefined(dir);
-  if (real === undefined || scope.chain.has(real) || !isWithin(scope.top, real)) {
+function walk(
+  dir: string,
+  real: string,
+  out: Map<string, string | undefined>,
+  scope: WalkScope,
+): void {
+  if (scope.chain.has(real) || !isWithin(scope.top, real)) {
     return;
   }
   let entries: Dirent[];
@@ -96,18 +121,44 @@ function walk(dir: string, out: Set<string>, scope: WalkScope): void {
   }
   scope.chain.add(real);
   for (const entry of entries) {
-    if (entry.name.startsWith(".")) {
-      continue;
-    }
-    const full = join(dir, entry.name);
-    const kind = entryKind(entry, full);
-    if (kind === "file" && scope.match(entry.name) && isWithin(scope.top, realOrUndefined(full))) {
-      out.add(full);
-    } else if (kind === "dir" && (isOpen(full, scope.open) || !skipped(entry.name, full))) {
-      walk(full, out, scope);
+    if (!entry.name.startsWith(".")) {
+      visit(entry, { dir, real }, out, scope);
     }
   }
   scope.chain.delete(real);
+}
+
+/**
+ * Adds one directory entry to `out` when it is a matching file, or walks it
+ * when it is a directory the rules let the walk enter.
+ *
+ * @param entry - the entry, not hidden.
+ * @param parent - the directory it is in, as reached and real.
+ * @param parent.dir - the directory as reached.
+ * @param parent.real - its real path.
+ * @param out - the collected paths with their real paths, written in place.
+ * @param scope - what the walk carries down the tree.
+ */
+function visit(
+  entry: Dirent,
+  { dir, real }: { dir: string; real: string },
+  out: Map<string, string | undefined>,
+  scope: WalkScope,
+): void {
+  const full = join(dir, entry.name);
+  const kind = entryKind(entry, full);
+  if (kind === "file" && scope.match(entry.name)) {
+    // A plain file adds no link: its real path is its directory's, plus its name.
+    const target = entry.isSymbolicLink() ? realOrUndefined(full) : join(real, entry.name);
+    if (isWithin(scope.top, target)) {
+      out.set(full, target);
+    }
+  } else if (kind === "dir") {
+    const target = realOrUndefined(full);
+    if (target !== undefined && (isOpen(full, target, scope.open) || !skipped(entry.name, full))) {
+      walk(full, target, out, scope);
+    }
+  }
 }
 
 /**
@@ -126,17 +177,13 @@ function skipped(name: string, full: string): boolean {
  * Tells whether a directory is in a layer package or above one, where nothing is skipped.
  *
  * @param dir - a directory path, as reached.
+ * @param real - its real path.
  * @param open - layer package directories, as written and real.
  * @returns true when the path as reached, or its real path, is inside or above one of them.
  */
-function isOpen(dir: string, open: readonly string[]): boolean {
-  if (open.length === 0) {
-    return false;
-  }
-  const spellings = [dir, realOrUndefined(dir)];
-  return open.some((top) =>
-    spellings.some((path) => isWithin(top, path) || (path !== undefined && isWithin(path, top))),
-  );
+function isOpen(dir: string, real: string, open: readonly string[]): boolean {
+  const spellings = [dir, real];
+  return open.some((top) => spellings.some((path) => isWithin(top, path) || isWithin(path, top)));
 }
 
 /**
@@ -295,6 +342,8 @@ function linkEntry(
 /** The walk behind the `FileWalker` contract. */
 export const nodeFileWalker: FileWalker = {
   pythonFiles: collectPythonFiles,
-  files: collectFiles,
+  pythonSources: collectPythonSources,
+  files: (paths: string[], match: (name: string) => boolean, open?: readonly string[]): string[] =>
+    collectFiles(paths, match, open).map((file) => file.path),
   links: (dir: string, top: string) => collectLinks(dir, top),
 };

@@ -61,6 +61,7 @@ const GROWTH: Readonly<Record<(typeof STYLES)[number], string>> = {
   "vertical-slices": "src/my_app/features/orders/customer.py",
   "bounded-contexts": "src/my_app/orders/domain/customer.py",
   django: "src/my_app/orders/admin.py",
+  fastapi: "src/my_app/pagination.py",
 };
 
 describe("inwards init --style X --scaffold writes package shapes", () => {
@@ -97,6 +98,7 @@ describe("inwards init --style X --scaffold writes package shapes", () => {
     ],
     ["bounded-contexts", "src/my_app/orders/utils.py", "INW007 warning src/my_app/orders/utils.py"],
     ["django", "src/my_app/orders/forms.py", "INW007 warning src/my_app/orders/forms.py"],
+    ["fastapi", "src/my_app/posts/helpers.py", "INW007 error src/my_app/posts/helpers.py"],
   ])("%s: planting %s reports %s", (style, rel, finding) => {
     const root = project(UV_PROJECT);
     expect(init(root, "--style", style, "--scaffold").code).toBe(0);
@@ -128,6 +130,7 @@ describe("inwards init --style X --scaffold writes package shapes", () => {
     ],
     ["bounded-contexts", "src/my_app/orders/api.py", "src/my_app/orders/__init__.py"],
     ["django", "src/my_app/orders/services.py", "src/my_app/orders/__init__.py"],
+    ["fastapi", "src/my_app/posts/router.py", "src/my_app/posts/__init__.py"],
   ])("%s: removing %s fails with INW008", (style, rel, where) => {
     const root = project(UV_PROJECT);
     expect(init(root, "--style", style, "--scaffold").code).toBe(0);

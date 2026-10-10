@@ -12,12 +12,13 @@
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
+import { joined } from "../shared/words.ts";
 import { type CodeSource, CodeWalk } from "./error-codes.ts";
 import { flag } from "./options.ts";
 import { declaredBy, hiddenBy, ownPlacement, type Placement, placementOf } from "./placement.ts";
 import type { FastApiProject } from "./project.ts";
 import type { FastApiFile, PathOperation } from "./records.ts";
-import { decoratorSpan, decoratorText, joined } from "./syntax.ts";
+import { decoratorSpan, decoratorText } from "./syntax.ts";
 
 /** FAPI002's options, with their defaults filled in. */
 interface Options {
@@ -75,9 +76,8 @@ export function checkUndocumentedErrors(
   raw: RuleOptions | undefined,
 ): Diagnostic[] {
   const options = optionsOf(raw);
-  const walk = new CodeWalk(scope, options.maxDepth);
   return file.operations.flatMap((op) => {
-    const missing = undeclared(op, file, { scope, walk, options });
+    const missing = undeclared(op, file, { scope, options });
     return missing.size === 0 ? [] : [report(op, src, missing)];
   });
 }
@@ -89,20 +89,20 @@ export function checkUndocumentedErrors(
  * @param file - its file.
  * @param tools - what the check needs.
  * @param tools.scope - the project lookups.
- * @param tools.walk - reads the codes of functions.
  * @param tools.options - the rule's options.
  * @returns the undeclared codes with their origins, empty when there are none or it's unknown.
  */
 function undeclared(
   op: PathOperation,
   file: FastApiFile,
-  { scope, walk, options }: { scope: FastApiProject; walk: CodeWalk; options: Options },
+  { scope, options }: { scope: FastApiProject; options: Options },
 ): Map<number, CodeSource[]> {
   const object = scope.objectOf(op.receiver);
   const own = declaredBy(op, scope);
   if (object === null || own === null || hiddenBy(op)) {
     return new Map();
   }
+  const walk = new CodeWalk(scope, options.maxDepth, object);
   // A per-edit check reads the inclusions above a router only for a code its own router misses.
   if (scope.lazy && object.kind === "router") {
     const local = codesBelow(op, file, ownPlacement(object, scope), { scope, walk, options });

@@ -4,43 +4,49 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 | ADR | Decision | Status |
 |---|---|---|
-| [001](#adr-001-typescript-for-the-engine) | TypeScript for the engine | :white_check_mark: Accepted |
-| [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), not native bindings | :white_check_mark: Accepted |
-| [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :white_check_mark: Accepted, built with `--bytecode` since [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
-| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :white_check_mark: Accepted, baselined modules skip the confirming parse since [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
-| [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :white_check_mark: Accepted |
-| [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :white_check_mark: Accepted, the adapter supplies the module index through a ProjectFiles port since [#44](03-Architecture-C4.md#c3-components-of-the-engine) |
-| [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :white_check_mark: Accepted |
-| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-progress-clock: Accepted, revisit in M6 (v0.6) |
-| [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :white_check_mark: Accepted |
+| [001](#adr-001-typescript-for-the-engine) | TypeScript for the engine | :material-check-circle: Accepted |
+| [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), not native bindings | :material-check-circle: Accepted |
+| [003](#adr-003-ship-a-bun-single-file-executable) | Ship a Bun single-file executable | :material-check-circle: Accepted, built with `--bytecode` since [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
+| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parse the import skeleton, confirm with a full parse | :material-check-circle: Accepted, baselined modules skip the confirming parse since [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
+| [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :material-check-circle: Accepted |
+| [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :material-check-circle: Accepted, the adapter supplies the module index through a ProjectFiles port since [#44](03-Architecture-C4.md#c3-components-of-the-engine) |
+| [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :material-check-circle: Accepted |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-swap-horizontal: Superseded by [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches); the name `inwards server` and its place beside the hook daemon in [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
+| [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :material-check-circle: Accepted |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Docs built with Zensical, served by Cloudflare Workers | :material-swap-horizontal: Hosting superseded by 012 |
-| [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :white_check_mark: Accepted |
-| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :white_check_mark: Accepted, deployed from `develop` since 019 |
-| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :white_check_mark: Accepted, symlinks in layers that hide code reported since [#83](https://github.com/SirCypkowskyy/inwards/issues/83) and [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
-| [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :white_check_mark: Accepted |
-| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :white_check_mark: Accepted, unreadable targets reported since 026 |
+| [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :material-check-circle: Accepted |
+| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publish the docs on GitHub Pages, for now | :material-check-circle: Accepted, deployed from `develop` since 019 |
+| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Real paths for the boundary, import paths for module names | :material-check-circle: Accepted, symlinks in layers that hide code reported since [#83](https://github.com/SirCypkowskyy/inwards/issues/83) and [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
+| [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Report files whose declared encoding can hide imports | :material-check-circle: Accepted |
+| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Check literal dynamic imports as INW011 | :material-check-circle: Accepted, unreadable targets reported since 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Versions and releases come from commit types, via a release PR | :material-swap-horizontal: Branching model superseded by 019 |
-| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :white_check_mark: Accepted, squashed into `develop` since 019 |
-| [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :white_check_mark: Accepted |
-| [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | A `develop` integration branch; `main` moves only at releases | :white_check_mark: Accepted |
-| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | The `init` picker uses @clack/prompts, loaded from a split chunk | :white_check_mark: Accepted |
-| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :white_check_mark: Accepted, switched on by the owner |
+| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Squash merges with Conventional Commit PR titles | :material-check-circle: Accepted, squashed into `develop` since 019 |
+| [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Package selectors take globs from the start; monorepos follow uv workspaces | :material-check-circle: Accepted |
+| [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | A `develop` integration branch; `main` moves only at releases | :material-check-circle: Accepted |
+| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | The `init` picker uses @clack/prompts, loaded from a split chunk | :material-check-circle: Accepted |
+| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publish the release wheels to PyPI from their own workflow, with trusted publishing | :material-check-circle: Accepted, switched on by the owner |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | M2 go or no-go: continue, conditionally, until partner data | :material-progress-clock: Accepted, provisional until partner data |
-| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :white_check_mark: Accepted, `extend-deny-libraries` adds to the default since [#155](guides/libraries.md#configure-it) |
-| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :white_check_mark: Accepted |
-| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :white_check_mark: Accepted, generated modules pass when missing since [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
-| [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Report unreadable dynamic-import targets in inner layers | :white_check_mark: Accepted |
-| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :white_check_mark: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
-| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :white_check_mark: Accepted |
-| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :white_check_mark: Accepted |
-| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :white_check_mark: Accepted |
-| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :white_check_mark: Accepted |
-| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :white_check_mark: Accepted |
-| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Layer selectors anchored in a top-level package, with slice-aware session checks | :white_check_mark: Accepted |
-| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :white_check_mark: Accepted |
-| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Package templates expand into config a user could write by hand | :white_check_mark: Accepted |
-| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :white_check_mark: Accepted |
-| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :white_check_mark: Accepted |
+| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Libraries per layer, with a default deny list for the innermost layer | :material-check-circle: Accepted, `extend-deny-libraries` adds to the default since [#155](guides/libraries.md#configure-it) |
+| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | A Polish translation as a second build, translated in the same PR | :material-check-circle: Accepted |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 probes the disk for existence and checks only the module part of an import | :material-check-circle: Accepted, generated modules pass when missing since [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
+| [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Report unreadable dynamic-import targets in inner layers | :material-check-circle: Accepted |
+| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | Per-rule `select`, `ignore` and `severity` in a `[tool.inwards.rules]` table | :material-check-circle: Accepted, the language server re-reads the table without a restart since [#163](03-Architecture-C4.md#known-limitations) |
+| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Inline suppressions need a reason, and an agent can't add one by default | :material-check-circle: Accepted |
+| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Generated modules pass INW010, protoc and version modules by default | :material-check-circle: Accepted |
+| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Bounded contexts as a `contexts` table of literal prefixes | :material-check-circle: Accepted |
+| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | A content-keyed extraction cache that the hooks never read | :material-check-circle: Accepted |
+| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Import cycles on whole-project runs, from the imports the check already reads | :material-check-circle: Accepted |
+| [033](#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) | OpenCode through a plugin that runs the Claude Code hook | :material-check-circle: Accepted |
+| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Layer selectors anchored in a top-level package, with slice-aware session checks | :material-check-circle: Accepted |
+| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` follows uv workspace members, each with its own config | :material-check-circle: Accepted |
+| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Package templates expand into config a user could write by hand | :material-check-circle: Accepted |
+| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :material-check-circle: Accepted |
+| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :material-check-circle: Accepted |
+| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-check-circle: Accepted |
+| [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Worker threads parse a large full check; the main thread keeps every decision | :material-check-circle: Accepted |
+| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted, the extension switched in [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
+| [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk | :material-check-circle: Accepted |
+| [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | The VS Code extension bundles the binary, one VSIX per platform | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -170,7 +176,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 ## ADR-008: Language server on Node inside the extension, for now
 
-**Status:** Accepted, revisit in M6 (v0.6) · 2026-09-25
+**Status:** Superseded by [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) keeps `inwards server` for the language server and gives the hooks a separate `inwards daemon`
 
 **Context.** Ruff and ty ship their language server inside the same binary (`ruff server`). That gives every LSP-capable editor (Neovim, Zed, Helix) the server for free. Inwards' scaffold instead bundles a Node LSP server into the VS Code extension, next to the grammar files.
 
@@ -571,6 +577,15 @@ The eval also showed what the checks can't: no evasion in any final diff; the co
 - :material-minus-circle-outline: Import names are matched, not distribution names (`PyYAML` is `yaml`), and a stdlib module newer than the bundled list counts as third-party.
 
 **Alternatives.** *Read installed distributions from the virtualenv*: exact, but breaks C4 and fails in CI images without the dependencies. *Default deny for every layer but the outermost*: guesses too much about what an application layer may use. *Name the configured list in the message*: a changed list would bring back every baselined violation.
+
+**Amendment, 2026-09-28: libraries denied to a module prefix ([#219](https://github.com/SirCypkowskyy/inwards/issues/219)).** import-linter's most common `forbidden` contract, "`mypackage.one` must not import `django`", names a package that isn't a layer, so `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) had to skip it.
+
+- **In INW005's options table.** `[tool.inwards.rules.pure-domain]` takes `deny`, a list of `{ modules, libraries }` tables, next to the `modules` every rule has since [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table)'s #181 amendment. `modules` has the grammar of `layers[].modules`, and `libraries` the grammar of `deny-libraries`. Only `pure-domain` takes the key; on another rule's table it is an unknown key.
+- **Independent of layers.** An entry applies to the modules it matches whether a layer owns them or not, so a file outside every layer that an entry covers gets its imports read. The layer's `allow-libraries` doesn't undo it: an entry is narrower than a layer, and a team writes one to take something away.
+- **The layer's lists are asked first.** When they deny the import too, the finding is the layer's, with the layer's message, so adding an entry leaves existing baseline keys alone. Otherwise the message names the module and the prefix the entry matched (`denies to "mypackage.one"`), and the fix puts the port in that prefix and the implementation outside it. The table's own `modules` still scopes every INW005 finding.
+- **`import-config`** keeps `extend-deny-libraries` for sources that are exactly one or more layers and writes a `deny` entry for everything else.
+
+*Alternatives.* *`deny-libraries` on a `[[tool.inwards.contexts]]` entry*: a context also brings INW002 and INW003 permissions, so a converted contract would change what else the package may import and who may import it. *A `modules` field on a layer's deny entries*: `deny-libraries` is a list of strings, and turning its entries into tables would change the type of an existing key.
 
 ## ADR-024: A Polish translation as a second build, translated in the same PR
 
@@ -1060,3 +1075,209 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 - *Read Claude Code's transcript and refuse a start recorded after the session's first tool use:* the Stop payload's `transcript_path` comes from Claude Code, but the transcript format isn't a public contract, the file can be large, it is just as writable by the agent, and OpenCode has none.
 - *A PreToolUse marker outside the project on the first tool call:* the same Bash command that deletes the state can delete the marker before it replays.
 - *Sign the start record:* the key would sit where the agent's user can read it.
+
+## ADR-039: A hook daemon per project, separate from the language server
+
+**Status:** Accepted · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
+
+**Context.** Three long-lived front ends are planned: a process that keeps the engine warm for the hooks ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)), a language server inside the binary ([#63](https://github.com/SirCypkowskyy/inwards/issues/63), [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)) and an MCP server ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)). Chapter 6 called the hook process `inwards server`, the name ADR-008 gives the language server, and the backlog called it `inwards daemon`. Whether one process could serve both the editor and the hooks was open.
+
+Today the CLI runs one command per process. `main.ts` builds `AppDeps` once, `runCheck` reads the config and creates an `Engine` on every call, and the WASM runtime and grammar load once per process (a module-level promise in `python/parser.ts`). The VS Code language server is resident already: a Node process the extension starts over IPC, holding the engine, the module index and an in-memory extraction cache while the window is open.
+
+The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) ran the real hook handler warm behind a Unix socket and compared it with the darwin-arm64 binary run one-shot, on macOS, under a load average of 5 to 7. It found:
+
+- **The client's own start is the floor.** `inwards --version` takes 15.5 ms p50, and every hook call starts a process before it can ask anything.
+- **PostToolUse is where a daemon pays.** One-shot, p50 / p95: 46.6 / 50.2 ms for a 13-line file, 119.9 / 151.6 ms for a 4,492-line file with two violations. The same handler warm, unchanged: 32.3 / 35.2 and 91.1 / 97.7 ms. With two in-memory caches: 17.2 / 19.8 and 18.2 / 19.7 ms, and 47.6 / 50.1 ms (one-shot 117.5 / 122.8) when the big file changes before every call.
+- **One git call costs as much as starting the process.** One `git cat-file blob` that reads the file's session-start text for the old-violation split takes about 15 ms, and each PostToolUse checks the file twice, as it is now and as it was at session start: 30 ms each for the big file, warm.
+- **The other events don't.** PreToolUse takes 16.8 ms one-shot, next to the 15.5 ms floor. Stop takes 141 ms, once per turn.
+
+**Decision.**
+
+- **Separate processes, one binary.** `inwards server` is the language server: LSP over stdio, started and stopped by the editor, one per workspace, checking the editor's unsaved text. `inwards daemon` serves the hooks: one per user and project, started by a hook, gone after 10 minutes without a request, checking what is on disk. `inwards mcp` is the MCP server over stdio, started by the MCP client. The three share one warm-engine module in the CLI and never talk to each other.
+- **Only PostToolUse goes through the daemon.** SessionStart, PreToolUse and Stop always run in the hook's own process. PreToolUse loads no grammar, so it would save nothing. Stop is the enforcement and finds what a session changed from the start manifest, not only from the edits PostToolUse recorded. A daemon that answers wrong (a bug, a stale build, or a process the agent put at the endpoint) can delay a finding until Stop; it can't let one through.
+- **The same handler, with a per-request platform.** The daemon runs today's `hookClaudeCode` with a `Runtime` built from the client's working directory and environment, and `Streams` that collect the output. The client writes stdout and stderr back and exits with the daemon's code. The hook E2E fixtures run both ways in the tests, and the outputs must match.
+- **It keeps only what its content identifies.** Across requests the daemon keeps the grammar, an extraction cache keyed like [ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)'s (text hash, module name, package flag, extraction revision; several texts per module, since the start text and the edited text are both in use; at most 5,000 entries and about 32 MB, as in the language server), and session-start text read from git, keyed by repository, start commit and path. The config, the baseline, the file listing and the session state are read again for every request, as a one-shot run does, so no config edit, checkout or new baseline can leave it stale. A warm check of a 13-line file, config and module index included, took 0.8 ms in the spike. Nothing is written to disk: the hooks still read no cache the agent can write.
+- **Transport.** `node:net` on both sides: a Unix domain socket on Linux and macOS, a named pipe on Windows. The socket goes in a directory only the user can open: `$XDG_RUNTIME_DIR/inwards/`, else `$TMPDIR/inwards-<uid>/`, else `/tmp/inwards-<uid>/`, created with mode 0700 and used only while it is a real directory the user owns with that mode. The name is 16 hex digits of the project's real path hash and 8 random ones, which keeps the path under macOS's 104-byte limit; the pipe is `\\.\pipe\inwards-<hash>-<random>`. After it listens, the daemon writes `daemons/<hash>.json` under the state directory of [ADR-038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) (mode 0600, through a temporary file and a rename): the protocol, the Inwards version, the executable's identity, its pid and the endpoint. Windows pipe names share one namespace across users, so the random part keeps another user from taking the name first.
+- **Framing.** One request per connection, one line of JSON each way. The request carries `protocol: "inwards-daemon/1"`, the version, the executable's identity (path, size and modification time), `argv` (only `hook claude-code` is served), the working directory, the environment variables `Runtime` reads, and the hook payload. The answer carries the exit code, stdout and stderr, or an `error` (`stale`, `protocol`, `too-large`). A payload over 16 MB isn't sent; the hook runs one-shot.
+- **Staleness.** Any difference in protocol, version or executable identity gets `stale`: the daemon exits, and the client runs one-shot and starts a new one. The daemon also checks its own executable on every request, for an upgrade that replaced the file in place. Client and daemon are always the same build, so there is no compatibility across versions to keep.
+- **Start-up, races and fallback.** A hook that finds no daemon, can't connect within 100 ms or gets `stale` runs one-shot, so it answers no later than today, and then starts `inwards daemon` detached. Two hooks starting one at once are settled by a lock file created exclusively next to the record, holding the pid; the loser exits, and a lock whose pid is gone is removed and retried once. Endpoints are random, so two daemons never contend for a path. Once the request is sent, the client waits for the answer as long as the hook's own timeout allows: running the hook again in parallel would record the edit twice. A connection that closes without an answer runs one-shot, and #60 keys recorded edits by `tool_use_id` so that this retry can't count an edit twice.
+- **One request at a time.** The daemon handles requests in arrival order, as the language server serialises its reloads: parallel tool calls write the same session state.
+- **Off switches.** `INWARDS_DAEMON=0` makes every hook run one-shot. The daemon is off when `CI` is set, and the test suite runs with it off except in the daemon's own tests. It isn't a `[tool.inwards]` key: it changes speed, never results.
+- **Full runs stay one-shot.** `inwards check`, `inwards baseline` and the worker pool ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) run in their own process; the daemon serves one-file checks and hosts no workers.
+- **Names.** `inwards server` (as `ruff server` and `ty server`), `inwards daemon` with `inwards daemon status` and `inwards daemon stop` for the current project, and `inwards mcp`. Chapter 6 and ADR-008 use these names.
+
+**Consequences.**
+
+- :material-plus-circle-outline: In the spike, PostToolUse p95 fell from 50.2 to 19.8 ms for a small file and from 122.8 to 50.1 ms for a 4,492-line file edited before every call. #60's target, p95 under 50 ms, is met for the small file and at the edge for the large one. On the Linux laptop of chapter 6's bytecode spike, `inwards --version` took 10.5 ms, not 15.5.
+- :material-plus-circle-outline: Warm JIT comes with it: a one-shot check of the large file took 70.8 ms, the same check warm 30 ms.
+- :material-plus-circle-outline: The Stop gate and the guards keep their trust model. A broken or impostor daemon costs latency and early feedback, not a missed violation at Stop.
+- :material-plus-circle-outline: One warm-engine module serves three front ends, and the language server moves into the binary (#63, #64) with the cache code it has today.
+- :material-minus-circle-outline: Each project with a daemon holds 150 to 210 MB of RSS (the spike's server, run from source) for up to 10 minutes after its last edit. Five agent sessions in five repositories hold five.
+- :material-minus-circle-outline: Every hook call still starts a Bun process, about 15 ms here. Only a client written in another language could remove that.
+- :material-minus-circle-outline: The user, and so the agent, can connect to the daemon, stop it, or point the record at its own process. Connecting gives nothing `inwards` itself doesn't; an impostor can only change what PostToolUse says before Stop checks again.
+- :material-minus-circle-outline: Named pipes weren't measured: the spike ran on macOS. #60 has to show the Windows row passing (a manual run of the full matrix) before it merges.
+- :material-minus-circle-outline: A second code path for PostToolUse. Running the E2E fixtures through both is what keeps them equal.
+
+**Alternatives.**
+
+- *One process for the editor and the hooks,* either the language server also listening for hooks or one daemon per project with `inwards server` as a stdio proxy to it. Lifetimes differ: an editor window against an agent session, and agents often run with no editor open, so the hooks can't rely on one. Inputs differ: unsaved buffers against the disk and the session state. A proxy puts a socket hop on every keystroke for a server that is resident anyway, a crash takes down both, and several windows on one repository would have to elect an owner.
+- *Every hook event through the daemon:* PreToolUse would save about 1 ms, and the Stop gate's verdict would come from a process the agent can replace.
+- *No daemon, a faster one-shot run:* bytecode already halved start-up ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). What remains is process start, WASM and grammar loading and cold JIT (27.7 ms one-shot against 0.8 ms warm for the small file), plus work that could only be reused between processes through files the agent can write.
+- *An engine per config, kept up to date by file watchers:* saves rereading the config, which costs well under a millisecond, and makes staleness a correctness problem (a missed event, a network filesystem).
+- *TCP on localhost:* any local user can connect, a port has to be chosen and published, and Windows may ask about the firewall.
+- *LSP framing, JSON-RPC or HTTP over the socket:* they handle request ids, notifications and routing; one request per connection needs none of them.
+- *A small native client for the hook command:* would remove most of the 15 ms floor, but adds a second toolchain and a second binary per platform, against [ADR-003](#adr-003-ship-a-bun-single-file-executable). Worth a look if the Linux benchmark misses 50 ms.
+- *Other names:* `inwards serve` is one letter from `server` and reads like the docs preview; `inwards lsp` breaks with Ruff and ty, which users try first; one `inwards server` with `--stdio` and `--socket` modes hides that the two have different owners and lifetimes.
+
+**Amendment · 2026-10-10 · [#60](https://github.com/SirCypkowskyy/inwards/issues/60).** The implementation settles details the decision left open:
+
+- **`INWARDS_DAEMON=1` turns the daemon on even when `CI` is set,** for the daemon's own tests and the bench job, which run under CI. Unset, it is on unless `CI` is set; `0` turns it off.
+- **A hook starts a daemon only in a project with Inwards session state** (`.inwards/state`, which only SessionStart creates, and only where `[tool.inwards]` exists). A hook installed for every project starts nothing in a project that doesn't use Inwards.
+- **The hook waits 45 s for an answer,** under Claude Code's 60 s default timeout, so the one-shot retry still has time. Recorded edits carry the payload's `tool_use_id`, and an edit recorded twice under one id counts once, for the Stop gate's list and for escalation, so that retry can't count an edit twice.
+- **The extraction cache keeps up to 4 texts per module** within the 5,000-entry and 32 MB bounds, and git answers are kept only for `cat-file blob <commit>:<path>` and `ls-tree <commit>` with a full commit id, bounded at 2,000 entries and 32 MB.
+- **Run from source,** the executable's identity is Bun's and `main.ts`'s; an edit to another source file doesn't make the daemon stale. `inwards daemon stop` after such an edit; the compiled binary has no such gap.
+- **The daemon refuses anything but a PostToolUse payload** for `hook claude-code`, so a process that connects to it can't get a Stop gate verdict from it either.
+- **`inwards daemon --idle SECONDS`** sets the idle limit, 600 by default; the tests use short ones.
+
+**Amendment · 2026-10-10 · [#276](https://github.com/SirCypkowskyy/inwards/issues/276).** A pid alone doesn't say who holds the lock: a daemon killed without cleaning up (SIGKILL, a crash, a reboot) leaves its lock behind, and once the OS gives that pid to another process, every later daemon stepped aside and every PostToolUse ran one-shot. The lock now holds the pid and 32 random hex digits, and `inwards daemon status`'s answer repeats them. A daemon that finds a lock takes it over when the pid is gone or is its own, and, once the lock is older than 10 seconds, when the daemon at the record's endpoint doesn't answer with that pid and token. A younger lock counts as held, because its daemon may still be starting to listen. The check uses only the socket and the file's age, so it works the same on Linux, macOS and Windows, and the Stop gate still doesn't depend on any of it.
+
+**Amendment · 2026-10-10 · [#275](https://github.com/SirCypkowskyy/inwards/issues/275).** A daemon that can't listen (no socket directory is private to the user, every socket path would be over 104 bytes, or the listen fails) exits, and the next PostToolUse found no record and started another, so every edit paid for a process that exited at once. The daemon now writes `daemons/<hash>.failed` beside the record (owner-only, through a temporary file and a rename) with the time, the reason and its pid, before it releases the lock. A hook that would start a daemon starts none while that note is less than 5 minutes old, so a run of edits starts at most one daemon per 5 minutes. A daemon that listens removes the note, and `inwards daemon status` shows it when nothing runs. A note dated more than 5 minutes ahead (the clock was set back) doesn't hold hooks back.
+
+**Amendment · 2026-10-10 · [#277](https://github.com/SirCypkowskyy/inwards/issues/277).** The hook's work is synchronous, and git ran through `spawnSync` with no limit, so one git call that hung (a network filesystem, a lock another git holds) held the daemon's queue: later PostToolUse hooks waited their 45 s before running one-shot, and `inwards daemon stop` waited behind them. Now all the git calls of one daemon request share a 5-second budget. A call that would run past it is killed with SIGKILL (SIGTERM can be ignored, and `spawnSync` returns only once the child exits), a call after it runs out isn't started, and both answer "not there", as a failed call does. A timed-out answer is never cached. The one-shot hook and the Stop gate keep running git without a limit. `status` and `stop` skip the queue: the daemon answers them as soon as it reads them, which a hook run delays by at most its git budget plus its own work, and the client waits 15 s for that answer instead of 5. Once stopping, the daemon drops the requests still queued, and their hooks run one-shot. A request that hits the budget doesn't retire the daemon: a new one would meet the same stuck git, and nothing it keeps came from the failed calls.
+
+## ADR-040: Worker threads parse a large full check; the main thread keeps every decision
+
+**Status:** Accepted · 2026-10-10 · [#61](https://github.com/SirCypkowskyy/inwards/issues/61)
+
+**Context.** A cold `inwards check` runs on one core: 1.48 s for saleor's 4,324 files, 2.34 s for the synthetic legacy repo whose every module needs a confirming full parse (p50 on a 10-core laptop). CI runners have several cores. Profiles of a cold run show where the time goes on saleor: about a third in the prescan's skeleton parse and the text tests before it, a quarter in full parses that confirm findings, a quarter in walking the tree, resolving real paths and reading files, and the rest in the rules, the module index and start-up. Only the parsing depends on nothing but a file's text. [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) already put the pool in the full run's own process, never in the hook daemon.
+
+**Decision.**
+
+- **Threads, not processes.** The CLI starts Bun worker threads, each running the binary's own entry: `main.ts` sees it isn't the main thread and serves extraction jobs instead of parsing argv. The compiled executable needs no second entry point and nothing on disk. Each worker loads the grammar from the bytes the main thread sends it.
+- **The unit of work is an extraction job.** `ExtractionJob` is a source file and what to extract: the skeleton (with the loader test that decides whether the skeleton is read at all) or the full parse's imports and suppression comments. The answer is the extraction cache's own record ([ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)), so it can't hold anything the cache couldn't. `createExtractionWorker` runs jobs with the code the engine uses itself.
+- **The engine asks twice, then checks as before.** `Engine.checkWith` hands the batch the skeleton jobs of every file the scan reads, scans, works out which files the confirmations and suppression comments will parse, hands those over, and then checks every file in order exactly as `Engine.check` does, reading the preloaded answers before the cache. Rules, precedence, the baseline shortcut, dynamic imports (whose reading depends on other files), FastAPI's cross-file findings and import cycles stay on the main thread.
+- **Answers are hints, never results.** A job the pool doesn't answer, a malformed answer or a batch that fails is computed by the engine as without the pool, so any error surfaces as it does today. A worker that dies or answers with an error is retired and its batch goes back in the queue.
+- **The main thread parses too.** While the workers run, the main thread takes batches from the back of the queue, so a pool of N threads starts N-1 workers.
+- **When.** Only `inwards check` and `inwards baseline` start workers, and only for 1,000 files or more, with one thread per 500 files up to the limit. The limit is `INWARDS_THREADS`, else half of the cores beyond two, at most 4: one thread on 4 cores, three on 8, four from 10. Each thread runs its own JavaScript VM, whose JIT compiler and garbage collector need cores of their own. `INWARDS_THREADS=1` keeps a check on one thread. It is an environment variable, not a `[tool.inwards]` key, because it changes speed, never results.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Cold full checks, p50 with four threads against the base build: saleor 1.48 → 0.98 s, polar 0.80 → 0.55 s, the synthetic repo 0.52 → 0.44 s, the synthetic legacy repo 2.34 → 1.14 s ([chapter 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). The output is byte for byte the same; a test compares one thread with four through the CLI, and the engine's tests compare `checkWith` with `check` on every path through the engine.
+- :material-plus-circle-outline: The engine stays pure. The port is a function from jobs to answers; the threads are the CLI's adapter.
+- :material-minus-circle-outline: Short of the 3× [#61](https://github.com/SirCypkowskyy/inwards/issues/61) asked for. Walking the tree, resolving real paths, reading the files and the rules stay on the main thread: with four threads, saleor spends about a third of its time before the engine starts. Eight threads were slower than four on saleor and the synthetic repo.
+- :material-minus-circle-outline: Each worker holds its own WASM runtime and grammar: saleor's peak RSS goes from about 360 MB to about 520 MB with four threads and 615 MB with eight.
+- :material-minus-circle-outline: On Linux the gain is smaller. Pinned to four cores, a container on the same laptop ran the synthetic repo 60% slower with four threads, and about as fast with two as with one; with eight cores, the legacy repo took 1.23 s on four threads against 2.30 s on one ([chapter 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). On the bench job's 4-core Linux runner, four threads made the synthetic repo's full check 59% slower and two 19% slower, so a 4-core machine keeps one thread, and the 3× on 4 vCPU that #61 named isn't possible this way.
+- :material-minus-circle-outline: A worker compiles the grammar and warms up its JIT on its own, so below about 1,000 files the threads cost more than they save. A repo that needs many confirming parses would gain earlier; the threshold counts files because the work isn't known until the scans run.
+
+**Alternatives.**
+
+- *Child processes of the binary:* each pays process start-up (about 15 ms) on top of the grammar, and the jobs would travel through pipes as JSON instead of a structured clone.
+- *Each worker checks a slice of the files:* parallelises the rules too, but the baseline shortcut, FastAPI's cross-file findings, the unassigned-package warnings and import cycles need every file, and each worker would build its own module index from the disk. Keeping the decisions on one thread keeps the output order and the precedence rules where they are.
+- *Workers read the files too:* would move the quarter spent reading into the pool, but the main thread needs every text for the rules anyway, and the module names come from real paths that the CLI's identity checks own.
+- *More threads by default:* on a loaded 10-core laptop, eight threads were slower than four on saleor (1.04 against 0.98 s) and the synthetic repo, and faster only on the legacy repo (1.03 against 1.14 s).
+
+**Amendment · 2026-10-10 · [#281](https://github.com/SirCypkowskyy/inwards/issues/281).** The serial part before the engine got cheaper without moving any decision off the main thread. The walk gives each file the real path it already resolved for the file's directory, so the check calls `realpath` once per directory and symlink instead of twice per file. A check of 1,000 files or more counts its files first, starts the pool, and then reads every file in one batch while the workers load the grammar. Each worker holds two batches, so it never waits for the main thread to finish one of its own before it gets the next. Saleor's cold check with four threads went from 1.09 to 0.87 s, against 1.48 s single-threaded before #61 ([chapter 6](06-Constraints-and-Quality.md#the-serial-part-of-a-full-run)). The alternative *Workers read the files too* stays rejected: a variant in which idle workers parsed each chunk of files as it was read, and the engine reused the answers to identical jobs, measured no faster. On Linux the change measured no faster on four cores and 5% faster on eight, since Linux resolves paths and reads files from its caches cheaply.
+
+## ADR-041: `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches
+
+**Status:** Accepted · 2026-10-10 · [#63](https://github.com/SirCypkowskyy/inwards/issues/63) · supersedes [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)
+
+**Context.** [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now) kept a Node language server inside the VS Code extension until the binary had `inwards server`; [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) fixed that name, kept the server a process of its own, and gave the CLI the warm-engine module (`daemon/memory.ts`) that the extension's in-memory extraction cache had been. The extension's server is a second adapter around the engine: its own file walk (`workspace.ts`, kept equal to the CLI's by a parity test), its own config reader, a module index it rebuilds on file events, and only the first workspace folder's root `pyproject.toml`. For files nobody opened it shows INW007 and INW008 from a directory listing, so the editor and `inwards check` disagree about every other rule there. The binary runs on Bun; the extension runs on Node in VS Code's extension host, and the CLI's check path uses Bun's TOML parser and grammar files embedded in the executable.
+
+**Decision.**
+
+- **The server lives in the CLI and checks with `inwards check`'s code.** `src/cli/src/lsp/` decides when to check what and what each document shows, `adapters/lsp-connection.ts` speaks LSP over stdio with `vscode-languageserver` 10 (the version the extension uses), and `commands/server.ts` is the command. Every check goes through `planCheck` and `runCheck`, so the server has no walk, config reader or module index of its own.
+- **Nothing is shared with the extension.** The extension keeps its Node server, frozen, until [#64](https://github.com/SirCypkowskyy/inwards/issues/64) makes it a thin client that starts `inwards server` and deletes `src/vscode-extension/src/server/`. Changes to what an editor shows go into the CLI's server.
+- **A whole pass is `inwards check` in every workspace folder.** Each folder gets the configs `inwards check` would run there (its nearest `[tool.inwards]`, or each uv workspace member's), each config once, with the open documents' unsaved text in place of the disk's. Every finding is published on its file, so a file nobody opened shows everything `inwards check` reports, and `pyproject.toml` shows the whole-project INW006 findings. The pass runs at start, on a save, when a workspace folder comes or goes, and when the editor's file watchers report a change that can alter a finding: a module file or a directory created, changed or deleted, a `pyproject.toml`, or `inwards-baseline.json`, outside hidden directories and `__pycache__`. Events are collected for 100 ms, so a branch switch runs one pass.
+- **A keystroke checks that document alone,** as the PostToolUse hook checks an edit (`edit: true`), with the config `inwards check` would route it to. The document shows that check plus what the last pass found in it that a check of one file can't find (an import cycle, a FastAPI router no app includes); those update on the next save.
+- **Nothing is kept but extracted text.** As in the daemon, every check reads the config, the baseline and the file listing again, so a config edit, a checkout or a new baseline can't leave the server stale, and file events only decide when a pass runs. Across checks the server keeps the daemon's extraction cache (5,000 entries, about 32 MB, 4 texts per module). On a 10-core laptop, the synthetic repo of [chapter 6](06-Constraints-and-Quality.md) (2,100 files) took 504 ms for the first pass, 154 ms p50 for later ones, and 0.6 ms p50 for a keystroke, run from source.
+- **One thread, one check at a time.** The server never starts worker threads ([ADR-040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)). Checks run in arrival order; a keystroke check that is still waiting reads the newest text when it runs, so typing queues at most one per document.
+- **Stdout belongs to the protocol.** The connection gets stdin and stdout explicitly; the check's own streams write stdout's text to stderr, and Biome keeps `console` out of the CLI. `--stdio`, which editors pass by convention, is accepted and changes nothing; the library reads `--clientProcessId` itself. The server exits on `exit`, when stdin closes, or when the editor's process is gone.
+- **Errors.** A broken config pops up once per config and message, and stays as an error on its `pyproject.toml` (on the line the TOML parser names, else the first) until a pass finds it fixed; its files show nothing meanwhile.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Any editor with an LSP client (Neovim, Helix, and VS Code once #64 lands) gets Inwards from the one binary, with nothing else installed.
+- :material-plus-circle-outline: Once every file is saved, the editor shows what `inwards check` reports in each folder; `src/cli/test/lsp/parity.test.ts` compares the two on examples/ as a two-folder workspace, against the compiled binary in CI.
+- :material-plus-circle-outline: No module index or config to keep up to date, so the extension's watcher fallbacks and serialised reloads have no counterpart here; an editor without file watching gets a new pass on every save.
+- :material-minus-circle-outline: Two language servers until #64: the extension's still shows only INW007 and INW008 for files nobody opened.
+- :material-minus-circle-outline: Every save costs a whole-project check. Parsing is cached, but walking the tree, reading the files and the rules are not: 154 ms for 2,100 files.
+- :material-minus-circle-outline: Unsaved edits to `pyproject.toml` or the baseline count only once saved, and findings in other files that depend on unsaved text (cycles through it, say) update only on the next pass.
+- :material-minus-circle-outline: Two workspace folders whose configs both cover a file (a project nested in another that isn't a uv workspace member) show its findings twice, as running `inwards check` in both folders would.
+- :material-minus-circle-outline: The binary carries `vscode-languageserver` and its protocol and JSON-RPC libraries.
+- :material-minus-circle-outline: Paths become URIs with Node's `pathToFileURL` for files nobody opened; open documents keep the editor's own URI. Windows drive letters and their encoding weren't tried on Windows, so the full test matrix has to run before a release.
+
+**Alternatives.**
+
+- *A module both servers import now:* the extension would run the CLI's check path on Node, which means replacing Bun's TOML parser and embedded grammars there, for a server #64 deletes in the next release.
+- *The extension starts the binary now:* the extension then needs a binary for each platform inside the VSIX or a download step, which is #64's work, with the Marketplace.
+- *The extension server's design in the binary* (open files checked in full, the rest from a listing, a module index kept by watchers): moves the disagreement with `inwards check` into the binary, and keeps a cache whose staleness depends on every event arriving.
+- *A whole pass on every keystroke:* always exact, but a pause in typing in a large project costs a whole check, against 0.6 ms for one file.
+- *Worker threads for the pass:* each pass would start a pool of JavaScript VMs again or keep one alive per editor window; ADR-040's numbers show threads pay only from about 1,000 files, and a warm pass is already cached.
+
+## ADR-042: `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk
+
+**Status:** Accepted · 2026-10-10 · [#65](https://github.com/SirCypkowskyy/inwards/issues/65)
+
+**Context.** [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) named `inwards mcp` as a third long-lived front end: an MCP server over stdio, started by the agent's MCP client, sharing the warm-engine module and talking to neither `inwards server` nor `inwards daemon`. The issue asked for three tools: `check_files`, `explain_rule` and `where_should_this_go`. The hooks see code only after an edit; an MCP tool can answer before the agent writes, but only when the agent asks. The MCP TypeScript SDK has two lines: v1 (`@modelcontextprotocol/sdk`), now on bug and security fixes only, and v2 (`@modelcontextprotocol/server` 2.3), which implements the 2026-07-28 revision and still serves clients that open with `initialize`. Claude Code and the v2 client itself still open with `initialize` (2025-11-25).
+
+**Decision.**
+
+- **One process per client session, in the CLI.** `src/cli/src/mcp/` holds the tools' policy, `adapters/mcp-connection.ts` speaks MCP over stdio with the SDK v2 (2.3.1) and its `serveStdio`, which serves both protocol eras from one server factory, and `commands/mcp.ts` is the command. Input schemas are Zod 4 (`zod` 4.6.5), which the SDK turns into the JSON Schema `tools/list` shows. The SDK, Zod and the rule pages load with dynamic imports, so the binary keeps them in chunks only `inwards mcp` reads; no hook call pays for them.
+- **`check_files` is `inwards check`.** `planCheck` routes the targets from the working directory, `runPlan` runs and merges the configs, and `runCheck` checks, with the language server's warm I/O (in-memory extraction cache, one kept parse, no worker threads). Python source an agent passes in `contents` is laid over the disk for that call (`project/overlay.ts`): a file that doesn't exist yet, with any missing package directories, appears in the probe, the listings, the walk and so the module index, and reads as the given text. The answer is the `inwards/diagnostics@1` report. Nothing is written, and nothing is noted in the run log, since a call is a question rather than a run.
+- **`explain_rule` serves the rule pages.** The English pages in `docs/chapters/rules/` are imported as text and built into the binary; the tool returns the registry's metadata and the page's What it does, Why is this bad, Example and How to fix sections (every section with `full`), with test markers dropped and relative links made absolute. A test fails when a registered rule has no embedded page.
+- **`where_should_this_go` asks the check, not a second reading of the config.** For the module the agent names, and for a new module in each layer's first literal prefix, it checks a probe module that holds only the planned imports, in memory. An import is refused exactly when a real file there would get INW001, INW002, INW003, INW005 or INW010. The suggestion is the named module when its imports pass; else, among the layers where they all pass, the one the description points to, else the innermost; without imports, the layer the description names or a short list of role words points to.
+- **Read-only and serial.** Every tool is annotated read-only and idempotent. Calls run one at a time, like the language server's checks, so two never share the kept parse. Each call reads the config, the baseline and the listing again.
+- **Stdout belongs to the protocol.** The checks get streams whose stdout writes to stderr, as `inwards server`'s do. The server ends when the client closes stdin.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Any MCP client gets the three tools from the one binary; Claude Code and Codex CLI were tried by hand, and the tests drive the compiled binary over stdio with the SDK's client in both eras.
+- :material-plus-circle-outline: An agent can check code before writing it, in a package that doesn't exist yet, and get the same findings and fix steps the PostToolUse hook would give after the edit.
+- :material-plus-circle-outline: `where_should_this_go` follows every rule that judges imports, including contexts and library rules, with no code of its own that could drift from them.
+- :material-minus-circle-outline: The binary carries the SDK and Zod (about 0.5 MB minified) and the rule pages (about 0.2 MB), loaded only by `inwards mcp`.
+- :material-minus-circle-outline: `explain_rule` serves English only; the Polish pages stay on the site.
+- :material-minus-circle-outline: Each probe is a check: one per layer, plus the named module. A config with many layers makes the call slower, though each is a one-file check on warm caches.
+- :material-minus-circle-outline: The description hint is a word list. It knows English role words and the configured names, nothing else.
+- :material-minus-circle-outline: A probe can't tell a lowercase name in a module (`shop.domain.order.total`) from a submodule; the tool reads it as a module, so INW010 may report it. Capitalised names (`Order`) are imported as names.
+
+**Alternatives.**
+
+- *SDK v1:* the same API shape, but maintenance only, and it doesn't serve the 2026-07-28 revision.
+- *JSON-RPC written by hand:* no dependency, but two protocol eras, schema validation and the handshake would be ours to keep up with the spec.
+- *`where_should_this_go` from the config alone* (layer order and prefixes): simpler, but it would miss contexts, library rules and modules that don't exist, and repeat the rules' logic outside the engine.
+- *A model to read the description:* Inwards has no network and no model, and an answer should be the same every time.
+- *Rule pages as MCP resources:* clients surface tools to the model more reliably than resources, and the issue asked for a tool. Resources can come later.
+- *Serving `explain_rule` from the published site:* needs the network, and the page could describe another version than the binary's.
+
+## ADR-043: The VS Code extension bundles the binary, one VSIX per platform
+
+**Status:** Accepted · 2026-10-10 · [#64](https://github.com/SirCypkowskyy/inwards/issues/64) · completes [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)
+
+**Context.** [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) moved the language server into the binary and left the extension's Node server frozen until the extension could start `inwards server`. To do that, the extension needs an `inwards` executable for the user's platform. `cd.yml` already cross-compiles six binaries on one runner, runs each on its own OS, and attaches them with `SHA256SUMS` to a draft GitHub Release ([#14](https://github.com/SirCypkowskyy/inwards/issues/14)). The repository is private, so downloading a release asset takes a GitHub login. Since VS Code 1.61 the Marketplace serves the package built for the user's platform, `vsce package --target` builds one, and Open VSX serves them too.
+
+**Decision.**
+
+- **One VSIX per platform, with that platform's binary inside.** `src/vscode-extension/scripts/package-target.ts` copies each release binary into `bin/` (`bin/inwards.exe` on Windows) and runs `vsce package --target` for `linux-x64`, `linux-arm64`, `alpine-x64` (the musl binary), `darwin-x64`, `darwin-arm64` and `win32-x64`. A seventh, universal VSIX has no binary; the registries serve it to every other platform (Windows on Arm, 32-bit Arm Linux, Alpine on arm64), where the extension needs `inwards` on `PATH` or the `inwards.path` setting. `package.json`'s `files` lists what ships, so nothing else gets in.
+- **Which binary runs.** `inwards.path` if set, else the bundled binary, else `inwards` on `PATH`. A set path that points at nothing is an error, never replaced by another binary of a different version. A bare name in the setting is looked up on `PATH`, a relative path resolves against the first workspace folder, and `~` and `${workspaceFolder}` are expanded. On Windows only an `.exe` counts, since Node can't start a `.cmd` or `.bat` without a shell.
+- **`inwards.path` is a restricted setting.** In an untrusted workspace VS Code hands the extension only the user's own value, so a cloned repository can't choose the program the extension starts.
+- **No binary is a message, not a crash.** The extension says what it looked for, offers the setting and the install guide, and stays idle until a setting changes or **Inwards: Restart Server** runs. `inwards.enable` turns the server off.
+- **Publishing is its own workflow.** `vscode-publish.yml` starts when a full release is published (once the owner sets the `VSCODE_PUBLISH` variable), downloads the release's seven VSIX files, checks them against `SHA256SUMS` and the tag's version, and uploads them with `vsce publish` and `ovsx publish`, each job holding one token from its own environment, on GitHub-hosted runners. Pre-releases never go to the registries: both take only `X.Y.Z`, and a release candidate's VSIX already carries the final version.
+- **The extension's Node server is gone,** with its tests, its fallow zone and the CLI test that compared its file walk with the CLI's. The extension depends on `vscode-languageclient` alone.
+
+**Consequences.**
+
+- :material-plus-circle-outline: An install from the Marketplace or Open VSX works with nothing else installed and no network at start-up, and the server is always the extension's own version.
+- :material-plus-circle-outline: The extension carries no download or checksum code. The bundled binary is the release binary: `cd.yml`'s verify matrix compares the two byte for byte on each OS and runs the bundled one, and `SHA256SUMS` covers every VSIX.
+- :material-plus-circle-outline: VS Code, Neovim and Helix run the same server, so the old server's limits (the first workspace folder's config only, INW007 and INW008 alone for unopened files) are gone.
+- :material-minus-circle-outline: A platform VSIX is about 27 MB (a 65 MB binary, compressed), against 139 KB for the client alone, and each release carries seven VSIX files, about 165 MB.
+- :material-minus-circle-outline: The bundled binary follows the extension's version. A project that pins another version with `uv add --dev inwards` sets `inwards.path` to its virtualenv's binary.
+- :material-minus-circle-outline: The Windows rules for paths (`.exe`, backslashes, spaces, quoted `PATH` entries) are unit-tested with Windows path semantics on any OS; the extension itself hasn't started on Windows yet, so the full test matrix and a manual install run before the first release.
+- :material-minus-circle-outline: The Marketplace upload uses a personal access token, and Azure DevOps retires global tokens on 1 December 2026; switching to Microsoft Entra ID (`vsce publish --azure-credential`) is follow-up work.
+
+**Alternatives.**
+
+- *Download the binary at first start from the GitHub Release that matches the extension's version, checked against `SHA256SUMS`:* one small VSIX, but a private repository's assets need a token, every first start needs the network (proxies, offline machines), and the extension would carry download, checksum and storage code. The checksums would also come from the same place as the binary.
+- *One VSIX with all six binaries:* every user downloads about 160 MB to use one of them.
+- *Only `inwards` from `PATH` or the project's virtualenv:* the extension would do nothing after install until the user also installs the binary. It stays as the fallback.
+- *Keep the Node server as a fallback:* two servers that disagree, which is what ADR-041 set out to end.

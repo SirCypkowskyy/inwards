@@ -10,6 +10,7 @@ import { ConfigError, type Report } from "@inwards/core";
 import { shownReport } from "../paths/display.ts";
 import { posix } from "../paths/lexical.ts";
 import type { CheckPlan, CheckUnit } from "../project/routing.ts";
+import { threadLimit } from "../project/threads.ts";
 import type { AppDeps } from "./deps.ts";
 
 /** One config's check, with what it was asked to check. */
@@ -33,18 +34,24 @@ export interface Outcome {
 /**
  * Runs every check of a plan, notes each in the run log, and merges the reports.
  *
- * @param deps - the check runner, the platform and the run log.
+ * @param deps - the check runner, the platform and the run log; without a run
+ *   log nothing is noted (`inwards mcp`, which checks for an agent mid-task).
  * @param plan - which config checks what, and what no config covers.
  * @param options - how to run.
  * @param options.cache - whether the extraction cache on disk may be used.
  * @param options.log - `--log`: log the run even when the run log is off.
+ * @param options.texts - Python source to check instead of the disk's, by absolute path.
  * @returns the merged report, the per-config lines and the exit code.
  * @throws {ConfigError} when the only config, or its baseline, is invalid.
  */
 export async function runPlan(
-  deps: AppDeps,
+  deps: Pick<AppDeps, "io" | "check"> & { runlog?: AppDeps["runlog"] | undefined },
   plan: CheckPlan,
-  { cache, log }: { cache: boolean; log: boolean },
+  {
+    cache,
+    log,
+    texts,
+  }: { cache: boolean; log: boolean; texts?: ReadonlyMap<string, string> | undefined },
 ): Promise<Outcome> {
   const { io } = deps;
   const { cwd } = io.runtime;
@@ -52,7 +59,7 @@ export async function runPlan(
   const runs: Run[] = [];
   for (const unit of plan.units) {
     // biome-ignore lint/performance/noAwaitInLoops: one config at a time, so each run's duration is its own; the reads are synchronous, so nothing would overlap anyway.
-    const report = await checkUnit(deps, unit, { cache, several });
+    const report = await checkUnit(deps, unit, { cache, several, texts });
     const empty = { diagnostics: [], filesChecked: 0, durationMs: 0 };
     runs.push({ ...unit, report: report ?? empty, invalid: report === undefined });
   }
@@ -66,7 +73,7 @@ export async function runPlan(
     exit = Math.max(exit, code);
     // Paths from the project even when --config spells it through a link (macOS /var).
     const project = io.probe.realpath(dirname(run.config));
-    if (project && !run.invalid) {
+    if (project && !run.invalid && deps.runlog !== undefined) {
       deps.runlog.noteRun(project, run.targets ?? [project], report.diagnostics);
       deps.runlog.noteSuppressions(report, []);
       deps.runlog.logRun(project, {
@@ -96,17 +103,28 @@ export async function runPlan(
  * @param options - how to run it.
  * @param options.cache - whether the extraction cache on disk may be used.
  * @param options.several - true when other configs run too.
+ * @param options.texts - Python source to check instead of the disk's, by absolute path.
  * @returns the report, or undefined for an invalid config in a run over several.
  * @throws {ConfigError} when the config or its baseline is invalid and it runs alone.
  */
 async function checkUnit(
-  deps: AppDeps,
+  deps: Pick<AppDeps, "io" | "check">,
   unit: CheckUnit,
-  { cache, several }: { cache: boolean; several: boolean },
+  {
+    cache,
+    several,
+    texts,
+  }: { cache: boolean; several: boolean; texts?: ReadonlyMap<string, string> | undefined },
 ): Promise<Report | undefined> {
   const { cwd } = deps.io.runtime;
+  const threads = threadLimit(deps.io.runtime);
   try {
-    return await deps.check(unit.config, unit.targets, cwd, { cache, exclude: unit.exclude });
+    return await deps.check(unit.config, unit.targets, cwd, {
+      cache,
+      exclude: unit.exclude,
+      threads,
+      ...(texts === undefined ? {} : { texts }),
+    });
   } catch (err) {
     if (!(several && err instanceof ConfigError)) {
       throw err;

@@ -1,15 +1,21 @@
 /**
- * @file The extension's boundaries (#176), as fallow applies them: the client
- * and the server each sit in their own zone, the client imports nothing of
- * ours, the server reaches only the engine's public API, and a file in a new
- * source folder has no zone, so fallow reports it until it gets one. The
- * answers come from `fallow guard`, not from re-reading the config.
+ * @file The extension's boundaries (#176, ADR-043), as fallow applies them:
+ * the client sits in its own zone and imports nothing of ours (the checking
+ * happens in the `inwards` binary it starts), the tests and build scripts may
+ * reach only the client, and a file in a new source folder has no zone, so
+ * fallow reports it until it gets one. The answers come from `fallow guard`,
+ * not from re-reading the config; the manifest check reads `package.json`.
  */
-import { expect, test } from "bun:test";
+import { expect, setDefaultTimeout, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
+
+// Every test here starts `fallow guard` cold. A hosted ubuntu-24.04 runner
+// took more than Bun's 5 s default for one call.
+setDefaultTimeout(30_000);
 
 /** What `fallow guard --format json` says about one file. */
 interface Guarded {
@@ -52,19 +58,30 @@ function reachable(file: Guarded): string[] {
 }
 
 test("the client imports nothing of ours", () => {
-  const client = guard("src/vscode-extension/src/client/extension.ts");
-  expect(client.zone?.name).toBe("vscode-client");
-  expect(reachable(client)).toEqual([]);
+  for (const path of ["extension.ts", "binary.ts", "selector.ts"]) {
+    const client = guard(`src/vscode-extension/src/client/${path}`);
+    expect(client.zone?.name).toBe("vscode-client");
+    expect(reachable(client)).toEqual([]);
+  }
 });
 
-test("the server reaches only the engine's public API", () => {
-  const server = guard("src/vscode-extension/src/server/server.ts");
-  expect(server.zone?.name).toBe("vscode-server");
-  expect(reachable(server)).toEqual(["core-api"]);
+test("the tests and build scripts reach the client only", () => {
+  for (const path of ["test/packaged.test.ts", "scripts/package-target.ts"]) {
+    const dev = guard(`src/vscode-extension/${path}`);
+    expect(dev.zone?.name).toBe("vscode-dev");
+    expect(reachable(dev)).toEqual(["vscode-client"]);
+  }
+});
+
+test("the shipped extension depends on the language client alone, not the engine", () => {
+  const manifest: { dependencies: Record<string, string> } = JSON.parse(
+    readFileSync(join(REPO, "src/vscode-extension/package.json"), "utf8"),
+  );
+  expect(Object.keys(manifest.dependencies)).toEqual(["vscode-languageclient"]);
 });
 
 test("a file in a new source folder has no zone, so fallow reports it", () => {
-  const fresh = guard("src/vscode-extension/src/new-folder/module.ts");
+  const fresh = guard("src/vscode-extension/src/server/server.ts");
   expect(fresh.zone).toBeNull();
   expect(fresh.boundary.coverage_required).toBe(true);
 });

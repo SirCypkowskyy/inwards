@@ -21,7 +21,8 @@ export const CLAUDE_USER_DIR: string = tempDir("inwards-claude-user-");
 // FORCE_COLOR on purpose: hosts set it, and machine output must stay plain anyway.
 // CLAUDE_PROJECT_DIR is dropped because these tests may run inside Claude Code,
 // and INWARDS_RUN_LOG so a developer's own setting can't change the results.
-const ENV: Record<string, string | undefined> = {
+/** The environment every CLI run in the tests gets. */
+export const TEST_ENV: Record<string, string | undefined> = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(
       ([name]) => name !== "CLAUDE_PROJECT_DIR" && name !== "INWARDS_RUN_LOG",
@@ -46,20 +47,27 @@ export interface RunResult {
  * FORCE_COLOR is on and CLAUDE_PROJECT_DIR is removed unless `opts.env` sets it.
  *
  * @param args - CLI arguments, e.g. `["check", "--format", "json"]`.
- * @param opts - working directory, optional stdin text, and extra environment.
+ * @param opts - working directory, optional stdin text, extra environment and a time limit.
  * @param opts.cwd - the directory to run in.
  * @param opts.stdin - text to pipe to stdin; none when undefined.
  * @param opts.env - variables added to the test environment.
+ * @param opts.timeout - milliseconds before the process is killed; none when undefined.
  * @returns the exit code and both output streams as text.
  */
 export function inwards(
   args: string[],
-  opts: { cwd: string; stdin?: string | undefined; env?: Record<string, string> },
+  opts: {
+    cwd: string;
+    stdin?: string | undefined;
+    env?: Record<string, string>;
+    timeout?: number | undefined;
+  },
 ): RunResult {
   const p = Bun.spawnSync([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: opts.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
-    env: { ...ENV, ...opts.env },
+    env: { ...TEST_ENV, ...opts.env },
+    ...(opts.timeout === undefined ? {} : { timeout: opts.timeout }),
   });
   return { code: p.exitCode, stdout: p.stdout.toString(), stderr: p.stderr.toString() };
 }
@@ -85,21 +93,22 @@ const TMP = tempDir("inwards-e2e-");
  * Runs the CLI without blocking, so several copies can run at once.
  *
  * @param args - CLI arguments.
- * @param opts - working directory and stdin text.
+ * @param opts - working directory, stdin text and extra environment.
  * @param opts.cwd - the directory to run in.
  * @param opts.stdin - text to pipe to stdin.
+ * @param opts.env - variables added to the test environment.
  * @returns the exit code and captured output, once the process ends.
  */
 export async function inwardsAsync(
   args: string[],
-  opts: { cwd: string; stdin: string },
+  opts: { cwd: string; stdin: string; env?: Record<string, string> },
 ): Promise<RunResult> {
   const p = Bun.spawn([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: new TextEncoder().encode(opts.stdin),
     stdout: "pipe",
     stderr: "pipe",
-    env: ENV,
+    env: { ...TEST_ENV, ...opts.env },
   });
   const [stdout, stderr, code] = await Promise.all([
     new Response(p.stdout).text(),
@@ -131,11 +140,15 @@ export function project(files: Record<string, string>): string {
 }
 
 const ROOT_MARKER = "{{ROOT}}";
+/** Numbers the tool calls `payload` makes up, so no two calls share a `tool_use_id`. */
+let toolCalls = 0;
 
 /**
  * Loads a recorded Claude Code payload and points it at a project.
  * Every string starting with `{{ROOT}}` becomes a native path under `root`;
- * top-level fields in `patch` then replace the recorded ones.
+ * top-level fields in `patch` then replace the recorded ones. A recorded
+ * `tool_use_id` gets a fresh value on every call, as each Claude Code tool
+ * call has its own, since the session counts an edit once per id (#60).
  *
  * @param name - fixture name in fixtures/claude-code, without `.json`.
  * @param root - the project root to substitute.
@@ -161,5 +174,7 @@ export function payload(name: string, root: string, patch: Record<string, unknow
   if (typeof recorded !== "object" || recorded === null) {
     throw new Error(`fixture ${name} is not a JSON object`);
   }
-  return JSON.stringify({ ...recorded, ...patch });
+  toolCalls += 1;
+  const tool = "tool_use_id" in recorded ? { tool_use_id: `toolu_test${toolCalls}` } : {};
+  return JSON.stringify({ ...recorded, ...tool, ...patch });
 }

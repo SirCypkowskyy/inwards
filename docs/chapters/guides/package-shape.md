@@ -1,6 +1,6 @@
 # Package shape
 
-Layer rules (INW001) look at imports. They can't see where code *lives*: a new `helpers.py` next to `service.py`, a `services/` package beside `service.py`, or a `test_orders.py` inside the app all pass them. Package shape closes that gap. You say which members a package may, must and must not hold, and Inwards checks it on every edit (the hook), in the editor (the language server) and in CI (`inwards check`).
+Layer rules (INW001) look at imports. They can't see where code *lives*: a new `helpers.py` next to `service.py`, a `services/` package beside `service.py`, or a `test_orders.py` inside the app all pass them. Package shape closes that gap. You say which members a package may, must and must not hold, and Inwards checks it on every edit (the hook), in the editor (`inwards server`) and in CI (`inwards check`).
 
 | Rule | Reports | Where |
 |---|---|---|
@@ -45,7 +45,7 @@ app/orders/helpers.py:1:1: INW007 "helpers.py" is not an allowed member of packa
 
 - **Per edit (PostToolUse).** INW007 blocks (exit 2) when the edited file is new this session. For a file that already existed when the session started, it goes back as context only, so legacy layout never blocks an unrelated edit. INW008 for the edited package is always context: the agent creating `app/payments/router.py` hears that `service.py` is still missing, and can add it next.
 - **Stop gate.** INW008 findings that are new since the session started block the turn, so deleting a required `service.py` through Bash is caught. A package that already lacked it at session start doesn't block. INW007 on files that predate the session doesn't block either.
-- **Editor.** The language server reports INW007 on each open file as you type. A workspace pass over the directory listing (nothing is read or parsed) pushes INW007 to files you haven't opened and INW008 to the package's `__init__.py`. It follows symlinks that stay inside the config root, like `inwards check`, and runs again, once per burst of events, whenever a Python file is created or deleted.
+- **Editor.** `inwards server` reports INW007 on the file you type in as you type. Its whole pass, which is `inwards check` in each workspace folder, puts INW007 on files you haven't opened and INW008 on the package's `__init__.py`; it runs when the editor starts the server, on every save, and once per burst of file events when files are created or deleted.
 - **CI.** A whole-project `inwards check` reports INW007 on every file, INW008 for every shaped package, and a warning for a selector that matches no package.
 
 ## Example: fastapi-best-practices
@@ -138,7 +138,9 @@ The presets with contexts also shape their context packages, through a `*` selec
 | `bounded-contexts` | `app.*` | requires `domain/`, `application/`, `infrastructure/`, `api`; anything else is a warning |
 | `django` | `app` | requires `settings.py` and `urls.py`; allows apps, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |
 | `django` | `app.*` | requires `models`, `services`, `views`, `urls`; allows `admin`, `apps`, `migrations/`, `tests`; anything else is a warning |
+| `fastapi` | `app` | requires `main.py`; allows domains, `config.py`, `database.py`, `exceptions.py`, `models.py`, `pagination.py`, `__main__.py`, `_version.py` |
+| `fastapi` | `app.*` | requires `__init__`, `router`, `service`; allows the other roles of the `fastapi-domain` template; anything else is an error |
 
 ## Not covered yet
 
-An `inwards init --style fastapi` preset ([#93](https://github.com/SirCypkowskyy/inwards/issues/93)), non-Python files, and what a file contains.
+Non-Python files, and what a file contains.

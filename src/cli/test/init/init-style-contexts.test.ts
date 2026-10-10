@@ -5,56 +5,21 @@
  * planted import across the boundary fails with INW002 or INW003, one against
  * a role's order with INW001, while an import through the public module
  * passes. Hexagonal's adapters are sibling layers, so one importing the other
- * fails with INW001.
+ * fails with INW001. The fastapi preset's own layout is
+ * `init-style-fastapi.test.ts`'s.
  */
 import { describe, expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { init, UV_PROJECT } from "../support/init-style-helpers.ts";
-import { inwards, project } from "../support/run.ts";
-
-/**
- * Runs `inwards check --format json` and lists each finding.
- *
- * @param root - the project directory.
- * @returns the exit code and each finding as `CODE file`, sorted.
- */
-function findings(root: string): { code: number; findings: string[] } {
-  const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
-  const { diagnostics } = JSON.parse(stdout);
-  const out: string[] = [];
-  for (const d of diagnostics) {
-    out.push(`${d.code} ${d.file}`);
-  }
-  return { code, findings: out.sort() };
-}
-
-/**
- * Writes files into a project, creating their directories.
- *
- * @param root - the project directory.
- * @param files - file text keyed by path relative to the project.
- */
-function write(root: string, files: Record<string, string>): void {
-  for (const [rel, text] of Object.entries(files)) {
-    const path = join(root, rel);
-    mkdirSync(join(path, ".."), { recursive: true });
-    writeFileSync(path, text);
-  }
-}
-
-/**
- * Adds a context entry to the project's config, as a user adds one for a new package.
- *
- * @param root - the project directory.
- * @param entry - the entry's keys, e.g. `name = "billing"`, one per line.
- */
-function addContext(root: string, ...entry: string[]): void {
-  appendFileSync(
-    join(root, "pyproject.toml"),
-    `\n[[tool.inwards.contexts]]\n${entry.join("\n")}\n`,
-  );
-}
+import {
+  addContext,
+  findings,
+  init,
+  PASSING,
+  UV_PROJECT,
+  write,
+} from "../support/init-style-helpers.ts";
+import { project } from "../support/run.ts";
 
 /**
  * Lets a context depend on orders, as a user does once the dependency is decided.
@@ -85,9 +50,6 @@ function scaffolded(style: string): {
   const { code } = init(root, "--style", style, "--scaffold");
   return { root, result: { init: code, check: findings(root) } };
 }
-
-/** What a fresh scaffold gives: init exits 0 and the check finds nothing. */
-const PASSING = { init: 0, check: { code: 0, findings: [] } };
 
 describe("vertical-slices", () => {
   const billing = "src/my_app/features/billing";

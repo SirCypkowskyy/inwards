@@ -24,8 +24,8 @@ platforms and platform wheels for `uv add`; see the
 | Path | What lives there |
 |---|---|
 | `src/core/` | The engine. TypeScript + web-tree-sitter (WASM). No I/O. |
-| `src/cli/` | `inwards` command, compiled to one binary with `bun build --compile`. |
-| `src/vscode-extension/` | LSP server + client. Uses the same engine as the CLI. |
+| `src/cli/` | `inwards` command, compiled to one binary with `bun build --compile`; `inwards server` is its language server, `inwards mcp` its MCP server. |
+| `src/vscode-extension/` | Thin LSP client that starts `inwards server`, packaged as one VSIX per platform with the binary inside. |
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
 | `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
 | `examples/broken-app/` | One deliberate INW001 violation; `sarif.yml` expects it and annotates PRs with it. |
@@ -50,9 +50,10 @@ release-please keeps a `chore: release X.Y.Z` PR open with the next version and 
 `CHANGELOG.md` section. Merging it tags `vX.Y.Z` and starts `cd.yml`, which cross-compiles
 binaries for Linux (glibc and musl), macOS and Windows, wraps each in a platform wheel
 (`scripts/build-wheels.py`), runs each binary and installs each wheel with `uvx` on its native
-runner, and drafts a GitHub Release with the binaries, the wheels, the `.vsix` and
+runner, and drafts a GitHub Release with the binaries, the wheels, a VSIX per platform and
 `SHA256SUMS`. Publish the draft by hand; once the owner switches it on, that starts `pypi.yml`,
-which uploads the same wheels to TestPyPI and then PyPI with trusted publishing (ADR-021). A release candidate is a hand-pushed tag with a
+which uploads the same wheels to TestPyPI and then PyPI with trusted publishing (ADR-021), and
+`vscode-publish.yml`, which uploads the VSIX files to the Marketplace and Open VSX (ADR-043). A release candidate is a hand-pushed tag with a
 suffix (`v0.2.0-rc.1`) on the release PR's branch, which already holds the new version. Build provenance attestations switch on once the repo is public.
 
 Report security issues privately, not in a public issue; see [SECURITY.md](SECURITY.md).

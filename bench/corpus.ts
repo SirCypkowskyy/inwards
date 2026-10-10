@@ -2,6 +2,7 @@
  * @file Runs the real-repo corpus (bench/corpus.json): fetches each repo at its
  * pinned commit, runs the prescan differential test on its Python files, and
  * times `inwards check` on it, whole and on one file, with a compiled binary.
+ * The one-file check runs with `--no-cache`, as the hooks do.
  * Run nightly by .github/workflows/corpus.yml.
  *
  *   bun run scripts/build-binaries.ts bun-linux-x64
@@ -25,9 +26,9 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { Glob } from "bun";
-import { percentile } from "./compare.ts";
 import { CONFIG_FILE, fetchRepo } from "./corpus-fetch.ts";
 import { isRecord, type Repo, readManifest, toml } from "./corpus-manifest.ts";
+import { percentile } from "./timing.ts";
 
 /** The prescan differential test's counts for one corpus. */
 export interface PrescanCounts {
@@ -246,9 +247,11 @@ function measure(repo: Repo, dir: string, options: Options): { result: RepoResul
     const full = sample(bin, ["check", "--config", CONFIG_FILE, "--format", "json"], dir, fullRuns);
     result.check = checkSummary(full.stdout);
     result.samples.full = full.samples;
+    // No cache for the one file: the hooks never read it (ADR-031), and the
+    // full runs above have just filled it, which hid the parse (#122).
     result.samples.file = sample(
       bin,
-      ["check", "--config", CONFIG_FILE, repo.file],
+      ["check", "--config", CONFIG_FILE, "--no-cache", repo.file],
       dir,
       fileRuns,
     ).samples;

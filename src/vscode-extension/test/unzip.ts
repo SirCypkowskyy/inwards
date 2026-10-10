@@ -2,9 +2,11 @@
  * @file Unpacks a zip archive (a VSIX is one), so the packaging test can look
  * at exactly what ships. It reads the central directory and inflates each
  * entry with `node:zlib`; GNU tar can't read zips and `unzip` isn't on every
- * runner. Stored and deflated entries are enough for what `vsce` writes.
+ * runner. Stored and deflated entries are enough for what `vsce` writes. Like
+ * VS Code's own installer, it gives each file the Unix mode the archive
+ * stored, so the test sees whether the bundled binary stays executable.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
@@ -80,6 +82,9 @@ function extractEntry(
   const size = view.getUint32(at + 20, true);
   const nameLength = view.getUint16(at + 28, true);
   const skip = nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+  // The upper half of the external attributes holds the Unix mode, when the archiver wrote one.
+  // biome-ignore lint/suspicious/noBitwiseOperators: a mode is a bit set.
+  const mode = (view.getUint32(at + 38, true) >>> 16) & 0o777;
   const local = view.getUint32(at + 42, true);
   const name = new TextDecoder().decode(zip.subarray(at + 46, at + 46 + nameLength));
   const dataAt = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
@@ -94,6 +99,9 @@ function extractEntry(
   if (!name.endsWith("/")) {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, method === STORED ? raw : inflateRawSync(raw));
+    if (mode !== 0) {
+      chmodSync(target, mode);
+    }
   }
   return { name, next: at + 46 + skip };
 }

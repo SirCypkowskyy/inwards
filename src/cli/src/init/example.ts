@@ -2,11 +2,10 @@
  * @file The example package `inwards init --style --scaffold` writes: an entity,
  * a port, a use case, an adapter, a driving adapter, the composition root and
  * one test, placed where the preset says, with a public `api` module in front
- * of them for the context presets (the Django app comes from `django.ts`). It
- * only builds file texts; planning where they land safely is `scaffold.ts`'s
- * job, and writing them is `InitFiles`'s.
+ * of them for the context presets (the Django and FastAPI examples come from
+ * `django.ts` and `fastapi.ts`). It only builds file texts; planning where
+ * they land safely is `scaffold.ts`'s job, and writing them is `InitFiles`'s.
  */
-import { djangoModules } from "./django.ts";
 import { type ExampleModules, expandLayers, type Style } from "./styles.ts";
 
 /** Docstrings for packages the scaffold creates that are not a layer themselves. */
@@ -15,6 +14,7 @@ const PACKAGE_DOCS: Readonly<Record<string, string>> = {
   ports: "Ports: what the application needs from the outside, as typing.Protocol classes.",
   use_cases: "Use cases: what the application does, written against ports.",
   orders: "Orders: placing and storing orders, kept apart from the rest of the code.",
+  posts: "Posts: writing and reading posts, a domain kept apart from the others.",
 };
 
 /**
@@ -30,8 +30,8 @@ const PACKAGE_DOCS: Readonly<Record<string, string>> = {
 export function scaffoldFiles(style: Style, pkg: string, root: string): Map<string, string> {
   const base = [...(root === "." ? [] : root.split("/")), ...pkg.split(".")].join("/");
   const layers = expandLayers(style);
-  const modules =
-    style.example === undefined ? djangoModules(pkg) : exampleModules(style.example, pkg);
+  const { example } = style;
+  const modules = typeof example === "function" ? example(pkg) : exampleModules(example, pkg);
   // Every package on the way to a module, and each layer package the example leaves empty.
   const dirs = [
     ...[...modules.keys()].map((module) => module.split(".").slice(0, -1)),
@@ -56,8 +56,8 @@ export function scaffoldFiles(style: Style, pkg: string, root: string): Map<stri
   for (const [module, text] of modules) {
     files.set(`${pathOf(base, module)}.py`, text);
   }
-  if (style.example !== undefined) {
-    files.set("tests/test_place_order.py", exampleTest(style.example, pkg));
+  if (typeof example !== "function") {
+    files.set("tests/test_place_order.py", exampleTest(example, pkg));
   }
   return files;
 }

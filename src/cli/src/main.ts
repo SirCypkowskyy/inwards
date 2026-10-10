@@ -4,19 +4,25 @@
  * environment once, has `adapters/compose.ts` build one invocation's
  * `AppDeps` from the real adapters, parses argv, and hands off to a command
  * (`commands/`). Nothing below it imports a concrete adapter; everything
- * receives what it needs as parameters.
+ * receives what it needs as parameters. Run as a worker thread (a large
+ * check's extraction pool, #61), it serves extraction jobs instead.
  */
 import process from "node:process";
 import { parseArgs } from "node:util";
+import { isMainThread } from "node:worker_threads";
 import { ConfigError, VERSION } from "@inwards/core";
 import { compose } from "./adapters/compose.ts";
+import { serveExtractions } from "./adapters/extraction-worker.ts";
 import { processStreams } from "./adapters/stdio.ts";
 import { baselineCommand } from "./commands/baseline.ts";
 import { checkCommand } from "./commands/check.ts";
 import { contextCommand } from "./commands/context.ts";
+import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
+import { mcpCommand } from "./commands/mcp.ts";
+import { serverCommand } from "./commands/server.ts";
 import { statsCommand } from "./commands/stats.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import { initMain } from "./init/style.ts";
@@ -37,6 +43,9 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
        inwards import-config [FILE] [--write]   (import-linter contracts as [tool.inwards]; --write: into pyproject.toml)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
+       inwards daemon [status|stop] [--idle SECONDS]   (keeps PostToolUse warm; hooks start it)
+       inwards server [--stdio]    (the language server, LSP over stdio; editors start it)
+       inwards mcp                 (the MCP server over stdio; agents' MCP clients start it)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
 
@@ -74,6 +83,11 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       launcher: { type: "string" },
       brief: { type: "boolean" },
       write: { type: "boolean" },
+      idle: { type: "string" },
+      // LSP's conventional server arguments (#63): stdio is the only transport,
+      // and vscode-languageserver reads --clientProcessId from argv itself.
+      stdio: { type: "boolean" },
+      clientProcessId: { type: "string" },
     },
   });
 
@@ -91,9 +105,21 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
 }
 
 /** The commands besides `check`. */
-type SetupCommand = "hook" | "init" | "baseline" | "stats" | "context" | "import-config";
+type SetupCommand =
+  | "hook"
+  | "daemon"
+  | "server"
+  | "mcp"
+  | "init"
+  | "baseline"
+  | "stats"
+  | "context"
+  | "import-config";
 const SETUP_COMMANDS: readonly string[] = [
   "hook",
+  "daemon",
+  "server",
+  "mcp",
   "init",
   "baseline",
   "stats",
@@ -105,15 +131,15 @@ const SETUP_COMMANDS: readonly string[] = [
  * Tells whether a positional names one of the commands besides `check`.
  *
  * @param command - the first positional.
- * @returns true for hook, init, baseline, stats, context or import-config.
+ * @returns true for hook, daemon, server, mcp, init, baseline, stats, context or import-config.
  */
 function isSetupCommand(command: string | undefined): command is SetupCommand {
   return command !== undefined && SETUP_COMMANDS.includes(command);
 }
 
 /**
- * Runs the commands besides `check`: the hook, `init`, `baseline`, `stats`, `context`
- * and `import-config`.
+ * Runs the commands besides `check`: the hook, `daemon`, `server`, `mcp`, `init`, `baseline`, `stats`,
+ * `context` and `import-config`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -127,6 +153,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
  * @param values.write - `--write`, for context and import-config.
+ * @param values.idle - `--idle SECONDS`, for daemon.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -140,6 +167,7 @@ async function setupCommand(
     export?: string | undefined;
     redact?: boolean | undefined;
     write?: boolean | undefined;
+    idle?: string | undefined;
   },
 ): Promise<number> {
   const { streams } = deps.io;
@@ -150,6 +178,15 @@ async function setupCommand(
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(deps, USAGE)
       : print(streams, USAGE, 2);
+  }
+  if (command === "daemon") {
+    return await daemonCommand(deps, paths, values.idle, USAGE);
+  }
+  if (command === "server") {
+    return await serverCommand(deps, paths, USAGE);
+  }
+  if (command === "mcp") {
+    return await mcpCommand(deps, paths, USAGE);
   }
   if (command === "context") {
     return paths.length === 0
@@ -214,21 +251,25 @@ function ignoreClosedPipe(err: Error & { code?: string }): void {
     throw err;
   }
 }
-process.stdout.on("error", ignoreClosedPipe);
-process.stderr.on("error", ignoreClosedPipe);
+if (isMainThread) {
+  process.stdout.on("error", ignoreClosedPipe);
+  process.stderr.on("error", ignoreClosedPipe);
 
-// exitCode, not exit(): Node-style exit() may drop writes still queued for a
-// pipe, and a hook's stderr is the whole message to the agent.
-main(compose(), process.argv.slice(2)).then(
-  (code: number) => {
-    process.exitCode = code;
-  },
-  (err: unknown) => {
-    const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
-    process.exitCode = print(
-      processStreams,
-      err instanceof ConfigError ? `config error: ${err.message}` : detail,
-      2,
-    );
-  },
-);
+  // exitCode, not exit(): Node-style exit() may drop writes still queued for a
+  // pipe, and a hook's stderr is the whole message to the agent.
+  main(compose(import.meta.url), process.argv.slice(2)).then(
+    (code: number) => {
+      process.exitCode = code;
+    },
+    (err: unknown) => {
+      const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+      process.exitCode = print(
+        processStreams,
+        err instanceof ConfigError ? `config error: ${err.message}` : detail,
+        2,
+      );
+    },
+  );
+} else {
+  serveExtractions();
+}

@@ -1,0 +1,9 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW013 async-blocking the fix names the async replacement and the def alternative 1`] = `
+[
+  "Replace \`sqlalchemy.orm.Session\` with \`AsyncSession\` from \`sqlalchemy.ext.asyncio\`, and \`await\` the call to \`db.execute\`.",
+  "If \`get_order\` is a FastAPI or Starlette route or dependency, declare it with \`def\` instead: FastAPI runs a plain \`def\` in its threadpool, off the event loop.",
+  "If the call has to stay synchronous inside \`async def\`, run it in a worker thread: \`await anyio.to_thread.run_sync(...)\`, \`await asyncio.to_thread(...)\` or Starlette's \`run_in_threadpool\`.",
+]
+`;
