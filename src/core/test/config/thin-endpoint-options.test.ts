@@ -39,17 +39,21 @@ extend-deny-calls = ["shop.integrations.stripe.*"]
 deny-receiver-types = ["sqlalchemy.orm.Session"]
 deny-receiver-params = ["db", "session"]
 delegate-to = ["application", "http-api", "shop.*.service"]
-decorators = ["shop.http.endpoint", "*.get"]`),
+decorators = ["shop.http.endpoint", "*.get"]
+frameworks = ["flask", "django"]
+base-classes = ["shop.http.Resource", "*.BaseView"]`),
     );
     expect(rules?.options?.["thin-endpoint"]).toEqual({
       "allow-comprehensions": false,
       "allow-loops": true,
+      "base-classes": ["shop.http.Resource", "*.BaseView"],
       decorators: ["shop.http.endpoint", "*.get"],
       "delegate-to": ["application", "http-api", "shop.*.service"],
       "deny-calls": ["httpx.*", "psycopg*.*"],
       "deny-receiver-params": ["db", "session"],
       "deny-receiver-types": ["sqlalchemy.orm.Session"],
       "extend-deny-calls": ["shop.integrations.stripe.*"],
+      frameworks: ["flask", "django"],
       "max-branches": false,
       "max-nesting": 0,
       "max-statements": 8,
@@ -76,6 +80,10 @@ decorators = ["shop.http.endpoint", "*.get"]`),
     ],
     ['delegate-to = ["*.service"]', '"*.service" is not a layer name, module prefix or selector'],
     ['decorators = ["@endpoint"]', "decorators must be a list of qualified names"],
+    ['frameworks = ["bottle"]', "frameworks must be a list of distinct entries from"],
+    ['frameworks = ["flask", "flask"]', "frameworks must be a list of distinct entries from"],
+    ['frameworks = "flask"', "frameworks must be a list of distinct entries from"],
+    ['base-classes = ["shop/http"]', "base-classes must be a list of qualified names"],
   ])("%s is a config error naming the key", (body, message) => {
     expect(() => parseConfig(table(body))).toThrow(ConfigError);
     expect(() => parseConfig(table(body))).toThrow(message);

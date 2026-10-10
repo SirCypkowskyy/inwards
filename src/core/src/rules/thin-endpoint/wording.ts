@@ -9,6 +9,7 @@ import { filledFrom } from "../../config/layer-selector.ts";
 import type { LayerSpec } from "../../config/layers.ts";
 import type { Fix } from "../../contracts/records.ts";
 import { joined } from "../shared/words.ts";
+import type { Kind } from "./frameworks.ts";
 
 /** How many calls a message names before it says how many more there are. */
 const MAX_NAMED = 6;
@@ -190,6 +191,33 @@ export function targetText(
   );
 }
 
+/** How the fix words the HTTP side of an endpoint, by the framework that marked it. */
+const HTTP_WORDS: Readonly<
+  Record<Kind, { readonly inject: string; readonly errors: string; readonly response: string }>
+> = {
+  fastapi: {
+    inject: " (inject it with Depends)",
+    errors: "`HTTPException`",
+    response: "response model",
+  },
+  custom: {
+    inject: " (inject it with Depends)",
+    errors: "`HTTPException`",
+    response: "response model",
+  },
+  litestar: {
+    inject: " (inject it with `Provide`)",
+    errors: "`HTTPException`",
+    response: "response",
+  },
+  flask: { inject: "", errors: "HTTP errors with `abort()`", response: "response" },
+  django: {
+    inject: "",
+    errors: "HTTP errors (`Http404`, or an `APIException` in DRF)",
+    response: "response",
+  },
+};
+
 /**
  * Writes the fix for one endpoint from what it tripped.
  *
@@ -199,14 +227,16 @@ export function targetText(
  * @param body - where its own body and its helpers' live.
  * @param body.spans - its own body first, then its helpers'.
  * @param body.path - the endpoint's file when it isn't the finding's, else undefined.
+ * @param body.kind - the framework that marked the endpoint, which words how it injects and maps errors.
  * @returns the summary and the steps.
  */
 export function fixFor(
   name: string,
   tripped: Tripped,
   where: string,
-  { spans, path }: { spans: readonly BodySpan[]; path: string | undefined },
+  { spans, path, kind }: { spans: readonly BodySpan[]; path: string | undefined; kind: Kind },
 ): Fix {
+  const http = HTTP_WORDS[kind];
   const span = linesText(spans, path);
   const steps = [
     ...(tripped.logic
@@ -216,7 +246,7 @@ export function fixFor(
       : []),
     ...(tripped.undelegated && !tripped.logic
       ? [
-          `Call a use case in ${where} from the endpoint (inject it with Depends) instead of doing its work here.`,
+          `Call a use case in ${where} from the endpoint${http.inject} instead of doing its work here.`,
         ]
       : []),
     ...(tripped.receivers.length > 0
@@ -229,7 +259,7 @@ export function fixFor(
           `Move ${quoted(tripped.denied)} into an adapter (a repository, an API client or a background task) that the use case reaches through a Protocol.`,
         ]
       : []),
-    "In the endpoint keep only: read the request, call the use case, map its errors to `HTTPException`, and return the response model.",
+    `In the endpoint keep only: read the request, call the use case, map its errors to ${http.errors}, and return the ${http.response}.`,
     "Don't move the code into a helper function in the same module: INW012 counts a helper's body as the endpoint's, and the work would still live in the HTTP layer.",
   ];
   return {

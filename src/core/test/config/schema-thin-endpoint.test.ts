@@ -32,6 +32,10 @@ describe("INW012's options", () => {
     ["an empty delegate-to", thin("delegate-to = []")],
     ["a blank delegate-to entry", thin('delegate-to = [" "]')],
     ["a decorator with a slash", thin('decorators = ["app/http"]')],
+    ["an unknown framework", thin('frameworks = ["bottle"]')],
+    ["a framework twice", thin('frameworks = ["flask", "flask"]')],
+    ["frameworks that isn't a list", thin('frameworks = "flask"')],
+    ["a base class with a space", thin('base-classes = ["shop.Base View"]')],
     ["max-statements on another rule", thin("max-statements = 8", "layer-dependency")],
   ])("%s fails both", (_what, text) => {
     expect(parserError(text)).toBeDefined();
@@ -49,7 +53,9 @@ extend-deny-calls = ["shop.integrations.*"]
 deny-receiver-types = ["sqlalchemy.orm.Session"]
 deny-receiver-params = ["db"]
 delegate-to = ["shop.application"]
-decorators = ["shop.http.endpoint", "*.get"]`);
+decorators = ["shop.http.endpoint", "*.get"]
+frameworks = ["fastapi", "flask", "litestar", "django"]
+base-classes = ["shop.http.Resource"]`);
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 });

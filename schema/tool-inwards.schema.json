@@ -541,8 +541,8 @@
           "$ref": "#/definitions/ruleOptions/properties/modules"
         },
         "max-statements": {
-          "description": "The most statements an endpoint's body may hold, nested ones included; guards that raise HTTPException and the docstring don't count. false turns the check off.",
-          "markdownDescription": "The most statements an endpoint's body may hold, nested ones included; guards that raise HTTPException and the docstring don't count. false turns the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "description": "The most statements an endpoint's body may hold, nested ones included; guards that raise an HTTP error and the docstring don't count. false turns the check off.",
+          "markdownDescription": "The most statements an endpoint's body may hold, nested ones included; guards that raise an HTTP error and the docstring don't count. false turns the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
           "oneOf": [
             {
               "type": "integer",
@@ -645,8 +645,25 @@
           }
         },
         "decorators": {
-          "description": "Decorators that mark an endpoint besides FastAPI's own, by qualified name with * and ? wildcards, such as app.http.endpoint.",
-          "markdownDescription": "Decorators that mark an endpoint besides FastAPI's own, by qualified name with * and ? wildcards, such as app.http.endpoint.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "description": "Decorators that mark an endpoint besides the frameworks' own, by qualified name with * and ? wildcards, such as app.http.endpoint.",
+          "markdownDescription": "Decorators that mark an endpoint besides the frameworks' own, by qualified name with * and ? wildcards, such as app.http.endpoint.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": []
+        },
+        "frameworks": {
+          "description": "The frameworks whose endpoints INW012 recognises: fastapi (with Starlette), flask, litestar and django (with Django REST framework). Default: every framework the file mentions.",
+          "markdownDescription": "The frameworks whose endpoints INW012 recognises: fastapi (with Starlette), flask, litestar and django (with Django REST framework). Default: every framework the file mentions.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["fastapi", "flask", "litestar", "django"] }
+        },
+        "base-classes": {
+          "description": "In-house view base classes, by qualified name with * and ? wildcards: methods named after HTTP verbs or ViewSet actions on their subclasses are endpoints.",
+          "markdownDescription": "In-house view base classes, by qualified name with * and ? wildcards: methods named after HTTP verbs or ViewSet actions on their subclasses are endpoints.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
           "type": "array",
           "items": {
             "type": "string",

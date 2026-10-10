@@ -3,8 +3,8 @@
  * `INWARDS_THREADS` when it is a whole number, else half the cores beyond two, up to the cap.
  * There are no workers below the file threshold or with one thread, and one
  * worker fewer than threads otherwise, since the main thread parses too. A
- * check big enough gets the pool, through its own methods, closes it, and
- * finds what it finds alone.
+ * check big enough gets a pool, uses it through its own methods, and finds
+ * what it finds alone; `runCheck` closes it (`check-io.test.ts`).
  */
 import { describe, expect, test } from "bun:test";
 import {
@@ -23,6 +23,7 @@ import {
   checkOnThreads,
   DEFAULT_MAX_THREADS,
   MIN_PARALLEL_FILES,
+  openPool,
   poolSize,
   threadLimit,
 } from "../../src/project/threads.ts";
@@ -78,7 +79,7 @@ const index: ProjectIndex = engine.index({
   read: (): string => "",
   listDir: (): undefined => undefined,
 });
-const run: Parameters<typeof checkOnThreads>[3] = {
+const run: Parameters<typeof checkOnThreads>[2] = {
   files,
   index,
   accepted: undefined,
@@ -108,23 +109,26 @@ class FakePool implements ExtractionPool {
   }
 }
 
-describe("checkOnThreads", () => {
-  test("uses the pool for a big check, closes it, and finds the same", async () => {
+describe("openPool and checkOnThreads", () => {
+  test("a big check gets a pool and uses it, and finds the same", async () => {
     const pool = new FakePool();
     const sizes: number[] = [];
     const io = {
-      grammars: (): Promise<GrammarBinaries> => Promise.resolve(wasm),
       extractionPool: (_wasm: GrammarBinaries, size: number): ExtractionPool => {
         sizes.push(size);
         return pool;
       },
     };
-    const alone = await checkOnThreads(io, engine, 1, run);
+    expect(openPool(io, wasm, 1, files.length)).toBeUndefined();
+    expect(openPool(io, wasm, 4, MIN_PARALLEL_FILES - 1)).toBeUndefined();
+    expect(openPool({}, wasm, 4, files.length)).toBeUndefined();
     expect(sizes).toEqual([]);
-    expect(await checkOnThreads(io, engine, 4, run)).toEqual(alone);
+    const alone = await checkOnThreads(engine, undefined, run);
+    expect(openPool(io, wasm, 4, files.length)).toBe(pool);
     expect(sizes).toEqual([1]);
+    expect(await checkOnThreads(engine, pool, run)).toEqual(alone);
     expect(pool.jobs).toBeGreaterThan(files.length);
-    expect(pool.closed).toBe(true);
+    expect(pool.closed).toBe(false);
     expect(alone.diagnostics.length).toBeGreaterThan(0);
   });
 });

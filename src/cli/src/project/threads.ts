@@ -5,18 +5,19 @@
  * than the threshold stays on the main thread, where starting workers would
  * cost more than they save. The main thread parses too, so a pool has one
  * worker fewer than there are threads. No I/O and no thread of its own: the
- * pool comes from `ProjectIo`.
+ * pool comes from `ProjectIo`, and the check that opens it closes it.
  */
 import type {
   Checked,
   Engine,
   ExtractionBatch,
   ExtractionJob,
+  GrammarBinaries,
   ProjectIndex,
   SourceFile,
 } from "@inwards/core";
 import type { Runtime } from "../platform/contracts.ts";
-import type { ProjectIo } from "./contracts.ts";
+import type { ExtractionPool, ProjectIo } from "./contracts.ts";
 
 /**
  * Threads at most when `INWARDS_THREADS` doesn't say. Reading the files and
@@ -74,13 +75,34 @@ export function poolSize(threads: number, files: number): number {
 }
 
 /**
- * Runs the engine over the loaded files: on this thread, or with the parsing
- * spread over worker threads as well when `poolSize` gives any for this many
- * files and the I/O can start them (#61). Either way the result is the same.
+ * Starts the worker threads for a check of this many files, when `poolSize`
+ * gives any and the I/O can start them. The check starts them before it
+ * reads the files (#281), so the workers load the grammar while this
+ * thread reads; the caller closes the pool once the engine is done.
  *
- * @param io - loads the grammars for the workers and starts the pool, when it can.
- * @param engine - the project's engine.
+ * @param io - starts the pool, when it can.
+ * @param wasm - the grammars every worker loads.
  * @param threads - how many threads may parse, this one included.
+ * @param files - how many source files the check will hand the engine.
+ * @returns the pool, or undefined to check on this thread alone.
+ */
+export function openPool(
+  io: Pick<ProjectIo, "extractionPool">,
+  wasm: GrammarBinaries,
+  threads: number,
+  files: number,
+): ExtractionPool | undefined {
+  const size = poolSize(threads, files);
+  return size > 0 && io.extractionPool ? io.extractionPool(wasm, size) : undefined;
+}
+
+/**
+ * Runs the engine over the loaded files: on this thread, or with the parsing
+ * spread over a pool's worker threads as well (#61). Either way the result is
+ * the same. The pool stays open; its owner closes it.
+ *
+ * @param engine - the project's engine.
+ * @param pool - the worker threads from `openPool`, or undefined for this thread alone.
  * @param run - what the engine's `check` takes.
  * @param run.files - the source files.
  * @param run.index - the project's module index.
@@ -90,10 +112,9 @@ export function poolSize(threads: number, files: number): number {
  * @param run.options.edit - true for a per-edit check.
  * @returns the findings and the suppressed ones.
  */
-export async function checkOnThreads(
-  io: Pick<ProjectIo, "extractionPool" | "grammars">,
+export function checkOnThreads(
   engine: Engine,
-  threads: number,
+  pool: ExtractionPool | undefined,
   {
     files,
     index,
@@ -106,21 +127,14 @@ export async function checkOnThreads(
     options: { whole: boolean; edit: boolean };
   },
 ): Promise<Checked> {
-  const size = poolSize(threads, files.length);
-  const pool =
-    size > 0 && io.extractionPool ? io.extractionPool(await io.grammars(), size) : undefined;
   if (pool === undefined) {
-    return engine.check(files, index, accepted, options);
+    return Promise.resolve(engine.check(files, index, accepted, options));
   }
-  try {
-    // Called as a method: a pool may keep its state on `this`.
-    return await engine.checkWith(
-      files,
-      index,
-      { accepted, ...options },
-      (jobs: readonly ExtractionJob[]): ReturnType<ExtractionBatch> => pool.extract(jobs),
-    );
-  } finally {
-    pool.close();
-  }
+  // Called as a method: a pool may keep its state on `this`.
+  return engine.checkWith(
+    files,
+    index,
+    { accepted, ...options },
+    (jobs: readonly ExtractionJob[]): ReturnType<ExtractionBatch> => pool.extract(jobs),
+  );
 }
