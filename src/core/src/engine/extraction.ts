@@ -28,7 +28,7 @@ import { commentsIn } from "../rules/suppression-comment.ts";
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "9";
+export const EXTRACTION_REVISION = "10";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {

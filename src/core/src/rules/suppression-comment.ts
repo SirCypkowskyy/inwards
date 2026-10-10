@@ -120,17 +120,44 @@ function parsedComments(parser: Parser, text: string): SuppressionComment[] {
   }
 }
 
+/** The word every directive holds; `DIRECTIVE` can match no comment without it. */
+const WORD = "inwards";
+
 /**
  * Reads every suppression comment from a full parse of the file.
  *
+ * A directive holds the word `inwards`, so only the comments around that
+ * word in the parsed text can hold one: for each occurrence, the smallest
+ * node that spans it is looked up, and kept when it is a comment. That reads
+ * the same comments, in the same order, as filtering
+ * `descendantsOfType("comment")`, without visiting the rest of the tree
+ * (#62). The text is the tree's own (with `flattenCommentRuns` applied,
+ * which never blanks a line that mentions `inwards`), so the offsets match.
+ *
  * @param tree - the file's syntax tree.
- * @returns the comments that hold the directive, valid or not.
+ * @returns the comments that hold the directive, valid or not, in source order.
  */
 export function commentsIn(tree: Tree): SuppressionComment[] {
-  return tree.rootNode.descendantsOfType("comment").flatMap((node) => {
-    const rest = node ? DIRECTIVE.exec(node.text.trimEnd())?.groups?.["rest"] : undefined;
-    return node && rest !== undefined ? [readComment(node, rest)] : [];
-  });
+  const root = tree.rootNode;
+  const { text } = root;
+  const found: SuppressionComment[] = [];
+  let readUpTo = 0;
+  for (let at = text.indexOf(WORD); at !== -1; at = text.indexOf(WORD, at + 1)) {
+    const start = root.startIndex + at;
+    if (start < readUpTo) {
+      continue; // a second mention in a comment already read
+    }
+    const node = root.descendantForIndex(start, start + WORD.length);
+    if (node?.type !== "comment") {
+      continue;
+    }
+    readUpTo = node.endIndex;
+    const rest = DIRECTIVE.exec(node.text.trimEnd())?.groups?.["rest"];
+    if (rest !== undefined) {
+      found.push(readComment(node, rest));
+    }
+  }
+  return found;
 }
 
 /**
