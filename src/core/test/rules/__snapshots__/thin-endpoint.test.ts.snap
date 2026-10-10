@@ -1,0 +1,14 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW012 thin-endpoint the fix names the target from delegate-to and the moved calls 1`] = `
+{
+  "steps": [
+    "Move the logic (lines 16 to 32) into a function in the \`application\` layer (\`shop.application\`) that takes plain arguments and returns a domain object or a result the endpoint maps to the response.",
+    "Move \`db.execute\`, \`db.get\`, \`db.add\` and \`db.commit\` behind a repository in the \`infrastructure\` layer, and give the use case a Protocol it can call.",
+    "Move \`select\` and \`httpx.post\` into an adapter (a repository, an API client or a background task) that the use case reaches through a Protocol.",
+    "In the endpoint keep only: read the request, call the use case, map its errors to \`HTTPException\`, and return the response model.",
+    "Don't move the code into a helper function in the same module to get under the limits: the work would still live in the HTTP layer.",
+  ],
+  "summary": "Move the work out of \`create_order\` into the \`application\` layer (\`shop.application\`), and keep the endpoint to HTTP.",
+}
+`;

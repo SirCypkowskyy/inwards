@@ -37,7 +37,7 @@ import { checkFileWiring, checkGraphWiring } from "../rules/fastapi/router-wirin
 import { checkYieldSwallows } from "../rules/fastapi/yield-dependency-swallows.ts";
 import { mentionsSuppression } from "../rules/suppression-comment.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
-import type { Confirmed } from "./stages.ts";
+import { type Confirmed, withFound } from "./stages.ts";
 
 /** The FAPI findings for a check, and the ones to drop after suppressions. */
 export interface FastApiFound {
@@ -272,12 +272,5 @@ function graphFindings(
  * @returns the confirmed findings with the file's FAPI ones.
  */
 export function withFastApi(confirmed: Confirmed, src: SourceFile, fapi: FastApiFound): Confirmed {
-  const extra = fapi.found.get(src.path) ?? [];
-  if (extra.length === 0) {
-    return confirmed;
-  }
-  const found = [...confirmed.found, ...extra].sort(
-    (a, b) => a.line - b.line || a.column - b.column,
-  );
-  return { ...confirmed, found };
+  return withFound(confirmed, fapi.found.get(src.path) ?? []);
 }

@@ -7,7 +7,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
-import type { CallSyntax, Qualify, Value } from "./values.ts";
+import type { Qualify } from "../../python/qualify.ts";
+import type { CallSyntax, Value } from "./values.ts";
 
 /** A name bound to `FastAPI(...)` or `APIRouter(...)`, with the constructor call. */
 export interface FastApiObject extends CallSyntax {

@@ -15,13 +15,15 @@ import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { namedChildren } from "../../python/nodes.ts";
+import type { Qualify } from "../../python/qualify.ts";
+import { joined } from "../shared/words.ts";
 import { flag, list } from "./options.ts";
 import { hiddenBy, placementOf } from "./placement.ts";
 import type { FastApiProject } from "./project.ts";
 import type { FastApiFile, FastApiObject, PathOperation } from "./records.ts";
 import { statusCode } from "./status.ts";
-import { decoratorSpan, decoratorText, joined } from "./syntax.ts";
-import type { Qualify, Value } from "./values.ts";
+import { decoratorSpan, decoratorText } from "./syntax.ts";
+import type { Value } from "./values.ts";
 
 /** FAPI001's options, with their defaults filled in. */
 interface Options {

@@ -79,7 +79,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code` |
 | **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; with a fresh engine when `pyproject.toml` changes; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
@@ -110,7 +110,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / index</small>"]
@@ -356,6 +356,7 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | INW009 | `suppression-comment` | An inline suppression, `# inwards: ignore[INW001] reason="..."`, that hides nothing: malformed, without a reason, or naming a code that is unknown or can't be suppressed (INW000, INW004, INW007, INW008, INW009) (error); one with a code that matches no finding on its line (warning). See [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | :material-check-circle: |
 | INW010 | `unknown-first-party` | A static import, in a layer, of a first-party module that doesn't exist, the typical agent hallucination (`from shop.domain.pricing import X` with no `pricing`), and a relative import that climbs above the top-level package, which Python always refuses. The module part is checked: `X` of `from X import name`, the whole name otherwise. Existence is probed on disk, so namespace packages, stubs and compiled extensions (`.so`, `.pyd`, `.pyx`) count; the fix lists the three closest modules in the same package. Such an import gets no INW006 as well, and an outward import INW001 reports gets no INW010. Packages that extend their `__path__` are skipped, and so are modules a build step writes (`generated`, by default `*_pb2`, `*_pb2_grpc` and `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). See [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :material-check-circle: |
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. In every layer but the outermost, a target Inwards can't read is reported as unverifiable: a variable, an f-string field, a `\N{...}` escape, an argument hidden behind `*args` or `**kwargs`, a relative `import_module` whose `package` isn't known, `exec` or `eval` of a non-literal source ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). A common way to dodge INW001. Known gaps are listed above | :material-check-circle: |
+| INW012 | `thin-endpoint` | Opt-in, a warning by default. An HTTP endpoint (a FastAPI path operation, or a function a configured decorator marks) that does the work itself: more statements, branches or nesting than its limits (guards that raise `HTTPException` don't count), loops over data, calls `deny-calls` names (`httpx.*`, `sqlalchemy.*`...), method calls on a parameter typed as a database session, or, with `delegate-to`, no call into the named layer. One finding per endpoint on its `def` line, listing every tripped signal; the fix names the target layer. One parse per file that mentions FastAPI or a configured decorator, whatever layer it is in | :material-check-circle: |
 | FAPI001 | `endpoint-metadata` | Opt-in. A FastAPI path operation in the schema without the OpenAPI metadata the project requires: a summary or docstring, a response model, an explicit status code on `POST` and `DELETE`, a `description` in each `responses=` entry, and optionally tags and `operation_id`. One finding per endpoint, on the decorator | :material-check-circle: |
 | FAPI002 | `undocumented-error-response` | Opt-in. A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare: raised or returned in the endpoint, in same-file or imported helpers and dependencies up to `max-depth` calls, or from a first-party exception an app handler maps to a code. Declarations on the decorator, the router, the inclusions above it and the app count; anything Inwards can't read keeps it quiet | :material-check-circle: |
 | FAPI003 | `router-wiring` | Opt-in. An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | :material-check-circle: |
@@ -382,12 +383,12 @@ src/
 │   │   │                  #   source-span.ts (where a value sits in pyproject.toml), toml.ts
 │   │   ├── python/        # parser.ts (tree-sitter, import extraction), module-names.ts,
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
-│   │   │                  #   literals.ts, stdlib.ts
+│   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
-│   │   │   │              #   edit-distance.ts
+│   │   │   │              #   edit-distance.ts, words.ts (English lists)
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
 │   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
@@ -401,6 +402,8 @@ src/
 │   │   │   ├── unknown-first-party.ts   # INW010: first-party modules that don't exist
 │   │   │   ├── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
 │   │   │   │                            #   loader-targets.ts, computed-source.ts
+│   │   │   ├── thin-endpoint/           # INW012: endpoints.ts (FastAPI and custom decorators),
+│   │   │   │                            #   metrics.ts, parameters.ts (annotations), wording.ts, check.ts
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
 │   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
@@ -414,7 +417,7 @@ src/
 │   │   │                                #   function's own yield, return and try statements)
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
-│   │   │                  #   fastapi.ts runs the FAPI rules that are on
+│   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts

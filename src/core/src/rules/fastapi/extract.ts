@@ -10,6 +10,7 @@
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
+import type { Qualify } from "../../python/qualify.ts";
 import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./handlers.ts";
 import type {
   Context,
@@ -22,7 +23,7 @@ import type {
   Registration,
   Wiring,
 } from "./records.ts";
-import { type Argument, callSyntax, type Qualify, valueFrom } from "./values.ts";
+import { type Argument, callSyntax, valueFrom } from "./values.ts";
 
 /** The constructors the model looks for, by qualified name. */
 const CONSTRUCTORS: ReadonlyMap<string, "app" | "router"> = new Map([

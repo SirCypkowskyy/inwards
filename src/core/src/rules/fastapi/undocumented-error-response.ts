@@ -12,12 +12,13 @@
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
+import { joined } from "../shared/words.ts";
 import { type CodeSource, CodeWalk } from "./error-codes.ts";
 import { flag } from "./options.ts";
 import { declaredBy, hiddenBy, ownPlacement, type Placement, placementOf } from "./placement.ts";
 import type { FastApiProject } from "./project.ts";
 import type { FastApiFile, PathOperation } from "./records.ts";
-import { decoratorSpan, decoratorText, joined } from "./syntax.ts";
+import { decoratorSpan, decoratorText } from "./syntax.ts";
 
 /** FAPI002's options, with their defaults filled in. */
 interface Options {

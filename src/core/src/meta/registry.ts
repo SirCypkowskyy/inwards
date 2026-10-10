@@ -45,6 +45,7 @@ type RuleCode =
   | "INW009"
   | "INW010"
   | "INW011"
+  | "INW012"
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
@@ -165,6 +166,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Dynamic imports (importlib, __import__, runpy, exec) must point toward inner layers too.",
     docs: page("INW011"),
+  },
+  // Opt-in, and a warning until corpus runs settle its thresholds (#182).
+  INW012: {
+    code: "INW012",
+    name: "thin-endpoint",
+    severity: "warning",
+    default: "off",
+    summary:
+      "An HTTP endpoint reads the request, calls one use case and shapes the response; the logic, queries and outgoing calls live in other layers.",
+    docs: page("INW012"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.

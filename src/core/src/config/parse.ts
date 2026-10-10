@@ -23,6 +23,7 @@ import {
   stopGateKey,
 } from "./hook-keys.ts";
 import { isModuleList, type LayerSpec, parseLayers } from "./layers.ts";
+import { delegateProblem, stringList } from "./rule-options.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
 import { parseTemplates, withContextTemplates, withShapeTemplates } from "./templates.ts";
@@ -219,6 +220,11 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...parseContexts(withContextTemplates(raw["contexts"], templates)),
     ...parseCycles(raw["cycles"]),
   };
+  const delegates = stringList(config.rules?.options?.["thin-endpoint"]?.["delegate-to"]) ?? [];
+  const problem = delegateProblem(delegates, new Set(parsed.map((layer) => layer.name)));
+  if (problem !== undefined) {
+    throw new ConfigError(problem);
+  }
   return config;
 }
 

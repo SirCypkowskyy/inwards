@@ -13,11 +13,12 @@ import type { Node } from "web-tree-sitter";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
+import type { Qualify } from "../../python/qualify.ts";
 import { WiringGraph } from "./graph.ts";
 import { returnedStatusCodes } from "./handlers.ts";
 import type { Definition, FastApiModel } from "./model.ts";
 import type { ExceptionHandler, FastApiFile, FastApiObject, Wiring } from "./records.ts";
-import type { Qualify, Value } from "./values.ts";
+import type { Value } from "./values.ts";
 import { valueFrom } from "./values.ts";
 
 /** A name that starts lower-case, as variables do and classes don't. */
