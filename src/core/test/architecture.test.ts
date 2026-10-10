@@ -16,13 +16,14 @@ const SRC = join(REPO, "src/core/src");
 const BIOME = join(REPO, "node_modules/.bin/biome");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /**
- * Timeout for the tests that start Biome once per probe. They take about
- * 250 ms on CI, but a slow self-hosted runner took 5.7 s for the first one
- * (its neighbours ran 6 to 8 times slower than usual too), past Bun's 5 s
- * default. Each probe is a cold Biome start, so the time follows the runner,
- * not the engine's code.
+ * Timeout for the tests that start Biome or `fallow guard` as a child
+ * process. They take about 250 ms on CI, but a slow self-hosted runner took
+ * 5.7 s for a Biome probe (its neighbours ran 6 to 8 times slower than usual
+ * too) and a hosted ubuntu-24.04 runner more than 5 s for a `fallow guard`
+ * call, past Bun's 5 s default. Each is a cold start of the tool, so the time
+ * follows the runner, not the engine's code.
  */
-const BIOME_PROBE_TIMEOUT_MS = 30_000;
+const CHILD_TOOL_TIMEOUT_MS = 30_000;
 /** The extension of a single-module rule. */
 const TS_SUFFIX = /\.ts$/u;
 
@@ -131,7 +132,7 @@ describe("no I/O in the engine", () => {
         expect(global.out).toContain("noRestrictedGlobals");
       }
     },
-    BIOME_PROBE_TIMEOUT_MS,
+    CHILD_TOOL_TIMEOUT_MS,
   );
 
   test(
@@ -167,7 +168,7 @@ describe("no I/O in the engine", () => {
         expect(result.out).toContain(rule);
       }
     },
-    BIOME_PROBE_TIMEOUT_MS,
+    CHILD_TOOL_TIMEOUT_MS,
   );
 });
 
@@ -206,9 +207,13 @@ describe("zones, as fallow applies them", () => {
     }
   });
 
-  test("a file in a new folder has no zone, and fallow reports it until it gets one", () => {
-    const [fresh] = guard(["src/core/src/new-folder/module.ts"]);
-    expect(fresh?.zone).toBeNull();
-    expect(fresh?.boundary.coverage_required).toBe(true);
-  });
+  test(
+    "a file in a new folder has no zone, and fallow reports it until it gets one",
+    () => {
+      const [fresh] = guard(["src/core/src/new-folder/module.ts"]);
+      expect(fresh?.zone).toBeNull();
+      expect(fresh?.boundary.coverage_required).toBe(true);
+    },
+    CHILD_TOOL_TIMEOUT_MS,
+  );
 });
