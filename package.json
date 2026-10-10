@@ -20,11 +20,11 @@
     "check:self": "bun run src/cli/src/main.ts check examples/clean-app"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.14",
+    "@biomejs/biome": "^2.5.15",
     "@types/bun": "^1.4.2",
-    "eslint-plugin-jsdoc": "64.5.4",
-    "fallow": "3.28.0",
-    "oxlint": "1.85.0",
+    "eslint-plugin-jsdoc": "65.2.0",
+    "fallow": "3.32.0",
+    "oxlint": "1.87.0",
     "typescript": "^7.0.2"
   },
   "license": "MIT"
