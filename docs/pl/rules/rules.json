@@ -211,6 +211,20 @@
       "url": "INW014/"
     },
     {
+      "code": "INW015",
+      "name": "construct-only-in",
+      "title": "INW015 construct-only-in",
+      "summary": "Moduł spoza korzenia kompozycji, który w czasie działania importuje adapter wyjściowy albo inną chronioną rolę lub buduje jedną z jej klas",
+      "description": "Tylko korzeń kompozycji importuje i buduje moduły chronionej roli, takie jak adaptery wyjściowe; reszta kodu dostaje je przez port.",
+      "category": ["roles", "ports-and-adapters"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, błąd",
+      "url": "INW015/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

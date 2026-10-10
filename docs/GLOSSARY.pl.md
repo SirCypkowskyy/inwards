@@ -212,6 +212,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | implementation (of a port) | implementacja (portu) |
 | DTO, value object | DTO, obiekt wartości |
 | test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
+| inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |
+| guarded role (INW015's `role`), build an adapter | chroniona rola, budować adapter |
 | pre-release | wersja przedpremierowa (pre-release) |
 | probe (the file system) | sondować, sondowanie |
 | promotion (PR `develop` → `main`) | promocja |

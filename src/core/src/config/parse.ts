@@ -226,6 +226,12 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
   if (problem !== undefined) {
     throw new ConfigError(problem);
   }
+  const construct = config.rules?.options?.["construct-only-in"];
+  if (construct !== undefined && construct["role"] === undefined) {
+    throw new ConfigError(
+      "tool.inwards.rules.construct-only-in.role must be set: the rule has nothing to check without it.",
+    );
+  }
   return config;
 }
 

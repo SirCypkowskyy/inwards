@@ -128,6 +128,11 @@
       { "name": "core-rule-async-blocking", "patterns": ["src/core/src/rules/async-blocking/**"] },
       // INW014 ports-abstract (#295): port modules hold only ABCs and Protocols.
       { "name": "core-rule-ports-abstract", "patterns": ["src/core/src/rules/ports-abstract/**"] },
+      // INW015 construct-only-in (#296): only the composition root imports and builds a role.
+      {
+        "name": "core-rule-construct-only-in",
+        "patterns": ["src/core/src/rules/construct-only-in/**"]
+      },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -316,6 +321,17 @@
         ]
       },
       {
+        "from": "core-rule-construct-only-in",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
         "from": "core-rule-thin-endpoint",
         "allow": [
           "core-contracts",
@@ -351,6 +367,7 @@
           "core-rule-thin-endpoint",
           "core-rule-async-blocking",
           "core-rule-ports-abstract",
+          "core-rule-construct-only-in",
           "core-baseline"
         ]
       },
@@ -406,6 +423,7 @@
           "core-rule-thin-endpoint",
           "core-rule-async-blocking",
           "core-rule-ports-abstract",
+          "core-rule-construct-only-in",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -863,6 +881,10 @@
         },
         {
           "from": "core-rule-ports-abstract",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-construct-only-in",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {
