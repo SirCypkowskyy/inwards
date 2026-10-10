@@ -86,6 +86,8 @@ A rule's options live in a table named after the rule, `[tool.inwards.rules.<rul
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
 ```
 
+A [template](../guides/configuration.md#template-rules) can turn an opt-in rule on for one of its roles, such as `router = { async-blocking = true }`; it expands into `extend-select` and the rule's options table, with the role's modules in `modules`.
+
 An options table doesn't turn a rule on. A table for a rule that is off (opt-in and not selected, or listed in `ignore`) does nothing, so `inwards check` reports a warning at the table in `pyproject.toml`, under the rule's code; that lets a team stage a rule's options before turning it on.
 
 To accept one finding for good, put a suppression on the line it points at, with the rule's code and a reason ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)):

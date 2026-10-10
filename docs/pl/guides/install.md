@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 2b618c82c15396c47966d93d4b6da9da63a782d8da4adeffcd6b00c5a54bace2
+source_hash: 9f5ac20c0f2662ab4c7e1e4936689d76063568f71f5ce981d0bdba21eec922ba
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -212,6 +212,8 @@ Istnieje siedem presetów, każdy z warstwami wymienionymi od najbardziej wewnę
 | `fastapi` | sam pakiet jako jądro (kernel); `app.*` z szablonem `fastapi-domain`: constants, exceptions i config, potem models i schemas, utils, service, dependencies, router w każdej domenie; `app.main` | routera używającego modeli bezpośrednio zamiast przez service |
 
 Każda warstwa może importować samą siebie i warstwy przed nią, więc konfiguracja złożona z samych warstw nie wyrazi luk z ostatniej kolumny; komentarz w tabeli `[tool.inwards]` nazywa tę lukę. `bootstrap.py` to korzeń kompozycji (composition root), jedyny moduł, który widzi każdą warstwę. W `hexagonal` adaptery inbound i outbound zajmują jedno miejsce w kolejności, więc żaden nie może importować drugiego.
+
+`clean` i `hexagonal` włączają też [INW014](../rules/INW014.md) przez `extend-select`, jako ostrzeżenie przez linię w `[tool.inwards.rules.severity]`: moduł w `application/ports/` może zawierać tylko klasy ABC i Protocol, a metoda w nim tylko docstring, `...`, `pass` albo `raise NotImplementedError`. Domyślny zakres reguły, czyli każdy moduł z segmentem `ports`, obejmuje już ten pakiet, więc preset nie ustawia żadnych opcji. `OrderRepository` z przykładowego pakietu jest klasą Protocol i przechodzi. Klasa konkretna albo metoda, która wykonuje pracę, w `application/ports/orders.py` dostaje ostrzeżenie, którego poprawka wskazuje warstwę adapterów: `infrastructure` w `clean` i `outbound` w `hexagonal`.
 
 Ostatnie cztery presety rozdzielają pakiety [kontekstami](configuration.md#contexts) i opisują pakiety [szablonem](configuration.md#templates):
 

@@ -7,8 +7,9 @@
  *
  * Templates (`templates.ts`) are expanded here, once, before anything else is
  * checked: `layers.ts` turns a layer entry with a template into its role
- * layers, and the shape and context entries get the template's keys. The
- * result holds no trace of templates, so the rules never see them.
+ * layers, the shape and context entries get the template's keys, and a
+ * template's `rules` join `[tool.inwards.rules]`. The result holds no trace of
+ * templates, so the rules never see them.
  */
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
@@ -26,6 +27,7 @@ import { isModuleList, type LayerSpec, parseLayers } from "./layers.ts";
 import { delegateProblem, stringList } from "./rule-options.ts";
 import { parseRules, type RuleSettings } from "./rule-settings.ts";
 import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
+import { templateUses, withTemplateRules } from "./template-rules.ts";
 import { parseTemplates, withContextTemplates, withShapeTemplates } from "./templates.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -215,7 +217,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...namespacePackagesKey(raw["namespace-packages"]),
     ...stopGateKey(raw["stop-gate"]),
     ...parseShapeKeys({ ...raw, shape: withShapeTemplates(raw["shape"], templates) }),
-    ...parseRules(raw["rules"]),
+    ...parseRules(withTemplateRules(raw["rules"], templates, templateUses(layers))),
     ...agentSuppressionsKey(raw["agent-suppressions"]),
     ...parseContexts(withContextTemplates(raw["contexts"], templates)),
     ...parseCycles(raw["cycles"]),

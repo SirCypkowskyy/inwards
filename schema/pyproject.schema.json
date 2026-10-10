@@ -967,6 +967,390 @@
           "description": "Project advice added to the INW007 fix steps.",
           "markdownDescription": "Project advice added to the INW007 fix steps.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#templates)",
           "$ref": "#/definitions/hints"
+        },
+        "rules": {
+          "description": "Opt-in rules each role turns on in its modules, such as { router = { async-blocking = true } }. Expands into [tool.inwards.rules].",
+          "markdownDescription": "Opt-in rules each role turns on in its modules, such as { router = { async-blocking = true } }. Expands into [tool.inwards.rules].\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#template-rules)",
+          "$ref": "#/definitions/templateRules"
+        }
+      }
+    },
+    "templateRules": {
+      "description": "Opt-in rules each role of the template turns on in the role's modules, by role: { router = { async-blocking = true } }.",
+      "markdownDescription": "Opt-in rules each role of the template turns on in the role's modules, by role: { router = { async-blocking = true } }.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#template-rules)",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/definitions/dottedName"
+      },
+      "additionalProperties": {
+        "description": "Opt-in rules this role turns on, by rule name: true, a severity, or the rule's options without modules (the role's modules fill it; INW015's role too).",
+        "markdownDescription": "Opt-in rules this role turns on, by rule name: true, a severity, or the rule's options without modules (the role's modules fill it; INW015's role too).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#template-rules)",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "thin-endpoint": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/thinEndpointOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "async-blocking": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/asyncBlockingOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "ports-abstract": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/portsAbstractOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "construct-only-in": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "$ref": "#/definitions/templateConstructOnlyIn"
+              }
+            ]
+          },
+          "orm-naming": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ormNamingOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "endpoint-metadata": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/endpointMetadataOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "undocumented-error-response": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/undocumentedErrorResponseOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "router-wiring": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/routerWiringOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "route-shadowing": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ruleOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "lifespan-events": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ruleOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "yield-dependency-swallows": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ruleOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "duplicate-operation-id": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ruleOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "depends-called": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ruleOptions"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "not": {
+                        "const": "modules"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "templateConstructOnlyIn": {
+      "description": "INW015's options in a template: allowed-in. The template fills role with the role's modules.",
+      "markdownDescription": "INW015's options in a template: allowed-in. The template fills role with the role's modules.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#template-rules)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed-in": {
+          "$ref": "#/definitions/constructOnlyInOptions/properties/allowed-in"
         }
       }
     },

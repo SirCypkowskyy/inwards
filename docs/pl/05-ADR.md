@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: a939e515ee0c9f4922d5c12adc22694bd28dc70b9292ce038f2c1a1ef25ec8fc
+source_hash: d6680059162c5617423a2b9a0453b78cca7f7d2475c075866b90000fd538583d
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -997,6 +997,7 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - **Warstwy sąsiednie to miejsce w kolejności.** Warstwa ma miejsce (rank), gdy konfiguracja ma warstwy sąsiednie; warstwy z tego samego miejsca nie mogą importować jedna drugiej, a warstwa może importować każdą warstwę z niższego miejsca. INW001 i INW011 traktują import warstwy sąsiedniej jak import na zewnątrz i mówią `from sibling layer`; dozwolony kierunek łączy warstwy sąsiednie znakiem `|`; INW005 daje domyślną listę zakazów każdej warstwie z najniższego miejsca. Konfiguracja bez warstw sąsiednich nie dostaje miejsc, więc jej wczytana postać i każdy komunikat zostają bez zmian.
 - **Warstwy ról nazywają się `<wpis>.<rola>`** i obejmują `<moduł>.<rola>` dla każdego z modułów wpisu, z listami bibliotek wpisu. Sam wpis nie staje się warstwą: moduł w nim, którego nie obejmuje żadna rola, leży poza wszystkimi warstwami, co zgłasza INW006.
 - **Błędy nazywają to, co napisał użytkownik**: klucz `template` wpisu dla nieznanego szablonu albo takiego, któremu brakuje ról lub `public` potrzebnych w danym miejscu, oraz własny klucz szablonu dla błędnej roli, wzorca albo wskazówki. Problem, który widać dopiero po rozwinięciu (zajęta już nazwa albo prefiks warstwy roli), nazywa rozwiniętą warstwę.
+- **Uzupełnione w [#298](https://github.com/SirCypkowskyy/inwards/issues/298): `rules` szablonu włączają reguły opt-in dla roli** i rozwijają się do `[tool.inwards.rules]` jak wszystko inne: kod dołącza do `extend-select`, moduły roli do `modules` reguły (przy INW015 do `role`, czyli chronionych modułów), a opcje i poziom do tabeli reguły. Własne opcje i poziom tabeli najwyższego poziomu wygrywają, tak jak własny klucz wpisu wygrywa z kluczem jego szablonu; dwie role, które się nie zgadzają, to błąd konfiguracji, bo reguła ma jedną wartość na opcję. Reguł domyślnie włączonych nie można wskazać: i tak zgłaszają wszędzie, a szablon mógłby je tylko zawęzić.
 
 **Konsekwencje.**
 

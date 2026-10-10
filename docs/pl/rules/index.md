@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: aef3b6d77221fe5c4b5011b9198f30aec396e7c18bf551bd78f792a43edfcde6
+source_hash: 08b01be65705871a9d1b15ced1eea3c7479b2fa8d03d912f92f81ff0a7eb9b91
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -90,6 +90,8 @@ Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<ru
 [tool.inwards.rules.pure-domain]
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
 ```
+
+[Szablon](../guides/configuration.md#template-rules) może włączyć regułę opt-in dla jednej ze swoich ról, na przykład `router = { async-blocking = true }`; rozwija się to do `extend-select` i tabeli opcji reguły, z modułami roli w `modules`.
 
 Tabela opcji nie włącza reguły. Tabela dla reguły wyłączonej (opt-in i niewybranej albo wymienionej w `ignore`) nic nie robi, więc `inwards check` zgłasza ostrzeżenie przy tej tabeli w `pyproject.toml`, z kodem reguły. Dzięki temu zespół może przygotować opcje reguły, zanim ją włączy.
 
