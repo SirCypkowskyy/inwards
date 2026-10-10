@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: d944b6425340cf054e6b92b79e3aee830493b152baba5e3094b057c1337b012e
+source_hash: bc1350441a3eaa8f2064a99b03f1f4281fde3e9408cbaf025dd508327ee5e6d7
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -208,7 +208,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 
 **Co działa gdzie.** `inwards check` i `inwards baseline` uruchamiają wątki robocze, gdy czytają 1000 plików lub więcej: jeden wątek na 500 plików, do `INWARDS_THREADS`, a bez niej do połowy rdzeni ponad dwa, najwyżej 4 (o Linuksie niżej). Wątek główny liczy się jako jeden z nich. Workery robią tylko to, o czym decyduje tekst pliku: test na loader, szkielet importów oraz importy i komentarze wyciszające z pełnego parsowania. Wątek główny przechodzi drzewo, czyta pliki, uruchamia wszystkie reguły w kolejności plików i sam parsuje nieliczne pliki z importami dynamicznymi. Wynik jest identyczny co do bajtu przy dowolnej liczbie wątków, a `INWARDS_THREADS=1` trzyma całe sprawdzenie w jednym wątku.
 
-**Metoda.** Plik binarny darwin-arm64 zbudowany przez `scripts/build-binaries.ts`, bazowa kompilacja z `develop` (`73936df`) wobec tej, na laptopie z Apple M1 Pro z 10 rdzeniami. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 4 do 7: bardziej ufaj proporcjom niż milisekundom. Każdy przypadek uruchomiono 11 razy po jednej rozgrzewce, każdy raz na rundę w zmiennej kolejności, z `INWARDS_NO_CACHE=1`; JSON z każdego uruchomienia musiał się zgadzać z bazową kompilacją. Prawdziwe repozytoria są sprawdzane z warstwami z korpusu (`bench/corpus.json`). Szczytowe RSS to `/usr/bin/time -l`, po trzy uruchomienia.
+**Metoda.** Plik binarny darwin-arm64 zbudowany przez `scripts/build-binaries.ts`, bazowa kompilacja z `develop` (`73936df`) wobec tej, na laptopie arm64 z macOS i 10 rdzeniami. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 4 do 7: bardziej ufaj proporcjom niż milisekundom. Każdy przypadek uruchomiono 11 razy po jednej rozgrzewce, każdy raz na rundę w zmiennej kolejności, z `INWARDS_NO_CACHE=1`; JSON z każdego uruchomienia musiał się zgadzać z bazową kompilacją. Prawdziwe repozytoria są sprawdzane z warstwami z korpusu (`bench/corpus.json`). Szczytowe RSS to `/usr/bin/time -l`, po trzy uruchomienia.
 
 | Repozytorium | Pliki | Baza | Jeden wątek | Cztery wątki (domyślnie) | Osiem wątków |
 |---|--:|--:|--:|--:|--:|
