@@ -3,7 +3,8 @@
  * `thin-endpoint` (through `thin-endpoint.ts`) and INW013 `async-blocking`.
  * Each decides whether a file needs it at all and parses the file itself,
  * and only one whose text may hold a finding; their findings join the file's
- * others before the suppression comments apply. No I/O: the caller supplies
+ * others before the suppression comments apply. Both may read another
+ * first-party module through the project index. No I/O: the caller supplies
  * the file and the project index.
  */
 import type { Parser } from "web-tree-sitter";
@@ -23,18 +24,20 @@ import { thinEndpointFindings } from "./thin-endpoint.ts";
  * @param parser - parser with the Python grammar loaded.
  * @param src - the source file, with normalised text.
  * @param config - the project's config, for its rules table.
+ * @param project - the project's module index, for the sync helpers a hop leads to.
  * @returns the findings, before suppressions.
  */
 function asyncBlockingFindings(
   parser: Parser,
   src: SourceFile,
   config: InwardsConfig,
+  project: ProjectIndex,
 ): Diagnostic[] {
   const { rules } = config;
   if (ruleLevel("INW013", rules, src.module) === "off" || checkEncoding(src)) {
     return [];
   }
-  return checkAsyncBlocking(parser, src, rules?.options?.["async-blocking"]);
+  return checkAsyncBlocking(parser, src, rules?.options?.["async-blocking"], project);
 }
 
 /**
@@ -43,7 +46,7 @@ function asyncBlockingFindings(
  * @param parser - parser with the Python grammar loaded.
  * @param src - the source file, with normalised text.
  * @param config - the project's config: its rules table and layers.
- * @param project - the project's module index, for INW012's handlers registered from another module.
+ * @param project - the project's module index, for INW012's handlers registered from another module and INW013's helpers one hop away.
  * @returns the findings, before suppressions.
  */
 export function contentFindings(
@@ -54,6 +57,6 @@ export function contentFindings(
 ): Diagnostic[] {
   return [
     ...thinEndpointFindings(parser, src, config, project),
-    ...asyncBlockingFindings(parser, src, config),
+    ...asyncBlockingFindings(parser, src, config, project),
   ];
 }

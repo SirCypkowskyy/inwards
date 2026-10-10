@@ -131,16 +131,18 @@ function depth(value: unknown, where: string): number {
 /**
  * Parses a non-empty list of module prefixes or selectors, checked like
  * `layers[].modules`: `modules` in every table, and FAPI003's `allow-unmounted`.
+ * INW013's `follow-modules` may be empty.
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
+ * @param empty - true when `[]` is allowed.
  * @returns the entries as written.
- * @throws {ConfigError} naming the first bad entry, or when the list is empty or not a list of strings.
+ * @throws {ConfigError} naming the first bad entry, or when the list is empty (unless allowed) or not a list of strings.
  */
-function moduleEntries(value: unknown, where: string): string[] {
-  if (!(isStringList(value) && value.length > 0)) {
+function moduleEntries(value: unknown, where: string, empty = false): string[] {
+  if (!(isStringList(value) && (empty || value.length > 0))) {
     throw new ConfigError(
-      `${where} must be a non-empty list of module prefixes or selectors, such as ["shop.domain", "shop.*.api"].`,
+      `${where} must be a ${empty ? "" : "non-empty "}list of module prefixes or selectors, such as ["shop.domain", "shop.*.api"].`,
     );
   }
   for (const entry of value) {
@@ -340,6 +342,8 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
   "async-blocking": {
     "extend-blocking-calls": namePatterns,
     "extend-blocking-types": namePatterns,
+    "follow-modules": (value: unknown, where: string): string[] =>
+      moduleEntries(value, where, true),
   },
   "router-wiring": {
     entrypoints,

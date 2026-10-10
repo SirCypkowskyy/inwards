@@ -198,6 +198,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | threadpool, worker thread | pula wątków, wątek roboczy |
 | async client, sync client | klient asynchroniczny, klient synchroniczny |
 | re-export (`from .views import f` in `__init__.py`) | reeksport |
+| one hop (INW013, following a call into a sync helper) | jeden krok (w głąb funkcji pomocniczej) |
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
