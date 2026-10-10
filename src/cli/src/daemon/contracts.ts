@@ -2,8 +2,8 @@
  * @file What the daemon feature needs from outside the process: a local socket
  * (or a named pipe) to listen on and to ask through, the daemon's record and
  * lock files, the running executable's identity, and a way to start
- * `inwards daemon` in the background. `adapters/daemon.ts` implements both
- * contracts; `main.ts` wires them in. Types only.
+ * `inwards daemon` in the background. `adapters/daemon-link.ts` and
+ * `adapters/daemon-host.ts` implement them; `main.ts` wires them in. Types only.
  */
 import type { DaemonPlace } from "./protocol.ts";
 
@@ -72,6 +72,37 @@ export type ServeResult =
   /** It couldn't listen: no private directory for the socket, or the listen failed. */
   | { kind: "failed"; why: string };
 
+/** What a daemon's lock file names. */
+export interface LockHolder {
+  /** The pid that took the lock; the OS may have given it to another process since. */
+  pid: number;
+  /** The random token the daemon took it with, which its status answer repeats; empty in a lock without one. */
+  token: string;
+}
+
+/** How `DaemonHost.serve` behaves. */
+export interface ServeOptions {
+  /** How long to wait for a request before exiting. */
+  idleMs: number;
+  /**
+   * Builds the record's text once the endpoint is known.
+   *
+   * @param endpoint - the socket path or named pipe it listens on.
+   * @param token - the token in the lock it holds, for its status answer.
+   * @returns the record's text.
+   */
+  record: (endpoint: string, token: string) => string;
+  /**
+   * Asks the project's daemon whether it holds a lock that a live process
+   * still names, so a pid the OS gave to another process doesn't keep a dead
+   * daemon's lock (#276).
+   *
+   * @param holder - the pid and token in the lock.
+   * @returns true only when a daemon answers with that pid and token.
+   */
+  holds: (holder: LockHolder) => Promise<boolean>;
+}
+
 /** What the daemon does with each request line. */
 export interface LineHandler {
   /**
@@ -88,8 +119,9 @@ export interface LineHandler {
 /** The daemon's side: holding the project's lock, listening and publishing the record. */
 export interface DaemonHost {
   /**
-   * Serves a project until stopped. Takes the lock (exclusively; a lock whose
-   * process is gone is removed and taken again, once), listens on a fresh
+   * Serves a project until stopped. Takes the lock (exclusively, with a fresh
+   * random token; a lock whose holder is gone, or whose live pid doesn't
+   * prove it holds it, is removed and taken again, once), listens on a fresh
    * endpoint, publishes the record, then hands each request line to the
    * handler, one at a time in arrival order. It stops when the handler says
    * so, after `idleMs` without a request, or on SIGINT or SIGTERM, and then
@@ -97,14 +129,8 @@ export interface DaemonHost {
    *
    * @param place - the project, the key and the record and lock paths.
    * @param handler - answers request lines.
-   * @param options - how to behave.
-   * @param options.idleMs - how long to wait for a request before exiting.
-   * @param options.record - builds the record's text once the endpoint is known.
+   * @param options - the idle limit, the record and the lock check.
    * @returns how serving ended.
    */
-  serve: (
-    place: DaemonPlace,
-    handler: LineHandler,
-    options: { idleMs: number; record: (endpoint: string) => string },
-  ) => Promise<ServeResult>;
+  serve: (place: DaemonPlace, handler: LineHandler, options: ServeOptions) => Promise<ServeResult>;
 }

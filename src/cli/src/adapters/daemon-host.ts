@@ -12,7 +12,9 @@
  * endpoint is a named pipe. Names end in 8 random hex digits, so two daemons
  * never contend for one path, and on Windows, where pipe names are shared by
  * every user, nobody can take the name first. The record and the lock are
- * owner-only files under the user's state directory.
+ * owner-only files under the user's state directory; the lock holds the pid
+ * and a random token, which the daemon's status answer repeats, so a pid
+ * the OS reused can't keep a dead daemon's lock (#276).
  */
 import { randomBytes } from "node:crypto";
 import { lstatSync, mkdirSync, rmSync } from "node:fs";
@@ -20,7 +22,7 @@ import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import process from "node:process";
-import type { DaemonHost, LineHandler, ServeResult } from "../daemon/contracts.ts";
+import type { DaemonHost, LineHandler, ServeOptions, ServeResult } from "../daemon/contracts.ts";
 import type { DaemonPlace } from "../daemon/protocol.ts";
 import { publishRecord, releaseLock, removeIfOwn, takeLock } from "./daemon-files.ts";
 import { isEmitter } from "./daemon-link.ts";
@@ -34,6 +36,8 @@ const PERMISSIONS = 0o777;
 const MAX_SOCKET_PATH = 103;
 /** Random bytes in an endpoint's name: 8 hex digits. */
 const RANDOM_BYTES = 4;
+/** Random bytes in the lock's token: 32 hex digits. */
+const TOKEN_BYTES = 16;
 
 /**
  * Builds the daemon's side on the real process.
@@ -49,27 +53,26 @@ export function nodeDaemonHost(): DaemonHost {
  *
  * @param place - the project, the key and the record and lock paths.
  * @param handler - answers request lines.
- * @param options - the idle limit and how to write the record.
- * @param options.idleMs - how long to wait for a request before exiting.
- * @param options.record - builds the record's text once the endpoint is known.
+ * @param options - the idle limit, how to write the record and how to check a lock's holder.
  * @returns how serving ended.
  */
 async function serve(
   place: DaemonPlace,
   handler: LineHandler,
-  options: { idleMs: number; record: (endpoint: string) => string },
+  options: ServeOptions,
 ): Promise<ServeResult> {
   mkdirSync(dirname(place.record), { recursive: true, mode: PRIVATE_DIR });
   // Every request brings its own working directory. Leaving the project's
   // keeps it free: Windows can't delete or rename a process's current directory.
   process.chdir(dirname(place.record));
-  const holder = takeLock(place.lock);
+  const token = randomBytes(TOKEN_BYTES).toString("hex");
+  const holder = await takeLock(place.lock, token, options.holds);
   if (holder !== undefined) {
     return { kind: "running", pid: holder };
   }
   const endpoint = pickEndpoint(place.key);
   if (endpoint === undefined) {
-    releaseLock(place.lock);
+    releaseLock(place.lock, token);
     return { kind: "failed", why: "no private directory for the socket" };
   }
   const loop = new RequestLoop(handler, options.idleMs);
@@ -77,16 +80,16 @@ async function serve(
   try {
     await listen(server, endpoint);
   } catch (err) {
-    releaseLock(place.lock);
+    releaseLock(place.lock, token);
     return { kind: "failed", why: err instanceof Error ? err.message : String(err) };
   }
-  publishRecord(place.record, options.record(endpoint));
+  publishRecord(place.record, options.record(endpoint, token));
   await loop.run(server);
   if (process.platform !== "win32") {
     rmSync(endpoint, { force: true });
   }
   removeIfOwn(place.record);
-  releaseLock(place.lock);
+  releaseLock(place.lock, token);
   return { kind: "served" };
 }
 

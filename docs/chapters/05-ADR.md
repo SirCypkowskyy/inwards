@@ -1136,6 +1136,8 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - **The daemon refuses anything but a PostToolUse payload** for `hook claude-code`, so a process that connects to it can't get a Stop gate verdict from it either.
 - **`inwards daemon --idle SECONDS`** sets the idle limit, 600 by default; the tests use short ones.
 
+**Amendment · 2026-10-10 · [#276](https://github.com/SirCypkowskyy/inwards/issues/276).** A pid alone doesn't say who holds the lock: a daemon killed without cleaning up (SIGKILL, a crash, a reboot) leaves its lock behind, and once the OS gives that pid to another process, every later daemon stepped aside and every PostToolUse ran one-shot. The lock now holds the pid and 32 random hex digits, and `inwards daemon status`'s answer repeats them. A daemon that finds a lock takes it over when the pid is gone or is its own, and, once the lock is older than 10 seconds, when the daemon at the record's endpoint doesn't answer with that pid and token. A younger lock counts as held, because its daemon may still be starting to listen. The check uses only the socket and the file's age, so it works the same on Linux, macOS and Windows, and the Stop gate still doesn't depend on any of it.
+
 ## ADR-040: Worker threads parse a large full check; the main thread keeps every decision
 
 **Status:** Accepted · 2026-10-10 · [#61](https://github.com/SirCypkowskyy/inwards/issues/61)
