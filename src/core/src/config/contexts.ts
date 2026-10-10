@@ -18,7 +18,11 @@ export interface ContextSpec {
   name: string;
   /** Literal module prefixes the context owns, with their descendants. */
   modules: string[];
-  /** Prefixes of its own modules that contexts depending on it may import. */
+  /**
+   * Prefixes of its own modules that contexts depending on it may import. An
+   * entry written `=pkg.name` is exact: it opens that module alone, not what
+   * lies under it (a package facade without its `_private` submodules).
+   */
   public: string[];
   /** Contexts this one may import from directly: not transitive, not reverse. */
   dependsOn: string[];
@@ -65,6 +69,35 @@ export function parseContexts(value: unknown): { contexts?: ContextSpec[] } {
     checkDependsOn(contexts, context, i);
   });
   return contexts.length === 0 ? {} : { contexts };
+}
+
+/** Marks a `public` entry that opens one module and nothing under it. */
+const EXACT_MARK = "=";
+
+/**
+ * Tells the module a `public` entry names, without the exact mark.
+ *
+ * @param entry - a `public` entry, such as `shop.billing` or `=shop.billing`.
+ * @returns the dotted module name.
+ */
+export function publicModule(entry: string): string {
+  return entry.startsWith(EXACT_MARK) ? entry.slice(EXACT_MARK.length) : entry;
+}
+
+/**
+ * Tells whether a context's `public` list opens a module: it lies at or under
+ * a prefix entry, or is the very module of an exact (`=`) entry.
+ *
+ * @param context - the context that owns the module.
+ * @param module - a dotted module name.
+ * @returns true when other contexts may import the module.
+ */
+export function isPublicModule(context: ContextSpec, module: string): boolean {
+  return context.public.some((entry) =>
+    entry.startsWith(EXACT_MARK)
+      ? module === publicModule(entry)
+      : module === entry || module.startsWith(`${entry}.`),
+  );
 }
 
 /**
@@ -117,7 +150,7 @@ function parseContext(entry: Record<string, unknown>, i: number): ContextSpec {
   return {
     name,
     modules,
-    public: moduleList(entry["public"], `${where}.public`) ?? [],
+    public: moduleList(entry["public"], `${where}.public`, true) ?? [],
     dependsOn: nameList(entry["depends-on"], `${where}.depends-on`) ?? [],
   };
 }
@@ -127,10 +160,11 @@ function parseContext(entry: Record<string, unknown>, i: number): ContextSpec {
  *
  * @param value - the raw list, if any.
  * @param where - the key's dotted path.
+ * @param exact - true to accept `=name` entries too (`public` only).
  * @returns the prefixes, or undefined when the key is absent.
  * @throws {ConfigError} naming the first entry that isn't a dotted module name.
  */
-function moduleList(value: unknown, where: string): string[] | undefined {
+function moduleList(value: unknown, where: string, exact = false): string[] | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -138,7 +172,7 @@ function moduleList(value: unknown, where: string): string[] | undefined {
     throw new ConfigError(`${where} must be a list of module names.`);
   }
   value.forEach((entry: unknown, k) => {
-    if (!isDottedName(entry)) {
+    if (!isModuleEntry(entry, exact)) {
       const glob = typeof entry === "string" && entry.includes("*");
       throw new ConfigError(
         glob
@@ -147,7 +181,18 @@ function moduleList(value: unknown, where: string): string[] | undefined {
       );
     }
   });
-  return value.filter(isDottedName);
+  return value.flatMap((entry: unknown) => (isModuleEntry(entry, exact) ? [entry] : []));
+}
+
+/**
+ * Tells whether one raw entry is a valid module name for a list.
+ *
+ * @param entry - the raw entry.
+ * @param exact - true when a leading `=` is allowed (`public`).
+ * @returns true for a dotted name, with the `=` mark in front when allowed.
+ */
+function isModuleEntry(entry: unknown, exact: boolean): entry is string {
+  return typeof entry === "string" && isDottedName(exact ? publicModule(entry) : entry);
 }
 
 /**
@@ -229,7 +274,7 @@ function rejectSharedPrefixes(contexts: readonly ContextSpec[]): void {
  */
 function checkPublic(contexts: readonly ContextSpec[], context: ContextSpec, i: number): void {
   context.public.forEach((prefix, k) => {
-    const owner = contextOf(prefix, contexts);
+    const owner = contextOf(publicModule(prefix), contexts);
     if (owner !== context) {
       const actual = owner === undefined ? "no context owns it" : `context "${owner.name}" owns it`;
       throw new ConfigError(

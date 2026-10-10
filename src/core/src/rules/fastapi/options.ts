@@ -3,6 +3,7 @@
  * when a key is absent. `config/rule-options.ts` has already checked each
  * value, so these only narrow the type; they never report a bad value.
  */
+import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 
 /**
@@ -31,8 +32,7 @@ export function list(
   key: string,
   fallback: readonly string[],
 ): readonly string[] {
-  const value = raw?.[key];
-  return typeof value === "object" ? value : fallback;
+  return stringList(raw?.[key]) ?? fallback;
 }
 
 /**
@@ -46,6 +46,5 @@ export function optionalList(
   raw: RuleOptions | undefined,
   key: string,
 ): readonly string[] | undefined {
-  const value = raw?.[key];
-  return typeof value === "object" ? value : undefined;
+  return stringList(raw?.[key]);
 }

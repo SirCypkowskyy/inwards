@@ -59,23 +59,12 @@ allowed_importers = shop.repository
 [tool.inwards]
 layers = [
   { name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["pydantic"] },
-  { name = "orders | billing", modules = ["shop.orders", "shop.billing"] },
+  [
+    { name = "orders", modules = ["shop.orders"] },
+    { name = "billing", modules = ["shop.billing"] },
+  ],
   { name = "web", modules = ["shop.web"] },
 ]
-# The contexts only stand for forbidden imports; import-linter checked no cycles.
-cycles = []
-
-[[tool.inwards.contexts]]
-name = "shop.billing"
-modules = ["shop.billing"]
-public = ["shop.billing"]
-depends-on = []
-
-[[tool.inwards.contexts]]
-name = "shop.orders"
-modules = ["shop.orders"]
-public = ["shop.orders"]
-depends-on = []
 ```
 
 and reports:
@@ -97,14 +86,14 @@ Inwards also runs rules import-linter doesn't have (INW006 for code outside ever
 |---|---|---|
 | `layers`, listed high to low | `layers`, listed innermost first: the order is reversed | INW001 |
 | a layer line `a : b` (siblings that may import each other) | one layer holding both modules | INW001 |
-| a layer line `a | b` (independent siblings) | one layer holding both, plus one context per sibling whose `depends-on` leaves the others out | INW001, INW002 |
+| a layer line `a | b` (independent siblings) | [sibling layers](configuration.md#sibling-layers): a nested array in `layers`, one layer per module, in the line's place | INW001 |
 | `containers` | every layer repeated under each container, in the same Inwards layer | INW001 |
 | `(optional)` layers | a plain layer; reported, because a prefix that matches no module gets an INW006 warning | INW006 |
 | `exhaustive = true` | reported: a module outside every layer gets the INW006 warning, not an error | INW006 |
 | `exhaustive_ignores` | `ignore`, one entry per container | INW006 |
 | `independence` | one context per module, none depending on another | INW002 |
 | `forbidden`, first-party `forbidden_modules` | one context per source and forbidden module; each source's `depends-on` leaves out what it may not import | INW002 |
-| `forbidden`, external `forbidden_modules` | `extend-deny-libraries` on the layers that hold exactly the source modules | INW005 |
+| `forbidden`, external `forbidden_modules` | `extend-deny-libraries` on the layers that hold exactly the source modules; otherwise a `deny` entry in `[tool.inwards.rules.pure-domain]` for the source modules | INW005 |
 | `root_package`, `root_packages` | with no layers contract, one layer holding the root packages; they also decide which forbidden modules are external | |
 
 A forbidden pair covers everything below its two ends, as import-linter's packages do: when `shop.a` may not import `shop.c`, a context declared inside `shop.a` may not import `shop.c` either. Each generated context is public in full (`public` is its own module), so [INW003](../rules/INW003.md) reports nothing extra, and `cycles = []` keeps [INW004](../rules/INW004.md) from reporting cycles between the new contexts, which import-linter didn't check.
@@ -120,7 +109,6 @@ Each of these is reported with its contract, never dropped silently:
 - **`as_packages = false`.** An Inwards module name always covers everything below it.
 - **`protected` contracts.** Inwards limits what a context exposes to others (`public`, [INW003](../rules/INW003.md)), not which modules may import it.
 - **`acyclic_siblings` contracts.** [INW004](../rules/INW004.md) reports cycles between modules or between contexts, not between sibling packages; set `cycles = ["modules", "contexts"]` by hand if that is close enough.
-- **An external forbidden module whose source modules aren't whole layers.** INW005 attaches library lists to layers. When `source_modules` is not exactly the modules of one or more layers, the library part is reported, and the first-party part still converts.
 - **Custom contract types**, and a layer line that mixes `|` and `:` (import-linter rejects it too).
 - **`broken_contract_guidance`.** Inwards writes its own fix steps for each violation.
 

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: 4e7164239d88d91ccd562381f48c95a9439f9e2540a3cb4735cc8588d0c1ce22
+source_hash: bef12979f716d1dc9dca92cea89631676ef26577f4c6943c7b452ef7cc594102
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -111,6 +111,9 @@ GrammarBinaries
 Zmyślony moduł (hallucinated module)
 :   Import własnego modułu, który nie istnieje, taki jak `shop.domain.pricing`, gdy nie ma żadnego `pricing`. Agenci tworzą takie importy, bo nazwa wygląda wiarygodnie. INW010 wyłapuje je na podstawie indeksu modułów, zanim uruchomi się jakikolwiek test.
 
+Daemon hooków (hook daemon)
+:   `inwards daemon`, planowany ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)): proces dla każdego użytkownika i projektu, który trzyma silnik w gotowości dla hooka PostToolUse i odpowiada mu przez lokalne gniazdo (na Windows przez nazwany potok). Hook uruchamia go na żądanie i działa jednorazowo zawsze, gdy nie może się z nim połączyć; daemon kończy pracę po 10 minutach bezczynności. Pozostałe hooki nigdy z niego nie korzystają, a serwer języka to osobny proces. Zobacz [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+
 Szkielet importów (import skeleton)
 :   Kopia pliku, w której każda linia niebędąca importem jest pusta, a linie importów mają usunięte wcięcie. Numery linii są zachowane, a parsuje się ją dużo szybciej niż cały plik.
 
@@ -144,7 +147,7 @@ Model C4 (C4 model)
 :   Cztery poziomy diagramów architektury według Simona Browna: kontekst, kontenery, komponenty, kod. Ta dokumentacja używa pierwszych trzech.
 
 LSP
-:   Language Server Protocol. Przez niego rozszerzenie VS Code dostaje diagnostyki z serwera języka Inwards.
+:   Language Server Protocol. Przez niego rozszerzenie VS Code dostaje diagnostyki z serwera języka Inwards. `inwards server` będzie go obsługiwać przez stdio z pliku binarnego, dla każdego edytora ([#63](https://github.com/SirCypkowskyy/inwards/issues/63)).
 
 MCP
 :   Model Context Protocol. Pozwala agentowi AI wywoływać zewnętrzne narzędzia. `inwards mcp` jest planowane ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)).

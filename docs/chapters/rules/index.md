@@ -2,6 +2,12 @@
 
 Every diagnostic Inwards prints links to its rule's page here: the `docs:` line of the text output, the `docs` field of the JSON output, `helpUri` in SARIF and the code link in the editor. Each page says what the rule flags, why it matters when an AI agent writes the code, a flagged and a fixed example, how to fix a finding, how to configure the rule, and what it doesn't catch yet.
 
+Search the rules, filter them by category, status or autofix, sort them by code, name or status, and page through them. The address bar keeps the view, so a link opens the same list. A category includes its sub-categories: `imports` also lists the rules filed under `imports › layers`.
+
+<div class="inw-rules" data-inwards-rules="rules.json"></div>
+
+<div class="inw-rules-fallback" markdown>
+
 | Code | Name | What it flags | Default | Inline suppression |
 |---|---|---|---|---|
 | [INW000](INW000.md) | `unsupported-encoding` | A declared source encoding under which a comment can be a real import | error | no |
@@ -17,26 +23,32 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | error | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | error | yes |
 
+</div>
+
 ## FastAPI rules { #fastapi }
 
 The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do.
+
+<div class="inw-rules-fallback" markdown>
 
 | Code | Name | What it flags | Default | Inline suppression |
 |---|---|---|---|---|
 | [FAPI001](FAPI001.md) | `endpoint-metadata` | A path operation without the OpenAPI metadata the project requires (summary, response model, status code) | opt-in, error | yes |
 | [FAPI002](FAPI002.md) | `undocumented-error-response` | A path operation that can produce an error status code (raised directly, in a helper or dependency, or through an app's exception handler) its `responses=` doesn't declare | opt-in, error | yes |
 | [FAPI003](FAPI003.md) | `router-wiring` | An `APIRouter` with routes that no app includes, routers that include each other in a cycle, or an `include_router` above the included router's routes | opt-in, error | yes |
+| [FAPI005](FAPI005.md) | `route-shadowing` | A path operation that an earlier one with the same method already answers: `/users/{id}` above `/users/me`, or the same method and path twice | opt-in, error | yes |
+| [FAPI006](FAPI006.md) | `lifespan-events` | A deprecated `on_event` handler or `on_startup=` (a warning), and one next to a `lifespan=` that makes FastAPI ignore it (an error) | opt-in, error | yes |
+| [FAPI007](FAPI007.md) | `yield-dependency-swallows` | A dependency with `yield` whose `except` clause around it doesn't re-raise, so the endpoint's error is hidden | opt-in, error | yes |
+| [FAPI008](FAPI008.md) | `duplicate-operation-id` | Two path operations of one app with the same literal `operation_id` | opt-in, error | yes |
+| [FAPI009](FAPI009.md) | `depends-called` | `Depends(get_db())`: the dependency is called at import time instead of being passed | opt-in, error | yes |
 
-Codes reserved for later FastAPI rules, not registered yet (an unknown code is still a config error):
+</div>
+
+One code is reserved and not registered (an unknown code is still a config error):
 
 | Code | Name | Issue | Status |
 |---|---|---|---|
 | FAPI004 | `unhandled-exception` | [#185](https://github.com/SirCypkowskyy/inwards/issues/185) | unused: the spike's corpus run said no-go (3% precision for declared exception classes, 4 true findings in 25 apps for raised ones) |
-| FAPI005 | `route-shadowing` | [#224](https://github.com/SirCypkowskyy/inwards/issues/224) | planned |
-| FAPI006 | `lifespan-events` | [#225](https://github.com/SirCypkowskyy/inwards/issues/225) | planned |
-| FAPI007 | `yield-dependency-swallows` | [#226](https://github.com/SirCypkowskyy/inwards/issues/226) | planned |
-| FAPI008 | `duplicate-operation-id` | [#227](https://github.com/SirCypkowskyy/inwards/issues/227) | planned |
-| FAPI009 | `depends-called` | [#228](https://github.com/SirCypkowskyy/inwards/issues/228) | planned |
 
 The [rule catalogue](../03-Architecture-C4.md#rule-catalogue) in chapter 3 lists every rule with the rest of the design.
 
@@ -81,4 +93,4 @@ Rules that point at a line of Python can be suppressed this way: INW001, INW002,
 
 ## Page format
 
-Each rule page starts with front matter in the [OKF](https://okf.md/spec/) format: `type: rule`, `title`, `description`, `resource` (the rule's source file), `tags` (the category, parent first), `timestamp` (when the rule shipped), `status`, and the Inwards fields `code`, `name`, `severity`, `suppressible`, `autofix` and `related_issues`. A test checks that every registered rule has a page and every page names a registered rule. The flagged and fixed examples run as tests too, against the output shown on the page.
+Each rule page starts with front matter in the [OKF](https://okf.md/spec/) format: `type: rule`, `title`, `description`, `resource` (the rule's source file), `tags` (the category, parent first), `timestamp` (when the rule shipped), `status`, and the Inwards fields `code`, `name`, `severity`, `suppressible`, `autofix` and `related_issues`. Every page also has the sections What it does, Why is this bad, Example (a flagged and a fixed code block) and Fix safety, and a row in a table on this page. `uv run scripts/check-rule-pages.py` checks all of that in both languages, in CI too, and writes the `rules.json` the list above reads; after changing a rule page or a row here, run it with `--write`. A test checks that every registered rule has a page and every page names a registered rule. The flagged and fixed examples run as tests too, against the output shown on the page.

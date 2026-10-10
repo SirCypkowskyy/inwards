@@ -5,13 +5,26 @@
  * takes `modules` only. The config parser, its error messages and the schema
  * test all read these specs, so a new option is one line here (plus its
  * schema entry and docs). Values are kept as the TOML gave them, by key; each
- * rule reads its own with typed defaults. This module only validates.
+ * rule reads its own with typed defaults. This module only validates, apart
+ * from `stringList` and `libraryDenies`, which read a list back with its type.
  */
 import { isSelector, selectorProblem } from "./layer-selector.ts";
-import { ConfigError, isDottedName } from "./toml.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+
+/**
+ * One entry of `[tool.inwards.rules.pure-domain].deny` (INW005, #219): the
+ * modules its entries match may not import its libraries, whichever layer
+ * owns them, or none.
+ */
+export interface LibraryDeny {
+  /** Module prefixes or selectors, in the grammar of `layers[].modules`. */
+  readonly modules: readonly string[];
+  /** Import names such as `django` or `http.client`; each covers its submodules. */
+  readonly libraries: readonly string[];
+}
 
 /** A validated option value, as the TOML gave it. */
-export type OptionValue = string | number | boolean | readonly string[];
+export type OptionValue = string | number | boolean | readonly string[] | readonly LibraryDeny[];
 
 /**
  * Checks one raw value and returns it as stored.
@@ -159,11 +172,46 @@ function entrypoints(value: unknown, where: string): string[] {
   return value;
 }
 
+/** The keys of one entry of INW005's `deny`. */
+const DENY_KEYS: ReadonlySet<string> = new Set(["modules", "libraries"]);
+
+/**
+ * Parses INW005's `deny`: a list of tables, each with a non-empty `modules`
+ * (as in every options table) and a non-empty `libraries` (import names, as
+ * in a layer's `deny-libraries`).
+ *
+ * @param value - the raw list.
+ * @param where - the key's dotted path.
+ * @returns the entries, in the order written.
+ * @throws {ConfigError} naming the entry and key that is missing, unknown or malformed.
+ */
+function denyEntries(value: unknown, where: string): LibraryDeny[] {
+  const example = '{ modules = ["shop.billing"], libraries = ["django"] }';
+  if (!Array.isArray(value)) {
+    throw new ConfigError(`${where} must be a list of tables such as ${example}.`);
+  }
+  return value.map((entry: unknown, i): LibraryDeny => {
+    const at = `${where}[${i}]`;
+    if (!isRecord(entry) || Array.isArray(entry)) {
+      throw new ConfigError(`${at} must be a table such as ${example}.`);
+    }
+    rejectUnknownKeys(entry, DENY_KEYS, at);
+    const libraries = entry["libraries"];
+    if (!(Array.isArray(libraries) && libraries.length > 0 && libraries.every(isDottedName))) {
+      throw new ConfigError(
+        `${at}.libraries must be a non-empty list of import names such as "django" or "http.client": no globs, and no distribution names like "python-dateutil".`,
+      );
+    }
+    return { modules: moduleEntries(entry["modules"], `${at}.modules`), libraries };
+  });
+}
+
 /** The keys every rule's table may hold. */
 const SHARED: Readonly<Record<string, OptionParser>> = { modules: moduleEntries };
 
 /** Each rule's own options, by rule name, then by key. */
 const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser>>>> = {
+  "pure-domain": { deny: denyEntries },
   "endpoint-metadata": {
     "require-summary": oneOf(["summary-or-docstring", "summary", false]),
     "require-response-model": boolean,
@@ -220,4 +268,44 @@ export function parseOptions(
     }
   }
   return options;
+}
+
+/**
+ * Reads INW005's `deny` back from a parsed options table.
+ *
+ * @param options - `[tool.inwards.rules.pure-domain]` as parsed, if set.
+ * @returns the entries, none when the key is absent.
+ */
+export function libraryDenies(
+  options: Readonly<Record<string, OptionValue | undefined>> | undefined,
+): LibraryDeny[] {
+  const value = options?.["deny"];
+  const entries: LibraryDeny[] = [];
+  for (const entry of typeof value === "object" ? value : []) {
+    if (typeof entry === "object") {
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
+/**
+ * Reads a list-of-strings option back from a parsed options table: `modules`
+ * or a rule's own list. Only INW005's `deny` holds tables instead.
+ *
+ * @param value - the stored value, if any.
+ * @returns the strings, or undefined when the value is absent or not a list of strings.
+ */
+export function stringList(value: OptionValue | undefined): readonly string[] | undefined {
+  if (typeof value !== "object") {
+    return undefined;
+  }
+  const strings: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      return undefined;
+    }
+    strings.push(entry);
+  }
+  return strings;
 }

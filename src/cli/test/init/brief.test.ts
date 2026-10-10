@@ -116,7 +116,7 @@ layers = [
   { name = "infrastructure", modules = ["shop.**"] },
 ]
 `;
-    const root = project({ "pyproject.toml": text, "shop/*/domain/ports.py": "" });
+    const root = project({ "pyproject.toml": text, "shop/orders/domain/ports.py": "" });
     const brief = briefFor(nodePlatform(), join(root, "pyproject.toml"), text);
     expect(brief).toContain("1. domain (`shop.*.domain`): imports no other layer");
     expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
@@ -142,6 +142,15 @@ roles = ["models | schemas", "service"]
     expect(brief).toContain("3. d.service (`app.*.service`): may import d.models, d.schemas");
     expect(brief).toContain("4. main (`app.main`): may import every other layer");
     expect(brief).toContain("- d.schemas: no web frameworks");
+  });
+
+  test("lists INW005's prefix denies after the layers (#219)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules.pure-domain]
+deny = [{ modules = ["shop.domain.pricing", "shop.*.jobs"], libraries = ["numpy", "celery"] }]
+`);
+    expect(architectureBrief({ config, style: undefined, ports: [] })).toContain(
+      "- `shop.domain.pricing`, `shop.*.jobs`: not `numpy`, `celery`",
+    );
   });
 
   test("leaves out the rules that are turned off", () => {

@@ -137,6 +137,11 @@
       "type": "string",
       "pattern": "^[^.\\s*?\\[\\]/\\\\-]+(\\.[^.\\s*?\\[\\]/\\\\-]+)*$"
     },
+    "publicEntry": {
+      "description": "A public entry: a dotted module prefix such as shop.billing.api, or, with a leading =, that module alone without what lies under it, such as =shop.billing.",
+      "type": "string",
+      "pattern": "^=?[^.\\s*?\\[\\]/\\\\-]+(\\.[^.\\s*?\\[\\]/\\\\-]+)*$"
+    },
     "selector": {
       "description": "A package selector: a.b (exact), a.* (one level) or a.** (any depth).",
       "type": "string",
@@ -183,7 +188,12 @@
         "INW011",
         "FAPI001",
         "FAPI002",
-        "FAPI003"
+        "FAPI003",
+        "FAPI005",
+        "FAPI006",
+        "FAPI007",
+        "FAPI008",
+        "FAPI009"
       ]
     },
     "layer": {
@@ -413,7 +423,7 @@
           "$ref": "#/definitions/ruleOptions"
         },
         "pure-domain": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/pureDomainOptions"
         },
         "unassigned-module": {
           "$ref": "#/definitions/ruleOptions"
@@ -441,6 +451,21 @@
         },
         "router-wiring": {
           "$ref": "#/definitions/routerWiringOptions"
+        },
+        "route-shadowing": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "lifespan-events": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "yield-dependency-swallows": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "duplicate-operation-id": {
+          "$ref": "#/definitions/ruleOptions"
+        },
+        "depends-called": {
+          "$ref": "#/definitions/ruleOptions"
         }
       }
     },
@@ -457,6 +482,47 @@
           "minItems": 1,
           "items": {
             "$ref": "#/definitions/layerEntry"
+          }
+        }
+      }
+    },
+    "pureDomainOptions": {
+      "description": "INW005's options, [tool.inwards.rules.pure-domain]: modules, as for every rule, and deny.",
+      "markdownDescription": "INW005's options, [tool.inwards.rules.pure-domain]: modules, as for every rule, and deny.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "deny": {
+          "description": "Libraries denied to module prefixes that aren't whole layers, whether or not a layer owns them. The layer's allow-libraries doesn't undo them (INW005).",
+          "markdownDescription": "Libraries denied to module prefixes that aren't whole layers, whether or not a layer owns them. The layer's allow-libraries doesn't undo them (INW005).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["modules", "libraries"],
+            "properties": {
+              "modules": {
+                "description": "Module prefixes or selectors, as in layers[].modules, that may not import this entry's libraries.",
+                "markdownDescription": "Module prefixes or selectors, as in layers[].modules, that may not import this entry's libraries.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/layerEntry"
+                }
+              },
+              "libraries": {
+                "description": "Import names such as django or http.client; each covers its submodules, stdlib included.",
+                "markdownDescription": "Import names such as django or http.client; each covers its submodules, stdlib included.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/dottedName"
+                }
+              }
+            }
           }
         }
       }
@@ -524,11 +590,11 @@
           }
         },
         "public": {
-          "description": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context.",
-          "markdownDescription": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
+          "description": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context. Write =name to open that module alone, not what lies under it (a package facade).",
+          "markdownDescription": "Prefixes of this context's own modules that contexts depending on it may import. Absolute names, not relative to the context. Write =name to open that module alone, not what lies under it (a package facade).\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/dottedName"
+            "$ref": "#/definitions/publicEntry"
           },
           "default": []
         },

@@ -5,7 +5,7 @@
  * disk. The runtime is loaded once per process, because `Parser.init` sets up a
  * global WASM module.
  */
-import { Language, type Node, Parser, type Tree } from "web-tree-sitter";
+import { Language, type Node, Parser, type Tree, type TreeCursor } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../contracts/records.ts";
 import { packageOf, resolveRelative } from "./module-names.ts";
 
@@ -60,11 +60,76 @@ export async function createPythonParser(wasm: GrammarBinaries): Promise<Parser>
  * @throws {Error} when tree-sitter returns no tree.
  */
 export function parsePython(parser: Parser, text: string): Tree {
-  const tree = parser.parse(text);
+  const tree = parser.parse(flattenCommentRuns(text));
   if (!tree) {
     throw new Error("tree-sitter returned no tree");
   }
   return tree;
+}
+
+/** Consecutive comment-only lines from which `flattenCommentRuns` blanks them. */
+const COMMENT_RUN_MIN = 16;
+const COMMENT_ONLY_LINE = /^[ \t\f]*#/u;
+
+/**
+ * Blanks long runs of comment-only lines, so tree-sitter-python parses them in
+ * linear time.
+ *
+ * The grammar's scanner looks past every comment line to the end of the run
+ * of comments to settle the next indentation, then rewinds and does it again
+ * for the next line, so a run of N lines costs N times its length: 520 lines
+ * of 1,900 characters take about 4 s, and 20,000 short ones about 3 minutes
+ * (#168). Blank lines are scanned once, so a run of at least
+ * `COMMENT_RUN_MIN` comment-only lines is replaced by spaces of the same
+ * length. Rows and columns do not move, and a comment-only line never changes
+ * what Python reads. A line that mentions `inwards` stays, because the
+ * suppression comments are read from the tree (`commentsIn`), and so does
+ * every shorter run. Text inside a multi-line string that looks like such a
+ * run is blanked too, which no rule can see, since none reads such a string.
+ *
+ * @param text - normalised file text.
+ * @returns the text with long comment runs blanked, or `text` itself when it holds none.
+ */
+export function flattenCommentRuns(text: string): string {
+  if (!text.includes("#")) {
+    return text;
+  }
+  const lines = text.split("\n");
+  let runStart = 0;
+  let blanked = false;
+  for (let i = 0; i <= lines.length; i += 1) {
+    if (isPlainComment(lines[i])) {
+      continue;
+    }
+    if (i - runStart >= COMMENT_RUN_MIN) {
+      for (let j = runStart; j < i; j += 1) {
+        lines[j] = blankLine(lines[j] ?? "");
+      }
+      blanked = true;
+    }
+    runStart = i + 1;
+  }
+  return blanked ? lines.join("\n") : text;
+}
+
+/**
+ * Tells whether a row is a comment-only line that can be blanked.
+ *
+ * @param line - one row of source, or undefined past the end.
+ * @returns true for a line that starts with `#` and does not mention `inwards`.
+ */
+function isPlainComment(line: string | undefined): boolean {
+  return line !== undefined && COMMENT_ONLY_LINE.test(line) && !line.includes("inwards");
+}
+
+/**
+ * Replaces a row with spaces of the same length, keeping a CRLF's `\r`.
+ *
+ * @param line - one row of source.
+ * @returns the blank row.
+ */
+function blankLine(line: string): string {
+  return line.endsWith("\r") ? `${" ".repeat(line.length - 1)}\r` : " ".repeat(line.length);
 }
 
 const LEADING_BOM = /^\uFEFF/u;
@@ -83,7 +148,108 @@ export function normalizeSource(text: string): string {
   return text.replace(LEADING_BOM, "").replace(LONE_CR, "\n");
 }
 
-const IMPORT_STATEMENTS = ["import_statement", "import_from_statement"];
+const IMPORT_STATEMENTS: ReadonlySet<string> = new Set([
+  "import_statement",
+  "import_from_statement",
+]);
+
+/**
+ * The node types that can hold an import statement somewhere below them in
+ * a tree without syntax errors: `module` and `block` hold statements, and the
+ * rest are the compound statements and clauses that hold a `block`. Read off
+ * tree-sitter-python's `node-types.json`, and checked against it by
+ * `test/python/extraction-walk.test.ts`, so a grammar bump that adds a holder
+ * fails a test instead of losing imports.
+ */
+export const IMPORT_HOLDERS: ReadonlySet<string> = new Set([
+  "block",
+  "case_clause",
+  "class_definition",
+  "decorated_definition",
+  "elif_clause",
+  "else_clause",
+  "except_clause",
+  "finally_clause",
+  "for_statement",
+  "function_definition",
+  "if_statement",
+  "match_statement",
+  "module",
+  "try_statement",
+  "while_statement",
+  "with_statement",
+]);
+
+/**
+ * Lists the import statements of a parsed file, in source order, with a
+ * tree-cursor walk that skips every subtree that can't hold one.
+ *
+ * `descendantsOfType` visits every node of the tree, and the walk over
+ * expressions, arguments and strings is most of its cost. In a subtree
+ * without syntax errors the grammar decides where an import can sit (only in
+ * a `module` or a `block`, reached through `IMPORT_HOLDERS`), so the walk
+ * enters only those. Error recovery can put an import anywhere, so the walk
+ * also enters every node that holds an error (`hasError`, which counts
+ * `ERROR` and missing nodes) and checks the children of such a node one by
+ * one; the children of an error-free node are error-free and need no check.
+ * The result is the same list, in the same pre-order, as
+ * `descendantsOfType(["import_statement", "import_from_statement"])` (#62).
+ *
+ * @param tree - the parsed file.
+ * @returns the `import_statement` and `import_from_statement` nodes, outermost first.
+ */
+export function importStatements(tree: Tree): Node[] {
+  const found: Node[] = [];
+  const cursor = tree.walk();
+  // errors[d]: the node at depth d on the current path holds a syntax error.
+  const errors: boolean[] = [];
+  let depth = 0;
+  try {
+    for (;;) {
+      const enter = visitForImports(cursor, depth === 0 || errors[depth - 1] === true, found);
+      if (enter !== null && cursor.gotoFirstChild()) {
+        errors[depth] = enter;
+        depth += 1;
+        continue;
+      }
+      while (!cursor.gotoNextSibling()) {
+        if (!cursor.gotoParent()) {
+          return found;
+        }
+        depth -= 1;
+      }
+    }
+  } finally {
+    cursor.delete(); // WASM memory is not garbage collected
+  }
+}
+
+/**
+ * Looks at the cursor's node for `importStatements`: keeps it when it is an
+ * import, and decides whether the walk goes into it.
+ *
+ * @param cursor - the walk, on the node to look at.
+ * @param parentHasError - whether the node's parent holds a syntax error; only
+ *   then can the node hold one, so only then is it checked.
+ * @param found - the imports so far, appended to in place.
+ * @returns whether the node holds a syntax error when the walk should enter
+ *   it, or null when no import can sit below it.
+ */
+function visitForImports(
+  cursor: TreeCursor,
+  parentHasError: boolean,
+  found: Node[],
+): boolean | null {
+  const type = cursor.nodeType;
+  const isImport = IMPORT_STATEMENTS.has(type);
+  const holder = !isImport && IMPORT_HOLDERS.has(type);
+  const node = isImport || parentHasError ? cursor.currentNode : null;
+  if (isImport && node) {
+    found.push(node);
+  }
+  const hasError = parentHasError && node?.hasError === true;
+  return hasError || holder ? hasError : null;
+}
 
 /**
  * Lists every import in a parsed file.
@@ -97,7 +263,7 @@ const IMPORT_STATEMENTS = ["import_statement", "import_from_statement"];
  */
 export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
   const refs: ImportRef[] = [];
-  for (const stmt of tree.rootNode.descendantsOfType(IMPORT_STATEMENTS)) {
+  for (const stmt of importStatements(tree)) {
     refs.push(...(stmt.type === "import_statement" ? plainImports(stmt) : fromImports(stmt, file)));
   }
   return refs;
@@ -117,7 +283,7 @@ export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
  */
 export function importedNames(tree: Tree, file: SourceFile): Map<string, string> {
   const names = new Map<string, string>();
-  for (const stmt of tree.rootNode.descendantsOfType(IMPORT_STATEMENTS)) {
+  for (const stmt of importStatements(tree)) {
     const from = stmt.childForFieldName("module_name");
     const base = from ? resolveModule(from, file) : undefined;
     if (base === null) {

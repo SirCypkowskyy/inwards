@@ -20,6 +20,8 @@ An unknown key, a wrong type or a bad value is a config error: `inwards check` e
 
 A JSON Schema for `[tool.inwards]` is published at <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. That URL follows the `develop` branch, like these docs. To pin the schema to the release you run, use the `inwards-tool-schema.json` file attached to each [GitHub release](https://github.com/SirCypkowskyy/inwards/releases).
 
+Editors that take `pyproject.toml`'s schema from [SchemaStore](https://www.schemastore.org/) will complete and check `[tool.inwards]` with no setup once SchemaStore merges Inwards' schema ([SchemaStore#6427](https://github.com/SchemaStore/schemastore/pull/6427), [#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Until then, set it up by hand.
+
 Editors that use [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML in VS Code, and others) attach schemas to whole files: Taplo ignores a rule's `keys` when it picks the schema, so the table schema alone would be checked against the entire `pyproject.toml`. Use the whole-file schema built from it instead, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, which checks `[tool.inwards]` and leaves every other table alone. A `.taplo.toml` next to `pyproject.toml`:
 
 ```toml title=".taplo.toml"
@@ -30,7 +32,7 @@ include = ["**/pyproject.toml"]
 path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
 
-This replaces the schema Taplo would otherwise take from SchemaStore for that file, so the other tables go unchecked until Inwards' schema is part of SchemaStore's ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Releases attach it as `inwards-pyproject-schema.json`.
+This replaces the schema Taplo would otherwise take from SchemaStore for that file, so the other tables go unchecked. Once SchemaStore has Inwards' schema, drop the rule and let SchemaStore's cover the whole file. Releases attach it as `inwards-pyproject-schema.json`.
 
 The schema checks structure: the keys, their types, the allowed values, the rule codes and the shape of names and patterns. Inwards checks more when it reads the config:
 
@@ -211,6 +213,7 @@ Which rules report and how loudly:
 - `ignore`: these rules don't report. It wins over `select` and `extend-select`.
 - `severity`: a table of rule code to `"error"` or `"warning"`.
 - `<rule-name>`: a table of that rule's options, such as `[tool.inwards.rules.pure-domain]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a layer's `modules`, which limits the rule to the modules they match. Some rules take their own options too, listed on the rule's page: [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) and [`router-wiring`](../rules/FAPI003.md#configuration). An unknown key, or one that belongs to another rule, is a config error that names it. The table doesn't turn the rule on, and a table for a rule that is off gets a warning.
+- `[tool.inwards.rules.pure-domain]` also takes `deny`, a list of tables with `modules` (prefixes or selectors, as above) and `libraries` (import names, as in a layer's `deny-libraries`). The modules an entry matches may not import its libraries, whether a layer owns them or not, and the layer's `allow-libraries` doesn't undo it ([INW005](../rules/INW005.md), [libraries guide](libraries.md#prefix-deny)). Use it for a package that isn't a whole layer, such as import-linter's "`mypackage.one` must not import `django`".
 
 INW000 can't be ignored, re-levelled or given options. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
 
@@ -222,7 +225,8 @@ ignore = ["INW007", "INW008"]
 severity = { INW005 = "warning" }
 
 [tool.inwards.rules.pure-domain]
-modules = ["shop.domain"]
+modules = ["shop"]
+deny = [{ modules = ["shop.billing"], libraries = ["django"] }]
 ```
 
 ### `shape` and `names` { #shape }
@@ -256,7 +260,7 @@ Each context has:
 
 - `name`: a non-blank, case-sensitive string, unique among contexts.
 - `modules`: module prefixes the context owns, with everything under them. They are literal dotted names; wildcards are a config error. When the prefixes of several contexts match a module, the longest wins, so the order of the tables never matters. The same prefix in two contexts is a config error.
-- `public` (default `[]`): prefixes of the context's own modules that the contexts depending on it may import. They are full module names, not relative to the context: `api` means the top-level module `api`. Each one must belong to this context; a prefix another context owns more specifically is a config error. A module is public when it lies at or under a public prefix and this context owns it.
+- `public` (default `[]`): prefixes of the context's own modules that the contexts depending on it may import. They are full module names, not relative to the context: `api` means the top-level module `api`. Each one must belong to this context; a prefix another context owns more specifically is a config error. A module is public when it lies at or under a public prefix and this context owns it. An entry written with a leading `=` is exact: `public = ["=shop.billing", "shop.billing.models"]` opens the package facade `shop.billing` (its `__init__`) and `shop.billing.models` with everything under it, but not `shop.billing._invoices` or any other submodule. The module after the `=` is a plain dotted name, and the same ownership rule applies to it.
 - `depends-on` (default `[]`): the contexts this one may import from. It is direct: not passed on, and not granted in return. A name may refer to a context declared further down. The context's own name, an unknown name and a repeated name are config errors.
 - `template`: a [template](#templates) whose `public` names, under each of the context's `modules`, join its `public` list.
 

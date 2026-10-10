@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     name: Build with Zensical
-    runs-on: [self-hosted, linux, x64, inwards] # irysek, ops/runner
+    runs-on: [self-hosted, linux, ARM64, inwards] # dellpromaxgb10, ops/runner
     permissions:
       contents: read
       pages: read

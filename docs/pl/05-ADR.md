@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3d501592b863f842d40c66e78cd12a3d5682c50fd45c4018f0eef7cb9a92e6cf
+source_hash: 7169f0bcced974580d00634efc9d17e3dadc8f4040f273d997b9ff1a7754611d
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -9,43 +9,45 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 | ADR | Decyzja | Stan |
 |---|---|---|
-| [001](#adr-001-typescript-for-the-engine) | TypeScript dla silnika | :white_check_mark: Przyjęty |
-| [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), a nie natywne wiązania | :white_check_mark: Przyjęty |
-| [003](#adr-003-ship-a-bun-single-file-executable) | Dystrybucja jako jednoplikowy program wykonywalny Buna | :white_check_mark: Przyjęty, budowany z `--bytecode` od [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
-| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parsuj szkielet importów, potwierdzaj pełnym parsowaniem | :white_check_mark: Przyjęty, moduły w baseline'ie pomijają parsowanie potwierdzające od [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
-| [005](#adr-005-configuration-lives-in-pyprojecttoml) | Konfiguracja mieszka w `pyproject.toml` | :white_check_mark: Przyjęty |
-| [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :white_check_mark: Przyjęty, od [#44](03-Architecture-C4.md#c3-components-of-the-engine) adapter dostarcza indeks modułów przez port ProjectFiles |
-| [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi | :white_check_mark: Przyjęty |
-| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6) |
-| [009](#adr-009-check-imports-wherever-they-appear) | Sprawdzaj importy, gdziekolwiek się pojawią | :white_check_mark: Przyjęty |
+| [001](#adr-001-typescript-for-the-engine) | TypeScript dla silnika | :material-check-circle: Przyjęty |
+| [002](#adr-002-web-tree-sitter-wasm-not-native-bindings) | web-tree-sitter (WASM), a nie natywne wiązania | :material-check-circle: Przyjęty |
+| [003](#adr-003-ship-a-bun-single-file-executable) | Dystrybucja jako jednoplikowy program wykonywalny Buna | :material-check-circle: Przyjęty, budowany z `--bytecode` od [#39](06-Constraints-and-Quality.md#spike-bytecode-and-minification) |
+| [004](#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) | Parsuj szkielet importów, potwierdzaj pełnym parsowaniem | :material-check-circle: Przyjęty, moduły w baseline'ie pomijają parsowanie potwierdzające od [#108](03-Architecture-C4.md#c3-components-of-the-engine) |
+| [005](#adr-005-configuration-lives-in-pyprojecttoml) | Konfiguracja mieszka w `pyproject.toml` | :material-check-circle: Przyjęty |
+| [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :material-check-circle: Przyjęty, od [#44](03-Architecture-C4.md#c3-components-of-the-engine) adapter dostarcza indeks modułów przez port ProjectFiles |
+| [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi | :material-check-circle: Przyjęty |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6); nazwę `inwards server` i jego miejsce obok daemona hooków ustala [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
+| [009](#adr-009-check-imports-wherever-they-appear) | Sprawdzaj importy, gdziekolwiek się pojawią | :material-check-circle: Przyjęty |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Dokumentacja budowana Zensicalem, serwowana przez Cloudflare Workers | :material-swap-horizontal: Hosting zastąpiony przez 012 |
-| [011](#adr-011-rename-stratum-to-inwards) | Zmiana nazwy ze Stratum na Inwards | :white_check_mark: Przyjęty |
-| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publikuj dokumentację na GitHub Pages, na razie | :white_check_mark: Przyjęty, wdrażana z `develop` od 019 |
-| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Rzeczywiste ścieżki dla granicy, ścieżki importu dla nazw modułów | :white_check_mark: Przyjęty, dowiązania symboliczne w warstwach ukrywające kod zgłaszane od [#83](https://github.com/SirCypkowskyy/inwards/issues/83) i [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
-| [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Zgłaszaj pliki, których zadeklarowane kodowanie może ukryć importy | :white_check_mark: Przyjęty |
-| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Sprawdzaj dosłowne importy dynamiczne jako INW011 | :white_check_mark: Przyjęty, niesprawdzalne cele zgłaszane od 026 |
+| [011](#adr-011-rename-stratum-to-inwards) | Zmiana nazwy ze Stratum na Inwards | :material-check-circle: Przyjęty |
+| [012](#adr-012-publish-the-docs-on-github-pages-for-now) | Publikuj dokumentację na GitHub Pages, na razie | :material-check-circle: Przyjęty, wdrażana z `develop` od 019 |
+| [013](#adr-013-real-paths-for-the-boundary-import-paths-for-module-names) | Rzeczywiste ścieżki dla granicy, ścieżki importu dla nazw modułów | :material-check-circle: Przyjęty, dowiązania symboliczne w warstwach ukrywające kod zgłaszane od [#83](https://github.com/SirCypkowskyy/inwards/issues/83) i [#84](https://github.com/SirCypkowskyy/inwards/issues/84) |
+| [014](#adr-014-report-files-whose-declared-encoding-can-hide-imports) | Zgłaszaj pliki, których zadeklarowane kodowanie może ukryć importy | :material-check-circle: Przyjęty |
+| [015](#adr-015-check-literal-dynamic-imports-as-inw011) | Sprawdzaj dosłowne importy dynamiczne jako INW011 | :material-check-circle: Przyjęty, niesprawdzalne cele zgłaszane od 026 |
 | [016](#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr) | Wersje i wydania wynikają z typów commitów, przez release PR | :material-swap-horizontal: Model gałęzi zastąpiony przez 019 |
-| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Scalanie przez squash z tytułami PR w formacie Conventional Commits | :white_check_mark: Przyjęty, squash do `develop` od 019 |
-| [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Selektory pakietów przyjmują globy od początku; monorepo podąża za workspace'ami uv | :white_check_mark: Przyjęty |
-| [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | Gałąź integracyjna `develop`; `main` przesuwa się tylko przy wydaniach | :white_check_mark: Przyjęty |
-| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | Kreator w `init` używa @clack/prompts, ładowanego z osobnego fragmentu | :white_check_mark: Przyjęty |
-| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publikuj wheele wydań na PyPI z osobnego workflow, przez trusted publishing | :white_check_mark: Przyjęty, włączany przez właściciela |
+| [017](#adr-017-squash-merges-with-conventional-commit-pr-titles) | Scalanie przez squash z tytułami PR w formacie Conventional Commits | :material-check-circle: Przyjęty, squash do `develop` od 019 |
+| [018](#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces) | Selektory pakietów przyjmują globy od początku; monorepo podąża za workspace'ami uv | :material-check-circle: Przyjęty |
+| [019](#adr-019-a-develop-integration-branch-main-moves-only-at-releases) | Gałąź integracyjna `develop`; `main` przesuwa się tylko przy wydaniach | :material-check-circle: Przyjęty |
+| [020](#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk) | Kreator w `init` używa @clack/prompts, ładowanego z osobnego fragmentu | :material-check-circle: Przyjęty |
+| [021](#adr-021-publish-the-release-wheels-to-pypi-from-their-own-workflow-with-trusted-publishing) | Publikuj wheele wydań na PyPI z osobnego workflow, przez trusted publishing | :material-check-circle: Przyjęty, włączany przez właściciela |
 | [022](#adr-022-m2-go-or-no-go-continue-conditionally-until-partner-data) | Decyzja „go/no-go” po M2: kontynuujemy warunkowo, do czasu danych od partnerów | :material-progress-clock: Przyjęty, tymczasowo do czasu danych od partnerów |
-| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy | :white_check_mark: Przyjęty, od [#155](guides/libraries.md#configure-it) `extend-deny-libraries` dopisuje wpisy do listy domyślnej |
-| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :white_check_mark: Przyjęty |
-| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem | :white_check_mark: Przyjęty, moduły generowane przechodzą, gdy ich brakuje, od [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
-| [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Zgłaszaj nieczytelne cele importów dynamicznych w warstwach wewnętrznych | :white_check_mark: Przyjęty |
-| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :white_check_mark: Przyjęty, serwer języka czyta tabelę ponownie bez restartu od [#163](03-Architecture-C4.md#known-limitations) |
-| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :white_check_mark: Przyjęty |
-| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji | :white_check_mark: Przyjęty |
-| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :white_check_mark: Przyjęty |
-| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :white_check_mark: Przyjęty |
-| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :white_check_mark: Przyjęty |
-| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji | :white_check_mark: Przyjęty |
-| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :white_check_mark: Przyjęty |
-| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie | :white_check_mark: Przyjęty |
-| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :white_check_mark: Przyjęty |
-| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :white_check_mark: Przyjęty |
+| [023](#adr-023-libraries-per-layer-with-a-default-deny-list-for-the-innermost-layer) | Biblioteki w warstwach, z domyślną listą zakazów dla najbardziej wewnętrznej warstwy | :material-check-circle: Przyjęty, od [#155](guides/libraries.md#configure-it) `extend-deny-libraries` dopisuje wpisy do listy domyślnej |
+| [024](#adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr) | Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR | :material-check-circle: Przyjęty |
+| [025](#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | INW010 sonduje dysk, żeby ustalić, czy moduł istnieje, i sprawdza tylko część importu będącą modułem | :material-check-circle: Przyjęty, moduły generowane przechodzą, gdy ich brakuje, od [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) |
+| [026](#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers) | Zgłaszaj nieczytelne cele importów dynamicznych w warstwach wewnętrznych | :material-check-circle: Przyjęty |
+| [027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) | `select`, `ignore` i `severity` dla każdej reguły w tabeli `[tool.inwards.rules]` | :material-check-circle: Przyjęty, serwer języka czyta tabelę ponownie bez restartu od [#163](03-Architecture-C4.md#known-limitations) |
+| [028](#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default) | Wyciszenie w linii wymaga powodu, a agent domyślnie nie może go dodać | :material-check-circle: Przyjęty |
+| [029](#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) | Moduły generowane przechodzą INW010, domyślnie moduły z protoc i moduły wersji | :material-check-circle: Przyjęty |
+| [030](#adr-030-bounded-contexts-as-a-contexts-table-of-literal-prefixes) | Konteksty ograniczone jako tabela `contexts` z dosłownymi prefiksami | :material-check-circle: Przyjęty |
+| [031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) | Pamięć podręczna ekstrakcji kluczowana treścią, której hooki nigdy nie czytają | :material-check-circle: Przyjęty |
+| [032](#adr-032-import-cycles-on-whole-project-runs-from-the-imports-the-check-already-reads) | Cykle importów przy sprawdzaniu całego projektu, z importów, które sprawdzenie i tak czyta | :material-check-circle: Przyjęty |
+| [033](#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook) | OpenCode przez plugin, który uruchamia hook Claude Code | :material-check-circle: Przyjęty |
+| [034](#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) | Selektory warstw zakotwiczone w pakiecie najwyższego poziomu, ze sprawdzaniem wycinków w sesji | :material-check-circle: Przyjęty |
+| [035](#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config) | `inwards check` idzie za członkami workspace'u uv, każdy z własną konfiguracją | :material-check-circle: Przyjęty |
+| [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie | :material-check-circle: Przyjęty |
+| [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :material-check-circle: Przyjęty |
+| [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :material-check-circle: Przyjęty |
+| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -175,7 +177,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 ## ADR-008: Serwer języka na Node wewnątrz rozszerzenia, na razie { #adr-008-language-server-on-node-inside-the-extension-for-now }
 
-**Stan:** Przyjęty, do ponownej oceny w M6 (v0.6) · 2026-09-25
+**Stan:** Przyjęty, do ponownej oceny w M6 (v0.6) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) zostawia `inwards server` dla serwera języka i daje hookom osobny `inwards daemon`
 
 **Kontekst.** Ruff i ty dostarczają swój serwer języka w tym samym pliku binarnym (`ruff server`). Dzięki temu każdy edytor obsługujący LSP (Neovim, Zed, Helix) dostaje serwer za darmo. Scaffold Inwards zamiast tego dołącza serwer LSP na Node do rozszerzenia VS Code, obok plików gramatyk.
 
@@ -576,6 +578,15 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: Dopasowywane są nazwy importu, a nie nazwy dystrybucji (`PyYAML` to `yaml`), a moduł biblioteki standardowej nowszy niż dołączona lista liczy się jako zewnętrzny.
 
 **Alternatywy.** *Czytać zainstalowane dystrybucje z virtualenva*: dokładne, ale łamie C4 i zawodzi w obrazach CI bez zależności. *Domyślny zakaz dla każdej warstwy poza najbardziej zewnętrzną*: za dużo zgaduje o tym, czego może używać warstwa aplikacji. *Wymieniać skonfigurowaną listę w komunikacie*: zmieniona lista przywróciłaby każde naruszenie z baseline'u.
+
+**Poprawka, 2026-09-28: biblioteki zakazane prefiksowi modułów ([#219](https://github.com/SirCypkowskyy/inwards/issues/219)).** Najczęstszy kontrakt `forbidden` import-lintera, „`mypackage.one` nie może importować `django`”, wskazuje pakiet, który nie jest warstwą, więc `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) musiał go pomijać.
+
+- **W tabeli opcji INW005.** `[tool.inwards.rules.pure-domain]` przyjmuje `deny`, listę tabel `{ modules, libraries }`, obok `modules`, które każda reguła ma od poprawki #181 do [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table). `modules` ma gramatykę `layers[].modules`, a `libraries` gramatykę `deny-libraries`. Klucz przyjmuje tylko `pure-domain`; w tabeli innej reguły to nieznany klucz.
+- **Niezależnie od warstw.** Wpis dotyczy modułów, do których pasuje, niezależnie od tego, czy należą do warstwy, więc plik poza wszystkimi warstwami, który obejmuje wpis, ma czytane importy. `allow-libraries` warstwy go nie znosi: wpis jest węższy niż warstwa, a zespół pisze go, żeby coś odebrać.
+- **Najpierw pytane są listy warstwy.** Gdy one też zakazują importu, zgłoszenie należy do warstwy i ma jej komunikat, więc dodanie wpisu nie rusza istniejących kluczy baseline'u. W przeciwnym razie komunikat podaje moduł i prefiks, do którego pasował wpis (`denies to "mypackage.one"`), a poprawka umieszcza port w tym prefiksie, a implementację poza nim. Własne `modules` tabeli nadal zawęża każde zgłoszenie INW005.
+- **`import-config`** zachowuje `extend-deny-libraries` dla źródeł, które są dokładnie jedną lub kilkoma warstwami, a dla pozostałych zapisuje wpis `deny`.
+
+*Alternatywy.* *`deny-libraries` we wpisie `[[tool.inwards.contexts]]`*: kontekst niesie też uprawnienia INW002 i INW003, więc przeniesiony kontrakt zmieniłby, co jeszcze pakiet może importować i kto może importować jego. *Pole `modules` we wpisach zakazu warstwy*: `deny-libraries` to lista napisów, a zamiana jej wpisów w tabele zmieniłaby typ istniejącego klucza.
 
 ## ADR-024: Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR { #adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr }
 
@@ -1065,3 +1076,56 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - *Czytać transkrypt Claude Code i odrzucać start zapisany po pierwszym użyciu narzędzia w sesji:* `transcript_path` w ładunku Stop pochodzi od Claude Code, ale format transkryptu nie jest publicznym kontraktem, plik bywa duży, agent może go zapisać tak samo, a OpenCode go nie ma.
 - *Znacznik poza projektem przy pierwszym wywołaniu narzędzia w PreToolUse:* to samo polecenie Bash, które usuwa stan, może usunąć znacznik przed odtworzeniem.
 - *Podpisywać zapis startu:* klucz leżałby tam, gdzie użytkownik agenta może go odczytać.
+
+## ADR-039: Daemon hooków dla każdego projektu, osobno od serwera języka { #adr-039-a-hook-daemon-per-project-separate-from-the-language-server }
+
+**Stan:** Przyjęty · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
+
+**Kontekst.** Zaplanowane są trzy długo działające procesy: proces, który trzyma silnik w gotowości dla hooków ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)), serwer języka w pliku binarnym ([#63](https://github.com/SirCypkowskyy/inwards/issues/63), [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)) i serwer MCP ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)). Rozdział 6 nazywał proces hooków `inwards server`, czyli tak, jak ADR-008 nazywa serwer języka, a backlog nazywał go `inwards daemon`. Otwarte było też pytanie, czy jeden proces może obsługiwać i edytor, i hooki.
+
+Dziś CLI uruchamia jedno polecenie na proces. `main.ts` raz buduje `AppDeps`, `runCheck` przy każdym wywołaniu czyta konfigurację i tworzy `Engine`, a środowisko WASM i gramatyka wczytują się raz na proces (obietnica na poziomie modułu w `python/parser.ts`). Serwer języka w VS Code już jest stałym procesem: to proces Node, który rozszerzenie uruchamia przez IPC i który trzyma silnik, indeks modułów i pamięciową pamięć podręczną ekstrakcji, dopóki okno jest otwarte.
+
+Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-process)) uruchamiał prawdziwą obsługę hooka na ciepło za gniazdem uniksowym i porównywał ją z jednorazowymi uruchomieniami pliku binarnego darwin-arm64, na macOS, przy średnim obciążeniu od 5 do 7. Wyniki:
+
+- **Start klienta to podłoga.** `inwards --version` trwa 15,5 ms (p50), a każde wywołanie hooka uruchamia proces, zanim o cokolwiek zapyta.
+- **Daemon opłaca się przy PostToolUse.** Jednorazowo, p50 / p95: 46,6 / 50,2 ms dla pliku z 13 liniami i 119,9 / 151,6 ms dla pliku z 4492 liniami i dwoma naruszeniami. Ta sama obsługa na ciepło, bez zmian w kodzie: 32,3 / 35,2 i 91,1 / 97,7 ms. Z dwiema pamięciami podręcznymi w pamięci: 17,2 / 19,8 i 18,2 / 19,7 ms, a 47,6 / 50,1 ms (jednorazowo 117,5 / 122,8), gdy duży plik zmienia się przed każdym wywołaniem.
+- **Jedno wywołanie gita kosztuje tyle, co start procesu.** Jedno `git cat-file blob`, które czyta tekst pliku ze startu sesji, żeby oddzielić stare naruszenia od nowych, trwa około 15 ms, a każdy PostToolUse sprawdza plik dwa razy: taki, jaki jest teraz, i taki, jaki był na starcie sesji. Dla dużego pliku to 30 ms za każdym razem, na ciepło.
+- **Pozostałe zdarzenia nie zyskują.** PreToolUse trwa jednorazowo 16,8 ms, tuż przy podłodze 15,5 ms. Stop trwa 141 ms, raz na turę.
+
+**Decyzja.**
+
+- **Osobne procesy, jeden plik binarny.** `inwards server` to serwer języka: LSP przez stdio, uruchamiany i zatrzymywany przez edytor, jeden na obszar roboczy, sprawdza niezapisany tekst z edytora. `inwards daemon` obsługuje hooki: jeden na użytkownika i projekt, uruchamia go hook, znika po 10 minutach bez żądania, sprawdza to, co jest na dysku. `inwards mcp` to serwer MCP przez stdio, uruchamiany przez klienta MCP. Wszystkie trzy korzystają z jednego modułu ciepłego silnika w CLI i nigdy ze sobą nie rozmawiają.
+- **Przez daemona idzie tylko PostToolUse.** SessionStart, PreToolUse i Stop zawsze działają we własnym procesie hooka. PreToolUse nie wczytuje gramatyki, więc nic by nie zyskał. Stop to egzekwowanie reguł i ustala, co sesja zmieniła, z manifestu startowego, a nie tylko z edycji zapisanych przez PostToolUse. Daemon, który odpowiada źle (błąd, nieaktualna wersja albo proces podstawiony przez agenta), może opóźnić zgłoszenie do Stop, ale nie może go przepuścić.
+- **Ta sama obsługa, platforma na żądanie.** Daemon uruchamia dzisiejsze `hookClaudeCode` z `Runtime` zbudowanym z katalogu roboczego i środowiska klienta oraz z `Streams`, które zbierają wyjście. Klient wypisuje stdout i stderr i kończy się kodem wyjścia daemona. Testy przepuszczają fixture'y E2E hooka obiema drogami, a wyniki muszą się zgadzać.
+- **Trzyma tylko to, co identyfikuje jego treść.** Między żądaniami daemon trzyma gramatykę, pamięć podręczną ekstrakcji z kluczem jak w [ADR-031](#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read) (skrót tekstu, nazwa modułu, flaga pakietu, rewizja ekstrakcji; kilka tekstów na moduł, bo w użyciu są i tekst ze startu, i tekst po edycji; najwyżej 5000 wpisów i około 32 MB, jak w serwerze języka) oraz tekst ze startu sesji czytany z gita, z kluczem: repozytorium, commit startowy i ścieżka. Konfiguracja, baseline, lista plików i stan sesji są czytane od nowa przy każdym żądaniu, tak jak przy jednorazowym uruchomieniu, więc żadna zmiana konfiguracji, checkout ani nowy baseline nie zostawi go z nieaktualnymi danymi. Ciepłe sprawdzenie pliku z 13 liniami, razem z konfiguracją i indeksem modułów, trwało w eksperymencie 0,8 ms. Nic nie trafia na dysk: hooki nadal nie czytają żadnej pamięci podręcznej, którą agent może zapisać.
+- **Transport.** `node:net` po obu stronach: gniazdo domeny uniksowej na Linuksie i macOS, nazwany potok na Windows. Gniazdo leży w katalogu, który może otworzyć tylko użytkownik: `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie `$TMPDIR/inwards-<uid>/`, w ostateczności `/tmp/inwards-<uid>/`, tworzonym z uprawnieniami 0700 i używanym tylko, dopóki jest prawdziwym katalogiem należącym do użytkownika z tymi uprawnieniami. Nazwa to 16 cyfr szesnastkowych skrótu prawdziwej ścieżki projektu i 8 losowych, co mieści ścieżkę w limicie 104 bajtów na macOS; potok nazywa się `\\.\pipe\inwards-<skrót>-<losowe>`. Gdy daemon już nasłuchuje, zapisuje `daemons/<skrót>.json` w katalogu stanu z [ADR-038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) (uprawnienia 0600, przez plik tymczasowy i zmianę nazwy): protokół, wersję Inwards, tożsamość pliku wykonywalnego, pid i adres. Nazwy potoków na Windows mają jedną przestrzeń dla wszystkich użytkowników, więc losowa część nie pozwala innemu użytkownikowi zająć nazwy wcześniej.
+- **Ramkowanie.** Jedno żądanie na połączenie, jedna linia JSON w każdą stronę. Żądanie niesie `protocol: "inwards-daemon/1"`, wersję, tożsamość pliku wykonywalnego (ścieżkę, rozmiar i czas modyfikacji), `argv` (obsługiwane jest tylko `hook claude-code`), katalog roboczy, zmienne środowiska, które czyta `Runtime`, i dane wejściowe hooka. Odpowiedź niesie kod wyjścia, stdout i stderr albo `error` (`stale`, `protocol`, `too-large`). Danych wejściowych powyżej 16 MB klient nie wysyła; hook działa wtedy jednorazowo.
+- **Nieaktualność.** Każda różnica w protokole, wersji albo tożsamości pliku wykonywalnego daje `stale`: daemon kończy pracę, a klient uruchamia sprawdzenie jednorazowo i startuje nowego daemona. Daemon przy każdym żądaniu sprawdza też własny plik wykonywalny, na wypadek aktualizacji, która podmieniła plik w miejscu. Klient i daemon to zawsze ta sama wersja, więc nie ma zgodności między wersjami do utrzymywania.
+- **Start, wyścigi i powrót do jednorazowego uruchomienia.** Hook, który nie znajdzie daemona, nie połączy się w ciągu 100 ms albo dostanie `stale`, działa jednorazowo, więc odpowiada nie później niż dziś, a potem uruchamia `inwards daemon` w tle. Dwa hooki, które startują daemona jednocześnie, rozstrzyga plik blokady tworzony na wyłączność obok zapisu, z pidem w środku; przegrany kończy pracę, a blokadę, której pid już nie istnieje, usuwa się i próbuje raz jeszcze. Adresy są losowe, więc dwa daemony nigdy nie walczą o tę samą ścieżkę. Po wysłaniu żądania klient czeka na odpowiedź tak długo, jak pozwala limit czasu samego hooka: równoległe uruchomienie hooka zapisałoby edycję dwa razy. Połączenie zamknięte bez odpowiedzi kończy się jednorazowym uruchomieniem, a #60 zapisuje edycje z kluczem `tool_use_id`, żeby ta powtórka nie policzyła edycji dwa razy.
+- **Jedno żądanie naraz.** Daemon obsługuje żądania w kolejności nadejścia, tak jak serwer języka szereguje przeładowania: równoległe wywołania narzędzi zapisują ten sam stan sesji.
+- **Wyłączniki.** `INWARDS_DAEMON=0` sprawia, że każdy hook działa jednorazowo. Daemon jest wyłączony, gdy ustawione jest `CI`, a testy działają z wyłączonym daemonem, z wyjątkiem jego własnych testów. To nie jest klucz `[tool.inwards]`: zmienia szybkość, nigdy wyniki.
+- **Pełne sprawdzenia zostają jednorazowe.** `inwards check`, `inwards baseline` i pula workerów ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) działają we własnym procesie; daemon obsługuje sprawdzenia jednego pliku i nie trzyma workerów.
+- **Nazwy.** `inwards server` (jak `ruff server` i `ty server`), `inwards daemon` z `inwards daemon status` i `inwards daemon stop` dla bieżącego projektu oraz `inwards mcp`. Rozdział 6 i ADR-008 używają tych nazw.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: W eksperymencie p95 PostToolUse spadło z 50,2 do 19,8 ms dla małego pliku i z 122,8 do 50,1 ms dla pliku z 4492 liniami edytowanego przed każdym wywołaniem. Cel #60, p95 poniżej 50 ms, jest spełniony dla małego pliku i na granicy dla dużego. Na linuksowym laptopie z eksperymentu z bajtkodem w rozdziale 6 `inwards --version` trwało 10,5 ms, a nie 15,5.
+- :material-plus-circle-outline: Przy okazji JIT jest rozgrzany: jednorazowe sprawdzenie dużego pliku trwało 70,8 ms, to samo na ciepło 30 ms.
+- :material-plus-circle-outline: Stop gate i guardy zachowują swój model zaufania. Zepsuty albo podstawiony daemon kosztuje opóźnienie i wczesną informację zwrotną, a nie przeoczone naruszenie przy Stop.
+- :material-plus-circle-outline: Jeden moduł ciepłego silnika obsługuje trzy procesy, a serwer języka przechodzi do pliku binarnego (#63, #64) z kodem pamięci podręcznej, który ma dziś.
+- :material-minus-circle-outline: Każdy projekt z daemonem zajmuje od 150 do 210 MB RSS (serwer z eksperymentu, uruchamiany ze źródeł) przez maksymalnie 10 minut po ostatniej edycji. Pięć sesji agentów w pięciu repozytoriach to pięć daemonów.
+- :material-minus-circle-outline: Każde wywołanie hooka nadal uruchamia proces Buna, tu około 15 ms. Usunąć to mógłby tylko klient napisany w innym języku.
+- :material-minus-circle-outline: Użytkownik, a więc i agent, może połączyć się z daemonem, zatrzymać go albo wskazać w zapisie własny proces. Połączenie nie daje nic, czego nie daje samo `inwards`; podstawiony proces może zmienić tylko to, co mówi PostToolUse, zanim Stop sprawdzi wszystko ponownie.
+- :material-minus-circle-outline: Nazwane potoki nie zostały zmierzone: eksperyment działał na macOS. #60 musi pokazać przechodzący wiersz Windows (ręczne uruchomienie pełnej macierzy), zanim zostanie scalone.
+- :material-minus-circle-outline: Druga ścieżka kodu dla PostToolUse. Przepuszczanie fixture'ów E2E obiema drogami utrzymuje je zgodne.
+
+**Alternatywy.**
+
+- *Jeden proces dla edytora i hooków,* czyli serwer języka, który nasłuchuje też na hooki, albo jeden daemon na projekt z `inwards server` jako pośrednikiem stdio. Czasy życia się różnią: okno edytora kontra sesja agenta, a agenci często działają bez otwartego edytora, więc hooki nie mogą na nim polegać. Dane wejściowe się różnią: niezapisane bufory kontra dysk i stan sesji. Pośrednik dodaje skok przez gniazdo przy każdym naciśnięciu klawisza dla serwera, który i tak działa stale, awaria zabiera oba procesy, a kilka okien na jednym repozytorium musiałoby wybrać właściciela.
+- *Każde zdarzenie hooka przez daemona:* PreToolUse zyskałby około 1 ms, a werdykt Stop gate pochodziłby z procesu, który agent może podmienić.
+- *Bez daemona, szybsze jednorazowe uruchomienie:* bajtkod już skrócił start o połowę ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)). Zostaje start procesu, wczytanie WASM i gramatyki oraz zimny JIT (27,7 ms jednorazowo wobec 0,8 ms na ciepło dla małego pliku), a do tego praca, którą między procesami dałoby się ponownie wykorzystać tylko przez pliki, które agent może zapisać.
+- *Silnik dla każdej konfiguracji, aktualizowany przez obserwatory plików:* oszczędza ponowne czytanie konfiguracji, które kosztuje dużo poniżej milisekundy, a nieaktualność zamienia w problem poprawności (przegapione zdarzenie, sieciowy system plików).
+- *TCP na localhost:* może się połączyć każdy lokalny użytkownik, port trzeba wybrać i ogłosić, a Windows może zapytać o zaporę.
+- *Ramkowanie LSP, JSON-RPC albo HTTP przez gniazdo:* obsługują identyfikatory żądań, powiadomienia i routing; jedno żądanie na połączenie nie potrzebuje żadnego z nich.
+- *Mały natywny klient jako polecenie hooka:* usunąłby większość podłogi 15 ms, ale dodaje drugi zestaw narzędzi i drugi plik binarny na platformę, wbrew [ADR-003](#adr-003-ship-a-bun-single-file-executable). Warto do tego wrócić, jeśli benchmark na Linuksie nie zmieści się w 50 ms.
+- *Inne nazwy:* `inwards serve` różni się od `server` jedną literą i kojarzy się z podglądem dokumentacji; `inwards lsp` zrywa z Ruffem i ty, których polecenia użytkownicy spróbują najpierw; jedno `inwards server` z trybami `--stdio` i `--socket` ukrywa, że oba procesy mają innych właścicieli i inne czasy życia.

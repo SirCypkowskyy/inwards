@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 2a62d10c7cba81435035fb73104391110f7ec1acb8e29bd765b5125eaedf0201
+source_hash: 3b7900dfb65aa4f4491162e60ae05298a7773db5bf469fdac09ee8d396a3f98f
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -25,6 +25,8 @@ Nieznany klucz, zły typ albo zła wartość to błąd konfiguracji: `inwards ch
 
 JSON Schema dla `[tool.inwards]` jest opublikowany pod adresem <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. Ten adres śledzi gałąź `develop`, tak jak ta dokumentacja. Żeby przypiąć schemat do wydania, którego używasz, weź plik `inwards-tool-schema.json` dołączony do każdego [wydania na GitHubie](https://github.com/SirCypkowskyy/inwards/releases).
 
+Edytory, które biorą schemat `pyproject.toml` z [SchemaStore](https://www.schemastore.org/), będą podpowiadać i sprawdzać `[tool.inwards]` bez żadnej konfiguracji, gdy SchemaStore przyjmie schemat Inwards ([SchemaStore#6427](https://github.com/SchemaStore/schemastore/pull/6427), [#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Do tego czasu ustaw go ręcznie.
+
 Edytory korzystające z [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML w VS Code i inne) przypisują schematy do całych plików: Taplo pomija `keys` reguły, gdy wybiera schemat, więc sam schemat tabeli byłby sprawdzany względem całego `pyproject.toml`. Zamiast niego użyj zbudowanego z niego schematu całego pliku, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, który sprawdza `[tool.inwards]` i zostawia wszystkie inne tabele w spokoju. Plik `.taplo.toml` obok `pyproject.toml`:
 
 ```toml title=".taplo.toml"
@@ -35,7 +37,7 @@ include = ["**/pyproject.toml"]
 path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
 
-To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane, dopóki schemat Inwards nie trafi do schematu SchemaStore ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Wydania dołączają go jako `inwards-pyproject-schema.json`.
+To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane. Gdy SchemaStore będzie miał schemat Inwards, usuń tę regułę i zostaw cały plik schematowi SchemaStore. Wydania dołączają go jako `inwards-pyproject-schema.json`.
 
 Schemat sprawdza strukturę: klucze, ich typy, dozwolone wartości, kody reguł i kształt nazw oraz wzorców. Inwards sprawdza więcej, gdy wczytuje konfigurację:
 
@@ -216,6 +218,7 @@ Które reguły zgłaszają i jak głośno:
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
 - `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
+- `[tool.inwards.rules.pure-domain]` przyjmuje też `deny`, listę tabel z `modules` (prefiksy albo selektory, jak wyżej) i `libraries` (nazwy importu, jak w `deny-libraries` warstwy). Moduły, do których pasuje wpis, nie mogą importować jego bibliotek, niezależnie od tego, czy należą do warstwy, a `allow-libraries` warstwy tego nie znosi ([INW005](../rules/INW005.md), [przewodnik po bibliotekach](libraries.md#prefix-deny)). Służy do pakietu, który nie jest całą warstwą, na przykład do kontraktu import-lintera „`mypackage.one` nie może importować `django`”.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
 
@@ -227,7 +230,8 @@ ignore = ["INW007", "INW008"]
 severity = { INW005 = "warning" }
 
 [tool.inwards.rules.pure-domain]
-modules = ["shop.domain"]
+modules = ["shop"]
+deny = [{ modules = ["shop.billing"], libraries = ["django"] }]
 ```
 
 ### `shape` i `names` { #shape }
@@ -261,7 +265,7 @@ Każdy kontekst ma:
 
 - `name`: niepusty tekst, z rozróżnianiem wielkości liter, unikalny wśród kontekstów.
 - `modules`: prefiksy modułów, które kontekst posiada, razem ze wszystkim pod nimi. To dosłowne nazwy z kropkami; gwiazdki są błędem konfiguracji. Gdy do modułu pasują prefiksy kilku kontekstów, wygrywa najdłuższy, więc kolejność tabel nigdy nie ma znaczenia. Ten sam prefiks w dwóch kontekstach to błąd konfiguracji.
-- `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu.
+- `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu. Wpis z wiodącym `=` jest dokładny: `public = ["=shop.billing", "shop.billing.models"]` otwiera fasadę pakietu `shop.billing` (jego `__init__`) oraz `shop.billing.models` ze wszystkim pod nim, ale nie `shop.billing._invoices` ani żadnego innego podmodułu. Moduł po `=` to zwykła nazwa z kropkami i obowiązuje go ta sama zasada przynależności.
 - `depends-on` (domyślnie `[]`): konteksty, z których ten może importować. Zależność jest bezpośrednia: nie przechodzi dalej i nie działa w drugą stronę. Nazwa może wskazywać kontekst zadeklarowany niżej. Własna nazwa kontekstu, nieznana nazwa i powtórzona nazwa to błędy konfiguracji.
 - `template`: [szablon](#templates), którego nazwy `public`, pod każdym z `modules` kontekstu, dołączają do jego listy `public`.
 
