@@ -1,8 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 85edf3c30d9512a27099beed3a9277bb92daa3c537b9587e98b4b81ddce204dd
-
-source_hash: 89032b1a878441454ee09188b4d11e361b1ffbdb0ccc8dc62b0e6bfd50ac5f9e
+source_hash: 667731527983fcd92877815749e0a06d80ed51b2fc15a923b4295892538c6acd
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -208,7 +206,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 
 [#61](https://github.com/SirCypkowskyy/inwards/issues/61) rozłożyło zimne pełne sprawdzenie na kilka wątków. Decyzję i odrzucone możliwości opisuje [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision).
 
-**Co działa gdzie.** `inwards check` i `inwards baseline` uruchamiają wątki robocze, gdy czytają 1000 plików lub więcej: jeden wątek na 500 plików, do `INWARDS_THREADS`, a bez niej do liczby rdzeni, najwyżej 4. Wątek główny liczy się jako jeden z nich. Workery robią tylko to, o czym decyduje tekst pliku: test na loader, szkielet importów oraz importy i komentarze wyciszające z pełnego parsowania. Wątek główny przechodzi drzewo, czyta pliki, uruchamia wszystkie reguły w kolejności plików i sam parsuje nieliczne pliki z importami dynamicznymi. Wynik jest identyczny co do bajtu przy dowolnej liczbie wątków, a `INWARDS_THREADS=1` trzyma całe sprawdzenie w jednym wątku.
+**Co działa gdzie.** `inwards check` i `inwards baseline` uruchamiają wątki robocze, gdy czytają 1000 plików lub więcej: jeden wątek na 500 plików, do `INWARDS_THREADS`, a bez niej do połowy liczby rdzeni, najwyżej 4 (o Linuksie niżej). Wątek główny liczy się jako jeden z nich. Workery robią tylko to, o czym decyduje tekst pliku: test na loader, szkielet importów oraz importy i komentarze wyciszające z pełnego parsowania. Wątek główny przechodzi drzewo, czyta pliki, uruchamia wszystkie reguły w kolejności plików i sam parsuje nieliczne pliki z importami dynamicznymi. Wynik jest identyczny co do bajtu przy dowolnej liczbie wątków, a `INWARDS_THREADS=1` trzyma całe sprawdzenie w jednym wątku.
 
 **Metoda.** Plik binarny darwin-arm64 zbudowany przez `scripts/build-binaries.ts`, bazowa kompilacja z `develop` (`73936df`) wobec tej, na laptopie z Apple M1 Pro z 10 rdzeniami. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 4 do 7: bardziej ufaj proporcjom niż milisekundom. Każdy przypadek uruchomiono 11 razy po jednej rozgrzewce, każdy raz na rundę w zmiennej kolejności, z `INWARDS_NO_CACHE=1`; JSON z każdego uruchomienia musiał się zgadzać z bazową kompilacją. Prawdziwe repozytoria są sprawdzane z warstwami z korpusu (`bench/corpus.json`). Szczytowe RSS to `/usr/bin/time -l`, po trzy uruchomienia.
 
@@ -224,7 +222,17 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 - **Więcej wątków szybko przestaje się opłacać.** Każdy worker sam kompiluje gramatykę i rozgrzewa swój JIT, a obciążona maszyna ma mniej wolnych rdzeni, niż podaje. Poniżej 1000 plików wątki kosztują mniej więcej tyle, ile oszczędzają: 537 plików saleora trwało 207 ms w jednym wątku i 218 ms w trzech.
 - **Pamięć.** Szczytowe RSS saleora wzrosło z około 360 MB w jednym wątku do około 520 MB przy czterech i 615 MB przy ośmiu.
 - **Pamięć podręczna i hooki.** Sprawdzenie z ciepłą pamięcią podręczną się nie zmieniło (0,95 → 0,91 s na saleorze), uruchomienie, które wypełnia pustą pamięć podręczną, przyspieszyło (2,6 → 2,05 s), a `bench/compare.ts` zmierzył hook i sprawdzenie PreToolUse nowego pliku w granicach 3% od bazy, pełne sprawdzenie o 20,5% szybsze.
-- **Niezmierzone:** 4-rdzeniowy runner `ubuntu-latest`, o którym mówi zgłoszenie, i Windows. Zadanie benchmarku w CI działa na 20-rdzeniowym runnerze ARM64, gdzie pełne sprawdzenie też używa czterech wątków.
+- **Linux, i dlaczego domyślnie połowa rdzeni.** Pierwsze uruchomienie zadania benchmarku w CI, na runnerze Linux arm64, który podaje 4 rdzenie, zmierzyło pełne sprawdzenie repozytorium syntetycznego o 59% wolniejsze przy czterech wątkach. Plik binarny linux-arm64 w kontenerze Ubuntu 24.04 na tym samym laptopie, przypięty do czterech albo ośmiu rdzeni (`--cpuset-cpus`), po pięć uruchomień, dał takie mediany:
+
+    | Rdzenie | Repozytorium | 1 wątek | 2 | 3 | 4 |
+    |--:|---|--:|--:|--:|--:|
+    | 4 | syntetyczne | 0,42 s | 0,44 s | 0,53 s | 0,67 s |
+    | 4 | syntetyczne w trybie starszego kodu | 2,28 s | 2,33 s (1,67 do 2,34) | 1,54 s | 1,77 s |
+    | 8 | syntetyczne | 0,42 s | 0,38 s | 0,40 s | 0,44 s |
+    | 8 | syntetyczne w trybie starszego kodu | 2,30 s | 1,68 s | 1,38 s | 1,23 s |
+
+    Każdy wątek uruchamia własną maszynę wirtualną JavaScriptu, a jej kompilator JIT i odśmiecacz działają w osobnych wątkach, więc wątek na rdzeń głodzi wątek główny. Domyślnie jest połowa rdzeni, najwyżej 4: dwa wątki na 4-rdzeniowym runnerze, co utrzymuje czyste repozytorium na tym samym poziomie, a repozytorium z wieloma potwierdzeniami przyspiesza tylko czasem.
+- **Niezmierzone:** hostowany 4-rdzeniowy runner `ubuntu-latest` GitHuba i Windows.
 
 ### Plan poprawy wydajności { #performance-roadmap }
 

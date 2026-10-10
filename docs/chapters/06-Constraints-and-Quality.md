@@ -201,7 +201,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 [#61](https://github.com/SirCypkowskyy/inwards/issues/61) spread a cold full check over several threads. The decision and its alternatives are [ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision).
 
-**What runs where.** `inwards check` and `inwards baseline` start worker threads when they read 1,000 files or more: one thread per 500 files, up to `INWARDS_THREADS` or, unset, the core count up to 4. The main thread counts as one of them. Workers do only what a file's text decides: the loader test, the import skeleton and the full parse's imports and suppression comments. The main thread walks the tree, reads the files, runs every rule in file order and parses the few files with dynamic imports itself. The output is the same byte for byte with any number of threads, and `INWARDS_THREADS=1` keeps the whole check on one thread.
+**What runs where.** `inwards check` and `inwards baseline` start worker threads when they read 1,000 files or more: one thread per 500 files, up to `INWARDS_THREADS` or, unset, half the core count up to 4 (Linux below). The main thread counts as one of them. Workers do only what a file's text decides: the loader test, the import skeleton and the full parse's imports and suppression comments. The main thread walks the tree, reads the files, runs every rule in file order and parses the few files with dynamic imports itself. The output is the same byte for byte with any number of threads, and `INWARDS_THREADS=1` keeps the whole check on one thread.
 
 **Method.** The darwin-arm64 binary built by `scripts/build-binaries.ts`, the base build from `develop` (`73936df`) against this one, on an Apple M1 Pro laptop with 10 cores. Other agents were working on the machine, so the load average was 4 to 7: trust the ratios more than the milliseconds. Each case ran 11 times after one warm-up, every case once per round in rotating order, with `INWARDS_NO_CACHE=1`; each run's JSON had to match the base build's. The real repos are checked with the corpus layering (`bench/corpus.json`). Peak RSS is `/usr/bin/time -l`, three runs each.
 
@@ -217,7 +217,17 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 - **More threads stop paying early.** Each worker compiles the grammar and warms its JIT up on its own, and a loaded machine has fewer free cores than it reports. Below 1,000 files the threads cost about as much as they save: 537 saleor files took 207 ms on one thread and 218 ms on three.
 - **Memory.** Saleor's peak RSS went from about 360 MB on one thread to about 520 MB with four and 615 MB with eight.
 - **The cache and the hooks.** A warm-cache check didn't change (0.95 → 0.91 s on saleor), the run that fills an empty cache got faster (2.6 → 2.05 s), and `bench/compare.ts` measured the hook and the pre-write guard within 3% of the base, the full check 20.5% faster.
-- **Not measured:** the 4-vCPU `ubuntu-latest` runner the issue names, and Windows. CI's bench job runs on the 20-core ARM64 runner, where the full check uses four threads too.
+- **Linux, and why the default is half the cores.** The first CI run of the bench job, on a Linux arm64 runner that reports 4 cores, measured the synthetic repo's full check 59% slower with four threads. The linux-arm64 binary in an Ubuntu 24.04 container on the same laptop, pinned to four or eight cores (`--cpuset-cpus`), five runs each, gave these medians:
+
+    | Cores | Repo | 1 thread | 2 | 3 | 4 |
+    |--:|---|--:|--:|--:|--:|
+    | 4 | synthetic | 0.42 s | 0.44 s | 0.53 s | 0.67 s |
+    | 4 | synthetic legacy | 2.28 s | 2.33 s (1.67 to 2.34) | 1.54 s | 1.77 s |
+    | 8 | synthetic | 0.42 s | 0.38 s | 0.40 s | 0.44 s |
+    | 8 | synthetic legacy | 2.30 s | 1.68 s | 1.38 s | 1.23 s |
+
+    Each thread runs its own JavaScript VM, and its JIT compiler and garbage collector run on threads of their own, so a thread per core starves the main thread. The default is half the cores, at most 4: two threads on a 4-core runner, which keeps a clean repo even and helps a repo with many confirmations only some of the time.
+- **Not measured:** GitHub's hosted 4-vCPU `ubuntu-latest` runner and Windows.
 
 ### Performance roadmap
 

@@ -1,8 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3082cdac3a8e88d524423b06e8dc9bf9409a6f0933acfcc5d991ab8a8a68bbbe
-
-source_hash: 83e6ab524e517cca7f05952f9e324467ffb7d90fa261a10ea9477147fce25254
+source_hash: 5d37b3574d8f157042793dae84d1c9d11abb516f6a3e550d7e445a62e170b0ad
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1156,7 +1154,7 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - **Silnik pyta dwa razy, potem sprawdza jak dotąd.** `Engine.checkWith` przekazuje partii zadania szkieletu dla każdego pliku, który czyta skan, skanuje, ustala, które pliki sparsują potwierdzenia i komentarze wyciszające, przekazuje je, a potem sprawdza każdy plik po kolei dokładnie tak, jak `Engine.check`, czytając wcześniej wczytane odpowiedzi przed pamięcią podręczną. Reguły, pierwszeństwo, skrót baseline'u, importy dynamiczne (ich odczyt zależy od innych plików), znaleziska FastAPI obejmujące wiele plików i cykle importów zostają w wątku głównym.
 - **Odpowiedzi to podpowiedzi, nigdy wyniki.** Zadanie, na które pula nie odpowie, odpowiedź w złym kształcie albo partia, która się nie powiedzie, silnik liczy sam, jak bez puli, więc każdy błąd pojawia się tak jak dziś. Worker, który padnie albo odpowie błędem, zostaje wycofany, a jego partia wraca do kolejki.
 - **Wątek główny też parsuje.** Gdy workery pracują, wątek główny bierze partie z końca kolejki, więc pula N wątków uruchamia N-1 workerów.
-- **Kiedy.** Wątki uruchamiają tylko `inwards check` i `inwards baseline`, i tylko dla 1000 plików lub więcej, po jednym wątku na 500 plików, do limitu. Limitem jest `INWARDS_THREADS`, a bez niej liczba rdzeni, najwyżej 4. `INWARDS_THREADS=1` trzyma sprawdzenie w jednym wątku. To zmienna środowiskowa, a nie klucz `[tool.inwards]`, bo zmienia szybkość, nigdy wyniki.
+- **Kiedy.** Wątki uruchamiają tylko `inwards check` i `inwards baseline`, i tylko dla 1000 plików lub więcej, po jednym wątku na 500 plików, do limitu. Limitem jest `INWARDS_THREADS`, a bez niej połowa liczby rdzeni, najwyżej 4: każdy wątek uruchamia własną maszynę wirtualną JavaScriptu, której kompilator JIT i odśmiecacz potrzebują własnych rdzeni. `INWARDS_THREADS=1` trzyma sprawdzenie w jednym wątku. To zmienna środowiskowa, a nie klucz `[tool.inwards]`, bo zmienia szybkość, nigdy wyniki.
 
 **Konsekwencje.**
 
@@ -1164,6 +1162,7 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - :material-plus-circle-outline: Silnik zostaje czysty. Port to funkcja z zadań w odpowiedzi; wątki są adapterem CLI.
 - :material-minus-circle-outline: Daleko do trzykrotnego przyspieszenia, o które prosił [#61](https://github.com/SirCypkowskyy/inwards/issues/61). Przejście drzewa, ustalanie rzeczywistych ścieżek, czytanie plików i reguły zostają w wątku głównym: z czterema wątkami saleor spędza mniej więcej jedną trzecią czasu, zanim silnik w ogóle ruszy. Osiem wątków było wolniejsze niż cztery na saleorze i repozytorium syntetycznym.
 - :material-minus-circle-outline: Każdy worker trzyma własne środowisko WASM i gramatykę: szczytowe RSS saleora rośnie z około 360 MB do około 520 MB przy czterech wątkach i 615 MB przy ośmiu.
+- :material-minus-circle-outline: Na Linuksie zysk jest mniejszy. Kontener na tym samym laptopie, przypięty do czterech rdzeni, sprawdzał repozytorium syntetyczne o 60% wolniej przy czterech wątkach, a przy dwóch tak samo jak w jednym; przy ośmiu rdzeniach repozytorium w trybie starszego kodu trwało 1,23 s w czterech wątkach wobec 2,30 s w jednym ([rozdział 6](06-Constraints-and-Quality.md#worker-threads-for-a-full-run)). 4-rdzeniowy runner CI dostaje dwa wątki i niewiele z nich ma.
 - :material-minus-circle-outline: Worker sam kompiluje gramatykę i rozgrzewa swój JIT, więc poniżej około 1000 plików wątki kosztują więcej, niż oszczędzają. Repozytorium, które wymaga wielu parsowań potwierdzających, zyskałoby wcześniej; próg liczy pliki, bo pracy nie znamy, dopóki nie przejdą skany.
 
 **Alternatywy.**

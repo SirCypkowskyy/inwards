@@ -88,7 +88,7 @@ export function nodeProjectIo(io: Platform, workerEntry?: string): ProjectIo {
  */
 export function compose(workerEntry?: string): AppDeps {
   const io = nodePlatform();
-  const project = nodeProjectIo(io);
+  const project = nodeProjectIo(io, workerEntry);
   const entry = resolve(import.meta.dir, "../main.ts");
   return {
     io,

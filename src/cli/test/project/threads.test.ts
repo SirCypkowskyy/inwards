@@ -1,6 +1,6 @@
 /**
  * @file How many threads parse a full check (#61). The limit is
- * `INWARDS_THREADS` when it is a whole number, else the cores up to the cap.
+ * `INWARDS_THREADS` when it is a whole number, else half the cores up to the cap.
  * There are no workers below the file threshold or with one thread, and one
  * worker fewer than threads otherwise, since the main thread parses too. A
  * check big enough gets the pool, through its own methods, closes it, and
@@ -29,8 +29,10 @@ import {
 import { LAYERS } from "../support/run.ts";
 
 describe("threadLimit", () => {
-  test("follows the cores up to the cap", () => {
-    expect(threadLimit({ threads: undefined, cores: 2 })).toBe(2);
+  test("follows half the cores up to the cap", () => {
+    expect(threadLimit({ threads: undefined, cores: 1 })).toBe(0);
+    expect(threadLimit({ threads: undefined, cores: 4 })).toBe(2);
+    expect(threadLimit({ threads: undefined, cores: 7 })).toBe(3);
     expect(threadLimit({ threads: undefined, cores: 64 })).toBe(DEFAULT_MAX_THREADS);
   });
 
@@ -42,7 +44,7 @@ describe("threadLimit", () => {
 
   test("a value that isn't a whole number is ignored", () => {
     for (const threads of ["auto", "-2", "1.5", "two"]) {
-      expect(threadLimit({ threads, cores: 3 })).toBe(3);
+      expect(threadLimit({ threads, cores: 6 })).toBe(3);
     }
   });
 });
