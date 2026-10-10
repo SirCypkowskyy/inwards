@@ -184,7 +184,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 
 [#60](https://github.com/SirCypkowskyy/inwards/issues/60) built the resident process the spike above measured, as [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) decided: `inwards daemon` serves PostToolUse through a Unix socket (a named pipe on Windows), keeps extractions by text hash and git's answers by commit id, and reads everything else again on each request. The hook command itself is unchanged, so every PostToolUse still starts one process.
 
-**Method.** The same M1 Pro laptop as the spike, the compiled `inwards-darwin-arm64` with bytecode, load average 5 to 7 from other agents. `examples/broken-app` in a fresh git repository with a generated 4,492-line `shop/domain/big.py` holding two INW001 violations, after a SessionStart, so every finding is old and the hook reads each file's start text from git. One-shot (`INWARDS_DAEMON=0`) and through the daemon alternate in each round, with `INWARDS_NO_CACHE=1`; 80 rounds after 2 warm-ups, 40 when the file changes before every call.
+**Method.** The same arm64 laptop on macOS as the spike, the compiled `inwards-darwin-arm64` with bytecode, load average 5 to 7 from other agents. `examples/broken-app` in a fresh git repository with a generated 4,492-line `shop/domain/big.py` holding two INW001 violations, after a SessionStart, so every finding is old and the hook reads each file's start text from git. One-shot (`INWARDS_DAEMON=0`) and through the daemon alternate in each round, with `INWARDS_NO_CACHE=1`; 80 rounds after 2 warm-ups, 40 when the file changes before every call.
 
 | PostToolUse | One-shot p50 / p95 | Through the daemon p50 / p95 |
 |---|--:|--:|

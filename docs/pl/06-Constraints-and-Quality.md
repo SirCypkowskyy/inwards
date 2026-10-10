@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: af61a3ff7d3de46ec713937c3acd54c745de1a502811134b20ae31cae4347327
+source_hash: 85edf3c30d9512a27099beed3a9277bb92daa3c537b9587e98b4b81ddce204dd
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -189,7 +189,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 
 [#60](https://github.com/SirCypkowskyy/inwards/issues/60) zbudowało stały proces, który mierzył eksperyment powyżej, tak jak zdecydował [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server): `inwards daemon` obsługuje PostToolUse przez gniazdo Unix (na Windows przez nazwany potok), trzyma ekstrakcje według skrótu tekstu i odpowiedzi gita według identyfikatora commita, a wszystko inne czyta od nowa przy każdym żądaniu. Samo polecenie hooka się nie zmieniło, więc każdy PostToolUse nadal uruchamia jeden proces.
 
-**Metoda.** Ten sam laptop z M1 Pro co w eksperymencie, skompilowany `inwards-darwin-arm64` z bajtkodem, średnie obciążenie 5 do 7 od innych agentów. `examples/broken-app` w świeżym repozytorium git z wygenerowanym `shop/domain/big.py` o 4492 liniach z dwoma naruszeniami INW001, po SessionStart, więc każde znalezisko jest stare, a hook czyta tekst każdego pliku ze startu z gita. Uruchomienie jednorazowe (`INWARDS_DAEMON=0`) i przez daemona na przemian w każdej rundzie, z `INWARDS_NO_CACHE=1`; 80 rund po 2 rozgrzewkowych, 40, gdy plik zmienia się przed każdym wywołaniem.
+**Metoda.** Ten sam laptop arm64 z macOS co w eksperymencie, skompilowany `inwards-darwin-arm64` z bajtkodem, średnie obciążenie 5 do 7 od innych agentów. `examples/broken-app` w świeżym repozytorium git z wygenerowanym `shop/domain/big.py` o 4492 liniach z dwoma naruszeniami INW001, po SessionStart, więc każde znalezisko jest stare, a hook czyta tekst każdego pliku ze startu z gita. Uruchomienie jednorazowe (`INWARDS_DAEMON=0`) i przez daemona na przemian w każdej rundzie, z `INWARDS_NO_CACHE=1`; 80 rund po 2 rozgrzewkowych, 40, gdy plik zmienia się przed każdym wywołaniem.
 
 | PostToolUse | Jednorazowo p50 / p95 | Przez daemona p50 / p95 |
 |---|--:|--:|

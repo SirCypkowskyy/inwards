@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: a5beb3431060904c2a9da73fb747b138b52d4c8469c3a5eadb6b5aea3838f57f
+source_hash: cff0e891e1cbadd35c8691836ba056e41f6c34fba81dd6524fa5052ed45fba05
 ---
 
 # Claude Code { #claude-code }
@@ -42,7 +42,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 
 ## Daemon hooków { #the-hook-daemon }
 
-PostToolUse, hook, który sprawdza każdy plik zapisany przez Claude, uruchamia się częściej niż pozostałe. Żeby był szybki, PostToolUse w projekcie z sesją Inwards uruchamia w tle `inwards daemon`: jeden proces na projekt, który trzyma w pamięci parser i przeczytane już pliki i odpowiada na kolejne hooki PostToolUse przez lokalne gniazdo (na Windows przez nazwany potok). Na M1 Pro PostToolUse dla pliku z 13 liniami trwał 38 ms p50 bez niego i 15 ms z nim ([rozdział 6](../06-Constraints-and-Quality.md#the-hook-daemon)).
+PostToolUse, hook, który sprawdza każdy plik zapisany przez Claude, uruchamia się częściej niż pozostałe. Żeby był szybki, PostToolUse w projekcie z sesją Inwards uruchamia w tle `inwards daemon`: jeden proces na projekt, który trzyma w pamięci parser i przeczytane już pliki i odpowiada na kolejne hooki PostToolUse przez lokalne gniazdo (na Windows przez nazwany potok). Na laptopie arm64 z macOS PostToolUse dla pliku z 13 liniami trwał 38 ms p50 bez niego i 15 ms z nim ([rozdział 6](../06-Constraints-and-Quality.md#the-hook-daemon)).
 
 - Zmienia szybkość, nigdy wyniki. Uruchamia ten sam kod hooka i przy każdej edycji czyta od nowa konfigurację, baseline i zapis sesji. Gdy nie działa, pochodzi z innego buildu Inwards albo nie odpowiada, hook uruchamia się we własnym procesie jak dotąd, a potem startuje nowy.
 - SessionStart, PreToolUse i Stop gate nigdy z niego nie korzystają. Stop gate sprawdza wszystko, co sesja zmieniła, we własnym procesie.

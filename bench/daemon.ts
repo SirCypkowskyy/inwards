@@ -22,7 +22,7 @@ export interface DaemonSamples {
 
 /**
  * Times the head's hook one-shot and through a running `inwards daemon`, in
- * alternation. The daemon is started first and stopped at the end, also when
+ * alternation: even rounds start one-shot, odd rounds through the daemon. The daemon is started first and stopped at the end, also when
  * a run fails.
  *
  * @param head - the head's executable.
@@ -52,8 +52,12 @@ export function daemonHook(
   try {
     waitForDaemon(head, repo, env);
     for (let i = 0; i < runs.warmup + runs.measured; i += 1) {
-      const oneShot = timeRun([head, "hook", "claude-code"], repo, stdin);
-      const daemon = timeRun([head, "hook", "claude-code"], repo, stdin, on);
+      // Each round starts with the other mode, so warming and drift hit both alike.
+      const first = i % 2 === 0 ? "oneShot" : "daemon";
+      const firstMs = timeHook(head, repo, stdin, first === "daemon");
+      const secondMs = timeHook(head, repo, stdin, first !== "daemon");
+      const oneShot = first === "oneShot" ? firstMs : secondMs;
+      const daemon = first === "oneShot" ? secondMs : firstMs;
       if (i >= runs.warmup) {
         samples.oneShot.push(oneShot);
         samples.daemon.push(daemon);
@@ -63,6 +67,20 @@ export function daemonHook(
     Bun.spawnSync([head, "daemon", "stop"], { cwd: repo, env });
   }
   return samples;
+}
+
+/**
+ * Times one run of the head's hook.
+ *
+ * @param head - the head's executable.
+ * @param repo - the synthetic repo.
+ * @param stdin - the PostToolUse payload.
+ * @param daemon - true to go through the daemon (`INWARDS_DAEMON=1`), false for one-shot.
+ * @returns the elapsed milliseconds.
+ */
+function timeHook(head: string, repo: string, stdin: string, daemon: boolean): number {
+  const env = { INWARDS_DAEMON: daemon ? "1" : "0" };
+  return timeRun([head, "hook", "claude-code"], repo, stdin, env);
 }
 
 /**

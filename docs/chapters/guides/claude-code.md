@@ -37,7 +37,7 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 
 ## The hook daemon
 
-PostToolUse, the hook that checks each file Claude writes, runs more often than the others. To keep it fast, a PostToolUse in a project with an Inwards session starts `inwards daemon` in the background: one process per project that keeps the parser and the files it has read in memory and answers the next PostToolUse hooks through a local socket (a named pipe on Windows). On an M1 Pro, PostToolUse on a 13-line file took 38 ms p50 without it and 15 ms with it ([chapter 6](../06-Constraints-and-Quality.md#the-hook-daemon)).
+PostToolUse, the hook that checks each file Claude writes, runs more often than the others. To keep it fast, a PostToolUse in a project with an Inwards session starts `inwards daemon` in the background: one process per project that keeps the parser and the files it has read in memory and answers the next PostToolUse hooks through a local socket (a named pipe on Windows). On an arm64 laptop running macOS, PostToolUse on a 13-line file took 38 ms p50 without it and 15 ms with it ([chapter 6](../06-Constraints-and-Quality.md#the-hook-daemon)).
 
 - It changes speed, never results. It runs the same hook code, and it reads the config, the baseline and the session record again for every edit. When it isn't running, comes from another Inwards build or doesn't answer, the hook runs in its own process as before, then starts a new one.
 - SessionStart, PreToolUse and the Stop gate never use it. The Stop gate checks everything the session changed in its own process.

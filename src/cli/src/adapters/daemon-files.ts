@@ -5,15 +5,7 @@
  * are owner-only. Used by `daemon-host.ts`; what they contain is decided in
  * `daemon/protocol.ts`.
  */
-import {
-  closeSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-  writeSync,
-} from "node:fs";
+import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
 
@@ -21,20 +13,25 @@ import process from "node:process";
 const OWNER_ONLY = 0o600;
 
 /**
- * Takes the project's lock: a file created exclusively, holding this pid. A
- * lock whose process is gone is removed and taken again, once.
+ * Takes the project's lock: a file holding this pid, written to a private
+ * temporary file and then hard-linked into place, which fails when a lock is
+ * already there. A lock is never seen empty, so a daemon starting at the same
+ * moment can't take a fresh lock for a stale one. A lock whose process is
+ * gone is removed and taken again, once.
  *
  * @param path - the lock file.
  * @returns undefined when taken, else the pid of the daemon that holds it.
  */
 export function takeLock(path: string): number | undefined {
+  const temp = `${path}.${process.pid}.tmp`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const fd = openSync(path, "wx", OWNER_ONLY);
-      writeSync(fd, String(process.pid));
-      closeSync(fd);
+      writeFileSync(temp, String(process.pid), { mode: OWNER_ONLY });
+      linkSync(temp, path);
+      rmSync(temp, { force: true });
       return undefined;
     } catch {
+      rmSync(temp, { force: true });
       const holder = lockHolder(path);
       if (holder !== undefined && alive(holder)) {
         return holder;
