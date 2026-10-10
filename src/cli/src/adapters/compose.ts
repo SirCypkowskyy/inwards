@@ -5,7 +5,8 @@
  * invocations in one process. This is the only place the adapters meet. It
  * also builds each request the daemon serves (`nodeDaemon`): the same
  * adapters, with the request's runtime, buffered streams and the daemon's
- * in-memory caches.
+ * in-memory caches; and the language server's connection and warm check
+ * (`nodeLsp`), whose stdout belongs to the protocol.
  */
 import { resolve } from "node:path";
 import {
@@ -14,9 +15,10 @@ import {
   type GrammarBinaries,
   type Report,
 } from "@inwards/core";
-import type { AppDeps, DaemonDeps } from "../commands/deps.ts";
+import type { AppDeps, DaemonDeps, LspDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
+import type { ServerCheck } from "../lsp/checks.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
 import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
@@ -115,6 +117,45 @@ export function compose(workerEntry?: string): AppDeps {
     },
     toml: parseToml,
     daemon: nodeDaemon(io, entry),
+    lsp: nodeLsp(io),
+  };
+}
+
+/**
+ * The language server on the real process: LSP over stdio, and a check that
+ * keeps what it extracted from each text in memory for as long as the server
+ * runs (the daemon's cache, ADR-039). The check gets no worker pool, so a
+ * keystroke never starts a thread, the kept parse of the last document
+ * (`createTreeReuse`), and streams whose stdout writes to stderr,
+ * since stdout carries the protocol. The connection and its protocol library
+ * load only when `inwards server` runs: imported at start-up, they cost every
+ * hook call about 5 ms (the bench's pre-write case, 11.3 to 16.6 ms p50).
+ *
+ * @param io - the server's own platform.
+ * @returns the language server's dependencies.
+ */
+function nodeLsp(io: Platform): LspDeps {
+  const extractions = daemonExtractionCache();
+  const streams: Streams = { ...io.streams, out: io.streams.err };
+  const files = {
+    ...nodeProjectIo({ ...io, streams }),
+    extractionCache: (): ExtractionCache => extractions,
+    // Checks run one at a time, so they share the kept parse: the next
+    // keystroke in the same document parses only what changed.
+    reuse: createTreeReuse(),
+  };
+  return {
+    serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
+      // A split chunk in the binary, loaded on use (as the init picker is, ADR-020).
+      const { serveLsp } = await import("./lsp-connection.ts");
+      return await serveLsp(build);
+    },
+    check: (
+      configPath: string,
+      targets: string[] | undefined,
+      base: string,
+      options: Parameters<ServerCheck>[3],
+    ): Promise<Report> => runCheck(files, configPath, targets, { ...options, base, cache: true }),
   };
 }
 

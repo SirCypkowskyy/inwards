@@ -129,6 +129,37 @@ mkdir -p ~/.local/bin && install -m 755 dist/inwards-linux-x64 ~/.local/bin/inwa
 inwards --version
 ```
 
+## In your editor
+
+`inwards server` is a language server over stdio. An editor with an LSP client starts it and shows, for every file in the workspace, what `inwards check` reports there: the document you type in is checked on every change, and the whole workspace again on every save and whenever files are created or deleted. Each workspace folder uses its own `[tool.inwards]`, as `inwards check` run in that folder would ([ADR-041](../05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). Point the editor at the binary:
+
+=== "Neovim 0.11+"
+
+    ```lua title="init.lua"
+    vim.lsp.config("inwards", {
+      cmd = { "inwards", "server" },
+      filetypes = { "python" },
+      root_markers = { "pyproject.toml" },
+    })
+    vim.lsp.enable("inwards")
+    ```
+
+=== "Helix"
+
+    ```toml title="~/.config/helix/languages.toml"
+    [language-server.inwards]
+    command = "inwards"
+    args = ["server"]
+
+    [[language]]
+    name = "python"
+    language-servers = ["ruff", "inwards"]   # keep the servers you already use in this list
+    ```
+
+With uv, use `uv run inwards server` as the command, so each project gets its own version. The tests drive the binary over stdio as these editors do; neither editor has been tried by hand yet.
+
+The VS Code extension (the `.vsix` on each release) still runs its own server, which shows only INW007 and INW008 for files you haven't opened; it switches to `inwards server` with [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
+
 ## Configure the layers
 
 ### A new project: start from a preset

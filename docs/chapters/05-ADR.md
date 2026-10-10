@@ -11,7 +11,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Configuration lives in `pyproject.toml` | :material-check-circle: Accepted |
 | [006](#adr-006-the-engine-does-no-io) | The engine does no I/O | :material-check-circle: Accepted, the adapter supplies the module index through a ProjectFiles port since [#44](03-Architecture-C4.md#c3-components-of-the-engine) |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | A versioned output contract with fix steps as data | :material-check-circle: Accepted |
-| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-progress-clock: Accepted, revisit in M6 (v0.6); the name `inwards server` and its place beside the hook daemon in [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Language server on Node inside the extension, for now | :material-swap-horizontal: Superseded by [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches); the name `inwards server` and its place beside the hook daemon in [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Check imports wherever they appear | :material-check-circle: Accepted |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Docs built with Zensical, served by Cloudflare Workers | :material-swap-horizontal: Hosting superseded by 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Rename Stratum to Inwards | :material-check-circle: Accepted |
@@ -44,6 +44,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :material-check-circle: Accepted |
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-check-circle: Accepted |
 | [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Worker threads parse a large full check; the main thread keeps every decision | :material-check-circle: Accepted |
+| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -173,7 +174,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 
 ## ADR-008: Language server on Node inside the extension, for now
 
-**Status:** Accepted, revisit in M6 (v0.6) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) keeps `inwards server` for the language server and gives the hooks a separate `inwards daemon`
+**Status:** Superseded by [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) keeps `inwards server` for the language server and gives the hooks a separate `inwards daemon`
 
 **Context.** Ruff and ty ship their language server inside the same binary (`ruff server`). That gives every LSP-capable editor (Neovim, Zed, Helix) the server for free. Inwards' scaffold instead bundles a Node LSP server into the VS Code extension, next to the grammar files.
 
@@ -1174,3 +1175,40 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - *More threads by default:* on a loaded 10-core laptop, eight threads were slower than four on saleor (1.04 against 0.98 s) and the synthetic repo, and faster only on the legacy repo (1.03 against 1.14 s).
 
 **Amendment · 2026-10-10 · [#281](https://github.com/SirCypkowskyy/inwards/issues/281).** The serial part before the engine got cheaper without moving any decision off the main thread. The walk gives each file the real path it already resolved for the file's directory, so the check calls `realpath` once per directory and symlink instead of twice per file. A check of 1,000 files or more counts its files first, starts the pool, and then reads every file in one batch while the workers load the grammar. Each worker holds two batches, so it never waits for the main thread to finish one of its own before it gets the next. Saleor's cold check with four threads went from 1.09 to 0.87 s, against 1.48 s single-threaded before #61 ([chapter 6](06-Constraints-and-Quality.md#the-serial-part-of-a-full-run)). The alternative *Workers read the files too* stays rejected: a variant in which idle workers parsed each chunk of files as it was read, and the engine reused the answers to identical jobs, measured no faster. On Linux the change measured no faster on four cores and 5% faster on eight, since Linux resolves paths and reads files from its caches cheaply.
+
+## ADR-041: `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches
+
+**Status:** Accepted · 2026-10-10 · [#63](https://github.com/SirCypkowskyy/inwards/issues/63) · supersedes [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)
+
+**Context.** [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now) kept a Node language server inside the VS Code extension until the binary had `inwards server`; [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) fixed that name, kept the server a process of its own, and gave the CLI the warm-engine module (`daemon/memory.ts`) that the extension's in-memory extraction cache had been. The extension's server is a second adapter around the engine: its own file walk (`workspace.ts`, kept equal to the CLI's by a parity test), its own config reader, a module index it rebuilds on file events, and only the first workspace folder's root `pyproject.toml`. For files nobody opened it shows INW007 and INW008 from a directory listing, so the editor and `inwards check` disagree about every other rule there. The binary runs on Bun; the extension runs on Node in VS Code's extension host, and the CLI's check path uses Bun's TOML parser and grammar files embedded in the executable.
+
+**Decision.**
+
+- **The server lives in the CLI and checks with `inwards check`'s code.** `src/cli/src/lsp/` decides when to check what and what each document shows, `adapters/lsp-connection.ts` speaks LSP over stdio with `vscode-languageserver` 10 (the version the extension uses), and `commands/server.ts` is the command. Every check goes through `planCheck` and `runCheck`, so the server has no walk, config reader or module index of its own.
+- **Nothing is shared with the extension.** The extension keeps its Node server, frozen, until [#64](https://github.com/SirCypkowskyy/inwards/issues/64) makes it a thin client that starts `inwards server` and deletes `src/vscode-extension/src/server/`. Changes to what an editor shows go into the CLI's server.
+- **A whole pass is `inwards check` in every workspace folder.** Each folder gets the configs `inwards check` would run there (its nearest `[tool.inwards]`, or each uv workspace member's), each config once, with the open documents' unsaved text in place of the disk's. Every finding is published on its file, so a file nobody opened shows everything `inwards check` reports, and `pyproject.toml` shows the whole-project INW006 findings. The pass runs at start, on a save, when a workspace folder comes or goes, and when the editor's file watchers report a change that can alter a finding: a module file or a directory created, changed or deleted, a `pyproject.toml`, or `inwards-baseline.json`, outside hidden directories and `__pycache__`. Events are collected for 100 ms, so a branch switch runs one pass.
+- **A keystroke checks that document alone,** as the PostToolUse hook checks an edit (`edit: true`), with the config `inwards check` would route it to. The document shows that check plus what the last pass found in it that a check of one file can't find (an import cycle, a FastAPI router no app includes); those update on the next save.
+- **Nothing is kept but extracted text.** As in the daemon, every check reads the config, the baseline and the file listing again, so a config edit, a checkout or a new baseline can't leave the server stale, and file events only decide when a pass runs. Across checks the server keeps the daemon's extraction cache (5,000 entries, about 32 MB, 4 texts per module). On a 10-core laptop, the synthetic repo of [chapter 6](06-Constraints-and-Quality.md) (2,100 files) took 504 ms for the first pass, 154 ms p50 for later ones, and 0.6 ms p50 for a keystroke, run from source.
+- **One thread, one check at a time.** The server never starts worker threads ([ADR-040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)). Checks run in arrival order; a keystroke check that is still waiting reads the newest text when it runs, so typing queues at most one per document.
+- **Stdout belongs to the protocol.** The connection gets stdin and stdout explicitly; the check's own streams write stdout's text to stderr, and Biome keeps `console` out of the CLI. `--stdio`, which editors pass by convention, is accepted and changes nothing; the library reads `--clientProcessId` itself. The server exits on `exit`, when stdin closes, or when the editor's process is gone.
+- **Errors.** A broken config pops up once per config and message, and stays as an error on its `pyproject.toml` (on the line the TOML parser names, else the first) until a pass finds it fixed; its files show nothing meanwhile.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Any editor with an LSP client (Neovim, Helix, and VS Code once #64 lands) gets Inwards from the one binary, with nothing else installed.
+- :material-plus-circle-outline: Once every file is saved, the editor shows what `inwards check` reports in each folder; `src/cli/test/lsp/parity.test.ts` compares the two on examples/ as a two-folder workspace, against the compiled binary in CI.
+- :material-plus-circle-outline: No module index or config to keep up to date, so the extension's watcher fallbacks and serialised reloads have no counterpart here; an editor without file watching gets a new pass on every save.
+- :material-minus-circle-outline: Two language servers until #64: the extension's still shows only INW007 and INW008 for files nobody opened.
+- :material-minus-circle-outline: Every save costs a whole-project check. Parsing is cached, but walking the tree, reading the files and the rules are not: 154 ms for 2,100 files.
+- :material-minus-circle-outline: Unsaved edits to `pyproject.toml` or the baseline count only once saved, and findings in other files that depend on unsaved text (cycles through it, say) update only on the next pass.
+- :material-minus-circle-outline: Two workspace folders whose configs both cover a file (a project nested in another that isn't a uv workspace member) show its findings twice, as running `inwards check` in both folders would.
+- :material-minus-circle-outline: The binary carries `vscode-languageserver` and its protocol and JSON-RPC libraries.
+- :material-minus-circle-outline: Paths become URIs with Node's `pathToFileURL` for files nobody opened; open documents keep the editor's own URI. Windows drive letters and their encoding weren't tried on Windows, so the full test matrix has to run before a release.
+
+**Alternatives.**
+
+- *A module both servers import now:* the extension would run the CLI's check path on Node, which means replacing Bun's TOML parser and embedded grammars there, for a server #64 deletes in the next release.
+- *The extension starts the binary now:* the extension then needs a binary for each platform inside the VSIX or a download step, which is #64's work, with the Marketplace.
+- *The extension server's design in the binary* (open files checked in full, the rest from a listing, a module index kept by watchers): moves the disagreement with `inwards check` into the binary, and keeps a cache whose staleness depends on every event arriving.
+- *A whole pass on every keystroke:* always exact, but a pause in typing in a large project costs a whole check, against 0.6 ms for one file.
+- *Worker threads for the pass:* each pass would start a pool of JavaScript VMs again or keep one alive per editor window; ADR-040's numbers show threads pay only from about 1,000 files, and a warm pass is already cached.

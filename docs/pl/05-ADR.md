@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 8273ed93d57797f5c326fc7a285722b1208bf4c4ebe0f83d06ec9035ac31a1cb
+source_hash: 34f6fd36d09f78c0c4fcf7bf6e974fd8cec65a3dd4c86c8835cd54b02db2428c
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -16,7 +16,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [005](#adr-005-configuration-lives-in-pyprojecttoml) | Konfiguracja mieszka w `pyproject.toml` | :material-check-circle: Przyjęty |
 | [006](#adr-006-the-engine-does-no-io) | Silnik nie wykonuje operacji wejścia-wyjścia | :material-check-circle: Przyjęty, od [#44](03-Architecture-C4.md#c3-components-of-the-engine) adapter dostarcza indeks modułów przez port ProjectFiles |
 | [007](#adr-007-a-versioned-output-contract-with-fix-steps-as-data) | Wersjonowany kontrakt wyjścia z krokami naprawy jako danymi | :material-check-circle: Przyjęty |
-| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-progress-clock: Przyjęty, do ponownej oceny w M6 (v0.6); nazwę `inwards server` i jego miejsce obok daemona hooków ustala [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
+| [008](#adr-008-language-server-on-node-inside-the-extension-for-now) | Serwer języka na Node wewnątrz rozszerzenia, na razie | :material-swap-horizontal: Zastąpiony przez [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches); nazwę `inwards server` i jego miejsce obok daemona hooków ustala [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) |
 | [009](#adr-009-check-imports-wherever-they-appear) | Sprawdzaj importy, gdziekolwiek się pojawią | :material-check-circle: Przyjęty |
 | [010](#adr-010-docs-built-with-zensical-served-by-cloudflare-workers) | Dokumentacja budowana Zensicalem, serwowana przez Cloudflare Workers | :material-swap-horizontal: Hosting zastąpiony przez 012 |
 | [011](#adr-011-rename-stratum-to-inwards) | Zmiana nazwy ze Stratum na Inwards | :material-check-circle: Przyjęty |
@@ -49,6 +49,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :material-check-circle: Przyjęty |
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
 | [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję | :material-check-circle: Przyjęty |
+| [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -178,7 +179,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 
 ## ADR-008: Serwer języka na Node wewnątrz rozszerzenia, na razie { #adr-008-language-server-on-node-inside-the-extension-for-now }
 
-**Stan:** Przyjęty, do ponownej oceny w M6 (v0.6) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) zostawia `inwards server` dla serwera języka i daje hookom osobny `inwards daemon`
+**Stan:** Zastąpiony przez [ADR-041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) · 2026-09-25 · [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) zostawia `inwards server` dla serwera języka i daje hookom osobny `inwards daemon`
 
 **Kontekst.** Ruff i ty dostarczają swój serwer języka w tym samym pliku binarnym (`ruff server`). Dzięki temu każdy edytor obsługujący LSP (Neovim, Zed, Helix) dostaje serwer za darmo. Scaffold Inwards zamiast tego dołącza serwer LSP na Node do rozszerzenia VS Code, obok plików gramatyk.
 
@@ -1179,3 +1180,40 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - *Domyślnie więcej wątków:* na obciążonym 10-rdzeniowym laptopie osiem wątków było wolniejsze niż cztery na saleorze (1,04 wobec 0,98 s) i repozytorium syntetycznym, a szybsze tylko na repozytorium w trybie starszego kodu (1,03 wobec 1,14 s).
 
 **Poprawka · 2026-10-10 · [#281](https://github.com/SirCypkowskyy/inwards/issues/281).** Szeregowa część przed silnikiem potaniała, a żadna decyzja nie opuściła wątku głównego. Przejście drzewa daje każdemu plikowi rzeczywistą ścieżkę, którą już ustaliło dla jego katalogu, więc sprawdzenie wywołuje `realpath` raz na katalog i dowiązanie symboliczne zamiast dwa razy na plik. Sprawdzenie 1000 plików lub więcej najpierw liczy pliki, uruchamia pulę, a potem czyta wszystkie pliki jedną partią, gdy workery ładują gramatykę. Każdy worker trzyma dwie partie, więc nie czeka, aż wątek główny skończy własną, żeby dostać następną. Zimne sprawdzenie saleora przy czterech wątkach skróciło się z 1,09 do 0,87 s, wobec 1,48 s w jednym wątku przed #61 ([rozdział 6](06-Constraints-and-Quality.md#the-serial-part-of-a-full-run)). Alternatywa *Workery czytają też pliki* pozostaje odrzucona: wariant, w którym wolne workery parsowały każdą porcję plików zaraz po przeczytaniu, a silnik używał odpowiedzi na identyczne zadania, nie był szybszy. Na Linuksie zmiana nie przyspieszyła niczego na czterech rdzeniach i przyspieszyła o 5% na ośmiu, bo Linux tanio ustala ścieżki i czyta pliki ze swoich pamięci podręcznych.
+
+## ADR-041: `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia { #adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches }
+
+**Stan:** Przyjęty · 2026-10-10 · [#63](https://github.com/SirCypkowskyy/inwards/issues/63) · zastępuje [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)
+
+**Kontekst.** [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now) zostawił serwer języka na Node w rozszerzeniu VS Code, dopóki plik binarny nie będzie miał `inwards server`. [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) ustalił tę nazwę, zostawił serwer jako osobny proces i dał CLI moduł z rozgrzanym silnikiem (`daemon/memory.ts`), którym wcześniej była pamięć podręczna ekstrakcji w pamięci rozszerzenia. Serwer rozszerzenia to drugi adapter wokół silnika: ma własne przejście po plikach (`workspace.ts`, utrzymywane w zgodzie z CLI przez test zgodności), własny odczyt konfiguracji, indeks modułów przebudowywany na zdarzeniach plików i czyta tylko `pyproject.toml` z korzenia pierwszego folderu obszaru roboczego. Dla plików, których nikt nie otworzył, pokazuje INW007 i INW008 z listingu katalogów, więc dla każdej innej reguły edytor i `inwards check` się tam nie zgadzają. Plik binarny działa na Bunie, rozszerzenie na Node w hoście rozszerzeń VS Code, a ścieżka sprawdzania w CLI używa parsera TOML Buna i gramatyk wbudowanych w plik wykonywalny.
+
+**Decyzja.**
+
+- **Serwer mieszka w CLI i sprawdza kodem `inwards check`.** `src/cli/src/lsp/` decyduje, co i kiedy sprawdzić i co pokazuje każdy dokument, `adapters/lsp-connection.ts` mówi LSP przez stdio za pomocą `vscode-languageserver` 10 (tej samej wersji co rozszerzenie), a `commands/server.ts` to komenda. Każde sprawdzenie idzie przez `planCheck` i `runCheck`, więc serwer nie ma własnego przejścia po plikach, odczytu konfiguracji ani indeksu modułów.
+- **Z rozszerzeniem nic nie jest współdzielone.** Rozszerzenie zachowuje zamrożony serwer Node, dopóki [#64](https://github.com/SirCypkowskyy/inwards/issues/64) nie zrobi z niego cienkiego klienta, który uruchamia `inwards server`, i nie usunie `src/vscode-extension/src/server/`. Zmiany w tym, co pokazuje edytor, trafiają do serwera w CLI.
+- **Przebieg całego projektu to `inwards check` w każdym folderze obszaru roboczego.** Każdy folder dostaje konfiguracje, które uruchomiłby tam `inwards check` (najbliższe `[tool.inwards]` albo konfigurację każdego członka workspace'u uv), każdą raz, z niezapisanym tekstem otwartych dokumentów zamiast tekstu z dysku. Każda diagnostyka trafia na swój plik, więc plik, którego nikt nie otworzył, pokazuje wszystko, co zgłasza `inwards check`, a `pyproject.toml` pokazuje diagnostyki INW006 całego projektu. Przebieg rusza na starcie, po zapisie, gdy folder obszaru roboczego się pojawi lub zniknie, i gdy obserwatory plików edytora zgłoszą zmianę, która może zmienić diagnostykę: utworzenie, zmianę lub usunięcie pliku modułu albo katalogu, `pyproject.toml` lub `inwards-baseline.json`, poza ukrytymi katalogami i `__pycache__`. Zdarzenia są zbierane przez 100 ms, więc zmiana gałęzi uruchamia jeden przebieg.
+- **Naciśnięcie klawisza sprawdza tylko ten dokument**, tak jak hook PostToolUse sprawdza edycję (`edit: true`), z konfiguracją, do której skierowałby go `inwards check`. Dokument pokazuje to sprawdzenie i to, co ostatni przebieg znalazł w nim, a czego sprawdzenie jednego pliku znaleźć nie może (cykl importów, router FastAPI, którego nie dołącza żadna aplikacja); te diagnostyki odświeżają się przy następnym zapisie.
+- **Nic nie jest trzymane poza wyekstrahowanym tekstem.** Jak w daemonie, każde sprawdzenie czyta konfigurację, baseline i listing plików od nowa, więc edycja konfiguracji, checkout ani nowy baseline nie zostawią serwera nieaktualnym, a zdarzenia plików decydują tylko o tym, kiedy rusza przebieg. Między sprawdzeniami serwer trzyma pamięć podręczną ekstrakcji daemona (5000 wpisów, około 32 MB, 4 teksty na moduł). Na 10-rdzeniowym laptopie syntetyczne repozytorium z [rozdziału 6](06-Constraints-and-Quality.md) (2100 plików) zajęło 504 ms przy pierwszym przebiegu, 154 ms p50 przy kolejnych i 0,6 ms p50 na naciśnięcie klawisza, uruchomione ze źródeł.
+- **Jeden wątek, jedno sprawdzenie naraz.** Serwer nigdy nie uruchamia wątków roboczych ([ADR-040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)). Sprawdzenia biegną w kolejności nadejścia; sprawdzenie po naciśnięciu klawisza, które jeszcze czeka, czyta najnowszy tekst, gdy rusza, więc pisanie kolejkuje najwyżej jedno na dokument.
+- **Stdout należy do protokołu.** Połączenie dostaje stdin i stdout wprost; strumienie samego sprawdzenia piszą tekst ze stdout na stderr, a Biome trzyma `console` z dala od CLI. `--stdio`, które edytory przekazują z przyzwyczajenia, jest przyjmowane i niczego nie zmienia; `--clientProcessId` biblioteka czyta sama. Serwer kończy się po `exit`, gdy stdin się zamknie albo gdy zniknie proces edytora.
+- **Błędy.** Zepsuta konfiguracja wyskakuje raz na konfigurację i komunikat i zostaje jako błąd na swoim `pyproject.toml` (w wierszu, który wskazuje parser TOML, inaczej w pierwszym), dopóki przebieg nie stwierdzi, że jest poprawiona; jej pliki niczego w tym czasie nie pokazują.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Każdy edytor z klientem LSP (Neovim, Helix, a VS Code po #64) dostaje Inwards z jednego pliku binarnego, bez instalowania czegokolwiek innego.
+- :material-plus-circle-outline: Gdy wszystkie pliki są zapisane, edytor pokazuje to, co `inwards check` zgłasza w każdym folderze; `src/cli/test/lsp/parity.test.ts` porównuje jedno z drugim na examples/ jako obszarze roboczym z dwoma folderami, w CI na skompilowanym pliku binarnym.
+- :material-plus-circle-outline: Nie ma indeksu modułów ani konfiguracji do utrzymywania w aktualności, więc rezerwowe ścieżki rozszerzenia dla braku obserwatorów i serializowane przeładowania nie mają tu odpowiednika; edytor bez obserwowania plików dostaje nowy przebieg przy każdym zapisie.
+- :material-minus-circle-outline: Do #64 są dwa serwery języka: serwer rozszerzenia nadal pokazuje dla nieotwartych plików tylko INW007 i INW008.
+- :material-minus-circle-outline: Każdy zapis kosztuje sprawdzenie całego projektu. Parsowanie jest w pamięci podręcznej, ale przejście po drzewie, czytanie plików i reguły już nie: 154 ms dla 2100 plików.
+- :material-minus-circle-outline: Niezapisane edycje `pyproject.toml` albo baseline'u liczą się dopiero po zapisie, a diagnostyki w innych plikach, które zależą od niezapisanego tekstu (na przykład cykle przez niego), odświeżają się dopiero przy następnym przebiegu.
+- :material-minus-circle-outline: Dwa foldery obszaru roboczego, których konfiguracje obejmują ten sam plik (projekt zagnieżdżony w innym, który nie jest członkiem workspace'u uv), pokazują jego diagnostyki dwa razy, tak jak `inwards check` uruchomione w obu folderach.
+- :material-minus-circle-outline: Plik binarny zawiera `vscode-languageserver` z jego bibliotekami protokołu i JSON-RPC.
+- :material-minus-circle-outline: Ścieżki plików, których nikt nie otworzył, stają się URI przez `pathToFileURL` z Node; otwarte dokumenty zachowują URI edytora. Litery dysków Windows i ich kodowanie nie były sprawdzane na Windows, więc przed wydaniem musi przejść pełna macierz testów.
+
+**Alternatywy.**
+
+- *Moduł importowany już teraz przez oba serwery:* rozszerzenie musiałoby uruchamiać ścieżkę sprawdzania CLI na Node, czyli zastąpić tam parser TOML Buna i wbudowane gramatyki, dla serwera, który #64 usunie w następnym wydaniu.
+- *Rozszerzenie uruchamia plik binarny już teraz:* rozszerzenie potrzebowałoby wtedy pliku binarnego dla każdej platformy w VSIX albo kroku pobierania, a to praca #64, razem z Marketplace.
+- *Projekt serwera rozszerzenia w pliku binarnym* (otwarte pliki sprawdzane w całości, reszta z listingu, indeks modułów utrzymywany przez obserwatory): przenosi niezgodność z `inwards check` do pliku binarnego i trzyma pamięć podręczną, której aktualność zależy od tego, czy dotrze każde zdarzenie.
+- *Przebieg całego projektu po każdym naciśnięciu klawisza:* zawsze dokładny, ale każda przerwa w pisaniu w dużym projekcie kosztuje sprawdzenie całego projektu, wobec 0,6 ms dla jednego pliku.
+- *Wątki robocze dla przebiegu:* każdy przebieg uruchamiałby od nowa pulę maszyn wirtualnych JavaScript albo trzymał jedną żywą na okno edytora; liczby z ADR-040 pokazują, że wątki opłacają się dopiero od około 1000 plików, a ciepły przebieg i tak korzysta z pamięci podręcznej.

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 32c2a001e7e714bc6648f16bcaa34ad6062193ce7d25b4e1eb1a88301ce58f5b
+source_hash: 66e773810c41905a955563f3848d015ef3a1ed3827a0891b23f5d371e0546bdc
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -133,6 +133,37 @@ bun run build:cli bun-linux-x64          # or bun-darwin-arm64, bun-windows-x64,
 mkdir -p ~/.local/bin && install -m 755 dist/inwards-linux-x64 ~/.local/bin/inwards
 inwards --version
 ```
+
+## W edytorze { #in-your-editor }
+
+`inwards server` to serwer języka przez stdio. Edytor z klientem LSP uruchamia go i pokazuje dla każdego pliku w obszarze roboczym to, co zgłasza dla niego `inwards check`: dokument, w którym piszesz, jest sprawdzany przy każdej zmianie, a cały obszar roboczy ponownie przy każdym zapisie i za każdym razem, gdy pliki powstają albo znikają. Każdy folder obszaru roboczego używa własnego `[tool.inwards]`, tak jak `inwards check` uruchomione w tym folderze ([ADR-041](../05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). Wskaż edytorowi plik binarny:
+
+=== "Neovim 0.11+"
+
+    ```lua title="init.lua"
+    vim.lsp.config("inwards", {
+      cmd = { "inwards", "server" },
+      filetypes = { "python" },
+      root_markers = { "pyproject.toml" },
+    })
+    vim.lsp.enable("inwards")
+    ```
+
+=== "Helix"
+
+    ```toml title="~/.config/helix/languages.toml"
+    [language-server.inwards]
+    command = "inwards"
+    args = ["server"]
+
+    [[language]]
+    name = "python"
+    language-servers = ["ruff", "inwards"]   # keep the servers you already use in this list
+    ```
+
+Z uv użyj jako komendy `uv run inwards server`, żeby każdy projekt dostał własną wersję. Testy sterują plikiem binarnym przez stdio tak, jak robią to te edytory; żadnego z nich nie sprawdzono jeszcze ręcznie.
+
+Rozszerzenie VS Code (`.vsix` w każdym wydaniu) nadal uruchamia własny serwer, który dla plików, których nie otworzyłeś, pokazuje tylko INW007 i INW008; przełączy się na `inwards server` w [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
 
 ## Skonfiguruj warstwy { #configure-the-layers }
 
