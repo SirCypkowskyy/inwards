@@ -51,8 +51,6 @@ interface ReportContext {
   readonly src: SourceFile;
   readonly settings: ThinSettings;
   readonly layers: readonly LayerSpec[];
-  /** Where the work goes, as `targetText` names it. */
-  readonly where: string;
 }
 
 /**
@@ -79,7 +77,7 @@ function spanOf(start: Node, end: Node): Span {
  * @param endpoint.fn - its `function_definition` node.
  * @param endpoint.name - its name.
  * @param endpoint.view - the file that defines it.
- * @param context - the checked file, settings, layers and target text.
+ * @param context - the checked file, settings and layers.
  * @param registered - the registration that names it from the checked file, for a handler in another module.
  * @returns one finding, or none when nothing tripped.
  */
@@ -98,6 +96,7 @@ function report(
   if (tripped.parts.length === 0) {
     return [];
   }
+  const where = targetText(context.settings.delegateTo ?? [], context.layers, view.src.module);
   const spans = bodies.map((body, index) => ({
     helper: index === 0 ? undefined : body.name,
     line: body.fn.startPosition.row + 1,
@@ -114,7 +113,7 @@ function report(
         ? spanOf(registered.at, registered.at)
         : spanOf(fn, fn.childForFieldName("name") ?? fn),
       message: `${subject} is an HTTP endpoint with ${joined(tripped.parts)}${helperText(spans, path)}. Endpoints parse the request, call one use case, and shape the response.`,
-      fix: fixFor(name, tripped, context.where, { spans, path }),
+      fix: fixFor(name, tripped, where, { spans, path }),
     }),
   ];
 }
@@ -146,7 +145,6 @@ export function checkThinEndpoints(
       src,
       settings,
       layers: inputs.layers,
-      where: targetText(settings.delegateTo ?? [], inputs.layers),
     };
     const own = view.found.endpoints.flatMap(({ fn, name }) => report({ fn, name, view }, context));
     const registered = view.found.registrations.flatMap(({ handler, target, how }) => {
