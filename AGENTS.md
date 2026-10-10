@@ -216,6 +216,7 @@ bun run check:overviews # every module's @file overview is 2+ sentences
 bun test                # unit + CLI + E2E snapshots
 uv run scripts/check-docs-nav.py  # every page in docs/chapters and docs/pl is in its nav
 uv run scripts/check-docs-translation.py  # every English page has a Polish one; lists stale ones
+uv run scripts/check-rule-pages.py  # rule pages follow the #49 contract; --write refreshes rules.json
 ```
 
 CI also runs `prescan-diff` (the prescan must never miss an import) and the
@@ -353,6 +354,10 @@ English stays the source of truth; the changelog isn't translated.
   terms, and the conventions (headings keep the English anchor with
   `{ #id }`, code blocks and CLI output stay verbatim, images come from
   `../assets/`). Add a missing term there in the same PR.
+- **A PR that adds or edits a rule page** reruns
+  `uv run scripts/check-rule-pages.py --write` so `rules.json` (EN and PL)
+  matches. Two such PRs conflict on it: rerun the script instead of merging
+  the file by hand.
 - **The reviewer checks the Polish diff** for meaning against the English
   change and for terminology against the glossary.
 - **CI** fails on a missing or orphaned Polish page, a committed stale
