@@ -14,7 +14,10 @@
  * - pre-write: `inwards hook claude-code` with a PreToolUse Write of a new
  *   Python file, which the config guard and the shape guard (#96) both see;
  * - full: a cold `inwards check` of the whole repo, with `INWARDS_NO_CACHE=1`
- *   for both binaries, so the gate compares the work itself (#56).
+ *   for both binaries, so the gate compares the work itself (#56);
+ * - large file: the PostToolUse hook on a 4,500-line module with two old
+ *   violations, changed before every run, in a project of its own
+ *   (`large-file.ts`, #122), with its p95 against the 100 ms budget.
  *
  * With 12 full runs, the "p95" column is the slowest run.
  *
@@ -39,10 +42,13 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { daemonHook, daemonMarkdown } from "./daemon.ts";
-import { judge, ms, type Samples, summarise, timeRun, type Verdict } from "./timing.ts";
+import { largeHook } from "./large-file.ts";
+import { alternate, judge, ms, summarise, timeRun, type Verdict } from "./timing.ts";
 
 const DEFAULTS = { hookRuns: 40, fullRuns: 12, warmup: 2, threshold: 0.2 };
 const PERCENT = 100;
+/** The quality goal for a hook on one edited file: p95 under 100 ms (chapter 6). */
+const HOOK_BUDGET_MS = 100;
 
 /**
  * Renders the verdicts as a Markdown table.
@@ -68,40 +74,6 @@ export function markdown(verdicts: readonly Verdict[], threshold: number): strin
     "",
     result,
   ].join("\n");
-}
-
-/**
- * Runs both binaries alternately and collects the samples.
- *
- * @param binaries - the two builds to compare.
- * @param binaries.base - the base branch's executable.
- * @param binaries.head - the head branch's executable.
- * @param args - how to run one check.
- * @param args.argv - the arguments after the executable.
- * @param args.cwd - the working directory.
- * @param args.stdin - text for standard input, if any.
- * @param args.env - variables added to the environment.
- * @param runs - how many runs.
- * @param runs.measured - measured runs per binary.
- * @param runs.warmup - unmeasured runs per binary before those.
- * @returns the samples.
- */
-function alternate(
-  binaries: { base: string; head: string },
-  args: { argv: string[]; cwd: string; stdin?: string; env?: Record<string, string> },
-  runs: { measured: number; warmup: number },
-): Samples {
-  const samples: Samples = { base: [], head: [] };
-  for (let i = 0; i < runs.warmup + runs.measured; i += 1) {
-    const order = i % 2 === 0 ? (["base", "head"] as const) : (["head", "base"] as const);
-    for (const which of order) {
-      const elapsed = timeRun([binaries[which], ...args.argv], args.cwd, args.stdin, args.env);
-      if (i >= runs.warmup) {
-        samples[which].push(elapsed);
-      }
-    }
-  }
-  return samples;
 }
 
 /** The head's full check in each cache mode, in milliseconds. */
@@ -301,11 +273,15 @@ function main(): number {
     { argv: ["check"], cwd: repo, env: { INWARDS_NO_CACHE: "1" } },
     { measured: fullRuns, warmup: 1 },
   );
+  const large = largeHook(binaries, { measured: hookRuns, warmup: DEFAULTS.warmup });
   const verdicts = [
     judge("hook (one file)", hook, threshold),
     judge("pre-write (new file)", pre, threshold),
     judge("full check", full, threshold),
+    judge("hook (4,500-line file)", large, threshold),
   ];
+  const largeP95 = summarise(large.head).p95;
+  const budget = `Head's hook on the 4,500-line file, p95 against the ${HOOK_BUDGET_MS} ms budget: ${largeP95 < HOOK_BUDGET_MS ? "met" : "**missed**"}.`;
   const cache = cacheModes(binaries.head, repo, { measured: fullRuns, warmup: 1 });
   const daemon = daemonHook(binaries.head, repo, payload, {
     measured: hookRuns,
@@ -319,11 +295,11 @@ function main(): number {
     bun: Bun.version,
   };
   process.stdout.write(
-    `${markdown(verdicts, threshold)}\n\n${cacheMarkdown(cache)}\n\n${daemonMarkdown(daemon)}\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}\n`,
+    `${markdown(verdicts, threshold)}\n\n${budget}\n\n${cacheMarkdown(cache)}\n\n${daemonMarkdown(daemon)}\n\nRunner: ${runner.os}, ${runner.cpu} (${runner.cores} cores), ${runner.label}\n`,
   );
   writeFileSync(
     options.out,
-    `${JSON.stringify({ runner, threshold, verdicts, samples: { hook, full, cache, daemon } }, null, 2)}\n`,
+    `${JSON.stringify({ runner, threshold, verdicts, samples: { hook, full, large, cache, daemon } }, null, 2)}\n`,
   );
   return verdicts.every((v) => v.pass) ? 0 : 1;
 }

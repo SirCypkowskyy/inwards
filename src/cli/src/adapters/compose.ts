@@ -8,7 +8,12 @@
  * in-memory caches.
  */
 import { resolve } from "node:path";
-import type { ExtractionCache, GrammarBinaries, Report } from "@inwards/core";
+import {
+  createTreeReuse,
+  type ExtractionCache,
+  type GrammarBinaries,
+  type Report,
+} from "@inwards/core";
 import type { AppDeps, DaemonDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
@@ -88,7 +93,8 @@ export function nodeProjectIo(io: Platform, workerEntry?: string): ProjectIo {
  */
 export function compose(workerEntry?: string): AppDeps {
   const io = nodePlatform();
-  const project = nodeProjectIo(io, workerEntry);
+  // One process runs one command, so the kept parse lives as long as this invocation.
+  const project = { ...nodeProjectIo(io, workerEntry), reuse: createTreeReuse() };
   const entry = resolve(import.meta.dir, "../main.ts");
   return {
     io,
@@ -133,6 +139,9 @@ const DAEMON_GIT_BUDGET_MS = 5000;
  */
 function nodeDaemon(io: Platform, entry: string): DaemonDeps {
   const extractions = daemonExtractionCache();
+  // Requests run one at a time, so they can share the kept parse: the next edit
+  // of the same file parses only what changed.
+  const reuse = createTreeReuse();
   const budgeted = budgetedGit(DAEMON_GIT_BUDGET_MS);
   const git = commitKeyedGit(budgeted);
   return {
@@ -167,6 +176,7 @@ function nodeDaemon(io: Platform, entry: string): DaemonDeps {
       const files = {
         ...nodeProjectIo(platform),
         extractionCache: (): ExtractionCache => extractions,
+        reuse,
       };
       return {
         deps: {

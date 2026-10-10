@@ -40,6 +40,7 @@ import type {
   SourceFile,
   Span,
   Suppressed,
+  TreeReuse,
 } from "../src/index.ts";
 
 /** One `export { ... } from "..."` or `export type { ... } from "..."` statement. */
@@ -82,6 +83,7 @@ type PublicTypes = [
   SourceFile,
   Span,
   Suppressed,
+  TreeReuse,
 ];
 
 test("the runtime exports are unchanged", async () => {
@@ -105,6 +107,7 @@ test("the runtime exports are unchanged", async () => {
     "checkSelectors",
     "checkShape",
     "createExtractionWorker",
+    "createTreeReuse",
     "declaresInwards",
     "extractImports",
     "inwardsTable",
@@ -180,6 +183,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "Span",
       "Suppressed",
       "SuppressionComment",
+      "TreeReuse",
       "VERSION",
       "baselineKey",
       "checkLayers",
@@ -192,6 +196,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "checkSelectors",
       "checkShape",
       "createExtractionWorker",
+      "createTreeReuse",
       "declaresInwards",
       "extractImports",
       "inwardsTable",

@@ -146,6 +146,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | hallucinated module | zmyślony moduł |
 | hypothesis | hipoteza |
 | importers (of a module) | moduły importujące (dany moduł) |
+| incremental parse (tree-sitter, from the last tree) | przyrostowe parsowanie |
 | import skeleton | szkielet importów |
 | job (CI) | zadanie |
 | kernel (the `kernel` layer of the `fastapi` preset) | jądro (kernel) |

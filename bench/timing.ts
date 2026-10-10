@@ -1,8 +1,9 @@
 /**
  * @file Timing for the bench scripts: one timed run of a command, and the
  * statistics the tables report (nearest-rank percentiles, the median of
- * per-pair ratios). `compare.ts` and `daemon.ts` share it; it prints
- * nothing and judges nothing on its own.
+ * per-pair ratios), and base and head runs in alternation. `compare.ts`,
+ * `daemon.ts` and `large-file.ts` share it; it prints nothing and judges
+ * nothing on its own.
  */
 import process from "node:process";
 
@@ -119,4 +120,46 @@ export function timeRun(
     throw new Error(`${cmd.join(" ")} ${how}: ${run.stderr.toString()}`);
   }
   return elapsed;
+}
+
+/**
+ * Runs both binaries alternately and collects the samples.
+ *
+ * @param binaries - the two builds to compare.
+ * @param binaries.base - the base branch's executable.
+ * @param binaries.head - the head branch's executable.
+ * @param args - how to run one check.
+ * @param args.argv - the arguments after the executable.
+ * @param args.cwd - the working directory.
+ * @param args.stdin - text for standard input, if any.
+ * @param args.env - variables added to the environment.
+ * @param args.before - runs before every timed run, untimed (an edit of the file, say).
+ * @param runs - how many runs.
+ * @param runs.measured - measured runs per binary.
+ * @param runs.warmup - unmeasured runs per binary before those.
+ * @returns the samples.
+ */
+export function alternate(
+  binaries: { base: string; head: string },
+  args: {
+    argv: string[];
+    cwd: string;
+    stdin?: string;
+    env?: Record<string, string>;
+    before?: () => void;
+  },
+  runs: { measured: number; warmup: number },
+): Samples {
+  const samples: Samples = { base: [], head: [] };
+  for (let i = 0; i < runs.warmup + runs.measured; i += 1) {
+    const order = i % 2 === 0 ? (["base", "head"] as const) : (["head", "base"] as const);
+    for (const which of order) {
+      args.before?.();
+      const elapsed = timeRun([binaries[which], ...args.argv], args.cwd, args.stdin, args.env);
+      if (i >= runs.warmup) {
+        samples[which].push(elapsed);
+      }
+    }
+  }
+  return samples;
 }

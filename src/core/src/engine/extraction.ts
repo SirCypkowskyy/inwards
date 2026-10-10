@@ -29,6 +29,7 @@ import {
   parsePython,
 } from "../python/parser.ts";
 import { skeletonImports } from "../python/prescan.ts";
+import type { TreeReuse } from "../python/reparse.ts";
 import { mentionsDynamicImport } from "../rules/dynamic-import/imports.ts";
 import { commentsIn, mentionsSuppression } from "../rules/suppression-comment.ts";
 
@@ -39,7 +40,7 @@ import { commentsIn, mentionsSuppression } from "../rules/suppression-comment.ts
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "12";
+export const EXTRACTION_REVISION = "13";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {
@@ -89,10 +90,11 @@ export async function createExtractionWorker(
  *
  * @param parser - parser with the Python grammar loaded.
  * @param src - the source file, with normalised text.
+ * @param reuse - the last full parse to parse incrementally from (#122), if the caller keeps one.
  * @returns the imports and comments.
  */
-function fullExtraction(parser: Parser, src: SourceFile): FullExtraction {
-  const tree = parsePython(parser, src.text);
+function fullExtraction(parser: Parser, src: SourceFile, reuse?: TreeReuse): FullExtraction {
+  const tree = reuse ? reuse.parse(parser, src.path, src.text) : parsePython(parser, src.text);
   try {
     return { imports: extractImports(tree, src), comments: commentsIn(tree) };
   } finally {
@@ -100,24 +102,37 @@ function fullExtraction(parser: Parser, src: SourceFile): FullExtraction {
   }
 }
 
+/** Where an `Extractor` keeps what it computed, both optional. */
+export interface ExtractionOptions {
+  /** Where extractions are kept between checks. */
+  cache?: ExtractionCache;
+  /** The last full parse, for an incremental parse of the same file (#122). */
+  reuse?: TreeReuse;
+}
+
 /** Reads imports and comments out of files, through a cache when there is one. */
 export class Extractor {
   private readonly parser: Parser;
   private readonly cache: ExtractionCache | undefined;
+  /** The last full parse, kept for an incremental parse of the same file (#122). */
+  private readonly reuse: TreeReuse | undefined;
   /** Extractions computed elsewhere for this run's source files, read before the cache. */
   private readonly preloaded = new WeakMap<SourceFile, CachedExtraction>();
   /** The loader test's answers computed elsewhere, by source file. */
   private readonly loaders = new WeakMap<SourceFile, boolean>();
 
   /**
-   * Keeps the parser and the optional cache.
+   * Keeps the parser, the optional cache and the optional kept parse.
    *
    * @param parser - parser with the Python grammar loaded.
-   * @param cache - where extractions are kept between checks, if anywhere.
+   * @param options - where to keep what it computes.
+   * @param options.cache - where extractions are kept between checks, if anywhere.
+   * @param options.reuse - the last full parse, for an incremental parse of the same file, if kept.
    */
-  constructor(parser: Parser, cache: ExtractionCache | undefined) {
+  constructor(parser: Parser, { cache, reuse }: ExtractionOptions) {
     this.parser = parser;
     this.cache = cache;
+    this.reuse = reuse;
   }
 
   /**
@@ -148,7 +163,7 @@ export class Extractor {
     if (known?.full !== undefined && known.comments !== undefined) {
       return { imports: known.full, comments: known.comments };
     }
-    const { imports, comments } = fullExtraction(this.parser, src);
+    const { imports, comments } = fullExtraction(this.parser, src, this.reuse);
     // A component the cache already held wins, as `fromTree` keeps it.
     const found = { imports: known?.full ?? imports, comments: known?.comments ?? comments };
     this.store(src, known, { full: found.imports, comments: found.comments });
