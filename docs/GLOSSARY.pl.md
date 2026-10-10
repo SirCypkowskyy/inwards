@@ -85,6 +85,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | worker, worker pool | worker (workera, workery), pula workerów | |
 | catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
 | health check | health-check | "aplikacja health-check" |
+| harness (agent harness: Copilot, Local in VS Code), matcher (hook) | harness (harnessu), matcher (matchera) | |
+| Problems panel (VS Code) | panel Problems | |
 | runtimepath, quickfix (Neovim) | runtimepath, quickfix | "w swoim runtimepath", "w oknie quickfix" |
 
 ## Fixed Polish terms
@@ -285,6 +287,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | platform package (one VSIX per platform) | pakiet dla platformy |
 | thin client | cienki klient |
 | file watcher (editor) | obserwator plików |
+| cloud agent (Copilot, formerly coding agent) | agent w chmurze (cloud agent) |
+| setup steps (`copilot-setup-steps.yml`) | kroki przygotowania |
 | project root (the directory an editor starts a language server in), root marker | katalog główny projektu, znacznik katalogu głównego |
 | dev extension (Zed) | rozszerzenie deweloperskie (dev extension) |
 | headless (an editor run without its UI) | bez interfejsu (headless) |
