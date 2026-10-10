@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: c518f90c0ba2e50f3177c87f38d926517f06c63b057cac56b9f9a6e83ac785a8
+source_hash: b81bf8623143e20b8ac1be5f635e8605bf3c764b34cf3cfc2db985aa5a9c35cb
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -156,7 +156,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 
 [#59](https://github.com/SirCypkowskyy/inwards/issues/59) pytało, czy hooki i serwer języka powinny dzielić jeden stały proces i co hooki by na nim zyskały. Decyzja to [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
 
-**Metoda.** Apple M1 Pro (10 rdzeni) na macOS, Bun 1.4.2, `inwards-darwin-arm64` zbudowany przez `scripts/build-binaries.ts` z `aede2ab`. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 5 do 7; bardziej ufaj różnicom niż wartościom bezwzględnym. Projekt to `examples/broken-app` z dodanym wygenerowanym `shop/domain/big.py`: 4492 linie, 114 KB, dwa naruszenia INW001, blisko pliku z polara z [#122](https://github.com/SirCypkowskyy/inwards/issues/122) (4482 linie, dwa naruszenia). Dane wejściowe hooka to fixture `PostToolUse` z Claude Code skierowany na każdy z plików, po SessionStart, więc naruszenia obu plików liczą się jako stare. Każdy przypadek uruchomiono 80 razy (60 dla PreToolUse i Stop), w każdej rundzie raz, w zmieniającej się kolejności, po jednym rozgrzewkowym uruchomieniu; sprawdzenia działały z `INWARDS_NO_CACHE=1`. Stały proces to jednorazowy skrypt Buna uruchamiany ze źródeł, który obsługuje dzisiejsze `hookClaudeCode` na ciepło za gniazdem uniksowym, z `Runtime` dla każdego żądania i buforowanymi `Streams`; klient to 10-liniowy program skompilowany jak plik binarny. „Z pamięciami podręcznymi” dodaje pamięciową pamięć podręczną ekstrakcji z kluczem z treści i zachowuje na czas życia procesu odpowiedzi `git cat-file blob`, które wskazują commit.
+**Metoda.** Jeden laptop arm64 z macOS, Bun 1.4.2, `inwards-darwin-arm64` zbudowany przez `scripts/build-binaries.ts` z `aede2ab`. Na maszynie pracowali inni agenci, więc średnie obciążenie wynosiło od 5 do 7; bardziej ufaj różnicom niż wartościom bezwzględnym. Projekt to `examples/broken-app` z dodanym wygenerowanym `shop/domain/big.py`: 4492 linie, 114 KB, dwa naruszenia INW001, blisko pliku z polara z [#122](https://github.com/SirCypkowskyy/inwards/issues/122) (4482 linie, dwa naruszenia). Dane wejściowe hooka to fixture `PostToolUse` z Claude Code skierowany na każdy z plików, po SessionStart, więc naruszenia obu plików liczą się jako stare. Każdy przypadek uruchomiono 80 razy (60 dla PreToolUse i Stop), w każdej rundzie raz, w zmieniającej się kolejności, po jednym rozgrzewkowym uruchomieniu; sprawdzenia działały z `INWARDS_NO_CACHE=1`. Stały proces to jednorazowy skrypt Buna uruchamiany ze źródeł, który obsługuje dzisiejsze `hookClaudeCode` na ciepło za gniazdem uniksowym, z `Runtime` dla każdego żądania i buforowanymi `Streams`; klient to 10-liniowy program skompilowany jak plik binarny. „Z pamięciami podręcznymi” dodaje pamięciową pamięć podręczną ekstrakcji z kluczem z treści i zachowuje na czas życia procesu odpowiedzi `git cat-file blob`, które wskazują commit.
 
 | Scenariusz | p50 | p95 |
 |---|--:|--:|
