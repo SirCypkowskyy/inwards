@@ -14,6 +14,7 @@ import { processStreams } from "./adapters/stdio.ts";
 import { baselineCommand } from "./commands/baseline.ts";
 import { checkCommand } from "./commands/check.ts";
 import { contextCommand } from "./commands/context.ts";
+import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
@@ -37,6 +38,7 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
        inwards import-config [FILE] [--write]   (import-linter contracts as [tool.inwards]; --write: into pyproject.toml)
        inwards stats [DIR] [--format text|json] [--export FILE [--redact]]   (hypothesis numbers from the run logs)
        inwards hook claude-code    (reads a Claude Code hook payload on stdin)
+       inwards daemon [status|stop] [--idle SECONDS]   (keeps PostToolUse warm; hooks start it)
 
 Checks Python imports against the layers declared in [tool.inwards].`;
 
@@ -74,6 +76,7 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
       launcher: { type: "string" },
       brief: { type: "boolean" },
       write: { type: "boolean" },
+      idle: { type: "string" },
     },
   });
 
@@ -91,9 +94,10 @@ async function main(deps: AppDeps, argv: string[]): Promise<number> {
 }
 
 /** The commands besides `check`. */
-type SetupCommand = "hook" | "init" | "baseline" | "stats" | "context" | "import-config";
+type SetupCommand = "hook" | "daemon" | "init" | "baseline" | "stats" | "context" | "import-config";
 const SETUP_COMMANDS: readonly string[] = [
   "hook",
+  "daemon",
   "init",
   "baseline",
   "stats",
@@ -105,15 +109,15 @@ const SETUP_COMMANDS: readonly string[] = [
  * Tells whether a positional names one of the commands besides `check`.
  *
  * @param command - the first positional.
- * @returns true for hook, init, baseline, stats, context or import-config.
+ * @returns true for hook, daemon, init, baseline, stats, context or import-config.
  */
 function isSetupCommand(command: string | undefined): command is SetupCommand {
   return command !== undefined && SETUP_COMMANDS.includes(command);
 }
 
 /**
- * Runs the commands besides `check`: the hook, `init`, `baseline`, `stats`, `context`
- * and `import-config`.
+ * Runs the commands besides `check`: the hook, `daemon`, `init`, `baseline`, `stats`,
+ * `context` and `import-config`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -127,6 +131,7 @@ function isSetupCommand(command: string | undefined): command is SetupCommand {
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
  * @param values.write - `--write`, for context and import-config.
+ * @param values.idle - `--idle SECONDS`, for daemon.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -140,6 +145,7 @@ async function setupCommand(
     export?: string | undefined;
     redact?: boolean | undefined;
     write?: boolean | undefined;
+    idle?: string | undefined;
   },
 ): Promise<number> {
   const { streams } = deps.io;
@@ -150,6 +156,9 @@ async function setupCommand(
     return paths[0] === "claude-code" && paths.length === 1
       ? await hookClaudeCode(deps, USAGE)
       : print(streams, USAGE, 2);
+  }
+  if (command === "daemon") {
+    return await daemonCommand(deps, paths, values.idle, USAGE);
   }
   if (command === "context") {
     return paths.length === 0

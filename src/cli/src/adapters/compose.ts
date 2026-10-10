@@ -2,17 +2,24 @@
  * @file Wires the real adapters into one invocation's `AppDeps`: the production
  * composition. `main.ts` calls it once per process; a test calls it to get
  * the real filesystem, git and streams, or to run two independent
- * invocations in one process. This is the only place the adapters meet.
+ * invocations in one process. This is the only place the adapters meet. It
+ * also builds each request the daemon serves (`nodeDaemon`): the same
+ * adapters, with the request's runtime, buffered streams and the daemon's
+ * in-memory caches.
  */
 import { resolve } from "node:path";
-import type { Report } from "@inwards/core";
-import type { AppDeps } from "../commands/deps.ts";
-import type { Platform } from "../platform/contracts.ts";
+import type { ExtractionCache, Report } from "@inwards/core";
+import type { AppDeps, DaemonDeps } from "../commands/deps.ts";
+import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
+import type { HookRequest } from "../daemon/protocol.ts";
+import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
 import type { ProjectIo } from "../project/contracts.ts";
 import { createRunLog } from "../runlog/record.ts";
 import type { CheckRunner } from "../session/contracts.ts";
 import { nodeBaselineWriter } from "./baseline-files.ts";
+import { nodeDaemonHost } from "./daemon-host.ts";
+import { nodeDaemonLink } from "./daemon-link.ts";
 import { nodeExportFiles } from "./export-files.ts";
 import { fileExtractionCache } from "./extraction-cache.ts";
 import { nodeFileWalker } from "./file-walk.ts";
@@ -21,7 +28,7 @@ import { nodeGit } from "./git.ts";
 import { loadGrammars } from "./grammars.ts";
 import { nodeInitFiles } from "./init-files.ts";
 import { terminalPicker } from "./picker.ts";
-import { readRuntime, systemClock } from "./runtime.ts";
+import { readRuntime, runtimeFrom, systemClock } from "./runtime.ts";
 import { nodeStateFiles } from "./state-files.ts";
 import { processStreams } from "./stdio.ts";
 import { parseToml } from "./toml.ts";
@@ -65,6 +72,7 @@ export function nodeProjectIo(io: Platform): ProjectIo {
 export function compose(): AppDeps {
   const io = nodePlatform();
   const project = nodeProjectIo(io);
+  const entry = resolve(import.meta.dir, "../main.ts");
   return {
     io,
     runlog: createRunLog(io),
@@ -79,9 +87,75 @@ export function compose(): AppDeps {
     init: {
       files: nodeInitFiles,
       picker: terminalPicker,
-      entry: resolve(import.meta.dir, "../main.ts"),
+      entry,
       toml: parseToml,
     },
     toml: parseToml,
+    daemon: nodeDaemon(io, entry),
+  };
+}
+
+/**
+ * The resident process on the real process: the socket, the files, and each
+ * request's dependencies. The extraction cache and the commit-keyed git
+ * answers are made here, once per invocation, so they live as long as the
+ * daemon and are shared by its requests only.
+ *
+ * @param io - the daemon's own platform.
+ * @param entry - the CLI's `main.ts`, for running from source.
+ * @returns the daemon's dependencies.
+ */
+function nodeDaemon(io: Platform, entry: string): DaemonDeps {
+  const extractions = daemonExtractionCache();
+  const git = commitKeyedGit(io.git);
+  return {
+    link: nodeDaemonLink(entry),
+    host: nodeDaemonHost(),
+    invocation(request: HookRequest): ReturnType<DaemonDeps["invocation"]> {
+      const out: string[] = [];
+      const err: string[] = [];
+      const streams: Streams = {
+        out(text: string): void {
+          out.push(text);
+        },
+        err(text: string): void {
+          err.push(text);
+        },
+        readIn: (): string => request.stdin,
+      };
+      const received = systemClock.elapsed();
+      const clock: Clock = {
+        now: systemClock.now,
+        // The hook's own start-up counts, as in a one-shot run.
+        elapsed: (): number => request.elapsed + systemClock.elapsed() - received,
+      };
+      const runtime = runtimeFrom(request.env, {
+        cwd: request.cwd,
+        stdinIsTTY: false,
+        stdoutIsTTY: request.tty,
+      });
+      const platform: Platform = { ...io, git, clock, runtime, streams };
+      const files = {
+        ...nodeProjectIo(platform),
+        extractionCache: (): ExtractionCache => extractions,
+      };
+      return {
+        deps: {
+          io: platform,
+          runlog: createRunLog(platform),
+          check: (
+            configPath: string,
+            targets: string[] | undefined,
+            base: string,
+            options: Parameters<CheckRunner>[3],
+          ): Promise<Report> =>
+            runCheck(files, configPath, targets, { ...options, base, cache: true }),
+        },
+        output: (): { stdout: string; stderr: string } => ({
+          stdout: out.join(""),
+          stderr: err.join(""),
+        }),
+      };
+    },
   };
 }

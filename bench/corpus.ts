@@ -25,9 +25,9 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
 import { Glob } from "bun";
-import { percentile } from "./compare.ts";
 import { CONFIG_FILE, fetchRepo } from "./corpus-fetch.ts";
 import { isRecord, type Repo, readManifest, toml } from "./corpus-manifest.ts";
+import { percentile } from "./timing.ts";
 
 /** The prescan differential test's counts for one corpus. */
 export interface PrescanCounts {

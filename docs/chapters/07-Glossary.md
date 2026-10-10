@@ -107,7 +107,7 @@ Hallucinated module
 :   An import of a first-party module that doesn't exist, such as `shop.domain.pricing` when there is no `pricing`. Agents produce these because the name looks plausible. INW010 catches them from the module index, before any test runs.
 
 Hook daemon
-:   `inwards daemon`, planned ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)): a process per user and project that keeps the engine warm for the PostToolUse hook and answers it through a local socket (a named pipe on Windows). A hook starts it on demand and runs one-shot whenever it can't reach it; it exits after 10 idle minutes. The other hooks never use it, and the language server is a separate process. See [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+:   `inwards daemon` ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)): a process per user and project that keeps the engine warm for the PostToolUse hook and answers it through a local socket (a named pipe on Windows). A hook starts it on demand and runs one-shot whenever it can't reach it; it exits after 10 idle minutes. The other hooks never use it, and the language server is a separate process. See [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
 
 Import skeleton
 :   A copy of a file where every non-import line is blank and import lines are dedented. Line numbers are preserved, and it parses far faster than the whole file.

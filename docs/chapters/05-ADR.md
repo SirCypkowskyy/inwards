@@ -1124,3 +1124,13 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - *LSP framing, JSON-RPC or HTTP over the socket:* they handle request ids, notifications and routing; one request per connection needs none of them.
 - *A small native client for the hook command:* would remove most of the 15 ms floor, but adds a second toolchain and a second binary per platform, against [ADR-003](#adr-003-ship-a-bun-single-file-executable). Worth a look if the Linux benchmark misses 50 ms.
 - *Other names:* `inwards serve` is one letter from `server` and reads like the docs preview; `inwards lsp` breaks with Ruff and ty, which users try first; one `inwards server` with `--stdio` and `--socket` modes hides that the two have different owners and lifetimes.
+
+**Amendment · 2026-10-10 · [#60](https://github.com/SirCypkowskyy/inwards/issues/60).** The implementation settles details the decision left open:
+
+- **`INWARDS_DAEMON=1` turns the daemon on even when `CI` is set,** for the daemon's own tests and the bench job, which run under CI. Unset, it is on unless `CI` is set; `0` turns it off.
+- **A hook starts a daemon only in a project with Inwards session state** (`.inwards/state`, which only SessionStart creates, and only where `[tool.inwards]` exists). A hook installed for every project starts nothing in a project that doesn't use Inwards.
+- **The hook waits 45 s for an answer,** under Claude Code's 60 s default timeout, so the one-shot retry still has time. Recorded edits carry the payload's `tool_use_id`, and an edit recorded twice under one id counts once, for the Stop gate's list and for escalation, so that retry can't count an edit twice.
+- **The extraction cache keeps up to 4 texts per module** within the 5,000-entry and 32 MB bounds, and git answers are kept only for `cat-file blob <commit>:<path>` and `ls-tree <commit>` with a full commit id, bounded at 2,000 entries and 32 MB.
+- **Run from source,** the executable's identity is Bun's and `main.ts`'s; an edit to another source file doesn't make the daemon stale. `inwards daemon stop` after such an edit; the compiled binary has no such gap.
+- **The daemon refuses anything but a PostToolUse payload** for `hook claude-code`, so a process that connects to it can't get a Stop gate verdict from it either.
+- **`inwards daemon --idle SECONDS`** sets the idle limit, 600 by default; the tests use short ones.

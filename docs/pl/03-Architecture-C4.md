@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 8c6cd7c5a575c86145e5691a8f70fd4975736b6860b0febe267db8c9c51d6f19
+source_hash: 5b5f79d7e7e3c90bd1337ecbe4314bb0dcef06a8e059ec01aac807c0a5e2e254
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -85,7 +85,7 @@ flowchart TB
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
 | **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012 |
-| **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code` |
+| **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon` |
 | **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` dla `claude`, `aider` i `agents-md` |
@@ -223,6 +223,7 @@ Kody wyjścia są takie jak w Ruffie: `0` czysto (ostrzeżenia dozwolone), `1` z
 Pozostałe polecenia korzystają z tych samych elementów:
 
 - `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia shape guard i config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
+- `inwards daemon` trzyma silnik w gotowości dla PostToolUse ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)). Hook wysyła mu przez lokalne gniazdo dane hooka, katalog roboczy i środowisko, po jednej linii JSON w każdą stronę; daemon uruchamia ten sam kod `hook claude-code` ze środowiskiem zbudowanym z tych danych i strumieniami, które zbierają wyjście, a hook wypisuje to wyjście i kończy się z jego kodem. Daemon trzyma tylko to, co identyfikuje treść: ekstrakcje według skrótu tekstu i odpowiedzi gita według identyfikatora commita. Bez odpowiedzi hook uruchamia się jednorazowo.
 - `inwards init --agent claude|opencode|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
 - `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet z pasującymi do niego kształtami pakietów) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -429,7 +430,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, hook, daemon: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
@@ -437,12 +438,15 @@ src/
 │   │   │                  #   agent suppressions, layout changes against the session start
 │   │   ├── project/       # running a check, the baseline, config discovery, project snapshots
 │   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
+│   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
+│   │   │                  #   the in-memory caches
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
-│   │                      #   the grammars, the picker; compose.ts wires them into AppDeps
+│   │                      #   the grammars, the picker, the daemon's socket and files;
+│   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
 └── vscode-extension/
     ├── src/

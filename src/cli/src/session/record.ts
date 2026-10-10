@@ -68,12 +68,14 @@ export type SessionIo = Pick<
 
 /** Session ids come from the agent's payload, so only a safe file name is accepted. */
 const SESSION_ID = /^[\w-]{1,128}$/u;
+/** A tool call's id (`toolu_...`), from the payload, kept only when it looks like one. */
+const TOOL_USE_ID = /^[\w-]{1,128}$/u;
 /** SessionStart sources that begin a session; `resume` and `compact` continue one. */
 const NEW_SESSION = new Set(["startup", "clear"]);
 
 /** One line of the session log. */
 type SessionEvent =
-  | { t: "edit"; at: string; file: string; fingerprints: string[] }
+  | { t: "edit"; at: string; file: string; fingerprints: string[]; tool?: string }
   | { t: "resume"; at: string; source: string }
   | { t: "stop"; at: string; fresh: boolean }
   | { t: "pass"; at: string }
@@ -92,6 +94,12 @@ export interface SessionState {
   record: StartRecord;
   /** A SessionStart for a new session came after the session had started, e.g. piped in through Bash. */
   replayed: boolean;
+  /**
+   * The `tool_use_id` of every recorded edit that had one. An edit recorded
+   * again under the same id (the hook's one-shot retry after the daemon died
+   * mid-request, #60) counts once.
+   */
+  tools: Set<string>;
 }
 
 /**
@@ -183,19 +191,31 @@ export function recordStart(
 }
 
 /**
+ * Tells whether a payload's `tool_use_id` can key a recorded edit.
+ *
+ * @param tool - the payload's `tool_use_id`.
+ * @returns true for 1-128 characters of letters, digits, `_` and `-`.
+ */
+export function isToolUseId(tool: unknown): tool is string {
+  return typeof tool === "string" && TOOL_USE_ID.test(tool);
+}
+
+/**
  * Records one edit and the violations the hook reported for it.
  *
  * @param io - resolves the file's real path, tells the time and appends to the log.
- * @param session - the real project root and a session id that passed `isSessionId`.
+ * @param session - the real project root, a session id that passed
+ *   `isSessionId`, and the tool call's id when the payload has one.
  * @param session.project - the real project root.
  * @param session.id - a session id that passed `isSessionId`.
+ * @param session.tool - the payload's `tool_use_id`; an invalid one is left out.
  * @param file - the edited file, absolute.
  * @param diagnostics - what the check of that file reported (empty when clean).
  * @throws when the log can't be written.
  */
 export function recordEdit(
   io: Pick<SessionIo, "probe" | "clock" | "state">,
-  { project, id }: { project: string; id: string },
+  { project, id, tool }: { project: string; id: string; tool?: unknown },
   file: string,
   diagnostics: readonly Diagnostic[],
 ): void {
@@ -205,6 +225,7 @@ export function recordEdit(
     file: projectPath(io.probe, project, file),
     // Once per edit: the same import twice in a file is one attempt, not two.
     fingerprints: [...new Set(diagnostics.map(fingerprint))],
+    ...(isToolUseId(tool) ? { tool } : {}),
   });
 }
 
@@ -294,6 +315,7 @@ export function readSession(
     stops: 0,
     record,
     replayed: false,
+    tools: new Set(),
   };
   for (const line of log.split("\n")) {
     const event = parseEvent(line);
@@ -318,12 +340,29 @@ function tally(state: SessionState, event: SessionEvent): void {
   } else if (event.t === "replay") {
     state.replayed = true;
   } else if (event.t === "edit") {
-    if (!state.edited.includes(event.file)) {
-      state.edited.push(event.file);
+    tallyEdit(state, event);
+  }
+}
+
+/**
+ * Folds one edit into the session state. An edit whose `tool_use_id` was
+ * already counted is a retry of the same tool call, not a second attempt.
+ *
+ * @param state - the state so far, updated in place.
+ * @param event - one edit event.
+ */
+function tallyEdit(state: SessionState, event: Extract<SessionEvent, { t: "edit" }>): void {
+  if (event.tool !== undefined) {
+    if (state.tools.has(event.tool)) {
+      return;
     }
-    for (const print of event.fingerprints) {
-      state.seen.set(print, (state.seen.get(print) ?? 0) + 1);
-    }
+    state.tools.add(event.tool);
+  }
+  if (!state.edited.includes(event.file)) {
+    state.edited.push(event.file);
+  }
+  for (const print of event.fingerprints) {
+    state.seen.set(print, (state.seen.get(print) ?? 0) + 1);
   }
 }
 
@@ -353,7 +392,8 @@ function parseEvent(line: string): SessionEvent | undefined {
       value["t"] === "edit" &&
       typeof value["file"] === "string" &&
       Array.isArray(value["fingerprints"]) &&
-      value["fingerprints"].every((f) => typeof f === "string")
+      value["fingerprints"].every((f) => typeof f === "string") &&
+      (value["tool"] === undefined || isToolUseId(value["tool"]))
     ) {
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: every field of an edit event is checked above.
       return value as unknown as SessionEvent;

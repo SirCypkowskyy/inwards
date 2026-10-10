@@ -191,6 +191,12 @@ export interface Runtime {
   /** `CI` is set to a non-empty value. */
   ci: boolean;
   /**
+   * `INWARDS_DAEMON`: "off" (`0`) makes every hook run in its own process,
+   * "on" (`1`) lets PostToolUse use the daemon even when `CI` is set, and
+   * "auto" (unset) uses it unless `CI` is set (ADR-039).
+   */
+  daemon: "on" | "off" | "auto";
+  /**
    * Which agent runs the hook: `"opencode"` when OpenCode's Inwards plugin
    * sets `INWARDS_HOOK_HOST=opencode`, else `"claude-code"`.
    */

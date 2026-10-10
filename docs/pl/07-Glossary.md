@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: bef12979f716d1dc9dca92cea89631676ef26577f4c6943c7b452ef7cc594102
+source_hash: c997616902203ea190bb5f837ce15d6642795d6f6281d5705b88bbd04a513698
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -112,7 +112,7 @@ Zmyślony moduł (hallucinated module)
 :   Import własnego modułu, który nie istnieje, taki jak `shop.domain.pricing`, gdy nie ma żadnego `pricing`. Agenci tworzą takie importy, bo nazwa wygląda wiarygodnie. INW010 wyłapuje je na podstawie indeksu modułów, zanim uruchomi się jakikolwiek test.
 
 Daemon hooków (hook daemon)
-:   `inwards daemon`, planowany ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)): proces dla każdego użytkownika i projektu, który trzyma silnik w gotowości dla hooka PostToolUse i odpowiada mu przez lokalne gniazdo (na Windows przez nazwany potok). Hook uruchamia go na żądanie i działa jednorazowo zawsze, gdy nie może się z nim połączyć; daemon kończy pracę po 10 minutach bezczynności. Pozostałe hooki nigdy z niego nie korzystają, a serwer języka to osobny proces. Zobacz [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+:   `inwards daemon` ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)): proces dla każdego użytkownika i projektu, który trzyma silnik w gotowości dla hooka PostToolUse i odpowiada mu przez lokalne gniazdo (na Windows przez nazwany potok). Hook uruchamia go na żądanie i działa jednorazowo zawsze, gdy nie może się z nim połączyć; daemon kończy pracę po 10 minutach bezczynności. Pozostałe hooki nigdy z niego nie korzystają, a serwer języka to osobny proces. Zobacz [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
 
 Szkielet importów (import skeleton)
 :   Kopia pliku, w której każda linia niebędąca importem jest pusta, a linie importów mają usunięte wcięcie. Numery linii są zachowane, a parsuje się ją dużo szybciej niż cały plik.

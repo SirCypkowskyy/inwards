@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 7169f0bcced974580d00634efc9d17e3dadc8f4040f273d997b9ff1a7754611d
+source_hash: 3082cdac3a8e88d524423b06e8dc9bf9409a6f0933acfcc5d991ab8a8a68bbbe
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1129,3 +1129,13 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - *Ramkowanie LSP, JSON-RPC albo HTTP przez gniazdo:* obsługują identyfikatory żądań, powiadomienia i routing; jedno żądanie na połączenie nie potrzebuje żadnego z nich.
 - *Mały natywny klient jako polecenie hooka:* usunąłby większość podłogi 15 ms, ale dodaje drugi zestaw narzędzi i drugi plik binarny na platformę, wbrew [ADR-003](#adr-003-ship-a-bun-single-file-executable). Warto do tego wrócić, jeśli benchmark na Linuksie nie zmieści się w 50 ms.
 - *Inne nazwy:* `inwards serve` różni się od `server` jedną literą i kojarzy się z podglądem dokumentacji; `inwards lsp` zrywa z Ruffem i ty, których polecenia użytkownicy spróbują najpierw; jedno `inwards server` z trybami `--stdio` i `--socket` ukrywa, że oba procesy mają innych właścicieli i inne czasy życia.
+
+**Poprawka · 2026-10-10 · [#60](https://github.com/SirCypkowskyy/inwards/issues/60).** Implementacja rozstrzyga szczegóły, które decyzja zostawiła otwarte:
+
+- **`INWARDS_DAEMON=1` włącza daemona nawet wtedy, gdy ustawiono `CI`,** dla własnych testów daemona i zadania benchmarku, które działają pod CI. Bez tej zmiennej daemon jest włączony, chyba że ustawiono `CI`; `0` go wyłącza.
+- **Hook uruchamia daemona tylko w projekcie ze stanem sesji Inwards** (`.inwards/state`, który tworzy tylko SessionStart i tylko tam, gdzie istnieje `[tool.inwards]`). Hook zainstalowany dla wszystkich projektów nie uruchamia niczego w projekcie, który nie używa Inwards.
+- **Hook czeka na odpowiedź 45 s,** poniżej domyślnego limitu 60 s w Claude Code, żeby jednorazowe ponowienie miało jeszcze czas. Zapisane edycje niosą `tool_use_id` z danych hooka, a edycja zapisana dwa razy pod tym samym identyfikatorem liczy się raz, dla listy Stop gate i dla eskalacji, więc to ponowienie nie policzy edycji dwa razy.
+- **Pamięć podręczna ekstrakcji trzyma do 4 tekstów na moduł** w granicach 5000 wpisów i 32 MB, a odpowiedzi gita są trzymane tylko dla `cat-file blob <commit>:<ścieżka>` i `ls-tree <commit>` z pełnym identyfikatorem commita, do 2000 wpisów i 32 MB.
+- **Przy uruchomieniu ze źródeł** tożsamość programu to tożsamość Buna i `main.ts`; edycja innego pliku źródłowego nie czyni daemona nieaktualnym. Po takiej edycji uruchom `inwards daemon stop`; skompilowany plik binarny nie ma tej luki.
+- **Daemon odrzuca wszystko poza danymi PostToolUse** dla `hook claude-code`, więc proces, który się z nim połączy, nie dostanie od niego także werdyktu Stop gate.
+- **`inwards daemon --idle SECONDS`** ustawia limit bezczynności, domyślnie 600; testy używają krótkich.
