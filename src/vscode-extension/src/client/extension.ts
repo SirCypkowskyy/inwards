@@ -163,6 +163,10 @@ function makeExecutable(path: string): void {
   try {
     accessSync(path, constants.X_OK);
   } catch {
-    chmodSync(path, EXECUTABLE);
+    try {
+      chmodSync(path, EXECUTABLE);
+    } catch {
+      // A read-only install can't be changed; the spawn reports what fails.
+    }
   }
 }
