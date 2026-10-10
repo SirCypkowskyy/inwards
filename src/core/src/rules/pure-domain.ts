@@ -17,8 +17,18 @@
  * adapter names them) is called a "workspace package" instead of a library,
  * and its fix points at another package rather than at a port (#203). The
  * check itself is the same; `allow-libraries` covers both.
+ *
+ * `[tool.inwards.rules.pure-domain].deny` denies libraries to module
+ * prefixes that aren't whole layers, such as import-linter's
+ * "`mypackage.one` must not import `django`" (#219). It applies to the
+ * modules its entries match whether or not a layer owns them, and the
+ * layer's `allow-libraries` doesn't undo it. The layer's own lists are asked
+ * first, so a library both deny keeps the layer's message, and with it the
+ * baseline keys of existing configs.
  */
+import { matchEntry } from "../config/layer-selector.ts";
 import type { LayerSpec } from "../config/layers.ts";
+import type { LibraryDeny } from "../config/rule-options.ts";
 import type { Diagnostic, Fix, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ModuleLookup } from "../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../meta/registry.ts";
@@ -101,6 +111,71 @@ function denial(layers: readonly LayerSpec[], i: number, target: string): string
   return allowed ? undefined : topOf(target);
 }
 
+/** What INW005 needs besides the file and the layers. */
+export interface LibraryInputs {
+  /** Finds the first-party module an import lands in. */
+  ownerOf: ModuleLookup;
+  /** The top-level import packages of the uv workspace's members; none by default. */
+  workspace?: ReadonlySet<string>;
+  /** `[tool.inwards.rules.pure-domain].deny`; none by default. */
+  deny?: readonly LibraryDeny[];
+}
+
+/** A `deny` entry that matches the importing file: the prefix it matched there, and its libraries. */
+interface PrefixDeny {
+  prefix: string;
+  libraries: readonly string[];
+}
+
+/**
+ * Finds the `deny` entries whose modules match a file's module.
+ *
+ * @param deny - `[tool.inwards.rules.pure-domain].deny`.
+ * @param module - the importing file's dotted module name.
+ * @returns each matching entry once, with the module prefix it matched (the
+ *   deepest when several of its entries match).
+ */
+function prefixDenies(deny: readonly LibraryDeny[], module: string): PrefixDeny[] {
+  return deny.flatMap(({ modules, libraries }) => {
+    const depth = Math.max(0, ...modules.map((entry) => matchEntry(entry, module)?.depth ?? 0));
+    return depth === 0 ? [] : [{ prefix: module.split(".").slice(0, depth).join("."), libraries }];
+  });
+}
+
+/**
+ * Tells whether a `deny` entry covers a module, so the engine reads the
+ * imports of a file outside every layer for INW005 too.
+ *
+ * @param deny - `[tool.inwards.rules.pure-domain].deny`.
+ * @param module - a dotted module name.
+ * @returns true when an entry's modules match it.
+ */
+export function coversModule(deny: readonly LibraryDeny[], module: string): boolean {
+  return prefixDenies(deny, module).length > 0;
+}
+
+/**
+ * Finds the prefix deny that covers a target: the longest library entry wins,
+ * the first entry on a tie.
+ *
+ * @param denies - the entries that match the importing file.
+ * @param target - a dotted import target.
+ * @returns the prefix and the library entry that matched, or undefined.
+ */
+function prefixDenial(
+  denies: readonly PrefixDeny[],
+  target: string,
+): { prefix: string; entry: string } | undefined {
+  let best: { prefix: string; entry: string } | undefined;
+  for (const { prefix, libraries } of denies) {
+    const entry = longest(libraries, target);
+    if (entry !== undefined && entry.length > (best?.entry.length ?? -1)) {
+      best = { prefix, entry };
+    }
+  }
+  return best;
+}
+
 /**
  * Names the top-level package of a dotted target.
  *
@@ -112,54 +187,100 @@ function topOf(target: string): string {
 }
 
 /**
- * Applies INW005 to a file's imports, static or dynamic: a layer imports only
- * the libraries its config lets it. First-party imports are not its concern.
+ * Applies INW005 to a file's imports, static or dynamic: a layer, and a
+ * module a `deny` entry matches, import only the libraries the config lets
+ * them. First-party imports are not its concern.
  *
  * @param file - the file the imports come from.
  * @param imports - the imports found in that file.
  * @param layers - the configured layers, innermost first.
- * @param project - what the adapter knows about the project's packages.
+ * @param project - what the adapter knows about the project's packages, and the prefix denies.
  * @param project.ownerOf - finds the first-party module an import lands in.
  * @param project.workspace - the top-level import packages of the uv workspace's members; none by default.
- * @returns one error per import of a library the layer may not use.
+ * @param project.deny - `[tool.inwards.rules.pure-domain].deny`; none by default.
+ * @returns one error per import of a library the file may not use.
  */
 export function checkLibraries(
   file: SourceFile,
   imports: readonly ImportRef[],
   layers: readonly LayerSpec[],
-  { ownerOf, workspace = new Set() }: { ownerOf: ModuleLookup; workspace?: ReadonlySet<string> },
+  { ownerOf, workspace = new Set(), deny = [] }: LibraryInputs,
 ): Diagnostic[] {
   const from = layerIndexOf(file.module, layers);
   const source = layers[from];
-  if (!source) {
+  const denies = prefixDenies(deny, file.module);
+  if (!source && denies.length === 0) {
     return [];
   }
-  const found: Diagnostic[] = [];
-  for (const ref of imports) {
-    // denial() first: ownerOf may probe the file system. The other two rule out first-party code.
-    const entry = denial(layers, from, ref.target);
-    if (
-      entry !== undefined &&
-      layerIndexOf(ref.target, layers) === -1 &&
-      ownerOf(ref.target) === undefined
-    ) {
-      const top = topOf(ref.target);
-      const member = workspace.has(top);
-      const owners = layers.filter(
-        (_, i) => i > from && denial(layers, i, ref.target) === undefined,
-      );
-      found.push(
-        diagnostic(RULES.INW005, file, {
-          span: ref,
-          message: `Layer "${source.name}" imports "${ref.target}" from ${member ? "workspace package" : "library"} "${top}", which "${source.name}" may not use.`,
-          fix: member
-            ? workspaceFix(source, ref, entry)
-            : fixFor(source, owners, ref, { entry, home: portHome(file, layers) }),
-        }),
-      );
+  return imports.flatMap((ref) => {
+    // Denials first: ownerOf may probe the file system. The other two rule out first-party code.
+    const entry = source ? denial(layers, from, ref.target) : undefined;
+    const scoped = entry === undefined ? prefixDenial(denies, ref.target) : undefined;
+    const denied = entry !== undefined || scoped !== undefined;
+    if (!denied || layerIndexOf(ref.target, layers) !== -1 || ownerOf(ref.target) !== undefined) {
+      return [];
     }
-  }
-  return found;
+    const kind = workspace.has(topOf(ref.target)) ? "workspace package" : "library";
+    if (source !== undefined && entry !== undefined) {
+      return [layerFinding(file, ref, layers, { source, from, entry, kind })];
+    }
+    return scoped === undefined ? [] : [prefixFinding(file, ref, { ...scoped, kind })];
+  });
+}
+
+/**
+ * Reports an import the layer's own lists forbid, in the wording existing
+ * baselines hold.
+ *
+ * @param file - the importing file.
+ * @param ref - the offending import.
+ * @param layers - the configured layers, innermost first.
+ * @param denied - what matched, and how to call the package.
+ * @param denied.source - the importing layer.
+ * @param denied.from - its index.
+ * @param denied.entry - the deny entry that matched, or the top-level package outside `allow-libraries`.
+ * @param denied.kind - "library", or "workspace package" for a uv workspace member.
+ * @returns the INW005 error.
+ */
+function layerFinding(
+  file: SourceFile,
+  ref: ImportRef,
+  layers: readonly LayerSpec[],
+  { source, from, entry, kind }: { source: LayerSpec; from: number; entry: string; kind: string },
+): Diagnostic {
+  const owners = layers.filter((_, i) => i > from && denial(layers, i, ref.target) === undefined);
+  return diagnostic(RULES.INW005, file, {
+    span: ref,
+    message: `Layer "${source.name}" imports "${ref.target}" from ${kind} "${topOf(ref.target)}", which "${source.name}" may not use.`,
+    fix:
+      kind === "library"
+        ? fixFor(source, owners, ref, { entry, home: portHome(file, layers) })
+        : workspaceFix(source, ref, entry),
+  });
+}
+
+/**
+ * Reports an import a `deny` entry forbids, naming the module and the prefix
+ * the entry matched.
+ *
+ * @param file - the importing file.
+ * @param ref - the offending import.
+ * @param denied - what matched, and how to call the package.
+ * @param denied.prefix - the module prefix the entry matched, e.g. `mypackage.one`.
+ * @param denied.entry - the library entry that covers the import, e.g. `django`.
+ * @param denied.kind - "library", or "workspace package" for a uv workspace member.
+ * @returns the INW005 error.
+ */
+function prefixFinding(
+  file: SourceFile,
+  ref: ImportRef,
+  denied: { prefix: string; entry: string; kind: string },
+): Diagnostic {
+  return diagnostic(RULES.INW005, file, {
+    span: ref,
+    message: `Module "${file.module}" imports "${ref.target}" from ${denied.kind} "${topOf(ref.target)}", which [tool.inwards.rules.pure-domain] denies to "${denied.prefix}".`,
+    fix: prefixFix(ref, denied),
+  });
 }
 
 /**
@@ -242,6 +363,30 @@ function fixFor(
       "Type this module against that Protocol and receive the implementation through a constructor or function parameter.",
       `Implement the Protocol with "${entry}" in the outer layer that holds adapters (allowed: ${allowed}), and wire it in the outermost layer (the composition root).`,
       ask,
+    ],
+  };
+}
+
+/**
+ * Writes the repair advice for an import a `deny` entry forbids: use the
+ * library outside the prefix, behind a port the prefix owns. No layer is
+ * named, since the prefix may sit inside one or in none.
+ *
+ * @param ref - the offending import.
+ * @param denied - the prefix the entry matched and the library entry that covers the import.
+ * @param denied.prefix - the module prefix, e.g. `mypackage.one`.
+ * @param denied.entry - the library entry, e.g. `django`.
+ * @returns the summary and numbered steps of the fix.
+ */
+function prefixFix(ref: ImportRef, { prefix, entry }: { prefix: string; entry: string }): Fix {
+  return {
+    summary: `"${prefix}" may not use "${entry}" ([tool.inwards.rules.pure-domain].deny): use it outside "${prefix}", behind a port "${prefix}" owns.`,
+    steps: [
+      removeStep(ref),
+      `Declare a typing.Protocol in \`${prefix}\` that describes only what this module needs from "${entry}".`,
+      "Type this module against that Protocol and receive the implementation through a constructor or function parameter.",
+      `Implement the Protocol with "${entry}" in a module outside "${prefix}" that may use it, and wire it in where the application is assembled.`,
+      `If "${prefix}" should be allowed to use "${entry}", ask the user to take "${entry}" out of the deny entry for "${prefix}" in [tool.inwards.rules.pure-domain]. Don't edit [tool.inwards] yourself.`,
     ],
   };
 }

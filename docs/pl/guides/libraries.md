@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/libraries.md
-source_hash: ccb7a52abacd045300972f0ac6b344d95ce80347c367624c96292426ce530d7e
+source_hash: 8d972e214e67d2f86e443e57cb3e2fc588763c5ff1ab09132464b6cd3af0177a
 ---
 
 # Biblioteki w warstwach { #libraries-per-layer }
@@ -55,6 +55,23 @@ Frameworki i serwery: `django`, `fastapi`, `flask`, `litestar`, `starlette`, `ce
 
 Czyste moduły biblioteki standardowej pozostają dozwolone: `dataclasses`, `typing`, `datetime`, `decimal`, `enum`, `urllib.parse`, `http.HTTPStatus`. Podobnie `os` i `pathlib`; dodaj je do `extend-deny-libraries`, jeśli twoja domena nie może też sięgać do systemu plików.
 
+### Zakaz biblioteki dla części warstwy { #prefix-deny }
+
+Trzy klucze dotyczą całej warstwy. Żeby trzymać bibliotekę z dala od jednego pakietu w warstwie albo od pakietu, który nie należy do żadnej warstwy, wpisz ją w `deny` w tabeli opcji INW005:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+layers = [{ name = "mypackage", modules = ["mypackage"] }]
+
+[tool.inwards.rules.pure-domain]
+deny = [
+  { modules = ["mypackage.one"], libraries = ["django"] },
+  { modules = ["mypackage.*.jobs"], libraries = ["celery", "http.client"] },
+]
+```
+
+`mypackage.one.views` nie może importować `django`, a `mypackage.two` nadal może. `modules` przyjmuje prefiksy i selektory jak `modules` warstwy; `libraries` przyjmuje nazwy importu jak `deny-libraries`, także z biblioteki standardowej. Wpis działa niezależnie od tego, czy moduł należy do warstwy, a `allow-libraries` warstwy go nie znosi: to węższa reguła. Gdy import zakazują też listy samej warstwy, zgłaszany jest raz, z komunikatem warstwy, więc dodanie wpisu nie zmienia istniejących kluczy baseline'u. `inwards import-config` zapisuje tę tabelę dla kontraktu `forbidden` import-lintera, którego `source_modules` nie są całymi warstwami.
+
 ## Co widzi agent { #what-the-agent-sees }
 
 Komunikat podaje warstwę, import i pakiet najwyższego poziomu biblioteki, nigdy listy, więc wpis w [baseline'ie](install.md#on-an-existing-codebase) przetrwa ich zmianę. Poprawka podaje wpis, który zabronił importu, niezależnie od listy, z której pochodzi (`http.client` dla `from http.client import HTTPConnection`; pakiet najwyższego poziomu, gdy import jest spoza `allow-libraries`), port do wprowadzenia i każdą warstwę zewnętrzną, której wolno używać tej biblioteki. Agent wybiera tę, która zawiera adaptery: w układzie heksagonalnym nie zawsze jest to następna warstwa na zewnątrz.
@@ -70,6 +87,13 @@ shop/domain/order.py:3:28: INW005 Layer "domain" imports "sqlalchemy.orm.Session
 ```
 
 Gdy biblioteki nie może używać także żadna warstwa zewnętrzna, poprawka zachowuje kroki 1 i 5 i każe agentowi zapytać użytkownika, gdzie ta biblioteka powinna się znaleźć.
+
+Import zakazany przez [wpis `deny`](#prefix-deny) podaje moduł i prefiks, do którego pasował wpis, a jego poprawka umieszcza port w tym prefiksie, a implementację poza nim:
+
+```text
+mypackage/one/views.py:1:8: INW005 Module "mypackage.one.views" imports "django.db" from library "django", which [tool.inwards.rules.pure-domain] denies to "mypackage.one".
+  fix: "mypackage.one" may not use "django" ([tool.inwards.rules.pure-domain].deny): use it outside "mypackage.one", behind a port "mypackage.one" owns.
+```
 
 ## Czego jeszcze nie obejmuje { #not-covered-yet }
 

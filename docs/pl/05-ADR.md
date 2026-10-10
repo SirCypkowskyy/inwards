@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: c8c91fd3265b4cc895474b9d0d2eb37c40d77c79e4f70659a16cb47d761a69ef
+source_hash: 6ba5b7143e5fcebfc263117cbc9d8b272822c84f304eabed671b4e039df2de3e
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -576,6 +576,15 @@ Ewaluacja pokazała też to, czego sprawdzenia nie są w stanie pokazać: w żad
 - :material-minus-circle-outline: Dopasowywane są nazwy importu, a nie nazwy dystrybucji (`PyYAML` to `yaml`), a moduł biblioteki standardowej nowszy niż dołączona lista liczy się jako zewnętrzny.
 
 **Alternatywy.** *Czytać zainstalowane dystrybucje z virtualenva*: dokładne, ale łamie C4 i zawodzi w obrazach CI bez zależności. *Domyślny zakaz dla każdej warstwy poza najbardziej zewnętrzną*: za dużo zgaduje o tym, czego może używać warstwa aplikacji. *Wymieniać skonfigurowaną listę w komunikacie*: zmieniona lista przywróciłaby każde naruszenie z baseline'u.
+
+**Poprawka, 2026-09-28: biblioteki zakazane prefiksowi modułów ([#219](https://github.com/SirCypkowskyy/inwards/issues/219)).** Najczęstszy kontrakt `forbidden` import-lintera, „`mypackage.one` nie może importować `django`”, wskazuje pakiet, który nie jest warstwą, więc `inwards import-config` ([#55](https://github.com/SirCypkowskyy/inwards/issues/55)) musiał go pomijać.
+
+- **W tabeli opcji INW005.** `[tool.inwards.rules.pure-domain]` przyjmuje `deny`, listę tabel `{ modules, libraries }`, obok `modules`, które każda reguła ma od poprawki #181 do [ADR-027](#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table). `modules` ma gramatykę `layers[].modules`, a `libraries` gramatykę `deny-libraries`. Klucz przyjmuje tylko `pure-domain`; w tabeli innej reguły to nieznany klucz.
+- **Niezależnie od warstw.** Wpis dotyczy modułów, do których pasuje, niezależnie od tego, czy należą do warstwy, więc plik poza wszystkimi warstwami, który obejmuje wpis, ma czytane importy. `allow-libraries` warstwy go nie znosi: wpis jest węższy niż warstwa, a zespół pisze go, żeby coś odebrać.
+- **Najpierw pytane są listy warstwy.** Gdy one też zakazują importu, zgłoszenie należy do warstwy i ma jej komunikat, więc dodanie wpisu nie rusza istniejących kluczy baseline'u. W przeciwnym razie komunikat podaje moduł i prefiks, do którego pasował wpis (`denies to "mypackage.one"`), a poprawka umieszcza port w tym prefiksie, a implementację poza nim. Własne `modules` tabeli nadal zawęża każde zgłoszenie INW005.
+- **`import-config`** zachowuje `extend-deny-libraries` dla źródeł, które są dokładnie jedną lub kilkoma warstwami, a dla pozostałych zapisuje wpis `deny`.
+
+*Alternatywy.* *`deny-libraries` we wpisie `[[tool.inwards.contexts]]`*: kontekst niesie też uprawnienia INW002 i INW003, więc przeniesiony kontrakt zmieniłby, co jeszcze pakiet może importować i kto może importować jego. *Pole `modules` we wpisach zakazu warstwy*: `deny-libraries` to lista napisów, a zamiana jej wpisów w tabele zmieniłaby typ istniejącego klucza.
 
 ## ADR-024: Polskie tłumaczenie jako drugi build, tłumaczone w tym samym PR { #adr-024-a-polish-translation-as-a-second-build-translated-in-the-same-pr }
 

@@ -1,11 +1,11 @@
 /**
  * @file Maps import-linter contracts onto a `[tool.inwards]` draft and says, per
  * contract, what was carried over and what wasn't. `layers` contracts go
- * through `layers.ts` (`|` siblings become sibling layers); `independence` and internal `forbidden` contracts
- * become bounded contexts whose `depends-on` leaves out exactly
- * the forbidden pairs (INW002); forbidden external packages become
- * `extend-deny-libraries` on the layers that are exactly the source modules
- * (INW005).
+ * through `layers.ts` (`|` siblings become sibling layers); `independence`
+ * and internal `forbidden` contracts become bounded contexts whose
+ * `depends-on` leaves out exactly the forbidden pairs (INW002); forbidden
+ * external packages become `extend-deny-libraries` on the layers that are
+ * exactly the source modules, or else a prefix deny in `[tool.inwards.rules.pure-domain]` (INW005, #219).
  *
  * What has no equivalent is reported with the reason, never dropped silently:
  * `ignore_imports`, wildcards (Inwards takes literal module names),
@@ -56,7 +56,14 @@ const UNMAPPABLE: Readonly<Record<string, string>> = {
  *   there is nothing to build a layer list from.
  */
 export function convert(config: LinterConfig): Conversion | string {
-  const state: State = { config, layers: [], shape: undefined, pairs: [], ignore: [] };
+  const state: State = {
+    config,
+    layers: [],
+    shape: undefined,
+    pairs: [],
+    ignore: [],
+    deny: [],
+  };
   const verdicts = new Map<LinterContract, Outcome>();
   for (const contract of config.contracts.filter((c) => c.type === "layers")) {
     verdicts.set(contract, layersContract(state, contract));
@@ -72,7 +79,12 @@ export function convert(config: LinterConfig): Conversion | string {
     (contract) => verdicts.get(contract) ?? otherContract(state, contract),
   );
   return {
-    draft: { layers: state.layers, contexts: contexts(state.pairs), ignore: state.ignore },
+    draft: {
+      layers: state.layers,
+      contexts: contexts(state.pairs),
+      ignore: state.ignore,
+      deny: state.deny,
+    },
     outcomes,
   };
 }
@@ -138,13 +150,10 @@ function forbiddenContract(state: State, contract: LinterContract): Outcome {
     return outcome(contract, reasons, pairs.length > 0);
   }
   const layers = layersOf(state.layers.flat(), sources);
-  if (typeof layers === "string") {
-    reasons.push(
-      `forbidden_modules ${external.join(", ")}: INW005 keeps libraries out of whole layers, and ${layers} Put the source modules in their own layer and add these to its extend-deny-libraries by hand.`,
-    );
-    return outcome(contract, reasons, pairs.length > 0);
+  if (layers === undefined) {
+    state.deny.push({ modules: [...sources], libraries: external });
   }
-  for (const layer of layers) {
+  for (const layer of layers ?? []) {
     layer.deny.push(...external.filter((lib) => !layer.deny.includes(lib)));
   }
   return outcome(contract, reasons, true);
@@ -179,26 +188,23 @@ function modulesProblem(
 
 /**
  * Finds the layers that hold exactly the given modules, so a deny list on
- * them applies to those modules and nothing else.
+ * them applies to those modules and nothing else; otherwise the libraries
+ * go to a prefix deny.
  *
  * @param layers - the layer list.
  * @param sources - the modules a forbidden contract restricts.
- * @returns the layers, or the end of a sentence saying why they don't line up.
+ * @returns the layers, or undefined when they don't line up: a source is
+ *   no layer's module, or a layer holds modules outside the sources.
  */
-function layersOf(layers: DraftLayer[], sources: readonly string[]): DraftLayer[] | string {
+function layersOf(layers: DraftLayer[], sources: readonly string[]): DraftLayer[] | undefined {
   const touched = layers.filter((layer) =>
     layer.modules.some((m) => sources.some((s) => within(m, s))),
   );
-  const loose = sources.find((s) => !touched.some((layer) => layer.modules.includes(s)));
-  if (loose !== undefined) {
-    return `"${loose}" is not a module of a layer.`;
-  }
-  const shared = touched.find((layer) =>
+  const loose = sources.some((s) => !touched.some((layer) => layer.modules.includes(s)));
+  const shared = touched.some((layer) =>
     layer.modules.some((m) => !sources.some((s) => within(m, s))),
   );
-  return shared === undefined
-    ? touched
-    : `layer "${shared.name}" also holds modules outside source_modules.`;
+  return loose || shared ? undefined : touched;
 }
 
 /**
