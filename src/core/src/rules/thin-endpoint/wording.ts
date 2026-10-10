@@ -5,6 +5,7 @@
  * signals an endpoint tripped. Plain strings from what `check.ts` measured;
  * it reads no syntax.
  */
+import { filledFrom } from "../../config/layer-selector.ts";
 import type { LayerSpec } from "../../config/layers.ts";
 import type { Fix } from "../../contracts/records.ts";
 import { joined } from "../shared/words.ts";
@@ -121,22 +122,70 @@ function linesText(spans: readonly BodySpan[], path: string | undefined): string
 }
 
 /**
+ * Names the module a selector stands for in the endpoint's package, when
+ * that is another module than the endpoint's own.
+ *
+ * @param entry - a layer entry or \`delegate-to\` target.
+ * @param module - the endpoint's module.
+ * @returns e.g. \`src.posts.service\` for \`src.*.service\` and \`src.posts.router\`, else undefined.
+ */
+function sibling(entry: string, module: string): string | undefined {
+  const filled = filledFrom(entry, module);
+  return filled === module ? undefined : filled;
+}
+
+/**
+ * Lists a layer's modules for a message: the ones its selectors stand for
+ * next to the endpoint when any fit, else the entries as configured.
+ *
+ * @param layer - the target layer.
+ * @param module - the endpoint's module, which fills the selectors' wildcards.
+ * @returns e.g. "`src.posts.service`" for `src.*.service`, or "`shop.application`".
+ */
+function layerModules(layer: LayerSpec, module: string): string {
+  const filled = [...new Set(layer.modules.flatMap((entry) => sibling(entry, module) ?? []))];
+  return (filled.length > 0 ? filled : layer.modules).map((m) => `\`${m}\``).join(", ");
+}
+
+/**
+ * Names one \`delegate-to\` target for a message or fix step: a layer with its
+ * modules, or a module prefix or selector, naming the module a selector
+ * stands for in the endpoint's package when the endpoint fits its shape.
+ *
+ * @param target - one \`delegate-to\` entry.
+ * @param layers - the configured layers.
+ * @param module - the endpoint's module.
+ * @returns e.g. "the \`domain.service\` layer (\`src.posts.service\`)" or "\`src.posts.service\` (a module matching \`src.*.service\`)".
+ */
+function oneTarget(target: string, layers: readonly LayerSpec[], module: string): string {
+  const layer = layers.find((l) => l.name === target);
+  if (layer) {
+    return `the \`${target}\` layer (${layerModules(layer, module)})`;
+  }
+  const filled = sibling(target, module);
+  return filled === undefined
+    ? `a module matching \`${target}\``
+    : `\`${filled}\` (a module matching \`${target}\`)`;
+}
+
+/**
  * Names where the endpoint's work should go, for a message or fix step.
  *
- * @param targets - the `delegate-to` entries, or none.
+ * @param targets - the \`delegate-to\` entries, or none.
  * @param layers - the configured layers.
- * @returns e.g. "the `application` layer (`shop.application`)", or "a service or use-case module".
+ * @param module - the endpoint's module, whose package fills a selector's wildcards.
+ * @returns e.g. "the \`application\` layer (\`shop.application\`)", or "a service or use-case module".
  */
-export function targetText(targets: readonly string[], layers: readonly LayerSpec[]): string {
+export function targetText(
+  targets: readonly string[],
+  layers: readonly LayerSpec[],
+  module: string,
+): string {
   if (targets.length === 0) {
     return "a service or use-case module";
   }
   return joined(
-    targets.map((target) => {
-      const layer = layers.find((l) => l.name === target);
-      const modules = layer ? ` (${layer.modules.map((m) => `\`${m}\``).join(", ")})` : "";
-      return layer ? `the \`${target}\` layer${modules}` : `a module matching \`${target}\``;
-    }),
+    targets.map((target) => oneTarget(target, layers, module)),
     "or",
   );
 }

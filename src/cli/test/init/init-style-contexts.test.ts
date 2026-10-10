@@ -249,7 +249,7 @@ describe("fastapi, in the fastapi-best-practices layout (--package src)", () => 
     expect(findings(root)).toEqual({ code: 0, findings: ["FAPI002 src/posts/router.py"] });
   });
 
-  test("a fat endpoint in the router is an INW012 warning that names the service layer", () => {
+  test("a fat endpoint in the router is an INW012 warning that names its domain's service module", () => {
     const { root } = bestPractices();
     appendFileSync(
       join(root, "src/posts/router.py"),
@@ -274,7 +274,7 @@ describe("fastapi, in the fastapi-best-practices layout (--package src)", () => 
       severity: "warning",
     });
     expect(finding.fix.summary).toBe(
-      "Move the work out of `count_words` into the `domain.service` layer (`src.*.service`), and keep the endpoint to HTTP.",
+      "Move the work out of `count_words` into the `domain.service` layer (`src.posts.service`), and keep the endpoint to HTTP.",
     );
   });
 

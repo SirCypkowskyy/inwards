@@ -188,3 +188,36 @@ function lastLiterals(pattern: readonly string[], name: readonly string[]): numb
   }
   return row;
 }
+
+/**
+ * Fills a selector's wildcards from a module, keeping its literal tail: the
+ * module `src.*.service` stands for next to `src.posts.router` is
+ * `src.posts.service`. The part up to the last wildcard must match a prefix
+ * of the module exactly; with `**`, which can match prefixes of several
+ * lengths, the longest one short of the module itself wins, so the result is
+ * a sibling in the module's own package.
+ *
+ * @param entry - a layer entry or `delegate-to` target.
+ * @param module - the dotted module whose segments fill the wildcards.
+ * @returns the concrete module, or undefined when the entry is literal, ends in a wildcard, or doesn't fit the module.
+ */
+export function filledFrom(entry: string, module: string): string | undefined {
+  const pattern = entry.split(".");
+  let cut = pattern.length;
+  while (cut > 0 && pattern[cut - 1] !== "*" && pattern[cut - 1] !== "**") {
+    cut -= 1;
+  }
+  if (cut === 0 || cut === pattern.length) {
+    return undefined;
+  }
+  const head = pattern.slice(0, cut).join(".");
+  const segments = module.split(".");
+  const lengths = [
+    ...Array.from({ length: segments.length - 1 }, (_, k) => segments.length - 1 - k),
+    segments.length,
+  ];
+  const fits = lengths.find((n) => entryReach(head, segments.slice(0, n)) === "match");
+  return fits === undefined
+    ? undefined
+    : [...segments.slice(0, fits), ...pattern.slice(cut)].join(".");
+}
