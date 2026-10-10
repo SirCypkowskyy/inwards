@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: e1cb8cab615ead10028edfe7ba210a1d7d7083caee84a4ef9ad859e84ee5a103
+source_hash: e9f2717a006af2a5820bb1575f90ddaff350dc17c7beeafa6aceffc7dee4e1a5
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -221,6 +221,7 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 - **Drugie parsowanie kosztuje około 3 ms zamiast około 16 ms** przy edycji kilku linii, mierzone w procesie na tym samym pliku.
 - **`inwards check` jednego pliku się nie zmienia,** bo parsuje raz. Pełne sprawdzenie też nie: tam żaden plik nie jest parsowany dwa razy.
 - **Zadanie benchmarku** mierzy teraz hook na module z 4482 liniami podobnym do pliku z polara (`bench/large-file.ts`). Na tym samym laptopie, po 20 uruchomień: 102,0 / 104,1 ms przed, 84,1 / 89,1 ms po jednorazowo i 23,0 / 26,2 ms przez daemona.
+- **Na runnerze CI z Linuksem arm64** (4 rdzenie), z zadań [PR #299](https://github.com/SirCypkowskyy/inwards/pull/299): `inwards check --no-cache` na pliku z polara trwał 62 i 65 ms p50 w dwóch uruchomieniach korpusu i 128 ms w trzecim, w którym każde repozytorium działało mniej więcej dwa razy wolniej. Hook z zadania benchmarku na module z 4482 liniami przyspieszył z 117 do 101 ms p50 jednorazowo (mediana par -17%), a przez daemona trwał 19,3 / 27,4 ms. Na tym runnerze jednorazowy hook na pliku tej wielkości nadal przekracza 100 ms; przez daemona mieści się w obu celach.
 - **Co zostaje z jednorazowego hooka:** około 15 ms startu procesu, 14 ms na odczyt tekstu ze startu z gita i pierwsze pełne parsowanie.
 
 ### Wątki robocze dla pełnego uruchomienia { #worker-threads-for-a-full-run }

@@ -216,6 +216,7 @@ This changes the performance roadmap. For the agent loop, parse speed doesn't ma
 - **The second parse costs about 3 ms instead of about 16 ms** for an edit of a few lines, measured in process on the same file.
 - **A one-file `inwards check` doesn't change,** since it parses once. Neither does a full check: no file is parsed twice there.
 - **The bench job** now times the hook on a 4,482-line module like polar's (`bench/large-file.ts`). On the same laptop, 20 runs each: 102.0 / 104.1 ms before, 84.1 / 89.1 ms after one-shot, and 23.0 / 26.2 ms through the daemon.
+- **On the Linux arm64 CI runner** (4 cores), from the jobs of [PR #299](https://github.com/SirCypkowskyy/inwards/pull/299): `inwards check --no-cache` on polar's file took 62 and 65 ms p50 in two corpus runs and 128 ms in a third, where every repo ran about twice as slow. The bench job's hook on the 4,482-line module went from 117 to 101 ms p50 one-shot (median of pairs -17%) and took 19.3 / 27.4 ms through the daemon. On that runner the one-shot hook on a file this size is still over 100 ms; through the daemon it meets both targets.
 - **What is left of the one-shot hook:** about 15 ms of process start, 14 ms for the git read of the start text, and the first full parse.
 
 ### Worker threads for a full run
