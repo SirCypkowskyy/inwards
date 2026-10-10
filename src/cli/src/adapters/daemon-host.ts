@@ -60,6 +60,9 @@ async function serve(
   options: { idleMs: number; record: (endpoint: string) => string },
 ): Promise<ServeResult> {
   mkdirSync(dirname(place.record), { recursive: true, mode: PRIVATE_DIR });
+  // Every request brings its own working directory. Leaving the project's
+  // keeps it free: Windows can't delete or rename a process's current directory.
+  process.chdir(dirname(place.record));
   const holder = takeLock(place.lock);
   if (holder !== undefined) {
     return { kind: "running", pid: holder };

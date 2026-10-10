@@ -45,8 +45,21 @@ afterAll(async () => {
     child.kill();
   }
   await Promise.all(children.map((child) => child.exited));
+  // A daemon a hook started isn't our child: wait until each one has released
+  // its lock, the last thing it does before it exits.
+  await until(() => started.every((root) => !existsSync(place(root).lock)));
   rmSync(RUNTIME_DIR, { recursive: true, force: true });
-});
+}, WAIT_MS * 2);
+
+/**
+ * Names a test project's daemon files.
+ *
+ * @param root - the project.
+ * @returns its record and lock under the tests' state directory.
+ */
+function place(root: string): ReturnType<typeof daemonPlace> {
+  return daemonPlace({ stateHome: STATE_HOME }, realpathSync(root));
+}
 
 /**
  * Starts `inwards daemon` in the foreground for a project and waits until it answers.
@@ -182,9 +195,7 @@ describe("inwards daemon", () => {
     expect(hook(root, "post-write-order", ON).code).toBe(2);
     await Bun.sleep(500);
     expect(status(root).code).toBe(1);
-    expect(existsSync(daemonPlace({ stateHome: STATE_HOME }, realpathSync(root)).record)).toBe(
-      false,
-    );
+    expect(existsSync(place(root).record)).toBe(false);
   });
 
   test("a second daemon for the same project steps aside", async () => {
@@ -199,9 +210,9 @@ describe("inwards daemon", () => {
     const root = project({ "pyproject.toml": LAYERS, ...FILES });
     const child = await startDaemon(root, 1);
     expect(await child.exited).toBe(0);
-    const place = daemonPlace({ stateHome: STATE_HOME }, realpathSync(root));
-    expect(existsSync(place.record)).toBe(false);
-    expect(existsSync(place.lock)).toBe(false);
+    const files = place(root);
+    expect(existsSync(files.record)).toBe(false);
+    expect(existsSync(files.lock)).toBe(false);
     expect(status(root).code).toBe(1);
   });
 

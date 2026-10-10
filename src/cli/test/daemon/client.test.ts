@@ -5,6 +5,7 @@
  * process or socket is involved; `daemon.test.ts` runs the real one.
  */
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { askDaemon, viaDaemon } from "../../src/daemon/client.ts";
 import type { AskResult } from "../../src/daemon/contracts.ts";
 import {
@@ -97,8 +98,9 @@ describe("wire format", () => {
 
   test("a project's files are named by a 16-digit key under the state directory", () => {
     expect(PLACE.key).toMatch(KEY);
-    expect(PLACE.record).toBe(`/state/inwards/daemons/${PLACE.key}.json`);
-    expect(PLACE.lock).toBe(`/state/inwards/daemons/${PLACE.key}.lock`);
+    // Native separators: on Windows these are \state\inwards\daemons\...
+    expect(PLACE.record).toBe(join("/state", "inwards", "daemons", `${PLACE.key}.json`));
+    expect(PLACE.lock).toBe(join("/state", "inwards", "daemons", `${PLACE.key}.lock`));
   });
 });
 
