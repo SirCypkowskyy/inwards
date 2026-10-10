@@ -6,7 +6,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { askDaemon, holdsLock, viaDaemon } from "../../src/daemon/client.ts";
+import {
+  askDaemon,
+  BACKOFF_MS,
+  backingOff,
+  holdsLock,
+  viaDaemon,
+} from "../../src/daemon/client.ts";
 import type { AskResult, LockHolder } from "../../src/daemon/contracts.ts";
 import {
   type DaemonAnswer,
@@ -30,6 +36,29 @@ import {
 } from "../support/daemon-helpers.ts";
 
 const KEY = /^[0-9a-f]{16}$/u;
+/** The wall clock in the back-off tests. */
+const T0 = "2026-10-10T12:00:00.000Z";
+const MS_PER_MINUTE = 60_000;
+
+/**
+ * Gives the time some minutes after `T0`.
+ *
+ * @param minutes - how long after.
+ * @returns the time, ISO 8601.
+ */
+function after(minutes: number): string {
+  return new Date(Date.parse(T0) + minutes * MS_PER_MINUTE).toISOString();
+}
+
+/**
+ * Builds the note a daemon that couldn't listen leaves.
+ *
+ * @param at - when it failed.
+ * @returns the note's text.
+ */
+function failureNote(at: string): string {
+  return toLine({ protocol: PROTOCOL, at, why: "no private directory for the socket", pid: 9 });
+}
 const HOOK: Parameters<typeof viaDaemon>[2] = { place: PLACE, stdin: POST, version: SELF.version };
 
 /**
@@ -39,9 +68,12 @@ const HOOK: Parameters<typeof viaDaemon>[2] = { place: PLACE, stdin: POST, versi
  * @param opts.daemon - `INWARDS_DAEMON`.
  * @param opts.ci - `CI` is set.
  * @param opts.state - the project has `.inwards/state`.
+ * @param opts.now - the wall clock, ISO 8601.
  * @returns the I/O and what it wrote.
  */
-function clientIo(opts: { daemon?: "on" | "off" | "auto"; ci?: boolean; state?: boolean } = {}): {
+function clientIo(
+  opts: { daemon?: "on" | "off" | "auto"; ci?: boolean; state?: boolean; now?: () => string } = {},
+): {
   io: Parameters<typeof viaDaemon>[1];
   out: string[];
   err: string[];
@@ -60,7 +92,7 @@ function clientIo(opts: { daemon?: "on" | "off" | "auto"; ci?: boolean; state?: 
       streams: { out: (t: string): number => out.push(t), err: (t: string): number => err.push(t) },
       probe: { kind: (): "dir" | undefined => (opts.state === false ? undefined : "dir") },
       state: { statePath: (p: string): string => `${p}/.inwards/state` },
-      clock: { elapsed: (): number => 7 },
+      clock: { elapsed: (): number => 7, now: opts.now ?? ((): string => T0) },
     },
     out,
     err,
@@ -153,6 +185,55 @@ describe("the hook's side", () => {
       kind: "fallback",
       start: false,
     });
+  });
+
+  test("a run of hooks starts at most one daemon per back-off period when none can listen (#275)", async () => {
+    const files = new Map<string, string>();
+    const { link } = fakeLink({ kind: "unreachable" }, "", files);
+    let starts = 0;
+    /**
+     * Runs one PostToolUse; a daemon it starts fails to listen at once and leaves its note.
+     *
+     * @param now - when the hook runs.
+     */
+    async function hook(now: string): Promise<void> {
+      const forwarded = await viaDaemon(link, clientIo({ now: () => now }).io, HOOK);
+      if (forwarded.kind === "fallback" && forwarded.start) {
+        starts += 1;
+        files.set(PLACE.failed, failureNote(now));
+      }
+    }
+    // One edit every 30 seconds for 14.5 minutes.
+    for (let half = 0; half < 30; half += 1) {
+      // biome-ignore lint/performance/noAwaitInLoops: each hook must see the note the one before it left.
+      await hook(after(half / 2));
+    }
+    expect(starts).toBe(Math.ceil((14.5 * MS_PER_MINUTE) / BACKOFF_MS));
+  });
+
+  test.each<[string, string, boolean]>([
+    ["a failure a minute ago", after(-1), true],
+    ["a failure at the back-off limit", after(-BACKOFF_MS / MS_PER_MINUTE), false],
+    ["a failure dated in the far future (the clock was set back)", after(60), false],
+    ["a failure with an unreadable time", "yesterday", false],
+  ])("%s: backing off is %p", (_, at, expected) => {
+    const note = { protocol: PROTOCOL, at, why: "x", pid: 9 };
+    expect(backingOff(note, T0)).toBe(expected);
+  });
+
+  test("a stale or unreachable daemon isn't replaced while a start is backing off", async () => {
+    const files = new Map([[PLACE.failed, failureNote(after(-1))]]);
+    const { link } = fakeLink({ kind: "lost" }, RECORD, files);
+    expect(await viaDaemon(link, clientIo().io, HOOK)).toEqual({ kind: "fallback", start: false });
+  });
+
+  test("status without a record reports the last failed start", async () => {
+    const files = new Map([[PLACE.failed, failureNote(T0)]]);
+    const { link, sent } = fakeLink({ kind: "unreachable" }, "", files);
+    const { record, failure } = await askDaemon(link, PLACE, "status", SELF.version);
+    expect(record).toBeUndefined();
+    expect(failure).toMatchObject({ at: T0, why: "no private directory for the socket", pid: 9 });
+    expect(sent).toEqual([]);
   });
 
   test("stop asks the daemon the record names", async () => {

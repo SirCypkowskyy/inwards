@@ -9,7 +9,7 @@
  */
 import { ConfigError, VERSION } from "@inwards/core";
 import { hookProject } from "../claude-code/protocol.ts";
-import { askDaemon, holdsLock } from "../daemon/client.ts";
+import { askDaemon, BACKOFF_MS, holdsLock } from "../daemon/client.ts";
 import type { LockHolder } from "../daemon/contracts.ts";
 import { daemonPlace, type HookRequest, PROTOCOL, toLine } from "../daemon/protocol.ts";
 import { createHandler, type HookOutcome } from "../daemon/server.ts";
@@ -20,6 +20,7 @@ import { hookClaudeCode } from "./hook.ts";
 /** How long the daemon waits for a request before it exits: 10 minutes. */
 const IDLE_SECONDS = 600;
 const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
 const DIGITS = /^\d+$/u;
 
 /**
@@ -129,6 +130,8 @@ async function serveDaemon(
         started,
       });
     },
+    failure: (why: string): string =>
+      toLine({ protocol: PROTOCOL, at: io.clock.now(), why, pid: io.runtime.pid }),
   });
   if (result.kind === "running") {
     return print(
@@ -181,14 +184,22 @@ async function runRequest(
  */
 async function status(deps: AppDeps, project: string): Promise<number> {
   const { io, daemon } = deps;
-  const { record, answer } = await askDaemon(
+  const { record, answer, failure } = await askDaemon(
     daemon.link,
     daemonPlace(io.runtime, project),
     "status",
     VERSION,
   );
   if (record === undefined) {
-    return print(io.streams, `inwards daemon: not running for ${project}.`, 1);
+    const lines = [`inwards daemon: not running for ${project}.`];
+    if (failure !== undefined) {
+      const minutes = Math.round(BACKOFF_MS / MS_PER_SECOND / SECONDS_PER_MINUTE);
+      lines.push(
+        `  the last start (pid ${failure.pid}, ${failure.at}) couldn't listen: ${failure.why}.`,
+        `  Hooks start no other one for ${minutes} minutes after that; \`inwards daemon\` tries now.`,
+      );
+    }
+    return print(io.streams, lines.join("\n"), 1);
   }
   if (answer !== undefined && "status" in answer) {
     const s = answer.status;
