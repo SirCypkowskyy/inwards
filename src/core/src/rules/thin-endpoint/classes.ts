@@ -9,6 +9,7 @@
 import type { Node } from "web-tree-sitter";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import type { NameMatch } from "../shared/name-patterns.ts";
 import {
   type Framework,
   frameworkBase,
@@ -17,7 +18,6 @@ import {
   VIEW_METHODS,
   type ViewKind,
 } from "./frameworks.ts";
-import type { NameMatch } from "./settings.ts";
 
 /** Tells what kind of view a first-party class in another module is, if any. */
 export type ResolveBase = (qualified: string) => ViewKind | undefined;

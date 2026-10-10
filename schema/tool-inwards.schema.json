@@ -187,6 +187,7 @@
         "INW010",
         "INW011",
         "INW012",
+        "INW013",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -447,6 +448,9 @@
         "thin-endpoint": {
           "$ref": "#/definitions/thinEndpointOptions"
         },
+        "async-blocking": {
+          "$ref": "#/definitions/asyncBlockingOptions"
+        },
         "endpoint-metadata": {
           "$ref": "#/definitions/endpointMetadataOptions"
         },
@@ -528,6 +532,37 @@
               }
             }
           }
+        }
+      }
+    },
+    "asyncBlockingOptions": {
+      "description": "INW013 async-blocking's options, [tool.inwards.rules.async-blocking]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "INW013 async-blocking's options, [tool.inwards.rules.async-blocking]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW013/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "extend-blocking-calls": {
+          "description": "Calls that block when called inside async def, added to INW013's built-in list (sqlite3.connect, psycopg2.connect and the other DB-API drivers), by qualified name with * and ? wildcards.",
+          "markdownDescription": "Calls that block when called inside async def, added to INW013's built-in list (sqlite3.connect, psycopg2.connect and the other DB-API drivers), by qualified name with * and ? wildcards.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW013/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": []
+        },
+        "extend-blocking-types": {
+          "description": "Types or factories whose every method blocks, added to INW013's built-in list (the sync SQLAlchemy Session and Engine, redis.Redis, boto3 clients, DB-API connections), by qualified name with * and ? wildcards. A parameter annotated with one, or a name bound from a call to one, is a blocking receiver.",
+          "markdownDescription": "Types or factories whose every method blocks, added to INW013's built-in list (the sync SQLAlchemy Session and Engine, redis.Redis, boto3 clients, DB-API connections), by qualified name with * and ? wildcards. A parameter annotated with one, or a name bound from a call to one, is a blocking receiver.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW013/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": []
         }
       }
     },

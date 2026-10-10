@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 9f6da89dd2607e0829a7b6d261d907484e1b12aa09c34a8a4c0d00efcd567adf
+source_hash: a3bc1f83c43856e3c1d89caefb9e57bc275dd712e684e51eaf4329f2f96c85a1
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -84,7 +84,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon` |
 | **Serwer języka** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
@@ -115,7 +115,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -361,6 +361,7 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | INW010 | `unknown-first-party` | Import statyczny w warstwie, który wskazuje własny moduł, który nie istnieje, typowa halucynacja agenta (`from shop.domain.pricing import X` bez żadnego `pricing`), oraz import względny, który wychodzi ponad pakiet najwyższego poziomu, czego Python nigdy nie przyjmuje. Sprawdzana jest część będąca modułem: `X` w `from X import name`, a w pozostałych przypadkach cała nazwa. Istnienie jest sondowane na dysku, więc liczą się pakiety przestrzeni nazw, zaślepki i skompilowane moduły rozszerzeń (`.so`, `.pyd`, `.pyx`); poprawka wymienia trzy najbliższe moduły z tego samego pakietu. Taki import nie dostaje dodatkowo INW006, a import skierowany na zewnątrz, który zgłasza INW001, nie dostaje INW010. Pakiety, które rozszerzają swój `__path__`, są pomijane, podobnie jak moduły zapisywane przez krok budowania (`generated`, domyślnie `*_pb2`, `*_pb2_grpc` i `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). Zobacz [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | :material-check-circle: |
 | INW011 | `dynamic-import` | Import dynamiczny z celem w postaci literału napisowego, który sięga do warstwy zewnętrznej: `importlib.import_module`, `__import__` (także `builtins.` i `importlib.`), `runpy.run_module` oraz instrukcje importu wewnątrz dosłownego kodu dla `exec` / `eval` / `compile` (bajty, których zadeklarowanego kodowania Inwards nie umie czytać, są zgłaszane jako niesprawdzone). Śledzone są aliasy importów, przypisania `name = loader`, `getattr(m, "name")`, `m.__dict__["name"]` i `vars(m)["name"]`; `+` między literałami i f-stringi z dosłownymi polami są składane. W każdej warstwie poza najbardziej zewnętrzną cel, którego Inwards nie umie odczytać, jest zgłaszany jako niesprawdzalny: zmienna, pole f-stringa, sekwencja `\N{...}`, argument ukryty za `*args` albo `**kwargs`, względne `import_module` z nieznanym `package`, `exec` albo `eval` z niedosłownym kodem ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Popularny sposób obejścia INW001. Znane luki są wymienione wyżej | :material-check-circle: |
 | INW012 | `thin-endpoint` | Opt-in, domyślnie ostrzeżenie. Endpoint HTTP (operacja ścieżki FastAPI, trasa Flaska, handler Litestara, widok albo akcja ViewSet Django lub DRF, handler rejestrowany przez `add_api_route`, `add_url_rule`, `Route` albo `path`, albo funkcja oznaczona skonfigurowanym dekoratorem lub metoda skonfigurowanej klasy bazowej), który sam wykonuje pracę, wliczając funkcje pomocnicze z tego samego modułu, które wywołuje: więcej instrukcji, gałęzi albo zagnieżdżeń niż jego limity (warunki ochronne, które rzucają błąd HTTP albo wywołują `abort` z Flaska, się nie liczą), pętle po danych, wywołania wskazane w `deny-calls` (`httpx.*`, `sqlalchemy.*`...), wywołania metod na parametrze otypowanym jako sesja bazy danych albo, z `delegate-to`, brak wywołania wskazanej warstwy. Jedno zgłoszenie na endpoint, na linii jego `def` (na rejestracji, gdy handler pochodzi z innego modułu), z każdym przekroczonym sygnałem i wliczonymi funkcjami pomocniczymi; poprawka nazywa warstwę docelową. Jedno parsowanie na plik, który wspomina rozpoznawany framework (albo te, które wymienia `frameworks`), skonfigurowany dekorator albo klasę bazową, bez względu na warstwę, plus moduł handlera, gdy wskazuje go rejestracja, i moduł klasy bazowej widoku, gdy klasa po niej dziedziczy | :material-check-circle: |
+| INW013 | `async-blocking` | Opt-in, błąd, gdy jest włączona. Wewnątrz `async def` (bez ciał zagnieżdżonych `def`, `lambda` i `class`) wywołanie metody na blokującym odbiorcy (parametrze z adnotacją albo nazwie przypisanej z wywołania synchronicznego `Session` lub `Engine` SQLAlchemy, `redis.Redis`, klienta boto3 albo połączenia DB-API, plus `extend-blocking-types`) albo wywołanie, które samo blokuje (`connect` sterownika, plus `extend-blocking-calls`). Jedno zgłoszenie na wywołanie; poprawka podaje klienta asynchronicznego, wariant z `def` i wątek roboczy. Jedno parsowanie na plik, który ma `async def` i wymienia blokującą bibliotekę albo skonfigurowany wzorzec, niezależnie od warstwy | :material-check-circle: |
 | FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI w schemacie bez metadanych OpenAPI, których wymaga projekt: podsumowania albo docstringu, modelu odpowiedzi, jawnego kodu statusu dla `POST` i `DELETE`, pola `description` w każdym wpisie `responses=`, a opcjonalnie tagów i `operation_id`. Jedna diagnostyka na endpoint, na dekoratorze | :material-check-circle: |
 | FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI: rzucony albo zwrócony w endpoincie, w funkcjach pomocniczych i zależnościach z tego samego pliku albo importowanych, do `max-depth` wywołań, albo z własnego wyjątku, który handler aplikacji zamienia na kod. Liczą się deklaracje na dekoratorze, routerze, dołączeniach nad nim i aplikacji; wszystko, czego Inwards nie umie odczytać, ucisza regułę | :material-check-circle: |
 | FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :material-check-circle: |
@@ -392,7 +393,8 @@ src/
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
-│   │   │   │              #   edit-distance.ts, words.ts (English lists)
+│   │   │   │              #   edit-distance.ts, words.ts (English lists), annotations.ts
+│   │   │   │              #   (parameter types), name-patterns.ts (fnmatch-style names)
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
 │   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
@@ -410,7 +412,9 @@ src/
 │   │   │   │                            #   frameworks.ts, classes.ts (view classes), view.ts,
 │   │   │   │                            #   helpers.ts (same-module helpers), remote.ts (handlers
 │   │   │   │                            #   and view bases in other modules), metrics.ts,
-│   │   │   │                            #   parameters.ts, signals.ts, wording.ts, check.ts
+│   │   │   │                            #   signals.ts, wording.ts, check.ts
+│   │   │   ├── async-blocking/          # INW013: catalog.ts (blocking families), receivers.ts,
+│   │   │   │                            #   check.ts
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
 │   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
@@ -424,7 +428,8 @@ src/
 │   │   │                                #   function's own yield, return and try statements)
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
-│   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012
+│   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
+│   │   │                  #   async-blocking.ts INW013
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts

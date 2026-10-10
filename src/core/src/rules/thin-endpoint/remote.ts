@@ -14,9 +14,10 @@
 import type { Node, Parser, Tree } from "web-tree-sitter";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { normalizeSource, parsePython } from "../../python/parser.ts";
+import { nameMatcher } from "../shared/name-patterns.ts";
 import { viewKind } from "./classes.ts";
 import { frameworksIn, type ViewKind } from "./frameworks.ts";
-import { nameMatcher, type Recognise } from "./settings.ts";
+import type { Recognise } from "./settings.ts";
 import { type FileView, fileView } from "./view.ts";
 
 /** How many re-exports a handler's name is followed through (a re-export cycle ends here). */

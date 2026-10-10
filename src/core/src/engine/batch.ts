@@ -19,6 +19,7 @@ import type {
   Suppressed,
 } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
+import { contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import type { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
@@ -31,7 +32,6 @@ import {
   wantsFull,
   withFound,
 } from "./stages.ts";
-import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 /** A file's findings after its suppression comments: those left, and those hidden. */
 export interface Suppressing {
@@ -214,7 +214,7 @@ function finish(
     }
     const extra = withFound(
       withFastApi(confirmed, src, wired),
-      thinEndpointFindings(steps.parser, src, config, project),
+      contentFindings(steps.parser, src, config, project),
     );
     const own = steps.suppressIn(src, extra);
     suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));

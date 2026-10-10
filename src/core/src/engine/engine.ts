@@ -45,6 +45,7 @@ import {
   type FileSteps,
   type Suppressing,
 } from "./batch.ts";
+import { contentFindings } from "./content-rules.ts";
 import { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
@@ -56,7 +57,6 @@ import {
   type Scan,
   withFound,
 } from "./stages.ts";
-import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 export type { Checked } from "./stages.ts";
 
@@ -149,8 +149,8 @@ export class Engine {
    * dropped, the rest get their configured severity (see `applyRules`).
    *
    * FAPI001 and FAPI002 run only when on and the text mentions FastAPI, and
-   * INW012 only when on for the file's module and the text may hold an
-   * endpoint (`engine/thin-endpoint.ts`).
+   * INW012 and INW013 only when on for the file's module and the text may
+   * hold a finding (`engine/content-rules.ts`).
    *
    * @param file - the source file as read by the adapter.
    * @param project - the project's module index (see `index`).
@@ -161,7 +161,7 @@ export class Engine {
     const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
     const confirmed = withFound(
       withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
-      thinEndpointFindings(this.parser, src, this.config, project),
+      contentFindings(this.parser, src, this.config, project),
     );
     const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
     return applyRules(kept, this.config.rules);
