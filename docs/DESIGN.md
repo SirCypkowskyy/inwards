@@ -141,6 +141,12 @@ components:
     textColor: "{colors.ink}"
     typography: "{typography.code}"
     rounded: "{rounded.sm}"
+  filter-control:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.md}"
+    padding: "0.35em 0.6em"
   nav-item:
     textColor: "{colors.ink}"
     typography: "{typography.label}"
@@ -402,6 +408,18 @@ A figure on Paper with a 1px Rule border and 6px corners, clipped. A path bar on
 
 A real `<table>` drawn as bars: each track is the 0 to 100 ms budget on a Rule fill ending in a 2px Ink tick, each bar the measured p95 in Hunk, the value in 700 beside the bar, or inside it in On Hunk when the bar is too long. Row labels link to where the number was measured.
 
+### Rule browser (rules index)
+
+The filterable list of every rule at the top of `rules/` (issue #145), drawn by `javascripts/rule-index.mjs` from the `rules.json` that `scripts/check-rule-pages.py` writes, and styled by `stylesheets/rules.css`. It is a read-mode component: no colour beyond the table's, Hunk only on links, focus and hover.
+
+- **Filters:** a search box and three selects (category, status, autofix) in a grid of 9.5rem minimum columns, the search spanning two. Labels sit above in Graphite at 600; controls are Ink on Paper at 0.8rem with a 1px Graphite edge (6.32:1, so the edge passes 3:1) and 6px corners, and take the global focus ring. The theme resets every input's border without a layer, so the search box draws its edge on a wrapper. Each option ends with the number of rules it would show.
+- **Count line:** "16 rules" or "Rules 11 to 16 of 16" in Graphite, a polite live region.
+- **Table:** the docs table (Rule border, Paper 2 header, 0.6em × 1em cells, tabular figures) with five columns: code (a link, in mono), name (the name in mono, then what it flags, then "Default: ..." in Graphite), category (the path joined with ›), status and autofix. Code, name and status sort: their header is a button, the direction is a ↑ or ↓ after the label (↕ in Graphite when unsorted) and `aria-sort` says it too.
+- **Pager:** Previous, one link per page and Next, under the table, beside a page-size select (10, 25, 50, all; 25 by default). The current page is Ink at 700 on Paper 2 with a 1px Rule edge. Links carry real hrefs, so they open in a new tab.
+- **Empty state:** a Paper 2 block with the message and an outline "Clear filters" button.
+- **Phone (below 45em):** each rule becomes a block of labelled lines (label in Graphite, 9em wide) and the header keeps only the three sort buttons, in one row.
+- **State:** every filter, the sort, the page and the page size are in the query string, defaults left out, and restored on load; `history.replaceState` keeps one history entry. Without JS, or when `rules.json` fails to load, the static tables below stay visible; once the browser draws, it hides them.
+
 ### Diagrams and charts
 
 **Hand-built SVG** (the model: `#homepage-loop` and `#quadrant-chart` in `stylesheets/extra.css`). Give the SVG an id, classes on its parts and colour them in CSS only with `var(--md-*)` or `var(--inw-*)`, never literal colours in the markup, so both schemes work. Nodes are Paper 2 with a 1px Graphite stroke and Ink labels (14.70 / 12.91), the one subject node is a Hunk fill with On Hunk text at 700 (6.39 / 8.66), edges and edge labels are Graphite at a 2px stroke, a pass is outlined in Added and a violation edge turns Removed. Set text in `var(--md-text-font-family)` at 14 to 15px and draw at the size it will be shown (the loop is 380 units wide and never scaled up). Focusable nodes get `tabindex="0"`, a visible focus state (2.5px Ink stroke) and the SVG an `aria-label` or `role="img"` with a description. Put diagram styles in `@layer inwards-diagrams`: the theme never styles SVG internals, so a layer loses nothing, and only a size the theme's unlayered `svg` rules would override goes in `home.css`.
@@ -426,6 +444,8 @@ Checked against Zensical 0.0.65. After an upgrade, diff each template's upstream
 | `stylesheets/theme.css` (unlayered) | Tokens, the `--md-*` mapping and restyles of theme classes: `.md-typeset` type and its code, admonition, tab, table, button, `kbd` and `mark` styles, `.md-header`, `.md-tabs`, `.md-nav`, `.md-select`, `.md-tooltip`/`.md-tooltip2`, `.md-footer`, `.md-source__repository`, `.md-copyright`, and the modern variant's `--color-*` triplets. |
 | `stylesheets/home.css` (unlayered) | Home page only, scoped to `.inw-home`, plus `.inw-actions`, which the 404 page reuses. |
 | `stylesheets/extra.css` (`@layer inwards-diagrams`) | The two hand-built SVGs. |
+| `stylesheets/rules.css` (`@layer inwards-rules`) | The rule browser. Its classes are its own, so a layer loses nothing, except the input border the theme resets (drawn on a wrapper instead). |
+| `javascripts/rule-index*.mjs` | The rule browser: the view logic (`-state`), labels in both languages (`-text`), DOM helpers (`-dom`) and the drawing. |
 
 `theme.css` and `home.css` are unlayered on purpose: Zensical's CSS is unlayered, and unlayered rules beat every cascade layer whatever their specificity, so a layered token or restyle would lose. `biome.jsonc` scopes that exception. The diagrams stay layered because the theme never styles SVG internals.
 
