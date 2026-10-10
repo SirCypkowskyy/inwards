@@ -85,6 +85,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | worker, worker pool | worker (workera, workery), pula workerów | |
 | catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
 | health check | health-check | "aplikacja health-check" |
+| runtimepath, quickfix (Neovim) | runtimepath, quickfix | "w swoim runtimepath", "w oknie quickfix" |
 
 ## Fixed Polish terms
 
@@ -284,6 +285,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | platform package (one VSIX per platform) | pakiet dla platformy |
 | thin client | cienki klient |
 | file watcher (editor) | obserwator plików |
+| project root (the directory an editor starts a language server in), root marker | katalog główny projektu, znacznik katalogu głównego |
+| dev extension (Zed) | rozszerzenie deweloperskie (dev extension) |
+| headless (an editor run without its UI) | bez interfejsu (headless) |
 | whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
 | MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |
 | tool (MCP) | narzędzie |
