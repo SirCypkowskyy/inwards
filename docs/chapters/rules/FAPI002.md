@@ -11,7 +11,7 @@ status: stable
 tags: [fastapi]
 resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/undocumented-error-response.ts
 timestamp: 2026-09-28T00:00:00Z
-related_issues: [186, 183]
+related_issues: [186, 183, 242]
 ---
 
 # FAPI002 `undocumented-error-response`
@@ -205,7 +205,10 @@ Unknown means silent: FAPI002 prefers a missed finding to a wrong one.
 - A status code it can't read (`HTTPException(code)`), a `responses=` that isn't a literal (`responses=build()`), a decorator with `**kwargs`, or an inclusion it can't resolve (`include_router(getattr(m, "router"))`, a router a factory returns, `include_router(r, **opts)`) makes that code or endpoint unknown, and nothing is reported for it. One unresolved inclusion anywhere makes every route on a router unknown. Inclusions are read from the app and router graph FAPI003 uses ([`graph.ts`](FAPI003.md)), so a loop over a literal list of routers counts.
 - Methods on injected objects (`svc.place()`) aren't followed; neither are third-party code, `getattr` dispatch or anything the app does at runtime (routes added in loops, an overridden `app.openapi()`, middleware).
 - There's no flow analysis: a `raise` counts if it is in the function, even on a branch this endpoint never takes. An `except X` around a call subtracts only first-party exceptions that are `X` or inherit from it.
-- Exception handlers are looked up across every app in the project, not only the one that mounts the route. A raised custom exception counts for nothing when some handler is registered from a variable (a loop over a dict of exceptions) or when the class inherits from a third-party exception, whose handler Inwards may not see. A generator function called by name (the body of a `StreamingResponse`) isn't read, since the call doesn't run it.
+- Exception handlers count only on the apps that serve the route: the app it is declared on, or each app that includes its router, directly or through other routers. A handler on another app (a worker's health-check app, say) doesn't count, and neither does one on the app that mounts the route's app, since a mounted app handles its own exceptions.
+- Handlers are read from `@app.exception_handler(X)`, `app.add_exception_handler(X, h)` (also in a `for` loop over a list or tuple literal of exceptions) and `exception_handlers=` on `FastAPI(...)`. That table can be a dict, a name bound to one in the same file, or an `"exception_handlers"` entry in a dict splatted into `FastAPI(**kwargs)`, including a dict that a caller in the same file passes to an app factory. A `**kwargs` whose dict sets other keys still hides the app's other keywords, and its routes stay unknown.
+- A raised custom exception counts for nothing on an app with a registration Inwards can't read: a loop over a dict of exceptions, or a splatted dict that comes from another file, is changed in place (`kwargs.update(...)`), or belongs to a factory no caller in the file reaches. The same goes for a class that inherits from a third-party exception, whose handler Inwards may not see. A handler for a builtin or third-party class, such as an `Exception` catch-all, is read but maps no code: catch-alls often pick the code by the exception's type inside.
+- A generator function called by name (the body of a `StreamingResponse`) isn't read, since the call doesn't run it.
 - Where several inclusions lead to one router, a code declared on any of them counts.
 - To find what sits above a router, FAPI002 reads every FastAPI file of the project once per check. In the per-edit hook it does so only for a route with a code its own decorator and router don't declare.
 

@@ -9,26 +9,7 @@
  * where each code comes from.
  */
 import { describe, expect, test } from "bun:test";
-import { checkProject, ERRORS, HEAD, MAIN, reported } from "./fixture.ts";
-
-/**
- * Checks a project whose router module is `app/orders.py`, with FAPI002 on.
- *
- * @param body - the router module after its imports and `router = APIRouter()`.
- * @param more - other files by path.
- * @param options - the options table's body, TOML.
- * @returns what FAPI002 reports.
- */
-function fapi002(
-  body: string,
-  more: Readonly<Record<string, string>> = {},
-  options = "",
-): Promise<string[]> {
-  const table =
-    options === "" ? "" : `[tool.inwards.rules.undocumented-error-response]\n${options}\n`;
-  const files = { "app/__init__.py": "", "app/orders.py": `${HEAD}${body}`, ...more };
-  return reported(files, "FAPI002", table);
-}
+import { checkProject, ERRORS, fapi002, HEAD, MAIN, raising, reported } from "./fixture.ts";
 
 const DIRECT = `
 @router.get("/orders/{id}")
@@ -277,23 +258,6 @@ async def create_order(svc: Annotated[Service, Depends(Service)]) -> OrderOut:
     expect(await fapi002(body)).toEqual([]);
   });
 });
-
-/**
- * Writes a route that raises an exception from `app/errors.py`.
- *
- * @param name - the exception class.
- * @returns the router module's routes.
- */
-function raising(name: string): string {
-  return `
-from app.errors import ${name}
-
-
-@router.post("/orders", status_code=201)
-async def create_order(id: int) -> OrderOut:
-    raise ${name}()
-`;
-}
 
 /**
  * Writes an `app/main.py` that includes the orders router.
