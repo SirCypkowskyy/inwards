@@ -188,6 +188,7 @@
         "INW011",
         "INW012",
         "INW013",
+        "INW014",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -451,6 +452,9 @@
         "async-blocking": {
           "$ref": "#/definitions/asyncBlockingOptions"
         },
+        "ports-abstract": {
+          "$ref": "#/definitions/portsAbstractOptions"
+        },
         "endpoint-metadata": {
           "$ref": "#/definitions/endpointMetadataOptions"
         },
@@ -571,6 +575,69 @@
           "items": {
             "$ref": "#/definitions/layerEntry"
           }
+        }
+      }
+    },
+    "portsAbstractOptions": {
+      "description": "INW014 ports-abstract's options, [tool.inwards.rules.ports-abstract]. They don't turn the rule on: extend-select or select does. Without modules, the rule checks the modules with a ports segment.",
+      "markdownDescription": "INW014 ports-abstract's options, [tool.inwards.rules.ports-abstract]. They don't turn the rule on: extend-select or select does. Without modules, the rule checks the modules with a ports segment.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW014/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "allow-bases": {
+          "description": "Bases that keep a class in a port module out of the check, by qualified name with * and ? wildcards; builtins are spelled bare (Exception). Replaces the default list of exceptions, pydantic.BaseModel, NamedTuple, TypedDict and enums.",
+          "markdownDescription": "Bases that keep a class in a port module out of the check, by qualified name with * and ? wildcards; builtins are spelled bare (Exception). Replaces the default list of exceptions, pydantic.BaseModel, NamedTuple, TypedDict and enums.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW014/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": [
+            "BaseException",
+            "Exception",
+            "*Error",
+            "*Exception",
+            "*Warning",
+            "pydantic.BaseModel",
+            "typing.NamedTuple",
+            "typing.TypedDict",
+            "typing_extensions.NamedTuple",
+            "typing_extensions.TypedDict",
+            "enum.*"
+          ]
+        },
+        "extend-allow-bases": {
+          "description": "Bases added to allow-bases (or to its default), by qualified name with * and ? wildcards.",
+          "markdownDescription": "Bases added to allow-bases (or to its default), by qualified name with * and ? wildcards.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW014/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": []
+        },
+        "allow-decorators": {
+          "description": "Class decorators that keep a class in a port module out of the check, by qualified name with * and ? wildcards. Replaces the default list of dataclass, pydantic and attrs decorators.",
+          "markdownDescription": "Class decorators that keep a class in a port module out of the check, by qualified name with * and ? wildcards. Replaces the default list of dataclass, pydantic and attrs decorators.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW014/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": [
+            "dataclasses.dataclass",
+            "pydantic.dataclasses.dataclass",
+            "attrs.define",
+            "attrs.frozen",
+            "attrs.mutable",
+            "attr.s",
+            "attr.attrs",
+            "attr.define",
+            "attr.frozen"
+          ]
         }
       }
     },

@@ -66,6 +66,7 @@ nav = [
     { "INW011 dynamic-import" = "rules/INW011.md" },
     { "INW012 thin-endpoint" = "rules/INW012.md" },
     { "INW013 async-blocking" = "rules/INW013.md" },
+    { "INW014 ports-abstract" = "rules/INW014.md" },
     { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },

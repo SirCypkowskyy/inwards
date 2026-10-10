@@ -8,6 +8,8 @@
  * rule reads its own with typed defaults. This module only validates, apart
  * from `stringList` and `libraryDenies`, which read a list back with its type.
  */
+
+import { delegateTargets } from "./delegate-targets.ts";
 import { isSelector, selectorProblem } from "./layer-selector.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -220,50 +222,7 @@ function listMatching(pattern: RegExp, example: string): OptionParser {
   };
 }
 
-/**
- * Parses INW012's `delegate-to`: a non-empty list of layer names or module
- * prefixes and selectors. Which entries name a layer is known only once the
- * layers are parsed, so `delegateProblem` checks the rest then.
- *
- * @param value - the raw list.
- * @param where - the key's dotted path.
- * @returns the entries as written.
- * @throws {ConfigError} when the list is empty or holds a blank or non-string entry.
- */
-function delegateTargets(value: unknown, where: string): string[] {
-  if (!(isStringList(value) && value.length > 0 && value.every((e) => e.trim() !== ""))) {
-    throw new ConfigError(
-      `${where} must be a non-empty list of layer names or module prefixes and selectors, such as ["application"] or ["shop.*.service"].`,
-    );
-  }
-  return value;
-}
-
-/**
- * Checks the `delegate-to` entries that name no layer: each must then be a
- * module prefix or selector, as in `layers[].modules`.
- *
- * @param entries - the entries as parsed.
- * @param layerNames - the names of the configured layers.
- * @returns the error message for the first bad entry, or undefined when all are fine.
- */
-export function delegateProblem(
-  entries: readonly string[],
-  layerNames: ReadonlySet<string>,
-): string | undefined {
-  for (const entry of entries) {
-    let problem = isSelector(entry) ? selectorProblem(entry) : undefined;
-    if (!(layerNames.has(entry) || isSelector(entry) || isDottedName(entry))) {
-      problem = "it names no layer and isn't a dotted module name";
-    }
-    if (problem !== undefined && !layerNames.has(entry)) {
-      return `tool.inwards.rules.thin-endpoint.delegate-to: "${entry}" is not a layer name, module prefix or selector: ${problem}.`;
-    }
-  }
-  return undefined;
-}
-
-/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types. */
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's bases and decorators. */
 const namePatterns = listMatching(
   NAME_PATTERN,
   'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
@@ -344,6 +303,11 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "extend-blocking-types": namePatterns,
     "follow-modules": (value: unknown, where: string): string[] =>
       moduleEntries(value, where, true),
+  },
+  "ports-abstract": {
+    "allow-bases": namePatterns,
+    "extend-allow-bases": namePatterns,
+    "allow-decorators": namePatterns,
   },
   "router-wiring": {
     entrypoints,

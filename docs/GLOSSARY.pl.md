@@ -63,7 +63,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW013, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW014, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
@@ -205,6 +205,13 @@ baseline'u); multi-word names are left uninflected where possible.
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
+| port module (INW014) | moduł portu |
+| abstract base class, ABC (`abc.ABC`) | abstrakcyjna klasa bazowa, ABC |
+| Protocol (`typing.Protocol`) | Protocol (protokół strukturalny) |
+| abstract method, method body (INW014) | metoda abstrakcyjna, ciało metody |
+| implementation (of a port) | implementacja (portu) |
+| DTO, value object | DTO, obiekt wartości |
+| test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
 | pre-release | wersja przedpremierowa (pre-release) |
 | probe (the file system) | sondować, sondowanie |
 | promotion (PR `develop` → `main`) | promocja |
