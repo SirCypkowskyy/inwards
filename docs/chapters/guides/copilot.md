@@ -1,7 +1,7 @@
 # GitHub Copilot
 
 !!! info "Verified 2026-10-10"
-    On macOS (arm64), with the compiled binary on `examples/broken-app`: `inwards init --agent agents-md`, and `inwards mcp` started the way the `.mcp.json` entry below starts it, answering `tools/list` and `check_files`. The setup workflow parses as YAML. No Copilot session was run, in VS Code or on GitHub, and the workflow hasn't run on GitHub. The Copilot settings, file names and limits on this page come from the VS Code and GitHub docs of that date.
+    On macOS (arm64), with the compiled binary on `examples/broken-app`: `inwards init --agent agents-md`, and `inwards mcp` started the way the `.mcp.json` entry below starts it, answering `tools/list` and `check_files`. The setup workflow parses as YAML. No Copilot session was run, in VS Code or on GitHub, and the workflow hasn't run on GitHub. The Copilot settings, file names and limits on this page come from the VS Code and GitHub docs of that date; the Hooks section's facts about the Copilot CLI's hook files come from GitHub's hooks reference read on 2026-10-11.
 
 Copilot has no hook that Inwards can plug into the way the [Claude Code hooks](claude-code.md) do. It meets Inwards in four places instead:
 

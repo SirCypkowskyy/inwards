@@ -1,12 +1,12 @@
 ---
 source: docs/chapters/guides/copilot.md
-source_hash: ac3a2ec195db94baab1984b3e6ebed37811f24b73340539a3d777d922e2890ce
+source_hash: 7bf556abd3ad8bf0d36bac4be51a46c704bf4822cc50892633443ce7266b17f6
 ---
 
 # GitHub Copilot { #github-copilot }
 
 !!! info "Zweryfikowano 2026-10-10"
-    Na macOS (arm64), ze skompilowanym plikiem binarnym na `examples/broken-app`: `inwards init --agent agents-md` oraz `inwards mcp` uruchomione tak, jak uruchamia go poniższy wpis w `.mcp.json`, który odpowiedział na `tools/list` i `check_files`. Workflow z krokami przygotowania parsuje się jako YAML. Nie uruchamiano żadnej sesji Copilota, ani w VS Code, ani na GitHubie, a workflow nie działał na GitHubie. Ustawienia Copilota, nazwy plików i ograniczenia na tej stronie pochodzą z dokumentacji VS Code i GitHuba z tego dnia.
+    Na macOS (arm64), ze skompilowanym plikiem binarnym na `examples/broken-app`: `inwards init --agent agents-md` oraz `inwards mcp` uruchomione tak, jak uruchamia go poniższy wpis w `.mcp.json`, który odpowiedział na `tools/list` i `check_files`. Workflow z krokami przygotowania parsuje się jako YAML. Nie uruchamiano żadnej sesji Copilota, ani w VS Code, ani na GitHubie, a workflow nie działał na GitHubie. Ustawienia Copilota, nazwy plików i ograniczenia na tej stronie pochodzą z dokumentacji VS Code i GitHuba z tego dnia; to, co sekcja Hooki mówi o plikach hooków Copilot CLI, pochodzi z opisu hooków GitHuba czytanego 2026-10-11.
 
 Copilot nie ma hooka, do którego Inwards mógłby się podłączyć tak jak do [hooków Claude Code](claude-code.md). Zamiast tego spotyka Inwards w czterech miejscach:
 
@@ -58,7 +58,7 @@ Sprawdź, czy działa:
 
 ### Hooki { #hooks }
 
-VS Code ma hooki agentów w wersji preview, ale Inwards jeszcze ich nie obsługuje. Jego hook (`inwards hook claude-code`) czyta dane wejściowe i nazwy narzędzi Claude Code. Harness Local w VS Code potrafi czytać hooki z plików ustawień Claude Code (`chat.useClaudeHooks`, domyślnie wyłączone), ale ignoruje ich matchery i inaczej nazywa narzędzia, a harness Copilota używa własnego formatu hooków. Nie podpinaj żadnego z nich pod `inwards hook claude-code`: config guard i Stop gate widziałyby wywołania narzędzi, których nie rozpoznają. Copilot CLI też czyta `.claude/settings.json` i `.claude/settings.local.json`, więc w projekcie podłączonym przez `inwards init --agent claude-code` już uruchamia ten hook, a ani guard, ani Stop gate tam nie działają: Copilot traktuje kod wyjścia 2 hooka jako ostrzeżenie dla użytkownika, nie blokadę. [ADR-044](../05-ADR.md#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) (proponowany) opisuje, co oferuje każda powierzchnia Copilota, i planowany `inwards hook copilot`.
+VS Code ma hooki agentów w wersji preview, ale Inwards jeszcze ich nie obsługuje. Jego hook (`inwards hook claude-code`) czyta dane wejściowe i nazwy narzędzi Claude Code. Harness Local w VS Code potrafi czytać hooki z plików ustawień Claude Code (`chat.useClaudeHooks`, domyślnie wyłączone), ale ignoruje ich matchery i inaczej nazywa narzędzia, a harness Copilota używa własnego formatu hooków. Nie podpinaj żadnego z nich pod `inwards hook claude-code`: config guard i Stop gate widziałyby wywołania narzędzi, których nie rozpoznają. Copilot CLI też czyta `.claude/settings.json` i `.claude/settings.local.json`, więc w projekcie podłączonym przez `inwards init --agent claude-code` już uruchamia ten hook, a ani config guard, ani Stop gate tam nie działają: Copilot traktuje kod wyjścia 2 hooka jako ostrzeżenie dla użytkownika, nie blokadę. [ADR-044](../05-ADR.md#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) (proponowany) opisuje, co oferuje każda powierzchnia Copilota, i planowany `inwards hook copilot`.
 
 ## Agent Copilota w chmurze { #cloud-agent }
 
