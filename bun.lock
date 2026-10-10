@@ -49,12 +49,7 @@
       "name": "inwards-vscode",
       "version": "0.1.0",
       "dependencies": {
-        "@inwards/core": "workspace:*",
-        "tree-sitter-python": "0.25.0",
         "vscode-languageclient": "^10.1.2",
-        "vscode-languageserver": "^10.1.2",
-        "vscode-languageserver-textdocument": "^1.0.15",
-        "web-tree-sitter": "0.27.0",
       },
       "devDependencies": {
         "@types/node": "^24.19.1",

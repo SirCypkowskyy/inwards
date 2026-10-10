@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: fa4d403101e3753fd0b2de1a2acba4cef924969db2923632282337a03c7006e4
+source_hash: 33d8696333ba1b6c17bff8a5dd2dc479c9d0a535fbae3856a5092cea01e1b647
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -58,8 +58,7 @@ flowchart TB
         cli["<b>inwards CLI</b><br/><small>TypeScript, kompilowany przez bun build --compile<br/>jeden plik binarny na OS/architekturę</small>"]
         server["<b>inwards server</b><br/><small>LSP przez stdio, w pliku binarnym CLI</small>"]
         mcp["<b>inwards mcp</b><br/><small>MCP przez stdio, w pliku binarnym CLI</small>"]
-        lsp["<b>Serwer języka rozszerzenia</b><br/><small>TypeScript na Node, dołączony do rozszerzenia<br/>do #64</small>"]
-        ext["<b>Rozszerzenie VS Code</b><br/><small>klient LSP, uruchamia serwer</small>"]
+        ext["<b>Rozszerzenie VS Code</b><br/><small>klient LSP, jeden VSIX na platformę<br/>z plikiem binarnym w środku</small>"]
         core["<b>Silnik</b> @inwards/core<br/><small>biblioteka TypeScript + tree-sitter WASM<br/>bez operacji wejścia-wyjścia</small>"]
         hooks["<b>Zestaw dla agentów</b><br/><small>inwards init --agent: hooki,<br/>sekcja AGENTS.md, lint-cmd dla aidera</small>"]
         state[("Stan sesji + run log<br/><small>.inwards/state, runs.jsonl</small>")]
@@ -73,16 +72,14 @@ flowchart TB
 
     agent -- "hook uruchamia" --> cli
     hooks -. "instaluje hooki dla" .-> agent
-    dev --> vscode --> ext -- "IPC" --> lsp
+    dev --> vscode --> ext -- "uruchamia, stdio" --> server
     dev --> other -- "stdio" --> server
     cli -- "uruchamia" --> server
     agent -- "stdio (MCP)" --> mcp
     cli -- "uruchamia" --> mcp
     cli -- "zawiera" --> core
-    lsp -- "dołącza" --> core
     cli -- "czyta" --> config
     cli -- "czyta" --> src
-    lsp -- "czyta" --> config
     cli -- "czyta/zapisuje (hook)" --> state
     cli -. "czyta/zapisuje" .-> cache
 
@@ -96,16 +93,15 @@ flowchart TB
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
-| **Serwer języka rozszerzenia** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: do czasu, gdy [#64](https://github.com/SirCypkowskyy/inwards/issues/64) przełączy rozszerzenie na `inwards server`: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
-| **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
+| **Rozszerzenie VS Code** | `vscode-languageclient` 10, cienki klient | `src/vscode-extension/src/client/` | :material-check-circle: uruchamia `inwards server` z pliku binarnego w swoim VSIX dla platformy, z `inwards.path` albo z `PATH` ([ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)); VSIX dla każdej platformy w każdym wydaniu; :material-progress-clock: Marketplace i Open VSX, gdy właściciel opublikuje ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` dla `claude`, `aider` i `agents-md` |
 | **Stan sesji i run log** | Pliki JSON i JSON Lines, tylko lokalnie | `.inwards/state/`, `.inwards/runs.jsonl` | :material-check-circle: (run log opcjonalny, [rozdział 8](08-Run-Log.md)) |
 | **Pamięć podręczna** | Listy importów kluczowane hashem zawartości | `.inwards/cache` | :material-progress-clock: [#56](https://github.com/SirCypkowskyy/inwards/issues/56) |
 
-Silnik to jedyne miejsce, w którym żyją reguły. CLI i serwer języka to adaptery: znajdują pliki, czytają je, ładują gramatyki i wybierają format wyjścia. Dzięki temu podziałowi podkreślenie w edytorze i błąd w CI nie mogą się rozjechać. Uruchamiają tę samą funkcję na tym samym tekście.
+Silnik to jedyne miejsce, w którym żyją reguły. CLI jest jego adapterem: znajduje pliki, czyta je, ładuje gramatyki i wybiera format wyjścia, a `inwards server` uruchamia to samo sprawdzenie dla edytorów. Dzięki temu podkreślenie w edytorze i błąd w CI nie mogą się rozjechać. Uruchamiają tę samą funkcję na tym samym tekście.
 
-!!! warning "Jeden silnik, dwa środowiska uruchomieniowe"
-    CLI uruchamia silnik na Bunie. Serwer języka uruchamia go na Node, wewnątrz procesu rozszerzeń VS Code. Jedno wywołanie API dostępnego tylko w Bunie wewnątrz `src/core/src` przeszłoby wszystkie testy (testy działają na Bunie), a potem zepsułoby rozszerzenie w czasie działania. Tej zasady pilnuje lint, a nie pamięć: `biome.jsonc` włącza `noRestrictedGlobals` dla `src/core/src/**` i odrzuca `Bun` oraz `Deno` z komunikatem wskazującym port `GrammarBinaries`. CI przy każdym pushu dodatkowo buduje paczkę rozszerzenia dla platformy `node`.
+!!! note "Jedno środowisko uruchomieniowe, trzymane z dala od silnika"
+    Silnik działa na Bunie, w pliku binarnym; od [ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) rozszerzenie VS Code uruchamia ten plik binarny, zamiast uruchamiać silnik na Node. Silnik nadal dostaje wszystko z zewnątrz przez porty, a lint tego pilnuje: `biome.jsonc` włącza `noRestrictedGlobals` dla `src/core/src/**` i odrzuca `Bun` oraz `Deno` z komunikatem wskazującym port `GrammarBinaries`. CI przy każdym pushu buduje paczkę klienta rozszerzenia dla platformy `node`, bo VS Code uruchamia go na Node.
 
 ## C3: komponenty silnika { #c3-components-of-the-engine }
 
@@ -240,22 +236,22 @@ Pozostałe polecenia korzystają z tych samych elementów:
 
 ```mermaid
 flowchart LR
-    pr["Scalony release PR<br/><small>release-please taguje vX.Y.Z</small>"] --> cd["cd.yml na ubuntu-26.04<br/><small>bun build --compile × 6 platform,<br/>5 wheeli platformowych, .vsix</small>"]
+    pr["Scalony release PR<br/><small>release-please taguje vX.Y.Z</small>"] --> cd["cd.yml na ubuntu-26.04<br/><small>bun build --compile × 6 platform,<br/>5 wheeli platformowych, 7 VSIX</small>"]
     rc["Ręcznie wypchnięty tag rc<br/><small>v0.2.0-rc.1</small>"] --> cd
-    cd --> verify["macierz weryfikacji<br/><small>linux x64/arm64/musl · macOS arm64/x64 · Windows x64<br/>każdy plik binarny sprawdza przykładową aplikację,<br/>każdy wheel instaluje się przez uvx</small>"]
-    verify --> art[("Szkic GitHub Release<br/><small>pliki binarne + wheele + .vsix + SHA256SUMS<br/>+ atestacje pochodzenia, gdy repozytorium będzie publiczne</small>")]
+    cd --> verify["macierz weryfikacji<br/><small>linux x64/arm64/musl · macOS arm64/x64 · Windows x64<br/>każdy plik binarny sprawdza przykładową aplikację,<br/>każdy wheel instaluje się przez uvx,<br/>każdy VSIX dla platformy zawiera ten plik binarny</small>"]
+    verify --> art[("Szkic GitHub Release<br/><small>pliki binarne + wheele + VSIX + SHA256SUMS<br/>+ atestacje pochodzenia, gdy repozytorium będzie publiczne</small>")]
     art --> manual["Ręczne pobranie<br/><small>obrazy CI, pre-commit</small>"]
     art --> uvurl["uv add --dev z URL-em wheela"]
     art -.->|"właściciel publikuje:<br/>pypi.yml"| testpypi["TestPyPI: inwards"]
     testpypi -.->|pełne wydania| pypi["PyPI: inwards"]
     pypi -.-> dev["uv add --dev inwards"]
-    art -.-> market["VS Code Marketplace"]
+    art -.->|"właściciel publikuje:<br/>vscode-publish.yml"| market["VS Code Marketplace<br/>i Open VSX"]
 
     classDef planned stroke-dasharray:5 5
     class testpypi,pypi,dev,market planned
 ```
 
-Wydania przebiegają według [ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr): release-please utrzymuje otwarty release PR, jego scalenie taguje wersję i uruchamia `cd.yml`, a właściciel ręcznie publikuje szkic. Opublikowanie szkicu uruchamia `pypi.yml`, gdy zostanie on włączony (niżej). Marketplace to [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
+Wydania przebiegają według [ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr): release-please utrzymuje otwarty release PR, jego scalenie taguje wersję i uruchamia `cd.yml`, a właściciel ręcznie publikuje szkic. Opublikowanie szkicu uruchamia `pypi.yml` i `vscode-publish.yml`, gdy każdy z nich zostanie włączony (niżej).
 
 Kompilacja skrośna z jednego runnera linuksowego jest możliwa, bo gramatyki są w WASM i nie ma natywnego dodatku do budowania dla każdej platformy (zobacz [ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)). Macierz weryfikacji uruchamia potem każdy plik binarny na jego prawdziwym systemie, bo skompilowany skrośnie wynik, którego nigdy nie uruchomiono, nie został przetestowany.
 
@@ -334,14 +330,33 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
 
 Żeby umieścić na PyPI także wersję przedpremierową, uruchom workflow z jej tagu, czego wymaga środowisko `pypi`: `gh workflow run pypi.yml --repo SirCypkowskyy/inwards --ref v0.2.0-rc.1 -f tag=v0.2.0-rc.1 -f index=pypi`. PyPI nigdy nie przyjmuje tej samej nazwy pliku dwa razy, więc wysłana tam wersja jest ostateczna; ponowne uruchomienie tylko uzupełnia pliki, których zabrakło po nieudanym uruchomieniu.
 
+### Publikacja rozszerzenia VS Code { #publishing-the-vs-code-extension }
+
+`.github/workflows/vscode-publish.yml` wysyła siedem plików VSIX opublikowanego pełnego wydania do Visual Studio Marketplace (`vsce publish`) i Open VSX (`ovsx publish`) ([ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)). Tak jak `pypi.yml`, niczego nie buduje: pobiera pliki spakowane przez `cd.yml`, sprawdza je względem `SHA256SUMS` wydania i wersji z taga (a także ich pochodzenie, gdy repozytorium będzie publiczne) i wysyła je z `--skip-duplicate`, więc ponowne uruchomienie dokańcza przerwaną wysyłkę. Każde zadanie wysyłki czyta jeden token z własnego środowiska, `vscode-marketplace` albo `open-vsx`, i biegnie na runnerze hostowanym przez GitHub. Opublikowanie pełnego wydania uruchamia workflow, gdy `VSCODE_PUBLISH` ma wartość `true`; wersja przedpremierowa nigdy go nie uruchamia, bo oba rejestry przyjmują tylko `X.Y.Z`. Ręczne uruchomienie przyjmuje tag i `both`, `marketplace` albo `open-vsx`. Pull requesty nigdy go nie uruchamiają.
+
+**Jednorazowa konfiguracja, po stronie właściciela:**
+
+1. **Wydawca w Marketplace.** Zaloguj się na [stronie wydawców Marketplace](https://marketplace.visualstudio.com/manage) i utwórz wydawcę `inwards`, czyli `publisher` z `src/vscode-extension/package.json`. Jeśli ten identyfikator jest zajęty, wybierz inny i zmień tam `publisher` (oraz adres w `vscode-publish.yml`). Utwórz w Azure DevOps token PAT z zakresem **Marketplace (Manage)**, jak opisuje [przewodnik publikacji](https://code.visualstudio.com/api/working-with-extensions/publishing-extension). Azure DevOps wycofuje tokeny globalne 1 grudnia 2026; dopóki workflow nie przejdzie na Microsoft Entra ID, odnów token przed tą datą.
+2. **Przestrzeń nazw w Open VSX.** Zaloguj się na [open-vsx.org](https://open-vsx.org) przez GitHuba, połącz konto eclipse.org i zaakceptuj umowę wydawcy Eclipse na stronie profilu, utwórz token dostępu, a potem przestrzeń nazw: `npx ovsx create-namespace inwards -p <token>`.
+3. **Środowiska i sekrety.** Utwórz środowiska `vscode-marketplace` i `open-vsx` (Settings → Environments), każde ograniczone do wzorca tagów `v*` i gałęzi `develop`, z tobą jako wymaganym recenzentem, jeśli GitHub to oferuje. Potem zapisz każdy token w jego środowisku:
+
+    ```sh
+    R=SirCypkowskyy/inwards
+    gh secret set VSCE_PAT --env vscode-marketplace --repo $R   # paste the Azure DevOps token
+    gh secret set OVSX_PAT --env open-vsx --repo $R             # paste the Open VSX token
+    ```
+
+4. **Uruchomienie:** `gh variable set VSCODE_PUBLISH --body true --repo SirCypkowskyy/inwards`. Następne opublikowane pełne wydanie trafi do obu rejestrów. Żeby wysłać wydanie opublikowane wcześniej: `gh workflow run vscode-publish.yml --repo SirCypkowskyy/inwards --ref develop -f tag=vX.Y.Z -f registry=both`.
+
+Po pierwszej wysyłce sprawdź instalację na Linuksie, macOS i Windows: `bun run src/vscode-extension/scripts/try-in-vscode.ts inwards.inwards-vscode` instaluje rozszerzenie z Marketplace w jednorazowym profilu VS Code, otwiera mały projekt i czeka na jego diagnostykę INW007.
+
 ## Znane ograniczenia { #known-limitations }
 
 - Jeden `root` na konfigurację. W monorepo każdy pakiet Pythona ma własne `[tool.inwards]`. `inwards check` w katalogu głównym workspace'u uv sprawdza każdego członka jego własną konfiguracją, a wskazane ścieżki kieruje do najbliższej konfiguracji; hook i Stop gate wybierają najbliższą konfigurację dla każdego pliku ([ADR-035](05-ADR.md#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config)). Wykrywane są tylko workspace'y uv: inne układy monorepo potrzebują osobnego uruchomienia na konfigurację albo wskazanych ścieżek. Globy członków dopasowują `*` tylko wewnątrz jednego segmentu, a `inwards baseline` bierze jedną konfigurację na uruchomienie.
-- `inwards server` pokazuje to, co zgłasza `inwards check`, gdy pliki są zapisane. Dopóki dokument ma niezapisane zmiany, pokazuje ten dokument sprawdzony osobno oraz to, co ostatni przebieg całego projektu znalazł w nim, a czego jeden plik nie pokaże (cykle, routery FastAPI, których nie dołącza żadna aplikacja); diagnostyki innych plików zależne od niezapisanego tekstu oraz niezapisane edycje `pyproject.toml` albo baseline'u liczą się od następnego zapisu. Dwa foldery obszaru roboczego, których konfiguracje obejmują ten sam plik, pokazują jego diagnostyki dwa razy. Każdy zapis kosztuje sprawdzenie całego projektu (154 ms dla 2100 plików po rozgrzaniu, [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). Ograniczenia poniżej, które wymieniają serwer języka, dotyczą serwera rozszerzenia, dopóki [#64](https://github.com/SirCypkowskyy/inwards/issues/64) nie przełączy go na `inwards server`.
-- Serwer języka rozszerzenia czyta tylko `pyproject.toml` z katalogu głównego pierwszego folderu obszaru roboczego i sprawdza jeden otwarty plik naraz, więc nie zgłasza martwych prefiksów warstw. Nie robi tego też `inwards check` z argumentami ścieżek; robi to tylko uruchomienie dla całego projektu. Konfigurację czyta ponownie, gdy zmienia się `pyproject.toml` ([#163](https://github.com/SirCypkowskyy/inwards/issues/163)); klient, który nie potrafi obserwować plików, czyta ją ponownie dopiero wtedy, gdy sam zapisze `pyproject.toml`. Błąd konfiguracji wyskakuje raz jako komunikat i zostaje na `pyproject.toml`, dopóki go nie poprawisz, a do tego czasu sprawdzanie jest wyłączone. `pyproject.toml`, którego nie da się odczytać, też jest błędem konfiguracji, tak jak w CLI; gdy w ogóle nie jest plikiem, pojawia się tylko komunikat. Ta diagnostyka trafia na właściwy wiersz tylko przy niepoprawnym TOML-u; przy każdym innym błędzie (na przykład nieznanym kodzie reguły) stoi w pierwszym wierszu, bo sprawdzenia konfiguracji wskazują klucz, a nie jego wiersz.
-- Niejawne pakiety przestrzeni nazw (bez `__init__.py`) są nazywane, a ich importy względne rozwiązywane tak jak w Pythonie. Moduł, którego brakuje pod takim pakietem, przechodzi INW010, gdy ma go inny członek workspace'u uv (w swoim `src/`, a bez niego w katalogu członka), gdy ma go site-packages katalogu `.venv` projektu albo gdy leży bezpośrednio w pakiecie wymienionym w `namespace-packages` ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). Środowisko wirtualne w innym miejscu nie jest widoczne. Serwer języka nie zagląda do innych członków ani do środowiska wirtualnego.
+- `inwards server` pokazuje to, co zgłasza `inwards check`, gdy pliki są zapisane. Dopóki dokument ma niezapisane zmiany, pokazuje ten dokument sprawdzony osobno oraz to, co ostatni przebieg całego projektu znalazł w nim, a czego jeden plik nie pokaże (cykle, routery FastAPI, których nie dołącza żadna aplikacja); diagnostyki innych plików zależne od niezapisanego tekstu oraz niezapisane edycje `pyproject.toml` albo baseline'u liczą się od następnego zapisu. Dwa foldery obszaru roboczego, których konfiguracje obejmują ten sam plik, pokazują jego diagnostyki dwa razy. Każdy zapis kosztuje sprawdzenie całego projektu (154 ms dla 2100 plików po rozgrzaniu, [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)).
+- Niejawne pakiety przestrzeni nazw (bez `__init__.py`) są nazywane, a ich importy względne rozwiązywane tak jak w Pythonie. Moduł, którego brakuje pod takim pakietem, przechodzi INW010, gdy ma go inny członek workspace'u uv (w swoim `src/`, a bez niego w katalogu członka), gdy ma go site-packages katalogu `.venv` projektu albo gdy leży bezpośrednio w pakiecie wymienionym w `namespace-packages` ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). Środowisko wirtualne w innym miejscu nie jest widoczne.
 - Przynależność do warstwy wynika tylko z prefiksu modułu. Wzorce glob (`shop.*.domain`) dla pionowych wycinków przyjdą ze schematem konfiguracji v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51), [ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
-- Dowiązania symboliczne w warstwie, które wskazują poza katalog `root` albo do innej warstwy, zgłasza INW006 w miejscu dowiązania: robi to `inwards check` całego projektu, a dla dowiązań utworzonych w trakcie sesji także Stop gate ([ADR-013](05-ADR.md#adr-013-real-paths-for-the-boundary-import-paths-for-module-names)). Serwer języka i `inwards check` ze ścieżkami jako argumentami ich nie zgłaszają, a katalog z danymi dowiązany do pakietu warstwy spoza `root` też jest zgłaszany.
+- Dowiązania symboliczne w warstwie, które wskazują poza katalog `root` albo do innej warstwy, zgłasza INW006 w miejscu dowiązania: robi to `inwards check` całego projektu, a dla dowiązań utworzonych w trakcie sesji także Stop gate ([ADR-013](05-ADR.md#adr-013-real-paths-for-the-boundary-import-paths-for-module-names)). `inwards check` ze ścieżkami jako argumentami ich nie zgłasza, a katalog z danymi dowiązany do pakietu warstwy spoza `root` też jest zgłaszany.
 - INW011 rozwiązuje import dynamiczny tylko wtedy, gdy celem jest stały napis. Każdy inny cel jest zgłaszany jako niesprawdzalny, i to tylko w warstwach, które mają warstwę zewnętrzną ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Znane luki:
     - stałe są zwijane tylko w granicach ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)): nazwa na poziomie modułu liczy się tylko wtedy, gdy cały plik wiąże ją raz, a plik nie ma `exec`, `eval`, funkcji zapisującej przestrzeń nazw ani importu z gwiazdką, a zwijanie `%`, `format` i f-stringów zatrzymuje się na wszystkim poza `%s`, `!s` i tekstową specyfikacją formatu. Wszystko inne jest niesprawdzalne;
     - `compile` z niedosłownym kodem nie jest zgłaszane, bo uruchomienie jego obiektu kodu wymaga `exec` albo `eval`, które są zgłaszane; obiekt kodu uruchomiony inaczej (`types.FunctionType`) zostaje przeoczony;
@@ -351,7 +366,7 @@ Opcjonalne utwardzenie: włącz niezmienne wydania (Settings → General → Rel
     - fałszywy alarm, zaakceptowany zamiast przeoczenia: przy dosłownym kodzie `exec`, `eval`, `compile` i `__import__` zawsze są traktowane jak funkcje wbudowane, więc po `from re import compile` wywołanie `compile("from shop.infrastructure import x")` zostaje zgłoszone. Bajty, które CPython odrzuca przed wykonaniem (UTF-8 BOM z innym zadeklarowanym kodowaniem, deklaracja `utf-16` albo `rot13`), są nadal czytane albo zgłaszane jako niesprawdzone;
     - fałszywie negatywny wynik, zaakceptowany zamiast szumu: samo `exec` albo `eval` z wyliczanym kodem jest pomijane tylko wtedy, gdy kod na pewno ponownie wiąże tę nazwę przy wywołaniu. Wiązaniem musi być `def`, `class`, zwykłe przypisanie albo import umieszczone bezpośrednio w ciele modułu (przed instrukcją najwyższego poziomu, która zawiera wywołanie) lub w ciele funkcji otaczającej wywołanie, parametr funkcji albo lambdy, której ciało zawiera wywołanie, albo cel pętli `for` wewnątrz tej pętli. Wyjątek jest wyłączony dla całego pliku, gdy którekolwiek wiązanie tej nazwy może być funkcją wbudowaną: przypisanie, operator morsa, cel `for`, `with` albo `except` czy domyślna wartość parametru, które wspominają loader; `def` albo `class`, których dekoratory lub argumenty klasy (klasy bazowe, `metaclass=`) go wspominają; import z `builtins`, `importlib`, `runpy`, modułu względnego albo własnego modułu projektu (każdy z nich może ponownie eksportować funkcję wbudowaną). Jest wyłączony także wtedy, gdy nazwa ma `global`, `nonlocal` albo `del` albo gdy plik ma import z gwiazdką lub wspomina `globals`, `vars`, `locals`, `setattr`, `delattr`, `__dict__`, `__builtins__` albo `sys.modules`. Dlatego `def eval(model, loader)` w kodzie treningowym nie jest zgłaszane. Nadal przeoczona zostaje funkcja wbudowana przekazana jako argument (`def run(exec, c): return exec(c)` wywołane jako `run(exec, code)`) oraz funkcja wbudowana osiągnięta przez obiekt, który nie nazywa loadera, `__self__`, `__globals__` ani funkcji zapisującej przestrzeń nazw. To samo sprawdzenie chroni `exec(compile("<literal>", ...))`, któremu ufamy tylko, dopóki `compile` nie jest ponownie związane;
     - zaakceptowane fałszywe alarmy tego ostrożnego sprawdzenia: zmienna wyrażenia listowego (`[eval(m) for eval in evaluators]`), nazwa metody użyta w ciele jej własnej klasy i przechwycenie `match` o nazwie `eval` albo `exec` są nadal zgłaszane.
-- INW010 sprawdza tylko tę część importu statycznego, która jest modułem ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` przechodzi, gdy `shop/domain` jest pakietem, bo `pricing` może być nazwą zdefiniowaną w jego `__init__.py`, a importy dynamiczne nie są sprawdzane. Moduł generowany przy budowaniu przechodzi, gdy obejmuje go `generated`, a domyślnie obejmuje `*_pb2` i `*_pb2_grpc` z protoc oraz moduł `_version` ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)); każdy inny jest zgłaszany, dopóki nie pojawi się w checkoucie, podobnie jak opcjonalny import za `try/except ImportError`. Zmyślony import, którego nazwę obejmuje wzorzec z `generated`, też przechodzi. Pozostałe reguły nadal widzą moduł generowany, którego nie ma na dysku, jako brakujący: INW001 patrzy na nazwę i zgłasza import skierowany na zewnątrz tak czy inaczej, a INW006 ocenia import po najbliższym istniejącym pakiecie, więc moduł generowany leżący bezpośrednio w pakiecie nad warstwami (`shop._version`, importowany z warstwy) dostaje błąd INW006 o innej treści z plikiem i bez niego, a wpis baseline'u zrobiony w jednym checkoucie nie pasuje w drugim. Generowany pakiet najwyższego poziomu bez zacommitowanego `__init__.py` wygląda dla każdej reguły jak kod zewnętrzny. Serwer języka nie zauważa, że `__init__.py` zaczął rozszerzać swój `__path__`, dopóki jakiś plik nie powstanie albo nie zniknie.
+- INW010 sprawdza tylko tę część importu statycznego, która jest modułem ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` przechodzi, gdy `shop/domain` jest pakietem, bo `pricing` może być nazwą zdefiniowaną w jego `__init__.py`, a importy dynamiczne nie są sprawdzane. Moduł generowany przy budowaniu przechodzi, gdy obejmuje go `generated`, a domyślnie obejmuje `*_pb2` i `*_pb2_grpc` z protoc oraz moduł `_version` ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)); każdy inny jest zgłaszany, dopóki nie pojawi się w checkoucie, podobnie jak opcjonalny import za `try/except ImportError`. Zmyślony import, którego nazwę obejmuje wzorzec z `generated`, też przechodzi. Pozostałe reguły nadal widzą moduł generowany, którego nie ma na dysku, jako brakujący: INW001 patrzy na nazwę i zgłasza import skierowany na zewnątrz tak czy inaczej, a INW006 ocenia import po najbliższym istniejącym pakiecie, więc moduł generowany leżący bezpośrednio w pakiecie nad warstwami (`shop._version`, importowany z warstwy) dostaje błąd INW006 o innej treści z plikiem i bez niego, a wpis baseline'u zrobiony w jednym checkoucie nie pasuje w drugim. Generowany pakiet najwyższego poziomu bez zacommitowanego `__init__.py` wygląda dla każdej reguły jak kod zewnętrzny.
 - Moduły, które nie należą do żadnej warstwy, nie podlegają żadnej regule warstw. INW006 to uwidacznia (ostrzeżenie na pakiet, błąd dla importu do takiego pakietu z warstwy i martwe prefiksy), ale importy wewnątrz nieprzypisanego pakietu nie są sprawdzane względem warstw, dopóki użytkownik go nie przypisze. Gdy zadeklarowano [konteksty](guides/configuration.md#contexts), importy każdego modułu są z nimi porównywane (INW002, INW003), a INW000 dotyczy każdego pliku. Moduły bez źródeł, głębokość `ignore`, przemianowane pakiety najwyższego poziomu i sprawdzanie prefiksów w zakresie ścieżek są otwarte w [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Katalog reguł { #rule-catalogue }
@@ -472,14 +487,12 @@ src/
 │   │                      #   the LSP connection over stdio (lsp-connection.ts), the MCP one
 │   │                      #   (mcp-connection.ts) and the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
-│   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
+│   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/
-    ├── src/
-    │   ├── client/        # extension.ts (activation, starts the server), selector.ts
-    │   └── server/        # server.ts (LSP), workspace.ts (INW007/INW008 pass), config-file.ts;
-    │                      #   frozen until #64 replaces it with inwards server
-    ├── scripts/           # copy-wasm.ts: grammars next to dist/server.js
-    └── test/              # LSP harness and tests, packaged.test.ts on the built dist/
+    ├── src/client/        # extension.ts (settings, starts inwards server), binary.ts (which
+    │                      #   binary), selector.ts
+    ├── scripts/           # package-target.ts (a VSIX per platform), try-in-vscode.ts
+    └── test/              # the binary lookup, boundaries, packaged.test.ts on the built VSIX
 ```
 
 Poza `src/`: `scripts/` buduje pliki binarne i wheele oraz sprawdza wersje i nawigację dokumentacji, `packaging/` zawiera README wheela i rezerwacje nazw, `eval/` to środowisko ewaluacji agentów, `bench/` generuje syntetyczne repozytorium do benchmarków i porównuje na nim dwa buildy dla bramki regresji w PR-ach, a `examples/clean-app` to aplikacja, którą sprawdza CI.

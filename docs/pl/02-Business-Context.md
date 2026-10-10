@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/02-Business-Context.md
-source_hash: 8c4ed16fb5dd7051dff42cd45d8775afbb34e583f89cf9417ac152eb14cbaafb
+source_hash: 20e14bca91068e3b9bdf934bb5610defaf4a0cdb1c4abc33dc79c04fb477c04c
 ---
 
 # :material-chart-timeline-variant: Kontekst biznesowy { #business-context }
@@ -277,7 +277,7 @@ flowchart LR
 | UC1 | Zadeklaruj warstwy | Architekt edytuje `[tool.inwards]` | Konfiguracja przechodzi walidację, a błędy wskazują winny klucz | :material-check-circle: |
 | UC2 | Sprawdzaj po każdej edycji | Agent zapisuje plik `.py`; hook PostToolUse zainstalowany przez `inwards init --agent claude` sprawdza ten plik | Naruszenia wracają do agenta z krokami naprawy w ciągu 100 ms | :material-check-circle: |
 | UC3 | Bramka przed „gotowe” | Agent próbuje zakończyć; Stop gate sprawdza każdy plik zmieniony w sesji, niezależnie od tego, jak go zmieniono | Agent nie może ogłosić zwycięstwa z naruszeniem, które sam wprowadził, a stare naruszenia w starszym repozytorium go nie blokują | :material-check-circle: |
-| UC4 | Zobacz naruszenia w edytorze | Programista pisze kod | Podkreślenie z tym samym komunikatem i kodem co w CLI | :material-check-circle: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace |
+| UC4 | Zobacz naruszenia w edytorze | Programista pisze kod | Podkreślenie z tym samym komunikatem i kodem co w CLI | :material-check-circle: VSIX dla każdej platformy w każdym wydaniu, z plikiem binarnym w środku; :material-progress-clock: Marketplace i Open VSX, gdy właściciel opublikuje |
 | UC5 | Zablokuj pull request | CI uruchamia `inwards check --format sarif` | Nieudane sprawdzenie oraz adnotacje w pull requeście i w GitHub code scanning | :material-check-circle: [szablon workflow](guides/ci.md) i adnotacje w pull requestach, sprawdzone w praktyce (dogfooding) na `examples/broken-app`; :material-progress-clock: code scanning, gdy repozytorium stanie się publiczne |
 | UC6 | Wdróż w starszym kodzie | Architekt uruchamia `inwards baseline` | Istniejące naruszenia zostają zapisane, a sprawdzenie oblewają tylko nowe | :material-check-circle: |
 | UC7 | Poinstruuj agenta z góry | `inwards context --write` albo `inwards init --brief` zapisuje podsumowanie do `AGENTS.md` (który `CLAUDE.md` może zaimportować) | Agent zna warstwy, zanim napisze pierwszy import | :material-check-circle: opcjonalnie, [#58](https://github.com/SirCypkowskyy/inwards/issues/58) |

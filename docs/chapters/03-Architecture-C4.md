@@ -53,8 +53,7 @@ flowchart TB
         cli["<b>inwards CLI</b><br/><small>TypeScript, compiled with bun build --compile<br/>single binary per OS/arch</small>"]
         server["<b>inwards server</b><br/><small>LSP over stdio, in the CLI binary</small>"]
         mcp["<b>inwards mcp</b><br/><small>MCP over stdio, in the CLI binary</small>"]
-        lsp["<b>Extension's language server</b><br/><small>TypeScript on Node, bundled in the extension<br/>until #64</small>"]
-        ext["<b>VS Code extension</b><br/><small>LSP client, starts the server</small>"]
+        ext["<b>VS Code extension</b><br/><small>LSP client, one VSIX per platform<br/>with the binary inside</small>"]
         core["<b>Engine</b> @inwards/core<br/><small>TypeScript library + tree-sitter WASM<br/>no I/O</small>"]
         hooks["<b>Agent kit</b><br/><small>inwards init --agent: hooks,<br/>AGENTS.md section, aider lint-cmd</small>"]
         state[("Session state + run log<br/><small>.inwards/state, runs.jsonl</small>")]
@@ -68,16 +67,14 @@ flowchart TB
 
     agent -- "hook runs" --> cli
     hooks -. "installs hooks for" .-> agent
-    dev --> vscode --> ext -- "IPC" --> lsp
+    dev --> vscode --> ext -- "starts, stdio" --> server
     dev --> other -- "stdio" --> server
     cli -- "runs" --> server
     agent -- "stdio (MCP)" --> mcp
     cli -- "runs" --> mcp
     cli -- "embeds" --> core
-    lsp -- "bundles" --> core
     cli -- "reads" --> config
     cli -- "reads" --> src
-    lsp -- "reads" --> config
     cli -- "reads/writes (hook)" --> state
     cli -. "reads/writes" .-> cache
 
@@ -91,16 +88,15 @@ flowchart TB
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
-| **Extension's language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: until [#64](https://github.com/SirCypkowskyy/inwards/issues/64) switches the extension to `inwards server`: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; with a fresh engine when `pyproject.toml` changes; INW007 and INW008 for the whole workspace from a directory listing |
-| **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
+| **VS Code extension** | `vscode-languageclient` 10, a thin client | `src/vscode-extension/src/client/` | :material-check-circle: starts `inwards server` from the binary in its platform VSIX, `inwards.path` or `PATH` ([ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)); a VSIX per platform on each release; :material-progress-clock: Marketplace and Open VSX once the owner publishes ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` for `claude`, `aider` and `agents-md` |
 | **Session state and run log** | JSON and JSON Lines files, local only | `.inwards/state/`, `.inwards/runs.jsonl` | :material-check-circle: (run log opt-in, [chapter 8](08-Run-Log.md)) |
 | **Cache** | Content-hash keyed import lists | `.inwards/cache` | :material-progress-clock: [#56](https://github.com/SirCypkowskyy/inwards/issues/56) |
 
-The engine is the only place rules live. The CLI and the language server are adapters: they find files, read them, load the grammars and pick an output format. That split is why an editor squiggle and a CI failure can't disagree. They run the same function on the same text.
+The engine is the only place rules live. The CLI is its adapter: it finds files, reads them, loads the grammars and picks an output format, and `inwards server` runs the same check for editors. That is why an editor squiggle and a CI failure can't disagree. They run the same function on the same text.
 
-!!! warning "One engine, two runtimes"
-    The CLI runs the engine on Bun. The language server runs it on Node inside the VS Code extension host. A single call to a Bun-only API inside `src/core/src` would pass every test (tests run on Bun) and then break the extension at runtime. The rule is enforced by lint, not by memory: `biome.jsonc` turns on `noRestrictedGlobals` for `src/core/src/**` and rejects `Bun` and `Deno` with a message pointing at the `GrammarBinaries` port. CI also bundles the extension for the `node` target on every push.
+!!! note "One runtime, kept out of the engine"
+    The engine runs on Bun, in the binary; since [ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) the VS Code extension starts that binary instead of running the engine on Node. The engine still takes everything from outside through ports, and lint keeps it that way: `biome.jsonc` turns on `noRestrictedGlobals` for `src/core/src/**` and rejects `Bun` and `Deno` with a message pointing at the `GrammarBinaries` port. The extension's client is bundled for the `node` target on every push, since VS Code runs it on Node.
 
 ## C3: Components of the engine
 
@@ -235,22 +231,22 @@ The other commands reuse the same pieces:
 
 ```mermaid
 flowchart LR
-    pr["Release PR merged<br/><small>release-please tags vX.Y.Z</small>"] --> cd["cd.yml on ubuntu-26.04<br/><small>bun build --compile × 6 targets,<br/>5 platform wheels, .vsix</small>"]
+    pr["Release PR merged<br/><small>release-please tags vX.Y.Z</small>"] --> cd["cd.yml on ubuntu-26.04<br/><small>bun build --compile × 6 targets,<br/>5 platform wheels, 7 VSIX</small>"]
     rc["Hand-pushed rc tag<br/><small>v0.2.0-rc.1</small>"] --> cd
-    cd --> verify["verify matrix<br/><small>linux x64/arm64/musl · macOS arm64/x64 · Windows x64<br/>each binary checks the example app,<br/>each wheel installs with uvx</small>"]
-    verify --> art[("Draft GitHub Release<br/><small>binaries + wheels + .vsix + SHA256SUMS<br/>+ provenance attestations once the repo is public</small>")]
+    cd --> verify["verify matrix<br/><small>linux x64/arm64/musl · macOS arm64/x64 · Windows x64<br/>each binary checks the example app,<br/>each wheel installs with uvx,<br/>each platform VSIX holds that binary</small>"]
+    verify --> art[("Draft GitHub Release<br/><small>binaries + wheels + VSIX + SHA256SUMS<br/>+ provenance attestations once the repo is public</small>")]
     art --> manual["Manual download<br/><small>CI images, pre-commit</small>"]
     art --> uvurl["uv add --dev with the wheel URL"]
     art -.->|"owner publishes it:<br/>pypi.yml"| testpypi["TestPyPI: inwards"]
     testpypi -.->|full releases| pypi["PyPI: inwards"]
     pypi -.-> dev["uv add --dev inwards"]
-    art -.-> market["VS Code Marketplace"]
+    art -.->|"owner publishes it:<br/>vscode-publish.yml"| market["VS Code Marketplace<br/>and Open VSX"]
 
     classDef planned stroke-dasharray:5 5
     class testpypi,pypi,dev,market planned
 ```
 
-Releases follow [ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr): release-please keeps a release PR open, merging it tags the version and starts `cd.yml`, and the owner publishes the draft by hand. Publishing the draft starts `pypi.yml` once it is switched on (below). The Marketplace is [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
+Releases follow [ADR-016](05-ADR.md#adr-016-versions-and-releases-come-from-commit-types-via-a-release-pr): release-please keeps a release PR open, merging it tags the version and starts `cd.yml`, and the owner publishes the draft by hand. Publishing the draft starts `pypi.yml` and `vscode-publish.yml` once each is switched on (below).
 
 Cross-compiling from one Linux runner is possible because the grammars are WASM, with no native addon to build per platform (see [ADR-002](05-ADR.md#adr-002-web-tree-sitter-wasm-not-native-bindings)). The verify matrix then runs each binary on its real OS, since cross-compiled output that was never executed hasn't been tested.
 
@@ -329,14 +325,33 @@ Optional hardening: turn on immutable releases (Settings → General → Release
 
 To put a pre-release on PyPI as well, run the workflow from its tag, which the `pypi` environment requires: `gh workflow run pypi.yml --repo SirCypkowskyy/inwards --ref v0.2.0-rc.1 -f tag=v0.2.0-rc.1 -f index=pypi`. PyPI never takes the same file name twice, so a version uploaded there is final; a re-run only fills in files a failed run missed.
 
+### Publishing the VS Code extension
+
+`.github/workflows/vscode-publish.yml` uploads a published full release's seven VSIX files to the Visual Studio Marketplace (`vsce publish`) and Open VSX (`ovsx publish`) ([ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)). Like `pypi.yml`, it builds nothing: it downloads the files `cd.yml` packaged, checks them against the release's `SHA256SUMS` and the tag's version (and their build provenance, once the repository is public), and uploads them with `--skip-duplicate`, so a re-run finishes a partial upload. Each upload job reads one token from its own environment, `vscode-marketplace` or `open-vsx`, and runs on a GitHub-hosted runner. Publishing a full release starts it once `VSCODE_PUBLISH` is `true`; a pre-release never does, since both registries take only `X.Y.Z`. A manual run takes a tag and `both`, `marketplace` or `open-vsx`. Pull requests never start it.
+
+**One-time setup, by the owner:**
+
+1. **Marketplace publisher.** Sign in at the [Marketplace publisher page](https://marketplace.visualstudio.com/manage) and create the publisher `inwards`, the `publisher` in `src/vscode-extension/package.json`. If the id is taken, pick another and change `publisher` there (and the item URL in `vscode-publish.yml`). Create an Azure DevOps personal access token with the **Marketplace (Manage)** scope, as the [publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) describes. Azure DevOps retires global tokens on 1 December 2026; until the workflow moves to Microsoft Entra ID, renew the token before then.
+2. **Open VSX namespace.** Sign in at [open-vsx.org](https://open-vsx.org) with GitHub, link an eclipse.org account and accept the Eclipse publisher agreement on your profile page, create an access token, then create the namespace: `npx ovsx create-namespace inwards -p <token>`.
+3. **Environments and secrets.** Create the environments `vscode-marketplace` and `open-vsx` (Settings → Environments), each limited to the tag pattern `v*` and the branch `develop`, with yourself as a required reviewer where GitHub offers it. Then store each token in its environment:
+
+    ```sh
+    R=SirCypkowskyy/inwards
+    gh secret set VSCE_PAT --env vscode-marketplace --repo $R   # paste the Azure DevOps token
+    gh secret set OVSX_PAT --env open-vsx --repo $R             # paste the Open VSX token
+    ```
+
+4. **Go live:** `gh variable set VSCODE_PUBLISH --body true --repo SirCypkowskyy/inwards`. The next published full release goes to both registries. To upload a release published earlier: `gh workflow run vscode-publish.yml --repo SirCypkowskyy/inwards --ref develop -f tag=vX.Y.Z -f registry=both`.
+
+After the first upload, check an install on Linux, macOS and Windows: `bun run src/vscode-extension/scripts/try-in-vscode.ts inwards.inwards-vscode` installs the extension from the Marketplace into a throwaway VS Code profile, opens a small project and waits for its INW007 diagnostic.
+
 ## Known limitations
 
 - One `root` per config. In a monorepo each Python package keeps its own `[tool.inwards]`. `inwards check` at a uv workspace root checks every member with its own config, and routes named paths to their nearest config; the hook and the Stop gate pick the nearest config per file ([ADR-035](05-ADR.md#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config)). Only uv workspaces are discovered: other monorepo layouts need a run per config, or named paths. Member globs match `*` inside one segment only, and `inwards baseline` takes one config per run.
-- `inwards server` shows what `inwards check` reports once files are saved. While a document has unsaved changes, it shows that document checked alone plus what the last whole pass found there that one file can't show (cycles, FastAPI routers no app includes); other files' findings that depend on the unsaved text, and unsaved edits to `pyproject.toml` or the baseline, count from the next save. Two workspace folders whose configs both cover a file show its findings twice. Each save costs a whole-project check (154 ms for 2,100 files once warm, [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)). The limits below that name the language server are the extension's, until [#64](https://github.com/SirCypkowskyy/inwards/issues/64) switches it to `inwards server`.
-- The extension's language server reads only the `pyproject.toml` at the root of the first workspace folder, and it checks one open file at a time, so it doesn't report dead layer prefixes. Neither does `inwards check` with path arguments; only a whole-project run does. It reads the config again when `pyproject.toml` changes ([#163](https://github.com/SirCypkowskyy/inwards/issues/163)); a client that can't watch files reads it again only when it saves `pyproject.toml` itself. A config error pops up once and stays on `pyproject.toml` until it is fixed, with checking off meanwhile. A `pyproject.toml` that can't be read is a config error too, as in the CLI; when it isn't a file at all, only the popup shows. That diagnostic sits on the right line only for invalid TOML; for any other error (an unknown rule code, say) it sits on the first line, because the config's own checks name the key, not its line.
-- Implicit namespace packages (no `__init__.py`) are named and their relative imports resolved as Python does. A module missing under one passes INW010 when another uv workspace member holds it (in its `src/`, else the member directory), when the site-packages of the project's `.venv` holds it, or when it sits directly inside a package `namespace-packages` lists ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). A virtualenv elsewhere isn't seen. The language server doesn't look in other members or the virtualenv.
+- `inwards server` shows what `inwards check` reports once files are saved. While a document has unsaved changes, it shows that document checked alone plus what the last whole pass found there that one file can't show (cycles, FastAPI routers no app includes); other files' findings that depend on the unsaved text, and unsaved edits to `pyproject.toml` or the baseline, count from the next save. Two workspace folders whose configs both cover a file show its findings twice. Each save costs a whole-project check (154 ms for 2,100 files once warm, [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)).
+- Implicit namespace packages (no `__init__.py`) are named and their relative imports resolved as Python does. A module missing under one passes INW010 when another uv workspace member holds it (in its `src/`, else the member directory), when the site-packages of the project's `.venv` holds it, or when it sits directly inside a package `namespace-packages` lists ([#161](https://github.com/SirCypkowskyy/inwards/issues/161)). A virtualenv elsewhere isn't seen.
 - Layer membership is by module prefix only. Glob patterns (`shop.*.domain`) for vertical slices come with the config schema v2 ([#51](https://github.com/SirCypkowskyy/inwards/issues/51), [ADR-018](05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces)).
-- Symlinks inside a layer that point out of the config root or into another layer are reported as INW006 at the link by a whole-project `inwards check` and, when made during a session, by the Stop gate ([ADR-013](05-ADR.md#adr-013-real-paths-for-the-boundary-import-paths-for-module-names)). The language server and `inwards check` with path arguments don't report them, and a data directory linked into a layer package from outside the root is reported too.
+- Symlinks inside a layer that point out of the config root or into another layer are reported as INW006 at the link by a whole-project `inwards check` and, when made during a session, by the Stop gate ([ADR-013](05-ADR.md#adr-013-real-paths-for-the-boundary-import-paths-for-module-names)). `inwards check` with path arguments doesn't report them, and a data directory linked into a layer package from outside the root is reported too.
 - INW011 resolves a dynamic import only when its target is a constant string. Any other target is reported as unverifiable, and only in layers that have an outer layer ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Known gaps:
     - constants are folded only within bounds ([#79](https://github.com/SirCypkowskyy/inwards/issues/79)): a module-level name counts only when the whole file binds it once and the file has no `exec`, `eval`, namespace writer or wildcard import, and `%`, `format` and f-string folding stop at anything but `%s`, `!s` and a string format spec. Anything else is unverifiable;
     - `compile` with a non-literal source is not reported, since running its code object takes `exec` or `eval`, which are; a code object run another way (`types.FunctionType`) is missed;
@@ -346,7 +361,7 @@ To put a pre-release on PyPI as well, run the workflow from its tag, which the `
     - a false positive, accepted over a miss: for a literal source, `exec`, `eval`, `compile` and `__import__` always count as the builtins, so after `from re import compile`, `compile("from shop.infrastructure import x")` is reported. Bytes that CPython rejects before running them (a UTF-8 BOM with another declared encoding, a `utf-16` or `rot13` declaration) are still read or reported as unchecked;
     - a false negative, accepted over noise: a bare `exec` or `eval` with a computed source is skipped only when the code surely rebinds that name at the call. The binding must be a `def`, `class`, plain assignment or import placed directly in the module body (before the top-level statement holding the call) or in the body of a function that encloses the call, a parameter of a function or lambda whose body holds the call, or a `for` target inside its loop. The exemption is off for the whole file when any binding of the name could be the builtin: an assignment, walrus, `for`, `with` or `except` target, or parameter default that mentions a loader; a `def` or `class` whose decorators or class arguments (bases, `metaclass=`) mention one; an import from `builtins`, `importlib`, `runpy`, a relative module or a first-party module (any of which may re-export the builtin). It is also off when the name has a `global`, `nonlocal` or `del`, or when the file has a wildcard import or names `globals`, `vars`, `locals`, `setattr`, `delattr`, `__dict__`, `__builtins__` or `sys.modules`. So `def eval(model, loader)` in training code isn't reported. It still misses the builtin passed in as an argument (`def run(exec, c): return exec(c)` called as `run(exec, code)`) and a builtin reached through an object that names neither a loader, `__self__`, `__globals__` nor a namespace writer. The same check guards `exec(compile("<literal>", ...))`, which is trusted only while `compile` isn't rebound;
     - accepted false positives of that conservative check: a comprehension variable (`[eval(m) for eval in evaluators]`), a method name used inside its own class body, and a `match` capture named `eval` or `exec` are still reported.
-- INW010 checks only the module part of a static import ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` passes when `shop/domain` is a package, since `pricing` could be a name its `__init__.py` defines, and dynamic imports aren't checked. A module generated at build time passes when `generated` covers it, as protoc's `*_pb2` and `*_pb2_grpc` and the `_version` module are by default ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)); any other one is reported until it exists in the checkout, and so is an optional import behind `try/except ImportError`. A hallucinated import whose name a `generated` pattern covers passes too. The other rules still see a generated module that isn't on disk as missing: INW001 goes by name and reports an outward import either way, and INW006 judges the import by the nearest package that exists, so a generated module directly in the package above the layers (`shop._version`, imported from a layer) gets an INW006 error worded differently with and without the file, and a baseline entry taken in one checkout doesn't match in the other. A generated top-level package with no committed `__init__.py` looks third-party to every rule. The language server doesn't notice an `__init__.py` that starts extending its `__path__` until a file is created or deleted.
+- INW010 checks only the module part of a static import ([ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import)): `from shop.domain import pricing` passes when `shop/domain` is a package, since `pricing` could be a name its `__init__.py` defines, and dynamic imports aren't checked. A module generated at build time passes when `generated` covers it, as protoc's `*_pb2` and `*_pb2_grpc` and the `_version` module are by default ([ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)); any other one is reported until it exists in the checkout, and so is an optional import behind `try/except ImportError`. A hallucinated import whose name a `generated` pattern covers passes too. The other rules still see a generated module that isn't on disk as missing: INW001 goes by name and reports an outward import either way, and INW006 judges the import by the nearest package that exists, so a generated module directly in the package above the layers (`shop._version`, imported from a layer) gets an INW006 error worded differently with and without the file, and a baseline entry taken in one checkout doesn't match in the other. A generated top-level package with no committed `__init__.py` looks third-party to every rule.
 - Modules that belong to no layer get no layer rule. INW006 makes that visible (a warning per package, an error for an import into one from a layer, and dead prefixes), but the imports inside an unassigned package aren't checked against the layers until the user assigns it. Once [contexts](guides/configuration.md#contexts) are declared, every module's imports are checked against them (INW002, INW003), and INW000 applies to every file. Sourceless modules, `ignore` depth, renamed top-level packages and path-scoped prefix checks are open in [#86](https://github.com/SirCypkowskyy/inwards/issues/86).
 
 ## Rule catalogue
@@ -467,14 +482,12 @@ src/
 │   │                      #   the LSP connection over stdio (lsp-connection.ts), the MCP one
 │   │                      #   (mcp-connection.ts) and the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
-│   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
+│   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/
-    ├── src/
-    │   ├── client/        # extension.ts (activation, starts the server), selector.ts
-    │   └── server/        # server.ts (LSP), workspace.ts (INW007/INW008 pass), config-file.ts;
-    │                      #   frozen until #64 replaces it with inwards server
-    ├── scripts/           # copy-wasm.ts: grammars next to dist/server.js
-    └── test/              # LSP harness and tests, packaged.test.ts on the built dist/
+    ├── src/client/        # extension.ts (settings, starts inwards server), binary.ts (which
+    │                      #   binary), selector.ts
+    ├── scripts/           # package-target.ts (a VSIX per platform), try-in-vscode.ts
+    └── test/              # the binary lookup, boundaries, packaged.test.ts on the built VSIX
 ```
 
 Outside `src/`: `scripts/` builds binaries and wheels and checks versions and the docs nav, `packaging/` holds the wheel README and the name placeholders, `eval/` is the agent eval harness, `bench/` generates the synthetic benchmark repo and compares two builds on it for the PR regression gate, and `examples/clean-app` is the app CI checks.

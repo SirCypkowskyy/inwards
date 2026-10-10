@@ -78,6 +78,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | loader (module loader) | loader (loadera) | |
 | launcher (`--launcher`, e.g. `uv run`) | launcher (launchera) | what starts Inwards in the project |
 | worktree (git) | worktree (worktree'a, worktree'y) | |
+| VSIX, Visual Studio Marketplace, Open VSX | VSIX (VSIX-a, pliki VSIX), Marketplace, Open VSX | the extension package and the two registries |
+| personal access token (PAT) | token PAT (tokenu PAT) | `VSCE_PAT`, `OVSX_PAT` |
 | daemon (`inwards daemon`), hook daemon | daemon (daemona, daemony), daemon hooków | the per-project process the PostToolUse hook talks to (ADR-039) |
 | worker, worker pool | worker (workera, workery), pula workerów | |
 | catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
@@ -265,6 +267,13 @@ baseline'u); multi-word names are left uninflected where possible.
 | workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |
 | workspace folder (editor) | folder obszaru roboczego |
+| untrusted workspace, Restricted Mode (VS Code) | niezaufany obszar roboczy, tryb ograniczony |
+| restricted setting (`restrictedConfigurations`) | ustawienie ograniczone |
+| setting (VS Code, `inwards.path`) | ustawienie |
+| registry (Marketplace, Open VSX) | rejestr |
+| environment (GitHub Actions deployments) | środowisko (GitHub Actions) |
+| platform package (one VSIX per platform) | pakiet dla platformy |
+| thin client | cienki klient |
 | file watcher (editor) | obserwator plików |
 | whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
 | MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |

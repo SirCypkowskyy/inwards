@@ -1,18 +1,18 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 408062fecfb1ddf063ee8089f251cd7fc607b15b7417669f93b88b91c6994d42
+source_hash: 5246f7564334fa60fa075301dd01b79f5c8f70d7a01c01f509a30b822d7ecfeb
 ---
 
 # Instalacja Inwards { #install-inwards }
 
 !!! info "Zweryfikowano 2026-09-25"
-    Budowanie ze źródeł i każde następne polecenie, ręcznie na Linuksie x64. Na macOS (arm64) i Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia. Kroków z `curl` i `Invoke-WebRequest` nie da się wypróbować, dopóki repozytorium jest prywatne; `gh release download` działa.
+    Budowanie ze źródeł i każde następne polecenie, ręcznie na Linuksie x64. Na macOS (arm64) i Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia. Kroków z `curl` i `Invoke-WebRequest` nie da się wypróbować, dopóki repozytorium jest prywatne; `gh release download` działa. Rozszerzenie VS Code 2026-10-10: VSIX dla platformy zainstalowany w VS Code 1.141 na macOS (arm64) pokazał INW007, sprawdzone skryptem `src/vscode-extension/scripts/try-in-vscode.ts`; Linux i Windows wciąż są do sprawdzenia.
 
 Inwards to jeden plik wykonywalny, bez środowiska uruchomieniowego do instalowania. Najnowsze wydanie to wersja przedpremierowa v0.1.0-rc.1; pierwsze pełne wydanie przyjdzie z jednym z późniejszych kamieni milowych. Możesz też zbudować Inwards ze źródeł.
 
 ## Z wydania { #from-a-release }
 
-Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) ma jeden plik binarny na platformę, wheele platformowe, rozszerzenie VS Code (`.vsix`) i `SHA256SUMS`. Atestacje buildów dojdą, gdy repozytorium stanie się publiczne.
+Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) ma jeden plik binarny na platformę, wheele platformowe, rozszerzenie VS Code (`.vsix` dla każdej platformy, [niżej](#vs-code)) i `SHA256SUMS`. Atestacje buildów dojdą, gdy repozytorium stanie się publiczne.
 
 | Platforma | Plik |
 |---|---|
@@ -163,7 +163,36 @@ inwards --version
 
 Z uv użyj jako komendy `uv run inwards server`, żeby każdy projekt dostał własną wersję. Testy sterują plikiem binarnym przez stdio tak, jak robią to te edytory; żadnego z nich nie sprawdzono jeszcze ręcznie.
 
-Rozszerzenie VS Code (`.vsix` w każdym wydaniu) nadal uruchamia własny serwer, który dla plików, których nie otworzyłeś, pokazuje tylko INW007 i INW008; przełączy się na `inwards server` w [#64](https://github.com/SirCypkowskyy/inwards/issues/64).
+### VS Code { #vs-code }
+
+Rozszerzenie jest cienkim klientem: uruchamia `inwards server` i pokazuje to, co serwer zgłasza ([ADR-043](../05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)). Pakiet dla każdej platformy zawiera plik binarny `inwards` tej platformy, więc nie trzeba instalować niczego więcej.
+
+| Platforma | Cel VS Code | Plik w wydaniu |
+|---|---|---|
+| Linux x64 | `linux-x64` | `inwards-vscode-linux-x64-<tag>.vsix` |
+| Linux arm64 | `linux-arm64` | `inwards-vscode-linux-arm64-<tag>.vsix` |
+| Alpine x64 | `alpine-x64` | `inwards-vscode-alpine-x64-<tag>.vsix` |
+| macOS na Apple silicon | `darwin-arm64` | `inwards-vscode-darwin-arm64-<tag>.vsix` |
+| macOS na Intelu | `darwin-x64` | `inwards-vscode-darwin-x64-<tag>.vsix` |
+| Windows x64 | `win32-x64` | `inwards-vscode-win32-x64-<tag>.vsix` |
+| każda inna | | `inwards-vscode-universal-<tag>.vsix`, bez pliku binarnego: dodaj `inwards` do `PATH` albo ustaw `inwards.path` |
+
+`.github/workflows/vscode-publish.yml` wysyła te pliki do Visual Studio Marketplace i Open VSX (dla VSCodium, Cursora i innych edytorów, które z niego korzystają), gdy właściciel opublikuje pełne wydanie; rozszerzenia nie ma jeszcze w żadnym z rejestrów. Do tego czasu zainstaluj plik dla swojej platformy z wydania nowszego niż v0.1.0-rc.1 (ta wersja przedpremierowa ma jeszcze stary pojedynczy `.vsix` z własnym serwerem):
+
+```sh
+code --install-extension inwards-vscode-darwin-arm64-vX.Y.Z.vsix
+```
+
+Ustawienia:
+
+| Ustawienie | Domyślnie | Co robi |
+|---|---|---|
+| `inwards.enable` | `true` | Uruchamia sprawdzenia. Wyłączone zatrzymuje serwer języka. |
+| `inwards.path` | `""` | Plik wykonywalny `inwards` do uruchomienia. Puste: dołączony plik binarny, a jeśli go nie ma, `inwards` z `PATH`. Sama nazwa jest szukana w `PATH`, ścieżka względna liczy się od pierwszego folderu obszaru roboczego, a `~` i `${workspaceFolder}` są rozwijane. Na Windows musi to być `.exe`. |
+
+Zmiana któregokolwiek ustawienia restartuje serwer, tak samo jak **Inwards: Restart Server** w palecie poleceń. Żeby uruchamiać wersję, którą projekt przypina przez `uv add --dev inwards`, ustaw w ustawieniach obszaru roboczego `inwards.path` na `${workspaceFolder}/.venv/bin/inwards` (`${workspaceFolder}\.venv\Scripts\inwards.exe` na Windows). W niezaufanym obszarze roboczym VS Code pomija wartość `inwards.path` z obszaru roboczego, więc sklonowane repozytorium nie może wybrać programu, który uruchomi rozszerzenie; zaufaj folderowi albo ustaw ścieżkę w ustawieniach użytkownika.
+
+Gdy rozszerzenie nie znajdzie pliku binarnego (ustawione `inwards.path` wskazuje na nic albo pakiet uniwersalny nie ma nic w `PATH`), mówi o tym, podaje przyciski do ustawienia i do tej strony i niczego nie uruchamia. Kanał **Inwards** w panelu Output pokazuje to, co serwer pisze na stderr.
 
 ## Skonfiguruj warstwy { #configure-the-layers }
 
