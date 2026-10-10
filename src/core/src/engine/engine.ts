@@ -9,13 +9,7 @@ import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { type LibraryDeny, libraryDenies } from "../config/rule-options.ts";
 import { applyRules, ruleLevel } from "../config/rule-settings.ts";
-import type {
-  Diagnostic,
-  ExtractionBatch,
-  ExtractionCache,
-  ImportRef,
-  SourceFile,
-} from "../contracts/records.ts";
+import type { Diagnostic, ExtractionBatch, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import {
   createPythonParser,
@@ -46,7 +40,7 @@ import {
   type Suppressing,
 } from "./batch.ts";
 import { contentFindings } from "./content-rules.ts";
-import { Extractor } from "./extraction.ts";
+import { type ExtractionOptions, Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
 import {
@@ -59,6 +53,9 @@ import {
 } from "./stages.ts";
 
 export type { Checked } from "./stages.ts";
+
+/** What `Engine.create` takes besides the grammar and the config. */
+type EngineOptions = ExtractionOptions & { workspacePackages?: ReadonlySet<string> };
 
 /** The whole engine surface. Adapters (CLI, LSP) call this and nothing deeper. */
 export class Engine {
@@ -77,15 +74,12 @@ export class Engine {
    * @param options - optional inputs, see `create`.
    * @param options.cache - where extractions are kept between checks, if anywhere.
    * @param options.workspacePackages - the uv workspace members' import packages.
+   * @param options.reuse - the last full parse, for an incremental parse of the same file.
    */
-  private constructor(
-    parser: Parser,
-    config: InwardsConfig,
-    options: { cache?: ExtractionCache; workspacePackages?: ReadonlySet<string> },
-  ) {
+  private constructor(parser: Parser, config: InwardsConfig, options: EngineOptions) {
     this.parser = parser;
     this.config = config;
-    this.extractor = new Extractor(parser, options.cache);
+    this.extractor = new Extractor(parser, options);
     const deny = libraryDenies(config.rules?.options?.["pure-domain"]);
     this.libraryInputs = { workspace: options.workspacePackages ?? new Set(), deny };
   }
@@ -100,6 +94,10 @@ export class Engine {
    * comments) is kept there and reused while the text is unchanged (#56).
    * Results never differ with or without it.
    *
+   * With `options.reuse` (shared by several engines), a full parse starts
+   * from the last full parse of the same path and parses only what changed
+   * (#122). Results never differ with or without it.
+   *
    * `options.workspacePackages` names the top-level import packages of the
    * uv workspace the project belongs to. It changes only INW005's wording:
    * an import of one is a "workspace package", not a "library" (#203).
@@ -109,12 +107,13 @@ export class Engine {
    * @param options - optional inputs.
    * @param options.cache - where extractions are kept between checks.
    * @param options.workspacePackages - the uv workspace members' import packages; none by default.
+   * @param options.reuse - the last full parse, shared between engines; none by default.
    * @returns an engine ready to check files.
    */
   static async create(
     wasm: GrammarBinaries,
     config: InwardsConfig,
-    options: { cache?: ExtractionCache; workspacePackages?: ReadonlySet<string> } = {},
+    options: EngineOptions = {},
   ): Promise<Engine> {
     return new Engine(await createPythonParser(wasm), config, options);
   }

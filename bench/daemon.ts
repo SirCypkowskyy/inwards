@@ -31,6 +31,7 @@ export interface DaemonSamples {
  * @param runs - how many runs.
  * @param runs.measured - measured runs per mode.
  * @param runs.warmup - unmeasured runs per mode before those.
+ * @param runs.before - runs before every timed run, untimed (an edit of the file, say).
  * @returns the samples.
  * @throws {Error} when the daemon doesn't start or a run fails.
  */
@@ -38,7 +39,7 @@ export function daemonHook(
   head: string,
   repo: string,
   stdin: string,
-  runs: { measured: number; warmup: number },
+  runs: { measured: number; warmup: number; before?: () => void },
 ): DaemonSamples {
   const on = { INWARDS_DAEMON: "1" };
   const env = { ...process.env, CLAUDE_PROJECT_DIR: repo, ...on };
@@ -54,7 +55,9 @@ export function daemonHook(
     for (let i = 0; i < runs.warmup + runs.measured; i += 1) {
       // Each round starts with the other mode, so warming and drift hit both alike.
       const first = i % 2 === 0 ? "oneShot" : "daemon";
+      runs.before?.();
       const firstMs = timeHook(head, repo, stdin, first === "daemon");
+      runs.before?.();
       const secondMs = timeHook(head, repo, stdin, first !== "daemon");
       const oneShot = first === "oneShot" ? firstMs : secondMs;
       const daemon = first === "oneShot" ? secondMs : firstMs;

@@ -2,8 +2,9 @@
  * @file Keeps `EXTRACTION_REVISION` honest (#56). A cached extraction is valid
  * only while the code that produced it is unchanged, so this test fingerprints
  * the files that decide what a text yields: normalisation and import
- * extraction, the prescan, module names, suppression-comment parsing, the
- * rule registry (whose codes a comment is checked against) and the extractor.
+ * extraction, the prescan, the incremental parse, module names,
+ * suppression-comment parsing, the rule registry (whose codes a comment is
+ * checked against) and the extractor.
  * When one of them changes, bump the revision and record the new fingerprint.
  */
 import { expect, test } from "bun:test";
@@ -17,6 +18,7 @@ const REPO = resolve(import.meta.dir, "../../../..");
 const FILES = [
   "src/core/src/python/parser.ts",
   "src/core/src/python/prescan.ts",
+  "src/core/src/python/reparse.ts",
   "src/core/src/python/module-names.ts",
   "src/core/src/rules/suppression-comment.ts",
   "src/core/src/meta/registry.ts",
@@ -37,6 +39,7 @@ const RECORDED: Readonly<Record<string, string>> = {
   "11": "75632adadc76208df97d414f48f0d446da16dfa709f20229556419b98d3760cb",
   "12": "98d73e3db7a4c4d3aa328c572362b274a51ec15fb79e84a2ea0b4a0f103113c4",
   "13": "c28e083953bf85affefacb59c8785b89d4a724b26948bcd21d090135b1d6db0f",
+  "14": "f1ec25a062423754b42a1c40f6af407ac1b86d943497de4df9756e9c1765cdd2",
 };
 
 test("the extraction revision changes with the code it describes", () => {

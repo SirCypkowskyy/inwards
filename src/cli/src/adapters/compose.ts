@@ -9,7 +9,12 @@
  * (`nodeLsp`), whose stdout belongs to the protocol.
  */
 import { resolve } from "node:path";
-import type { ExtractionCache, GrammarBinaries, Report } from "@inwards/core";
+import {
+  createTreeReuse,
+  type ExtractionCache,
+  type GrammarBinaries,
+  type Report,
+} from "@inwards/core";
 import type { AppDeps, DaemonDeps, LspDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
@@ -90,7 +95,8 @@ export function nodeProjectIo(io: Platform, workerEntry?: string): ProjectIo {
  */
 export function compose(workerEntry?: string): AppDeps {
   const io = nodePlatform();
-  const project = nodeProjectIo(io, workerEntry);
+  // One process runs one command, so the kept parse lives as long as this invocation.
+  const project = { ...nodeProjectIo(io, workerEntry), reuse: createTreeReuse() };
   const entry = resolve(import.meta.dir, "../main.ts");
   return {
     io,
@@ -119,7 +125,8 @@ export function compose(workerEntry?: string): AppDeps {
  * The language server on the real process: LSP over stdio, and a check that
  * keeps what it extracted from each text in memory for as long as the server
  * runs (the daemon's cache, ADR-039). The check gets no worker pool, so a
- * keystroke never starts a thread, and streams whose stdout writes to stderr,
+ * keystroke never starts a thread, the kept parse of the last document
+ * (`createTreeReuse`), and streams whose stdout writes to stderr,
  * since stdout carries the protocol. The connection and its protocol library
  * load only when `inwards server` runs: imported at start-up, they cost every
  * hook call about 5 ms (the bench's pre-write case, 11.3 to 16.6 ms p50).
@@ -133,6 +140,9 @@ function nodeLsp(io: Platform): LspDeps {
   const files = {
     ...nodeProjectIo({ ...io, streams }),
     extractionCache: (): ExtractionCache => extractions,
+    // Checks run one at a time, so they share the kept parse: the next
+    // keystroke in the same document parses only what changed.
+    reuse: createTreeReuse(),
   };
   return {
     serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
@@ -170,6 +180,9 @@ const DAEMON_GIT_BUDGET_MS = 5000;
  */
 function nodeDaemon(io: Platform, entry: string): DaemonDeps {
   const extractions = daemonExtractionCache();
+  // Requests run one at a time, so they can share the kept parse: the next edit
+  // of the same file parses only what changed.
+  const reuse = createTreeReuse();
   const budgeted = budgetedGit(DAEMON_GIT_BUDGET_MS);
   const git = commitKeyedGit(budgeted);
   return {
@@ -204,6 +217,7 @@ function nodeDaemon(io: Platform, entry: string): DaemonDeps {
       const files = {
         ...nodeProjectIo(platform),
         extractionCache: (): ExtractionCache => extractions,
+        reuse,
       };
       return {
         deps: {

@@ -97,9 +97,13 @@ async function openProject(
   const wasm = await io.grammars();
   const dir = dirname(configPath);
   const store = cache ? io.extractionCache?.(io.probe.realpath(dir) ?? dir, wasm) : undefined;
-  const options = { workspacePackages: workspacePackages(io, dir) };
+  const options = {
+    workspacePackages: workspacePackages(io, dir),
+    ...(store ? { cache: store } : {}),
+    ...(io.reuse ? { reuse: io.reuse } : {}),
+  };
   return {
-    engine: await Engine.create(wasm, config, store ? { ...options, cache: store } : options),
+    engine: await Engine.create(wasm, config, options),
     config,
     configPath,
     configText,
