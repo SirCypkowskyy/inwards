@@ -189,6 +189,7 @@
         "INW012",
         "INW013",
         "INW015",
+        "INW016",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -455,6 +456,9 @@
         "construct-only-in": {
           "$ref": "#/definitions/constructOnlyInOptions"
         },
+        "orm-naming": {
+          "$ref": "#/definitions/ormNamingOptions"
+        },
         "endpoint-metadata": {
           "$ref": "#/definitions/endpointMetadataOptions"
         },
@@ -536,6 +540,67 @@
               }
             }
           }
+        }
+      }
+    },
+    "ormNamingOptions": {
+      "description": "INW016 orm-naming's options, [tool.inwards.rules.orm-naming]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "INW016 orm-naming's options, [tool.inwards.rules.orm-naming]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "table-name": {
+          "description": "How table names are checked: lower_case_snake and singular (\"snake_singular\"), lower_case_snake only (\"snake\"), or not at all (false).",
+          "markdownDescription": "How table names are checked: lower_case_snake and singular (\"snake_singular\"), lower_case_snake only (\"snake\"), or not at all (false).\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
+          "enum": ["snake", "snake_singular", false],
+          "default": "snake_singular"
+        },
+        "datetime-suffix": {
+          "description": "The suffix every datetime column name ends with, or false to turn the check off.",
+          "markdownDescription": "The suffix every datetime column name ends with, or false to turn the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            },
+            {
+              "const": false
+            }
+          ],
+          "default": "_at"
+        },
+        "date-suffix": {
+          "description": "The suffix every date column name ends with, or false to turn the check off.",
+          "markdownDescription": "The suffix every date column name ends with, or false to turn the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            },
+            {
+              "const": false
+            }
+          ],
+          "default": "_date"
+        },
+        "allow-tables": {
+          "description": "Table names INW016 accepts as written, such as a mass noun the singular heuristic reads as a plural (\"news\" is built in).",
+          "markdownDescription": "Table names INW016 accepts as written, such as a mass noun the singular heuristic reads as a plural (\"news\" is built in).\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "default": []
+        },
+        "require-naming-convention": {
+          "description": "In a whole-project run, report a project with SQLAlchemy or SQLModel tables and no MetaData(naming_convention=...).",
+          "markdownDescription": "In a whole-project run, report a project with SQLAlchemy or SQLModel tables and no MetaData(naming_convention=...).\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
+          "type": "boolean",
+          "default": true
         }
       }
     },

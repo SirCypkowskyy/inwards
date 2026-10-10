@@ -1,10 +1,12 @@
 /**
  * @file Runs the per-file content rules for the engine: INW012
- * `thin-endpoint` (through `thin-endpoint.ts`), INW013 `async-blocking` and
- * INW015 `construct-only-in`. Each decides whether a file needs it at all
+ * `thin-endpoint` (through `thin-endpoint.ts`), INW013 `async-blocking`,
+ * INW015 `construct-only-in` and INW016 `orm-naming` (through
+ * `orm-naming.ts`). Each decides whether a file needs it at all
  * and parses the file itself, and only one whose text may hold a finding;
  * their findings join the file's others before the suppression comments
- * apply. All may read another first-party module through the project index.
+ * apply. All but INW016 may read another first-party module through the
+ * project index.
  * It also decides that an outward import INW001 reports gets INW001 alone,
  * not INW015 as well. No I/O: the caller supplies the file and the project
  * index.
@@ -18,6 +20,7 @@ import { checkAsyncBlocking } from "../rules/async-blocking/check.ts";
 import { checkConstructOnlyIn } from "../rules/construct-only-in/check.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { ormNamingFindings } from "./orm-naming.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 /**
@@ -83,7 +86,7 @@ function constructOnlyInFindings(
 }
 
 /**
- * Finds the content rules' findings in a file: INW012's, INW013's, then INW015's.
+ * Finds the content rules' findings in a file: INW012's, INW013's, INW015's, then INW016's.
  *
  * @param parser - parser with the Python grammar loaded.
  * @param src - the source file, with normalised text.
@@ -101,5 +104,6 @@ export function contentFindings(
     ...thinEndpointFindings(parser, src, config, project),
     ...asyncBlockingFindings(parser, src, config, project),
     ...constructOnlyInFindings(parser, src, config, project),
+    ...ormNamingFindings(parser, src, config),
   ];
 }

@@ -48,6 +48,7 @@ type RuleCode =
   | "INW012"
   | "INW013"
   | "INW015"
+  | "INW016"
   | "FAPI001"
   | "FAPI002"
   | "FAPI003"
@@ -198,6 +199,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
     docs: page("INW015"),
+  },
+  // Opt-in, one of #98's role-scoped content rules (#297).
+  INW016: {
+    code: "INW016",
+    name: "orm-naming",
+    severity: "error",
+    default: "off",
+    summary:
+      "ORM table names and the names of datetime and date columns follow the project's scheme: lower_case_snake singular tables, _at for datetimes, _date for dates.",
+    docs: page("INW016"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.
