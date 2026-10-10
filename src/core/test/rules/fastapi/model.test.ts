@@ -275,6 +275,75 @@ describe("the FastAPI model", () => {
   });
 });
 
+describe("handler registrations the model unrolls or follows (#242)", () => {
+  test("a loop over a list literal registers each item", () => {
+    const loop = model.fileModel(
+      file(
+        "app/looped.py",
+        "from fastapi import FastAPI\n\napp = FastAPI()\n\nasync def h(request, exc):\n    return JSONResponse(status_code=409, content={})\n\nfor exc in [KeyError, OutOfStock]:\n    app.add_exception_handler(exc, h)\nfor exc in ERRORS:\n    app.add_exception_handler(exc, h)\n",
+      ),
+    );
+    expect(summary(loop)).toEqual([
+      "3 app app.looped.app: ",
+      "9 handler on app.looped.app via add_exception_handler: app.looped.KeyError -> app.looped.h (def on 5) status 409",
+      "9 handler on app.looped.app via add_exception_handler: app.looped.OutOfStock -> app.looped.h (def on 5) status 409",
+      "11 handler on app.looped.app via add_exception_handler: app.looped.exc -> app.looped.h (def on 5) status 409",
+    ]);
+  });
+
+  test("exception_handlers splatted from a module dict or a factory's caller", () => {
+    const splat = model.fileModel(
+      file(
+        "app/splat.py",
+        [
+          "from fastapi import FastAPI",
+          "",
+          'KWARGS = {"exception_handlers": {Gone: h}}',
+          'app = FastAPI(title="Shop", **KWARGS)',
+          "",
+          "def create(kwargs=None):",
+          "    kwargs = kwargs or {}",
+          "    api = FastAPI(**kwargs)",
+          "    return api",
+          "",
+          'one = create(kwargs={"exception_handlers": {Exception: h, Gone: h}})',
+          "two = create()",
+          'other = FastAPI(**{"debug": True, "exception_handlers": TABLE})',
+          "TABLE = {Gone: h}",
+          "lost = FastAPI(**settings())",
+          "",
+        ].join("\n"),
+      ),
+    );
+    expect(summary(splat)).toEqual([
+      '4 app app.splat.app: title="Shop"',
+      "8 app app.splat.api (nested): ",
+      "13 app app.splat.other: ",
+      "15 app app.splat.lost: **?",
+      "3 handler on app.splat.app via exception_handlers: app.splat.Gone -> app.splat.h (elsewhere) status -",
+      "11 handler on app.splat.api via exception_handlers: app.splat.Exception -> app.splat.h (elsewhere) status -",
+      "11 handler on app.splat.api via exception_handlers: app.splat.Gone -> app.splat.h (elsewhere) status -",
+      "14 handler on app.splat.other via exception_handlers: app.splat.Gone -> app.splat.h (elsewhere) status -",
+      "15 handler on app.splat.lost via exception_handlers: ? -> ? (elsewhere) status -",
+    ]);
+  });
+
+  test("a mutated dict, or a factory no caller in the file reaches, is unknown", () => {
+    const mutated = model.fileModel(
+      file(
+        "app/mutated.py",
+        'from fastapi import FastAPI\n\nKW = {"exception_handlers": {}}\nKW.update(extra)\napp = FastAPI(**KW)\n\ndef build(kw):\n    return FastAPI(**kw)\n\ndef make(kw):\n    api = FastAPI(**kw)\n',
+      ),
+    );
+    expect(summary(mutated)).toEqual([
+      "5 app app.mutated.app: **?",
+      "11 app app.mutated.api (nested): **?",
+      "5 handler on app.mutated.app via exception_handlers: ? -> ? (elsewhere) status -",
+      "11 handler on app.mutated.api via exception_handlers: ? -> ? (elsewhere) status -",
+    ]);
+  });
+});
+
 describe("name resolution across files", () => {
   test("resolves every inclusion in main to its router, through the project index", () => {
     const targets = model.moduleModel("app.main")?.wiring.map((w) => w.target ?? "") ?? [];

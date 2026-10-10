@@ -4,8 +4,9 @@
  * with a literal code in the endpoint (ring 0); the same in functions and
  * dependencies it calls by name, in its file (ring 1) or imported from another
  * first-party module (ring 2), up to `max-depth` calls; and a raised
- * first-party exception an app handler maps to a literal code, or an
- * `HTTPException` subclass that fixes its code (ring 3).
+ * first-party exception a handler maps to a literal code, on an app that
+ * serves the endpoint (#242), or an `HTTPException` subclass that fixes its
+ * code (ring 3).
  *
  * Each code keeps where it comes from, so the finding can name it. A code
  * Inwards can't read is dropped, never guessed. An `except X` around a call
@@ -19,6 +20,7 @@ import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { DEPENDS } from "./extract.ts";
 import { ownNodes } from "./function-body.ts";
 import type { FastApiProject, Lineage } from "./project.ts";
+import type { FastApiObject } from "./records.ts";
 import { statusCode } from "./status.ts";
 import { type Qualify, type Value, valueFrom } from "./values.ts";
 
@@ -61,18 +63,23 @@ const READ: ReadonlySet<string> = new Set(["raise_statement", "return_statement"
 export class CodeWalk {
   private readonly scope: FastApiProject;
   private readonly maxDepth: number;
+  /** The app or router the endpoint is declared on, whose apps' handlers count. */
+  private readonly object: FastApiObject;
   /** The functions on the current call path, by node id, which ends recursion. */
   private readonly active = new Set<number>();
 
   /**
-   * Keeps the lookups and the depth limit.
+   * Keeps the lookups, the depth limit and where the endpoint is declared.
    *
    * @param scope - the project lookups.
    * @param maxDepth - how many calls deep to follow (`max-depth`).
+   * @param object - the app or router the endpoint is declared on: only the
+   *   handlers of the apps that serve it map exceptions (ring 3).
    */
-  constructor(scope: FastApiProject, maxDepth: number) {
+  constructor(scope: FastApiProject, maxDepth: number, object: FastApiObject) {
     this.scope = scope;
     this.maxDepth = maxDepth;
+    this.object = object;
   }
 
   /**
@@ -216,23 +223,29 @@ export class CodeWalk {
     }
     // A third-party base can have a handler Inwards can't see, and a dynamic registration any.
     const foreign = [...lineage.external].some((base) => !this.scope.firstParty(base));
-    if (foreign || !this.scope.handlersKnown()) {
-      return [];
-    }
-    for (const cls of lineage.classes) {
-      const handler = this.scope.handlerFor(cls.name);
-      if (handler !== undefined) {
-        const origin = `from \`${short}\` raised at ${at}, handled in ${handler.where}`;
-        return (handler.codes ?? []).map((code) => ({
-          code,
-          origin,
-          handled: true,
-          direct: false,
-          exceptions,
-        }));
+    return foreign ? [] : this.handled(lineage, `from \`${short}\` raised at ${at}`);
+  }
+
+  /**
+   * Reads the codes the handlers of the apps serving the endpoint map a
+   * raised first-party exception to, each app looking the nearest class up
+   * first, as Starlette does. Different apps can map it differently.
+   *
+   * @param lineage - the raised class and its first-party bases.
+   * @param raised - where it is raised, for the origin.
+   * @returns the codes, none when no serving app handles it or the handlers are unknown.
+   */
+  private handled(lineage: Lineage, raised: string): CodeSource[] {
+    const exceptions = lineage.classes.map((c) => c.name);
+    const found = new Map<string, CodeSource>();
+    for (const table of this.scope.handlersOver(this.object) ?? []) {
+      const handler = lineage.classes.map((c) => table.get(c.name)).find((h) => h !== undefined);
+      const origin = `${raised}, handled in ${handler?.where ?? ""}`;
+      for (const code of handler?.codes ?? []) {
+        found.set(`${code} ${origin}`, { code, origin, handled: true, direct: false, exceptions });
       }
     }
-    return [];
+    return [...found.values()];
   }
 
   /**

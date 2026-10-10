@@ -47,6 +47,14 @@ export interface HandlerInfo {
   readonly where: string;
 }
 
+/** One app's exception handlers. */
+interface AppHandlers {
+  /** The handler of each first-party exception class, by canonical class name. */
+  readonly handlers: ReadonlyMap<string, HandlerInfo>;
+  /** True when some registration's exception can't be read, so it may handle any class. */
+  readonly open: boolean;
+}
+
 /** An `include_router` edge whose target is a known first-party router. */
 export interface Edge {
   readonly wiring: Wiring;
@@ -65,9 +73,10 @@ export class FastApiProject {
   private readonly project: ProjectIndex;
   /** The checked files that mention FastAPI, as the adapter handed them in. */
   private readonly own: readonly FastApiFile[];
-  private handlerMap: ReadonlyMap<string, HandlerInfo> | undefined;
-  /** True when some handler registration's exception can't be read. */
-  private handlersOpen = false;
+  /** Each app's handlers, by the app's qualified name; built on first use. */
+  private handlerMap: ReadonlyMap<string, AppHandlers> | undefined;
+  /** True when some registration is on an app Inwards can't find, so it may be on any app. */
+  private handlersAstray = false;
   /** Every name resolved so far: the rules ask for the same helpers and routers per route. */
   private readonly resolved = new Map<string, Definition | null>();
   private files: readonly FastApiFile[] | undefined;
@@ -190,27 +199,60 @@ export class FastApiProject {
   }
 
   /**
-   * Finds the handler an app registers for a first-party exception class, by
-   * the class's canonical name. Scans the project once, on first use.
+   * Lists the exception handlers of every app that serves an app's or a
+   * router's routes (#242): the app itself, or each app that includes the
+   * router, directly or through other routers. Starlette looks a handler up
+   * in the app that runs the route, so another app's handlers don't count.
+   * Scans the project once, on first use.
    *
-   * @param name - a canonical class name (`ClassInfo.name`).
-   * @returns the handler, or undefined when no app registers one.
+   * @param object - the app or router the route is declared on.
+   * @returns each app's handlers by canonical class name, none when no app
+   *   includes the router, or null when they can't be known: an inclusion
+   *   Inwards can't follow, or an app with a registration it can't read (a
+   *   dict and a loop, say, which could handle any class).
    */
-  handlerFor(name: string): HandlerInfo | undefined {
+  handlersOver(object: FastApiObject): readonly ReadonlyMap<string, HandlerInfo>[] | null {
     this.handlerMap ??= this.scanHandlers();
-    return this.handlerMap.get(name);
+    const apps = this.appsOver(object, new Set());
+    if (apps === null || this.handlersAstray) {
+      return null;
+    }
+    const tables: ReadonlyMap<string, HandlerInfo>[] = [];
+    for (const app of apps) {
+      const entry = this.handlerMap.get(app);
+      if (entry?.open === true) {
+        return null;
+      }
+      tables.push(entry?.handlers ?? new Map());
+    }
+    return tables;
   }
 
   /**
-   * Tells whether every exception handler registration in the project names
-   * its exception: one registered from a variable (a dict and a loop, say)
-   * could handle any class, so no handler lookup can be trusted.
+   * Finds the apps that serve an app's or a router's routes, through the
+   * `include_router` edges above it. A mount isn't followed: a mounted app
+   * handles its own exceptions.
    *
-   * @returns false when some registration's exception Inwards can't read.
+   * @param object - the app or router.
+   * @param seen - the routers already on this path, which ends an inclusion cycle.
+   * @returns the apps' qualified names, or null when an inclusion above can't be followed.
    */
-  handlersKnown(): boolean {
-    this.handlerMap ??= this.scanHandlers();
-    return !this.handlersOpen;
+  private appsOver(object: FastApiObject, seen: ReadonlySet<string>): ReadonlySet<string> | null {
+    if (object.kind === "app" || seen.has(object.name)) {
+      return new Set(object.kind === "app" ? [object.name] : []);
+    }
+    const apps = new Set<string>();
+    for (const { parent } of this.edgesTo(object.name) ?? [{ parent: null }]) {
+      const above = parent === null ? null : this.objectOf(parent);
+      const found = above ? this.appsOver(above, new Set([...seen, object.name])) : null;
+      if (found === null) {
+        return null;
+      }
+      for (const app of found) {
+        apps.add(app);
+      }
+    }
+    return apps;
   }
 
   /**
@@ -267,28 +309,35 @@ export class FastApiProject {
 
   /**
    * Reads every file that names `exception_handler`, and maps each handled
-   * first-party exception class to its handler. The first registration of a
-   * class wins, as a later one on another app can't be told apart.
+   * first-party exception class to its handler, per app. On one app, the
+   * first registration of a class wins.
    *
-   * @returns handlers by canonical class name.
+   * @returns each app's handlers, by the app's qualified name.
    */
-  private scanHandlers(): Map<string, HandlerInfo> {
-    const handlers = new Map<string, HandlerInfo>();
+  private scanHandlers(): Map<string, AppHandlers> {
+    const apps = new Map<string, { handlers: Map<string, HandlerInfo>; open: boolean }>();
     const registered = this.projectFiles().flatMap((file) =>
       file.handlers.map((handler) => ({ file, handler })),
     );
     for (const { file, handler } of registered) {
+      const app = this.objectOf(handler.app);
+      if (app === null) {
+        this.handlersAstray = true;
+        continue;
+      }
+      const entry = apps.get(app.name) ?? { handlers: new Map(), open: false };
+      apps.set(app.name, entry);
       const { exception } = handler;
       const handled = exception.kind === "name" ? this.classOf(exception.name) : null;
       const readable = exception.kind === "int" || exception.kind === "name";
       const dynamic = exception.kind === "name" && handled === null && this.bound(exception.name);
-      this.handlersOpen ||= !readable || dynamic;
-      if (handled !== null && !handlers.has(handled.name)) {
+      entry.open ||= !readable || dynamic;
+      if (handled !== null && !entry.handlers.has(handled.name)) {
         const where = `${file.path}:${handler.node.startPosition.row + 1}`;
-        handlers.set(handled.name, { codes: this.handlerCodes(handler), where });
+        entry.handlers.set(handled.name, { codes: this.handlerCodes(handler), where });
       }
     }
-    return handlers;
+    return apps;
   }
 
   /**

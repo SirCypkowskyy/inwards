@@ -10,7 +10,7 @@
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { constructorHandlers, handlerOf } from "./handlers.ts";
+import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./handlers.ts";
 import type {
   Context,
   DependencyUse,
@@ -19,6 +19,7 @@ import type {
   FastApiFile,
   FastApiObject,
   PathOperation,
+  Registration,
   Wiring,
 } from "./records.ts";
 import { type Argument, callSyntax, type Qualify, valueFrom } from "./values.ts";
@@ -141,18 +142,16 @@ function record(call: Node, context: Context, found: Found): void {
     return;
   }
   const decorated = decoratedFunction(call);
-  const exception = argumentAt(call, 0, "exc_class_or_status_code");
   if (decorated && (METHODS.has(method) || method === "api_route")) {
     found.operations.push(operationOf(call, { method, receiver: app, fn: decorated }, context));
   } else if (decorated && method === "exception_handler") {
-    const via = "decorator";
     found.handlers.push(
-      handlerOf({ app, via, node: call, exception, handler: decorated }, context),
+      ...registered({ app, via: "decorator", node: call, handler: decorated }, context),
     );
   } else if (method === "add_exception_handler") {
     const handler = argumentAt(call, 1, "handler");
     const via = "add_exception_handler";
-    found.handlers.push(handlerOf({ app, via, node: call, exception, handler }, context));
+    found.handlers.push(...registered({ app, via, node: call, handler }, context));
   } else if (method === "on_event" || method === "add_event_handler") {
     found.events.push(eventOf(call, { via: method, receiver: app }, context.qualify));
   } else if (method === "include_router" || method === "mount") {
@@ -195,9 +194,10 @@ function objectOf(assignment: Node, context: Context): FastApiObject[] {
   }
   const local = identifierName(left);
   const topLevel = assignment.parent?.parent?.type === "module";
-  return [
-    { kind, name: `${file.module}.${local}`, local, topLevel, ...callSyntax(right, qualify) },
-  ];
+  const syntax = callSyntax(right, qualify);
+  // An app's `**kwargs` that only carries `exception_handlers` hides no other keyword (#242).
+  const splat = syntax.splat && !(kind === "app" && splatsOnlyHandlers(right));
+  return [{ kind, name: `${file.module}.${local}`, local, topLevel, ...syntax, splat }];
 }
 
 /**
@@ -324,7 +324,7 @@ function wiringOf(call: Node, method: string, receiver: string, qualify: Qualify
     receiver,
     target: target ? qualify(target) : null,
     path: path ? valueFrom(path, qualify) : null,
-    loopTargets: target ? loopItems(target, qualify) : [],
+    loopTargets: (target ? loopItems(target) : null)?.map((item) => qualify(item)) ?? [],
   };
 }
 
@@ -333,13 +333,12 @@ function wiringOf(call: Node, method: string, receiver: string, qualify: Qualify
  * when that loop encloses the name's use: `for r in [a.router, b.router]:`.
  *
  * @param target - the argument node, e.g. the identifier `r`.
- * @param qualify - qualifies a name through the file's imports.
- * @returns each item's qualified name, null for one that isn't a name; empty
- *   when the argument isn't such a loop variable.
+ * @returns the literal's item nodes, or null when the argument isn't the
+ *   variable of an enclosing loop over a list or tuple literal.
  */
-function loopItems(target: Node, qualify: Qualify): (string | null)[] {
+function loopItems(target: Node): Node[] | null {
   if (target.type !== "identifier") {
-    return [];
+    return null;
   }
   const name = identifierName(target);
   for (let at = target.parent; at !== null; at = at.parent) {
@@ -347,8 +346,27 @@ function loopItems(target: Node, qualify: Qualify): (string | null)[] {
     const right = at.childForFieldName("right");
     if (left?.type === "identifier" && identifierName(left) === name) {
       const literal = right?.type === "list" || right?.type === "tuple";
-      return literal ? namedChildren(right).map((item) => qualify(item)) : [];
+      return literal ? namedChildren(right) : null;
     }
   }
-  return [];
+  return null;
+}
+
+/**
+ * Reads a decorator or `add_exception_handler` registration. The loop
+ * variable of `for exc in [A, B]: app.add_exception_handler(exc, h)` stands
+ * for each item of the literal, as in argilla (#242), so that gives one
+ * handler per item; any other exception argument stands for itself.
+ *
+ * @param registration - the registration, its exception still to read from the call.
+ * @param context - the file, its qualifier and its functions.
+ * @returns the handler records.
+ */
+function registered(
+  registration: Omit<Registration, "exception">,
+  context: Context,
+): ExceptionHandler[] {
+  const exception = argumentAt(registration.node, 0, "exc_class_or_status_code");
+  const items = (exception ? loopItems(exception) : null) ?? [exception];
+  return items.map((one) => handlerOf({ ...registration, exception: one }, context));
 }

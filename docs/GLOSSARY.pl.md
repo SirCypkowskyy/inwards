@@ -77,6 +77,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | loader (module loader) | loader (loadera) | |
 | launcher (`--launcher`, e.g. `uv run`) | launcher (launchera) | what starts Inwards in the project |
 | worktree (git) | worktree (worktree'a, worktree'y) | |
+| catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
+| health check | health-check | "aplikacja health-check" |
 
 ## Fixed Polish terms
 
@@ -213,6 +215,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | exception handler (FastAPI) | handler wyjątków |
 | helper (function) | funkcja pomocnicza |
 | inclusion (`include_router`) | dołączenie |
+| splat (`**kwargs` in a call), splatted dict | rozpakowanie, rozpakowany słownik |
+| app factory | fabryka aplikacji |
 | finding | diagnostyka (as for diagnostic) |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |
