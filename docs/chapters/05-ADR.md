@@ -47,6 +47,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted, the extension switched in [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk | :material-check-circle: Accepted |
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | The VS Code extension bundles the binary, one VSIX per platform | :material-check-circle: Accepted |
+| [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot through an `inwards hook copilot` entry point and a committed hooks file | :material-help-circle-outline: Proposed, waits for the owner |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1281,3 +1282,56 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - *One VSIX with all six binaries:* every user downloads about 160 MB to use one of them.
 - *Only `inwards` from `PATH` or the project's virtualenv:* the extension would do nothing after install until the user also installs the binary. It stays as the fallback.
 - *Keep the Node server as a fallback:* two servers that disagree, which is what ADR-041 set out to end.
+
+## ADR-044: Copilot through an `inwards hook copilot` entry point and a committed hooks file
+
+**Status:** Proposed · 2026-10-11 · [#316](https://github.com/SirCypkowskyy/inwards/issues/316) · waits for the owner's acceptance and for the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records
+
+**Context.** The [Copilot guide](guides/copilot.md) wires Copilot to Inwards through `AGENTS.md`, the editor extension, `inwards mcp` and CI, so Copilot gets no config guard and no Stop gate. Copilot now runs agent hooks on four surfaces. What follows comes from the docs read on 2026-10-11: GitHub's [hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference), [About hooks](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-hooks), [Using hooks with the Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-hooks) and [Customize the cloud agent with hooks](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/use-hooks) (none of the four shows a date), and VS Code's [hooks guide](https://code.visualstudio.com/docs/agent-customization/hooks) and [hooks reference](https://code.visualstudio.com/docs/agents/reference/hooks-reference) (both dated 2026-10-07). No Copilot session ran: neither the Copilot CLI nor VS Code is installed on the machine the spike ran on, and nothing was signed in to.
+
+| | Copilot CLI | Cloud agent | VS Code, Copilot harness | VS Code, Local harness (preview) |
+|---|---|---|---|---|
+| Hook files | `.github/hooks/*.json`, `.github/copilot/settings*.json`, `.claude/settings*.json`, `~/.copilot/hooks/`, policy directories, plugins; every entry runs | `.github/hooks/*.json` on the default branch only; only the `bash` command runs | Copilot's own implementation (the Copilot SDK), Copilot's format | `.github/hooks/*.json` (Copilot files mapped), `~/.copilot/hooks/`, `.claude/settings*.json` with `chat.useClaudeHooks` (matchers ignored), custom agents' front matter; workspace trust applies |
+| Payload | camelCase (`sessionId`, `toolName`, `toolArgs`) with Copilot's tool names (`edit`, `create`, `bash`, `apply_patch`); a PascalCase event key switches to snake_case with Claude's tool names | as the CLI | as the CLI | snake_case with `hook_event_name`, `tool_name`, `tool_input`; the Local tool names aren't documented |
+| Deny an edit | `permissionDecision: "deny"`, or exit 2; another non-zero exit denies too (fail-closed); a timeout allows (fail-open, 30 s default) | as the CLI; `ask` becomes `deny` | as the CLI | `hookSpecificOutput.permissionDecision`, or exit 2 with the reason on stderr |
+| After an edit | `additionalContext` appended to the tool result, at most 10 KB; no block | as the CLI | as the CLI | `additionalContext`, or `decision: "block"` |
+| End of a turn | `agentStop`: `decision: "block"` and `reason` start another turn; `stop_hook_active` is set; the CLI ends the turn after 8 blocks in a row | as the CLI; a block counts against the job's timeout | as the CLI | `Stop`: `decision: "block"` and `reason`, or exit 2 |
+| Session start | `sessionStart`, `additionalContext` only, `source` is `startup`, `resume` or `new` | once per job | as the CLI | `SessionStart`, `source` always `new` |
+
+So every surface can deny a tool call and keep a turn going, which is what the config guard and the Stop gate need. Two things the docs leave out decide the details: the argument names of `edit`, `create` and `apply_patch` (and whether `toolArgs` arrives as an object or as a JSON string; the CLI how-to shows a string), and the Local harness's tool names.
+
+`inwards hook claude-code` can't serve these surfaces as it is, even where Copilot reads Claude Code's files. The Copilot CLI reads `.claude/settings.local.json`, which `inwards init --agent claude-code` writes, so it already runs the hook in a project wired for Claude Code. There the hook misbehaves in three ways:
+
+- the Stop gate and the per-edit check answer with exit 2 and stderr, which Copilot treats as a warning shown to the user, so the turn ends and the model never sees the finding;
+- the reference documents flat outputs only, so a deny wrapped in `hookSpecificOutput` may be ignored;
+- the config guard reads `tool_input.file_path` and lets a call through when it isn't there (`config-guard.ts`), so if Copilot's `edit` names its file `path`, a `[tool.inwards]` edit passes unchecked.
+
+In VS Code's Local harness the exit codes mean what they mean to Claude Code, but the tool names differ, so the guard sees calls it doesn't recognise and lets them through.
+
+**Decision (proposed).**
+
+- **Record first.** A logging hook on each of the four surfaces records `sessionStart`, `preToolUse` and `postToolUse` for `edit`, `create`, `bash` and `apply_patch`, and `agentStop`, and the recordings become test fixtures ([#320](https://github.com/SirCypkowskyy/inwards/issues/320)). The Claude Code adapter was built the same way, against recorded payloads.
+- **One entry point for Copilot's dialects, in the CLI.** `inwards hook copilot` ([#321](https://github.com/SirCypkowskyy/inwards/issues/321)) reads the camelCase payload, the PascalCase one and the Local harness's, telling them apart by the payload (only the snake_case ones carry `hook_event_name`). It turns each into the call the handlers take now (Claude's tool names and argument names) and answers in the caller's dialect: a deny as exit 2 with `permissionDecision` on stdout and the reason on stderr, which both Copilot and the Local harness read as a deny; a finding after an edit as `additionalContext`; a Stop gate block as `decision: "block"` with the gate's reasons, or exit 2 and stderr for the Local harness. The handlers keep their policy and return their answer instead of printing it, and each host's entry point prints it.
+- **A committed hooks file.** `inwards init --agent copilot` ([#322](https://github.com/SirCypkowskyy/inwards/issues/322)) writes `.github/hooks/inwards.json` in Copilot's camelCase format, with `bash` and `powershell` commands, `timeoutSec: 60` and `INWARDS_HOOK_HOST=copilot` in `env`. The cloud agent reads only committed files on the default branch, so this file holds no machine's path: it starts `inwards` from `PATH`, or the launcher `--launcher` names (`uv run`). The cloud agent gets Inwards from `copilot-setup-steps.yml`, as the guide shows. A tool the adapter doesn't recognise passes, as in Claude Code.
+- **The Stop gate checks the hooks file** when `INWARDS_HOOK_HOST=copilot`: the gate blocks when `.github/hooks/inwards.json` is gone or no longer runs `inwards hook copilot` for the four events, as it does for OpenCode's plugin.
+- **What the guard can't read, the adapter refuses.** An `apply_patch` call that touches `pyproject.toml`, `.github/hooks/`, `.inwards/` or the baseline is denied, as the OpenCode plugin does, because the guard judges an edit by its old and new text.
+- **`inwards hook claude-code` stops pretending under Copilot** ([#323](https://github.com/SirCypkowskyy/inwards/issues/323)): when a recorded Copilot payload shows the caller isn't Claude Code, it passes and says once, at session start, to run `inwards init --agent copilot`, so a project wired for both doesn't run two hooks with one of them half working.
+
+**Consequences.**
+
+- :material-plus-circle-outline: The per-edit check, the config guard and the Stop gate reach the Copilot CLI and the cloud agent with the one implementation the Claude Code and OpenCode hooks use. Unlike OpenCode, Copilot can refuse the end of a turn, so the Stop gate keeps the agent working as it does on Claude Code, in a non-interactive run too.
+- :material-plus-circle-outline: One committed file serves the cloud agent, every contributor's Copilot CLI and both VS Code harnesses.
+- :material-minus-circle-outline: The file runs on every contributor's machine. Where `inwards` isn't installed, the shell exits 127, and Copilot denies every tool call (fail-closed). The command checks for the binary first and passes when it's missing, so the guard is gone on that machine, and CI stays the gate there.
+- :material-minus-circle-outline: A timeout lets the call through. The default is 30 s; the file sets 60 s, as on OpenCode, and the hook daemon ([ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)) keeps a warm per-edit check well under it.
+- :material-minus-circle-outline: Copilot can't block after an edit. A violation goes back as context on the tool result, at most 10 KB, so a long report is cut to the first findings and a pointer to `inwards check`.
+- :material-minus-circle-outline: On the cloud agent a Stop gate block spends the job's time, and `sessionStart` fires once per job, so the session record covers the whole job. The CLI's limit of 8 blocks in a row ends a turn that `escalate-after` hasn't ended first.
+- :material-minus-circle-outline: VS Code's hooks are in preview and the Local harness's tool names are undocumented. Until #320 records them, the Local harness gets the per-edit check only for the tool names it records, and CI stays the gate.
+- :material-minus-circle-outline: A second payload contract to keep, in three dialects, against an API that changed between the Copilot CLI's [general availability](https://github.blog/changelog/2026-02-25-github-copilot-cli-is-now-generally-available/) (2026-02-25, `preToolUse` and `postToolUse` only) and the reference of October 2026.
+
+**Alternatives.**
+
+- *Keep `AGENTS.md`, `inwards mcp` and CI only:* nothing to build, but no guard and no gate, on the surfaces that now can have both. It stays the setup for Copilot surfaces without hooks.
+- *Rely on Copilot reading Claude Code's settings:* no new code, but the exit codes mean something else, the outputs may be ignored, the cloud agent doesn't read `.claude/`, and the guard would let edits through without a sign.
+- *A shell script that translates Copilot's payloads into Claude Code's and runs `inwards hook claude-code`, as the OpenCode plugin does ([ADR-033](#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook)):* the translation would need `jq` or PowerShell on every machine, and the answers would still need translating back. OpenCode had a JavaScript runtime for it; a Copilot hook is a plain command.
+- *Hooks with PascalCase event names, so Copilot sends Claude's tool names:* closer to what the handlers read, but the docs don't say the arguments are renamed too, and the cloud agent's docs show only camelCase. #320 decides whether this is simpler.
+- *HTTP hooks to the hook daemon:* no process per event, but `preToolUse` needs `https`, a local `http` URL needs `COPILOT_HOOK_ALLOW_LOCALHOST=1` on every machine, and the cloud agent has no daemon to talk to.
