@@ -33,10 +33,7 @@ export const NESTED_SCOPES: ReadonlySet<string> = new Set([
  * @param families - the families to try, built-in ones first.
  * @returns the family and the name that matched, or undefined.
  */
-function sourceOf(
-  names: readonly string[],
-  families: readonly Family[],
-): Source | undefined {
+function sourceOf(names: readonly string[], families: readonly Family[]): Source | undefined {
   for (const type of names) {
     const family = families.find((f) => f.isType(type));
     if (family) {
