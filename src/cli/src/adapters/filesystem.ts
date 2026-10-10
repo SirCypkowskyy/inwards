@@ -7,6 +7,7 @@
  */
 import {
   lstatSync,
+  promises,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -58,6 +59,7 @@ export const nodeFileReader: FileReader = {
   text(path: string): string {
     return readFileSync(path, "utf8");
   },
+  texts: readTexts,
   bytes(path: string): Uint8Array {
     return readFileSync(path);
   },
@@ -87,4 +89,20 @@ function realpath(path: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Reads many files as UTF-8 text, all requested at once, so the reads wait
+ * on the disk together. Bun's docs list `node:fs` as fully implemented
+ * without saying how many files `fs.promises.readFile` keeps open at once;
+ * measured instead, saleor's 4,324 files read the same under a limit of 64
+ * open files (`ulimit -n 64`) on macOS and Linux, and a bounded queue of 16
+ * reads was no faster (#281).
+ *
+ * @param paths - the files.
+ * @returns their texts, in the order of `paths`.
+ * @throws (as a rejected promise) a read error, as `readFileSync` would throw it.
+ */
+function readTexts(paths: readonly string[]): Promise<string[]> {
+  return Promise.all(paths.map((path) => promises.readFile(path, "utf8")));
 }

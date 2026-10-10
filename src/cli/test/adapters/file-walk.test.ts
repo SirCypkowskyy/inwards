@@ -4,12 +4,18 @@
  * hidden directories, lists a file under every name Python could import it by,
  * survives symlink cycles, and never follows a link out of the directory it was
  * asked to walk. The link listing records links without following them.
+ * The real paths the walk gives with each file are what `realpath` says,
+ * though it resolves only directories and links (#281).
  */
 import { expect, test } from "bun:test";
 import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import process from "node:process";
-import { collectPythonFiles, nodeFileWalker } from "../../src/adapters/file-walk.ts";
+import {
+  collectPythonFiles,
+  collectPythonSources,
+  nodeFileWalker,
+} from "../../src/adapters/file-walk.ts";
 import { tempDir } from "../support/temp.ts";
 
 test("walks build/dist/site inside packages, skips venvs and hidden dirs", () => {
@@ -76,4 +82,24 @@ test("lists the importable links below a directory without following them", () =
     ["domain/leak.py", join(realpathSync(outside), "leak.py")],
     ["domain/node_modules/ext", realpathSync(outside)],
   ]);
+});
+
+test("gives each file the real path realpath gives, through aliases and links", () => {
+  const root = tempDir("inwards-files-");
+  mkdirSync(join(root, "real/pkg"), { recursive: true });
+  writeFileSync(join(root, "real/pkg/Mod.py"), "");
+  writeFileSync(join(root, "real/pkg/other.py"), "");
+  mkdirSync(join(root, "shop"));
+  const named = join(root, "real/pkg/other.py");
+  if (process.platform !== "win32") {
+    symlinkSync(join(root, "real/pkg"), join(root, "shop/pkg"));
+    symlinkSync(join(root, "real/pkg/Mod.py"), join(root, "shop/alias.py"));
+  }
+  const found = collectPythonSources([root, named]);
+  expect(found.length).toBe(process.platform === "win32" ? 2 : 5);
+  for (const { path, real } of found) {
+    expect(real).toBe(realpathSync(path));
+  }
+  // The walk starts from the root as written, which may itself sit behind a link (macOS /var).
+  expect(found.map(({ path }) => path)).toEqual(collectPythonFiles([root, named]));
 });

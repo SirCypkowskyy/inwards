@@ -3,7 +3,8 @@
  * what `createExtractionWorker` gives in this thread, at the job's own place
  * whatever order the threads finish in, and it still answers when its
  * workers crash, answer with an error or can't start: the calling thread
- * works through the queue too. A worker's answers land at their own jobs.
+ * works through the queue too. A worker's answers land at their own jobs,
+ * and a worker holds two batches at once (#281).
  * The workers run `main.ts`, as the binary's do.
  */
 import { describe, expect, test } from "bun:test";
@@ -101,6 +102,33 @@ describe("the pool answers like this thread", () => {
       const fromWorkers = answers.filter((answer) => Bun.deepEquals(answer, fake)).length;
       expect(fromWorkers).toBeGreaterThan(0);
       expect(fromWorkers % 24).toBe(0); // whole batches
+      const fromHere = jobs.filter((each, n) => Bun.deepEquals(answers[n], run(each))).length;
+      expect(fromHere + fromWorkers).toBe(jobs.length);
+    } finally {
+      pool.close();
+    }
+  });
+
+  test("a worker holds two batches at once, and answers land whatever their order", async () => {
+    // Answers nothing until it holds two batches, then answers the second first:
+    // with one batch at a time, only the calling thread would ever answer.
+    const code = `const held = [];
+    self.onmessage = (e) => {
+      if (!e.data.id) return;
+      held.push(e.data);
+      if (held.length < 2) return;
+      for (const b of held.splice(0).reverse()) {
+        postMessage({ id: b.id, answers: b.jobs.map((j) => ({ extraction: { skeleton: [] }, dynamic: j.file.path.length < 0 })) });
+      }
+    };`;
+    const entry = URL.createObjectURL(new Blob([code], { type: "application/javascript" }));
+    const jobs = Array.from({ length: 960 }, (_unused, n) => job(n + 1, "skeleton"));
+    const pool = startExtractionPool(entry, WASM, 2);
+    try {
+      const answers = await pool.extract(jobs);
+      const fake = { extraction: { skeleton: [] }, dynamic: false };
+      const fromWorkers = answers.filter((answer) => Bun.deepEquals(answer, fake)).length;
+      expect(fromWorkers).toBeGreaterThan(0);
       const fromHere = jobs.filter((each, n) => Bun.deepEquals(answers[n], run(each))).length;
       expect(fromHere + fromWorkers).toBe(jobs.length);
     } finally {
