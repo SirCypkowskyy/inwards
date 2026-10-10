@@ -1,8 +1,9 @@
 /**
- * @file The daemon's two files under the user's state directory (ADR-039):
+ * @file The daemon's files under the user's state directory (ADR-039):
  * the lock a running daemon holds, created exclusively with its pid and a
- * random token in it, and the record that tells hooks where it listens,
- * written atomically. Both are owner-only. Used by `daemon-host.ts`; what
+ * random token in it, the record that tells hooks where it listens, written
+ * atomically, and the note a daemon that couldn't listen leaves (#275).
+ * All are owner-only. Used by `daemon-host.ts`; what
  * they contain is decided in `daemon/protocol.ts`, and whether a live
  * process really holds a lock is asked over the socket by the caller.
  */
@@ -161,6 +162,21 @@ export function publishRecord(path: string, text: string): void {
   const temp = join(dirname(path), `.${basename(path)}.${process.pid}.tmp`);
   writeFileSync(temp, text, { mode: OWNER_ONLY });
   renameSync(temp, path);
+}
+
+/**
+ * Writes the note of a failed start, best effort: a daemon that can't write
+ * it exits all the same, and the next hook starts another.
+ *
+ * @param path - the note (`DaemonPlace.failed`).
+ * @param text - its content.
+ */
+export function noteFailure(path: string, text: string): void {
+  try {
+    publishRecord(path, text);
+  } catch {
+    // best effort, see above
+  }
 }
 
 /**
