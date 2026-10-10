@@ -22,6 +22,7 @@ import { request, SELF } from "../support/daemon-helpers.ts";
  */
 function handler(identity: () => string | undefined = (): string => SELF.identity): {
   handle: (line: string) => Promise<{ answer: unknown; stop: boolean }>;
+  urgent: (line: string) => boolean;
   ran: HookRequest[];
 } {
   const ran: HookRequest[] = [];
@@ -49,11 +50,23 @@ function handler(identity: () => string | undefined = (): string => SELF.identit
       const { answer, stop } = await h.handle(line);
       return { answer: JSON.parse(answer), stop };
     },
+    urgent: h.urgent,
     ran,
   };
 }
 
 describe("the daemon's side", () => {
+  test("status and stop skip the queue; hook runs and foreign requests wait their turn (#277)", () => {
+    const h = handler();
+    const stamp = { protocol: PROTOCOL, ...SELF };
+    expect(h.urgent(JSON.stringify({ ...stamp, op: "status" }))).toBe(true);
+    expect(h.urgent(JSON.stringify({ ...stamp, op: "stop" }))).toBe(true);
+    expect(h.urgent(JSON.stringify(request()))).toBe(false);
+    expect(h.urgent(JSON.stringify({ ...stamp, version: "9", op: "stop" }))).toBe(false);
+    expect(h.urgent("not json")).toBe(false);
+    expect(h.urgent(JSON.stringify({ ...stamp, op: "stop", pad: "x".repeat(5000) }))).toBe(false);
+  });
+
   test("a PostToolUse request runs the hook and is counted", async () => {
     const h = handler();
     expect(await h.handle(JSON.stringify(request()))).toEqual({

@@ -25,7 +25,7 @@ import { fileExtractionCache } from "./extraction-cache.ts";
 import { startExtractionPool } from "./extraction-pool.ts";
 import { nodeFileWalker } from "./file-walk.ts";
 import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
-import { nodeGit } from "./git.ts";
+import { budgetedGit, nodeGit } from "./git.ts";
 import { loadGrammars } from "./grammars.ts";
 import { nodeInitFiles } from "./init-files.ts";
 import { terminalPicker } from "./picker.ts";
@@ -113,10 +113,19 @@ export function compose(workerEntry?: string): AppDeps {
 }
 
 /**
+ * How long all of one daemon request's git calls may take together: well
+ * under the 15 s `inwards daemon stop` waits and the 45 s a hook waits, so a
+ * hung git can't hold the daemon's queue (#277). A healthy call takes about
+ * 15 ms.
+ */
+const DAEMON_GIT_BUDGET_MS = 5000;
+
+/**
  * The resident process on the real process: the socket, the files, and each
  * request's dependencies. The extraction cache and the commit-keyed git
  * answers are made here, once per invocation, so they live as long as the
- * daemon and are shared by its requests only.
+ * daemon and are shared by its requests only. Its git runs under a budget
+ * that starts again with every request.
  *
  * @param io - the daemon's own platform.
  * @param entry - the CLI's `main.ts`, for running from source.
@@ -124,11 +133,14 @@ export function compose(workerEntry?: string): AppDeps {
  */
 function nodeDaemon(io: Platform, entry: string): DaemonDeps {
   const extractions = daemonExtractionCache();
-  const git = commitKeyedGit(io.git);
+  const budgeted = budgetedGit(DAEMON_GIT_BUDGET_MS);
+  const git = commitKeyedGit(budgeted);
   return {
     link: nodeDaemonLink(entry),
     host: nodeDaemonHost(),
     invocation(request: HookRequest): ReturnType<DaemonDeps["invocation"]> {
+      // Requests run one at a time, so the budget is this request's alone.
+      budgeted.begin();
       const out: string[] = [];
       const err: string[] = [];
       const streams: Streams = {

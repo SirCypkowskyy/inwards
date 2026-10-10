@@ -4,8 +4,9 @@
  * executable has changed on disk, refuse anything but a PostToolUse payload
  * for `hook claude-code`, and run that through the caller's hook runner,
  * one request at a time. It owns the request count `inwards daemon status`
- * shows; the socket, the lock and the idle timer are the adapter's
- * (`DaemonHost`). No I/O of its own.
+ * shows, and says which requests skip the queue (`status` and `stop`, #277);
+ * the socket, the lock and the idle timer are the adapter's (`DaemonHost`).
+ * No I/O of its own.
  */
 import type { LineHandler } from "./contracts.ts";
 import {
@@ -17,6 +18,12 @@ import {
   parseRequest,
   toLine,
 } from "./protocol.ts";
+
+/**
+ * The longest line, in characters, that may be a `status` or `stop` request;
+ * anything longer is a hook run, and isn't parsed twice.
+ */
+const CONTROL_MAX_LENGTH = 4096;
 
 /** What one hook run produced. */
 export interface HookOutcome {
@@ -60,6 +67,13 @@ export function createHandler(
   let requests = 0;
   return {
     tooLarge: toLine({ protocol: PROTOCOL, error: "too-large" }),
+    urgent(text: string): boolean {
+      if (text.length > CONTROL_MAX_LENGTH) {
+        return false;
+      }
+      const request = parseRequest(text, self);
+      return request !== "stale" && request !== "protocol" && request.op !== "hook";
+    },
     async handle(text: string): Promise<{ answer: string; stop: boolean }> {
       const request = parseRequest(text, self);
       if (request === "stale" || self.currentIdentity() !== self.identity) {

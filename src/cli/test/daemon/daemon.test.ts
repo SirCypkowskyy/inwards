@@ -10,21 +10,32 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import process from "node:process";
 import { daemonPlace, PROTOCOL, toLine } from "../../src/daemon/protocol.ts";
-import { CMD, inwards, LAYERS, payload, project, type RunResult } from "../support/run.ts";
-import { STATE_HOME } from "../support/temp.ts";
+import {
+  CMD,
+  inwards,
+  inwardsAsync,
+  LAYERS,
+  payload,
+  project,
+  type RunResult,
+} from "../support/run.ts";
+import { ID, LEAK, session } from "../support/stop-helpers.ts";
+import { STATE_HOME, tempDir } from "../support/temp.ts";
 
 /**
  * A short private directory for the sockets: macOS's socket paths can't
@@ -41,6 +52,8 @@ const SERVED = /(?<count>\d+) hook runs served/u;
 /** How long to wait for a daemon to come up or go away. */
 const WAIT_MS = 15_000;
 const POLL_MS = 50;
+/** Well under the 60 s the fake git hangs for, and over the daemon's 5 s git budget. */
+const GIT_HANG_MS = 20_000;
 
 /** Every project a test started a daemon in, stopped after the run. */
 const started: string[] = [];
@@ -76,13 +89,18 @@ function place(root: string): ReturnType<typeof daemonPlace> {
  *
  * @param root - the project.
  * @param idle - the idle limit in seconds.
+ * @param env - variables added to the daemon's environment.
  * @returns the daemon process.
  */
-async function startDaemon(root: string, idle = 120): Promise<ReturnType<typeof Bun.spawn>> {
+async function startDaemon(
+  root: string,
+  idle = 120,
+  env: Record<string, string> = {},
+): Promise<ReturnType<typeof Bun.spawn>> {
   started.push(root);
   const child = Bun.spawn([...CMD, "daemon", "--idle", String(idle)], {
     cwd: root,
-    env: { ...process.env, ...ON, XDG_STATE_HOME: STATE_HOME },
+    env: { ...process.env, ...ON, XDG_STATE_HOME: STATE_HOME, ...env },
     stdout: "ignore",
     stderr: "ignore",
   });
@@ -287,4 +305,45 @@ describe("inwards daemon", () => {
     expect(inwards(["daemon", "restart"], { cwd: root, env: ON }).code).toBe(2);
     expect(inwards(["daemon", "--idle", "soon"], { cwd: root, env: ON }).code).toBe(2);
   });
+});
+
+// A shell script stands in for git, so this one runs on Unix only.
+describe.skipIf(process.platform === "win32")("inwards daemon with a hung git", () => {
+  test(
+    "a hung git holds a hook run only for the git budget, and stop works meanwhile (#277)",
+    async () => {
+      // A git repository with a started session, so PostToolUse reads the
+      // file's session-start text from git.
+      const resident = session({ "shop/domain/order.py": LEAK });
+      // A git that never answers and ignores SIGTERM, first on the daemon's PATH.
+      const bin = tempDir("inwards-hung-git-");
+      const calls = join(bin, "calls");
+      writeFileSync(
+        join(bin, "git"),
+        `#!/bin/sh\necho "$@" >> '${calls}'\ntrap '' TERM\nexec sleep 60\n`,
+      );
+      chmodSync(join(bin, "git"), 0o755);
+      const child = await startDaemon(resident, 120, {
+        PATH: `${bin}${delimiter}${process.env["PATH"] ?? ""}`,
+      });
+      const begun = performance.now();
+      const through = inwardsAsync(["hook", "claude-code"], {
+        cwd: resident,
+        stdin: payload("post-write-order", resident, { session_id: ID }),
+        env: ON,
+      });
+      await until(() => existsSync(calls));
+      const stop = await inwardsAsync(["daemon", "stop"], { cwd: resident, stdin: "", env: ON });
+      expect(stop.stdout).toContain("stopped");
+      const answered = await through;
+      // The budget is 5 s; a git left to hang would take 60.
+      expect(performance.now() - begun).toBeLessThan(GIT_HANG_MS);
+      expect(await child.exited).toBe(0);
+      expect(readFileSync(calls, "utf8")).toContain("cat-file");
+      // The violation is still reported; only the session-start split is lost.
+      expect(answered.code).toBe(2);
+      expect(answered.stderr).toContain("INW001");
+    },
+    WAIT_MS * 2,
+  );
 });

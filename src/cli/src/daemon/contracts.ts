@@ -123,6 +123,15 @@ export interface LineHandler {
    * @returns the answer line (newline included) and whether to stop after sending it.
    */
   handle: (request: string) => Promise<{ answer: string; stop: boolean }>;
+  /**
+   * Tells whether a request is answered at once instead of waiting its turn:
+   * `status` and `stop`, so a daemon busy with a slow hook run can still be
+   * asked and stopped (#277).
+   *
+   * @param request - the line, without its newline.
+   * @returns true for a `status` or `stop` request of this build.
+   */
+  urgent: (request: string) => boolean;
   /** The answer to a request line longer than `MAX_REQUEST_BYTES`, newline included. */
   tooLarge: string;
 }
@@ -135,7 +144,9 @@ export interface DaemonHost {
    * prove it holds it, is removed and taken again, once), listens on a fresh
    * endpoint, publishes the record and removes the note of an earlier failed
    * start (or, when it can't listen, writes one), then hands each request line to the
-   * handler, one at a time in arrival order. It stops when the handler says
+   * handler, one at a time in arrival order (an urgent one at once, see
+   * `LineHandler.urgent`). Once stopping, it drops the requests still
+   * waiting, whose hooks then run in their own process. It stops when the handler says
    * so, after `idleMs` without a request, or on SIGINT or SIGTERM, and then
    * removes the endpoint, the record and the lock if they are still its own.
    *

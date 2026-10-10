@@ -28,6 +28,7 @@ const LONG_NAME = "d".repeat(120);
 const HANDLER: LineHandler = {
   handle: (): Promise<{ answer: string; stop: boolean }> =>
     Promise.resolve({ answer: "", stop: true }),
+  urgent: (): boolean => false,
   tooLarge: "",
 };
 

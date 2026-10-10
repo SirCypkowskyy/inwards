@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: c7f21b90653605570c57fba98edee9a9d8441a3dc01289417b61ee626641bfa1
+source_hash: 444e7fc76e87da338abd19d043d215bd92b0f76767b35fdfab2e174909e79d7f
 ---
 
 # Claude Code { #claude-code }
@@ -55,7 +55,7 @@ inwards daemon stop     # stop it; the next edit starts a new one
 inwards daemon          # run it in the foreground (--idle SECONDS sets the idle limit)
 ```
 
-`INWARDS_DAEMON=0` w środowisku, w którym działa Claude Code, go wyłącza i każdy hook działa we własnym procesie. Jest wyłączony, gdy ustawiono `CI`, chyba że `INWARDS_DAEMON=1`. Jego zapis jest w `$XDG_STATE_HOME/inwards/daemons/` (domyślnie `~/.local/state/inwards/daemons/`), a gniazdo w `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie w `$TMPDIR/inwards-<uid>/`; oba może czytać tylko ty. Gdy żaden katalog na gniazdo się nie nadaje, daemon od razu kończy działanie; hooki nie uruchamiają wtedy kolejnego przez 5 minut, a `inwards daemon status` podaje, dlaczego ostatnie uruchomienie się nie udało. Projekt opisuje [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+`INWARDS_DAEMON=0` w środowisku, w którym działa Claude Code, go wyłącza i każdy hook działa we własnym procesie. Jest wyłączony, gdy ustawiono `CI`, chyba że `INWARDS_DAEMON=1`. Jego zapis jest w `$XDG_STATE_HOME/inwards/daemons/` (domyślnie `~/.local/state/inwards/daemons/`), a gniazdo w `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie w `$TMPDIR/inwards-<uid>/`; oba może czytać tylko ty. Gdy żaden katalog na gniazdo się nie nadaje, daemon od razu kończy działanie; hooki nie uruchamiają wtedy kolejnego przez 5 minut, a `inwards daemon status` podaje, dlaczego ostatnie uruchomienie się nie udało. W daemonie wywołania gita jednego PostToolUse mają wspólny limit 5 sekund, więc zawieszony git kosztuje ten hook porównanie ze stanem z początku sesji, zamiast blokować każdą kolejną edycję; Stop gate uruchamia gita bez limitu. Projekt opisuje [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
 
 ## Rozwiązywanie problemów { #troubleshooting }
 
