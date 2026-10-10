@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: f804e56bed1f7ef2e70f26cd158ba5d4f482d423f07d73c14fcda4f5d5c8029a
+source_hash: bb74ed3e63c5dbd52f70161fc985ecbe4e6541478240a628407398e2f6b9cef9
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -150,7 +150,7 @@ LSP
 :   Language Server Protocol. Przez niego rozszerzenie VS Code dostaje diagnostyki z serwera języka Inwards. `inwards server` obsługuje go przez stdio z pliku binarnego, dla każdego edytora; rozszerzenie przełączy się na niego w [#64](https://github.com/SirCypkowskyy/inwards/issues/64). Zobacz [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches).
 
 MCP
-:   Model Context Protocol. Pozwala agentowi AI wywoływać zewnętrzne narzędzia. `inwards mcp` jest planowane ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)).
+:   Model Context Protocol. Pozwala agentowi AI wywoływać zewnętrzne narzędzia. `inwards mcp` udostępnia trzy z nich przez stdio: `check_files`, `explain_rule` i `where_should_this_go` ([poradnik](guides/mcp.md)).
 
 SARIF
 :   Static Analysis Results Interchange Format 2.1.0, format JSON dla wyników analizy. Przyjmuje go GitHub code scanning.

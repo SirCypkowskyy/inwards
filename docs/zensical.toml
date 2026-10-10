@@ -39,6 +39,7 @@ nav = [
     { "OpenCode" = "guides/opencode.md" },
     { "Aider" = "guides/aider.md" },
     { "AGENTS.md (Codex, Cursor, …)" = "guides/agents-md.md" },
+    { "MCP server" = "guides/mcp.md" },
     { "GitHub Actions" = "guides/ci.md" },
     { "Package shape" = "guides/package-shape.md" },
     { "Libraries per layer" = "guides/libraries.md" },

@@ -215,6 +215,7 @@
         "src/cli/src/init/**",
         "src/cli/src/json/**",
         "src/cli/src/lsp/**",
+        "src/cli/src/mcp/**",
         "src/cli/src/paths/**",
         "src/cli/src/platform/**",
         "src/cli/src/project/**",

@@ -24,6 +24,7 @@ flowchart TB
 
     architect -- "writes [tool.inwards]" --> repo
     agent -- "edits files; its hooks run inwards" --> inwards
+    agent -- "MCP tools" --> inwards
     dev -- "types in" --> editor
     editor -- "LSP" --> inwards
     ci -- "runs inwards check --format sarif" --> inwards
@@ -51,6 +52,7 @@ flowchart TB
     subgraph dist["Inwards"]
         cli["<b>inwards CLI</b><br/><small>TypeScript, compiled with bun build --compile<br/>single binary per OS/arch</small>"]
         server["<b>inwards server</b><br/><small>LSP over stdio, in the CLI binary</small>"]
+        mcp["<b>inwards mcp</b><br/><small>MCP over stdio, in the CLI binary</small>"]
         lsp["<b>Extension's language server</b><br/><small>TypeScript on Node, bundled in the extension<br/>until #64</small>"]
         ext["<b>VS Code extension</b><br/><small>LSP client, starts the server</small>"]
         core["<b>Engine</b> @inwards/core<br/><small>TypeScript library + tree-sitter WASM<br/>no I/O</small>"]
@@ -69,6 +71,8 @@ flowchart TB
     dev --> vscode --> ext -- "IPC" --> lsp
     dev --> other -- "stdio" --> server
     cli -- "runs" --> server
+    agent -- "stdio (MCP)" --> mcp
+    cli -- "runs" --> mcp
     cli -- "embeds" --> core
     lsp -- "bundles" --> core
     cli -- "reads" --> config
@@ -84,8 +88,9 @@ flowchart TB
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
 | **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013 |
-| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server` |
+| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
+| **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
 | **Extension's language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: until [#64](https://github.com/SirCypkowskyy/inwards/issues/64) switches the extension to `inwards server`: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; with a fresh engine when `pyproject.toml` changes; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` for `claude`, `aider` and `agents-md` |
@@ -222,6 +227,7 @@ The other commands reuse the same pieces:
 
 - `inwards hook claude-code` reads a Claude Code hook payload from stdin and dispatches on the event: SessionStart records the session state, PreToolUse runs the shape guard and the config guard, PostToolUse checks the edited file, and Stop runs the Stop gate over what the session changed. [Chapter 4](04-AI-Integration.md) describes each one.
 - `inwards daemon` keeps the engine warm for PostToolUse ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)). The hook sends it the payload, the working directory and the environment over a local socket, one JSON line each way; the daemon runs the same `hook claude-code` code with a runtime built from them and streams that collect the output, and the hook writes that output and exits with its code. It keeps only what content identifies: extractions by text hash and git answers by commit id. Without an answer the hook runs one-shot.
+- `inwards mcp` serves three tools to an agent's MCP client over stdio ([ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)). `check_files` runs `inwards check`'s routing and check with the agent's unwritten Python source laid over the disk, `explain_rule` serves the rule pages built into the binary, and `where_should_this_go` checks a module holding only the planned imports in each layer. The SDK and the pages load from their own chunks, only for this command.
 - `inwards init --agent claude|opencode|aider|agents-md` computes every file change first, so `--dry-run` can print it as a diff and a second run changes nothing.
 - `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi [--scaffold]` writes a preset's `[tool.inwards]` (and an example package with the package shapes that fit it) only where nothing exists yet, then runs the check in process and prints the package as an annotated tree. On a terminal with no flags, a picker built on `@clack/prompts` asks instead; it is loaded with a dynamic import that the build puts in its own chunk ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -437,25 +443,29 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook, daemon, server: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, hook, daemon, server, mcp: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
 │   │   ├── session/       # the session record, start identity and content, old errors,
 │   │   │                  #   agent suppressions, layout changes against the session start
-│   │   ├── project/       # running a check, the baseline, config discovery, project snapshots
+│   │   ├── project/       # running a check, the baseline, config discovery, project snapshots,
+│   │   │                  #   texts laid over the disk (overlay.ts)
 │   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
 │   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
 │   │   │                  #   the in-memory caches
 │   │   ├── lsp/           # inwards server: when to check what (session.ts), the whole pass
 │   │   │                  #   and the one-document check (checks.ts), what each file shows
+│   │   ├── mcp/           # inwards mcp: the three tools (check-files.ts, explain-rule.ts,
+│   │   │                  #   where.ts), queued one at a time (tools.ts)
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
 │   │                      #   the grammars, the picker, the daemon's socket and files,
-│   │                      #   the LSP connection over stdio (lsp-connection.ts);
+│   │                      #   the LSP connection over stdio (lsp-connection.ts), the MCP one
+│   │                      #   (mcp-connection.ts) and the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
 └── vscode-extension/

@@ -148,6 +148,8 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     An instruction is weaker than a hook, because the agent can skip it. Where the agent has a hook system, install the hook as well (`inwards init --agent claude`).
 
+    An agent with an MCP client (Codex CLI, Cursor and Claude Code among them) can also ask Inwards directly through `inwards mcp`: where new code belongs, whether code passes before it is written, and what a rule means. The [MCP guide](guides/mcp.md) has the setup for each client.
+
 ## What Inwards says, and why it's shaped that way
 
 ### Formats
@@ -241,7 +243,7 @@ Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy
 Fixing a violation costs a retry. Avoiding it costs nothing. Two features move Inwards earlier in the loop:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) prints a map of the layers, what each one may import, where ports live, and the library and context rules, in under 300 tokens. `inwards context --write` or `inwards init --brief` keeps it in a marked section of `AGENTS.md`. It is opt-in, so design partners can compare runs with and without it ([the brief](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** (planned, [#65](https://github.com/SirCypkowskyy/inwards/issues/65)) exposes Inwards as an MCP server with tools such as `check_files`, `explain_rule` and `where_should_this_go`. That last one takes a description ("SQL repository for orders") and answers with a layer and module path from the config.
+- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page.
 
 ```mermaid
 flowchart LR

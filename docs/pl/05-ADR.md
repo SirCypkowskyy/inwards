@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 34f6fd36d09f78c0c4fcf7bf6e974fd8cec65a3dd4c86c8835cd54b02db2428c
+source_hash: d147cfbd80af10610ba81f5a5f30562a75c6b75ccd7d6fdf68aaa45b139ab58f
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -50,6 +50,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
 | [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Wątki robocze parsują duże pełne sprawdzenie; wątek główny podejmuje każdą decyzję | :material-check-circle: Przyjęty |
 | [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia | :material-check-circle: Przyjęty |
+| [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` odpowiada sprawdzeniem `inwards check`, na tekstach nałożonych na dysk | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1217,3 +1218,38 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - *Projekt serwera rozszerzenia w pliku binarnym* (otwarte pliki sprawdzane w całości, reszta z listingu, indeks modułów utrzymywany przez obserwatory): przenosi niezgodność z `inwards check` do pliku binarnego i trzyma pamięć podręczną, której aktualność zależy od tego, czy dotrze każde zdarzenie.
 - *Przebieg całego projektu po każdym naciśnięciu klawisza:* zawsze dokładny, ale każda przerwa w pisaniu w dużym projekcie kosztuje sprawdzenie całego projektu, wobec 0,6 ms dla jednego pliku.
 - *Wątki robocze dla przebiegu:* każdy przebieg uruchamiałby od nowa pulę maszyn wirtualnych JavaScript albo trzymał jedną żywą na okno edytora; liczby z ADR-040 pokazują, że wątki opłacają się dopiero od około 1000 plików, a ciepły przebieg i tak korzysta z pamięci podręcznej.
+
+## ADR-042: `inwards mcp` odpowiada sprawdzeniem `inwards check`, na tekstach nałożonych na dysk { #adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk }
+
+**Stan:** Przyjęty · 2026-10-10 · [#65](https://github.com/SirCypkowskyy/inwards/issues/65)
+
+**Kontekst.** [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) nazwał `inwards mcp` trzecim długo działającym frontem: serwerem MCP przez stdio, uruchamianym przez klienta MCP agenta, korzystającym z modułu z rozgrzanym silnikiem i nierozmawiającym ani z `inwards server`, ani z `inwards daemon`. Zgłoszenie prosiło o trzy narzędzia: `check_files`, `explain_rule` i `where_should_this_go`. Hooki widzą kod dopiero po edycji; narzędzie MCP może odpowiedzieć, zanim agent coś zapisze, ale tylko wtedy, gdy agent zapyta. SDK MCP dla TypeScriptu ma dwie linie: v1 (`@modelcontextprotocol/sdk`), które dostaje już tylko poprawki błędów i bezpieczeństwa, oraz v2 (`@modelcontextprotocol/server` 2.3), które implementuje rewizję 2026-07-28 i nadal obsługuje klientów zaczynających od `initialize`. Claude Code i sam klient v2 wciąż zaczynają od `initialize` (2025-11-25).
+
+**Decyzja.**
+
+- **Jeden proces na sesję klienta, w CLI.** `src/cli/src/mcp/` zawiera politykę narzędzi, `adapters/mcp-connection.ts` mówi MCP przez stdio za pomocą SDK v2 (2.3.1) i jego `serveStdio`, które obsługuje obie ery protokołu z jednej fabryki serwera, a `commands/mcp.ts` to komenda. Schematy wejścia to Zod 4 (`zod` 4.6.5), które SDK zamienia na JSON Schema pokazywane przez `tools/list`. SDK, Zod i strony reguł ładują się przez dynamiczne importy, więc plik binarny trzyma je w chunkach, które czyta tylko `inwards mcp`; żadne wywołanie hooka za nie nie płaci.
+- **`check_files` to `inwards check`.** `planCheck` kieruje cele od katalogu roboczego, `runPlan` uruchamia i scala konfiguracje, a `runCheck` sprawdza, z rozgrzanym wejściem-wyjściem serwera języka (pamięć podręczna ekstrakcji w pamięci, jedno zachowane parsowanie, bez wątków roboczych). Kod Pythona, który agent przekazuje w `contents`, jest na czas wywołania nakładany na dysk (`project/overlay.ts`): plik, którego jeszcze nie ma, razem z brakującymi katalogami pakietów, pojawia się w sondzie, listingach, przejściu po drzewie, a więc i w indeksie modułów, i czyta się jako podany tekst. Odpowiedź to raport `inwards/diagnostics@1`. Nic nie jest zapisywane i nic nie trafia do run logu, bo wywołanie jest pytaniem, a nie uruchomieniem.
+- **`explain_rule` zwraca strony reguł.** Angielskie strony z `docs/chapters/rules/` są importowane jako tekst i wbudowane w plik binarny; narzędzie zwraca metadane z rejestru i sekcje strony What it does, Why is this bad, Example i How to fix (z `full` każdą sekcję), bez znaczników testów i z linkami względnymi zamienionymi na bezwzględne. Test nie przechodzi, gdy zarejestrowana reguła nie ma wbudowanej strony.
+- **`where_should_this_go` pyta sprawdzenie, a nie czyta konfiguracji drugi raz.** Dla modułu, który wskazał agent, i dla nowego modułu w pierwszym dosłownym prefiksie każdej warstwy sprawdza w pamięci moduł próbny, który zawiera tylko planowane importy. Import jest odrzucony dokładnie wtedy, gdy prawdziwy plik w tym miejscu dostałby INW001, INW002, INW003, INW005 albo INW010. Sugestia to wskazany moduł, gdy jego importy przechodzą; w przeciwnym razie, spośród warstw, w których przechodzą wszystkie, ta, na którą wskazuje opis, a gdy żadna, najbardziej wewnętrzna; bez importów warstwa nazwana w opisie albo wskazana przez krótką listę słów o roli kodu.
+- **Tylko do odczytu i po kolei.** Każde narzędzie jest oznaczone jako tylko do odczytu i idempotentne. Wywołania idą jedno po drugim, jak sprawdzenia serwera języka, więc dwa nigdy nie dzielą zachowanego parsowania. Każde wywołanie czyta konfigurację, baseline i listing od nowa.
+- **Stdout należy do protokołu.** Sprawdzenia dostają strumienie, których stdout pisze na stderr, tak jak w `inwards server`. Serwer kończy pracę, gdy klient zamyka stdin.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Każdy klient MCP dostaje trzy narzędzia z jednego pliku binarnego; Claude Code i Codex CLI wypróbowano ręcznie, a testy sterują skompilowanym plikiem binarnym przez stdio klientem z SDK, w obu erach.
+- :material-plus-circle-outline: Agent może sprawdzić kod, zanim go zapisze, także w pakiecie, którego jeszcze nie ma, i dostać te same diagnostyki i kroki naprawy, które hook PostToolUse dałby po edycji.
+- :material-plus-circle-outline: `where_should_this_go` przestrzega każdej reguły, która ocenia importy, łącznie z kontekstami i regułami bibliotek, bez własnego kodu, który mógłby się z nimi rozjechać.
+- :material-minus-circle-outline: Plik binarny zawiera SDK i Zod (około 0,5 MB po minifikacji) oraz strony reguł (około 0,2 MB), ładowane tylko przez `inwards mcp`.
+- :material-minus-circle-outline: `explain_rule` zwraca tylko wersję angielską; polskie strony zostają na stronie dokumentacji.
+- :material-minus-circle-outline: Każda próba to sprawdzenie: jedno na warstwę i jedno dla wskazanego modułu. Konfiguracja z wieloma warstwami spowalnia wywołanie, choć każde to sprawdzenie jednego pliku na rozgrzanych pamięciach podręcznych.
+- :material-minus-circle-outline: Podpowiedź z opisu to lista słów. Zna angielskie słowa o roli kodu i skonfigurowane nazwy, nic więcej.
+- :material-minus-circle-outline: Moduł próbny nie odróżni nazwy pisanej małą literą w module (`shop.domain.order.total`) od podmodułu; narzędzie czyta ją jako moduł, więc INW010 może ją zgłosić. Nazwy wielką literą (`Order`) są importowane jako nazwy.
+
+**Alternatywy.**
+
+- *SDK v1:* ten sam kształt API, ale tylko utrzymanie, i bez obsługi rewizji 2026-07-28.
+- *JSON-RPC pisany ręcznie:* bez zależności, ale dwie ery protokołu, walidacja schematów i handshake byłyby na naszej głowie przy każdej zmianie specyfikacji.
+- *`where_should_this_go` z samej konfiguracji* (kolejność warstw i prefiksy): prostsze, ale pominęłoby konteksty, reguły bibliotek i moduły, których nie ma, i powtarzało logikę reguł poza silnikiem.
+- *Model językowy do czytania opisu:* Inwards nie ma sieci ani modelu, a odpowiedź powinna być za każdym razem taka sama.
+- *Strony reguł jako zasoby MCP:* klienci podsuwają modelowi narzędzia pewniej niż zasoby, a zgłoszenie prosiło o narzędzie. Zasoby mogą przyjść później.
+- *`explain_rule` z opublikowanej strony:* wymaga sieci, a strona mogłaby opisywać inną wersję niż ta w pliku binarnym.

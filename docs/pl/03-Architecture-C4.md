@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 3ec9c497916ed2e8beb434acb34ff68e76da24a53bd3abd8c896ebdcfd103c13
+source_hash: fa4d403101e3753fd0b2de1a2acba4cef924969db2923632282337a03c7006e4
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -29,6 +29,7 @@ flowchart TB
 
     architect -- "pisze [tool.inwards]" --> repo
     agent -- "edytuje pliki; jego hooki uruchamiają inwards" --> inwards
+    agent -- "narzędzia MCP" --> inwards
     dev -- "pisze w" --> editor
     editor -- "LSP" --> inwards
     ci -- "uruchamia inwards check --format sarif" --> inwards
@@ -56,6 +57,7 @@ flowchart TB
     subgraph dist["Inwards"]
         cli["<b>inwards CLI</b><br/><small>TypeScript, kompilowany przez bun build --compile<br/>jeden plik binarny na OS/architekturę</small>"]
         server["<b>inwards server</b><br/><small>LSP przez stdio, w pliku binarnym CLI</small>"]
+        mcp["<b>inwards mcp</b><br/><small>MCP przez stdio, w pliku binarnym CLI</small>"]
         lsp["<b>Serwer języka rozszerzenia</b><br/><small>TypeScript na Node, dołączony do rozszerzenia<br/>do #64</small>"]
         ext["<b>Rozszerzenie VS Code</b><br/><small>klient LSP, uruchamia serwer</small>"]
         core["<b>Silnik</b> @inwards/core<br/><small>biblioteka TypeScript + tree-sitter WASM<br/>bez operacji wejścia-wyjścia</small>"]
@@ -74,6 +76,8 @@ flowchart TB
     dev --> vscode --> ext -- "IPC" --> lsp
     dev --> other -- "stdio" --> server
     cli -- "uruchamia" --> server
+    agent -- "stdio (MCP)" --> mcp
+    cli -- "uruchamia" --> mcp
     cli -- "zawiera" --> core
     lsp -- "dołącza" --> core
     cli -- "czyta" --> config
@@ -89,8 +93,9 @@ flowchart TB
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
 | **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013 |
-| **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server` |
+| **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
+| **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
 | **Serwer języka rozszerzenia** | `vscode-languageserver` 10 na Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: do czasu, gdy [#64](https://github.com/SirCypkowskyy/inwards/issues/64) przełączy rozszerzenie na `inwards server`: każda reguła jednoplikowa, przy każdej zmianie otwartego pliku oraz gdy powstaje albo znika plik lub katalog, który może być modułem; z nowym silnikiem, gdy zmienia się `pyproject.toml`; INW007 i INW008 dla całego obszaru roboczego na podstawie zawartości katalogów |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` w każdym wydaniu, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` dla `claude`, `aider` i `agents-md` |
@@ -227,6 +232,7 @@ Pozostałe polecenia korzystają z tych samych elementów:
 
 - `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia shape guard i config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
 - `inwards daemon` trzyma silnik w gotowości dla PostToolUse ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)). Hook wysyła mu przez lokalne gniazdo dane hooka, katalog roboczy i środowisko, po jednej linii JSON w każdą stronę; daemon uruchamia ten sam kod `hook claude-code` ze środowiskiem zbudowanym z tych danych i strumieniami, które zbierają wyjście, a hook wypisuje to wyjście i kończy się z jego kodem. Daemon trzyma tylko to, co identyfikuje treść: ekstrakcje według skrótu tekstu i odpowiedzi gita według identyfikatora commita. Bez odpowiedzi hook uruchamia się jednorazowo.
+- `inwards mcp` udostępnia trzy narzędzia klientowi MCP agenta przez stdio ([ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)). `check_files` uruchamia routing i sprawdzenie `inwards check` z niezapisanym jeszcze kodem Pythona od agenta nałożonym na dysk, `explain_rule` zwraca strony reguł wbudowane w plik binarny, a `where_should_this_go` sprawdza w każdej warstwie moduł zawierający tylko planowane importy. SDK i strony ładują się z osobnych chunków, tylko dla tego polecenia.
 - `inwards init --agent claude|opencode|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
 - `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet z pasującymi do niego kształtami pakietów) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -442,25 +448,29 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook, daemon, server: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, hook, daemon, server, mcp: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
 │   │   ├── session/       # the session record, start identity and content, old errors,
 │   │   │                  #   agent suppressions, layout changes against the session start
-│   │   ├── project/       # running a check, the baseline, config discovery, project snapshots
+│   │   ├── project/       # running a check, the baseline, config discovery, project snapshots,
+│   │   │                  #   texts laid over the disk (overlay.ts)
 │   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
 │   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
 │   │   │                  #   the in-memory caches
 │   │   ├── lsp/           # inwards server: when to check what (session.ts), the whole pass
 │   │   │                  #   and the one-document check (checks.ts), what each file shows
+│   │   ├── mcp/           # inwards mcp: the three tools (check-files.ts, explain-rule.ts,
+│   │   │                  #   where.ts), queued one at a time (tools.ts)
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
 │   │                      #   the grammars, the picker, the daemon's socket and files,
-│   │                      #   the LSP connection over stdio (lsp-connection.ts);
+│   │                      #   the LSP connection over stdio (lsp-connection.ts), the MCP one
+│   │                      #   (mcp-connection.ts) and the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
 └── vscode-extension/

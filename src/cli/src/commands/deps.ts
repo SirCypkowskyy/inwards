@@ -2,7 +2,8 @@
  * @file What the CLI's commands are given: everything the hook handlers get, plus
  * the storage only some commands write (the baseline, the export), a TOML
  * parser for the uv workspace, the daemon's socket and per-request
- * wiring (ADR-039), and the language server's connection and check (ADR-041). `main.ts`
+ * wiring (ADR-039), the language server's connection and check (ADR-041),
+ * and the MCP server's (ADR-042). `main.ts`
  * builds one `AppDeps` per invocation from the adapters; commands never
  * import an adapter themselves.
  */
@@ -12,8 +13,12 @@ import type { HookRequest } from "../daemon/protocol.ts";
 import type { InitDeps } from "../init/contracts.ts";
 import type { ServerCheck } from "../lsp/checks.ts";
 import type { Editor, LanguageServer } from "../lsp/contracts.ts";
+import type { McpTools } from "../mcp/contracts.ts";
+import type { RulePages } from "../mcp/explain-rule.ts";
+import type { Platform } from "../platform/contracts.ts";
 import type { BaselineWriter } from "../project/contracts.ts";
 import type { ExportFiles } from "../runlog/contracts.ts";
+import type { CheckRunner } from "../session/contracts.ts";
 
 /** What the hook and `inwards daemon` need for the resident process. */
 export interface DaemonDeps {
@@ -49,12 +54,38 @@ export interface LspDeps {
   check: ServerCheck;
 }
 
+/** What `inwards mcp` needs: the MCP connection, the rule pages and a warm check. */
+export interface McpDeps {
+  /**
+   * Serves MCP over stdio until the client closes stdin.
+   *
+   * @param tools - the tools to serve.
+   * @returns the exit code, once the client has gone.
+   */
+  serve: (tools: McpTools) => Promise<number>;
+  /**
+   * Loads the rule pages, which only `inwards mcp` carries in memory.
+   *
+   * @returns the English rule pages' Markdown, by code.
+   */
+  pages: () => Promise<RulePages>;
+  /** The platform, with streams that keep stdout for the protocol. */
+  io: Platform;
+  /**
+   * Runs a check with the server's in-memory extraction cache, on one thread;
+   * its `texts` may name Python files that don't exist yet.
+   */
+  check: CheckRunner;
+}
+
 /** One invocation's dependencies. */
 export interface AppDeps extends HookDeps {
   /** The resident process for PostToolUse (`inwards daemon`). */
   daemon: DaemonDeps;
   /** The language server (`inwards server`). */
   lsp: LspDeps;
+  /** The MCP server (`inwards mcp`). */
+  mcp: McpDeps;
   /** Replaces `inwards-baseline.json`. */
   baselines: BaselineWriter;
   /** Keeps the export key and writes the export. */

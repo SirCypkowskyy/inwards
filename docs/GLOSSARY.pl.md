@@ -70,6 +70,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | File and config names | `pyproject.toml`, `[tool.inwards]`, `AGENTS.md`, `escalate-after`, ... | |
 | Product names | Claude Code, Aider, Codex, Cursor, Copilot, Ruff, ty, mypy, import-linter, tree-sitter, Bun, Zensical, ... | |
 | Tool terms | LSP, MCP, SARIF, WASM, CI, C4, ADR, JSON | |
+| MCP tool names and their arguments | `check_files`, `explain_rule`, `where_should_this_go`, `contents`, `paths` | |
 | scaffold (the example code, also the repo's early code) | scaffold (scaffoldu) | the `--scaffold` flag's output is "przykładowy pakiet" |
 | fixture | fixture (fixture'a, fixture'y) | test and eval fixtures |
 | ruleset (GitHub) | ruleset (rulesetu) | |
@@ -266,3 +267,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | workspace folder (editor) | folder obszaru roboczego |
 | file watcher (editor) | obserwator plików |
 | whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
+| MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |
+| tool (MCP) | narzędzie |
+| structured content (an MCP tool result's `structuredContent`) | treść strukturalna |
+| probe module (`where_should_this_go`) | moduł próbny |
+| protocol era, revision (MCP) | era protokołu, rewizja |
+| texts laid over the disk (`project/overlay.ts`) | teksty nałożone na dysk |

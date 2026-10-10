@@ -5,7 +5,7 @@
  * pins this list, so a change to it is deliberate.
  */
 export { baselineKey, stableMessage } from "./baseline/accepted.ts";
-export type { ContextSpec } from "./config/contexts.ts";
+export { type ContextSpec, contextOf } from "./config/contexts.ts";
 export { CONFIG_DEFAULTS } from "./config/defaults.ts";
 export type { AgentSuppressions } from "./config/hook-keys.ts";
 export type { LayerSpec } from "./config/layers.ts";

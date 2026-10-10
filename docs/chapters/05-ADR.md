@@ -45,6 +45,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-check-circle: Accepted |
 | [040](#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision) | Worker threads parse a large full check; the main thread keeps every decision | :material-check-circle: Accepted |
 | [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted |
+| [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1212,3 +1213,38 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 - *The extension server's design in the binary* (open files checked in full, the rest from a listing, a module index kept by watchers): moves the disagreement with `inwards check` into the binary, and keeps a cache whose staleness depends on every event arriving.
 - *A whole pass on every keystroke:* always exact, but a pause in typing in a large project costs a whole check, against 0.6 ms for one file.
 - *Worker threads for the pass:* each pass would start a pool of JavaScript VMs again or keep one alive per editor window; ADR-040's numbers show threads pay only from about 1,000 files, and a warm pass is already cached.
+
+## ADR-042: `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk
+
+**Status:** Accepted · 2026-10-10 · [#65](https://github.com/SirCypkowskyy/inwards/issues/65)
+
+**Context.** [ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) named `inwards mcp` as a third long-lived front end: an MCP server over stdio, started by the agent's MCP client, sharing the warm-engine module and talking to neither `inwards server` nor `inwards daemon`. The issue asked for three tools: `check_files`, `explain_rule` and `where_should_this_go`. The hooks see code only after an edit; an MCP tool can answer before the agent writes, but only when the agent asks. The MCP TypeScript SDK has two lines: v1 (`@modelcontextprotocol/sdk`), now on bug and security fixes only, and v2 (`@modelcontextprotocol/server` 2.3), which implements the 2026-07-28 revision and still serves clients that open with `initialize`. Claude Code and the v2 client itself still open with `initialize` (2025-11-25).
+
+**Decision.**
+
+- **One process per client session, in the CLI.** `src/cli/src/mcp/` holds the tools' policy, `adapters/mcp-connection.ts` speaks MCP over stdio with the SDK v2 (2.3.1) and its `serveStdio`, which serves both protocol eras from one server factory, and `commands/mcp.ts` is the command. Input schemas are Zod 4 (`zod` 4.6.5), which the SDK turns into the JSON Schema `tools/list` shows. The SDK, Zod and the rule pages load with dynamic imports, so the binary keeps them in chunks only `inwards mcp` reads; no hook call pays for them.
+- **`check_files` is `inwards check`.** `planCheck` routes the targets from the working directory, `runPlan` runs and merges the configs, and `runCheck` checks, with the language server's warm I/O (in-memory extraction cache, one kept parse, no worker threads). Python source an agent passes in `contents` is laid over the disk for that call (`project/overlay.ts`): a file that doesn't exist yet, with any missing package directories, appears in the probe, the listings, the walk and so the module index, and reads as the given text. The answer is the `inwards/diagnostics@1` report. Nothing is written, and nothing is noted in the run log, since a call is a question rather than a run.
+- **`explain_rule` serves the rule pages.** The English pages in `docs/chapters/rules/` are imported as text and built into the binary; the tool returns the registry's metadata and the page's What it does, Why is this bad, Example and How to fix sections (every section with `full`), with test markers dropped and relative links made absolute. A test fails when a registered rule has no embedded page.
+- **`where_should_this_go` asks the check, not a second reading of the config.** For the module the agent names, and for a new module in each layer's first literal prefix, it checks a probe module that holds only the planned imports, in memory. An import is refused exactly when a real file there would get INW001, INW002, INW003, INW005 or INW010. The suggestion is the named module when its imports pass; else, among the layers where they all pass, the one the description points to, else the innermost; without imports, the layer the description names or a short list of role words points to.
+- **Read-only and serial.** Every tool is annotated read-only and idempotent. Calls run one at a time, like the language server's checks, so two never share the kept parse. Each call reads the config, the baseline and the listing again.
+- **Stdout belongs to the protocol.** The checks get streams whose stdout writes to stderr, as `inwards server`'s do. The server ends when the client closes stdin.
+
+**Consequences.**
+
+- :material-plus-circle-outline: Any MCP client gets the three tools from the one binary; Claude Code and Codex CLI were tried by hand, and the tests drive the compiled binary over stdio with the SDK's client in both eras.
+- :material-plus-circle-outline: An agent can check code before writing it, in a package that doesn't exist yet, and get the same findings and fix steps the PostToolUse hook would give after the edit.
+- :material-plus-circle-outline: `where_should_this_go` follows every rule that judges imports, including contexts and library rules, with no code of its own that could drift from them.
+- :material-minus-circle-outline: The binary carries the SDK and Zod (about 0.5 MB minified) and the rule pages (about 0.2 MB), loaded only by `inwards mcp`.
+- :material-minus-circle-outline: `explain_rule` serves English only; the Polish pages stay on the site.
+- :material-minus-circle-outline: Each probe is a check: one per layer, plus the named module. A config with many layers makes the call slower, though each is a one-file check on warm caches.
+- :material-minus-circle-outline: The description hint is a word list. It knows English role words and the configured names, nothing else.
+- :material-minus-circle-outline: A probe can't tell a lowercase name in a module (`shop.domain.order.total`) from a submodule; the tool reads it as a module, so INW010 may report it. Capitalised names (`Order`) are imported as names.
+
+**Alternatives.**
+
+- *SDK v1:* the same API shape, but maintenance only, and it doesn't serve the 2026-07-28 revision.
+- *JSON-RPC written by hand:* no dependency, but two protocol eras, schema validation and the handshake would be ours to keep up with the spec.
+- *`where_should_this_go` from the config alone* (layer order and prefixes): simpler, but it would miss contexts, library rules and modules that don't exist, and repeat the rules' logic outside the engine.
+- *A model to read the description:* Inwards has no network and no model, and an answer should be the same every time.
+- *Rule pages as MCP resources:* clients surface tools to the model more reliably than resources, and the issue asked for a tool. Resources can come later.
+- *Serving `explain_rule` from the published site:* needs the network, and the page could describe another version than the binary's.
