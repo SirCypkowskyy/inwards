@@ -47,7 +47,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` runs `inwards check`'s own code; the extension's Node server stays until it switches | :material-check-circle: Accepted, the extension switched in [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk | :material-check-circle: Accepted |
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | The VS Code extension bundles the binary, one VSIX per platform | :material-check-circle: Accepted |
-| [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot through an `inwards hook copilot` entry point and a committed hooks file | :material-help-circle-outline: Proposed, waits for the owner |
+| [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot through an `inwards hook copilot` entry point and a committed hooks file | :material-check-circle: Accepted, built after the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1285,7 +1285,7 @@ The spike ([chapter 6](06-Constraints-and-Quality.md#spike-a-resident-process)) 
 
 ## ADR-044: Copilot through an `inwards hook copilot` entry point and a committed hooks file
 
-**Status:** Proposed · 2026-10-11 · [#316](https://github.com/SirCypkowskyy/inwards/issues/316) · waits for the owner's acceptance and for the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records
+**Status:** Accepted · 2026-10-11 · [#316](https://github.com/SirCypkowskyy/inwards/issues/316) · the work starts with the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records
 
 **Context.** The [Copilot guide](guides/copilot.md) wires Copilot to Inwards through `AGENTS.md`, the editor extension, `inwards mcp` and CI, so Copilot gets no config guard and no Stop gate. Copilot now runs agent hooks on four surfaces. What follows comes from the docs read on 2026-10-11: GitHub's [hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference), [About hooks](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-hooks), [Using hooks with the Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-hooks) and [Customize the cloud agent with hooks](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/use-hooks) (none of the four shows a date), and VS Code's [hooks guide](https://code.visualstudio.com/docs/agent-customization/hooks) and [hooks reference](https://code.visualstudio.com/docs/agents/reference/hooks-reference) (both dated 2026-10-07). No Copilot session ran: neither the Copilot CLI nor VS Code is installed on the machine the spike ran on, and nothing was signed in to.
 
@@ -1308,7 +1308,7 @@ So every surface can deny a tool call and keep a turn going, which is what the c
 
 In VS Code's Local harness the exit codes mean what they mean to Claude Code, but the tool names differ, so the guard sees calls it doesn't recognise and lets them through.
 
-**Decision (proposed).**
+**Decision.**
 
 - **Record first.** A logging hook on each of the four surfaces records `sessionStart`, `preToolUse` and `postToolUse` for `edit`, `create`, `bash` and `apply_patch`, and `agentStop`, and the recordings become test fixtures ([#320](https://github.com/SirCypkowskyy/inwards/issues/320)). The Claude Code adapter was built the same way, against recorded payloads.
 - **One entry point for Copilot's dialects, in the CLI.** `inwards hook copilot` ([#321](https://github.com/SirCypkowskyy/inwards/issues/321)) reads the camelCase payload, the PascalCase one and the Local harness's, telling them apart by the payload: only the snake_case ones carry `hook_event_name`. Copilot's PascalCase variant and the Local harness's payload look alike, and #320 finds what tells them apart. Until then the hooks file uses camelCase event names, so Copilot sends camelCase and only the Local harness sends snake_case. It turns each into the call the handlers take now (Claude's tool names and argument names) and answers in the caller's dialect: a deny as exit 2 with `permissionDecision` on stdout and the reason on stderr, which both Copilot and the Local harness read as a deny; a finding after an edit as `additionalContext`; a Stop gate block as `decision: "block"` with the gate's reasons, or exit 2 and stderr for the Local harness. The handlers keep their policy and return their answer instead of printing it, and each host's entry point prints it.

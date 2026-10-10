@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 7b061e6a5d20ed26bdfb71acaf0534478dbf541906061263bd591610b32e3db8
+source_hash: a939e515ee0c9f4922d5c12adc22694bd28dc70b9292ce038f2c1a1ef25ec8fc
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -52,7 +52,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia | :material-check-circle: Przyjęty, rozszerzenie przełączone w [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` odpowiada sprawdzeniem `inwards check`, na tekstach nałożonych na dysk | :material-check-circle: Przyjęty |
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
-| [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-help-circle-outline: Proponowany, czeka na właściciela |
+| [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1290,7 +1290,7 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 
 ## ADR-044: Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków { #adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file }
 
-**Stan:** Proponowany · 2026-10-11 · [#316](https://github.com/SirCypkowskyy/inwards/issues/316) · czeka na akceptację właściciela i na dane wejściowe, które nagra [#320](https://github.com/SirCypkowskyy/inwards/issues/320)
+**Stan:** Przyjęty · 2026-10-11 · [#316](https://github.com/SirCypkowskyy/inwards/issues/316) · prace zaczynają się od danych wejściowych, które nagra [#320](https://github.com/SirCypkowskyy/inwards/issues/320)
 
 **Kontekst.** [Przewodnik po Copilocie](guides/copilot.md) łączy Copilota z Inwards przez `AGENTS.md`, rozszerzenie edytora, `inwards mcp` i CI, więc Copilot nie dostaje ani config guarda, ani Stop gate. Copilot uruchamia teraz hooki agenta w czterech miejscach. Poniższe pochodzi z dokumentacji czytanej 2026-10-11: z [opisu hooków](https://docs.github.com/en/copilot/reference/hooks-reference) GitHuba, [About hooks](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-hooks), [Using hooks with the Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-hooks) i [Customize the cloud agent with hooks](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/use-hooks) (żadna z czterech stron nie podaje daty) oraz z [przewodnika po hookach](https://code.visualstudio.com/docs/agent-customization/hooks) i [opisu hooków](https://code.visualstudio.com/docs/agents/reference/hooks-reference) VS Code (obie z datą 2026-10-07). Nie uruchomiono żadnej sesji Copilota: na maszynie, na której przeprowadzono eksperyment, nie ma ani Copilot CLI, ani VS Code, i nigdzie się nie logowano.
 
@@ -1313,7 +1313,7 @@ Każda z tych powierzchni potrafi więc odmówić wywołania narzędzia i przed�
 
 W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, ale nazwy narzędzi są inne, więc config guard widzi wywołania, których nie rozpoznaje, i je przepuszcza.
 
-**Decyzja (proponowana).**
+**Decyzja.**
 
 - **Najpierw nagranie.** Hook zapisujący dane wejściowe na każdej z czterech powierzchni nagrywa `sessionStart`, `preToolUse` i `postToolUse` dla `edit`, `create`, `bash` i `apply_patch` oraz `agentStop`, a nagrania stają się fixture'ami testów ([#320](https://github.com/SirCypkowskyy/inwards/issues/320)). Adapter Claude Code powstał tak samo, na nagranych danych wejściowych.
 - **Jeden punkt wejścia dla dialektów Copilota, w CLI.** `inwards hook copilot` ([#321](https://github.com/SirCypkowskyy/inwards/issues/321)) czyta dane wejściowe w camelCase, w PascalCase i te z harnessu Local, rozróżniając je po samych danych: tylko te w snake_case mają `hook_event_name`. Wariant PascalCase Copilota i dane z harnessu Local wyglądają tak samo; co je odróżnia, ustali #320. Do tego czasu plik hooków używa nazw zdarzeń w camelCase, więc Copilot wysyła camelCase, a snake_case przychodzi tylko z harnessu Local. Każde zamienia na wywołanie, które handlery przyjmują dziś (nazwy narzędzi i argumentów Claude'a), i odpowiada w dialekcie wywołującego: odmowa to kod wyjścia 2 z `permissionDecision` na stdout i powodem na stderr, co i Copilot, i harness Local czytają jako odmowę; diagnostyka po edycji to `additionalContext`; blokada Stop gate to `decision: "block"` z powodami bramki albo, dla harnessu Local, kod wyjścia 2 i stderr. Handlery zachowują swoją politykę i zwracają odpowiedź zamiast ją drukować, a drukuje ją punkt wejścia danego hosta.
