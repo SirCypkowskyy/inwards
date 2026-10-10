@@ -70,7 +70,7 @@ export const FASTAPI: Style = {
     why: "Domains may use each other's public modules without declaring it; INW003 keeps them to those.",
   },
   optIn: {
-    codes: ["FAPI001", "FAPI002", "FAPI003"],
+    codes: ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009"],
     why: "The FastAPI rules, as warnings to start with: make them errors once the project is clean.",
     options: [
       {

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: ebf6cb1b0e75e7e3300f8c4d2669a82041b179ebc71de058083ee90f28323928
+source_hash: c4aa450be6492d7f9dddcdbd6971a884a2c0ebaeefade3f6bd6e2520c9f30466
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -32,7 +32,7 @@ Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki auto
 
 ## Reguły FastAPI { #fastapi }
 
-Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa.
+Rodzina `FAPI` sprawdza aplikacje FastAPI między plikami: który router aplikacja dołącza, jakie kody błędów deklaruje schemat OpenAPI ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Każda reguła FAPI jest opt-in i żadna nie zgłasza tego, co już zgłaszają reguły `FAST` Ruffa. W nowym projekcie [`inwards init --style fastapi`](../guides/install.md#a-new-project-start-from-a-preset) włącza je wszystkie jako ostrzeżenia.
 
 <div class="inw-rules-fallback" markdown>
 

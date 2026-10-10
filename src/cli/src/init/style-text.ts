@@ -239,7 +239,9 @@ function roleRanks(roles: readonly { name: string; sibling?: true }[]): string[]
 
 /**
  * Writes `[tool.inwards.rules]`: the rules the preset turns off, the opt-in
- * rules it turns on as warnings, and their options tables.
+ * rules it turns on, a severity table that makes each of them a warning (one
+ * line per rule, so a user deletes a line to report the rule at its own severity again), and their
+ * options tables.
  *
  * @param style - the preset.
  * @returns the lines, after a blank line, or none when the preset sets no rules.
@@ -256,8 +258,14 @@ function rulesLines(style: Style): string[] {
   if (on === undefined) {
     return lines;
   }
-  const severity = on.codes.map((code) => `${code} = "warning"`).join(", ");
-  lines.push(`# ${on.why}`, `extend-select = ${array(on.codes)}`, `severity = { ${severity} }`);
+  lines.push(
+    `# ${on.why}`,
+    `extend-select = ${array(on.codes)}`,
+    "",
+    "# Delete a line to report that rule at its own severity, an error for most findings.",
+    "[tool.inwards.rules.severity]",
+    ...on.codes.map((code) => `${code} = "warning"`),
+  );
   for (const table of on.options) {
     lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...table.lines);
   }

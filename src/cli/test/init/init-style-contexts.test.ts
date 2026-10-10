@@ -227,7 +227,9 @@ describe("fastapi, in the fastapi-best-practices layout (--package src)", () => 
     const { root, run, check } = bestPractices();
     expect({ init: run.code, check }).toEqual(PASSING);
     const text = readFileSync(join(root, "pyproject.toml"), "utf8");
-    expect(text).toContain('extend-select = ["FAPI001", "FAPI002", "FAPI003"]');
+    expect(text).toContain(
+      'extend-select = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009"]',
+    );
     expect(text).toContain("report-direct-raises = false");
     expect(text).not.toContain("tool.ruff");
     expect(run.stdout).toContain('extend-select = ["ASYNC", "FAST", "TID251"]');
@@ -243,6 +245,15 @@ describe("fastapi, in the fastapi-best-practices layout (--package src)", () => 
     expect(text).toContain(declared);
     writeFileSync(router, text.replace(declared, ""));
     expect(findings(root)).toEqual({ code: 0, findings: ["FAPI002 src/posts/router.py"] });
+  });
+
+  test("a deprecated startup event in main.py is a FAPI006 warning", () => {
+    const { root } = bestPractices();
+    appendFileSync(
+      join(root, "src/main.py"),
+      '\n\n@app.on_event("startup")\nasync def warm_up() -> None:\n    """Runs once at startup."""\n',
+    );
+    expect(findings(root)).toEqual({ code: 0, findings: ["FAPI006 src/main.py"] });
   });
 
   test("a helpers module in a domain fails with INW007, the service importing the router with INW001", () => {
