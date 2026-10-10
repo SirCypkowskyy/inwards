@@ -218,10 +218,11 @@ function portModules(
  * @returns e.g. `app.application.ports`, or undefined when that layer isn't configured or has only selectors.
  */
 function presetPorts(style: Style, config: InwardsConfig): string | undefined {
-  if (style.example === undefined) {
+  const { example } = style;
+  if (typeof example === "function") {
     return undefined;
   }
-  const parent = style.example.port.split(".").slice(0, -1).join(".");
+  const parent = example.port.split(".").slice(0, -1).join(".");
   const owner = expandLayers(style).find(
     (layer) => parent === layer.module || parent.startsWith(`${layer.module}.`),
   );

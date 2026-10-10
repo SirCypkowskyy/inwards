@@ -5,7 +5,8 @@
  * planted import across the boundary fails with INW002 or INW003, one against
  * a role's order with INW001, while an import through the public module
  * passes. Hexagonal's adapters are sibling layers, so one importing the other
- * fails with INW001.
+ * fails with INW001. The fastapi preset is also checked in the
+ * fastapi-best-practices layout, with its FastAPI rules on.
  */
 import { describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -203,6 +204,78 @@ describe("django", () => {
     expect(result).toEqual(PASSING);
     write(root, { "src/my_app/orders/models.py": "from my_app.orders.views import place\n" });
     expect(findings(root)).toEqual({ code: 1, findings: ["INW001 src/my_app/orders/models.py"] });
+  });
+});
+
+describe("fastapi, in the fastapi-best-practices layout (--package src)", () => {
+  /**
+   * Scaffolds the fastapi preset with `src` as the import package, as fastapi-best-practices has it.
+   *
+   * @returns the project directory, the init run and the findings of a check right after.
+   */
+  function bestPractices(): {
+    root: string;
+    run: ReturnType<typeof init>;
+    check: ReturnType<typeof findings>;
+  } {
+    const root = project({ "pyproject.toml": '[project]\nname = "blog"\nversion = "0.1.0"\n' });
+    const run = init(root, "--style", "fastapi", "--scaffold", "--package", "src");
+    return { root, run, check: findings(root) };
+  }
+
+  test("the scaffold passes with the FAPI rules on, and init prints the Ruff config without writing it", () => {
+    const { root, run, check } = bestPractices();
+    expect({ init: run.code, check }).toEqual(PASSING);
+    const text = readFileSync(join(root, "pyproject.toml"), "utf8");
+    expect(text).toContain(
+      'extend-select = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009"]',
+    );
+    expect(text).toContain("report-direct-raises = false");
+    expect(text).not.toContain("tool.ruff");
+    expect(run.stdout).toContain('extend-select = ["ASYNC", "FAST", "TID251"]');
+    expect(run.stdout).toContain('"src/models.py" = ["TID251"]');
+  });
+
+  test("an undeclared error response is a FAPI002 warning", () => {
+    const { root } = bestPractices();
+    const router = join(root, "src/posts/router.py");
+    const text = readFileSync(router, "utf8");
+    const declared =
+      '    responses={status.HTTP_404_NOT_FOUND: {"description": "No post has this id"}},\n';
+    expect(text).toContain(declared);
+    writeFileSync(router, text.replace(declared, ""));
+    expect(findings(root)).toEqual({ code: 0, findings: ["FAPI002 src/posts/router.py"] });
+  });
+
+  test("a deprecated startup event in main.py is a FAPI006 warning", () => {
+    const { root } = bestPractices();
+    appendFileSync(
+      join(root, "src/main.py"),
+      '\n\n@app.on_event("startup")\nasync def warm_up() -> None:\n    """Runs once at startup."""\n',
+    );
+    expect(findings(root)).toEqual({ code: 0, findings: ["FAPI006 src/main.py"] });
+  });
+
+  test("a helpers module in a domain fails with INW007, the service importing the router with INW001", () => {
+    const { root } = bestPractices();
+    write(root, { "src/posts/helpers.py": "VALUE = 1\n" });
+    expect(findings(root)).toEqual({ code: 1, findings: ["INW007 src/posts/helpers.py"] });
+    const service = join(root, "src/posts/service.py");
+    writeFileSync(service, `from src.posts.router import router\n${readFileSync(service, "utf8")}`);
+    expect(findings(root).findings).toContain("INW001 src/posts/service.py");
+  });
+
+  test("a domain importing another domain's models fails with INW003; its service passes", () => {
+    const { root } = bestPractices();
+    addContext(root, 'name = "auth"', 'modules = ["src.auth"]', 'template = "fastapi-domain"');
+    write(root, {
+      "src/auth/__init__.py": "",
+      "src/auth/router.py": "",
+      "src/auth/service.py": "from src.posts.models import Post\n",
+    });
+    expect(findings(root)).toEqual({ code: 1, findings: ["INW003 src/auth/service.py"] });
+    write(root, { "src/auth/service.py": "from src.posts.service import get_post\n" });
+    expect(findings(root)).toEqual({ code: 0, findings: [] });
   });
 });
 

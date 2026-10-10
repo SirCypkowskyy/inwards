@@ -27,7 +27,7 @@ Search the rules, filter them by category, status or autofix, sort them by code,
 
 ## FastAPI rules { #fastapi }
 
-The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do.
+The `FAPI` family checks FastAPI applications across files: which router the app includes, which error codes the OpenAPI schema declares ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). Every FAPI rule is opt-in, and none reports what Ruff's `FAST` rules already do. On a new project, [`inwards init --style fastapi`](../guides/install.md#a-new-project-start-from-a-preset) turns them all on as warnings.
 
 <div class="inw-rules-fallback" markdown>
 

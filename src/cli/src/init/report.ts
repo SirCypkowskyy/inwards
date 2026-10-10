@@ -1,7 +1,8 @@
 /**
  * @file What `inwards init --style` prints once it has written: the package as a
  * tree annotated with each layer and what it may import, then the result of
- * a check run in process, then what to try next.
+ * a check run in process, the config a preset suggests for another tool
+ * (Ruff, for fastapi), then what to try next.
  * The check runs through the injected check runner with the baseline off, so
  * the counts show every violation the new layers find.
  */
@@ -47,6 +48,9 @@ export async function report(ctx: InitContext, setup: Setup, plan: InitPlan): Pr
     `\ninwards check: ${plural(errors, "violation")}, ${plural(warnings, "warning")}.${more}`,
     0,
   );
+  if (style.companion !== undefined) {
+    print(streams, `\n${style.companion(packagePath(setup))}`, 0);
+  }
   const next = [
     plan.scaffold ? `Try the example: ${style.tryIt(pkg)}` : "",
     plan.agent === undefined ? `Wire an agent: inwards init --agent ${AGENTS.join("|")}` : "",
@@ -81,11 +85,22 @@ function annotatedTree(probe: Pick<PathProbe, "kind" | "exists">, setup: Setup):
   const { style, pkg, root } = setup;
   const project = dirname(setup.configPath);
   const base = resolve(project, root, ...pkg.split("."));
-  return drawTree(style, `${posix(relative(project, base))}/  (${style.name})`, (parts) => {
+  return drawTree(style, `${packagePath(setup)}/  (${style.name})`, (parts) => {
     const path = join(base, ...parts);
     if (probe.kind(path) === "dir") {
       return "dir";
     }
     return probe.exists(`${path}.py`) ? "file" : "missing";
   });
+}
+
+/**
+ * Names the package's directory relative to the project.
+ *
+ * @param setup - the pyproject.toml, the package and the config root.
+ * @returns e.g. `src/app`, with forward slashes.
+ */
+function packagePath(setup: Setup): string {
+  const project = dirname(setup.configPath);
+  return posix(relative(project, resolve(project, setup.root, ...setup.pkg.split("."))));
 }

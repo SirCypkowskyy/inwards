@@ -337,7 +337,7 @@ Templates are expanded when the config is read, before anything else is checked,
 - **Use `*`, not `**`, in a template entry's modules.** `src.*` gives `src.*.models`, which only matches a domain's own `models`, so `src/orders/service/models.py` stays in the `service` role. With `src.**`, `src.**.models` matches that file too, and it moves to the `models` role, because the deepest last literal segment wins ([Selectors](#selectors)).
 - **Config errors name the entry or the template key**: `tool.inwards.layers[1].template` for an unknown template or one without roles, `tool.inwards.templates.fastapi-domain.roles[2]` for a bad role. A problem only the expansion shows, such as a role layer's name already taken, names the expanded layer.
 
-A template nobody uses is allowed. Three presets write a template and contexts for you: `inwards init --style vertical-slices`, `bounded-contexts` and `django` ([Install](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) records the design.
+A template nobody uses is allowed. Four presets write a template and contexts for you: `inwards init --style vertical-slices`, `bounded-contexts`, `django` and `fastapi`, the last one the fastapi-best-practices template above ([Install](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) records the design.
 
 ### `cycles` { #cycles }
 

@@ -138,7 +138,9 @@ The presets with contexts also shape their context packages, through a `*` selec
 | `bounded-contexts` | `app.*` | requires `domain/`, `application/`, `infrastructure/`, `api`; anything else is a warning |
 | `django` | `app` | requires `settings.py` and `urls.py`; allows apps, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |
 | `django` | `app.*` | requires `models`, `services`, `views`, `urls`; allows `admin`, `apps`, `migrations/`, `tests`; anything else is a warning |
+| `fastapi` | `app` | requires `main.py`; allows domains, `config.py`, `database.py`, `exceptions.py`, `models.py`, `pagination.py`, `__main__.py`, `_version.py` |
+| `fastapi` | `app.*` | requires `__init__`, `router`, `service`; allows the other roles of the `fastapi-domain` template; anything else is an error |
 
 ## Not covered yet
 
-An `inwards init --style fastapi` preset ([#93](https://github.com/SirCypkowskyy/inwards/issues/93)), non-Python files, and what a file contains.
+Non-Python files, and what a file contains.

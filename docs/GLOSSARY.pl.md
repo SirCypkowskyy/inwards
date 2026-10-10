@@ -146,6 +146,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | importers (of a module) | moduły importujące (dany moduł) |
 | import skeleton | szkielet importów |
 | job (CI) | zadanie |
+| kernel (the `kernel` layer of the `fastapi` preset) | jądro (kernel) |
 | language server | serwer języka |
 | libraries per layer (INW005 guide) | biblioteki w warstwach |
 | legacy codebase, repo, violation | starszy kod, starsze repozytorium, stare naruszenie |
