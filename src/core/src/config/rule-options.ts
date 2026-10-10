@@ -334,6 +334,8 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "deny-receiver-params": listMatching(IDENTIFIER, 'parameter names such as "db"'),
     "delegate-to": delegateTargets,
     decorators: namePatterns,
+    frameworks: listOf(["fastapi", "flask", "litestar", "django"]),
+    "base-classes": namePatterns,
   },
   "router-wiring": {
     entrypoints,

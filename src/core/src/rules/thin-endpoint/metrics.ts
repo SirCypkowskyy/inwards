@@ -2,8 +2,8 @@
  * @file Measures one endpoint's body for INW012 in one walk: statements,
  * branches, how deep blocks nest, its loops, and the calls it makes. Mapping
  * an error to HTTP is the endpoint's job, so a guard (`if <cond>: raise
- * HTTPException(...)`) and an `except` that only raises one count for
- * nothing. A docstring doesn't count either. A nested function, class or
+ * HTTPException(...)`, or Flask's `abort(404)`) and an `except` that only
+ * raises one count for nothing. A docstring doesn't count either. A nested function, class or
  * lambda counts as one statement and its body is its own business. It reads
  * syntax only; what is denied is `check.ts`'s question.
  */
@@ -64,7 +64,7 @@ export interface Metrics {
   readonly lines: readonly [number, number];
 }
 
-/** Tells whether a `raise` statement maps an error to HTTP. */
+/** Tells whether a statement maps an error to HTTP: it raises an HTTP error, or calls something that does. */
 export type RaisesHttp = (raise: Node) => boolean;
 
 /** The counts so far, and what the walk needs to tell guards and the docstring apart. */
@@ -84,13 +84,13 @@ interface Tally {
  * Tells whether a block holds one statement and it raises an HTTP error.
  *
  * @param block - a `block` node.
- * @param raisesHttp - tells whether a `raise` maps an error to HTTP.
+ * @param raisesHttp - tells whether a statement maps an error to HTTP.
  * @returns true for a guard's or a mapping handler's body.
  */
 function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp): boolean {
   const statements = block ? namedChildren(block) : [];
   const [only] = statements;
-  return statements.length === 1 && only?.type === "raise_statement" && raisesHttp(only);
+  return statements.length === 1 && only !== undefined && raisesHttp(only);
 }
 
 /**
@@ -98,7 +98,7 @@ function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp):
  * whose body only raises an HTTP error.
  *
  * @param statement - a statement node.
- * @param raisesHttp - tells whether a `raise` maps an error to HTTP.
+ * @param raisesHttp - tells whether a statement maps an error to HTTP.
  * @returns true for `if <cond>: raise HTTPException(...)`.
  */
 function isGuard(statement: Node, raisesHttp: RaisesHttp): boolean {
@@ -114,7 +114,7 @@ function isGuard(statement: Node, raisesHttp: RaisesHttp): boolean {
  * `except` handler that only raises an HTTP error.
  *
  * @param clause - a clause node of a compound statement.
- * @param raisesHttp - tells whether a `raise` maps an error to HTTP.
+ * @param raisesHttp - tells whether a statement maps an error to HTTP.
  * @returns false for a mapping handler.
  */
 function counts(clause: Node, raisesHttp: RaisesHttp): boolean {
@@ -129,7 +129,7 @@ function counts(clause: Node, raisesHttp: RaisesHttp): boolean {
  * error to HTTP left out.
  *
  * @param statement - a compound statement.
- * @param raisesHttp - tells whether a `raise` maps an error to HTTP.
+ * @param raisesHttp - tells whether a statement maps an error to HTTP.
  * @returns the blocks and whether each adds a branch.
  */
 function blocksOf(statement: Node, raisesHttp: RaisesHttp): { block: Node; branch: boolean }[] {
@@ -228,7 +228,7 @@ function isDocstring(statement: Node): boolean {
  * Measures an endpoint's body.
  *
  * @param fn - the endpoint's `function_definition` node.
- * @param raisesHttp - tells whether a `raise` maps an error to HTTP.
+ * @param raisesHttp - tells whether a statement maps an error to HTTP.
  * @returns the counts, the calls and the lines the counted statements span.
  */
 export function measure(fn: Node, raisesHttp: RaisesHttp): Metrics {

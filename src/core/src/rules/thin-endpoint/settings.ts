@@ -5,10 +5,11 @@
  * has already checked every value, so this only narrows types and fills in
  * defaults; it never reports a bad value.
  */
-import { stringList } from "../../config/rule-options.ts";
+import { type OptionValue, stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
+import type { Framework } from "./frameworks.ts";
 
-/** Calls an endpoint shouldn't make itself: HTTP clients, mail, cloud SDKs, caches, databases, task queues. */
+/** Calls an endpoint shouldn't make itself: HTTP clients, mail, cloud SDKs, caches, databases (Django's raw connection too), task queues. */
 const DEFAULT_DENY_CALLS: readonly string[] = [
   "requests.*",
   "httpx.*",
@@ -21,6 +22,7 @@ const DEFAULT_DENY_CALLS: readonly string[] = [
   "psycopg*.*",
   "asyncpg.*",
   "celery.*",
+  "django.db.connection.*",
 ];
 
 /** Parameter types whose methods are database work: SQLAlchemy's and SQLModel's sessions. */
@@ -54,8 +56,20 @@ export interface ThinSettings {
   readonly denyReceiverParams: ReadonlySet<string>;
   /** Layer names or module entries the endpoint must call into; undefined when unset. */
   readonly delegateTo: readonly string[] | undefined;
-  /** Qualified decorator names that mark an endpoint, besides the framework's own. */
+  /** What marks an endpoint: the frameworks, and the configured decorators and base classes. */
+  readonly recognise: Recognise;
+}
+
+/** What marks an endpoint in a file, from the options. */
+export interface Recognise {
+  /** Qualified decorator patterns that mark an endpoint, besides the frameworks' own. */
   readonly decorators: readonly string[];
+  /** The frameworks whose recognisers may run; undefined for every one the file mentions. */
+  readonly frameworks: readonly Framework[] | undefined;
+  /** Qualified patterns of in-house view base classes. */
+  readonly baseClasses: readonly string[];
+  /** True when `modules` narrows the rule, which lets plain Django function views count. */
+  readonly scoped: boolean;
 }
 
 /**
@@ -115,6 +129,20 @@ function flag(raw: RuleOptions | undefined, key: string, fallback: boolean): boo
 }
 
 /**
+ * Narrows the parsed `frameworks` list, which the parser has already checked.
+ *
+ * @param value - the raw option.
+ * @returns the frameworks, or undefined when the key is absent.
+ */
+function frameworkList(value: OptionValue | undefined): Framework[] | undefined {
+  const names = stringList(value);
+  return names?.filter(
+    (name): name is Framework =>
+      name === "fastapi" || name === "flask" || name === "litestar" || name === "django",
+  );
+}
+
+/**
  * Reads `[tool.inwards.rules.thin-endpoint]` with INW012's defaults.
  *
  * @param raw - the parsed options table, if any.
@@ -134,6 +162,11 @@ export function thinSettings(raw: RuleOptions | undefined): ThinSettings {
     denyReceiverTypes: nameMatcher(types),
     denyReceiverParams: new Set(stringList(raw?.["deny-receiver-params"]) ?? []),
     delegateTo: stringList(raw?.["delegate-to"]),
-    decorators: stringList(raw?.["decorators"]) ?? [],
+    recognise: {
+      decorators: stringList(raw?.["decorators"]) ?? [],
+      frameworks: frameworkList(raw?.["frameworks"]),
+      baseClasses: stringList(raw?.["base-classes"]) ?? [],
+      scoped: raw?.["modules"] !== undefined,
+    },
   };
 }
