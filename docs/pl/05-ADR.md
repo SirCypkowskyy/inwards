@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: bebc57312fa91845b461320809fc3a0f6c6596d631fb49b3b7c67b9eeed4b008
+source_hash: 8dbd2cac7dfcbb2ea433910b69624a430fb9497f70aa520101fb396c6103155b
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -47,7 +47,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Szablony pakietów rozwijają się w konfigurację, którą użytkownik mógłby napisać ręcznie | :material-check-circle: Przyjęty |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Rodziny reguł dla frameworków, opt-in, z własnym prefiksem | :material-check-circle: Przyjęty |
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart | :material-check-circle: Przyjęty |
-| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-progress-question: Proponowany, czeka na przyjęcie przez właściciela |
+| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | Daemon hooków dla każdego projektu, osobno od serwera języka | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1070,7 +1070,7 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 
 ## ADR-039: Daemon hooków dla każdego projektu, osobno od serwera języka { #adr-039-a-hook-daemon-per-project-separate-from-the-language-server }
 
-**Stan:** Proponowany, czeka na przyjęcie przez właściciela, zanim ruszy [#60](https://github.com/SirCypkowskyy/inwards/issues/60) · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
+**Stan:** Przyjęty · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
 
 **Kontekst.** Zaplanowane są trzy długo działające procesy: proces, który trzyma silnik w gotowości dla hooków ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)), serwer języka w pliku binarnym ([#63](https://github.com/SirCypkowskyy/inwards/issues/63), [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)) i serwer MCP ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)). Rozdział 6 nazywał proces hooków `inwards server`, czyli tak, jak ADR-008 nazywa serwer języka, a backlog nazywał go `inwards daemon`. Otwarte było też pytanie, czy jeden proces może obsługiwać i edytor, i hooki.
 

@@ -42,7 +42,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) | Package templates expand into config a user could write by hand | :material-check-circle: Accepted |
 | [037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix) | Framework rule families, opt-in, with their own prefix | :material-check-circle: Accepted |
 | [038](#adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart) | A witness of the session start outside the project, against a replayed SessionStart | :material-check-circle: Accepted |
-| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-progress-question: Proposed, waits for the owner's acceptance |
+| [039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server) | A hook daemon per project, separate from the language server | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1065,7 +1065,7 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 
 ## ADR-039: A hook daemon per project, separate from the language server
 
-**Status:** Proposed, waits for the owner's acceptance before [#60](https://github.com/SirCypkowskyy/inwards/issues/60) starts · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
+**Status:** Accepted · 2026-10-10 · [#59](https://github.com/SirCypkowskyy/inwards/issues/59)
 
 **Context.** Three long-lived front ends are planned: a process that keeps the engine warm for the hooks ([#60](https://github.com/SirCypkowskyy/inwards/issues/60)), a language server inside the binary ([#63](https://github.com/SirCypkowskyy/inwards/issues/63), [ADR-008](#adr-008-language-server-on-node-inside-the-extension-for-now)) and an MCP server ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)). Chapter 6 called the hook process `inwards server`, the name ADR-008 gives the language server, and the backlog called it `inwards daemon`. Whether one process could serve both the editor and the hooks was open.
 
