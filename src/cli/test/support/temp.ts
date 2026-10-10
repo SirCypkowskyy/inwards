@@ -5,7 +5,8 @@
  * directory is registered here and `preload.ts`, which bunfig.toml loads,
  * removes them all once the last test file has run. Run `bun test` from the
  * repository root, as CI does, so bunfig.toml applies. It also points
- * `XDG_STATE_HOME` at a temporary directory (`STATE_HOME`).
+ * `XDG_STATE_HOME` at a temporary directory (`STATE_HOME`) and sets
+ * `INWARDS_DAEMON=0`, so no test leaves a daemon running unless it asks for one.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,6 +25,9 @@ const made: string[] = [];
  */
 export const STATE_HOME: string = tempDir("inwards-state-home-");
 process.env["XDG_STATE_HOME"] = STATE_HOME;
+// The hooks run in their own process in the tests (ADR-039); the daemon's
+// own tests (test/daemon/) turn it on for the runs they make.
+process.env["INWARDS_DAEMON"] = "0";
 
 /**
  * Creates a temporary directory that is removed after the whole run.

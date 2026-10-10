@@ -39,6 +39,7 @@ const FALLOW = join(REPO, "node_modules/.bin/fallow");
 const POLICY = [
   "claude-code",
   "commands",
+  "daemon",
   "init",
   "json",
   "paths",

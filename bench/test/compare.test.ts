@@ -5,7 +5,8 @@
  * empty cache costs and what a warm one saves.
  */
 import { describe, expect, test } from "bun:test";
-import { cacheMarkdown, judge, markdown, percentile } from "../compare.ts";
+import { cacheMarkdown, markdown } from "../compare.ts";
+import { judge, percentile } from "../timing.ts";
 
 describe("bench compare", () => {
   test("percentile uses the nearest rank", () => {

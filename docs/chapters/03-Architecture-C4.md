@@ -80,7 +80,7 @@ flowchart TB
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
 | **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012 |
-| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code` |
+| **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon` |
 | **Language server** | `vscode-languageserver` 10 on Node | `src/vscode-extension/src/server/server.ts` | :material-check-circle: every per-file rule, on each change to an open file and when a file or directory that could be a module is created or deleted; with a fresh engine when `pyproject.toml` changes; INW007 and INW008 for the whole workspace from a directory listing |
 | **VS Code extension** | `vscode-languageclient` 10 | `src/vscode-extension/src/client/extension.ts` | :material-check-circle: `.vsix` on each release, :material-progress-clock: Marketplace ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` for `claude`, `aider` and `agents-md` |
@@ -218,6 +218,7 @@ Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usag
 The other commands reuse the same pieces:
 
 - `inwards hook claude-code` reads a Claude Code hook payload from stdin and dispatches on the event: SessionStart records the session state, PreToolUse runs the shape guard and the config guard, PostToolUse checks the edited file, and Stop runs the Stop gate over what the session changed. [Chapter 4](04-AI-Integration.md) describes each one.
+- `inwards daemon` keeps the engine warm for PostToolUse ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)). The hook sends it the payload, the working directory and the environment over a local socket, one JSON line each way; the daemon runs the same `hook claude-code` code with a runtime built from them and streams that collect the output, and the hook writes that output and exits with its code. It keeps only what content identifies: extractions by text hash and git answers by commit id. Without an answer the hook runs one-shot.
 - `inwards init --agent claude|opencode|aider|agents-md` computes every file change first, so `--dry-run` can print it as a diff and a second run changes nothing.
 - `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi [--scaffold]` writes a preset's `[tool.inwards]` (and an example package with the package shapes that fit it) only where nothing exists yet, then runs the check in process and prints the package as an annotated tree. On a terminal with no flags, a picker built on `@clack/prompts` asks instead; it is loaded with a dynamic import that the build puts in its own chunk ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -424,7 +425,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, hook, daemon: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
@@ -432,12 +433,15 @@ src/
 │   │   │                  #   agent suppressions, layout changes against the session start
 │   │   ├── project/       # running a check, the baseline, config discovery, project snapshots
 │   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
+│   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
+│   │   │                  #   the in-memory caches
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
-│   │                      #   the grammars, the picker; compose.ts wires them into AppDeps
+│   │                      #   the grammars, the picker, the daemon's socket and files;
+│   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs, parity) and support/
 └── vscode-extension/
     ├── src/

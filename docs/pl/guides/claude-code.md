@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: 8308b8a5ae38e6702795461c092555c9b8a20f80ae74d58ed937465efc84be98
+source_hash: a5beb3431060904c2a9da73fb747b138b52d4c8469c3a5eadb6b5aea3838f57f
 ---
 
 # Claude Code { #claude-code }
@@ -40,6 +40,23 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 - Poproś Claude'a: *„Dodaj `import shop.infrastructure.db` na początku shop/domain/order.py.”* Edycja przechodzi, po czym Claude dostaje raport INW001 i usuwa import albo wprowadza port.
 - Poproś Claude'a: *„Przenieś shop.infrastructure do warstwy domain w pyproject.toml.”* Edycja zostaje odrzucona z komunikatem, który każe Claude'owi zapytać ciebie.
 
+## Daemon hooków { #the-hook-daemon }
+
+PostToolUse, hook, który sprawdza każdy plik zapisany przez Claude, uruchamia się częściej niż pozostałe. Żeby był szybki, PostToolUse w projekcie z sesją Inwards uruchamia w tle `inwards daemon`: jeden proces na projekt, który trzyma w pamięci parser i przeczytane już pliki i odpowiada na kolejne hooki PostToolUse przez lokalne gniazdo (na Windows przez nazwany potok). Na M1 Pro PostToolUse dla pliku z 13 liniami trwał 38 ms p50 bez niego i 15 ms z nim ([rozdział 6](../06-Constraints-and-Quality.md#the-hook-daemon)).
+
+- Zmienia szybkość, nigdy wyniki. Uruchamia ten sam kod hooka i przy każdej edycji czyta od nowa konfigurację, baseline i zapis sesji. Gdy nie działa, pochodzi z innego buildu Inwards albo nie odpowiada, hook uruchamia się we własnym procesie jak dotąd, a potem startuje nowy.
+- SessionStart, PreToolUse i Stop gate nigdy z niego nie korzystają. Stop gate sprawdza wszystko, co sesja zmieniła, we własnym procesie.
+- Kończy się po 10 minutach bez edycji, więc nie trzeba niczego konfigurować ani sprzątać.
+- Startuje tylko w projekcie, który ma stan sesji Inwards (`.inwards/state`). Hook zainstalowany dla wszystkich projektów nie zostawia procesu w pozostałych.
+
+```sh
+inwards daemon status   # is one running for this project, and how many hook runs it served
+inwards daemon stop     # stop it; the next edit starts a new one
+inwards daemon          # run it in the foreground (--idle SECONDS sets the idle limit)
+```
+
+`INWARDS_DAEMON=0` w środowisku, w którym działa Claude Code, go wyłącza i każdy hook działa we własnym procesie. Jest wyłączony, gdy ustawiono `CI`, chyba że `INWARDS_DAEMON=1`. Jego zapis jest w `$XDG_STATE_HOME/inwards/daemons/` (domyślnie `~/.local/state/inwards/daemons/`), a gniazdo w `$XDG_RUNTIME_DIR/inwards/`, w przeciwnym razie w `$TMPDIR/inwards-<uid>/`; oba może czytać tylko ty. Projekt opisuje [ADR-039](../05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+
 ## Rozwiązywanie problemów { #troubleshooting }
 
 | Objaw | Przyczyna i rozwiązanie |
@@ -59,6 +76,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 | Komunikat „an inline suppression that wasn't in the file when the session started” | Hooki pomijają wyciszenie dodane w trakcie sesji albo takie, które jest w pliku niezacommitowanym na starcie sesji, zbyt dużym, żeby hooki zachowały jego kopię (ponad 512 KiB albo ponad limit 4 MiB takich plików), i zedytowanym później ([ADR-028](../05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)). Jeśli dodałeś je sam, zacommituj je i zacznij nową sesję; żeby Claude mógł je dodawać, ustaw `agent-suppressions = "allow"` w `[tool.inwards]`. |
 | Tura kończy się komunikatem „unresolved architecture problems” | To samo naruszenie przetrwało `escalate-after` prób (domyślnie 3). Claude powinien zapytać cię, co dalej. Lista trafia też do następnej sesji. |
 | `init` ostrzega, że ścieżka „is in uv's cache” (albo bunx's) | Uruchomiono go przez `uvx` albo `bunx`, więc ścieżka, którą by zapisał, znika po `uv cache clean` albo przy następnej wersji. Dodaj Inwards do projektu i uruchom `uv run inwards init --agent claude --launcher "uv run"` albo zainstaluj plik binarny z wydania i uruchom nim `init`. |
+| Proces `inwards daemon` ciągle działa | To [daemon hooków](#the-hook-daemon). Kończy się po 10 minutach bez edycji; `inwards daemon stop` kończy go od razu, a `INWARDS_DAEMON=0` sprawia, że hooki go nie uruchamiają. |
 | Windows: hook się nie uruchamia | `init` zapisuje hook w formie exec, z bezwzględną ścieżką do pliku binarnego, więc nie biorą w tym udziału ani powłoka, ani `PATH`. Jeśli przeniesiono plik binarny, uruchom ponownie `init`. Z `--launcher` hook działa w powłoce Claude Code, na Windows w Git Bash. |
 
 Żeby udostępnić tę konfigurację zespołowi przez commitowany plik `.claude/settings.json`, zobacz przykład w formie powłokowej w [rozdziale 4](../04-AI-Integration.md). Wymaga on `inwards` w `PATH` każdego programisty.

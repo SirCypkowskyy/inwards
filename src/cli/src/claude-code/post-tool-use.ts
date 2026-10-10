@@ -24,7 +24,13 @@ import type { Start } from "../session/contracts.ts";
 import { fingerprint } from "../session/fingerprint.ts";
 import { createStartLookups } from "../session/lookups.ts";
 import { oldErrors, oldNote } from "../session/old-errors.ts";
-import { isSessionId, readSession, readSessionStart, recordEdit } from "../session/record.ts";
+import {
+  isSessionId,
+  isToolUseId,
+  readSession,
+  readSessionStart,
+  recordEdit,
+} from "../session/record.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER } from "./escalation.ts";
 import { type HookDeps, hookProject } from "./protocol.ts";
 
@@ -73,7 +79,8 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
       report.diagnostics.filter((d) => !old.includes(d)),
     );
     deps.runlog.noteSuppressions(report, rejected);
-    const session = { project: target.project, id };
+    // Keyed by the tool call, so a retry after the daemon died mid-request counts once.
+    const session = { project: target.project, id, tool: input["tool_use_id"] };
     const escalation = escalationOf(io, session, configPath, blocking);
     // Only what blocks counts toward escalation: context isn't an attempt that failed.
     rememberEdit(io, session, target.file, blocking);
@@ -208,17 +215,22 @@ function reply(
  * mid-session changes nothing. Only that run escalates; the next one with the
  * same violation blocks again.
  *
+ * An edit already recorded under this run's `tool_use_id` (the daemon
+ * recorded it, then died before answering, and this is the one-shot retry)
+ * is already in the counts, so it isn't added again.
+ *
  * @param io - reads the session and resolves the config's path.
- * @param session - the real project root and the payload's `session_id`.
+ * @param session - the real project root, the payload's `session_id` and `tool_use_id`.
  * @param session.project - the real project root.
  * @param session.id - the payload's `session_id`.
+ * @param session.tool - the payload's `tool_use_id`, if any.
  * @param configPath - the config the file was checked with.
  * @param diagnostics - this run's blocking errors.
  * @returns the limit, and whether every error in the run reached it; undefined when none did.
  */
 export function escalationOf(
   io: Pick<Platform, "probe" | "read" | "state" | "runtime">,
-  { project, id }: { project: string; id: unknown },
+  { project, id, tool }: { project: string; id: unknown; tool?: unknown },
   configPath: string,
   diagnostics: readonly Diagnostic[],
 ): { limit: number; every: boolean } | undefined {
@@ -229,7 +241,8 @@ export function escalationOf(
   const config = state.start.configs[projectPath(io.probe, project, configPath)];
   const limit = config?.escalateAfter ?? DEFAULT_ESCALATE_AFTER;
   const errors = new Set(diagnostics.filter((d) => d.severity === "error").map(fingerprint));
-  const reached = [...errors].filter((fp) => (state.seen.get(fp) ?? 0) + 1 === limit);
+  const counted = isToolUseId(tool) && state.tools.has(tool) ? 0 : 1;
+  const reached = [...errors].filter((fp) => (state.seen.get(fp) ?? 0) + counted === limit);
   return reached.length === 0 ? undefined : { limit, every: reached.length === errors.size };
 }
 
@@ -270,15 +283,16 @@ export function sessionConfig(
  * closed without a start record.
  *
  * @param io - resolves the file's path, tells the time and writes the log.
- * @param session - the real project root and the payload's `session_id`.
+ * @param session - the real project root, the payload's `session_id` and `tool_use_id`.
  * @param session.project - the real project root.
  * @param session.id - the payload's `session_id`.
+ * @param session.tool - the payload's `tool_use_id`, which keys the edit; absent for the shape guard.
  * @param file - the edited file.
  * @param diagnostics - the errors the check blocked on (context-only findings are left out).
  */
 export function rememberEdit(
   io: Pick<Platform, "probe" | "clock" | "state">,
-  { project, id }: { project: string; id: unknown },
+  { project, id, tool }: { project: string; id: unknown; tool?: unknown },
   file: string,
   diagnostics: readonly Diagnostic[],
 ): void {
@@ -286,7 +300,7 @@ export function rememberEdit(
     return;
   }
   try {
-    recordEdit(io, { project, id }, file, diagnostics);
+    recordEdit(io, { project, id, tool }, file, diagnostics);
   } catch {
     // best effort, see above
   }

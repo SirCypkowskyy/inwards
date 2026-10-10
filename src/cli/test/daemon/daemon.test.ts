@@ -1,0 +1,218 @@
+/**
+ * @file `inwards daemon` as a real process (ADR-039): every recorded hook
+ * fixture gives the same exit code and output through the daemon as in the
+ * hook's own process; a hook with no daemon runs one-shot and starts one; a
+ * second daemon for the same project steps aside; an idle daemon exits and
+ * cleans up; and `status` and `stop` report what runs. Every daemon these
+ * tests start is stopped in `afterAll`, and each has a short idle limit as a
+ * second guard, so none outlives the run.
+ */
+import { afterAll, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import process from "node:process";
+import { daemonPlace } from "../../src/daemon/protocol.ts";
+import { CMD, inwards, LAYERS, payload, project, type RunResult } from "../support/run.ts";
+import { STATE_HOME } from "../support/temp.ts";
+
+/**
+ * A short private directory for the sockets: macOS's socket paths can't
+ * exceed 104 bytes, and its temporary directory is already long.
+ */
+const RUNTIME_DIR: string = mkdtempSync(join(tmpdir(), "irt-"));
+/** The environment that turns the daemon on for one run. */
+const ON: Record<string, string> = { INWARDS_DAEMON: "1", CI: "", XDG_RUNTIME_DIR: RUNTIME_DIR };
+/** The environment that keeps a run in its own process. */
+const OFF = { INWARDS_DAEMON: "0" };
+const DURATION = /"durationMs":[\d.]+/gu;
+const JSON_SUFFIX = /\.json$/u;
+const SERVED = /(?<count>\d+) hook runs served/u;
+/** How long to wait for a daemon to come up or go away. */
+const WAIT_MS = 15_000;
+const POLL_MS = 50;
+
+/** Every project a test started a daemon in, stopped after the run. */
+const started: string[] = [];
+/** The daemons started in the foreground, killed if `stop` didn't end them. */
+const children: ReturnType<typeof Bun.spawn>[] = [];
+
+afterAll(async () => {
+  for (const root of started) {
+    inwards(["daemon", "stop"], { cwd: root, env: ON });
+  }
+  for (const child of children) {
+    child.kill();
+  }
+  await Promise.all(children.map((child) => child.exited));
+  rmSync(RUNTIME_DIR, { recursive: true, force: true });
+});
+
+/**
+ * Starts `inwards daemon` in the foreground for a project and waits until it answers.
+ *
+ * @param root - the project.
+ * @param idle - the idle limit in seconds.
+ * @returns the daemon process.
+ */
+async function startDaemon(root: string, idle = 120): Promise<ReturnType<typeof Bun.spawn>> {
+  started.push(root);
+  const child = Bun.spawn([...CMD, "daemon", "--idle", String(idle)], {
+    cwd: root,
+    env: { ...process.env, ...ON, XDG_STATE_HOME: STATE_HOME },
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  children.push(child);
+  await until(() => status(root).code === 0);
+  return child;
+}
+
+/**
+ * Runs `inwards daemon status` for a project.
+ *
+ * @param root - the project.
+ * @returns the exit code and output.
+ */
+function status(root: string): RunResult {
+  return inwards(["daemon", "status"], { cwd: root, env: ON });
+}
+
+/**
+ * Waits for a condition, polling.
+ *
+ * @param ok - the condition.
+ * @param deadline - when to give up, on the `Date.now()` clock.
+ * @returns once it holds.
+ * @throws {Error} when it doesn't hold within `WAIT_MS`.
+ */
+async function until(ok: () => boolean, deadline = Date.now() + WAIT_MS): Promise<void> {
+  if (ok()) {
+    return;
+  }
+  if (Date.now() > deadline) {
+    throw new Error("timed out waiting for the daemon");
+  }
+  await Bun.sleep(POLL_MS);
+  await until(ok, deadline);
+}
+
+/**
+ * Reads how many hook runs a daemon has served, from `inwards daemon status`.
+ *
+ * @param root - the project.
+ * @returns the count, or -1 when no daemon answers.
+ */
+function served(root: string): number {
+  const count = SERVED.exec(status(root).stdout)?.groups?.["count"];
+  return count === undefined ? -1 : Number(count);
+}
+
+/**
+ * Runs the hook with a fixture and makes the output comparable across projects.
+ *
+ * @param root - the project.
+ * @param name - the fixture.
+ * @param env - the daemon switch.
+ * @returns the exit code and output, with the project path and durations masked.
+ */
+function hook(root: string, name: string, env: Record<string, string>): RunResult {
+  const run = inwards(["hook", "claude-code"], { cwd: root, stdin: payload(name, root), env });
+  return { code: run.code, stdout: mask(root, run.stdout), stderr: mask(root, run.stderr) };
+}
+
+/**
+ * Masks what differs between two projects' output.
+ *
+ * @param root - the project.
+ * @param s - stdout or stderr.
+ * @returns the text with the root as `<root>` and durations as 0.
+ */
+function mask(root: string, s: string): string {
+  return s
+    .replaceAll(realpathSync(root), "<root>")
+    .replaceAll(root, "<root>")
+    .replace(DURATION, '"durationMs":0');
+}
+
+const FILES = { "shop/domain/order.py": "import shop.infrastructure.db\n", "README.md": "hi" };
+
+describe("inwards daemon", () => {
+  test("every hook fixture answers the same through the daemon as one-shot", async () => {
+    const oneShot = project({ "pyproject.toml": LAYERS, ...FILES });
+    const resident = project({ "pyproject.toml": LAYERS, ...FILES });
+    await startDaemon(resident);
+    const fixtures = readdirSync(join(import.meta.dir, "../support/fixtures/claude-code"))
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => f.replace(JSON_SUFFIX, ""))
+      .sort();
+    for (const name of fixtures) {
+      expect({ name, ...hook(resident, name, ON) }).toEqual({
+        name,
+        ...hook(oneShot, name, OFF),
+      });
+    }
+    // Only the PostToolUse fixtures went through it; the others ran in the hook's own process.
+    expect(served(resident)).toBe(fixtures.filter((f) => f.startsWith("post-")).length);
+  });
+
+  test("a config error reaches the agent the same way through the daemon", async () => {
+    const broken = { "pyproject.toml": "[tool.inwards]\nlayers = []\n", ...FILES };
+    const oneShot = project(broken);
+    const resident = project(broken);
+    await startDaemon(resident);
+    const through = hook(resident, "post-write-order", ON);
+    expect(through.code).toBe(2);
+    expect(through).toEqual(hook(oneShot, "post-write-order", OFF));
+  });
+
+  test("with no daemon, the hook runs one-shot and starts one for a project with session state", async () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    started.push(root);
+    expect(hook(root, "session-start", ON).code).toBe(0);
+    const first = hook(root, "post-write-order", ON);
+    expect(first.stdout).toContain("already in the file when the session started");
+    await until(() => served(root) === 0);
+    expect(hook(root, "post-write-order", ON)).toEqual(first);
+    expect(served(root)).toBe(1);
+  });
+
+  test("a project without session state gets no daemon", async () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    expect(hook(root, "post-write-order", ON).code).toBe(2);
+    await Bun.sleep(500);
+    expect(status(root).code).toBe(1);
+    expect(existsSync(daemonPlace({ stateHome: STATE_HOME }, realpathSync(root)).record)).toBe(
+      false,
+    );
+  });
+
+  test("a second daemon for the same project steps aside", async () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    await startDaemon(root);
+    const second = inwards(["daemon", "--idle", "5"], { cwd: root, env: ON });
+    expect(second.code).toBe(0);
+    expect(second.stdout).toContain("already running");
+  });
+
+  test("an idle daemon exits and removes its record and lock", async () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    const child = await startDaemon(root, 1);
+    expect(await child.exited).toBe(0);
+    const place = daemonPlace({ stateHome: STATE_HOME }, realpathSync(root));
+    expect(existsSync(place.record)).toBe(false);
+    expect(existsSync(place.lock)).toBe(false);
+    expect(status(root).code).toBe(1);
+  });
+
+  test("stop ends it; status and stop say when nothing runs", async () => {
+    const root = project({ "pyproject.toml": LAYERS, ...FILES });
+    const child = await startDaemon(root);
+    expect(inwards(["daemon", "stop"], { cwd: root, env: ON }).stdout).toContain("stopped");
+    expect(await child.exited).toBe(0);
+    expect(status(root)).toMatchObject({ code: 1, stderr: expect.stringContaining("not running") });
+    expect(inwards(["daemon", "stop"], { cwd: root, env: ON }).code).toBe(0);
+    expect(inwards(["daemon", "restart"], { cwd: root, env: ON }).code).toBe(2);
+    expect(inwards(["daemon", "--idle", "soon"], { cwd: root, env: ON }).code).toBe(2);
+  });
+});

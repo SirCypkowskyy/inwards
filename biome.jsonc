@@ -211,6 +211,7 @@
       "includes": [
         "src/cli/src/claude-code/**",
         "src/cli/src/commands/**",
+        "src/cli/src/daemon/**",
         "src/cli/src/init/**",
         "src/cli/src/json/**",
         "src/cli/src/paths/**",

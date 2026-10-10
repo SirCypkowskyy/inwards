@@ -131,11 +131,15 @@ export function project(files: Record<string, string>): string {
 }
 
 const ROOT_MARKER = "{{ROOT}}";
+/** Numbers the tool calls `payload` makes up, so no two calls share a `tool_use_id`. */
+let toolCalls = 0;
 
 /**
  * Loads a recorded Claude Code payload and points it at a project.
  * Every string starting with `{{ROOT}}` becomes a native path under `root`;
- * top-level fields in `patch` then replace the recorded ones.
+ * top-level fields in `patch` then replace the recorded ones. A recorded
+ * `tool_use_id` gets a fresh value on every call, as each Claude Code tool
+ * call has its own, since the session counts an edit once per id (#60).
  *
  * @param name - fixture name in fixtures/claude-code, without `.json`.
  * @param root - the project root to substitute.
@@ -161,5 +165,7 @@ export function payload(name: string, root: string, patch: Record<string, unknow
   if (typeof recorded !== "object" || recorded === null) {
     throw new Error(`fixture ${name} is not a JSON object`);
   }
-  return JSON.stringify({ ...recorded, ...patch });
+  toolCalls += 1;
+  const tool = "tool_use_id" in recorded ? { tool_use_id: `toolu_test${toolCalls}` } : {};
+  return JSON.stringify({ ...recorded, ...tool, ...patch });
 }

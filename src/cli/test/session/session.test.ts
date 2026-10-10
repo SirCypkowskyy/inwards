@@ -106,6 +106,24 @@ describe("session state", () => {
     expect([...(state?.seen.values() ?? [])]).toEqual([2]); // one violation, seen twice
   });
 
+  test("an edit recorded twice under one tool_use_id counts once (#60)", () => {
+    const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+    start(root);
+    writeFileSync(join(root, "shop/domain/order.py"), "import shop.infrastructure.db\n");
+    // The daemon recorded the edit and died before answering; the hook's one-shot retry records it again.
+    const retried = payload("post-write-order", root, {
+      session_id: ID,
+      tool_use_id: "toolu_retried",
+      tool_input: { file_path: join(root, "shop/domain/order.py") },
+    });
+    expect(hook(root, retried).code).toBe(2);
+    expect(hook(root, retried).code).toBe(2);
+    expect(hook(root, edit(root, "shop/domain/order.py")).code).toBe(2);
+    const state = readSession(IO, realpathSync(root), ID);
+    expect([...(state?.seen.values() ?? [])]).toEqual([2]);
+    expect([...(state?.tools ?? [])]).toContain("toolu_retried");
+  });
+
   test("20 parallel hooks leave a log with every fingerprint", async () => {
     const files: Record<string, string> = { "pyproject.toml": LAYERS };
     for (let i = 0; i < 20; i += 1) {

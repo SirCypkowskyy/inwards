@@ -135,6 +135,8 @@
       { "name": "cli-project", "patterns": ["src/cli/src/project/**"] },
       { "name": "cli-runlog", "patterns": ["src/cli/src/runlog/**"] },
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
+      // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
+      { "name": "cli-daemon", "patterns": ["src/cli/src/daemon/**"] },
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
@@ -516,6 +518,26 @@
         ]
       },
       {
+        "from": "cli-daemon",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json"
+        ]
+      },
+      {
         "from": "cli-commands",
         "allow": [
           "core-api",
@@ -539,7 +561,8 @@
           "cli-runlog",
           "cli-protocol",
           "cli-claude-code",
-          "cli-init"
+          "cli-init",
+          "cli-daemon"
         ]
       },
       {
@@ -564,7 +587,8 @@
           "cli-session",
           "cli-runlog",
           "cli-init",
-          "cli-commands"
+          "cli-commands",
+          "cli-daemon"
         ]
       },
       {
@@ -616,7 +640,8 @@
           "cli-init",
           "cli-paths",
           "cli-platform",
-          "cli-json"
+          "cli-json",
+          "cli-daemon"
         ]
       },
       // The client talks to VS Code and the server only; the server reaches the
