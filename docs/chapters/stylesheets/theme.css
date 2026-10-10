@@ -267,11 +267,11 @@ body {
 /* Measure: prose stops at about 72 characters; tables, code and diagrams
    keep the full column. */
 .md-typeset :is(p, ul, ol, dl, blockquote) {
-  max-width: 34em;
+  max-inline-size: 34em;
 }
 
 .md-typeset :is(.admonition, details, .tabbed-set, td, th, li) :is(p, ul, ol, dl) {
-  max-width: none;
+  max-inline-size: none;
 }
 
 .md-typeset a {
@@ -468,8 +468,8 @@ body {
 }
 
 .md-header__button.md-logo svg {
-  height: 1.1rem;
-  width: auto;
+  block-size: 1.1rem;
+  inline-size: auto;
 }
 
 .md-tabs {
@@ -541,7 +541,7 @@ body {
 /* Footer. */
 .md-footer {
   background-color: var(--inw-paper);
-  border-top: 1px solid var(--inw-rule);
+  border-block-start: 1px solid var(--inw-rule);
 }
 
 .md-footer-meta {

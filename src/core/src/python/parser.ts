@@ -5,7 +5,7 @@
  * disk. The runtime is loaded once per process, because `Parser.init` sets up a
  * global WASM module.
  */
-import { Language, type Node, Parser, type Tree } from "web-tree-sitter";
+import { Language, type Node, Parser, type Tree, type TreeCursor } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../contracts/records.ts";
 import { packageOf, resolveRelative } from "./module-names.ts";
 
@@ -148,7 +148,108 @@ export function normalizeSource(text: string): string {
   return text.replace(LEADING_BOM, "").replace(LONE_CR, "\n");
 }
 
-const IMPORT_STATEMENTS = ["import_statement", "import_from_statement"];
+const IMPORT_STATEMENTS: ReadonlySet<string> = new Set([
+  "import_statement",
+  "import_from_statement",
+]);
+
+/**
+ * The node types that can hold an import statement somewhere below them in
+ * a tree without syntax errors: `module` and `block` hold statements, and the
+ * rest are the compound statements and clauses that hold a `block`. Read off
+ * tree-sitter-python's `node-types.json`, and checked against it by
+ * `test/python/extraction-walk.test.ts`, so a grammar bump that adds a holder
+ * fails a test instead of losing imports.
+ */
+export const IMPORT_HOLDERS: ReadonlySet<string> = new Set([
+  "block",
+  "case_clause",
+  "class_definition",
+  "decorated_definition",
+  "elif_clause",
+  "else_clause",
+  "except_clause",
+  "finally_clause",
+  "for_statement",
+  "function_definition",
+  "if_statement",
+  "match_statement",
+  "module",
+  "try_statement",
+  "while_statement",
+  "with_statement",
+]);
+
+/**
+ * Lists the import statements of a parsed file, in source order, with a
+ * tree-cursor walk that skips every subtree that can't hold one.
+ *
+ * `descendantsOfType` visits every node of the tree, and the walk over
+ * expressions, arguments and strings is most of its cost. In a subtree
+ * without syntax errors the grammar decides where an import can sit (only in
+ * a `module` or a `block`, reached through `IMPORT_HOLDERS`), so the walk
+ * enters only those. Error recovery can put an import anywhere, so the walk
+ * also enters every node that holds an error (`hasError`, which counts
+ * `ERROR` and missing nodes) and checks the children of such a node one by
+ * one; the children of an error-free node are error-free and need no check.
+ * The result is the same list, in the same pre-order, as
+ * `descendantsOfType(["import_statement", "import_from_statement"])` (#62).
+ *
+ * @param tree - the parsed file.
+ * @returns the `import_statement` and `import_from_statement` nodes, outermost first.
+ */
+export function importStatements(tree: Tree): Node[] {
+  const found: Node[] = [];
+  const cursor = tree.walk();
+  // errors[d]: the node at depth d on the current path holds a syntax error.
+  const errors: boolean[] = [];
+  let depth = 0;
+  try {
+    for (;;) {
+      const enter = visitForImports(cursor, depth === 0 || errors[depth - 1] === true, found);
+      if (enter !== null && cursor.gotoFirstChild()) {
+        errors[depth] = enter;
+        depth += 1;
+        continue;
+      }
+      while (!cursor.gotoNextSibling()) {
+        if (!cursor.gotoParent()) {
+          return found;
+        }
+        depth -= 1;
+      }
+    }
+  } finally {
+    cursor.delete(); // WASM memory is not garbage collected
+  }
+}
+
+/**
+ * Looks at the cursor's node for `importStatements`: keeps it when it is an
+ * import, and decides whether the walk goes into it.
+ *
+ * @param cursor - the walk, on the node to look at.
+ * @param parentHasError - whether the node's parent holds a syntax error; only
+ *   then can the node hold one, so only then is it checked.
+ * @param found - the imports so far, appended to in place.
+ * @returns whether the node holds a syntax error when the walk should enter
+ *   it, or null when no import can sit below it.
+ */
+function visitForImports(
+  cursor: TreeCursor,
+  parentHasError: boolean,
+  found: Node[],
+): boolean | null {
+  const type = cursor.nodeType;
+  const isImport = IMPORT_STATEMENTS.has(type);
+  const holder = !isImport && IMPORT_HOLDERS.has(type);
+  const node = isImport || parentHasError ? cursor.currentNode : null;
+  if (isImport && node) {
+    found.push(node);
+  }
+  const hasError = parentHasError && node?.hasError === true;
+  return hasError || holder ? hasError : null;
+}
 
 /**
  * Lists every import in a parsed file.
@@ -162,7 +263,7 @@ const IMPORT_STATEMENTS = ["import_statement", "import_from_statement"];
  */
 export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
   const refs: ImportRef[] = [];
-  for (const stmt of tree.rootNode.descendantsOfType(IMPORT_STATEMENTS)) {
+  for (const stmt of importStatements(tree)) {
     refs.push(...(stmt.type === "import_statement" ? plainImports(stmt) : fromImports(stmt, file)));
   }
   return refs;
@@ -182,7 +283,7 @@ export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
  */
 export function importedNames(tree: Tree, file: SourceFile): Map<string, string> {
   const names = new Map<string, string>();
-  for (const stmt of tree.rootNode.descendantsOfType(IMPORT_STATEMENTS)) {
+  for (const stmt of importStatements(tree)) {
     const from = stmt.childForFieldName("module_name");
     const base = from ? resolveModule(from, file) : undefined;
     if (base === null) {
