@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 4cea00a28b8073a109b9790a9ab2ac027c6de8285e9dfa8bbd29ffa3f28ad981
+source_hash: 6cbab1c8be13d4b70e08b87e1b30680ec8c8102adbd5f68fb1953bf44524762c
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -217,7 +217,7 @@ Które reguły zgłaszają i jak głośno:
 - `extend-select`: te reguły też zgłaszają, obok `select` albo reguł domyślnie włączonych. Włącza [reguły opt-in](../rules/index.md#opt-in-rules).
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
-- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`thin-endpoint`](../rules/INW012.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
+- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
 - `[tool.inwards.rules.pure-domain]` przyjmuje też `deny`, listę tabel z `modules` (prefiksy albo selektory, jak wyżej) i `libraries` (nazwy importu, jak w `deny-libraries` warstwy). Moduły, do których pasuje wpis, nie mogą importować jego bibliotek, niezależnie od tego, czy należą do warstwy, a `allow-libraries` warstwy tego nie znosi ([INW005](../rules/INW005.md), [przewodnik po bibliotekach](libraries.md#prefix-deny)). Służy do pakietu, który nie jest całą warstwą, na przykład do kontraktu import-lintera „`mypackage.one` nie może importować `django`”.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).

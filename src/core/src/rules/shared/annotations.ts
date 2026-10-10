@@ -1,11 +1,12 @@
 /**
- * @file What an endpoint's parameters stand for, for INW012: the qualified
- * types of each annotation and the dependency each `Depends(...)` names, so a
- * call on `db` can be told apart as database work (`db: AsyncSession`) or a
- * call into a use case (`place_order: Annotated[PlaceOrder, Depends(...)]`).
- * It reads `Annotated[T, ...]`, `Optional[T]`, `Union[...]`, `T | None` and
- * aliases bound at module level in the same file. String annotations and
- * aliases imported from another module are not read.
+ * @file What a function's parameters stand for: the qualified types of each
+ * annotation and the dependency each `Depends(...)` names. INW012 tells a
+ * call on `db` apart as database work (`db: AsyncSession`) or a call into a
+ * use case (`place_order: Annotated[PlaceOrder, Depends(...)]`), and INW013
+ * finds the parameters whose methods block (`db: Session`). It reads
+ * `Annotated[T, ...]`, `Optional[T]`, `Union[...]`, `T | None` and aliases
+ * bound at module level in the same file. String annotations and aliases
+ * imported from another module are not read.
  */
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
@@ -121,7 +122,7 @@ function dependencyOf(node: Node, qualify: Qualify): string[] {
  * @param hops - aliases followed so far.
  * @returns the qualified names, `Depends` targets included; none for what it can't read.
  */
-function typesOf(node: Node, context: TypeContext, hops = 0): string[] {
+export function typesOf(node: Node, context: TypeContext, hops = 0): string[] {
   const { qualify, aliases } = context;
   if (node.type === "type") {
     return namedChildren(node).flatMap((child) => typesOf(child, context, hops));
