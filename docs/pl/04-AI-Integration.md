@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 09cbc76715516ae4114b5c9548aa7f6001e612c8097ea1dddbdc06dbad67d981
+source_hash: d311f9ba983864e1f16e00044da0d84c620c8d2e8a76383a890c90ffdc0e2907
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -153,6 +153,8 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     Instrukcja jest słabsza niż hook, bo agent może ją pominąć. Tam, gdzie agent ma system hooków, zainstaluj również hook (`inwards init --agent claude`).
 
+    Agent z klientem MCP (między innymi Codex CLI, Cursor i Claude Code) może też pytać Inwards bezpośrednio przez `inwards mcp`: gdzie należy nowy kod, czy kod przejdzie sprawdzenie, zanim zostanie zapisany, i co znaczy reguła. [Poradnik MCP](guides/mcp.md) opisuje konfigurację każdego klienta.
+
 ## Co mówi Inwards i dlaczego w takiej formie { #what-inwards-says-and-why-its-shaped-that-way }
 
 ### Formaty { #formats }
@@ -246,7 +248,7 @@ Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing 
 Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. Dwie funkcje przesuwają Inwards wcześniej w pętli:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) wypisuje mapę warstw, tego, co każda z nich może importować, tego, gdzie leżą porty, oraz reguły bibliotek i kontekstów, w mniej niż 300 tokenach. `inwards context --write` albo `inwards init --brief` utrzymuje ją w oznaczonej sekcji `AGENTS.md`. Jest opcjonalna, żeby design partnerzy mogli porównać przebiegi z nią i bez niej ([opis architektury](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** (planowane, [#65](https://github.com/SirCypkowskyy/inwards/issues/65)) udostępnia Inwards jako serwer MCP z narzędziami takimi jak `check_files`, `explain_rule` i `where_should_this_go`. To ostatnie przyjmuje opis („SQL repository for orders”) i odpowiada warstwą i ścieżką modułu z konfiguracji.
+- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły.
 
 ```mermaid
 flowchart LR

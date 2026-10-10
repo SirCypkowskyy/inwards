@@ -5,8 +5,9 @@
  * invocations in one process. This is the only place the adapters meet. It
  * also builds each request the daemon serves (`nodeDaemon`): the same
  * adapters, with the request's runtime, buffered streams and the daemon's
- * in-memory caches; and the language server's connection and warm check
- * (`nodeLsp`), whose stdout belongs to the protocol.
+ * in-memory caches; and the language server's and the MCP server's
+ * connections and warm checks (`nodeLsp`, `nodeMcp`), whose stdout belongs to
+ * the protocol.
  */
 import { resolve } from "node:path";
 import {
@@ -15,13 +16,15 @@ import {
   type GrammarBinaries,
   type Report,
 } from "@inwards/core";
-import type { AppDeps, DaemonDeps, LspDeps } from "../commands/deps.ts";
+import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
 import type { ServerCheck } from "../lsp/checks.ts";
+import type { RulePages } from "../mcp/explain-rule.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
 import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
+import { overlayTexts } from "../project/overlay.ts";
 import { createRunLog } from "../runlog/record.ts";
 import type { CheckRunner } from "../session/contracts.ts";
 import { nodeBaselineWriter } from "./baseline-files.ts";
@@ -118,15 +121,38 @@ export function compose(workerEntry?: string): AppDeps {
     toml: parseToml,
     daemon: nodeDaemon(io, entry),
     lsp: nodeLsp(io),
+    mcp: nodeMcp(io),
   };
+}
+
+/**
+ * What a long-lived stdio server checks with: its platform with streams whose
+ * stdout writes to stderr, since stdout carries the protocol, and the project
+ * I/O with an in-memory extraction cache (the daemon's, ADR-039) and one kept
+ * parse, both made once, so they live as long as the server. Its checks get
+ * no worker pool, so a request never starts a thread.
+ *
+ * @param io - the server's own platform.
+ * @returns the platform for the server, and the project I/O its checks read.
+ */
+function warmIo(io: Platform): { platform: Platform; files: ProjectIo } {
+  const extractions = daemonExtractionCache();
+  const platform: Platform = { ...io, streams: { ...io.streams, out: io.streams.err } };
+  const files = {
+    ...nodeProjectIo(platform),
+    extractionCache: (): ExtractionCache => extractions,
+    // Checks run one at a time, so they share the kept parse: the next check
+    // of the same file parses only what changed.
+    reuse: createTreeReuse(),
+  };
+  return { platform, files };
 }
 
 /**
  * The language server on the real process: LSP over stdio, and a check that
  * keeps what it extracted from each text in memory for as long as the server
- * runs (the daemon's cache, ADR-039). The check gets no worker pool, so a
- * keystroke never starts a thread, the kept parse of the last document
- * (`createTreeReuse`), and streams whose stdout writes to stderr,
+ * runs (`warmIo`): no worker pool, so a keystroke never starts a thread, the
+ * kept parse of the last document, and streams whose stdout writes to stderr,
  * since stdout carries the protocol. The connection and its protocol library
  * load only when `inwards server` runs: imported at start-up, they cost every
  * hook call about 5 ms (the bench's pre-write case, 11.3 to 16.6 ms p50).
@@ -135,15 +161,7 @@ export function compose(workerEntry?: string): AppDeps {
  * @returns the language server's dependencies.
  */
 function nodeLsp(io: Platform): LspDeps {
-  const extractions = daemonExtractionCache();
-  const streams: Streams = { ...io.streams, out: io.streams.err };
-  const files = {
-    ...nodeProjectIo({ ...io, streams }),
-    extractionCache: (): ExtractionCache => extractions,
-    // Checks run one at a time, so they share the kept parse: the next
-    // keystroke in the same document parses only what changed.
-    reuse: createTreeReuse(),
-  };
+  const { files } = warmIo(io);
   return {
     serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
       // A split chunk in the binary, loaded on use (as the init picker is, ADR-020).
@@ -156,6 +174,41 @@ function nodeLsp(io: Platform): LspDeps {
       base: string,
       options: Parameters<ServerCheck>[3],
     ): Promise<Report> => runCheck(files, configPath, targets, { ...options, base, cache: true }),
+  };
+}
+
+/**
+ * The MCP server on the real process (ADR-042): MCP over stdio, the rule
+ * pages, and the same warm check as the language server's (`warmIo`), with the
+ * texts an agent passes laid over the disk, so a file it hasn't written yet
+ * can be checked. The connection with its SDK and the rule pages load only
+ * when `inwards mcp` runs, in chunks of their own in the binary, so no hook
+ * call pays for them.
+ *
+ * @param io - the server's own platform.
+ * @returns the MCP server's dependencies.
+ */
+function nodeMcp(io: Platform): McpDeps {
+  const { platform, files } = warmIo(io);
+  return {
+    io: platform,
+    serve: async (tools: Parameters<McpDeps["serve"]>[0]): Promise<number> => {
+      const { serveMcp } = await import("./mcp-connection.ts");
+      return await serveMcp(tools);
+    },
+    pages: async (): Promise<RulePages> => (await import("./rule-pages.ts")).RULE_PAGES,
+    check: (
+      configPath: string,
+      targets: string[] | undefined,
+      base: string,
+      options: Parameters<CheckRunner>[3],
+    ): Promise<Report> =>
+      runCheck(overlayTexts(files, options.texts ?? new Map()), configPath, targets, {
+        ...options,
+        base,
+        cache: true,
+        threads: 1,
+      }),
   };
 }
 

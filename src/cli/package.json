@@ -13,12 +13,15 @@
   "dependencies": {
     "@clack/prompts": "1.8.1",
     "@inwards/core": "workspace:*",
+    "@modelcontextprotocol/server": "2.3.1",
     "tree-sitter-python": "0.25.0",
     "vscode-languageserver": "^10.1.2",
-    "web-tree-sitter": "0.27.0"
+    "web-tree-sitter": "0.27.0",
+    "zod": "4.6.5"
   },
   "license": "MIT",
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
     "ajv": "8.20.0"
   }
 }

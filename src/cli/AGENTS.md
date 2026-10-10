@@ -12,18 +12,19 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
-| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `import-config`, `daemon`, `server`), `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
+| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `import-config`, `daemon`, `server`, `mcp`), `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
 | `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings` and `hook-host` (whether the agent still has Inwards wired in), and `protocol` (shared by all of them) | read the environment or the filesystem itself |
 | `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), violation fingerprints, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
-| `project/` | running a check, which files it reads and under which module names, then reading them (`sources`: one batch from 1,000 files, #281), the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), and how many threads parse a full check (`threads`, ADR-040) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
+| `project/` | running a check, which files it reads and under which module names, then reading them (`sources`: one batch from 1,000 files, #281), the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), how many threads parse a full check (`threads`, ADR-040), and texts laid over the disk for one check, files not yet written included (`overlay`, for `inwards mcp`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
 | `runlog/` | the run log, reading it back, stats, `--export` | keep notes in a module global |
 | `init/` | `inwards init`: agent wiring, `--style`, the scaffold plan, the report, presets, the architecture brief (`--brief`, `inwards context`), import-linter contracts as `[tool.inwards]` (`import-linter/`, for `inwards import-config`) | write files itself (`InitFiles` does) |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
 | `daemon/` | the hook daemon's side of ADR-039: the `inwards-daemon/1` wire format and the daemon's file names (`protocol`), the hook's side (`viaDaemon` and `askDaemon` in `client`), the request handler (`server`), the caches kept between requests (`memory`), and the `DaemonLink` and `DaemonHost` contracts | do I/O (the socket, the record and the lock are `adapters/daemon-*.ts`) |
 | `lsp/` | the language server's policy (`inwards server`, ADR-041): when to run a whole pass or a one-document check (`session`), the two checks through `planCheck` and `runCheck` (`checks`), what each file shows (`publish`), which file events matter (`events`), and the `Editor` and `LanguageServer` contracts | import the protocol library or touch a stream (that is `adapters/lsp-connection.ts`) |
+| `mcp/` | the MCP server's policy (`inwards mcp`, ADR-042): the three tools (`check-files`, `explain-rule` with `rule-page`, `where` with `where-answer` and `hints`), their arguments and answers (`contracts`), and running them one at a time (`tools`) | import the SDK or Zod, or touch a stream (that is `adapters/mcp-connection.ts`) |
 | `platform/` | the contracts for everything outside the process, `print()`, and `time.ts`, the one place that may name `Date` to parse a recorded timestamp | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
-| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), and the LSP connection over stdio (`lsp-connection`); `compose.ts` wires them into `AppDeps` | hold policy |
+| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), the LSP connection over stdio (`lsp-connection`), the MCP connection over stdio (`mcp-connection`) and the rule pages it serves (`rule-pages`, embedded as text); `compose.ts` wires them into `AppDeps` | hold policy |
 
 ## Dependency rules
 
@@ -39,7 +40,8 @@ then `commands`. `daemon/` sits beside them, below `commands/`, and imports
 only `platform` and `json` (and the engine's API); `commands/` and the
 `daemon-*` adapters use it. `lsp/` sits beside it too and imports `platform`,
 `json`, `paths` and `project` (for `planCheck`); `commands/` and
-`adapters/lsp-connection.ts` use it. Only `main.ts` imports `adapters/`. `eval/` may
+`adapters/lsp-connection.ts` use it. `mcp/` sits beside them with the same
+imports as `lsp/`; `commands/` and `adapters/mcp-connection.ts` use it. Only `main.ts` imports `adapters/`. `eval/` may
 import `claude-code/protocol.ts` and nothing else.
 
 Enforced by:
@@ -94,6 +96,11 @@ last pass for as long as the editor keeps it, and `nodeLsp` in
 `adapters/compose.ts` makes its extraction cache once. Every check still reads
 the config, the baseline and the listing again; don't keep any of them.
 
+The MCP server (`inwards mcp`, ADR-042) works the same way: `nodeMcp` makes
+the same warm I/O as the language server (`warmIo`), once per invocation,
+and `createTools` (`mcp/tools.ts`) keeps only the queue that runs calls one
+at a time. The texts an agent passes live for one call (`overlayTexts`).
+
 A module-level `Map` or array that grows at run time is a bug.
 
 ## Where new code goes
@@ -112,6 +119,14 @@ A module-level `Map` or array that grows at run time is a bug.
   when, what a document shows), the protocol in `adapters/lsp-connection.ts`.
   Test it over stdio with `test/support/lsp-client.ts`, which drives the
   compiled binary in CI. The extension's own server is frozen until #64.
+- **A new MCP tool.** The policy goes in `mcp/` (a module per tool, plus
+  its arguments in `mcp/contracts.ts` and its entry in `mcp/tools.ts`), the
+  Zod schema and registration in `adapters/mcp-connection.ts`. Test it with
+  `test/support/mcp-client.ts`: in process through the SDK's client, and over
+  stdio against `run.ts`'s `CMD`, which is the compiled binary in CI.
+- **A new rule's page.** `adapters/rule-pages.ts` imports every page in
+  `docs/chapters/rules/` as text for `explain_rule`; add the new page's
+  import there, or `test/mcp/rule-pages.test.ts` fails.
 - **A new config key.** The engine parses config (`src/core`). The CLI's
   config guard protects the whole `[tool.inwards]` table, so a key needs no
   guard change, but add a guard test that an edit of it is denied.
@@ -142,9 +157,10 @@ A module-level `Map` or array that grows at run time is a bug.
   that appeared mid-session, or missing hooks all block at Stop. A filesystem
   observation that fails answers "not there", which means "no start
   identity", never "unchanged".
-- **`inwards server`'s stdout is the protocol.** Anything else written there
-  breaks the editor's connection. `nodeLsp` gives the check streams whose
-  `out` writes to stderr; never write through `processStreams` from `lsp/`.
+- **`inwards server`'s and `inwards mcp`'s stdout is the protocol.**
+  Anything else written there breaks the client's connection. `warmIo` in
+  `compose.ts` gives their checks streams whose `out` writes to stderr; never
+  write through `processStreams` from `lsp/` or `mcp/`.
 - **Hook stdin is read synchronously** (`adapters/stdio.ts`): awaiting stdin in
   the Windows binary lost violations.
 - **Temp directories in tests** go through `test/support/temp.ts`, and

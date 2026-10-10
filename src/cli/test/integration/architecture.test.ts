@@ -43,6 +43,7 @@ const POLICY = [
   "init",
   "json",
   "lsp",
+  "mcp",
   "paths",
   "platform",
   "project",

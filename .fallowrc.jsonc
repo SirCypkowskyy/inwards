@@ -141,6 +141,8 @@
       { "name": "cli-daemon", "patterns": ["src/cli/src/daemon/**"] },
       // The language server's policy (`inwards server`, ADR-041): when to check what.
       { "name": "cli-lsp", "patterns": ["src/cli/src/lsp/**"] },
+      // The MCP server's policy (`inwards mcp`, ADR-042): the three tools.
+      { "name": "cli-mcp", "patterns": ["src/cli/src/mcp/**"] },
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
@@ -587,6 +589,28 @@
         ]
       },
       {
+        "from": "cli-mcp",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project"
+        ]
+      },
+      {
         "from": "cli-commands",
         "allow": [
           "core-api",
@@ -612,7 +636,8 @@
           "cli-claude-code",
           "cli-init",
           "cli-daemon",
-          "cli-lsp"
+          "cli-lsp",
+          "cli-mcp"
         ]
       },
       {
@@ -639,7 +664,8 @@
           "cli-init",
           "cli-commands",
           "cli-daemon",
-          "cli-lsp"
+          "cli-lsp",
+          "cli-mcp"
         ]
       },
       {
@@ -693,7 +719,8 @@
           "cli-platform",
           "cli-json",
           "cli-daemon",
-          "cli-lsp"
+          "cli-lsp",
+          "cli-mcp"
         ]
       },
       // The client talks to VS Code and the server only; the server reaches the

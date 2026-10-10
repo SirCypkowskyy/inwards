@@ -145,7 +145,7 @@ LSP
 :   Language Server Protocol. It's how the VS Code extension gets diagnostics from the Inwards language server. `inwards server` serves it over stdio from the binary, for any editor; the extension switches to it in [#64](https://github.com/SirCypkowskyy/inwards/issues/64). See [ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches).
 
 MCP
-:   Model Context Protocol. It lets an AI agent call external tools. `inwards mcp` is planned ([#65](https://github.com/SirCypkowskyy/inwards/issues/65)).
+:   Model Context Protocol. It lets an AI agent call external tools. `inwards mcp` serves three of them over stdio: `check_files`, `explain_rule` and `where_should_this_go` ([guide](guides/mcp.md)).
 
 SARIF
 :   Static Analysis Results Interchange Format 2.1.0, a JSON format for analysis results. GitHub code scanning ingests it.
