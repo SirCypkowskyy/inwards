@@ -63,8 +63,8 @@ describe.each([
     const { root, init: code, check } = scaffolded(style);
     expect({ init: code, check }).toEqual(PASSING);
     const text = readFileSync(join(root, "pyproject.toml"), "utf8");
-    expect(text).toContain('extend-select = ["INW014"]');
-    expect(text).toContain('[tool.inwards.rules.severity]\nINW014 = "warning"');
+    expect(text).toContain('extend-select = ["INW014", "INW015"]');
+    expect(text).toContain('[tool.inwards.rules.severity]\nINW014 = "warning"\n');
     expect(text).not.toContain("[tool.inwards.rules.ports-abstract]");
   });
 

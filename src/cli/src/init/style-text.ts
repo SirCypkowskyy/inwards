@@ -202,7 +202,7 @@ function extraLines(style: Style, pkg: string, scaffold: boolean): string[] {
     }
     lines.push(`public = ${array(template.public)}`);
   }
-  lines.push(...rulesLines(style));
+  lines.push(...rulesLines(style, pkg));
   const { contexts } = style;
   if (contexts !== undefined) {
     lines.push("", ...contexts.why.map((line) => `# ${line}`));
@@ -246,9 +246,10 @@ function roleRanks(roles: readonly { name: string; sibling?: true }[]): string[]
  * options tables.
  *
  * @param style - the preset.
+ * @param pkg - the project's import package, for options that name modules.
  * @returns the lines, after a blank line, or none when the preset sets no rules.
  */
-function rulesLines(style: Style): string[] {
+function rulesLines(style: Style, pkg: string): string[] {
   const { ignoreRules: off, optIn: on } = style;
   if (off === undefined && on === undefined) {
     return [];
@@ -269,7 +270,8 @@ function rulesLines(style: Style): string[] {
     ...on.codes.map((code) => `${code} = "warning"`),
   );
   for (const table of on.options) {
-    lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...table.lines);
+    const options = typeof table.lines === "function" ? table.lines(pkg) : table.lines;
+    lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...options);
   }
   return lines;
 }
