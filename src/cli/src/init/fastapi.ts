@@ -220,6 +220,11 @@ def get_post(post_id: int) -> PostResponse:
         msg = f"no post has the id {post_id}"
         raise PostNotFound(msg)
     return _response(post)
+
+
+def delete_post(post_id: int) -> None:
+    """Deletes the post with this id."""
+    del _posts[post_id]
 `,
     ],
     [
@@ -245,7 +250,7 @@ from fastapi import APIRouter, Depends, status
 
 from ${pkg}.posts.dependencies import valid_post_id
 from ${pkg}.posts.schemas import PostCreate, PostResponse
-from ${pkg}.posts.service import create_post
+from ${pkg}.posts.service import create_post, delete_post, get_post
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -260,10 +265,18 @@ async def add_post(data: PostCreate) -> PostResponse:
     summary="Read a post",
     responses={status.HTTP_404_NOT_FOUND: {"description": "No post has this id"}},
 )
-async def read_post(
-    post: Annotated[PostResponse, Depends(valid_post_id)],
-) -> PostResponse:
-    return post
+async def read_post(post_id: int) -> PostResponse:
+    return get_post(post_id)
+
+
+@router.delete(
+    "/{post_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a post",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "No post has this id"}},
+)
+async def remove_post(post: Annotated[PostResponse, Depends(valid_post_id)]) -> None:
+    delete_post(post.id)
 `,
     ],
   ]);

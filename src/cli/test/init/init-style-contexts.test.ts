@@ -6,7 +6,7 @@
  * a role's order with INW001, while an import through the public module
  * passes. Hexagonal's adapters are sibling layers, so one importing the other
  * fails with INW001. The fastapi preset is also checked in the
- * fastapi-best-practices layout, with its FastAPI rules on.
+ * fastapi-best-practices layout, with its FastAPI rules and INW012 on.
  */
 import { describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -223,13 +223,15 @@ describe("fastapi, in the fastapi-best-practices layout (--package src)", () => 
     return { root, run, check: findings(root) };
   }
 
-  test("the scaffold passes with the FAPI rules on, and init prints the Ruff config without writing it", () => {
+  test("the scaffold passes with the FAPI rules and INW012 on, and init prints the Ruff config without writing it", () => {
     const { root, run, check } = bestPractices();
     expect({ init: run.code, check }).toEqual(PASSING);
     const text = readFileSync(join(root, "pyproject.toml"), "utf8");
     expect(text).toContain(
-      'extend-select = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009"]',
+      'extend-select = ["FAPI001", "FAPI002", "FAPI003", "FAPI005", "FAPI006", "FAPI007", "FAPI008", "FAPI009", "INW012"]',
     );
+    expect(text).toContain('INW012 = "warning"');
+    expect(text).toContain('[tool.inwards.rules.thin-endpoint]\ndelegate-to = ["domain.service"]');
     expect(text).toContain("report-direct-raises = false");
     expect(text).not.toContain("tool.ruff");
     expect(run.stdout).toContain('extend-select = ["ASYNC", "FAST", "TID251"]');
@@ -245,6 +247,35 @@ describe("fastapi, in the fastapi-best-practices layout (--package src)", () => 
     expect(text).toContain(declared);
     writeFileSync(router, text.replace(declared, ""));
     expect(findings(root)).toEqual({ code: 0, findings: ["FAPI002 src/posts/router.py"] });
+  });
+
+  test("a fat endpoint in the router is an INW012 warning that names the service layer", () => {
+    const { root } = bestPractices();
+    appendFileSync(
+      join(root, "src/posts/router.py"),
+      [
+        "",
+        "",
+        '@router.get("/{post_id}/words", summary="Count the words of a post")',
+        "async def count_words(post_id: int) -> dict[str, int]:",
+        "    counts: dict[str, int] = {}",
+        "    for word in str(post_id).split():",
+        "        counts[word] = counts.get(word, 0) + 1",
+        "    return counts",
+        "",
+      ].join("\n"),
+    );
+    const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+    const [finding, ...rest] = JSON.parse(stdout).diagnostics;
+    expect({ code, rest }).toEqual({ code: 0, rest: [] });
+    expect(finding).toMatchObject({
+      code: "INW012",
+      file: "src/posts/router.py",
+      severity: "warning",
+    });
+    expect(finding.fix.summary).toBe(
+      "Move the work out of `count_words` into the `domain.service` layer (`src.*.service`), and keep the endpoint to HTTP.",
+    );
   });
 
   test("a deprecated startup event in main.py is a FAPI006 warning", () => {
