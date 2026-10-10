@@ -5,7 +5,7 @@
  * configuration guide; a change to either must change both.
  */
 import { describe, expect, test } from "bun:test";
-import { entryReach, matchEntry } from "../../src/config/layer-selector.ts";
+import { entryReach, filledFrom, matchEntry } from "../../src/config/layer-selector.ts";
 import { ConfigError, layerIndexOf, layerPackages, parseConfig } from "../../src/index.ts";
 import { layerMembership } from "../../src/rules/shared/layer-ownership.ts";
 
@@ -266,5 +266,20 @@ describe("matching internals", () => {
     ["shop.**", ["shop", "a", "b"], "match"],
   ] as const)("%s at %j: %s", (selector, segments, want) => {
     expect(entryReach(selector, segments)).toBe(want);
+  });
+
+  test.each([
+    ["src.*.service", "src.posts.router", "src.posts.service"],
+    ["src.*.service", "src.posts", "src.posts.service"],
+    ["src.*.service", "src.posts.api.router", "src.posts.service"],
+    ["src.**.service", "src.posts.api.router", "src.posts.api.service"],
+    ["src.**.service", "src.posts.router", "src.posts.service"],
+    ["src.*.application.orders", "src.billing.api", "src.billing.application.orders"],
+    ["src.*.service", "lib.posts.router", undefined],
+    ["src.*.service", "src", undefined],
+    ["src.*", "src.posts.router", undefined],
+    ["src.service", "src.posts.router", undefined],
+  ] as const)("%s filled from %s: %s", (selector, module, want) => {
+    expect(filledFrom(selector, module)).toBe(want);
   });
 });

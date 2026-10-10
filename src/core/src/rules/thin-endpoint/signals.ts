@@ -197,7 +197,9 @@ export function trip(bodies: readonly Body[], context: TripContext): Tripped {
   const parts = [
     ...sized,
     ...(direct.length === 0 ? [] : [calls]),
-    ...(undelegated ? [`no call into ${targetText(settings.delegateTo ?? [], layers)}`] : []),
+    ...(undelegated
+      ? [`no call into ${targetText(settings.delegateTo ?? [], layers, context.module)}`]
+      : []),
   ];
   const own = layerMembership(context.module, layers)?.layer.name;
   const sessionLayer = sorted.sessions

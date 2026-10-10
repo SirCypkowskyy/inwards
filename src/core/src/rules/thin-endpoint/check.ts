@@ -21,6 +21,7 @@ import { diagnostic, RULES } from "../../meta/registry.ts";
 import { parsePython } from "../../python/parser.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
+import type { Kind } from "./frameworks.ts";
 import { RemoteModules } from "./remote.ts";
 import { type ThinSettings, thinSettings } from "./settings.ts";
 import { trip } from "./signals.ts";
@@ -51,8 +52,6 @@ interface ReportContext {
   readonly src: SourceFile;
   readonly settings: ThinSettings;
   readonly layers: readonly LayerSpec[];
-  /** Where the work goes, as `targetText` names it. */
-  readonly where: string;
 }
 
 /**
@@ -75,16 +74,17 @@ function spanOf(start: Node, end: Node): Span {
  * Reports one endpoint when it trips a signal: on its `def` line, or on the
  * registration in the checked file when its body lives in another module.
  *
- * @param endpoint - the endpoint's function, its name and the file it lives in.
+ * @param endpoint - the endpoint's function, its name, its framework and the file it lives in.
  * @param endpoint.fn - its `function_definition` node.
  * @param endpoint.name - its name.
+ * @param endpoint.kind - the framework that marked it, which words the fix.
  * @param endpoint.view - the file that defines it.
- * @param context - the checked file, settings, layers and target text.
+ * @param context - the checked file, settings and layers.
  * @param registered - the registration that names it from the checked file, for a handler in another module.
  * @returns one finding, or none when nothing tripped.
  */
 function report(
-  { fn, name, view }: { fn: Node; name: string; view: FileView },
+  { fn, name, kind, view }: { fn: Node; name: string; kind: Kind; view: FileView },
   context: ReportContext,
   registered?: Registered,
 ): Diagnostic[] {
@@ -98,6 +98,7 @@ function report(
   if (tripped.parts.length === 0) {
     return [];
   }
+  const where = targetText(context.settings.delegateTo ?? [], context.layers, view.src.module);
   const spans = bodies.map((body, index) => ({
     helper: index === 0 ? undefined : body.name,
     line: body.fn.startPosition.row + 1,
@@ -114,7 +115,7 @@ function report(
         ? spanOf(registered.at, registered.at)
         : spanOf(fn, fn.childForFieldName("name") ?? fn),
       message: `${subject} is an HTTP endpoint with ${joined(tripped.parts)}${helperText(spans, path)}. Endpoints parse the request, call one use case, and shape the response.`,
-      fix: fixFor(name, tripped, context.where, { spans, path }),
+      fix: fixFor(name, tripped, where, { spans, path, kind }),
     }),
   ];
 }
@@ -135,23 +136,24 @@ export function checkThinEndpoints(
   inputs: ThinInputs,
 ): Diagnostic[] {
   const settings = thinSettings(inputs.options);
-  if (!mayHoldEndpoints(src.text, settings.decorators)) {
+  if (!mayHoldEndpoints(src.text, settings.recognise)) {
     return [];
   }
   const tree = parsePython(parser, src.text);
-  const remote = new RemoteModules(parser, inputs.project, settings.decorators);
+  const remote = new RemoteModules(parser, inputs.project, settings.recognise);
   try {
-    const view = fileView(tree, src, settings.decorators);
+    const view = fileView(tree, src, settings.recognise, (q) => remote.baseKind(q));
     const context = {
       src,
       settings,
       layers: inputs.layers,
-      where: targetText(settings.delegateTo ?? [], inputs.layers),
     };
-    const own = view.found.endpoints.flatMap(({ fn, name }) => report({ fn, name, view }, context));
-    const registered = view.found.registrations.flatMap(({ handler, target, how }) => {
+    const own = view.found.endpoints.flatMap(({ fn, name, kind }) =>
+      report({ fn, name, kind, view }, context),
+    );
+    const registered = view.found.registrations.flatMap(({ handler, target, how, kind }) => {
       const found = remote.resolve(target);
-      return found ? report(found, context, { at: handler, how }) : [];
+      return found ? report({ ...found, kind }, context, { at: handler, how }) : [];
     });
     return [...own, ...registered].sort((a, b) => a.line - b.line || a.column - b.column);
   } finally {
