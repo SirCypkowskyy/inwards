@@ -113,6 +113,7 @@ test("the runtime exports are unchanged", async () => {
     "rootPathOf",
     "ruleLevel",
     "stableMessage",
+    "topLevelModules",
   ]);
 });
 
@@ -195,6 +196,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "rootPathOf",
       "ruleLevel",
       "stableMessage",
+      "topLevelModules",
     ].sort(),
   );
 });

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 57ac58d81dcf7e08b3b2d443afadf24ee4e031e0f165ec667468660ba53d4b04
+source_hash: 5907dccbf3efdc5488a660161e2725a30f40d1d6d7c01684e90214e52ba96e74
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -73,17 +73,17 @@ Dwie rzeczy, których syntetyczne repozytorium nie pokazało. `inwards check` na
 
 | Scenariusz | Wynik | Budżet | Stan |
 |---|---|---|---|
-| Zimne pełne uruchomienie, naiwne pełne parsowanie (pierwsze podejście) | 7,5 s | < 1 s | :x: odrzucone, doprowadziło do ADR-004 |
+| Zimne pełne uruchomienie, naiwne pełne parsowanie (pierwsze podejście) | 7,5 s | < 1 s | :material-close-circle: odrzucone, doprowadziło do ADR-004 |
 | Zimne pełne uruchomienie, szkielet importów | 0,63–1,17 s (uruchomienia z dwóch sesji) | < 1 s | :material-alert: na granicy |
 | Ciepłe pełne uruchomienie, pamięć podręczna ekstrakcji ([#56](https://github.com/SirCypkowskyy/inwards/issues/56)) | p50 0,46 s, wobec 1,25 s bez pamięci podręcznej w tym samym przebiegu (3,0 raza szybciej, maszyna pod obciążeniem) | nie dotyczy | |
 | Zimne sprawdzenie całego projektu z szukaniem cykli importów ([#54](https://github.com/SirCypkowskyy/inwards/issues/54), `cycles = ["modules"]`), po 8 naprzemiennych uruchomień z `INWARDS_NO_CACHE=1`, średnie obciążenie około 1,1 | mediana 1,51 s wobec 1,35 s dla tego samego sprawdzenia bez niego; większość modułów leży w cyklicznych grupach, a każdy plik w nich jest potwierdzany (pełne parsowanie każdego trwałoby około 7 s) | < 1 s | :material-alert: ponad budżetem na tej maszynie, z szukaniem i bez niego; sprawdzenie punktowe poniżej, 0,40 do 0,44 s, było na nieobciążonej maszynie |
-| Jeden plik, czas rzeczywisty ze startem procesu (30 uruchomień) | p50 48,6 ms, p95 80,4 ms | p95 < 100 ms | :white_check_mark: z niewielkim zapasem |
+| Jeden plik, czas rzeczywisty ze startem procesu (30 uruchomień) | p50 48,6 ms, p95 80,4 ms | p95 < 100 ms | :material-check-circle: z niewielkim zapasem |
 | Jeden plik, czas silnika zgłaszany przez CLI | 16 do 30 ms | nie dotyczy | |
 | `inwards --version` (sam start procesu) | około 10 ms | nie dotyczy | |
-| Indeks modułów + moduły importujące jeden moduł, na zimno, jeden rdzeń (2100 plików, świeży proces) | 0,1 s indeks + 0,65 do 0,74 s na moduły importujące (684 pliki wspominają `m0`: syntetyczne nazwy to najgorszy przypadek dla filtra tekstowego). Od #44 indeks niczego nie czyta z góry: jego zbudowanie trwa od 17 do 21 ms, wypisanie 2100 modułów od 25 do 32 ms, a moduły importujące czytają potrzebne im pliki, łącznie od 0,53 do 0,71 s (od 0,58 do 0,66 s dla zachłannego indeksu, który zastąpił) | < 1 s | :white_check_mark: |
-| Odmowy prescanu na bibliotece standardowej CPythona 3.14 | 8,3 % z 1921 plików | im mniej, tym szybciej | :white_check_mark: |
-| Importy pominięte przez prescan na tym samym korpusie | 0 | 0 | :white_check_mark: |
-| Importy pominięte przez prescan na korpusie prawdziwych repozytoriów (6543 pliki, pięć serwisów) | 0 | 0 | :white_check_mark: |
+| Indeks modułów + moduły importujące jeden moduł, na zimno, jeden rdzeń (2100 plików, świeży proces) | 0,1 s indeks + 0,65 do 0,74 s na moduły importujące (684 pliki wspominają `m0`: syntetyczne nazwy to najgorszy przypadek dla filtra tekstowego). Od #44 indeks niczego nie czyta z góry: jego zbudowanie trwa od 17 do 21 ms, wypisanie 2100 modułów od 25 do 32 ms, a moduły importujące czytają potrzebne im pliki, łącznie od 0,53 do 0,71 s (od 0,58 do 0,66 s dla zachłannego indeksu, który zastąpił) | < 1 s | :material-check-circle: |
+| Odmowy prescanu na bibliotece standardowej CPythona 3.14 | 8,3 % z 1921 plików | im mniej, tym szybciej | :material-check-circle: |
+| Importy pominięte przez prescan na tym samym korpusie | 0 | 0 | :material-check-circle: |
+| Importy pominięte przez prescan na korpusie prawdziwych repozytoriów (6543 pliki, pięć serwisów) | 0 | 0 | :material-check-circle: |
 | Szczytowe zużycie pamięci, pełne uruchomienie syntetyczne | około 120 MB RSS | nie dotyczy | |
 | Rozmiar pliku binarnego, Linux x64 | 82 MB | nie dotyczy | :material-alert: duży |
 
@@ -128,15 +128,15 @@ config:
   theme: base
   themeVariables:
     pieSectionTextColor: "#ffffff"
-    pieLegendTextColor: "#607d8b"
+    pieTitleTextColor: "#6b7580"
     pieStrokeColor: "#ffffff"
     pieOpacity: "1"
-    pie1: "#4527a0"
-    pie2: "#673ab7"
-    pie3: "#7e57c2"
-    pie4: "#37474f"
-    pie5: "#455a64"
-    pie6: "#546e7a"
+    pie1: "#084e65"
+    pie2: "#0b6784"
+    pie3: "#2f7f99"
+    pie4: "#3e4852"
+    pie5: "#56616c"
+    pie6: "#6b7580"
 ---
 pie showData
     title Sprawdzenie jednego pliku, około 25 ms pracy (silnik + start)
@@ -157,9 +157,9 @@ To zmienia plan poprawy wydajności. W pętli agenta szybkość parsowania nie m
 | Krok | Oczekiwany efekt | Na co wpływa |
 |---|---|---|
 | Stały proces, z którego hooki korzystają przez lokalne gniazdo, z powrotem do jednorazowego uruchomienia (model procesu i nazwa polecenia do ustalenia w ADR, bo może go współdzielić serwer LSP; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Usuwa ~20 ms startu WASM i środowiska z każdego wywołania hooka | p95 dla jednego pliku |
-| :white_check_mark: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), zrobione | Zmierzone: start 22 → 10 ms, wywołanie hooka około 45% szybsze, 2,5 MB więcej na plik binarny (zobacz eksperyment wyżej) | p95 dla jednego pliku |
+| :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), zrobione | Zmierzone: start 22 → 10 ms, wywołanie hooka około 45% szybsze, 2,5 MB więcej na plik binarny (zobacz eksperyment wyżej) | p95 dla jednego pliku |
 | Pula workerów, jeden parser na rdzeń ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Niemal liniowe przyspieszenie zimnego pełnego uruchomienia na maszynie wielordzeniowej | Zimne pełne uruchomienie |
-| :white_check_mark: Pamięć podręczna list importów po hashu zawartości (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), zrobione dla `inwards check` i `inwards baseline` | Zmierzone: ciepłe pełne sprawdzenie 3,0 raza szybsze (0,46 s wobec 1,25 s p50, po 12 uruchomień na tym laptopie pod obciążeniem), o 27% wolniejsze, gdy pamięć podręczna się wypełnia. Hooki z niej nie korzystają ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Ciepłe pełne uruchomienie |
+| :material-check-circle: Pamięć podręczna list importów po hashu zawartości (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), zrobione dla `inwards check` i `inwards baseline` | Zmierzone: ciepłe pełne sprawdzenie 3,0 raza szybsze (0,46 s wobec 1,25 s p50, po 12 uruchomień na tym laptopie pod obciążeniem), o 27% wolniejsze, gdy pamięć podręczna się wypełnia. Hooki z niej nie korzystają ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Ciepłe pełne uruchomienie |
 | Zastąpienie `descendantsOfType` przejściem kursorem po drzewie na ścieżce pełnego parsowania ([#62](https://github.com/SirCypkowskyy/inwards/issues/62)) | Profilowanie pokazało, że w naiwnym podejściu szło na to 1,2 s | Odrzucone pliki i potwierdzenia |
 
 ### Odtworzenie { #reproduce }

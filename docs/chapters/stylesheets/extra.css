@@ -13,28 +13,53 @@
     overflow-x: auto;
   }
 
-  /* Below this width the SVG keeps its natural size and the wrapper
-     scrolls horizontally instead, so node/edge text never shrinks past
-     legible (width:100% on a viewBox this wide would scale 13px text
-     down to ~5px on a phone otherwise). */
+  /* The loop is drawn top to bottom, 380 units wide, so it fits a phone
+     at its natural text size and never needs the wrapper to scroll. */
   #homepage-loop {
+    display: block;
     width: 100%;
-    min-width: 720px;
+    max-width: 380px;
     height: auto;
     font-family: var(--md-text-font-family, sans-serif);
-    font-size: 13px;
+    font-size: 15px;
   }
 
+  /* Nodes in Paper 2 with ink labels; the hook, which is Inwards, in Hunk;
+     the end state outlined in Added, since it is the pass. */
   #homepage-loop .hl-node rect {
-    fill: var(--md-primary-fg-color);
-    stroke: var(--md-primary-fg-color--dark);
-    stroke-width: 1.5;
+    fill: var(--inw-paper-2, var(--md-default-bg-color));
+    stroke: var(--md-default-fg-color--light);
+    stroke-width: 1;
   }
 
   #homepage-loop .hl-node text {
-    fill: var(--md-primary-bg-color);
+    fill: var(--md-default-fg-color);
     text-anchor: middle;
     dominant-baseline: middle;
+  }
+
+  #homepage-loop .hl-node--inwards rect {
+    fill: var(--md-primary-fg-color);
+    stroke: var(--md-primary-fg-color);
+  }
+
+  #homepage-loop .hl-node--inwards text {
+    fill: var(--md-primary-bg-color);
+    font-weight: 700;
+  }
+
+  #homepage-loop .hl-node--end rect {
+    stroke: var(--inw-added, var(--md-default-fg-color--light));
+    stroke-width: 1.5;
+  }
+
+  #homepage-loop .hl-node:focus-visible {
+    outline: none;
+  }
+
+  #homepage-loop .hl-node:focus-visible rect {
+    stroke: var(--md-default-fg-color);
+    stroke-width: 2.5;
   }
 
   #homepage-loop .hl-edge {
@@ -53,8 +78,8 @@
 
   #homepage-loop .hl-edge-label {
     fill: var(--md-default-fg-color--light);
-    font-size: 11px;
-    text-anchor: middle;
+    font-size: 14px;
+    text-anchor: start;
   }
 
   /* Hovering (or focusing, for keyboard users) a node highlights the arrows
@@ -121,7 +146,7 @@
   }
 
   #quadrant-chart .qc-point circle {
-    fill: var(--md-accent-fg-color);
+    fill: var(--md-default-fg-color--light);
   }
 
   #quadrant-chart .qc-point-target circle {

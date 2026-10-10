@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/import-linter.md
-source_hash: 91595619ad77c620d4e6eddbaced875a26a594ece04fe5483bfd5f8fd2283fcf
+source_hash: 377ac9eb9b681fee74eef5069e5be74223a29248015cec38055deead463748de
 ---
 
 # Migracja z import-linter { #migrating-from-import-linter }
@@ -64,23 +64,12 @@ allowed_importers = shop.repository
 [tool.inwards]
 layers = [
   { name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["pydantic"] },
-  { name = "orders | billing", modules = ["shop.orders", "shop.billing"] },
+  [
+    { name = "orders", modules = ["shop.orders"] },
+    { name = "billing", modules = ["shop.billing"] },
+  ],
   { name = "web", modules = ["shop.web"] },
 ]
-# The contexts only stand for forbidden imports; import-linter checked no cycles.
-cycles = []
-
-[[tool.inwards.contexts]]
-name = "shop.billing"
-modules = ["shop.billing"]
-public = ["shop.billing"]
-depends-on = []
-
-[[tool.inwards.contexts]]
-name = "shop.orders"
-modules = ["shop.orders"]
-public = ["shop.orders"]
-depends-on = []
 ```
 
 i raportuje:
@@ -102,7 +91,7 @@ Inwards also runs rules import-linter doesn't have (INW006 for code outside ever
 |---|---|---|
 | `layers`, od najwyższej do najniższej | `layers`, od najbardziej wewnętrznej: kolejność jest odwrócona | INW001 |
 | linia warstwy `a : b` (moduły sąsiednie, które mogą się wzajemnie importować) | jedna warstwa z oboma modułami | INW001 |
-| linia warstwy `a | b` (niezależne moduły sąsiednie) | jedna warstwa z oboma modułami oraz po jednym kontekście na moduł, którego `depends-on` pomija pozostałe | INW001, INW002 |
+| linia warstwy `a | b` (niezależne moduły sąsiednie) | [warstwy sąsiednie](configuration.md#sibling-layers): zagnieżdżona tablica w `layers`, po jednej warstwie na moduł, w miejscu linii | INW001 |
 | `containers` | każda warstwa powtórzona pod każdym kontenerem, w tej samej warstwie Inwards | INW001 |
 | warstwy `(optional)` | zwykła warstwa; zgłaszana w raporcie, bo prefiks, który nie pasuje do żadnego modułu, dostaje ostrzeżenie INW006 | INW006 |
 | `exhaustive = true` | zgłaszane w raporcie: moduł poza wszystkimi warstwami dostaje ostrzeżenie INW006, nie błąd | INW006 |

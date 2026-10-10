@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI002.md
-source_hash: fd54700d0fadf07ccbb2844c4c1186c2d1e6cf88dfc5685c66391ce14ae60b85
+source_hash: e36ae2882e6432bcd17edb3d881672b15d610d3883f539919943319ab3109167
 type: rule
 title: FAPI002 undocumented-error-response
 description: Operacja ścieżki FastAPI może zwrócić kod błędu, bezpośrednio, przez funkcję pomocniczą albo zależność, albo przez handler wyjątków aplikacji, którego jej wpis OpenAPI nie deklaruje.
@@ -13,7 +13,7 @@ status: stable
 tags: [fastapi]
 resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/undocumented-error-response.ts
 timestamp: 2026-09-28T00:00:00Z
-related_issues: [186, 183]
+related_issues: [186, 183, 242]
 ---
 
 # FAPI002 `undocumented-error-response`
@@ -207,7 +207,10 @@ Nieznane znaczy ciche: FAPI002 woli przeoczyć diagnostykę niż zgłosić błę
 - Kod statusu, którego nie umie odczytać (`HTTPException(code)`), `responses=`, które nie jest literałem (`responses=build()`), dekorator z `**kwargs` albo dołączenie, którego nie umie rozwiązać (`include_router(getattr(m, "router"))`, router zwracany przez fabrykę, `include_router(r, **opts)`), sprawia, że ten kod albo endpoint jest nieznany i nic dla niego nie jest zgłaszane. Jedno nierozwiązane dołączenie gdziekolwiek sprawia, że nieznana jest każda trasa na routerze. Dołączenia są czytane z grafu aplikacji i routerów, którego używa FAPI003 ([`graph.ts`](FAPI003.md)), więc pętla po literalnej liście routerów się liczy.
 - Metody wstrzykniętych obiektów (`svc.place()`) nie są śledzone, podobnie jak kod zewnętrzny, wywołania przez `getattr` i wszystko, co aplikacja robi w czasie działania (trasy dodawane w pętlach, nadpisane `app.openapi()`, middleware).
 - Nie ma analizy przepływu: `raise` liczy się, jeśli jest w funkcji, nawet w gałęzi, do której ten endpoint nigdy nie trafia. `except X` wokół wywołania odejmuje tylko własne wyjątki, które są `X` albo po nim dziedziczą.
-- Handlery wyjątków są szukane we wszystkich aplikacjach projektu, a nie tylko w tej, która montuje trasę. Rzucony własny wyjątek nic nie wnosi, gdy któryś handler jest rejestrowany ze zmiennej (pętla po słowniku wyjątków) albo gdy klasa dziedziczy po wyjątku zewnętrznym, którego handlera Inwards może nie widzieć. Funkcja-generator wywołana po nazwie (treść `StreamingResponse`) nie jest czytana, bo wywołanie jej nie uruchamia.
+- Handlery wyjątków liczą się tylko w aplikacjach, które obsługują trasę: w tej, na której trasa jest zadeklarowana, albo w każdej aplikacji, która dołącza jej router, bezpośrednio albo przez inne routery. Handler w innej aplikacji (na przykład w aplikacji health-check workera) się nie liczy, podobnie jak handler w aplikacji, która montuje aplikację trasy, bo zamontowana aplikacja sama obsługuje swoje wyjątki.
+- Handlery są czytane z `@app.exception_handler(X)`, `app.add_exception_handler(X, h)` (także w pętli `for` po literalnej liście albo krotce wyjątków) i z `exception_handlers=` w `FastAPI(...)`. Ta tabela może być słownikiem, nazwą związaną ze słownikiem w tym samym pliku albo wpisem `"exception_handlers"` w słowniku rozpakowanym w `FastAPI(**kwargs)`, także w słowniku, który wywołanie w tym samym pliku przekazuje do fabryki aplikacji. `**kwargs`, którego słownik ustawia inne klucze, nadal ukrywa pozostałe argumenty aplikacji i jej trasy pozostają nieznane.
+- Rzucony własny wyjątek nic nie wnosi w aplikacji z rejestracją, której Inwards nie umie odczytać: pętlą po słowniku wyjątków albo rozpakowanym słownikiem, który pochodzi z innego pliku, jest zmieniany w miejscu (`kwargs.update(...)`) albo należy do fabryki, której żadne wywołanie w pliku nie osiąga. Tak samo jest z klasą dziedziczącą po wyjątku zewnętrznym, którego handlera Inwards może nie widzieć. Handler dla klasy wbudowanej albo zewnętrznej, na przykład catch-all dla `Exception`, jest czytany, ale nie mapuje żadnego kodu: taki handler często wybiera kod w środku, według typu wyjątku.
+- Funkcja-generator wywołana po nazwie (treść `StreamingResponse`) nie jest czytana, bo wywołanie jej nie uruchamia.
 - Gdy do jednego routera prowadzi kilka dołączeń, liczy się kod zadeklarowany w którymkolwiek z nich.
 - Żeby ustalić, co jest nad routerem, FAPI002 czyta raz na sprawdzenie każdy plik projektu z FastAPI. W hooku po edycji robi to tylko dla trasy z kodem, którego nie deklarują jej dekorator ani router.
 

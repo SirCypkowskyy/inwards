@@ -73,7 +73,8 @@ export interface ProjectFiles {
  * A project's first-party modules, answered on demand.
  *
  * - `ownerOf` probes the file system (see `probeLookup`), each path at most
- *   once, and never walks the tree. It follows Python, not the
+ *   once, and never walks the tree; a compiled or sourceless module
+ *   (`.so`, `.pyd`, `.pyc`, `.pyx`) is found in its package's listing. It follows Python, not the
  *   listing, and so does `importersOf`, which resolves owners through it: it
  *   can return a name missing from `modules`, such as a namespace package (a
  *   directory without `__init__.py`), a module under a virtualenv or
@@ -133,12 +134,19 @@ export class ProjectIndex {
     // A long-lived adapter must rebuild the index when a path that could be a module is
     // created or deleted; the language server does, or builds one per check without file events.
     const kinds = new Map<string, ReturnType<PathKind>>();
+    /**
+     * Lists a directory once, for the compiled modules the probe looks for.
+     *
+     * @param dir - a directory relative to the config root, `""` for the root.
+     * @returns its entries, or undefined when it isn't a readable directory.
+     */
+    const listed = (dir: string): Entries => this.entries(dir);
     const lookup = probeLookup((rel: string): ReturnType<PathKind> => {
       if (!kinds.has(rel)) {
         kinds.set(rel, source.kind(rel));
       }
       return kinds.get(rel);
-    });
+    }, listed);
     // Several rules, and the import graph, ask about the same targets.
     const owners = new Map<string, string | undefined>();
     this.ownerOf = (target: string): string | undefined => {

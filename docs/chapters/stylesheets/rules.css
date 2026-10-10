@@ -1,0 +1,281 @@
+/* fallow-ignore-file unused-file */
+/* Loaded via docs/zensical.toml's extra_css, a TOML config fallow's JS
+   import graph can't trace. The rule browser on rules/index.md (issue #145),
+   built by javascripts/rule-index.mjs. Every class is its own, so the
+   theme's unlayered rules never target these elements and a layer is safe.
+   docs/DESIGN.md, "Rule browser", describes it. */
+@layer inwards-rules {
+  /* scroll-margin keeps the top clear of the sticky header after a page change. */
+  .inw-rules {
+    margin: 1.4rem 0 2rem;
+    scroll-margin-top: 3.6rem;
+    font-size: 0.8rem;
+  }
+
+  .inw-rules [hidden] {
+    display: none;
+  }
+
+  /* Filters: one row on a wide column, wrapping to two or one. */
+  .inw-rules__filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.6rem;
+    align-items: end;
+  }
+
+  .inw-rules__field {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .inw-rules__field > span {
+    color: var(--inw-graphite);
+    font-weight: 600;
+  }
+
+  .inw-rules__field--search {
+    grid-column: span 2;
+  }
+
+  /* The theme resets every input's border without a layer, which beats this
+     one, so the search box draws its border on a wrapper. */
+  .inw-rules :is(select, .inw-rules__box) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.2em;
+    border: 1px solid var(--inw-graphite);
+    border-radius: 6px;
+    background-color: var(--inw-paper);
+    color: var(--inw-ink);
+    font: inherit;
+  }
+
+  .inw-rules__box {
+    display: flex;
+  }
+
+  .inw-rules :is(select, input) {
+    padding: 0.35em 0.6em;
+  }
+
+  .inw-rules input {
+    box-sizing: border-box;
+    width: 100%;
+    border-radius: 5px;
+    background-color: transparent;
+    color: inherit;
+    font: inherit;
+  }
+
+  .inw-rules input::placeholder {
+    color: var(--inw-graphite);
+    opacity: 1;
+  }
+
+  .inw-rules__count {
+    margin: 1.4rem 0 0.6rem;
+    color: var(--inw-graphite);
+  }
+
+  /* The table: the docs table component (Rule border, Paper 2 header,
+     0.6em x 1em cells), scrolling inside its wrapper on a narrow column. */
+  .inw-rules__scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .inw-rules__table {
+    width: 100%;
+    border: 1px solid var(--inw-rule);
+    border-radius: 6px;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .inw-rules__table :is(th, td) {
+    padding: 0.6em 1em;
+    border-top: 1px solid var(--inw-rule);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .inw-rules__table thead :is(th, td) {
+    border-top: 0;
+    background-color: var(--inw-paper-2);
+    font-weight: 700;
+  }
+
+  .inw-rules__caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The name cell: the name, what the rule flags, and its default in
+     Graphite, one per line. */
+  .inw-rules__name,
+  .inw-rules__summary,
+  .inw-rules__default {
+    display: block;
+    width: fit-content;
+  }
+
+  .inw-rules__summary {
+    margin-top: 0.3em;
+  }
+
+  .inw-rules__default {
+    color: var(--inw-graphite);
+  }
+
+  .inw-rules__table thead th:first-child {
+    border-top-left-radius: 6px;
+  }
+
+  .inw-rules__table thead th:last-child {
+    border-top-right-radius: 6px;
+  }
+
+  .inw-rules__table td:first-child {
+    white-space: nowrap;
+  }
+
+  /* Sortable headers are buttons that read as the header text; the
+     direction is a mark after the label, and aria-sort says it too. */
+  .inw-rules__table th button {
+    padding: 0;
+    white-space: nowrap;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .inw-rules__table th button::after {
+    content: "\2195";
+    margin-left: 0.3em;
+    color: var(--inw-graphite);
+  }
+
+  .inw-rules__table th[aria-sort="ascending"] button::after {
+    content: "\2191";
+    color: inherit;
+  }
+
+  .inw-rules__table th[aria-sort="descending"] button::after {
+    content: "\2193";
+    color: inherit;
+  }
+
+  .inw-rules__table th button:hover {
+    color: var(--inw-hunk-strong);
+  }
+
+  .inw-rules__empty {
+    padding: 1em;
+    border: 1px solid var(--inw-rule);
+    border-radius: 6px;
+    background-color: var(--inw-paper-2);
+  }
+
+  .inw-rules__empty p {
+    margin: 0 0 0.6em;
+  }
+
+  /* Pager and page size on one line under the table. */
+  .inw-rules__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.4rem;
+    align-items: end;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+  }
+
+  .inw-rules__pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    align-items: center;
+  }
+
+  .inw-rules__pages > * {
+    min-width: 1.6rem;
+    padding: 0.3em 0.6em;
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .inw-rules__pages [aria-current="page"] {
+    background-color: var(--inw-paper-2);
+    box-shadow: inset 0 0 0 1px var(--inw-rule);
+    font-weight: 700;
+  }
+
+  .inw-rules__per {
+    grid-auto-flow: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .inw-rules__per select {
+    width: auto;
+  }
+
+  /* Below 45em (the theme's breakpoint) each rule is a block of labelled
+     lines, and the header keeps only its sort buttons, as one row. */
+  @media screen and (max-width: 44.9844em) {
+    .inw-rules__field--search {
+      grid-column: 1 / -1;
+    }
+
+    .inw-rules__table,
+    .inw-rules__table :is(thead, tbody, tr, td) {
+      display: block;
+    }
+
+    .inw-rules__table thead tr {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.2rem 1.4rem;
+      padding: 0.6em 1em;
+      border-radius: 6px 6px 0 0;
+      background-color: var(--inw-paper-2);
+    }
+
+    .inw-rules__table thead th {
+      padding: 0;
+      background: none;
+    }
+
+    .inw-rules__table thead th:not([aria-sort]):not(:has(button)) {
+      display: none;
+    }
+
+    .inw-rules__table tbody tr {
+      padding: 0.6em 1em;
+      border-top: 1px solid var(--inw-rule);
+    }
+
+    .inw-rules__table td {
+      display: grid;
+      grid-template-columns: 9em minmax(0, 1fr);
+      gap: 0.6rem;
+      padding: 0.15em 0;
+      border: 0;
+      white-space: normal;
+    }
+
+    .inw-rules__table td::before {
+      content: attr(data-label);
+      color: var(--inw-graphite);
+      font-weight: 600;
+    }
+  }
+}

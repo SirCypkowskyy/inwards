@@ -6,7 +6,8 @@
  * Two files per session in `.inwards/state/`:
  *
  * - `<id>.start.json`: HEAD, every `[tool.inwards]` table in the project, a
- *   content-hash manifest and the symlinks in layer packages. Written once,
+ *   content-hash manifest, the symlinks in layer packages and the top-level
+ *   modules under each config root. Written once,
  *   at startup or /clear, to a temporary file that is then renamed, so a
  *   reader never sees half of it.
  * - `<id>.jsonl`: one small event per line (edits, resumes). Hooks run in
@@ -40,7 +41,13 @@ import type { Diagnostic } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { baselineHashes } from "../project/baseline.ts";
-import { projectConfigs, projectLinks, projectManifest, projectPath } from "../project/snapshot.ts";
+import {
+  projectConfigs,
+  projectLinks,
+  projectManifest,
+  projectPath,
+  projectTopLevel,
+} from "../project/snapshot.ts";
 import type { SessionStart } from "./contracts.ts";
 import { fingerprint } from "./fingerprint.ts";
 import { copiesName, startCopier } from "./start-copies.ts";
@@ -162,6 +169,7 @@ export function recordStart(
     manifest,
     baselines,
     links: projectLinks(io, project, configs),
+    topLevel: projectTopLevel(io, project, configs),
   };
   const text = JSON.stringify(start);
   io.state.publish(dir, `${id}.start.json`, text);

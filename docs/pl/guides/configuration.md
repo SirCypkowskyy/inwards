@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 3ac7c7ee8e834d2afd29706681fe1e433fc9a2e1c8a7a9bec56d1fc5686a962f
+source_hash: 3b7900dfb65aa4f4491162e60ae05298a7773db5bf469fdac09ee8d396a3f98f
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -25,6 +25,8 @@ Nieznany klucz, zły typ albo zła wartość to błąd konfiguracji: `inwards ch
 
 JSON Schema dla `[tool.inwards]` jest opublikowany pod adresem <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. Ten adres śledzi gałąź `develop`, tak jak ta dokumentacja. Żeby przypiąć schemat do wydania, którego używasz, weź plik `inwards-tool-schema.json` dołączony do każdego [wydania na GitHubie](https://github.com/SirCypkowskyy/inwards/releases).
 
+Edytory, które biorą schemat `pyproject.toml` z [SchemaStore](https://www.schemastore.org/), będą podpowiadać i sprawdzać `[tool.inwards]` bez żadnej konfiguracji, gdy SchemaStore przyjmie schemat Inwards ([SchemaStore#6427](https://github.com/SchemaStore/schemastore/pull/6427), [#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Do tego czasu ustaw go ręcznie.
+
 Edytory korzystające z [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML w VS Code i inne) przypisują schematy do całych plików: Taplo pomija `keys` reguły, gdy wybiera schemat, więc sam schemat tabeli byłby sprawdzany względem całego `pyproject.toml`. Zamiast niego użyj zbudowanego z niego schematu całego pliku, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, który sprawdza `[tool.inwards]` i zostawia wszystkie inne tabele w spokoju. Plik `.taplo.toml` obok `pyproject.toml`:
 
 ```toml title=".taplo.toml"
@@ -35,7 +37,7 @@ include = ["**/pyproject.toml"]
 path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
 
-To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane, dopóki schemat Inwards nie trafi do schematu SchemaStore ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Wydania dołączają go jako `inwards-pyproject-schema.json`.
+To zastępuje schemat, który Taplo wziąłby dla tego pliku z SchemaStore, więc inne tabele nie są sprawdzane. Gdy SchemaStore będzie miał schemat Inwards, usuń tę regułę i zostaw cały plik schematowi SchemaStore. Wydania dołączają go jako `inwards-pyproject-schema.json`.
 
 Schemat sprawdza strukturę: klucze, ich typy, dozwolone wartości, kody reguł i kształt nazw oraz wzorców. Inwards sprawdza więcej, gdy wczytuje konfigurację:
 
@@ -146,13 +148,13 @@ Najstarsza wersja Inwards, która może sprawdzać projekt. Starszy program koń
 
 Typ: lista nazw modułów. Domyślnie: brak.
 
-Moduły pominięte w ostrzeżeniu INW006 o kodzie poza wszystkimi warstwami, na przykład `tests` albo `migrations`. Wpis dopasowuje całe segmenty nazwy w dowolnym miejscu nazwy modułu: `migrations` obejmuje `shop.orders.migrations.0001_initial`. Importy z warstwy do tych modułów nadal są sprawdzane.
+Moduły pominięte w ostrzeżeniu INW006 o kodzie poza wszystkimi warstwami, na przykład `tests` albo `migrations`. Wpis dopasowuje całe segmenty nazwy w dowolnym miejscu nazwy modułu: `migrations` obejmuje `shop.orders.migrations.0001_initial`, a `tests` obejmuje `shop.tests` tak samo jak `tests` najwyższego poziomu. Wpis zaczynający się od `/` pasuje tylko na początku nazwy: `/tests` obejmuje `tests.test_order`, ale nie `shop.tests.test_order`, które nadal dostaje ostrzeżenie. `inwards init` zapisuje domyślne wpisy bez `/`. Importy z warstwy do pominiętych modułów nadal są sprawdzane.
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
-ignore = ["tests", "scripts", "migrations", "conftest"]
+ignore = ["/tests", "scripts", "migrations", "conftest"]
 ```
 
 ### `generated` { #generated }
@@ -263,7 +265,7 @@ Każdy kontekst ma:
 
 - `name`: niepusty tekst, z rozróżnianiem wielkości liter, unikalny wśród kontekstów.
 - `modules`: prefiksy modułów, które kontekst posiada, razem ze wszystkim pod nimi. To dosłowne nazwy z kropkami; gwiazdki są błędem konfiguracji. Gdy do modułu pasują prefiksy kilku kontekstów, wygrywa najdłuższy, więc kolejność tabel nigdy nie ma znaczenia. Ten sam prefiks w dwóch kontekstach to błąd konfiguracji.
-- `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu.
+- `public` (domyślnie `[]`): prefiksy własnych modułów kontekstu, które mogą importować konteksty od niego zależne. To pełne nazwy modułów, a nie nazwy względne wobec kontekstu: `api` oznacza moduł najwyższego poziomu `api`. Każdy musi należeć do tego kontekstu; prefiks, który dokładniej posiada inny kontekst, to błąd konfiguracji. Moduł jest publiczny, gdy leży na publicznym prefiksie albo pod nim i należy do tego kontekstu. Wpis z wiodącym `=` jest dokładny: `public = ["=shop.billing", "shop.billing.models"]` otwiera fasadę pakietu `shop.billing` (jego `__init__`) oraz `shop.billing.models` ze wszystkim pod nim, ale nie `shop.billing._invoices` ani żadnego innego podmodułu. Moduł po `=` to zwykła nazwa z kropkami i obowiązuje go ta sama zasada przynależności.
 - `depends-on` (domyślnie `[]`): konteksty, z których ten może importować. Zależność jest bezpośrednia: nie przechodzi dalej i nie działa w drugą stronę. Nazwa może wskazywać kontekst zadeklarowany niżej. Własna nazwa kontekstu, nieznana nazwa i powtórzona nazwa to błędy konfiguracji.
 - `template`: [szablon](#templates), którego nazwy `public`, pod każdym z `modules` kontekstu, dołączają do jego listy `public`.
 

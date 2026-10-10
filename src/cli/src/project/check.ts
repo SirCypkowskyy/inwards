@@ -31,6 +31,7 @@ import {
 } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
+import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ProjectIo } from "./contracts.ts";
 import { layerLinks, linksUnder } from "./links.ts";
@@ -290,6 +291,8 @@ function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
  *   `configPath` (the Stop gate's session-start config, after the agent changed it).
  * @param options.exclude - directories whose files are left out because their own
  *   config checks them: the uv workspace members under a workspace root's config (#57).
+ * @param options.absent - top-level module names the index treats as missing: those
+ *   new since the session start, for the Stop gate's check of a file as it was then (#86).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
  */
@@ -306,6 +309,7 @@ export async function runCheck(
     cache = false,
     config,
     exclude = [],
+    absent = [],
   }: {
     base: string;
     baseline?: boolean | undefined;
@@ -315,6 +319,7 @@ export async function runCheck(
     cache?: boolean | undefined;
     config?: InwardsConfig | undefined;
     exclude?: readonly string[] | undefined;
+    absent?: readonly string[] | undefined;
   },
 ): Promise<Report> {
   const started = io.clock.elapsed();
@@ -322,7 +327,7 @@ export async function runCheck(
   const { files, loaded } = loadSources(io, project, { targets, base, texts, exclude });
   // Read first: the engine skips the confirming parse where the baseline accepts everything.
   const accepted = baseline ? readBaseline(io, configPath, project.config.rules) : undefined;
-  const listing = projectFiles(io, project);
+  const listing = hideTopLevel(projectFiles(io, project), absent);
   const index = project.engine.index(listing);
   // A whole-project run also looks for import cycles (INW004), which one file can't show.
   const whole = targets === undefined;

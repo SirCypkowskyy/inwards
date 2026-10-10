@@ -85,21 +85,42 @@ describe("mapping layers", () => {
     expect(parseConfig(toml).layers.map((l) => l.name)).toEqual(["low", "medium", "high"]);
   });
 
-  test("| siblings become contexts that may not import each other; : siblings share a layer", () => {
+  test("| siblings become a sibling group that may not import each other; : siblings share a layer", () => {
     const { toml } = converted(
       `${ROOT}[importlinter:contract:l]\nname = L\ntype = layers\nlayers =\n  mypackage.high\n  mypackage.a | mypackage.b\n  mypackage.c : mypackage.d\n`,
     );
+    expect(toml).toContain('  [\n    { name = "a", modules = ["mypackage.a"] },');
     const config = parseConfig(toml);
-    expect(config.layers.map((l) => l.modules)).toEqual([
-      ["mypackage.c", "mypackage.d"],
-      ["mypackage.a", "mypackage.b"],
-      ["mypackage.high"],
+    expect(config.layers.map((l) => [l.name, l.modules])).toEqual([
+      ["c : d", ["mypackage.c", "mypackage.d"]],
+      ["a", ["mypackage.a"]],
+      ["b", ["mypackage.b"]],
+      ["high", ["mypackage.high"]],
     ]);
-    expect(config.contexts?.map((c) => [c.name, c.dependsOn])).toEqual([
-      ["mypackage.a", []],
-      ["mypackage.b", []],
+    expect(config.layers.map((l) => l.rank)).toEqual([0, 1, 1, 2]);
+    expect(config.contexts ?? []).toEqual([]);
+  });
+
+  test("| siblings with containers: one sibling per name, across containers", () => {
+    const { toml } = converted(
+      `${ROOT}[importlinter:contract:l]\nname = L\ntype = layers\nlayers =\n  high\n  a | b\ncontainers =\n  mypackage.foo\n  mypackage.bar\n`,
+    );
+    expect(parseConfig(toml).layers.map((l) => l.modules)).toEqual([
+      ["mypackage.foo.a", "mypackage.bar.a"],
+      ["mypackage.foo.b", "mypackage.bar.b"],
+      ["mypackage.foo.high", "mypackage.bar.high"],
     ]);
-    expect(config.cycles).toEqual([]);
+  });
+
+  test("a second contract with the same shape joins the siblings", () => {
+    const { toml } = converted(
+      `${ROOT}[importlinter:contract:a]\nname = A\ntype = layers\nlayers =\n  high\n  a | b\ncontainers = mypackage.foo\n\n[importlinter:contract:b]\nname = B\ntype = layers\nlayers =\n  high\n  a | b\ncontainers = mypackage.bar\n`,
+    );
+    expect(parseConfig(toml).layers.map((l) => l.modules)).toEqual([
+      ["mypackage.foo.a", "mypackage.bar.a"],
+      ["mypackage.foo.b", "mypackage.bar.b"],
+      ["mypackage.foo.high", "mypackage.bar.high"],
+    ]);
   });
 
   test("containers repeat each layer; exhaustive_ignores go to ignore; both are reported", () => {

@@ -35,7 +35,12 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { changedBaselines } from "../project/baseline.ts";
-import { projectConfigs, projectLinks, projectManifest } from "../project/snapshot.ts";
+import {
+  projectConfigs,
+  projectLinks,
+  projectManifest,
+  projectTopLevel,
+} from "../project/snapshot.ts";
 import { rejectedNote } from "../session/agent-suppressions.ts";
 import { uncommittedConfigs } from "../session/committed-config.ts";
 import { fingerprint } from "../session/fingerprint.ts";
@@ -50,7 +55,7 @@ import {
   type SessionState,
 } from "../session/record.ts";
 import { touchWitness } from "../session/start-record.ts";
-import { changedFiles, checkChanged } from "./changed-files.ts";
+import { changedFiles, checkChanged, freshImporters, newTopLevel } from "./changed-files.ts";
 import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
 import { hookProblem } from "./hook-host.ts";
 import { type HookDeps, hookProject } from "./protocol.ts";
@@ -164,7 +169,9 @@ function unknownSession(io: Platform, project: string, id: unknown, active: bool
  * Checks what the session changed, with one set of start lookups for this
  * invocation: the changed files against their session-start configs (or the
  * whole project, for `stop-gate = "project"`), plus the layout comparison
- * with the session start. Shape findings on files that predate the session
+ * with the session start. Files that mention a top-level package new this
+ * session count as changed, since it can turn their old imports into
+ * first-party ones (#86). Shape findings on files that predate the session
  * are legacy, like old violations. A baseline changed during the session
  * can't be trusted, so none is applied, and project mode falls back to the
  * changed files.
@@ -200,11 +207,18 @@ async function review(
   const { io } = deps;
   const manifest = projectManifest(io, project, configs);
   const lookups = createStartLookups({ ...io, check: deps.check }, { project, id });
-  const changed = changedFiles(io, lookups, state, manifest);
+  const fresh = newTopLevel(project, configs, {
+    before: state.start.topLevel,
+    now: projectTopLevel(io, project, configs),
+  });
+  const edits = changedFiles(io, lookups, state, manifest);
+  // Not in `edits`, so byte for byte what they were at start: their own start content.
+  const unchanged = freshImporters(io, project, fresh, manifest).filter((f) => !edits.includes(f));
+  const changed = [...edits, ...unchanged];
   const checked = await checkChanged(
     lookups,
     changed,
-    { start: state.start, now: configs, found },
+    { start: state.start, now: configs, found, fresh, unchanged: new Set(unchanged) },
     edited.length === 0,
   );
   const texts = Object.fromEntries(

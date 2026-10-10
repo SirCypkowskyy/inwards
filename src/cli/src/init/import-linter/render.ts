@@ -3,7 +3,7 @@
  * `[tool.inwards]` table in TOML, and the per-contract report for the
  * terminal. Pure text: the command decides where each one goes.
  */
-import type { Draft, Outcome } from "./model.ts";
+import type { Draft, DraftLayer, Outcome } from "./model.ts";
 
 /** The width of the status column in the report (`partial`, the longest). */
 const STATUS_WIDTH: number = "partial".length;
@@ -29,6 +29,23 @@ function array(items: readonly string[]): string {
 }
 
 /**
+ * Renders one place in the layer order: an inline table, or a nested array
+ * of them for sibling layers.
+ *
+ * @param place - the layers sharing the place, innermost place first in the list.
+ * @returns the lines of the `layers` array that stand for it.
+ */
+function placeLines(place: readonly DraftLayer[]): string[] {
+  const siblings = place.length > 1;
+  const indent = siblings ? "    " : "  ";
+  const rows = place.map((layer) => {
+    const deny = layer.deny.length > 0 ? `, extend-deny-libraries = ${array(layer.deny)}` : "";
+    return `${indent}{ name = ${quoted(layer.name)}, modules = ${array(layer.modules)}${deny} },`;
+  });
+  return siblings ? ["  [", ...rows, "  ],"] : rows;
+}
+
+/**
  * Renders the draft as a `[tool.inwards]` table.
  *
  * @param draft - the converted table.
@@ -43,10 +60,7 @@ export function renderToml(draft: Draft, opts: { source: string; root: string })
     lines.push(`root = ${quoted(opts.root)}`);
   }
   lines.push("layers = [");
-  for (const layer of draft.layers) {
-    const deny = layer.deny.length > 0 ? `, extend-deny-libraries = ${array(layer.deny)}` : "";
-    lines.push(`  { name = ${quoted(layer.name)}, modules = ${array(layer.modules)}${deny} },`);
-  }
+  lines.push(...draft.layers.flatMap(placeLines));
   lines.push("]");
   if (draft.ignore.length > 0) {
     lines.push(`ignore = ${array(draft.ignore)}`);

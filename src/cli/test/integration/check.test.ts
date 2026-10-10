@@ -5,7 +5,8 @@
  * config root is reported in every format instead of passing as clean (#200),
  * and a uv workspace checked from its root warns about each member instead of
  * passing silently (#201). Layer selectors check every slice, including code
- * in a `node_modules` directory inside one (#191).
+ * in a `node_modules` directory inside one (#191). A path-scoped check skips
+ * the whole-project checks, as `--help` says (#86).
  */
 import { expect, test } from "bun:test";
 import { symlinkSync } from "node:fs";
@@ -193,6 +194,20 @@ test("a directory that holds the root, and a whole-project run, report nothing u
     expect(code).toBe(1);
     expect(JSON.parse(stdout).notChecked).toBeUndefined();
   }
+});
+
+test("a path-scoped check skips the whole-project checks, and --help says so (#86)", () => {
+  const root = project({
+    "pyproject.toml": LAYERS.replace('"shop.domain"', '"shop.domain", "shop.gone"'),
+    "shop/domain/order.py": "",
+  });
+  const whole = inwards(["check", "--format", "json"], { cwd: root });
+  const scoped = inwards(["check", "--format", "json", "shop/domain/order.py"], { cwd: root });
+  expect(whole.stdout).toContain("shop.gone");
+  expect(scoped.stdout).not.toContain("shop.gone");
+  expect(inwards(["--help"], { cwd: root }).stdout).toContain(
+    "whole-project checks such as dead layer",
+  );
 });
 
 test("a named path that doesn't exist is a usage error", () => {

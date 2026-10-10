@@ -20,6 +20,8 @@ An unknown key, a wrong type or a bad value is a config error: `inwards check` e
 
 A JSON Schema for `[tool.inwards]` is published at <https://sircypkowskyy.github.io/inwards/schema/tool-inwards.json>. That URL follows the `develop` branch, like these docs. To pin the schema to the release you run, use the `inwards-tool-schema.json` file attached to each [GitHub release](https://github.com/SirCypkowskyy/inwards/releases).
 
+Editors that take `pyproject.toml`'s schema from [SchemaStore](https://www.schemastore.org/) will complete and check `[tool.inwards]` with no setup once SchemaStore merges Inwards' schema ([SchemaStore#6427](https://github.com/SchemaStore/schemastore/pull/6427), [#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Until then, set it up by hand.
+
 Editors that use [Taplo](https://taplo.tamasfe.dev/) (Even Better TOML in VS Code, and others) attach schemas to whole files: Taplo ignores a rule's `keys` when it picks the schema, so the table schema alone would be checked against the entire `pyproject.toml`. Use the whole-file schema built from it instead, <https://sircypkowskyy.github.io/inwards/schema/pyproject.json>, which checks `[tool.inwards]` and leaves every other table alone. A `.taplo.toml` next to `pyproject.toml`:
 
 ```toml title=".taplo.toml"
@@ -30,7 +32,7 @@ include = ["**/pyproject.toml"]
 path = "https://sircypkowskyy.github.io/inwards/schema/pyproject.json"
 ```
 
-This replaces the schema Taplo would otherwise take from SchemaStore for that file, so the other tables go unchecked until Inwards' schema is part of SchemaStore's ([#192](https://github.com/SirCypkowskyy/inwards/issues/192)). Releases attach it as `inwards-pyproject-schema.json`.
+This replaces the schema Taplo would otherwise take from SchemaStore for that file, so the other tables go unchecked. Once SchemaStore has Inwards' schema, drop the rule and let SchemaStore's cover the whole file. Releases attach it as `inwards-pyproject-schema.json`.
 
 The schema checks structure: the keys, their types, the allowed values, the rule codes and the shape of names and patterns. Inwards checks more when it reads the config:
 
@@ -141,13 +143,13 @@ The oldest Inwards allowed to check the project. An older binary fails with a co
 
 Type: list of module names. Default: none.
 
-Modules left out of the INW006 warning about code outside every layer, such as `tests` or `migrations`. An entry matches whole name segments anywhere in a module name: `migrations` covers `shop.orders.migrations.0001_initial`. Imports from a layer into them are still checked.
+Modules left out of the INW006 warning about code outside every layer, such as `tests` or `migrations`. An entry matches whole name segments anywhere in a module name: `migrations` covers `shop.orders.migrations.0001_initial`, and `tests` covers `shop.tests` as well as the top-level `tests`. An entry that starts with `/` matches at the start of the name only: `/tests` covers `tests.test_order` but not `shop.tests.test_order`, which still gets the warning. `inwards init` writes the unanchored defaults. Imports from a layer into ignored modules are still checked.
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
-ignore = ["tests", "scripts", "migrations", "conftest"]
+ignore = ["/tests", "scripts", "migrations", "conftest"]
 ```
 
 ### `generated` { #generated }
@@ -258,7 +260,7 @@ Each context has:
 
 - `name`: a non-blank, case-sensitive string, unique among contexts.
 - `modules`: module prefixes the context owns, with everything under them. They are literal dotted names; wildcards are a config error. When the prefixes of several contexts match a module, the longest wins, so the order of the tables never matters. The same prefix in two contexts is a config error.
-- `public` (default `[]`): prefixes of the context's own modules that the contexts depending on it may import. They are full module names, not relative to the context: `api` means the top-level module `api`. Each one must belong to this context; a prefix another context owns more specifically is a config error. A module is public when it lies at or under a public prefix and this context owns it.
+- `public` (default `[]`): prefixes of the context's own modules that the contexts depending on it may import. They are full module names, not relative to the context: `api` means the top-level module `api`. Each one must belong to this context; a prefix another context owns more specifically is a config error. A module is public when it lies at or under a public prefix and this context owns it. An entry written with a leading `=` is exact: `public = ["=shop.billing", "shop.billing.models"]` opens the package facade `shop.billing` (its `__init__`) and `shop.billing.models` with everything under it, but not `shop.billing._invoices` or any other submodule. The module after the `=` is a plain dotted name, and the same ownership rule applies to it.
 - `depends-on` (default `[]`): the contexts this one may import from. It is direct: not passed on, and not granted in return. A name may refer to a context declared further down. The context's own name, an unknown name and a repeated name are config errors.
 - `template`: a [template](#templates) whose `public` names, under each of the context's `modules`, join its `public` list.
 

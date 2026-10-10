@@ -1,0 +1,16 @@
+{#-
+  The header's repository link (issue #177). The theme's version carries
+  data-md-component="source", which makes its JS fetch the star and fork
+  counts from api.github.com on every first visit: a third-party request the
+  docs budget doesn't allow, and one that fails while the repository is
+  private. Same markup, without that attribute.
+-#}
+<a href="{{ config.repo_url }}" title="{{ lang.t('source') }}" class="md-source">
+  <div class="md-source__icon md-icon">
+    {% set icon = config.theme.icon.repo or "fontawesome/brands/git-alt" %}
+    {% include ".icons/" ~ icon ~ ".svg" %}
+  </div>
+  <div class="md-source__repository">
+    {{ config.repo_name }}
+  </div>
+</a>

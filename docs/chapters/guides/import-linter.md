@@ -59,23 +59,12 @@ allowed_importers = shop.repository
 [tool.inwards]
 layers = [
   { name = "domain", modules = ["shop.domain"], extend-deny-libraries = ["pydantic"] },
-  { name = "orders | billing", modules = ["shop.orders", "shop.billing"] },
+  [
+    { name = "orders", modules = ["shop.orders"] },
+    { name = "billing", modules = ["shop.billing"] },
+  ],
   { name = "web", modules = ["shop.web"] },
 ]
-# The contexts only stand for forbidden imports; import-linter checked no cycles.
-cycles = []
-
-[[tool.inwards.contexts]]
-name = "shop.billing"
-modules = ["shop.billing"]
-public = ["shop.billing"]
-depends-on = []
-
-[[tool.inwards.contexts]]
-name = "shop.orders"
-modules = ["shop.orders"]
-public = ["shop.orders"]
-depends-on = []
 ```
 
 and reports:
@@ -97,7 +86,7 @@ Inwards also runs rules import-linter doesn't have (INW006 for code outside ever
 |---|---|---|
 | `layers`, listed high to low | `layers`, listed innermost first: the order is reversed | INW001 |
 | a layer line `a : b` (siblings that may import each other) | one layer holding both modules | INW001 |
-| a layer line `a | b` (independent siblings) | one layer holding both, plus one context per sibling whose `depends-on` leaves the others out | INW001, INW002 |
+| a layer line `a | b` (independent siblings) | [sibling layers](configuration.md#sibling-layers): a nested array in `layers`, one layer per module, in the line's place | INW001 |
 | `containers` | every layer repeated under each container, in the same Inwards layer | INW001 |
 | `(optional)` layers | a plain layer; reported, because a prefix that matches no module gets an INW006 warning | INW006 |
 | `exhaustive = true` | reported: a module outside every layer gets the INW006 warning, not an error | INW006 |

@@ -6,8 +6,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { type PathKind, parseConfig } from "../../src/index.ts";
-import { checkNestedProjects, checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
-import { check, engine, file, OWNERS, PROJECT } from "../support/helpers.ts";
+import { unassignedWarning } from "../../src/rules/unassigned-module/imports.ts";
+import {
+  checkMoves,
+  checkNestedProjects,
+  checkPrefixes,
+} from "../../src/rules/unassigned-module/layout.ts";
+import { check, engine, file, indexOn, OWNERS, PROJECT } from "../support/helpers.ts";
 
 /**
  * Builds a path probe that sees a pyproject.toml in the given directories only.
@@ -19,6 +24,23 @@ function hasPyproject(...dirs: string[]): PathKind {
   return (rel: string): ReturnType<PathKind> =>
     dirs.some((dir) => rel === `${dir}/pyproject.toml`) ? "file" : undefined;
 }
+
+/**
+ * Moves `shop.domain.pricing` to a new top-level module in a module-to-hash map.
+ *
+ * @param before - the modules and their content hashes at session start.
+ * @param name - the new top-level module.
+ * @param hash - its content hash now.
+ * @returns the modules now.
+ */
+function movedTo(before: Map<string, string>, name: string, hash: string): Map<string, string> {
+  const now = new Map(before);
+  now.delete("shop.domain.pricing");
+  return now.set(name, hash);
+}
+
+/** Reads the unassigned package an INW006 import finding names. */
+const CHECKS_WHAT = /checks what "(?<pkg>[^"]+)"/u;
 
 describe("INW006 unassigned-module", () => {
   test("a layer importing first-party code outside every layer is an error", () => {
@@ -70,9 +92,53 @@ describe("INW006 unassigned-module", () => {
     expect(check(file(path, "import os\n"))).toEqual([]);
   });
 
+  test("an ignore entry starting with / covers top-level modules only (#86)", () => {
+    const config = parseConfig(`[tool.inwards]
+ignore = ["/tests", "migrations"]
+layers = [{ name = "domain", modules = ["shop.domain"] }]
+`);
+    const warned = [
+      "tests/test_order.py",
+      "shop/tests/test_order.py",
+      "shop/migrations/m1.py",
+    ].filter((path) => unassignedWarning(file(path, ""), config, () => false) !== undefined);
+    expect(warned).toEqual(["shop/tests/test_order.py"]);
+  });
+
   test("checkFiles warns once per package", () => {
     const files = [file("shop/persistence/a.py", ""), file("shop/persistence/b.py", "")];
     expect(engine.checkFiles(files, PROJECT)).toHaveLength(1);
+  });
+
+  test("a compiled or sourceless module is first-party code outside every layer (#86)", () => {
+    const disk = new Map<string, "file" | "dir">([
+      ["shop", "dir"],
+      ["shop/__init__.py", "file"],
+      ["shop/domain", "dir"],
+      ["shop/domain/order.py", "file"],
+      ["shop/persistence.cpython-313-x86_64-linux-gnu.so", "file"],
+      ["shop/cache.pyc", "file"],
+      ["speedups.cp313-win_amd64.pyd", "file"],
+      ["native", "dir"],
+      ["native/__init__.abi3.so", "file"],
+    ]);
+    const project = indexOn(disk);
+    const owners = [
+      "from shop import persistence\n",
+      "import shop.cache\n",
+      "import speedups\n",
+      "from native import fast\n",
+    ].map((src) => {
+      const found = engine.checkFile(file("shop/domain/order.py", src), project);
+      return found.map((d) => `${d.code} ${CHECKS_WHAT.exec(d.message)?.groups?.["pkg"]}`);
+    });
+    expect(owners).toEqual([
+      ["INW006 shop.persistence"],
+      ["INW006 shop.cache"],
+      ["INW006 speedups"],
+      ["INW006 native"],
+    ]);
+    expect(project.ownerOf("shop.persistence.Repo")).toBe("shop.persistence");
   });
 
   test("the index owns a namespace package it doesn't list", () => {
@@ -109,6 +175,22 @@ layers = [
     expect(rest).toEqual([]);
     expect(d).toMatchObject({ severity: "error", file: "pyproject.toml" });
     expect(d?.message).toContain("matched modules when the session started");
+  });
+
+  test("a move to a new top-level module is caught by name or content, not by similarity (#86)", () => {
+    const before = new Map([
+      ["shop.domain.order", "h-order"],
+      ["shop.domain.pricing", "h-pricing"],
+      ["shop.infra.db", "h-db"],
+    ]);
+    expect(
+      checkMoves(config, before, movedTo(before, "pricing", "h-edited"), pyproject),
+    ).toHaveLength(1);
+    expect(
+      checkMoves(config, before, movedTo(before, "rates", "h-pricing"), pyproject),
+    ).toHaveLength(1);
+    // Renamed and edited: documented as not caught; a layer importing it gets INW006.
+    expect(checkMoves(config, before, movedTo(before, "rates", "h-edited"), pyproject)).toEqual([]);
   });
 
   describe("nested projects", () => {

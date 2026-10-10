@@ -1,11 +1,11 @@
 /**
  * @file Maps import-linter contracts onto a `[tool.inwards]` draft and says, per
  * contract, what was carried over and what wasn't. `layers` contracts go
- * through `layers.ts`; `independence` and internal `forbidden` contracts, and
- * `|` siblings, become bounded contexts whose `depends-on` leaves out exactly
- * the forbidden pairs (INW002); forbidden external packages become
- * `extend-deny-libraries` on the layers that are exactly the source modules,
- * or else a prefix deny in `[tool.inwards.rules.pure-domain]` (INW005, #219).
+ * through `layers.ts` (`|` siblings become sibling layers); `independence`
+ * and internal `forbidden` contracts become bounded contexts whose
+ * `depends-on` leaves out exactly the forbidden pairs (INW002); forbidden
+ * external packages become `extend-deny-libraries` on the layers that are
+ * exactly the source modules, or else a prefix deny in `[tool.inwards.rules.pure-domain]` (INW005, #219).
  *
  * What has no equivalent is reported with the reason, never dropped silently:
  * `ignore_imports`, wildcards (Inwards takes literal module names),
@@ -73,7 +73,7 @@ export function convert(config: LinterConfig): Conversion | string {
       return "the import-linter config names no root_package and no layers contract could be mapped, so there is no layer to build [tool.inwards] from.";
     }
     const name = config.rootPackages.length === 1 ? (config.rootPackages[0] ?? "") : "project";
-    state.layers.push({ name, modules: [...config.rootPackages], deny: [] });
+    state.layers.push([{ name, modules: [...config.rootPackages], deny: [] }]);
   }
   const outcomes = config.contracts.map(
     (contract) => verdicts.get(contract) ?? otherContract(state, contract),
@@ -149,7 +149,7 @@ function forbiddenContract(state: State, contract: LinterContract): Outcome {
     }
     return outcome(contract, reasons, pairs.length > 0);
   }
-  const layers = layersOf(state.layers, sources);
+  const layers = layersOf(state.layers.flat(), sources);
   if (layers === undefined) {
     state.deny.push({ modules: [...sources], libraries: external });
   }

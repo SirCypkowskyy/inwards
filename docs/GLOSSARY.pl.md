@@ -77,6 +77,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | loader (module loader) | loader (loadera) | |
 | launcher (`--launcher`, e.g. `uv run`) | launcher (launchera) | what starts Inwards in the project |
 | worktree (git) | worktree (worktree'a, worktree'y) | |
+| catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
+| health check | health-check | "aplikacja health-check" |
 
 ## Fixed Polish terms
 
@@ -85,6 +87,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | adapter | adapter |
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
+| agent loop | pętla agenta |
 | architecture linter | linter architektury |
 | architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
@@ -93,6 +96,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | bytecode | bajtkod |
 | check (the act of running `inwards check`) | sprawdzenie |
 | whole-project check | sprawdzenie całego projektu |
+| one-file check (what the hook runs) | sprawdzenie jednego pliku |
+| full check (every file) | pełne sprawdzenie |
+| quickstart (home page) | szybki start |
 | clean (no violations) | czysty (projekt, plik) |
 | code scanning | code scanning (GitHub) |
 | composition root | korzeń kompozycji (composition root) |
@@ -169,6 +175,12 @@ baseline'u); multi-word names are left uninflected where possible.
 | path operation (FastAPI) | operacja ścieżki |
 | include a router (`include_router`) | dołączać router, dołączenie |
 | unmounted router (FAPI003) | niepodpięty router |
+| shadowed route (FAPI005) | przesłonięta trasa |
+| lifespan (FastAPI, FAPI006) | lifespan (menedżer kontekstu cyklu życia aplikacji) |
+| event handler (`on_event`, FAPI006) | handler zdarzeń |
+| yield dependency (FAPI007) | zależność z `yield` |
+| swallow an exception (FAPI007) | połykać wyjątek |
+| operation id (`operation_id`, FAPI008) | identyfikator operacji (`operation_id`) |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |
@@ -183,6 +195,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule | reguła |
 | rule catalogue | katalog reguł |
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
+| rule list, rule browser (the filterable list on `rules/`) | lista reguł |
+| category, sub-category (a rule page's `tags`) | kategoria, podkategoria |
+| autofix (the rule list's filter and column; the key stays `autofix`) | poprawka automatyczna |
+| rule status: stable, in review, in development, backlog | stabilna, w przeglądzie, w rozwoju, w planach |
+| rules per page, page (pagination) | reguł na stronie, strona |
 | scaffold (`--scaffold`) | przykładowy pakiet (scaffold) |
 | selector | selektor |
 | matched prefix (of a layer selector) | dopasowany prefiks |
@@ -203,6 +220,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | exception handler (FastAPI) | handler wyjątków |
 | helper (function) | funkcja pomocnicza |
 | inclusion (`include_router`) | dołączenie |
+| splat (`**kwargs` in a call), splatted dict | rozpakowanie, rozpakowany słownik |
+| app factory | fabryka aplikacji |
 | finding | diagnostyka (as for diagnostic) |
 | stub (`.pyi`) | zaślepka (plik `.pyi`) |
 | symlink | dowiązanie symboliczne |

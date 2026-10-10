@@ -23,17 +23,21 @@ docs_dir = "pl"
 site_dir = "site/pl"
 
 extra_css = [
+  "../stylesheets/theme.css",
   "../stylesheets/extra.css",
+  "../stylesheets/home.css",
+  "../stylesheets/rules.css",
 ]
 
 extra_javascript = [
   "../javascripts/homepage-loop.mjs",
   "../javascripts/language-switch.mjs",
+  "../javascripts/rule-index.mjs",
 ]
 
 nav = [
   { "Start" = "index.md" },
-  { "Pierwsze kroki" = [
+  { "Poradniki" = [
     { "Instalacja" = "guides/install.md" },
     { "Konfiguracja" = "guides/configuration.md" },
     { "Claude Code" = "guides/claude-code.md" },
@@ -44,7 +48,6 @@ nav = [
     { "Kształt pakietu" = "guides/package-shape.md" },
     { "Biblioteki w warstwach" = "guides/libraries.md" },
     { "Migracja z import-linter" = "guides/import-linter.md" },
-    { "Design partnerzy" = "guides/design-partners.md" },
   ] },
   { "Reguły" = [
     { "Przegląd" = "rules/index.md" },
@@ -63,15 +66,25 @@ nav = [
     { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },
+    { "FAPI005 route-shadowing" = "rules/FAPI005.md" },
+    { "FAPI006 lifespan-events" = "rules/FAPI006.md" },
+    { "FAPI007 yield-dependency-swallows" = "rules/FAPI007.md" },
+    { "FAPI008 duplicate-operation-id" = "rules/FAPI008.md" },
+    { "FAPI009 depends-called" = "rules/FAPI009.md" },
   ] },
-  { "1. Wprowadzenie" = "01-Introduction.md" },
-  { "2. Kontekst biznesowy" = "02-Business-Context.md" },
-  { "3. Architektura (C4)" = "03-Architecture-C4.md" },
-  { "4. Integracja z AI" = "04-AI-Integration.md" },
-  { "5. Decyzje (ADR)" = "05-ADR.md" },
-  { "6. Ograniczenia i jakość" = "06-Constraints-and-Quality.md" },
-  { "7. Słownik" = "07-Glossary.md" },
-  { "8. Run log" = "08-Run-Log.md" },
+  { "Jak to działa" = [
+    { "Integracja z AI" = "04-AI-Integration.md" },
+    { "Architektura (C4)" = "03-Architecture-C4.md" },
+    { "Ograniczenia i jakość" = "06-Constraints-and-Quality.md" },
+  ] },
+  { "Projekt" = [
+    { "Wprowadzenie" = "01-Introduction.md" },
+    { "Kontekst biznesowy" = "02-Business-Context.md" },
+    { "Decyzje (ADR)" = "05-ADR.md" },
+    { "Słownik" = "07-Glossary.md" },
+    { "Run log" = "08-Run-Log.md" },
+    { "Design partnerzy" = "guides/design-partners.md" },
+  ] },
 ]
 
 # The header's language selector. Links are relative to this site's root;
@@ -83,6 +96,7 @@ alternate = [
 ]
 
 [project.theme]
+font = false
 language = "pl"
 custom_dir = "overrides"
 features = [
@@ -93,28 +107,26 @@ features = [
   "navigation.footer",
   "navigation.instant",
   "navigation.sections",
+  "navigation.tabs",
   "navigation.top",
   "navigation.tracking",
   "search.highlight",
   "toc.follow",
 ]
 
-[project.theme.icon]
-logo = "material/layers-triple"
-
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
-primary = "deep purple"
-accent = "amber"
+primary = "custom"
+accent = "custom"
 toggle.icon = "material/weather-night"
 toggle.name = "Przełącz na tryb ciemny"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
-primary = "deep purple"
-accent = "amber"
+primary = "custom"
+accent = "custom"
 toggle.icon = "material/weather-sunny"
 toggle.name = "Przełącz na tryb jasny"
 
