@@ -205,6 +205,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
+| inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |
+| guarded role (INW015's `role`), build an adapter | chroniona rola, budować adapter |
 | pre-release | wersja przedpremierowa (pre-release) |
 | probe (the file system) | sondować, sondowanie |
 | promotion (PR `develop` → `main`) | promocja |
