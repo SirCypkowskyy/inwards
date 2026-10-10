@@ -17,6 +17,7 @@ import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
 import { type ResolveBase, viewMethods } from "./classes.ts";
 import {
   type Framework,
@@ -28,7 +29,7 @@ import {
   ROUTERS,
   standaloneDecorator,
 } from "./frameworks.ts";
-import { type NameMatch, nameMatcher, type Recognise } from "./settings.ts";
+import type { Recognise } from "./settings.ts";
 
 /** The frameworks whose apps and routers declare and register routes through methods. */
 const ROUTER_FRAMEWORKS: readonly ("fastapi" | "flask")[] = ["fastapi", "flask"];

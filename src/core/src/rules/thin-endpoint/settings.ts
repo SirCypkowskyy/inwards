@@ -7,6 +7,7 @@
  */
 import { type OptionValue, stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
 import type { Framework } from "./frameworks.ts";
 
 /** Calls an endpoint shouldn't make itself: HTTP clients, mail, cloud SDKs, caches, databases (Django's raw connection too), task queues. */
@@ -34,12 +35,6 @@ const DEFAULT_DENY_RECEIVER_TYPES: readonly string[] = [
   "sqlmodel.Session",
   "sqlmodel.ext.asyncio.session.AsyncSession",
 ];
-
-/** The characters a regular expression would read as syntax, escaped when a pattern holds them. */
-const REGEX_SYNTAX = /[.\\^$+()[\]{}|]/u;
-
-/** Tells whether a qualified name matches one of a list of patterns. */
-export type NameMatch = (qualified: string) => boolean;
 
 /** INW012's settings, with defaults filled in. A threshold of `false` turns its signal off. */
 export interface ThinSettings {
@@ -70,36 +65,6 @@ export interface Recognise {
   readonly baseClasses: readonly string[];
   /** True when `modules` narrows the rule, which lets plain Django function views count. */
   readonly scoped: boolean;
-}
-
-/**
- * Turns one fnmatch pattern into a regular expression: `*` is any run of
- * characters (dots included, as in fnmatch), `?` any one character.
- *
- * @param pattern - a qualified name with wildcards, e.g. `psycopg*.*`.
- * @returns an anchored regular expression.
- */
-function patternRegExp(pattern: string): RegExp {
-  const source = [...pattern]
-    .map((c) => {
-      if (c === "*") {
-        return ".*";
-      }
-      return c === "?" ? "." : c.replace(REGEX_SYNTAX, "\\$&");
-    })
-    .join("");
-  return new RegExp(`^${source}$`, "u");
-}
-
-/**
- * Builds a matcher for a list of name patterns.
- *
- * @param patterns - qualified names with fnmatch wildcards.
- * @returns a function that tells whether a qualified name matches any of them.
- */
-export function nameMatcher(patterns: readonly string[]): NameMatch {
-  const compiled = patterns.map(patternRegExp);
-  return (qualified: string): boolean => compiled.some((re) => re.test(qualified));
 }
 
 /**

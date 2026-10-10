@@ -261,7 +261,7 @@ export function delegateProblem(
   return undefined;
 }
 
-/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators. */
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types. */
 const namePatterns = listMatching(
   NAME_PATTERN,
   'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
@@ -336,6 +336,10 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     decorators: namePatterns,
     frameworks: listOf(["fastapi", "flask", "litestar", "django"]),
     "base-classes": namePatterns,
+  },
+  "async-blocking": {
+    "extend-blocking-calls": namePatterns,
+    "extend-blocking-types": namePatterns,
   },
   "router-wiring": {
     entrypoints,

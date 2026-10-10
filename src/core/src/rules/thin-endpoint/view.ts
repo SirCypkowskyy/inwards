@@ -11,12 +11,12 @@ import type { SourceFile } from "../../contracts/records.ts";
 import { moduleFunctions } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import { moduleAliases, parameterTypes } from "../shared/annotations.ts";
 import { moduleClasses, type ResolveBase } from "./classes.ts";
 import { type Found, findEndpoints } from "./endpoints.ts";
 import { isAbort, isHttpError } from "./frameworks.ts";
 import { type Body, helpersOf } from "./helpers.ts";
 import { measure } from "./metrics.ts";
-import { moduleAliases, parameterTypes } from "./parameters.ts";
 import type { Recognise } from "./settings.ts";
 
 /** One file, read for INW012. */

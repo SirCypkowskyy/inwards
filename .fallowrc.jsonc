@@ -119,6 +119,8 @@
       { "name": "core-rule-fastapi", "patterns": ["src/core/src/rules/fastapi/**"] },
       // INW012 thin-endpoint (#182): framework-aware, so not part of the FastAPI family.
       { "name": "core-rule-thin-endpoint", "patterns": ["src/core/src/rules/thin-endpoint/**"] },
+      // INW013 async-blocking (#293): the first of #98's role-scoped content rules.
+      { "name": "core-rule-async-blocking", "patterns": ["src/core/src/rules/async-blocking/**"] },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -167,7 +169,10 @@
       { "from": "core-config", "allow": ["core-contracts", "core-meta"] },
       { "from": "core-python", "allow": ["core-contracts"] },
       { "from": "core-lookup", "allow": ["core-contracts", "core-python"] },
-      { "from": "core-rules-shared", "allow": ["core-contracts", "core-meta", "core-config"] },
+      {
+        "from": "core-rules-shared",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python"]
+      },
       {
         "from": "core-rule-unsupported-encoding",
         "allow": [
@@ -280,6 +285,17 @@
         ]
       },
       {
+        "from": "core-rule-async-blocking",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
         "from": "core-rule-thin-endpoint",
         "allow": [
           "core-contracts",
@@ -313,6 +329,7 @@
           "core-rule-dynamic-import",
           "core-rule-fastapi",
           "core-rule-thin-endpoint",
+          "core-rule-async-blocking",
           "core-baseline"
         ]
       },
@@ -366,6 +383,7 @@
           "core-rule-dynamic-import",
           "core-rule-fastapi",
           "core-rule-thin-endpoint",
+          "core-rule-async-blocking",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -825,6 +843,10 @@
         },
         {
           "from": "core-rule-thin-endpoint",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-async-blocking",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

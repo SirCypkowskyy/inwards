@@ -63,7 +63,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW012, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW013, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
@@ -192,6 +192,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | signal, threshold (INW012) | sygnał, próg |
 | route registration (`add_api_route`, `add_url_rule`, `Route`, `path`, INW012), registered handler | rejestracja trasy, zarejestrowany handler |
 | class-based view, view class, view base class (INW012) | widok oparty na klasie, klasa widoku, klasa bazowa widoku |
+| event loop (asyncio) | pętla zdarzeń |
+| blocking call, blocking I/O (INW013) | wywołanie blokujące, blokujące I/O |
+| blocking receiver (INW013) | blokujący odbiorca (nazwa, której metody blokują) |
+| threadpool, worker thread | pula wątków, wątek roboczy |
+| async client, sync client | klient asynchroniczny, klient synchroniczny |
 | re-export (`from .views import f` in `__init__.py`) | reeksport |
 | repository (the pattern) | repozytorium |
 | port | port |
