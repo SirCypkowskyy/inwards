@@ -5,11 +5,13 @@
  * otherwise wait, and puts every answer back at its job's place, so the
  * order the threads finish in never shows. A worker runs this same program
  * (`main.ts` sends a worker thread to `serveExtractions`), so the compiled
- * binary needs nothing else on disk. A worker that dies or answers with an
- * error is retired and its batch goes back in the queue; a job no thread
- * could answer stays unanswered, and the engine computes it itself, so its
- * error surfaces there as without the pool. The pool never decides
- * anything about a file.
+ * binary needs nothing else on disk. Once the queue is empty, the calling
+ * thread also takes over batches the workers still hold, so a slow or stuck
+ * worker never makes a call wait longer than this thread alone would. A
+ * worker that dies or answers with an error is retired and its batch goes
+ * back in the queue; a job no thread could answer stays unanswered, and the
+ * engine computes it itself, so its error surfaces there as without the
+ * pool. The pool never decides anything about a file.
  */
 import {
   createExtractionWorker,
@@ -171,6 +173,7 @@ class WorkerPool implements ExtractionPool {
   close(): void {
     for (const slot of this.slots) {
       slot.alive = false;
+      slot.worker.unref(); // even a worker that ignores terminate can't keep the process alive
       slot.worker.terminate();
     }
   }
@@ -306,13 +309,30 @@ class WorkerPool implements ExtractionPool {
   }
 
   /**
-   * Takes the last queued batch of a call that is still running.
+   * Takes the last queued batch of a call that is still running. With the
+   * queue empty, it takes a batch a worker still holds instead, so a worker
+   * that is slow to start, or never answers, can't keep the call waiting:
+   * the worker's answer to it, if one comes, is ignored.
    *
    * @param call - the call this thread works on, which may have ended meanwhile.
-   * @returns the batch, or undefined when the call has ended or nothing is queued.
+   * @returns the batch, or undefined when the call has ended or nothing is left.
    */
   private takeLast(call: Call): Batch | undefined {
-    return this.call === call ? call.queue.pop() : undefined;
+    if (this.call !== call) {
+      return undefined;
+    }
+    const queued = call.queue.pop();
+    if (queued !== undefined) {
+      return queued;
+    }
+    const holder = this.slots.find((slot) => slot.batch !== undefined);
+    const held = holder?.batch;
+    if (holder === undefined || held === undefined) {
+      return undefined;
+    }
+    holder.batch = undefined; // its late answer no longer matches, and it can take new work
+    call.pending -= 1;
+    return held;
   }
 }
 

@@ -8,6 +8,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import process from "node:process";
 import {
   createExtractionWorker,
   type ExtractionAnswer,
@@ -18,6 +19,8 @@ import {
 import { startExtractionPool } from "../../src/adapters/extraction-pool.ts";
 import { loadGrammars } from "../../src/adapters/grammars.ts";
 
+/** Both pools in the child answered every job, and the child exited 0. */
+const BOTH_EXITED = /^ok ok exit 0 after/u;
 const ENTRY = join(import.meta.dir, "../../src/main.ts");
 const WASM: GrammarBinaries = await loadGrammars();
 const run: (job: ExtractionJob) => ExtractionAnswer = await createExtractionWorker(WASM);
@@ -104,4 +107,47 @@ describe("the pool answers like this thread", () => {
       pool.close();
     }
   });
+
+  test("a worker that never answers doesn't hold up the call", async () => {
+    const stuck = URL.createObjectURL(
+      new Blob(["for (;;) {}"], { type: "application/javascript" }),
+    );
+    const jobs = Array.from({ length: 50 }, (_unused, n) => job(n, "full"));
+    const pool = startExtractionPool(stuck, WASM, 2);
+    try {
+      expect(await pool.extract(jobs)).toEqual(jobs.map(run));
+    } finally {
+      pool.close();
+    }
+  });
+
+  test("a process that used the pool exits, stuck workers and all", () => {
+    // In its own process: the test runner would hide a worker that keeps the event loop alive.
+    const pool = join(import.meta.dir, "../../src/adapters/extraction-pool.ts");
+    const grammars = join(import.meta.dir, "../../src/adapters/grammars.ts");
+    const script = `
+      import { startExtractionPool } from ${JSON.stringify(pool)};
+      import { loadGrammars } from ${JSON.stringify(grammars)};
+      const wasm = await loadGrammars();
+      const file = { path: "a.py", module: "shop.a", isPackage: false, text: "import os\\n" };
+      const jobs = Array.from({ length: 40 }, () => ({ file, want: "skeleton" }));
+      const stuck = URL.createObjectURL(new Blob(["for (;;) {}"], { type: "application/javascript" }));
+      for (const entry of [${JSON.stringify(ENTRY)}, stuck]) {
+        const p = startExtractionPool(entry, wasm, 2);
+        const answers = await p.extract(jobs);
+        p.close();
+        process.stdout.write(answers.every((a) => a !== undefined) ? "ok " : "missing ");
+      }
+    `;
+    const started = performance.now();
+    const child = Bun.spawnSync([process.execPath, "-e", script], {
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 30_000,
+    });
+    const seconds = ((performance.now() - started) / 1000).toFixed(1);
+    expect(`${child.stdout.toString()}exit ${child.exitCode} after ${seconds} s`).toMatch(
+      BOTH_EXITED,
+    );
+  }, 40_000);
 });

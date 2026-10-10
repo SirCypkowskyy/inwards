@@ -46,20 +46,27 @@ export interface RunResult {
  * FORCE_COLOR is on and CLAUDE_PROJECT_DIR is removed unless `opts.env` sets it.
  *
  * @param args - CLI arguments, e.g. `["check", "--format", "json"]`.
- * @param opts - working directory, optional stdin text, and extra environment.
+ * @param opts - working directory, optional stdin text, extra environment and a time limit.
  * @param opts.cwd - the directory to run in.
  * @param opts.stdin - text to pipe to stdin; none when undefined.
  * @param opts.env - variables added to the test environment.
+ * @param opts.timeout - milliseconds before the process is killed; none when undefined.
  * @returns the exit code and both output streams as text.
  */
 export function inwards(
   args: string[],
-  opts: { cwd: string; stdin?: string | undefined; env?: Record<string, string> },
+  opts: {
+    cwd: string;
+    stdin?: string | undefined;
+    env?: Record<string, string>;
+    timeout?: number | undefined;
+  },
 ): RunResult {
   const p = Bun.spawnSync([...CMD, ...args], {
     cwd: opts.cwd,
     stdin: opts.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
     env: { ...ENV, ...opts.env },
+    ...(opts.timeout === undefined ? {} : { timeout: opts.timeout }),
   });
   return { code: p.exitCode, stdout: p.stdout.toString(), stderr: p.stderr.toString() };
 }
