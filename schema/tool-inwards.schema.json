@@ -563,6 +563,14 @@
             "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
           },
           "default": []
+        },
+        "follow-modules": {
+          "description": "Module prefixes or selectors, as in layers[].modules, of the first-party modules INW013 follows one hop into from an async def to find a sync helper that blocks; packages above them are read too, for re-exports. Unset follows every first-party module; [] keeps the check to the checked module.",
+          "markdownDescription": "Module prefixes or selectors, as in layers[].modules, of the first-party modules INW013 follows one hop into from an async def to find a sync helper that blocks; packages above them are read too, for re-exports. Unset follows every first-party module; [] keeps the check to the checked module.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW013/)",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
         }
       }
     },

@@ -4,8 +4,9 @@
  * resolves to a blocking type (through `Annotated`, `Optional`, unions and
  * same-file aliases); a name counts when the module or the function binds it
  * from a call to a blocking type or factory (`cache = redis.Redis()`,
- * `with Session(engine) as session`) or annotates it with one. It reads one
- * function and its module, and follows no name into another module or
+ * `with Session(engine) as session`) or annotates it with one; a helper's
+ * parameter can also take the receiver its caller passed (#294). It reads
+ * one function and its module, and follows no name into another module or
  * through `self`.
  */
 import type { Node } from "web-tree-sitter";
@@ -166,24 +167,35 @@ export function moduleReceivers(
 }
 
 /**
- * Lists the blocking receivers an `async def` sees: the module's, then its
- * parameters', then the names its own body binds (which win on a clash).
+ * Lists the blocking receivers a function sees: the module's, then its
+ * parameters', then the names its own body binds (which win on a clash). A
+ * parameter whose own annotation names no blocking type takes what the
+ * caller passed to it, for a helper INW013 follows one hop (#294).
  *
  * @param fn - a `function_definition` node.
- * @param module - the receivers the module binds at the top level.
- * @param context - the file's qualifier and aliases.
- * @param families - the families to try.
+ * @param scope - the function's module.
+ * @param scope.module - the receivers the module binds at the top level.
+ * @param scope.context - the module's qualifier and aliases.
+ * @param scope.families - the families to try.
+ * @param passed - the receivers the call passes to the function, by parameter name.
  * @returns the receivers by name.
  */
 export function functionReceivers(
   fn: Node,
-  module: ReadonlyMap<string, Source>,
-  context: TypeContext,
-  families: readonly Family[],
+  {
+    module,
+    context,
+    families,
+  }: {
+    readonly module: ReadonlyMap<string, Source>;
+    readonly context: TypeContext;
+    readonly families: readonly Family[];
+  },
+  passed: ReadonlyMap<string, Source> = new Map(),
 ): Map<string, Source> {
   const receivers = new Map(module);
   for (const [name, types] of parameterTypes(fn, context)) {
-    const source = sourceOf(types, families);
+    const source = sourceOf(types, families) ?? passed.get(name);
     if (source) {
       receivers.set(name, source);
     } else {

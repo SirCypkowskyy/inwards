@@ -3,7 +3,7 @@
  * `[tool.inwards]` JSON Schema, kept beside `schema-negatives.test.ts`. Each
  * structural mistake fails both the schema and the parser, and a valid table
  * passes both, so the two can't drift on `extend-blocking-calls` and
- * `extend-blocking-types`.
+ * `extend-blocking-types`, or on `follow-modules` (#294).
  */
 import { describe, expect, test } from "bun:test";
 import { MINIMAL, parserError, schemaErrors } from "../support/config-schema.ts";
@@ -27,6 +27,12 @@ describe("INW013's options", () => {
     ["a number in the list", blocking("extend-blocking-types = [1]")],
     ["an unknown key", blocking('blocking-calls = ["shop.db.*"]')],
     ["an empty modules", blocking("modules = []")],
+    ["follow-modules that isn't a list", blocking('follow-modules = "shop.*.service"')],
+    [
+      "a follow-modules selector that starts with a wildcard",
+      blocking('follow-modules = ["*.service"]'),
+    ],
+    ["a follow-modules number", blocking("follow-modules = [1]")],
   ])("%s fails both", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).not.toEqual([]);
@@ -35,7 +41,13 @@ describe("INW013's options", () => {
   test("a valid table passes both", () => {
     const text = blocking(`modules = ["shop.api", "shop.*.service"]
 extend-blocking-calls = ["shop.legacy.fetch_*", "ldap3.*"]
-extend-blocking-types = ["shop.legacy.Client", "pymongo.MongoClient"]`);
+extend-blocking-types = ["shop.legacy.Client", "pymongo.MongoClient"]
+follow-modules = ["shop.*.service", "shop.common"]`);
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("an empty follow-modules passes both", () => {
+    const text = blocking("follow-modules = []");
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 });

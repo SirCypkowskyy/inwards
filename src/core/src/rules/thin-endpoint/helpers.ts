@@ -10,8 +10,8 @@
  * passed to them. It reads one file's syntax; the caller measures bodies.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../python/literals.ts";
 import { identifierName } from "../../python/nodes.ts";
+import { passedNames } from "../shared/arguments.ts";
 import type { Metrics } from "./metrics.ts";
 
 /** How many calls deep helpers are followed: the ones the endpoint calls, theirs, and theirs. */
@@ -54,14 +54,17 @@ export interface HelperScope {
  * @returns the helper's parameters.
  */
 function passed(call: Node, own: Params, caller: Params): Params {
-  const params = new Map(own);
-  [...own].forEach(([name, types], index) => {
-    const arg = types.length === 0 ? argumentAt(call, index, name) : null;
-    const from = arg?.type === "identifier" ? caller.get(identifierName(arg)) : undefined;
-    if (from !== undefined && from.length > 0) {
-      params.set(name, from);
-    }
+  const from = passedNames(call, [...own.keys()], (name) => {
+    const types = caller.get(name);
+    return types !== undefined && types.length > 0 ? types : undefined;
   });
+  const params = new Map(own);
+  for (const [name, types] of own) {
+    const given = types.length === 0 ? from.get(name) : undefined;
+    if (given !== undefined) {
+      params.set(name, given);
+    }
+  }
   return params;
 }
 

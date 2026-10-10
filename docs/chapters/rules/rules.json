@@ -187,7 +187,7 @@
       "name": "async-blocking",
       "title": "INW013 async-blocking",
       "summary": "A synchronous database, cache or cloud call inside `async def`: a sync SQLAlchemy `Session`, `redis.Redis`, boto3 or a blocking driver",
-      "description": "An async def makes no synchronous database, cache or cloud call; a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
+      "description": "An async def makes no synchronous database, cache or cloud call, itself or through a sync helper it calls; a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
       "category": ["async", "roles"],
       "status": "stable",
       "autofix": false,
