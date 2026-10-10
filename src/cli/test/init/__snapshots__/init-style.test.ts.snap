@@ -117,6 +117,14 @@ layers = [
   { name = "bootstrap", modules = ["my_app.bootstrap"] },            # composition root: wires the adapters into the use cases
 ]
 
+[tool.inwards.rules]
+# Port modules hold only ABCs and Protocols (INW014), as a warning to start with: make it an error once the project is clean.
+extend-select = ["INW014"]
+
+# Delete a line to report that rule at its own severity, an error for most findings.
+[tool.inwards.rules.severity]
+INW014 = "warning"
+
 # Package shapes (INW007, INW008) for the scaffold's packages.
 # my_app: the layers and the composition root only; anything else is an error, since no layer would hold it.
 [[tool.inwards.shape]]
@@ -193,6 +201,14 @@ layers = [
   ],
   { name = "bootstrap", modules = ["my_app.bootstrap"] },           # composition root: wires the adapters into the use cases
 ]
+
+[tool.inwards.rules]
+# Port modules hold only ABCs and Protocols (INW014), as a warning to start with: make it an error once the project is clean.
+extend-select = ["INW014"]
+
+# Delete a line to report that rule at its own severity, an error for most findings.
+[tool.inwards.rules.severity]
+INW014 = "warning"
 
 # Package shapes (INW007, INW008) for the scaffold's packages.
 # my_app: the layers and the composition root only; anything else is an error, since no layer would hold it.
@@ -606,6 +622,7 @@ clean: entities at the centre, use cases around them, frameworks outside
   3. infrastructure  shop.infrastructure  adapters that implement ports
   4. presentation    shop.presentation    CLI or HTTP handlers
   5. bootstrap       shop.bootstrap       composition root: wires the adapters into the use cases
+  Turns on INW014 as a warning.
   Gap: presentation may import infrastructure; leave the wiring to bootstrap.
   Shapes, with --scaffold:
     shop              requires domain/, application/, infrastructure/, presentation/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it
@@ -617,6 +634,7 @@ hexagonal: ports and adapters: the application talks to the world only through p
   3. outbound     shop.adapters.outbound  driven adapters: implement ports
   3. inbound      shop.adapters.inbound   driving adapters: call use cases
   4. bootstrap    shop.bootstrap          composition root: wires the adapters into the use cases
+  Turns on INW014 as a warning.
   Gap: an inbound adapter may call a port directly instead of a use case.
   Shapes, with --scaffold:
     shop              requires domain/, application/, adapters/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it

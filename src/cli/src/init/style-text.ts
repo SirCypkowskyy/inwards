@@ -131,7 +131,9 @@ export function describeStyles(pkg: string): string {
       ...(rules === undefined ? [] : [`  Turns off ${rules.codes.join(", ")}. ${rules.why}`]),
       ...(style.optIn === undefined
         ? []
-        : [`  Turns on ${style.optIn.codes.join(", ")} as warnings.`]),
+        : [
+            `  Turns on ${style.optIn.codes.join(", ")} as ${style.optIn.codes.length === 1 ? "a warning" : "warnings"}.`,
+          ]),
       `  Gap: ${style.gap}.`,
       "  Shapes, with --scaffold:",
       ...describeShapes(style.shapes, pkg),
