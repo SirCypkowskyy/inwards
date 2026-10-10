@@ -69,6 +69,7 @@
         "INW009",
         "INW010",
         "INW011",
+        "INW012",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -347,6 +348,9 @@
         "dynamic-import": {
           "$ref": "#/definitions/ruleOptions"
         },
+        "thin-endpoint": {
+          "$ref": "#/definitions/thinEndpointOptions"
+        },
         "endpoint-metadata": {
           "$ref": "#/definitions/endpointMetadataOptions"
         },
@@ -431,6 +435,131 @@
               }
             }
           }
+        }
+      }
+    },
+    "thinEndpointOptions": {
+      "description": "INW012 thin-endpoint's options, [tool.inwards.rules.thin-endpoint]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "INW012 thin-endpoint's options, [tool.inwards.rules.thin-endpoint]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "max-statements": {
+          "description": "The most statements an endpoint's body may hold, nested ones included; guards that raise HTTPException and the docstring don't count. false turns the check off.",
+          "markdownDescription": "The most statements an endpoint's body may hold, nested ones included; guards that raise HTTPException and the docstring don't count. false turns the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "const": false
+            }
+          ],
+          "default": 10
+        },
+        "max-branches": {
+          "description": "The most if/elif, case and except branches an endpoint may hold, guards left out. false turns the check off.",
+          "markdownDescription": "The most if/elif, case and except branches an endpoint may hold, guards left out. false turns the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "const": false
+            }
+          ],
+          "default": 2
+        },
+        "max-nesting": {
+          "description": "How deep compound statements may nest in an endpoint. false turns the check off.",
+          "markdownDescription": "How deep compound statements may nest in an endpoint. false turns the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "const": false
+            }
+          ],
+          "default": 2
+        },
+        "allow-loops": {
+          "description": "Whether an endpoint may hold for and while loops.",
+          "markdownDescription": "Whether an endpoint may hold for and while loops.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "boolean",
+          "default": false
+        },
+        "allow-comprehensions": {
+          "description": "Whether comprehensions and generator expressions are allowed; false counts them as loops.",
+          "markdownDescription": "Whether comprehensions and generator expressions are allowed; false counts them as loops.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "boolean",
+          "default": true
+        },
+        "deny-calls": {
+          "description": "Calls an endpoint may not make, by qualified name with * and ? wildcards. Replaces the default list (requests.*, httpx.*, sqlalchemy.* and others); [] turns the check off.",
+          "markdownDescription": "Calls an endpoint may not make, by qualified name with * and ? wildcards. Replaces the default list (requests.*, httpx.*, sqlalchemy.* and others); [] turns the check off.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          }
+        },
+        "extend-deny-calls": {
+          "description": "Calls added to deny-calls (or to its default list), by qualified name with * and ? wildcards.",
+          "markdownDescription": "Calls added to deny-calls (or to its default list), by qualified name with * and ? wildcards.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          }
+        },
+        "deny-receiver-types": {
+          "description": "Parameter types whose method calls are database work (db.execute, session.add), by qualified name. Default: the SQLAlchemy and SQLModel sessions.",
+          "markdownDescription": "Parameter types whose method calls are database work (db.execute, session.add), by qualified name. Default: the SQLAlchemy and SQLModel sessions.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          }
+        },
+        "deny-receiver-params": {
+          "description": "Parameter names whose method calls count as database work whatever their type, for untyped code, such as db or session.",
+          "markdownDescription": "Parameter names whose method calls count as database work whatever their type, for untyped code, such as db or session.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^\\d\\W]\\w*$"
+          },
+          "default": []
+        },
+        "delegate-to": {
+          "description": "Layer names, module prefixes or selectors the endpoint must call into at least once, such as application or shop.*.service.",
+          "markdownDescription": "Layer names, module prefixes or selectors the endpoint must call into at least once, such as application or shop.*.service.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "decorators": {
+          "description": "Decorators that mark an endpoint besides FastAPI's own, by qualified name with * and ? wildcards, such as app.http.endpoint.",
+          "markdownDescription": "Decorators that mark an endpoint besides FastAPI's own, by qualified name with * and ? wildcards, such as app.http.endpoint.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW012/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": []
         }
       }
     },

@@ -22,6 +22,7 @@ Search the rules, filter them by category, status or autofix, sort them by code,
 | [INW009](INW009.md) | `suppression-comment` | An inline suppression that hides nothing, or matches no finding | error, unused ones warn | no |
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | error | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | error | yes |
+| [INW012](INW012.md) | `thin-endpoint` | An HTTP endpoint that does the work itself: too many statements, branches or loops, database or HTTP calls of its own, or no call into the layer `delegate-to` names | opt-in, warning | yes |
 
 </div>
 
@@ -70,9 +71,9 @@ Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `
 
 ### Opt-in rules and rule options { #opt-in-rules }
 
-A rule whose Default column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default; the opt-in ones are the rules that judge code against thresholds a team picks, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
+A rule whose Default column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
 
-A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
+A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([INW012](INW012.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
 
 <!-- config: fragment -->
 
@@ -89,7 +90,7 @@ To accept one finding for good, put a suppression on the line it points at, with
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW003, INW005, INW006, INW010, INW011 and the FAPI rules. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
+Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012 and the FAPI rules. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
 
 ## Page format
 

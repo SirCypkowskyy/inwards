@@ -2,7 +2,8 @@
  * @file The stages a file goes through in the engine, and the helpers that
  * join them. A scan holds what the prescan found, a confirmation what the
  * full parse found, and a check's result the findings to report. The helpers
- * put a full parse's findings in source order and keep each
+ * put a full parse's findings in source order, add the findings of rules
+ * that parse a file on their own (FAPI, INW012), and keep each
  * unassigned-package warning once across files.
  */
 import type {
@@ -62,7 +63,8 @@ export function ordered(
 /**
  * Keeps each warning that names no place once across files: the INW006
  * warning for an unassigned package is kept on its first file. An
- * unused-suppression warning (INW009) is each comment's own and always kept.
+ * unused-suppression warning (INW009) is each comment's own and always kept,
+ * and so is an INW012 warning, which is each endpoint's own.
  *
  * @param kept - one file's findings, after its suppressions.
  * @param warned - the warnings kept so far, by message, updated in place.
@@ -70,11 +72,28 @@ export function ordered(
  */
 export function keptOnce(kept: readonly Diagnostic[], warned: Set<string>): Diagnostic[] {
   return kept.filter((found) => {
-    if (found.severity !== "warning" || found.code === "INW009") {
+    if (found.severity !== "warning" || found.code === "INW009" || found.code === "INW012") {
       return true;
     }
     const first = !warned.has(found.message);
     warned.add(found.message);
     return first;
   });
+}
+
+/**
+ * Adds findings another stage found in a file to its confirmed ones, in source order.
+ *
+ * @param confirmed - the file's confirmed findings.
+ * @param extra - the other findings in the same file.
+ * @returns the confirmed findings with the extra ones.
+ */
+export function withFound(confirmed: Confirmed, extra: readonly Diagnostic[]): Confirmed {
+  if (extra.length === 0) {
+    return confirmed;
+  }
+  const found = [...confirmed.found, ...extra].sort(
+    (a, b) => a.line - b.line || a.column - b.column,
+  );
+  return { ...confirmed, found };
 }

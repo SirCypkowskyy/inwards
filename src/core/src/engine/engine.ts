@@ -47,7 +47,8 @@ import { type Collected, projectCycles } from "./cycles.ts";
 import { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
-import { type Checked, type Confirmed, keptOnce, ordered, type Scan } from "./stages.ts";
+import { type Checked, type Confirmed, keptOnce, ordered, type Scan, withFound } from "./stages.ts";
+import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 export type { Checked } from "./stages.ts";
 
@@ -139,7 +140,9 @@ export class Engine {
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
-   * FAPI001 and FAPI002 run only when on and the text mentions FastAPI.
+   * FAPI001 and FAPI002 run only when on and the text mentions FastAPI, and
+   * INW012 only when on for the file's module and the text may hold an
+   * endpoint (`engine/thin-endpoint.ts`).
    *
    * @param file - the source file as read by the adapter.
    * @param project - the project's module index (see `index`).
@@ -148,7 +151,10 @@ export class Engine {
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
     const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
-    const confirmed = withFastApi(this.confirm(src, this.scan(src, project), project), src, wired);
+    const confirmed = withFound(
+      withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
+      thinEndpointFindings(this.parser, src, this.config),
+    );
     const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
     return applyRules(kept, this.config.rules);
   }
@@ -441,7 +447,11 @@ export class Engine {
       if (imports !== undefined) {
         collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
       }
-      const own = this.suppressIn(src, withFastApi(confirmed, src, wired));
+      const extra = withFound(
+        withFastApi(confirmed, src, wired),
+        thinEndpointFindings(this.parser, src, this.config),
+      );
+      const own = this.suppressIn(src, extra);
       suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
       all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }

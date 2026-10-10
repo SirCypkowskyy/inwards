@@ -117,6 +117,8 @@
       },
       // The FastAPI family (#186): the shared model now, FAPI001 to FAPI003 in #183 and #184.
       { "name": "core-rule-fastapi", "patterns": ["src/core/src/rules/fastapi/**"] },
+      // INW012 thin-endpoint (#182): framework-aware, so not part of the FastAPI family.
+      { "name": "core-rule-thin-endpoint", "patterns": ["src/core/src/rules/thin-endpoint/**"] },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -275,6 +277,10 @@
           "core-rules-shared"
         ]
       },
+      {
+        "from": "core-rule-thin-endpoint",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
+      },
       { "from": "core-baseline", "allow": ["core-contracts"] },
       {
         "from": "core-engine",
@@ -297,6 +303,7 @@
           "core-rule-unknown-first-party",
           "core-rule-dynamic-import",
           "core-rule-fastapi",
+          "core-rule-thin-endpoint",
           "core-baseline"
         ]
       },
@@ -349,6 +356,7 @@
           "core-rule-unknown-first-party",
           "core-rule-dynamic-import",
           "core-rule-fastapi",
+          "core-rule-thin-endpoint",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -781,6 +789,10 @@
         },
         {
           "from": "core-rule-fastapi",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-thin-endpoint",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

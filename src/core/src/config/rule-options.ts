@@ -172,6 +172,101 @@ function entrypoints(value: unknown, where: string): string[] {
   return value;
 }
 
+/** The highest threshold INW012 accepts; a larger one would turn the signal off in all but name. */
+const MAX_LIMIT = 1000;
+
+/** A qualified-name pattern: dotted identifiers, with fnmatch's `*` and `?`. */
+const NAME_PATTERN = /^[\p{XID_Continue}*?]+(?:\.[\p{XID_Continue}*?]+)*$/u;
+
+/** A Python identifier. */
+const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u;
+
+/**
+ * Parses one of INW012's thresholds: an integer from 0 to `MAX_LIMIT`, or
+ * `false` to turn the signal off.
+ *
+ * @param value - the raw value.
+ * @param where - the key's dotted path.
+ * @returns the integer, or false.
+ * @throws {ConfigError} for anything else.
+ */
+function limit(value: unknown, where: string): number | false {
+  const ok =
+    value === false ||
+    (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_LIMIT);
+  if (!ok) {
+    throw new ConfigError(
+      `${where} must be an integer from 0 to ${MAX_LIMIT}, or false to turn the check off.`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Makes a parser for a list of strings that each match a pattern, empty included.
+ *
+ * @param pattern - what every entry must match.
+ * @param example - how the message describes a good entry.
+ * @returns the parser.
+ */
+function listMatching(pattern: RegExp, example: string): OptionParser {
+  return (value: unknown, where: string): OptionValue => {
+    if (!(isStringList(value) && value.every((e) => pattern.test(e)))) {
+      throw new ConfigError(`${where} must be a list of ${example}.`);
+    }
+    return value;
+  };
+}
+
+/**
+ * Parses INW012's `delegate-to`: a non-empty list of layer names or module
+ * prefixes and selectors. Which entries name a layer is known only once the
+ * layers are parsed, so `delegateProblem` checks the rest then.
+ *
+ * @param value - the raw list.
+ * @param where - the key's dotted path.
+ * @returns the entries as written.
+ * @throws {ConfigError} when the list is empty or holds a blank or non-string entry.
+ */
+function delegateTargets(value: unknown, where: string): string[] {
+  if (!(isStringList(value) && value.length > 0 && value.every((e) => e.trim() !== ""))) {
+    throw new ConfigError(
+      `${where} must be a non-empty list of layer names or module prefixes and selectors, such as ["application"] or ["shop.*.service"].`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Checks the `delegate-to` entries that name no layer: each must then be a
+ * module prefix or selector, as in `layers[].modules`.
+ *
+ * @param entries - the entries as parsed.
+ * @param layerNames - the names of the configured layers.
+ * @returns the error message for the first bad entry, or undefined when all are fine.
+ */
+export function delegateProblem(
+  entries: readonly string[],
+  layerNames: ReadonlySet<string>,
+): string | undefined {
+  for (const entry of entries) {
+    let problem = isSelector(entry) ? selectorProblem(entry) : undefined;
+    if (!(layerNames.has(entry) || isSelector(entry) || isDottedName(entry))) {
+      problem = "it names no layer and isn't a dotted module name";
+    }
+    if (problem !== undefined && !layerNames.has(entry)) {
+      return `tool.inwards.rules.thin-endpoint.delegate-to: "${entry}" is not a layer name, module prefix or selector: ${problem}.`;
+    }
+  }
+  return undefined;
+}
+
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators. */
+const namePatterns = listMatching(
+  NAME_PATTERN,
+  'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
+);
+
 /** The keys of one entry of INW005's `deny`. */
 const DENY_KEYS: ReadonlySet<string> = new Set(["modules", "libraries"]);
 
@@ -226,6 +321,19 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "report-direct-raises": boolean,
     "handled-counts-as-documented": boolean,
     "explicit-422": oneOf(["ignore", "report"]),
+  },
+  "thin-endpoint": {
+    "max-statements": limit,
+    "max-branches": limit,
+    "max-nesting": limit,
+    "allow-loops": boolean,
+    "allow-comprehensions": boolean,
+    "deny-calls": namePatterns,
+    "extend-deny-calls": namePatterns,
+    "deny-receiver-types": namePatterns,
+    "deny-receiver-params": listMatching(IDENTIFIER, 'parameter names such as "db"'),
+    "delegate-to": delegateTargets,
+    decorators: namePatterns,
   },
   "router-wiring": {
     entrypoints,

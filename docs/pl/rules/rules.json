@@ -169,6 +169,20 @@
       "url": "INW011/"
     },
     {
+      "code": "INW012",
+      "name": "thin-endpoint",
+      "title": "INW012 thin-endpoint",
+      "summary": "Endpoint HTTP, który sam wykonuje pracę: za dużo instrukcji, gałęzi albo pętli, własne wywołania bazy danych albo HTTP, albo brak wywołania warstwy, którą wskazuje `delegate-to`",
+      "description": "Endpoint HTTP czyta żądanie, wywołuje jeden przypadek użycia i kształtuje odpowiedź; logika, zapytania i wywołania na zewnątrz mieszkają w innych warstwach.",
+      "category": ["layers", "endpoints"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "warning",
+      "suppressible": true,
+      "default": "opt-in, ostrzeżenie",
+      "url": "INW012/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

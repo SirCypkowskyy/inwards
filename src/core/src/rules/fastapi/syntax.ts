@@ -1,8 +1,8 @@
 /**
  * @file How a FAPI finding points at and talks about a path operation: the
  * span of its decorator, where one finding per endpoint goes (and where an
- * inline suppression goes), the decorator as a message quotes it, and word
- * lists. It only reads the syntax the model recorded.
+ * inline suppression goes), and the decorator as a message quotes it. It
+ * only reads the syntax the model recorded.
  */
 import type { Node } from "web-tree-sitter";
 import type { Span } from "../../contracts/records.ts";
@@ -50,17 +50,4 @@ export function decoratorText(op: PathOperation): string {
   const callee = op.node.childForFieldName("function")?.text ?? op.decorator;
   const path = argumentAt(op.node, 0, "path");
   return `@${callee}(${path?.text ?? ""})`;
-}
-
-/**
- * Joins words as English lists them.
- *
- * @param words - the items, in order.
- * @param conjunction - the word before the last one.
- * @returns "a", "a and b", or "a, b and c".
- */
-export function joined(words: readonly string[], conjunction = "and"): string {
-  return words.length <= 1
-    ? (words[0] ?? "")
-    : `${words.slice(0, -1).join(", ")} ${conjunction} ${words.at(-1) ?? ""}`;
 }

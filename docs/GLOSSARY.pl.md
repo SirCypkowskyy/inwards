@@ -63,7 +63,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW011, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW012, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
@@ -184,6 +184,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | yield dependency (FAPI007) | zależność z `yield` |
 | swallow an exception (FAPI007) | połykać wyjątek |
 | operation id (`operation_id`, FAPI008) | identyfikator operacji (`operation_id`) |
+| HTTP endpoint, thin endpoint (INW012) | endpoint HTTP, cienki endpoint |
+| guard (`if <cond>: raise HTTPException(...)`, INW012) | warunek ochronny (guard) |
+| signal, threshold (INW012) | sygnał, próg |
+| repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
 | pre-release | wersja przedpremierowa (pre-release) |

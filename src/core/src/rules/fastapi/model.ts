@@ -15,10 +15,10 @@ import type { Node, Parser, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { importedNames, normalizeSource, parsePython } from "../../python/parser.ts";
+import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { type ModuleDefinitions, moduleDefinitions } from "./definitions.ts";
 import { extract, moduleFunctions } from "./extract.ts";
 import type { FastApiFile, FastApiObject } from "./records.ts";
-import { type Qualify, qualifierFor } from "./values.ts";
 
 /** The text pre-filter: a file that spells none of these holds no FastAPI object or wiring. */
 const MENTIONS =
