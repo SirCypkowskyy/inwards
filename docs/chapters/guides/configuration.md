@@ -212,7 +212,7 @@ Which rules report and how loudly:
 - `extend-select`: these rules report too, next to `select` or the rules that are on by default. It turns [opt-in rules](../rules/index.md#opt-in-rules) on.
 - `ignore`: these rules don't report. It wins over `select` and `extend-select`.
 - `severity`: a table of rule code to `"error"` or `"warning"`.
-- `<rule-name>`: a table of that rule's options, such as `[tool.inwards.rules.pure-domain]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a layer's `modules`, which limits the rule to the modules they match. Some rules take their own options too, listed on the rule's page: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`ports-abstract`](../rules/INW014.md#configuration), [`construct-only-in`](../rules/INW015.md#configuration), [`orm-naming`](../rules/INW016.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) and [`router-wiring`](../rules/FAPI003.md#configuration). An unknown key, or one that belongs to another rule, is a config error that names it. The table doesn't turn the rule on, and a table for a rule that is off gets a warning.
+- `<rule-name>`: a table of that rule's options, such as `[tool.inwards.rules.pure-domain]`. Every rule takes `modules`, a list of module prefixes or selectors written as in a layer's `modules`, which limits the rule to the modules they match. Some rules take their own options too, listed on the rule's page: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`ports-abstract`](../rules/INW014.md#configuration), [`construct-only-in`](../rules/INW015.md#configuration), [`orm-naming`](../rules/INW016.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) and [`router-wiring`](../rules/FAPI003.md#configuration). An unknown key, or one that belongs to another rule, is a config error that names it. The table doesn't turn the rule on, and a table for a rule that is off gets a warning. A [template](#template-rules) can also turn opt-in rules on for one of its roles, which adds to these tables.
 - `[tool.inwards.rules.pure-domain]` also takes `deny`, a list of tables with `modules` (prefixes or selectors, as above) and `libraries` (import names, as in a layer's `deny-libraries`). The modules an entry matches may not import its libraries, whether a layer owns them or not, and the layer's `allow-libraries` doesn't undo it ([INW005](../rules/INW005.md), [libraries guide](libraries.md#prefix-deny)). Use it for a package that isn't a whole layer, such as import-linter's "`mypackage.one` must not import `django`".
 
 INW000 can't be ignored, re-levelled or given options. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
@@ -319,6 +319,7 @@ A template has these keys, all optional:
 - `public`: module names relative to a context's modules, which other contexts may import ([INW003](../rules/INW003.md)).
 - `allow`, `require`, `forbid`, `extra`: as in a [shape entry](package-shape.md#configure-it). When `allow` is set, the first segment of every role is added to it, so `allow = []` means the roles, `require` and `__init__` only.
 - `hints`: sentences added to the fix steps of [INW007](../rules/INW007.md) findings in the packages the template shapes, such as where shared code goes.
+- `rules`: opt-in rules each role turns on in its modules, such as `router = { async-blocking = true }` ([Rules for a role](#template-rules)).
 
 Where `template = "<name>"` is set, it means:
 
@@ -336,6 +337,51 @@ Templates are expanded when the config is read, before anything else is checked,
 - **A role no package has is an empty layer.** A role layer that matches no module gets the INW006 error for an empty layer, like any other layer, so list only the roles every kind of package can have; the optional ones can live in `allow`. The error points at the entry that carries the template and names the role.
 - **Use `*`, not `**`, in a template entry's modules.** `src.*` gives `src.*.models`, which only matches a domain's own `models`, so `src/orders/service/models.py` stays in the `service` role. With `src.**`, `src.**.models` matches that file too, and it moves to the `models` role, because the deepest last literal segment wins ([Selectors](#selectors)).
 - **Config errors name the entry or the template key**: `tool.inwards.layers[1].template` for an unknown template or one without roles, `tool.inwards.templates.fastapi-domain.roles[2]` for a bad role. A problem only the expansion shows, such as a role layer's name already taken, names the expanded layer.
+
+#### Rules for a role { #template-rules }
+
+A template's `rules` table turns [opt-in rules](../rules/index.md#opt-in-rules) on for the modules of one role, so "every router gets INW013" is said once, next to the roles:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+layers = [
+  { name = "core", modules = ["src.database"] },
+  { name = "domain", modules = ["src.*"], template = "domain" },
+]
+
+[tool.inwards.templates.domain]
+roles = ["models", "service", "router"]
+
+[tool.inwards.templates.domain.rules]
+router = { async-blocking = true, thin-endpoint = { max-statements = 8 } }
+models = { orm-naming = "warning" }
+```
+
+Each key is a role the template lists (quote a dotted one: `"api.v1"`), and each value names rules by their kebab-case names. A rule's value is `true`, a severity (`"error"` or `"warning"`), or a table of the rule's options without `modules`. The template expands into `[tool.inwards.rules]`, and the result is what you would write by hand:
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards.rules]
+extend-select = ["INW012", "INW013", "INW016"]
+severity = { INW016 = "warning" }
+
+[tool.inwards.rules.async-blocking]
+modules = ["src.*.router"]
+
+[tool.inwards.rules.thin-endpoint]
+modules = ["src.*.router"]
+max-statements = 8
+
+[tool.inwards.rules.orm-naming]
+modules = ["src.*.models"]
+```
+
+- **The role's modules** are its layer's modules: `<module>.<role>` for every module of every `layers` entry that uses the template. They join the rule's `modules`, so the rule reports only there. [INW015](../rules/INW015.md) is the exception: they join its `role`, the modules it guards, and its `modules` stays as the top-level table sets it.
+- **The rule is turned on**: its code joins `extend-select`, after the codes already there. `ignore` still wins.
+- **The top-level table adds to it.** `[tool.inwards.rules.<rule>]` `modules` (or INW015's `role`) entries come first, then the roles'. Any other option set there, and a severity in `[tool.inwards.rules] severity`, wins over the template's, as a shape entry's own key wins over its template's. Once a template names a rule, a top-level table without `modules` no longer means the whole project: the rule's scope is the template's roles plus the top-level `modules`.
+- **One value per option.** Two roles, or two templates, that give the same rule different values for one option, or different severities, are a config error that names both; set the value once in the top-level table instead.
+- **Config errors name the key**, such as `tool.inwards.templates.domain.rules.router.async-blocking.modules`: a role the template doesn't list, a template without `roles`, an unknown rule or a rule code, a rule that is on by default (it already reports everywhere, so set its `modules` in the top-level table to narrow it), a value other than `true`, a severity or a table, `modules` (or INW015's `role`) in a template table, and an option the rule doesn't take. A template with `rules` that no `layers` entry uses is an error too, since its roles match no modules.
 
 A template nobody uses is allowed. Four presets write a template and contexts for you: `inwards init --style vertical-slices`, `bounded-contexts`, `django` and `fastapi`, the last one the fastapi-best-practices template above ([Install](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) records the design.
 

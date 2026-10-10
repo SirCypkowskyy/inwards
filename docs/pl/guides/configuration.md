@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 9b03ef5a68d6c4ce1a7e3f463a01f356ed1de4925fb8357da9b5b0f65471c2af
+source_hash: cc1bcfd0a2777986bf577b986c164e3aceff6f5d32b46821d87eeaab2628c509
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -217,7 +217,7 @@ Które reguły zgłaszają i jak głośno:
 - `extend-select`: te reguły też zgłaszają, obok `select` albo reguł domyślnie włączonych. Włącza [reguły opt-in](../rules/index.md#opt-in-rules).
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`.
-- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`ports-abstract`](../rules/INW014.md#configuration), [`construct-only-in`](../rules/INW015.md#configuration), [`orm-naming`](../rules/INW016.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie.
+- `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`ports-abstract`](../rules/INW014.md#configuration), [`construct-only-in`](../rules/INW015.md#configuration), [`orm-naming`](../rules/INW016.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie. [Szablon](#template-rules) może też włączyć reguły opt-in dla jednej ze swoich ról, co dodaje się do tych tabel.
 - `[tool.inwards.rules.pure-domain]` przyjmuje też `deny`, listę tabel z `modules` (prefiksy albo selektory, jak wyżej) i `libraries` (nazwy importu, jak w `deny-libraries` warstwy). Moduły, do których pasuje wpis, nie mogą importować jego bibliotek, niezależnie od tego, czy należą do warstwy, a `allow-libraries` warstwy tego nie znosi ([INW005](../rules/INW005.md), [przewodnik po bibliotekach](libraries.md#prefix-deny)). Służy do pakietu, który nie jest całą warstwą, na przykład do kontraktu import-lintera „`mypackage.one` nie może importować `django`”.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
@@ -324,6 +324,7 @@ Szablon ma te klucze, wszystkie opcjonalne:
 - `public`: nazwy modułów względne wobec modułów kontekstu, które mogą importować inne konteksty ([INW003](../rules/INW003.md)).
 - `allow`, `require`, `forbid`, `extra`: jak we [wpisie kształtu](package-shape.md#configure-it). Gdy `allow` jest ustawione, dochodzi do niego pierwszy segment każdej roli, więc `allow = []` oznacza tylko role, `require` i `__init__`.
 - `hints`: zdania dodawane do kroków naprawy diagnostyk [INW007](../rules/INW007.md) w pakietach, którym szablon nadaje kształt, na przykład gdzie trafia wspólny kod.
+- `rules`: reguły opt-in, które każda rola włącza w swoich modułach, na przykład `router = { async-blocking = true }` ([Reguły dla roli](#template-rules)).
 
 Tam, gdzie ustawiono `template = "<nazwa>"`, oznacza to:
 
@@ -341,6 +342,51 @@ Szablony są rozwijane przy wczytywaniu konfiguracji, zanim cokolwiek innego zos
 - **Rola, której nie ma żaden pakiet, to pusta warstwa.** Warstwa roli, do której nie pasuje żaden moduł, dostaje błąd INW006 o pustej warstwie jak każda inna warstwa, więc wymieniaj tylko role, które może mieć każdy pakiet danego rodzaju; opcjonalne mogą trafić do `allow`. Błąd wskazuje wpis, który niesie szablon, i nazywa rolę.
 - **W modułach wpisu z szablonem używaj `*`, nie `**`.** `src.*` daje `src.*.models`, które pasuje tylko do `models` samej domeny, więc `src/orders/service/models.py` zostaje w roli `service`. Przy `src.**` wzorzec `src.**.models` pasuje też do tego pliku, który przechodzi wtedy do roli `models`, bo wygrywa najgłębszy ostatni dosłowny segment ([Selektory](#selectors)).
 - **Błędy konfiguracji nazywają wpis albo klucz szablonu**: `tool.inwards.layers[1].template` dla nieznanego szablonu albo takiego bez ról, `tool.inwards.templates.fastapi-domain.roles[2]` dla błędnej roli. Problem, który widać dopiero po rozwinięciu, na przykład zajęta już nazwa warstwy roli, nazywa rozwiniętą warstwę.
+
+#### Reguły dla roli { #template-rules }
+
+Tabela `rules` szablonu włącza [reguły opt-in](../rules/index.md#opt-in-rules) w modułach jednej roli, więc „każdy router dostaje INW013” mówi się raz, obok ról:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+layers = [
+  { name = "core", modules = ["src.database"] },
+  { name = "domain", modules = ["src.*"], template = "domain" },
+]
+
+[tool.inwards.templates.domain]
+roles = ["models", "service", "router"]
+
+[tool.inwards.templates.domain.rules]
+router = { async-blocking = true, thin-endpoint = { max-statements = 8 } }
+models = { orm-naming = "warning" }
+```
+
+Każdy klucz to rola wymieniona w szablonie (rolę z kropką trzeba wziąć w cudzysłów: `"api.v1"`), a każda wartość wskazuje reguły po ich nazwach w kebab-case. Wartość reguły to `true`, poziom (`"error"` albo `"warning"`) albo tabela opcji reguły bez `modules`. Szablon rozwija się do `[tool.inwards.rules]`, a wynik to to, co napisałbyś ręcznie:
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards.rules]
+extend-select = ["INW012", "INW013", "INW016"]
+severity = { INW016 = "warning" }
+
+[tool.inwards.rules.async-blocking]
+modules = ["src.*.router"]
+
+[tool.inwards.rules.thin-endpoint]
+modules = ["src.*.router"]
+max-statements = 8
+
+[tool.inwards.rules.orm-naming]
+modules = ["src.*.models"]
+```
+
+- **Moduły roli** to moduły jej warstwy: `<moduł>.<rola>` dla każdego modułu każdego wpisu `layers`, który korzysta z szablonu. Dołączają do `modules` reguły, więc reguła zgłasza tylko tam. Wyjątkiem jest [INW015](../rules/INW015.md): u niej dołączają do `role`, czyli chronionych modułów, a jej `modules` zostaje takie, jak ustawia tabela najwyższego poziomu.
+- **Reguła zostaje włączona**: jej kod dołącza do `extend-select`, za kodami, które już tam są. `ignore` nadal wygrywa.
+- **Tabela najwyższego poziomu dodaje się do tego.** Wpisy `modules` z `[tool.inwards.rules.<reguła>]` (albo `role` przy INW015) idą najpierw, potem wpisy ról. Każda inna opcja ustawiona tam oraz poziom w `[tool.inwards.rules] severity` wygrywają z wartością szablonu, tak jak własny klucz wpisu kształtu wygrywa z kluczem jego szablonu. Gdy szablon wskaże regułę, tabela najwyższego poziomu bez `modules` nie oznacza już całego projektu: zakresem reguły są role szablonu i `modules` z tabeli najwyższego poziomu.
+- **Jedna wartość na opcję.** Dwie role albo dwa szablony, które dają tej samej regule różne wartości jednej opcji albo różne poziomy, to błąd konfiguracji podający oba miejsca; ustaw wtedy wartość raz w tabeli najwyższego poziomu.
+- **Błędy konfiguracji podają klucz**, na przykład `tool.inwards.templates.domain.rules.router.async-blocking.modules`: rola, której szablon nie wymienia, szablon bez `roles`, nieznana reguła albo kod reguły zamiast nazwy, reguła domyślnie włączona (i tak zgłasza wszędzie, więc żeby ją zawęzić, ustaw jej `modules` w tabeli najwyższego poziomu), wartość inna niż `true`, poziom albo tabela, `modules` (albo `role` przy INW015) w tabeli szablonu oraz opcja, której reguła nie przyjmuje. Błędem jest też szablon z `rules`, z którego nie korzysta żaden wpis `layers`, bo do jego ról nie pasuje żaden moduł.
 
 Szablon, z którego nikt nie korzysta, jest dozwolony. Cztery presety zapisują szablon i konteksty za ciebie: `inwards init --style vertical-slices`, `bounded-contexts`, `django` i `fastapi`, ten ostatni jako szablon fastapi-best-practices z przykładu powyżej ([Instalacja](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
 

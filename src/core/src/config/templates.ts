@@ -3,13 +3,15 @@
  * package, which layer, shape and context entries use with `template =
  * "<name>"` (#97, ADR-036). This module validates the templates and expands a
  * shape or context entry that names one into the keys a hand-written entry
- * would have; `parse.ts` expands a layer entry's roles into layers.
+ * would have; `parse.ts` expands a layer entry's roles into layers, and a
+ * template's `rules` into `[tool.inwards.rules]` (`template-rules.ts`).
  *
  * Nothing after the parser knows templates exist: every rule sees what the
  * equivalent hand-written config would give it. Pure: no I/O.
  */
 import type { Severity } from "../contracts/records.ts";
 import { memberPatterns, strings } from "./shape.ts";
+import { parseTemplateRules, type TemplateRules } from "./template-rules.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 /** One validated template. */
@@ -32,6 +34,8 @@ export interface TemplateSpec {
   extra?: Severity;
   /** Project advice added to the INW007 fix steps. */
   hints?: string[];
+  /** Opt-in rules each role turns on (`template-rules.ts`), by role, then by rule name. */
+  rules?: TemplateRules;
 }
 
 /** Keys one `[tool.inwards.templates.<name>]` table understands. */
@@ -43,6 +47,7 @@ export const TEMPLATE_KEYS: ReadonlySet<string> = new Set([
   "forbid",
   "extra",
   "hints",
+  "rules",
 ]);
 
 /** The shape keys a template can supply to a `[[tool.inwards.shape]]` entry. */
@@ -230,6 +235,9 @@ function parseTemplate(entry: Record<string, unknown>, where: string): TemplateS
   }
   if (hints !== undefined) {
     spec.hints = strings(hints, `${where}.hints`);
+  }
+  if (entry["rules"] !== undefined) {
+    spec.rules = parseTemplateRules(entry["rules"], spec.roles, `${where}.rules`);
   }
   if (spec.allow !== undefined && spec.roles !== undefined) {
     const members = spec.roles.flat().map((role) => role.split(".")[0] ?? role);
