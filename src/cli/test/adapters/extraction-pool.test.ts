@@ -4,7 +4,8 @@
  * whatever order the threads finish in, and it still answers when its
  * workers crash, answer with an error or can't start: the calling thread
  * works through the queue too. A worker's answers land at their own jobs,
- * and a worker holds two batches at once (#281).
+ * and a worker holds two batches at once (#281); both are checked with
+ * this thread kept off the queue, so no race with it decides them (#319).
  * The workers run `main.ts`, as the binary's do.
  */
 import { describe, expect, test } from "bun:test";
@@ -45,6 +46,45 @@ function job(n: number, want: ExtractionJob["want"]): ExtractionJob {
     text,
   };
   return { file, want };
+}
+
+/** Worker code that answers each job with one import of the job's own module, as `tagged` does. */
+const TAG_JS = `const tag = (jobs) => jobs.map((j) => ({
+  extraction: { skeleton: [{ line: 1, column: 1, endLine: 1, endColumn: 1, target: j.file.module, statement: "import" }] },
+  dynamic: false,
+}));`;
+
+/**
+ * Turns worker code into an entry a pool can start, with `tag` in scope.
+ *
+ * @param body - what the worker does with its messages.
+ * @returns a blob URL for the worker's program.
+ */
+function workerEntry(body: string): string {
+  return URL.createObjectURL(new Blob([`${TAG_JS}\n${body}`], { type: "application/javascript" }));
+}
+
+/**
+ * A worker that answers each batch at once with `tag`. This thread never
+ * extracts an import of a file's own module from these files, so an answer
+ * shows which thread gave it and which job it was for.
+ */
+const TAGGING_WORKER = workerEntry(
+  "self.onmessage = (e) => { if (e.data.id) postMessage({ id: e.data.id, answers: tag(e.data.jobs) }); };",
+);
+
+/**
+ * The answer the tagging workers give a job.
+ *
+ * @param each - the job.
+ * @returns a skeleton with one import of the job's own module, not dynamic.
+ */
+function tagged(each: ExtractionJob): ExtractionAnswer {
+  const at = { line: 1, column: 1, endLine: 1, endColumn: 1 };
+  return {
+    extraction: { skeleton: [{ ...at, target: each.file.module, statement: "import" }] },
+    dynamic: false,
+  };
 }
 
 describe("the pool answers like this thread", () => {
@@ -89,48 +129,59 @@ describe("the pool answers like this thread", () => {
   });
 
   test("the workers' answers are used, each at its own job", async () => {
-    // A worker that answers every job with an empty skeleton, unlike this thread.
-    const code = `self.onmessage = (e) => {
-      if (e.data.id) postMessage({ id: e.data.id, answers: e.data.jobs.map(() => ({ extraction: { skeleton: [] }, dynamic: false })) });
-    };`;
-    const entry = URL.createObjectURL(new Blob([code], { type: "application/javascript" }));
-    const jobs = Array.from({ length: 480 }, (_unused, n) => job(n + 1, "skeleton"));
-    const pool = startExtractionPool(entry, WASM, 3);
+    // With this thread kept off the queue, only the workers can answer, so no
+    // race with them decides what the test sees (#319).
+    const pool = startExtractionPool(TAGGING_WORKER, WASM, 3, {
+      local: Promise.resolve(undefined),
+    });
     try {
+      const jobs = Array.from({ length: 480 }, (_unused, n) => job(n + 1, "skeleton"));
+      expect(await pool.extract(jobs)).toEqual(jobs.map(tagged));
+    } finally {
+      pool.close();
+    }
+  });
+
+  test("the workers' answers and this thread's mix in whole batches", async () => {
+    // Who answers which batch depends on timing; that each answer sits at its
+    // own job, and a batch comes from one thread, doesn't.
+    const pool = startExtractionPool(TAGGING_WORKER, WASM, 3);
+    try {
+      const jobs = Array.from({ length: 480 }, (_unused, n) => job(n + 1, "skeleton"));
       const answers = await pool.extract(jobs);
-      const fake = { extraction: { skeleton: [] }, dynamic: false };
-      const fromWorkers = answers.filter((answer) => Bun.deepEquals(answer, fake)).length;
-      expect(fromWorkers).toBeGreaterThan(0);
-      expect(fromWorkers % 24).toBe(0); // whole batches
-      const fromHere = jobs.filter((each, n) => Bun.deepEquals(answers[n], run(each))).length;
-      expect(fromHere + fromWorkers).toBe(jobs.length);
+      const sources = jobs.map((each, n) => {
+        if (Bun.deepEquals(answers[n], tagged(each))) {
+          return "worker";
+        }
+        return Bun.deepEquals(answers[n], run(each)) ? "here" : "wrong";
+      });
+      expect(sources.filter((source) => source === "wrong")).toEqual([]);
+      for (let start = 0; start < jobs.length; start += 24) {
+        expect(new Set(sources.slice(start, start + 24)).size).toBe(1);
+      }
     } finally {
       pool.close();
     }
   });
 
   test("a worker holds two batches at once, and answers land whatever their order", async () => {
-    // Answers nothing until it holds two batches, then answers the second first:
-    // with one batch at a time, only the calling thread would ever answer.
-    const code = `const held = [];
-    self.onmessage = (e) => {
-      if (!e.data.id) return;
-      held.push(e.data);
-      if (held.length < 2) return;
-      for (const b of held.splice(0).reverse()) {
-        postMessage({ id: b.id, answers: b.jobs.map((j) => ({ extraction: { skeleton: [] }, dynamic: j.file.path.length < 0 })) });
-      }
-    };`;
-    const entry = URL.createObjectURL(new Blob([code], { type: "application/javascript" }));
-    const jobs = Array.from({ length: 960 }, (_unused, n) => job(n + 1, "skeleton"));
-    const pool = startExtractionPool(entry, WASM, 2);
+    // Answers nothing until it holds two batches, answers the second first,
+    // then answers each batch as it comes. This thread stays off the queue, so
+    // the workers answer every job: with one batch at a time, they would answer
+    // none and the call would hang.
+    const entry = workerEntry(`let held = [];
+      self.onmessage = (e) => {
+        if (!e.data.id) return;
+        if (held === undefined) return postMessage({ id: e.data.id, answers: tag(e.data.jobs) });
+        held.push(e.data);
+        if (held.length < 2) return;
+        for (const b of held.reverse()) postMessage({ id: b.id, answers: tag(b.jobs) });
+        held = undefined;
+      };`);
+    const pool = startExtractionPool(entry, WASM, 2, { local: Promise.resolve(undefined) });
     try {
-      const answers = await pool.extract(jobs);
-      const fake = { extraction: { skeleton: [] }, dynamic: false };
-      const fromWorkers = answers.filter((answer) => Bun.deepEquals(answer, fake)).length;
-      expect(fromWorkers).toBeGreaterThan(0);
-      const fromHere = jobs.filter((each, n) => Bun.deepEquals(answers[n], run(each))).length;
-      expect(fromHere + fromWorkers).toBe(jobs.length);
+      const jobs = Array.from({ length: 960 }, (_unused, n) => job(n + 1, "skeleton"));
+      expect(await pool.extract(jobs)).toEqual(jobs.map(tagged));
     } finally {
       pool.close();
     }
