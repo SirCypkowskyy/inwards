@@ -77,6 +77,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | loader (module loader) | loader (loadera) | |
 | launcher (`--launcher`, e.g. `uv run`) | launcher (launchera) | what starts Inwards in the project |
 | worktree (git) | worktree (worktree'a, worktree'y) | |
+| daemon (`inwards daemon`), hook daemon | daemon (daemona, daemony), daemon hooków | the per-project process the PostToolUse hook talks to (ADR-039) |
+| worker, worker pool | worker (workera, workery), pula workerów | |
 
 ## Fixed Polish terms
 
@@ -205,6 +207,13 @@ baseline'u); multi-word names are left uninflected where possible.
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
 | snapshot | migawka |
 | spike | eksperyment |
+| resident process | stały proces |
+| one-shot run (a hook or check in its own process) | jednorazowe uruchomienie, jednorazowo |
+| socket, Unix domain socket | gniazdo, gniazdo uniksowe |
+| named pipe (Windows) | nazwany potok |
+| endpoint (a socket path or pipe name) | adres |
+| framing (of a protocol) | ramkowanie |
+| stale (a daemon, a build) | nieaktualny |
 | start-up (process) | start (startu) |
 | string (Python) | napis |
 | suppression, inline suppression (`# inwards: ignore[...]`) | wyciszenie, wyciszenie w linii |

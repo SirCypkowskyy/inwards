@@ -147,11 +147,44 @@ In M0 the same check was about 30 ms of work: 10 ms process start, 12 ms WASM in
 
 This changes the performance roadmap. For the agent loop, parse speed doesn't matter much. Start-up does.
 
+### Spike: a resident process
+
+[#59](https://github.com/SirCypkowskyy/inwards/issues/59) asked whether the hooks and the language server should share one resident process, and what the hooks would gain from one. The decision is [ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server).
+
+**Method.** An Apple M1 Pro (10 cores) on macOS, Bun 1.4.2, `inwards-darwin-arm64` built by `scripts/build-binaries.ts` from `aede2ab`. Other agents were working on the machine, so the load average was 5 to 7; trust the differences more than the absolute numbers. The project is `examples/broken-app` with a generated `shop/domain/big.py` added: 4,492 lines, 114 KB, two INW001 violations, close to polar's file in [#122](https://github.com/SirCypkowskyy/inwards/issues/122) (4,482 lines, two violations). The hook input is the Claude Code `PostToolUse` fixture pointed at each file, after a SessionStart, so both files' violations count as old. Each case ran 80 times (60 for PreToolUse and Stop), every case once per round in rotating order, after one warm-up; check runs set `INWARDS_NO_CACHE=1`. The resident process is a throwaway Bun script, run from source, that serves today's `hookClaudeCode` warm behind a Unix socket, with a per-request `Runtime` and buffered `Streams`; the client is a 10-line program compiled like the binary. "With caches" adds an in-memory extraction cache keyed by content and keeps `git cat-file blob` answers, which name a commit, for the life of the process.
+
+| Scenario | p50 | p95 |
+|---|--:|--:|
+| An empty program compiled like the binary | 16.6 ms | 17.4 ms |
+| `inwards --version` | 15.5 ms | 16.9 ms |
+| The spike client with no daemon listening | 13.1 ms | 14.1 ms |
+| `inwards check` on the 13-line `order.py` | 27.7 ms | 30.6 ms |
+| `inwards check` on `big.py` | 70.8 ms | 77.3 ms |
+| The same two checks warm, in one process (`runCheck`, 200 runs) | 0.8 / 29.8 ms | 1.4 / 31.3 ms |
+| PreToolUse, one-shot | 16.8 ms | 17.6 ms |
+| Stop over both files, one-shot | 141.1 ms | 149.6 ms |
+| PostToolUse `order.py`: one-shot | 46.6 ms | 50.2 ms |
+| PostToolUse `order.py`: resident | 32.3 ms | 35.2 ms |
+| PostToolUse `order.py`: resident, with caches | 17.2 ms | 19.8 ms |
+| PostToolUse `big.py`: one-shot | 119.9 ms | 151.6 ms |
+| PostToolUse `big.py`: resident | 91.1 ms | 97.7 ms |
+| PostToolUse `big.py`: resident, with caches | 18.2 ms | 19.7 ms |
+| PostToolUse `big.py`, changed before every call (40 rounds): one-shot | 117.5 ms | 122.8 ms |
+| PostToolUse `big.py`, changed before every call: resident, with caches | 47.6 ms | 50.1 ms |
+
+- **The client's start is the floor.** Every hook call starts a process, about 15 ms here, before it can reach a daemon. Finding that no daemon listens costs nothing measurable.
+- **One git call is half of a small file's hook.** PostToolUse reads the file's session-start text with `git cat-file blob` to split old violations from new ones: about 15 ms per call on this machine. A daemon reads it once per session.
+- **PostToolUse checks a file twice,** as it is now and as it was at session start: 30 ms each for `big.py`, warm. With a cache keyed by content, the start text is parsed once per session; an edited file still costs one parse.
+- **Warm JIT counts too.** A one-shot check costs 27 ms more than a warm one for `order.py` and 41 ms more for `big.py`. The extra 14 ms is parsing and walking code that a fresh process hasn't optimised yet.
+- **PreToolUse can't gain,** at 16.8 ms against the 15.5 ms floor. Stop takes 141 ms but runs once per turn.
+- **Memory.** The resident processes held 151 and 212 MB of RSS after the runs.
+- **Not measured:** Windows named pipes, the compiled binary as the resident process, and Linux. The spike's scripts were throwaway and aren't in the repository; [#60](https://github.com/SirCypkowskyy/inwards/issues/60) adds the daemon to the benchmark job.
+
 ### Performance roadmap
 
 | Step | Expected effect | Targets |
 |---|---|---|
-| Resident process reused by hooks through a local socket, with fallback to a one-shot run (process model and command name to be settled in an ADR, since the LSP server may share it; [#59](https://github.com/SirCypkowskyy/inwards/issues/59), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Removes ~20 ms of WASM and runtime start-up from every hook call | Single-file p95 |
+| `inwards daemon`: a resident process per project that PostToolUse reaches through a local socket, with fallback to a one-shot run; the language server stays a separate process, `inwards server` ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server), [#60](https://github.com/SirCypkowskyy/inwards/issues/60)) | Measured in the spike above: PostToolUse p95 50.2 → 19.8 ms for a small file, 122.8 → 50.1 ms for a 4,492-line file edited before every call | Single-file p95 |
 | :material-check-circle: `bun build --bytecode` ([#39](https://github.com/SirCypkowskyy/inwards/issues/39)), done | Measured: start-up 22 → 10 ms, hook call about 45% faster, 2.5 MB more per binary (see the spike above) | Single-file p95 |
 | Worker pool, one parser per core ([#61](https://github.com/SirCypkowskyy/inwards/issues/61)) | Near-linear speed-up on the cold full run on a multi-core machine | Cold full run |
 | :material-check-circle: Content-hash cache of import lists (`.inwards/cache`, [#56](https://github.com/SirCypkowskyy/inwards/issues/56)), done for `inwards check` and `inwards baseline` | Measured: a warm full check 3.0 times faster (0.46 s against 1.25 s p50, 12 runs each on this laptop under load), 27% slower while it fills. The hooks don't use it ([ADR-031](05-ADR.md#adr-031-a-content-keyed-extraction-cache-that-the-hooks-never-read)) | Warm full run |
@@ -186,7 +219,7 @@ The screenshots in these docs come from `scripts/screenshots.py`, which runs eac
 |---|:-:|:-:|---|
 | Astral ships layer contracts in ty or Ruff | Medium | High | Compete on agent integration and fix quality, which aren't Astral's focus. Keep the rules format simple enough to export |
 | import-linter adds JSON output and agent hooks | Medium | Medium | Stay ahead on latency, a standalone binary and per-violation fixes. Keep switching one command: `inwards import-config` converts import-linter contracts ([guide](guides/import-linter.md)) |
-| Real repos break the 100 ms p95 | Happened: a 4,482-line polar file with violations took 125 to 280 ms before bytecode compilation, 90 ms p95 locally after ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | High | Resident process first, then a Rust/Zig WASM prescan (the fallback in ADR-001) |
+| Real repos break the 100 ms p95 | Happened: a 4,482-line polar file with violations took 125 to 280 ms before bytecode compilation, 90 ms p95 locally after ([#122](https://github.com/SirCypkowskyy/inwards/issues/122)) | High | `inwards daemon` first ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)), then a Rust/Zig WASM prescan (the fallback in ADR-001) |
 | The prescan misses an import on some unusual file | Low | High | Differential test in CI on the stdlib, nightly on five real services; grow that corpus with repos from design partners |
 | Agents edit `[tool.inwards]` to pass | High without a guard | High | PreToolUse config guard, the Stop gate's config comparison, `permissions.deny` rules from `init`, CODEOWNERS ([chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check)). Bash can still get past the guard; a replayed session start is caught by the start record's copy outside the project, unless the agent deletes that too, and a Stop hook removed through Bash is only reported at the next session start ([#88](https://github.com/SirCypkowskyy/inwards/issues/88)) |
 | Bun `--compile` regressions or breaking changes | Low | Medium | Pinned via `.bun-version`; the CD verify matrix runs every binary |
