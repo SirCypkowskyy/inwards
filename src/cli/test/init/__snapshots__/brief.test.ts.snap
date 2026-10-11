@@ -1,18 +1,32 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`inwards context prints the brief for the example config, under 300 tokens 1`] = `
+exports[`inwards context prints the brief for the example config, under 450 tokens 1`] = `
 "## Architecture brief (Inwards)
 
-\`[tool.inwards]\` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own.
+\`[tool.inwards]\` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of your own layer (sibling groups: 4-6).
 
-1. domain (\`shop.domain\`): imports no other layer
-2. application (\`shop.application\`): may import domain
-3. infrastructure (\`shop.infrastructure\`): may import domain, application
-4. interface (\`shop.api\`, \`shop.cli\`): may import every other layer
+1. slice.models (\`shop.*.models\`): imports no other layer
+2. slice.ports (\`shop.*.ports\`): may import slice.models
+3. slice.services (\`shop.*.services\`): may import slice.models, slice.ports
+4. slice.commands (\`shop.*.commands\`): may import slice.models, slice.ports, slice.services
+5. slice.queries (\`shop.*.queries\`): may import slice.models, slice.ports, slice.services
+6. slice.adapters (\`shop.*.adapters\`): may import slice.models, slice.ports, slice.services
+7. slice.api (\`shop.*.api\`): may import layers 1-6
+8. slice.factory (\`shop.*.factory\`): may import layers 1-7
+9. bootstrap (\`shop.main\`): may import every other layer
 
-Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in \`shop.domain.ports\` and implement it in the outer layer.
+Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in the inner layer and implement it in the outer layer.
 
 Libraries (INW005):
-- domain: no web frameworks, database or network clients, \`subprocess\` or \`socket\`
+- slice.models: no web frameworks, database or network clients, \`subprocess\` or \`socket\`
+
+Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.
+- catalog (\`shop.catalog\`): public \`shop.catalog.{api,factory}\`; depends on shared
+- orders (\`shop.orders\`): public \`shop.orders.{api,factory}\`; depends on shared
+- shared (\`shop.shared\`): public \`shop.shared\`; no dependencies
+
+Opt-in rules:
+- INW014: \`shop.*.ports\` hold only ABCs and Protocols whose methods have no body
+- INW015: only \`shop.*.factory\`, \`shop.main\` may import or build \`shop.*.adapters\`; elsewhere take it through a port
 "
 `;

@@ -3,7 +3,8 @@
  * module name to its layer, the closest preset orders the layers, unmapped
  * modules are listed as comments, and the first check after `--write` has no
  * "matches no module" finding, on a tree shaped like
- * full-stack-fastapi-template's backend and on copies of both `examples/`.
+ * full-stack-fastapi-template's backend and on copies of the eval harness's
+ * layered app, as is and with a planted INW001.
  * Also: the proposal without `--write` exits 2 and writes nothing, and the refusals.
  */
 import { describe, expect, test } from "bun:test";
@@ -14,7 +15,7 @@ import { findings, init, stable, tree } from "../support/init-style-helpers.ts";
 import { inwards, project } from "../support/run.ts";
 import { tempDir } from "../support/temp.ts";
 
-/** The repository, for `examples/`. */
+/** The repository, for `eval/app`. */
 const REPO = resolve(import.meta.dir, "../../../..");
 
 /** A pyproject.toml whose `[project].name` is `app`. */
@@ -151,17 +152,24 @@ describe("inwards init --style auto", () => {
     expect(deadPrefixes(root)).toEqual([]);
   });
 
-  // clean-app's domain/ports.py imports domain/order.py back only under
+  // The eval app's domain/ports.py imports domain/order.py back only under
   // TYPE_CHECKING, which INW004 doesn't count (#375), so it checks clean.
   test.each([
-    ["clean-app", []],
-    ["broken-app", ["INW001 shop/domain/order.py"]],
+    ["as is", {}, []],
+    [
+      "with a planted INW001",
+      { "domain/leak.py": "from shop.infrastructure.sql_orders import SqlOrderRepository\n" },
+      ["INW001 shop/domain/leak.py"],
+    ],
   ])(
-    "examples/%s without its config: every layer prefix matches a module, cycles on",
-    (name, found) => {
+    "eval/app %s, without a config: every layer prefix matches a module, cycles on",
+    (_name, extra: Record<string, string>, found) => {
       const root = tempDir("inwards-auto-");
-      cpSync(join(REPO, "examples", name, "shop"), join(root, "shop"), { recursive: true });
-      writeFileSync(join(root, "pyproject.toml"), `[project]\nname = "${name}"\n`);
+      cpSync(join(REPO, "eval/app/shop"), join(root, "shop"), { recursive: true });
+      for (const [rel, text] of Object.entries(extra)) {
+        writeFileSync(join(root, "shop", rel), text);
+      }
+      writeFileSync(join(root, "pyproject.toml"), '[project]\nname = "shop"\n');
       const run = init(root, "--style", "auto", "--write");
       expect(run.code).toBe(0);
       expect(table(root)).toContain('{ name = "domain", modules = ["shop.domain"] },');

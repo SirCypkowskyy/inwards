@@ -3,8 +3,9 @@
  * as well as Inwards (#406), so its adapters really fit their Protocol ports
  * (the `if TYPE_CHECKING:` assignment at the end of each adapter module) and
  * the Django and FastAPI examples type-check against the real frameworks.
- * It needs uv and the network for the first run; CI's test job has no uv,
- * so there it returns at once, as the uv test in `init-style.test.ts` does.
+ * It needs uv and the network for the first run; uv runs with `--quiet` so its
+ * download progress on a cold cache isn't taken for tool output. Without uv
+ * (a runner that doesn't install it) it returns at once.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
@@ -55,16 +56,16 @@ describe("inwards init --style X --scaffold passes Ruff and Ty", () => {
     "%s",
     (style) => {
       if (UV === null) {
-        return; // CI's test job has no uv.
+        return; // no uv on this machine
       }
       const root = project(UV_PROJECT);
       expect(init(root, "--style", style, "--scaffold").code).toBe(0);
       expect(findings(root)).toEqual(PASSING.check);
-      expect(uv(UV, ["tool", "run", RUFF, "check", "-q", "."], root)).toEqual({
+      expect(uv(UV, ["--quiet", "tool", "run", RUFF, "check", "-q", "."], root)).toEqual({
         code: 0,
         output: "",
       });
-      const ty = uv(UV, ["tool", "run", TY, "check", "-q", "--python", venv, "."], root);
+      const ty = uv(UV, ["--quiet", "tool", "run", TY, "check", "-q", "--python", venv, "."], root);
       expect(ty).toEqual({ code: 0, output: "" });
     },
     120_000,

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 67b0511dc9c5ee467782c31d1f27bb90e622d91cf32424523435893ba34750a0
+source_hash: 5839d0609eac7b6c069ba7cb83f8fd12c0488365c1d23cfda673326ba43a514c
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -89,7 +89,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019, INW021 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -121,7 +121,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -171,7 +171,7 @@ sequenceDiagram
         E-->>A: INW000
     else plik wymienia loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(pełny tekst)
-        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011
+        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011 + INW021
         R-->>E: diagnostyki
         E-->>A: diagnostyki
     else wszystko inne
@@ -386,6 +386,7 @@ Reguły są pogrupowane według kategorii, w kolejności, której używa [indeks
 | INW005 | `pure-domain` | Warstwa importująca moduł zewnętrzny albo z biblioteki standardowej, na który nie pozwalają jej `allow-libraries` / `deny-libraries` / `extend-deny-libraries`, statycznie albo dynamicznie, także w funkcjach i pod `TYPE_CHECKING`. Najbardziej wewnętrzna z dwóch lub więcej warstw domyślnie zabrania frameworków, klientów baz danych i sieci oraz operacji wejścia-wyjścia z biblioteki standardowej (`sqlalchemy`, `fastapi`, `requests`, `subprocess`...); `extend-deny-libraries` dopisuje wpisy do tej listy, `deny-libraries` ją zastępuje, a `[tool.inwards.rules.pure-domain].deny` zakazuje bibliotek prefiksom modułów, które nie są całymi warstwami. Własny kod zostaje dla INW001 i INW006. Zobacz [Biblioteki w warstwach](guides/libraries.md) | domyślnie | błąd | wszystkie | :material-check-circle: |
 | INW010 | `unknown-first-party` | Import statyczny w warstwie, który wskazuje własny moduł, który nie istnieje, typowa halucynacja agenta (`from shop.domain.pricing import X` bez żadnego `pricing`), oraz import względny, który wychodzi ponad pakiet najwyższego poziomu, czego Python nigdy nie przyjmuje. Sprawdzana jest część będąca modułem: `X` w `from X import name`, a w pozostałych przypadkach cała nazwa. Istnienie jest sondowane na dysku, więc liczą się pakiety przestrzeni nazw, zaślepki i skompilowane moduły rozszerzeń (`.so`, `.pyd`, `.pyx`); poprawka wymienia trzy najbliższe moduły z tego samego pakietu. Taki import nie dostaje dodatkowo INW006, a import skierowany na zewnątrz, który zgłasza INW001, nie dostaje INW010. Pakiety, które rozszerzają swój `__path__`, są pomijane, podobnie jak moduły zapisywane przez krok budowania (`generated`, domyślnie `*_pb2`, `*_pb2_grpc` i `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). Zobacz [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | domyślnie | błąd | wszystkie | :material-check-circle: |
 | INW011 | `dynamic-import` | Import dynamiczny z celem w postaci literału napisowego, który sięga do warstwy zewnętrznej: `importlib.import_module`, `__import__` (także `builtins.` i `importlib.`), `runpy.run_module` oraz instrukcje importu wewnątrz dosłownego kodu dla `exec` / `eval` / `compile` (bajty, których zadeklarowanego kodowania Inwards nie umie czytać, są zgłaszane jako niesprawdzone). Śledzone są aliasy importów, przypisania `name = loader`, `getattr(m, "name")`, `m.__dict__["name"]` i `vars(m)["name"]`; `+` między literałami i f-stringi z dosłownymi polami są składane. W każdej warstwie poza najbardziej zewnętrzną cel, którego Inwards nie umie odczytać, jest zgłaszany jako niesprawdzalny: zmienna, pole f-stringa, sekwencja `\N{...}`, argument ukryty za `*args` albo `**kwargs`, względne `import_module` z nieznanym `package`, `exec` albo `eval` z niedosłownym kodem ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). Popularny sposób obejścia INW001. Znane luki są wymienione wyżej | domyślnie | błąd | wszystkie | :material-check-circle: |
+| INW021 | `private-module` | Import, spoza pakietu, własnego modułu, którego nazwa poniżej pakietu najwyższego poziomu zaczyna się od jednego podkreślenia (nazwy dunder nie są prywatne): moduł jest prywatny dla rodzica najgłębszego takiego segmentu, więc `__init__.py` pakietu, jego moduły i podpakiety mogą go importować. Ten sam zbiór importów co w INW003, łącznie z `TYPE_CHECKING` i odczytywalnymi importami dynamicznymi; import, który INW003 zgłasza w tej samej linii, dostaje tylko INW003. Czyta też moduły poza warstwami, w tym skrypty; moduły testowe pomija, chyba że `check-tests` | opt-in | błąd | żaden | :material-check-circle: |
 
 ### Układ { #catalogue-layout }
 
@@ -452,6 +453,7 @@ src/
 │   │   ├── python/        # parser.ts (tree-sitter, import extraction), module-names.ts,
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
+│   │   │                  #   private-modules.ts (which module names are private)
 │   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
 │   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
 │   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
@@ -469,6 +471,7 @@ src/
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
 │   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
 │   │   │   ├── public-api-only.ts       # INW003: a context's public modules
+│   │   │   ├── private-module.ts        # INW021: _private modules stay in their package
 │   │   │   ├── import-cycles/           # INW004: graph.ts (Tarjan, shortest cycle), cycles.ts
 │   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
@@ -509,7 +512,8 @@ src/
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
-│   │   │                  #   diagrams.ts INW017 to INW019
+│   │   │                  #   diagrams.ts INW017 to INW019,
+│   │   │                  #   package-boundaries.ts INW002, INW003 and INW021
 │   │   └── report/        # render.ts: text / concise / json / sarif; github.ts
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
@@ -556,4 +560,4 @@ src/
     └── test/              # the binary lookup, boundaries, packaged.test.ts on the built VSIX
 ```
 
-Poza `src/`: `scripts/` buduje pliki binarne i wheele oraz sprawdza wersje i nawigację dokumentacji, `packaging/` zawiera README wheela i rezerwacje nazw, `eval/` to środowisko ewaluacji agentów, `bench/` generuje syntetyczne repozytorium do benchmarków i porównuje na nim dwa buildy dla bramki regresji w PR-ach, a `examples/clean-app` to aplikacja, którą sprawdza CI.
+Poza `src/`: `scripts/` buduje pliki binarne i wheele oraz sprawdza wersje i nawigację dokumentacji, `packaging/` zawiera README wheela i rezerwacje nazw, `eval/` to środowisko ewaluacji agentów (z `eval/app`, warstwowym sklepem, na którym budują jego fixture'y), `bench/` generuje syntetyczne repozytorium do benchmarków i porównuje na nim dwa buildy dla bramki regresji w PR-ach, a `examples/clean-app` to aplikacja w pionowych wycinkach, którą CI sprawdza najnowszym wydaniem, Ruffem i Ty.

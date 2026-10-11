@@ -1,6 +1,6 @@
 /**
  * @file `inwards diagram` (#349) as a command, by round trip: every preset's
- * scaffold and both example apps get their config printed as a Mermaid and
+ * scaffold, both example apps and the eval app get their config printed as a Mermaid and
  * a PlantUML diagram, the diagrams go into the docs the config lists under
  * `diagrams`, `inwards check` with INW017 and INW018 on finds nothing in
  * them, and `inwards import-diagram` reads them back to the same layers,
@@ -136,13 +136,12 @@ describe("inwards diagram: round trip", () => {
 
   /**
    * Copies examples/clean-app with the reference config from the repository's
-   * pyproject.toml. The config names shop.cli, which the example app doesn't
-   * have (INW006 says so); the copy adds it, so every label names a module.
+   * pyproject.toml: one template's roles as layers, and three contexts.
    *
    * @returns the project, and the reference config.
    */
   function cleanApp(): { root: string; before: InwardsConfig } {
-    const root = project({ "shop/cli/__init__.py": "" });
+    const root = project({});
     cpSync(join(REPO, "examples/clean-app/shop"), join(root, "shop"), { recursive: true });
     const reference = readFileSync(join(REPO, "pyproject.toml"), "utf8");
     const table = reference.slice(reference.indexOf("\n[tool.inwards]\n") + 1);
@@ -150,15 +149,22 @@ describe("inwards diagram: round trip", () => {
     return { root, before: parseConfig(table) };
   }
 
-  test("examples/clean-app with the reference config, mermaid", () => {
+  test.each([...NOTATIONS])("examples/clean-app with the reference config, %s", (notation) => {
     const { root, before } = cleanApp();
-    expect(drawDocs(root, "mermaid")).toEqual(CLEAN);
+    expect(drawDocs(root, notation)).toEqual({ ...CLEAN, codes: [0, 0] });
     expect(diagramFindings(root)).toEqual([]);
     expect(drawn(imported(root))).toEqual(drawn(before));
   });
 
-  test("examples/clean-app, plantuml: a layer's second module is left out, with a note", () => {
-    const { root, before } = cleanApp();
+  test("eval/app, plantuml: a layer's second module is left out, with a note", () => {
+    const root = project({ "shop/cli/__init__.py": "" });
+    cpSync(join(REPO, "eval/app/shop"), join(root, "shop"), { recursive: true });
+    const config = readFileSync(join(REPO, "eval/pyproject.toml"), "utf8");
+    writeFileSync(
+      join(root, "pyproject.toml"),
+      config.replace('["shop.api"]', '["shop.api", "shop.cli"]'),
+    );
+    const before = parseConfig(readFileSync(join(root, "pyproject.toml"), "utf8"));
     expect(drawDocs(root, "plantuml")).toEqual({
       codes: [0],
       notes:

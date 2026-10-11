@@ -2,7 +2,7 @@
  * @file Every rule's options table, `[tool.inwards.rules.<rule-name>]`: one
  * spec per rule, mapping each key the table may hold to the parser that
  * checks its value. `modules` is every rule's, and `check-tests` every opt-in
- * content rule's; a rule without its own entry takes those only. The config parser, its error messages and the schema
+ * content rule's and INW021's; a rule without its own entry takes those only. The config parser, its error messages and the schema
  * test all read these specs, so a new option is one line here (plus its
  * schema entry and docs). Values are kept as the TOML gave them, by key; each
  * rule reads its own with typed defaults. This module only validates, apart
@@ -234,9 +234,10 @@ function denyEntries(value: unknown, where: string): LibraryDeny[] {
 const SHARED: Readonly<Record<string, OptionParser>> = { modules: moduleEntries };
 
 /**
- * The opt-in content rules, which skip test modules unless their table sets
- * `check-tests = true` (#362): INW012 to INW016 and the FAPI family. The
- * import, layout and diagram rules don't take the key.
+ * The opt-in rules that skip test modules unless their table sets
+ * `check-tests = true` (#362): the content rules INW012 to INW016 and the
+ * FAPI family, and the import rule INW021 (ADR-046). The other import,
+ * layout and diagram rules don't take the key.
  */
 const CONTENT_RULES: ReadonlySet<string> = new Set([
   "thin-endpoint",
@@ -244,6 +245,7 @@ const CONTENT_RULES: ReadonlySet<string> = new Set([
   "ports-abstract",
   "construct-only-in",
   "orm-naming",
+  "private-module",
   "endpoint-metadata",
   "undocumented-error-response",
   "router-wiring",
@@ -258,10 +260,10 @@ const CONTENT_RULES: ReadonlySet<string> = new Set([
 export const CHECK_TESTS = "check-tests";
 
 /**
- * Tells whether a rule is a content rule, one that skips test modules by default.
+ * Tells whether a rule skips test modules by default.
  *
  * @param rule - the rule's kebab-case name.
- * @returns true for INW012 to INW016 and the FAPI rules.
+ * @returns true for INW012 to INW016, INW021 and the FAPI rules.
  */
 export function skipsTests(rule: string): boolean {
   return CONTENT_RULES.has(rule);
@@ -333,7 +335,7 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
  * Lists the keys a rule's options table may hold.
  *
  * @param rule - the rule's kebab-case name.
- * @returns `modules`, `check-tests` for a content rule, and the rule's own keys.
+ * @returns `modules`, `check-tests` for a rule that skips tests, and the rule's own keys.
  */
 export function optionKeys(rule: string): ReadonlySet<string> {
   const content = skipsTests(rule) ? [CHECK_TESTS] : [];

@@ -47,7 +47,7 @@ Every key is described in the [configuration reference](guides/configuration.md)
 
 <figure markdown="span">
   ![inwards check on a clean codebase](assets/screens/check-clean.svg){ loading=lazy }
-  <figcaption>The example app as shipped: every import points inward.</figcaption>
+  <figcaption>The layered example shop (`eval/app`) as shipped: every import points inward.</figcaption>
 </figure>
 
 Layers are listed innermost first. A module may import its own layer and anything listed before it. `required-version` makes an older binary (or a shim that isn't Inwards) fail with exit 2 instead of checking the project with rules it may not know. Code outside every layer isn't checked, so INW006 makes that gap visible: importing first-party code that belongs to no layer from a layer is an error (so is importing from the package above the layers, whose `__init__.py` no layer owns), a package outside every layer (unless `ignore` names it) gets a warning, and a prefix that matches no module is reported against `pyproject.toml`. `ignore` entries match whole name segments anywhere, so `migrations` covers `shop.orders.migrations`. Unknown keys and a prefix listed in two layers are config errors (exit 2). Warnings don't change the exit code. When the domain imports infrastructure, you get this (abridged, one diagnostic out of the `diagnostics` array):
@@ -70,7 +70,7 @@ Layers are listed innermost first. A module may import its own layer and anythin
 }
 ```
 
-The diagnostic comes from the working scaffold in this repository, run on a copy of `examples/clean-app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
+The diagnostic comes from the working scaffold in this repository, run on a copy of the layered shop now in `eval/app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
 
 To phase rules in, a `[tool.inwards.rules]` table sets which rules report and how loudly:
 
@@ -153,7 +153,7 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 !!! info "Status"
     Pre-alpha.
-    The rules INW000 to INW019 and the FastAPI rules FAPI001 to FAPI009 (FAPI004 is unused) work end to end in the CLI, the engine and the editor (`inwards server`); the [rules index](rules/index.md) groups them by category and says what each one checks.
+    The rules INW000 to INW019 and INW021, and the FastAPI rules FAPI001 to FAPI009 (FAPI004 is unused) work end to end in the CLI, the engine and the editor (`inwards server`); the [rules index](rules/index.md) groups them by category and says what each one checks.
     `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` writes the layers, and `--scaffold` adds an example package that passes the check.
     The latest release is 0.7.0 (2026-10-11). Each release goes to [PyPI](https://pypi.org/project/inwards/) as five platform wheels (`uv add --dev inwards`), and to GitHub Releases with binaries for six platforms, the same wheels and the VS Code extension, one VSIX per platform with the binary inside. [Install](guides/install.md) has the details.
     Everything marked :material-progress-clock: in these docs is planned, not built.

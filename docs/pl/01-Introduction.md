@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: b3b0532f0fddad5c3725111edf2f3fc8546260cb9fc969483bc8d329db328193
+source_hash: 68ded61269528eccb76757070f2ebc1af81706f801d1c220c3cb4acc0638eab9
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -52,7 +52,7 @@ Każdy klucz opisuje [dokumentacja konfiguracji](guides/configuration.md), któr
 
 <figure markdown="span">
   ![inwards check na czystym kodzie](../assets/screens/check-clean.svg){ loading=lazy }
-  <figcaption>Przykładowa aplikacja w wersji z repozytorium: każdy import wskazuje do środka.</figcaption>
+  <figcaption>Warstwowy przykładowy sklep (`eval/app`) w wersji z repozytorium: każdy import wskazuje do środka.</figcaption>
 </figure>
 
 Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować własną warstwę i wszystko, co jest na liście przed nią. `required-version` sprawia, że starszy plik binarny (albo nakładka, która nie jest Inwards) kończy się kodem wyjścia 2, zamiast sprawdzać projekt regułami, których może nie znać. Kod poza wszystkimi warstwami nie jest sprawdzany, więc INW006 uwidacznia tę lukę: import własnego kodu, który nie należy do żadnej warstwy, z wnętrza warstwy jest błędem (podobnie jak import z pakietu nad warstwami, którego `__init__.py` nie należy do żadnej warstwy), pakiet poza wszystkimi warstwami (chyba że wymienia go `ignore`) dostaje ostrzeżenie, a prefiks, który nie pasuje do żadnego modułu, jest zgłaszany w `pyproject.toml`. Wpisy `ignore` dopasowują całe segmenty nazwy w dowolnym miejscu, więc `migrations` obejmuje `shop.orders.migrations`. Nieznane klucze i prefiks wymieniony w dwóch warstwach to błędy konfiguracji (kod wyjścia 2). Ostrzeżenia nie zmieniają kodu wyjścia. Gdy domena importuje infrastrukturę, dostajesz to (w skrócie, jedna diagnostyka z tablicy `diagnostics`):
@@ -75,7 +75,7 @@ Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować wła
 }
 ```
 
-Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii `examples/clean-app` z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
+Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii warstwowego sklepu, który leży teraz w `eval/app`, z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
 
 Żeby wprowadzać reguły stopniowo, tabela `[tool.inwards.rules]` ustala, które reguły zgłaszają naruszenia i na jakim poziomie:
 
@@ -158,7 +158,7 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 
 !!! info "Stan"
     Pre-alpha.
-    Reguły INW000–INW019 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
+    Reguły INW000–INW019 i INW021 oraz reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Najnowsze wydanie to 0.7.0 (2026-10-11). Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako pięć wheeli platformowych (`uv add --dev inwards`) oraz do GitHub Releases z plikami binarnymi dla sześciu platform, tymi samymi wheelami i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Szczegóły są w [Instalacji](guides/install.md).
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.

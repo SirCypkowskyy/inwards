@@ -8,7 +8,7 @@
 import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { type LibraryDeny, libraryDenies } from "../config/rule-options.ts";
-import { applyRules, ruleLevel } from "../config/rule-settings.ts";
+import { applyRules } from "../config/rule-settings.ts";
 import type { Diagnostic, ExtractionBatch, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import {
@@ -17,11 +17,9 @@ import {
   normalizeSource,
   parsePython,
 } from "../python/parser.ts";
-import { checkContextDependencies } from "../rules/context-independence.ts";
 import { checkDynamicImports, extractDynamicImports } from "../rules/dynamic-import/imports.ts";
 import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
-import { checkPublicApi } from "../rules/public-api-only.ts";
 import { checkLibraries, coversModule, type LibraryInputs } from "../rules/pure-domain.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
@@ -43,6 +41,7 @@ import { ContentRun, contentFindings } from "./content-rules.ts";
 import { type ExtractionOptions, Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
+import { boundaryFindings, privateOn } from "./package-boundaries.ts";
 import {
   type Checked,
   type Confirmed,
@@ -140,7 +139,7 @@ export class Engine {
    * With contexts, every file is parsed, since any of them may import a
    * context (INW002, INW003); outside the layers it gets that warning and
    * the context rules. A file that INW005's `deny` option covers is parsed
-   * too, layer or not (#219).
+   * too, layer or not (#219), and so is one INW021 is on for.
    *
    * Inline suppression comments then hide the findings they cover and add
    * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).
@@ -219,14 +218,19 @@ export class Engine {
 
   /**
    * Tells whether the scan leaves a file unread: outside every layer, with
-   * no contexts declared and no `deny` of INW005 covering it.
+   * no contexts declared, no `deny` of INW005 covering it and INW021 off for it.
    *
    * @param src - the source file.
    * @returns true when only its unassigned-package warning can apply.
    */
   private outside(src: SourceFile): boolean {
     const { contexts } = this.config;
-    return !(this.layered(src) || contexts || coversModule(this.libraryInputs.deny, src.module));
+    return !(
+      this.layered(src) ||
+      contexts ||
+      coversModule(this.libraryInputs.deny, src.module) ||
+      privateOn(this.config, src)
+    );
   }
 
   /**
@@ -247,17 +251,6 @@ export class Engine {
    */
   private librariesIn(project: ProjectIndex): LibraryInputs {
     return { ownerOf: project.ownerOf, ...this.libraryInputs };
-  }
-
-  /**
-   * Tells whether INW002 reports undeclared dependencies, so INW003 leaves
-   * them alone; with INW002 off, INW003 still holds such imports to the
-   * public modules.
-   *
-   * @returns true unless `[tool.inwards.rules]` turns INW002 off.
-   */
-  private defersToInw002(): boolean {
-    return ruleLevel("INW002", this.config.rules) !== "off";
   }
 
   /**
@@ -302,14 +295,15 @@ export class Engine {
   }
 
   /**
-   * Applies the rules that look at import statements: INW001, INW002, INW005, INW006 and INW010.
+   * Applies the rules that look at import statements: INW001, INW002,
+   * INW003, INW005, INW006, INW010 and INW021.
    * An import of a module that doesn't exist gets INW010 alone, not INW006
    * as well, and one that climbs above the top-level package (empty target)
    * reaches no other rule. An outward import gets INW001 alone, even when its
    * module doesn't exist either. INW002 is independent of the layer rules: an
    * import can break a layer and a context boundary at once. A file outside
-   * every layer gets only INW002, INW003, INW005's prefix denies and its
-   * unassigned-package warning.
+   * every layer gets only INW002, INW003, INW005's prefix denies, INW021 and
+   * its unassigned-package warning.
    *
    * @param file - the source file.
    * @param imports - its imports.
@@ -321,11 +315,8 @@ export class Engine {
     imports: readonly ImportRef[],
     project: ProjectIndex,
   ): Diagnostic[] {
-    const { layers, contexts = [] } = this.config;
-    const across = [
-      ...checkContextDependencies(file, imports, contexts, project.ownerOf),
-      ...checkPublicApi(file, imports, project, { contexts, defer: this.defersToInw002() }),
-    ];
+    const { layers } = this.config;
+    const across = boundaryFindings(this.config, file, imports, project);
     const resolved = imports.filter((ref) => ref.target !== "");
     const libraries = checkLibraries(file, resolved, layers, this.librariesIn(project));
     if (!this.layered(file)) {
@@ -375,10 +366,8 @@ export class Engine {
       // Dynamic imports are never cached: they depend on other files (ownerOf).
       const refs = extractDynamicImports(this.parser, tree, file, project.ownerOf);
       const readable = refs.filter((ref) => ref.unreadable === null && ref.target !== "");
-      const { contexts = [] } = this.config;
       found.push(
-        ...checkContextDependencies(file, readable, contexts, project.ownerOf),
-        ...checkPublicApi(file, readable, project, { contexts, defer: this.defersToInw002() }),
+        ...boundaryFindings(this.config, file, readable, project),
         ...checkLibraries(file, readable, layers, this.librariesIn(project)),
       );
       if (this.layered(file)) {

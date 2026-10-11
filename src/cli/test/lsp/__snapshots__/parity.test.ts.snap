@@ -4,14 +4,14 @@ exports[`inwards server publishes what inwards check reports on examples/ 1`] = 
 [
   {
     "code": "INW001",
-    "end": "3:40",
-    "file": "examples/broken-app/shop/domain/order.py",
+    "end": "3:54",
+    "file": "examples/broken-app/shop/orders/models.py",
     "message": 
-"Layer "domain" imports "shop.infrastructure.db.save" from outer layer "infrastructure". Allowed direction: domain <- infrastructure.
-Depend on an abstraction owned by "domain" instead of "shop.infrastructure.db.save"."
+"Layer "slice.models" imports "shop.orders.adapters.sql_orders.SqlOrders" from outer layer "slice.adapters". Allowed direction: slice.models <- slice.ports <- slice.adapters.
+Depend on an abstraction owned by "slice.models" instead of "shop.orders.adapters.sql_orders.SqlOrders"."
 ,
     "severity": "error",
-    "start": "3:36",
+    "start": "3:45",
   },
 ]
 `;
