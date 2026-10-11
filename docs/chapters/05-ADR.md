@@ -50,6 +50,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot through an `inwards hook copilot` entry point and a committed hooks file | :material-check-circle: Accepted, built after the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records |
 | [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Architecture diagrams are checked against `[tool.inwards]`, never read as config | :material-check-circle: Accepted, INW017 since [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 and `import-diagram` since [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
 | [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Structural ports, conformance lines and private modules are opt-in rules, CQRS slices a template | :material-check-circle: Accepted, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
+| [047](#adr-047-typescript-in-vertical-slices-moved-one-small-pr-at-a-time) | TypeScript in vertical slices, moved one small PR at a time | :material-check-circle: Accepted |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1467,3 +1468,112 @@ No project in the corpus follows the conformance-line convention, and only polar
 - *Private modules as an INW003 option:* INW003 needs contexts; package privacy holds in any project, with or without them.
 - *Leave private modules to Ruff:* PLC2701 is in preview and skips every first-party import from the same top-level package, which is the case here.
 - *A `commands`/`queries` rule:* sibling roles already forbid the imports, and the rest of CQRS isn't visible in imports.
+## ADR-047: TypeScript in vertical slices, moved one small PR at a time
+
+**Status:** Accepted · 2026-10-11 · [#408](https://github.com/SirCypkowskyy/inwards/issues/408)
+
+**Context.** The owner set conventions for Python projects in [#405](https://github.com/SirCypkowskyy/inwards/issues/405) to [#407](https://github.com/SirCypkowskyy/inwards/issues/407): vertical slices by domain, a `shared/` package for what slices share, mini-domains inside a slice, the same module names in every slice, private modules behind a public face, commands and queries where a slice has both, and factories for wiring. Inwards' own TypeScript should follow them too. Inwards can't check TypeScript, so fallow zones, Biome and the architecture tests have to guard the shape. Part of the code is sliced already; the rest is cut into horizontal layers:
+
+| Package | Already a slice | Horizontal |
+|---|---|---|
+| `src/core` | each rule under `rules/` (13 folders, 7 single files), `diagram/`, `baseline/`, `report/` | `contracts/`, `meta/`, `python/`, `lookup/` (used by everything), `config/` (every rule's options), `engine/` (the facade and a runner per rule family) |
+| `src/cli` | `claude-code/`, `session/`, `daemon/`, `lsp/`, `mcp/`, `runlog/`, `init/`, `project/` | `commands/` (17 modules, one per command, every domain), `adapters/` (27 modules, the I/O of every domain), `platform/`, `json/`, `paths/` |
+| `src/vscode-extension` | `src/client/` (3 files) | none |
+
+So one CLI feature spans three folders: `inwards server` is `commands/server.ts`, `lsp/` and `adapters/lsp-connection.ts`. No folder has a public face either: a module may import any module of a folder its zone allows. About 260 import lines cross a folder in the CLI and about 390 in the engine. Many PRs touch `src/` at once (FastAPI rules in #401, scaffolds in #406), so a move in one PR would conflict with all of them.
+
+**Decision.**
+
+- **Target map of the engine.** `index.ts` stays the public API. `contracts/`, `meta/`, `python/` and `lookup/` move under `shared/`, the kernel every slice may use. `config/`, `diagram/`, `baseline/` and `report/` are slices. Every rule is a folder under `rules/` (the 7 single-file rules become folders), and `rules/shared/` stays the rule family's own kit. `engine/` stays the facade, the per-family runners included: rule precedence lives in the engine (`src/core/AGENTS.md`), and the runners use `engine/stages.ts` and INW000's and INW009's modules, which a rule may not import.
+- **Target map of the CLI.**
+
+    | Folder | Holds |
+    |---|---|
+    | `main.ts`, `compose.ts`, `deps.ts`, `usage.ts` | the root: argv and the process lifecycle, the wiring (`compose.ts` moves up from `adapters/`), `AppDeps` and the help text (from `commands/`) |
+    | `shared/` | `platform/`, `json/`, `paths/`, and `adapters/` for the I/O several slices use (filesystem, git, runtime, stdio, TOML, grammars, file walk, the `.d.ts` typings) |
+    | `check/` | today's `project/`, the `check`, `check-runs` and `baseline` commands, the `baseline-files` and `extraction-*` adapters, `fingerprint` (from `session/`) and `CheckRunner` (from `session/contracts.ts`) |
+    | `hook/` | three mini-domains, `claude-code/`, `session/` and `daemon/`, plus the `hook` and `daemon` commands and the `daemon-*` and `state-files` adapters; `claude-code/protocol.ts` becomes `hook/contracts.ts`, which `eval/` imports |
+    | `runlog/` | today's `runlog/`, the `stats` command, the `export-files` adapter |
+    | `init/` | today's `init/`, the `context`, `import-config`, `import-diagram`, `diagram` and `append-table` commands, the `init-files` and `picker` adapters |
+    | `rules/` | the `rules` command, `rule-sources`, `mcp/rule-page.ts`, the `rule-pages` adapter |
+    | `lsp/` | today's `lsp/`, the `server` command, the `lsp-connection` adapter |
+    | `mcp/` | today's `mcp/`, the `mcp` command, the `mcp-connection` adapter |
+
+    Slices depend one way: `shared` under everything; `check` on `shared`; `runlog`, `rules` and `lsp` on `check`; `mcp` on `check` and `rules`; `hook` on `check` and `runlog`; `init` on `check` and `hook`. `commands/` and `adapters/` disappear.
+- **The extension stays as it is.** `src/client/` is already one slice with three files.
+- **Names that repeat in every slice.**
+
+    | Name | Means | Guarded by |
+    |---|---|---|
+    | `index.ts` | the public face of a slice or mini-domain; re-exports only | the private-module pattern below; "re-exports only" by review |
+    | `_name.ts` | private to the folder it sits in | Biome `noRestrictedImports` |
+    | `contracts.ts` | the ports and records a slice owns, public (already the name in 6 CLI folders) | the naming test |
+    | `cli.ts` | a CLI slice's `inwards <command>` handlers, which replace `commands/` | the naming test |
+    | `adapters/` | a CLI slice's I/O; only the root imports it, and a slice's `index.ts` never re-exports it | fallow zones; Biome's I/O ban covers the rest |
+    | `<mini-domain>/` | a subfolder with its own `index.ts` and the same rules one level down | the naming test |
+    | `commands/`, `queries/` | writes and reads of the same state, only where a slice has both and they grow apart: `runlog/` (`record` against `runs`, `stats`, `export`) and `hook/session/` (the start record, copies and witness against old errors, suppressions and layout changes); nowhere else | Biome: `../commands/**` is refused, so `queries/` can't import `commands/` |
+    | `create*` | a factory for per-invocation state, exported from the slice's `index.ts` (`createRunLog`, `createStartLookups` and `createTools` exist) | the state tests in `architecture.test.ts` |
+    | `compose.ts` | the one place adapters are built and wired (`nodePlatform`, `nodeDaemon`, `nodeLsp`, `nodeMcp`) | fallow: only the root zone may import an `adapters` zone |
+    | `shared/` | what several slices use; imports no slice | fallow zone edges |
+
+    In the engine a rule's `index.ts` exports what `engine/` calls, and its private modules keep today's repeated names (`_check.ts`, `_wording.ts`, already in 8 rule folders).
+- **How the tools enforce it.**
+    - *Biome, private modules.* Every override that sets `noRestrictedImports` on `src/core/src/**` or the CLI's policy files gets this pattern:
+
+        ```jsonc
+        "patterns": [
+          { "group": ["**/_*", "!./_*", "!../_*", "!../../_*"],
+            "message": "A module named _x.ts is private to its folder; import the slice's index.ts." }
+        ]
+        ```
+
+        `./_x.ts` (same folder) and `../_x.ts` (from a mini-domain up to its slice) pass; `../check/_x.ts`, `./session/_x.ts` and `../../hook/_x.ts` fail. This spike ran it on Biome 2.5.15. Biome doesn't merge one rule's options across overrides: a later override that sets `noRestrictedImports` replaces the earlier options for the files it matches, so the pattern is repeated in each such override (two: the engine's, which sets no `noRestrictedImports` today, and the CLI policy's). Tests are outside these overrides, so a unit test may import the private modules of the slice it mirrors.
+    - *Biome, barrels.* `performance` is at error, so `noBarrelFile` refuses every `index.ts` that re-exports. Today one override turns it off for `src/core/src/index.ts`; its `includes` widen to `src/*/src/**/index.ts`, with the reason that a slice's face is a barrel on purpose. `noReExportAll` stays on, so an `index.ts` names what it exports.
+    - *Biome, I/O.* The CLI's policy override changes from a list of folders to `src/cli/src/**` minus `src/cli/src/*.ts` (the root) and `src/cli/src/**/adapters/**`, so a new folder gets the I/O ban without being listed. The engine's override is unchanged.
+    - *Biome, commands and queries.* The `../commands/**` pattern joins the list once the CLI's own `commands/` folder is gone (the root's last import of it moves in the same step).
+    - *fallow.* One zone per slice (`src/cli/src/check/**`) and, listed before it since the first matching zone wins, one per slice's adapters (`src/cli/src/check/adapters/**`). A slice's zone allows `shared` zones, the slices below it and the engine's zones; an adapters zone allows its own slice, `shared` and the engine; only the root zone (`src/cli/src/*.ts`) allows an adapters zone. fallow can't guard private modules: since 3.31 it judges an import through a barrel by the zone of the module that declares the symbol ([#262](https://github.com/SirCypkowskyy/inwards/issues/262)), so a zone for `_*.ts` files would refuse every import through `index.ts`. Zones stay per slice, and Biome checks the specifier. `requireAllFiles` still fails a file in a folder without a zone. In the engine the single-file rule patterns (`rules/x.ts`) go, and the kernel's move changes its zone patterns and the eval list in `.fallow-core-api.jsonc`.
+    - *Architecture tests.* A Biome probe: a file that imports another slice's `_x.ts` fails, its own `_x.ts` passes. A naming test: in every migrated slice each file is `index.ts`, `contracts.ts`, `cli.ts`, `_*.ts` or `*.d.ts`, and each subfolder has an `index.ts` or is `adapters/`. The test's list of migrated slices grows with each step, so a folder not yet moved doesn't fail and a moved one can't drift back. The existing zone and I/O probes take the new paths.
+    - *`check:cycles`* catches a private module that imports its own slice's `index.ts`.
+- **What doesn't change.** The exports of `@inwards/core` (`test/api.test.ts` passes untouched in every step); `inwards/diagnostics@1`, `inwards-daemon/1`, exit codes, CLI flags and the E2E snapshots' content; the types of the contracts (only their files move); the split chunks for `@clack/prompts`, the MCP SDK and the rule pages, since `compose.ts` keeps their dynamic `import()` and no `index.ts` re-exports an adapter; the extension; the rule pages' URLs (only their `resource:` front matter changes). The engine's no-I/O rule and the CLI's policy and adapter split stay as strict as they are.
+- **Migration.** Fifteen small PRs, each green on its own, filed as sub-issues of [#7](https://github.com/SirCypkowskyy/inwards/issues/7), each blocked on the steps it needs. The enforcement comes first and changes nothing; the slices other PRs touch least come next; the busiest folders (`project/`, the hook, the CLI's kernel, the engine's kernel) go last, each at a quiet moment with the PR queue near empty. A move PR is a `git mv` plus a scripted import rewrite, so a rebase reruns the script instead of merging imports by hand.
+
+    | Step | What moves | Risk | Size | Issue |
+    |---|---|---|---|---|
+    | 1 | Nothing: the Biome patterns, the barrel exception, the I/O override's new `includes`, the probe and the naming test with an empty list | low: config and tests only | S | [#417](https://github.com/SirCypkowskyy/inwards/issues/417) |
+    | 2 | CLI `lsp/` with `server` and `lsp-connection`, the first `cli.ts` and slice `adapters/` | low | S | [#418](https://github.com/SirCypkowskyy/inwards/issues/418) |
+    | 3 | CLI `mcp/` with `mcp` and `mcp-connection` | low | S | [#419](https://github.com/SirCypkowskyy/inwards/issues/419) |
+    | 4 | CLI `rules/`: `rules`, `rule-sources`, `rule-page`, `rule-pages` | low; after step 3 | S | [#420](https://github.com/SirCypkowskyy/inwards/issues/420) |
+    | 5 | CLI `runlog/` with `stats` and `export-files`, split into `commands/` and `queries/`; `fingerprint` moves to `project/` first | low | S | [#421](https://github.com/SirCypkowskyy/inwards/issues/421) |
+    | 6 | Engine: the 7 single-file rules become folders; their pages' `resource:` (EN and PL) | low | S | [#422](https://github.com/SirCypkowskyy/inwards/issues/422) |
+    | 7 | Engine: every rule folder but `fastapi/` gets `index.ts` and `_` names; `engine/` imports the indexes | medium: every open rule PR | M | [#423](https://github.com/SirCypkowskyy/inwards/issues/423) |
+    | 8 | Engine: `config/`, `diagram/`, `baseline/`, `report/` get `index.ts` and `_` names | medium: about 100 import lines | M | [#424](https://github.com/SirCypkowskyy/inwards/issues/424) |
+    | 9 | CLI `init/` with its five commands and two adapters; `_` names over 34 modules | medium; after #406 merges | M | [#425](https://github.com/SirCypkowskyy/inwards/issues/425) |
+    | 10 | Engine: `rules/fastapi/` as a slice with a `model/` mini-domain | medium; after #401 merges | M | [#426](https://github.com/SirCypkowskyy/inwards/issues/426) |
+    | 11 | CLI `project/` becomes `check/` with its commands and adapters, and `CheckRunner` | high: about 50 import lines, the worker entry in `main.ts` and the binary build | M | [#427](https://github.com/SirCypkowskyy/inwards/issues/427) |
+    | 12 | CLI `hook/` with `claude-code/` and `session/` (split into `commands/` and `queries/`); `protocol.ts` becomes `hook/contracts.ts` | high: the hook's E2E snapshots and `eval/` | M | [#428](https://github.com/SirCypkowskyy/inwards/issues/428) |
+    | 13 | CLI `hook/daemon/` with the `daemon` command and the `daemon-*` adapters | medium | S | [#429](https://github.com/SirCypkowskyy/inwards/issues/429) |
+    | 14 | CLI `shared/` and the root; `commands/` and `adapters/` go; the `../commands/**` pattern | high: about 120 import lines | M | [#430](https://github.com/SirCypkowskyy/inwards/issues/430) |
+    | 15 | Engine kernel into `shared/` | high: about 240 import lines; it can be dropped on its own | M | [#431](https://github.com/SirCypkowskyy/inwards/issues/431) |
+
+**Consequences.**
+
+- :material-plus-circle-outline: A CLI feature lives in one folder: `inwards server` is `lsp/` (policy, handler and adapter), with its tests in `test/lsp/`.
+- :material-plus-circle-outline: A slice's surface is its `index.ts`, so a private module can change without a search through other folders.
+- :material-plus-circle-outline: The repository uses the names the scaffolds ([#406](https://github.com/SirCypkowskyy/inwards/issues/406)) teach.
+- :material-plus-circle-outline: A new CLI folder gets the I/O ban by default instead of after someone lists it.
+- :material-minus-circle-outline: About 650 import lines are rewritten over 15 PRs, and an open PR that touches a moved file rebases across a rename. `git log --follow` follows the moves; blame across a heavily edited move may not.
+- :material-minus-circle-outline: `.fallowrc.jsonc` gains about 8 adapters zones, and each adapter allow-list still repeats the engine's zones.
+- :material-minus-circle-outline: The private-module pattern is repeated in every Biome override that sets `noRestrictedImports`; a new override that leaves it out drops the check for its files, and the probe only covers the folders it probes.
+- :material-minus-circle-outline: `noBarrelFile` is off for every `index.ts`, so a slice's face costs Bun what a barrel costs: importing one name loads the whole slice. The CLI is one bundle, so only startup work inside the slice counts, and the split chunks stay split.
+- :material-minus-circle-outline: "An `index.ts` only re-exports" is a review rule; no tool checks it.
+- :material-minus-circle-outline: Each step also changes chapter 3's code map, a package guide (`AGENTS.md` files have one owner at a time) and, for rules, up to 28 rule pages' `resource:` in both languages.
+
+**Alternatives.**
+
+- *Move everything in one PR:* it conflicts with every open PR under `src/` and asks for one review over about 400 files.
+- *Keep `commands/` and `adapters/` and only add `index.ts` files:* cheaper, but a feature still spans three folders.
+- *Guard private modules with fallow zones:* fallow resolves an import through a barrel to the declaring module's zone, so it can't tell the barrel from a direct import.
+- *"Import only `index.ts`" instead of `_` names:* no renames, but the Biome pattern would have to name every kernel folder and `contracts.ts` as exceptions, and it would differ from the Python convention.
+- *Move the engine's family runners into their rule slices:* they need `engine/stages.ts` and two other rules' modules, which a rule may not import.
+- *Split `meta/registry.ts` into an entry per rule slice:* the registry is one table on purpose (`biome.jsonc` says why), and the reporters, SARIF and the docs check read it whole.
+- *Leave the engine's kernel at the top level:* saves about 240 import lines but keeps a second name for the same idea; it is the last step, so the owner can drop it alone.
