@@ -251,6 +251,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | abstract base class, ABC (`abc.ABC`) | abstrakcyjna klasa bazowa, ABC |
 | Protocol (`typing.Protocol`) | Protocol (protokół strukturalny) |
 | abstract method, method body (INW014) | metoda abstrakcyjna, ciało metody |
+| conformance line (`_: Port = Adapter(...)` under `if TYPE_CHECKING:`, INW020) | linia zgodności |
+| private module (`_user.py`, INW021) | moduł prywatny |
+| command, query (CQRS; the `commands` and `queries` packages stay in code) | komenda, zapytanie |
+| test stub, test double | atrapa (w testach) |
 | implementation (of a port) | implementacja (portu) |
 | DTO, value object | DTO, obiekt wartości |
 | test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
