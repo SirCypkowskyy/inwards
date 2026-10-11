@@ -114,7 +114,9 @@ function itemsOf(node: GraphNode, walk: Walk): { items: Item[]; ordered: boolean
   const items = [...ops, ...edges].sort(
     (a, b) => a.file.path.localeCompare(b.file.path) || a.at - b.at,
   );
-  return { items, ordered: new Set(items.map((item) => item.file.path)).size <= 1 };
+  // A first-party router class may set its own route_class, which can match routes its own way (#358).
+  const oneFile = new Set(items.map((item) => item.file.path)).size <= 1;
+  return { items, ordered: oneFile && !node.object.custom };
 }
 
 /**
@@ -202,7 +204,7 @@ export function fileRoutes(file: FastApiFile, scope: FastApiProject): Route[][] 
     if (object !== null) {
       byRouter.set(object.name, [
         ...(byRouter.get(object.name) ?? []),
-        routeOf(op, file, "", true),
+        routeOf(op, file, "", !object.custom),
       ]);
     }
   }

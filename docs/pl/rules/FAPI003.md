@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI003.md
-source_hash: a3435ec20f3fddf4da5cd7a28dc4af10462ec89b030d0b94288e2129ec07b87e
+source_hash: 10dc0495caf209d1c0b29967fcb57868a548b0526d48c2c9879db884191b9cdb
 type: rule
 title: FAPI003 router-wiring
 description: Każdy APIRouter z trasami jest dołączony do aplikacji, a routery nie dołączają się nawzajem w cyklu.
@@ -172,7 +172,7 @@ Każda diagnostyka ma własną linię i można ją wyciszyć w linii przez `# in
 
 ## Znane ograniczenia { #known-limitations }
 
-- **Dynamiczne podpinanie:** `importlib.import_module(...)`, `getattr(m, "router")`, pętla po czymś innym niż literał, router zwracany przez funkcję fabrykującą, pluginy z entry pointów. Wywołanie `include_router`, którego celu Inwards nie umie rozwiązać, zamienia niepodpięte routery w ostrzeżenia (albo w nic, z `"silent"`), nigdy w błędy oparte na zgadywaniu. Router biblioteki (`from fastapi_users import ...`) nie jest nierozwiązanym wywołaniem; po prostu nie ma go w grafie.
+- **Dynamiczne podpinanie:** `importlib.import_module(...)`, `getattr(m, "router")`, pętla po czymś innym niż literał, router zwracany przez funkcję fabrykującą, pluginy z entry pointów. Wywołanie `include_router`, którego celu Inwards nie umie rozwiązać, zamienia niepodpięte routery w ostrzeżenia (albo w nic, z `"silent"`), nigdy w błędy oparte na zgadywaniu. Router biblioteki (`from fastapi_users import ...`) nie jest nierozwiązanym wywołaniem; po prostu nie ma go w grafie. Router zbudowany przez własną klasę albo fabrykę ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)) nie jest zgłaszany wcale, dopóki takie wywołanie mogłoby dołączyć jego albo router nad nim: `include_router(make_router())` może dołączyć tylko routery zwracane przez `make_router`, a każdy inny nierozwiązany cel (parametr funkcji, `getattr`) dowolny router. Polar podpina swój router API przez parametr `add_versioned_routers(app, api_router)`, więc żaden z jego 72 routerów nie jest zgłaszany ([#391](https://github.com/SirCypkowskyy/inwards/issues/391) dotyczy śledzenia takich wywołań).
 - **Warunkowe podpinanie:** `if settings.DEBUG: app.include_router(debug.router)` liczy się jako dołączenie.
 - **Routery celowo nieużywane** (wspólny router dołączany przez inne pakiety, router tylko dla testów, router odłożony na kolejne wydanie): użyj `allow-unmounted` albo wyciszenia z powodem.
 - **Aplikacje spoza projektu** nie są widoczne: router dołączany przez aplikację z biblioteki jest dla FAPI003 niepodpięty. Dla takiego kodu użyj `allow-unmounted` albo `ignore`.

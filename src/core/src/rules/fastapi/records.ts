@@ -8,9 +8,14 @@
 import type { Node } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import type { RouterKinds } from "../shared/fastapi-routers.ts";
 import type { CallSyntax, Value } from "./values.ts";
 
-/** A name bound to `FastAPI(...)` or `APIRouter(...)`, with the constructor call. */
+/**
+ * A name bound to `FastAPI(...)` or `APIRouter(...)`, a first-party router
+ * class, or a router factory (#358), with the call. A factory's arguments
+ * aren't the router's keywords, so `splat` is true for one: what it sets is unknown.
+ */
 export interface FastApiObject extends CallSyntax {
   readonly kind: "app" | "router";
   /** The qualified name, e.g. `app.routers.users.router`. */
@@ -19,6 +24,15 @@ export interface FastApiObject extends CallSyntax {
   readonly local: string;
   /** False when the assignment sits in a function or class, e.g. an app factory. */
   readonly topLevel: boolean;
+  /** True when a first-party factory built it (#358): its call's keywords are the factory's, so they are left out. */
+  readonly factory: boolean;
+  /**
+   * True when a first-party router class or factory built it (#358), not
+   * FastAPI's own constructor. Such a class may set its own `route_class`
+   * and may be wired in ways the graph can't follow, so FAPI003 and FAPI005
+   * treat what they can't see about it as unknown.
+   */
+  readonly custom: boolean;
 }
 
 /** A path operation: `@router.get("/path", ...)` on a function, or `@app.api_route(...)`. */
@@ -108,6 +122,8 @@ export interface Context {
   readonly qualify: Qualify;
   /** The file's module-level functions, by name. */
   readonly functions: ReadonlyMap<string, Node>;
+  /** What first-party callees build, so a router class built at run time or a factory counts (#358). */
+  readonly kinds: RouterKinds;
 }
 
 /** One handler registration as written, before it becomes an `ExceptionHandler`. */

@@ -131,6 +131,27 @@ function gapsOf(
 }
 
 /**
+ * Tells whether one operation lacks the summary the project requires. In
+ * the default mode a description counts: `description=`, or a docstring,
+ * which FastAPI reads only when `description=` is absent.
+ *
+ * @param op - the operation.
+ * @param options - the rule's options.
+ * @returns the summary gap, or none.
+ */
+function summaryGap(op: PathOperation, options: Options): Gap[] {
+  const { keywords } = op;
+  const described =
+    options.requireSummary === "summary-or-docstring" &&
+    (keywords.has("description") || hasDocstring(op.function));
+  if (options.requireSummary === false || keywords.has("summary") || described) {
+    return [];
+  }
+  const or = options.requireSummary === "summary" ? "" : " (or a docstring)";
+  return [{ noun: "summary", add: `\`summary="..."\`${or}` }];
+}
+
+/**
  * Lists the keywords one operation lacks: summary, status code, operation
  * id and tags.
  *
@@ -141,12 +162,7 @@ function gapsOf(
  */
 function keywordGaps(op: PathOperation, object: FastApiObject, options: Options): Gap[] {
   const { keywords } = op;
-  const gaps: Gap[] = [];
-  const docstring = options.requireSummary === "summary-or-docstring" && hasDocstring(op.function);
-  if (options.requireSummary !== false && !(keywords.has("summary") || docstring)) {
-    const or = options.requireSummary === "summary" ? "" : " (or a docstring)";
-    gaps.push({ noun: "summary", add: `\`summary="..."\`${or}` });
-  }
+  const gaps: Gap[] = summaryGap(op, options);
   const methods = op.methods === "unknown" ? [] : op.methods;
   const method = methods.find((m) => options.requireStatusCode.includes(m));
   if (method !== undefined && !keywords.has("status_code")) {
