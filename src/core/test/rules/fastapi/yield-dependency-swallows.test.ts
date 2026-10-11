@@ -170,6 +170,46 @@ def db():
     expect(await check(text)).toEqual([]);
   });
 
+  test("skips streams: a generator that yields in a loop or in its except", async () => {
+    // The four FAPI007 findings of the #182 corpus run (Polar's SSE streams,
+    // Saleor's discount iterator) were streams, not dependencies: FastAPI
+    // runs a dependency's code up to its one `yield`.
+    const text = `def discounts(rules):
+    for rule in rules:
+        try:
+            yield apply(rule)
+        except NotApplicable:
+            pass
+
+
+async def events(stream):
+    try:
+        async for event in stream:
+            yield event
+    except Exception:
+        log()
+
+
+async def progress(job):
+    try:
+        yield await job.start()
+    except JobError:
+        yield "failed"
+`;
+    expect(await check(text)).toEqual([]);
+  });
+
+  test("still reports a dependency whose yield sits in a with block", async () => {
+    const text = `def get_db():
+    with open_session() as db:
+        try:
+            yield db
+        except Exception:
+            db.rollback()
+`;
+    expect(await check(text)).toHaveLength(1);
+  });
+
   test("reports in a per-edit check too, and a suppression hides it", async () => {
     const body = dependency("        db.rollback()");
     expect(await check(body, true)).toHaveLength(1);

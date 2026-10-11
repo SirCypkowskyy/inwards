@@ -14,7 +14,7 @@ import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { moduleAliases, parameterTypes } from "../shared/annotations.ts";
 import { moduleClasses, type ResolveBase } from "./classes.ts";
 import { type Found, findEndpoints } from "./endpoints.ts";
-import { isAbort, isHttpError } from "./frameworks.ts";
+import { isAbort } from "./frameworks.ts";
 import { type Body, helpersOf } from "./helpers.ts";
 import { measure } from "./metrics.ts";
 import type { Recognise } from "./settings.ts";
@@ -36,27 +36,28 @@ export interface FileView {
 }
 
 /**
- * Tells whether a statement maps an error to HTTP: a `raise` of an HTTP
- * error (any `HTTPException`, Werkzeug's, Litestar's or DRF's exceptions,
- * Django's `Http404`), called or not, or a call of Flask's `abort`.
+ * Tells whether a statement ends the request with an error: any `raise`, or
+ * a call of Flask's `abort`. Any exception counts, not only `HTTPException`:
+ * an app-wide exception handler (FastAPI's `exception_handler`, DRF's
+ * `EXCEPTION_HANDLER`) maps the project's own errors to HTTP, and one file
+ * can't show which ones it maps. Polar's endpoints raise `ResourceNotFound`
+ * and `NotPermitted` that way (#182 corpus run).
  *
  * @param statement - a statement node.
  * @param qualify - qualifies a name through the file's imports.
- * @returns true for `raise HTTPException(404)`, `raise Http404 from e` and `abort(404)`.
+ * @returns true for `raise HTTPException(404)`, `raise ResourceNotFound() from e`, a bare `raise` and `abort(404)`.
  */
 function mapsToHttp(statement: Node, qualify: Qualify): boolean {
-  const [first] = statement.namedChildren;
-  if (statement.type === "expression_statement" && first?.type === "call") {
-    const callee = first.childForFieldName("function");
-    const name = callee ? qualify(callee) : null;
-    return name !== null && isAbort(name);
+  if (statement.type === "raise_statement") {
+    return true;
   }
-  if (statement.type !== "raise_statement") {
+  const [first] = statement.namedChildren;
+  if (statement.type !== "expression_statement" || first?.type !== "call") {
     return false;
   }
-  const callee = first?.type === "call" ? first.childForFieldName("function") : first;
+  const callee = first.childForFieldName("function");
   const name = callee ? qualify(callee) : null;
-  return name !== null && isHttpError(name);
+  return name !== null && isAbort(name);
 }
 
 /**

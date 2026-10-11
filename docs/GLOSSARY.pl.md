@@ -119,6 +119,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | thread, worker thread (ADR-040) | wątek, wątek roboczy (worker); the main thread: wątek główny |
 | extraction job | zadanie ekstrakcji |
 | corpus | korpus |
+| precision (of a rule), true positive, false positive | precyzja, trafne zgłoszenie, fałszywy alarm |
+| sample, sampled precision | próba, precyzja w próbie |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
 | contract (import-linter) | kontrakt |
@@ -217,6 +219,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | singular, plural | liczba pojedyncza, liczba mnoga |
 | mass noun | rzeczownik niepoliczalny |
 | migration (Alembic) | migracja |
+| loader option (SQLAlchemy `joinedload`, `selectinload`) | opcja ładowania (loader option) |
+| server-rendered HTML | HTML renderowany na serwerze |
 | architecture diagram, marked diagram (INW017) | diagram architektury, oznaczony diagram |
 | marker comment (`%% inwards: layers`) | komentarz-znacznik, znacznik |
 | node, edge, link (Mermaid) | węzeł, krawędź |

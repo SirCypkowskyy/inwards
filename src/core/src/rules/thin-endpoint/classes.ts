@@ -151,6 +151,11 @@ function methodsOf(cls: Node): { fn: Node; name: string }[] {
   });
 }
 
+/** Every method name some kind of view handles requests with. */
+const ANY_VIEW_METHOD: ReadonlySet<string> = new Set(
+  Object.values(VIEW_METHODS).flatMap((names) => [...names]),
+);
+
 /**
  * Finds the request-handling methods of the file's view classes, at any depth.
  *
@@ -161,12 +166,19 @@ function methodsOf(cls: Node): { fn: Node; name: string }[] {
 export function viewMethods(root: Node, context: ClassContext): ViewMethod[] {
   const classes = moduleClasses(root);
   return root.descendantsOfType("class_definition").flatMap((cls) => {
-    const kind = viewKind(cls, classes, context);
+    const methods = methodsOf(cls);
     const className = cls.childForFieldName("name");
-    if (kind === undefined || !className) {
+    // Only a class with a method some view kind handles can hold an endpoint,
+    // so the others never resolve their bases: in Saleor (#182 corpus run)
+    // reading the bases of every model took the full check from 1.1 to 8 s.
+    if (!(className && methods.some(({ name }) => ANY_VIEW_METHOD.has(name)))) {
       return [];
     }
-    return methodsOf(cls)
+    const kind = viewKind(cls, classes, context);
+    if (kind === undefined) {
+      return [];
+    }
+    return methods
       .filter(({ name }) => VIEW_METHODS[kind].has(name))
       .map(({ fn, name }) => ({
         fn,

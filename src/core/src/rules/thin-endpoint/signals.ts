@@ -83,10 +83,12 @@ function calleeTexts(calls: readonly Node[]): string[] {
  *
  * @param count - how many the endpoint has.
  * @param max - the limit, or false when the signal is off.
- * @param noun - what is counted, plural, e.g. `statements`.
- * @returns e.g. `["14 statements (max 10)"]`, or nothing within the limit.
+ * @param nouns - what is counted, singular and plural, e.g. `["statement", "statements"]`.
+ * @returns e.g. `["14 statements (max 10)"]` or, with `max = 0`, `["1 statement (max 0)"]`;
+ *   nothing within the limit.
  */
-function over(count: number, max: number | false, noun: string): string[] {
+function over(count: number, max: number | false, nouns: readonly [string, string]): string[] {
+  const noun = count === 1 ? nouns[0] : nouns[1];
   return max !== false && count > max ? [`${count} ${noun} (max ${max})`] : [];
 }
 
@@ -179,9 +181,12 @@ export function trip(bodies: readonly Body[], context: TripContext): Tripped {
   const metrics = totals(bodies);
   const loops = metrics.loops + (settings.allowComprehensions ? 0 : metrics.comprehensions);
   const sized = [
-    ...over(metrics.statements, settings.maxStatements, "statements"),
-    ...over(metrics.branches, settings.maxBranches, "branches"),
-    ...over(metrics.nesting, settings.maxNesting, "levels of nested blocks"),
+    ...over(metrics.statements, settings.maxStatements, ["statement", "statements"]),
+    ...over(metrics.branches, settings.maxBranches, ["branch", "branches"]),
+    ...over(metrics.nesting, settings.maxNesting, [
+      "level of nested blocks",
+      "levels of nested blocks",
+    ]),
     ...(settings.allowLoops || loops === 0
       ? []
       : [`${loops} ${loops === 1 ? "loop" : "loops"} over data`]),
