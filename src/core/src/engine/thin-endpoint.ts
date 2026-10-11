@@ -1,13 +1,12 @@
 /**
  * @file Runs INW012 `thin-endpoint` for the engine: decides whether a file
  * needs the rule at all and hands it the rule's options and the layers. The
- * rule (`rules/thin-endpoint/`) parses the file itself, and only one that
- * may hold an endpoint, plus the module of a handler a registration in it
- * names, read through the run's first-party modules; its findings join the file's others
+ * rule (`rules/thin-endpoint/`) reads the file's tree, and only one that may
+ * hold an endpoint, plus the module of a handler a registration in it names,
+ * both through the run's shared trees; its findings join the file's others
  * before the suppression comments apply. No I/O: the caller supplies the
- * file and the run's first-party modules.
+ * file and the run's trees.
  */
-import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
@@ -21,14 +20,12 @@ import { checkEncoding } from "../rules/unsupported-encoding.ts";
  * encoding can hide code (INW000 reports it), or when its text mentions no
  * framework and no configured decorator.
  *
- * @param parser - parser with the Python grammar loaded.
  * @param src - the source file, with normalised text.
  * @param config - the project's config: its rules table and layers.
- * @param project - the run's first-party modules, for handlers registered from another module.
+ * @param project - the run's trees: the file's own, and the modules of handlers registered from another module.
  * @returns the findings, before suppressions.
  */
 export function thinEndpointFindings(
-  parser: Parser,
   src: SourceFile,
   config: InwardsConfig,
   project: ModuleTrees,
@@ -38,5 +35,5 @@ export function thinEndpointFindings(
     return [];
   }
   const options = rules?.options?.["thin-endpoint"];
-  return checkThinEndpoints(parser, src, { options, layers, project });
+  return checkThinEndpoints(src, { options, layers, project });
 }

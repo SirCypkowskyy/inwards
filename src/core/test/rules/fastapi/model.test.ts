@@ -10,6 +10,7 @@ import { returnedStatusCodes } from "../../../src/rules/fastapi/handlers.ts";
 import { FastApiModel, mentionsFastApi } from "../../../src/rules/fastapi/model.ts";
 import type { FastApiFile } from "../../../src/rules/fastapi/records.ts";
 import type { Value } from "../../../src/rules/fastapi/values.ts";
+import { ModuleTrees } from "../../../src/rules/shared/module-trees.ts";
 import { file, indexOn, parser } from "../../support/helpers.ts";
 
 const MAIN = `from fastapi import Depends, FastAPI, status
@@ -108,10 +109,13 @@ const DISK = new Map<string, "file" | "dir">([
   ...[...TEXTS.keys()].map((path) => [path, "file"] as const),
 ]);
 
-const model = new FastApiModel(parser, indexOn(DISK, TEXTS));
+const project = indexOn(DISK, TEXTS);
+const trees = new ModuleTrees(parser, project);
+const model = new FastApiModel(trees, project);
 
 afterAll(() => {
   model.dispose();
+  trees.dispose();
 });
 
 /**

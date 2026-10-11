@@ -16,11 +16,11 @@
  * every path through it raises, as Inwards can tell: a `raise` in the block,
  * or an `if`/`else`, `with` or `try` whose every branch raises.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { parsePython } from "../../python/parser.ts";
+import type { FileTrees } from "../shared/module-trees.ts";
 import { ownNodes } from "./function-body.ts";
 import { spanOf } from "./syntax.ts";
 
@@ -213,21 +213,17 @@ function swallowsIn(fn: Node, src: SourceFile): Diagnostic[] {
  * Checks one file for dependencies that swallow the endpoint's exceptions.
  * Parses the file only when it spells both `yield` and `except`.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @returns the findings, in source order.
  */
-export function checkYieldSwallows(parser: Parser, src: SourceFile): Diagnostic[] {
+export function checkYieldSwallows(trees: FileTrees, src: SourceFile): Diagnostic[] {
   if (!(YIELD.test(src.text) && EXCEPT.test(src.text))) {
     return [];
   }
-  const tree = parsePython(parser, src.text);
-  try {
-    return tree.rootNode
-      .descendantsOfType("function_definition")
-      .flatMap((fn) => (fn ? swallowsIn(fn, src) : []))
-      .sort((a, b) => a.line - b.line);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+  return trees
+    .treeOf(src)
+    .rootNode.descendantsOfType("function_definition")
+    .flatMap((fn) => (fn ? swallowsIn(fn, src) : []))
+    .sort((a, b) => a.line - b.line);
 }

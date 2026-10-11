@@ -8,18 +8,19 @@
  * through `allow-bases` and `allow-decorators`. Without `modules`, the rule
  * checks the modules with a `ports` segment (`shop.application.ports.users`);
  * with it, the modules it selects. A file with no `class` is never parsed.
- * I/O-free: the caller supplies the parser, the file, the options and the
- * layers.
+ * I/O-free: the caller supplies the run's trees, the file, the options and
+ * the layers.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import { matchEntry } from "../../config/layer-selector.ts";
 import type { LayerSpec } from "../../config/layers.ts";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
-import { importedNames, parsePython } from "../../python/parser.ts";
+import { importedNames } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import type { FileTrees } from "../shared/module-trees.ts";
 import { nameMatcher } from "../shared/name-patterns.ts";
 import { type ClassContext, classNames, concreteMethods, portClasses } from "./classes.ts";
 import { adapterTarget, reportClass, reportImplementation, reportMethod } from "./wording.ts";
@@ -114,12 +115,16 @@ function qualifierOf(
  * for the file's module; this decides whether it is a port module, and
  * parses it only when its text has a class.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse the file once per run.
  * @param src - the file, with normalised text.
  * @param inputs - the rule's options and the project's layers.
  * @returns the findings in source order, before suppressions and severities apply.
  */
-export function checkPortsAbstract(parser: Parser, src: SourceFile, inputs: Inputs): Diagnostic[] {
+export function checkPortsAbstract(
+  trees: FileTrees,
+  src: SourceFile,
+  inputs: Inputs,
+): Diagnostic[] {
   const { options, layers } = inputs;
   const inScope = scopeOf(stringList(options?.["modules"]));
   if (!(inScope(src.module) && CLASS.test(src.text))) {
@@ -128,30 +133,26 @@ export function checkPortsAbstract(parser: Parser, src: SourceFile, inputs: Inpu
   const bases = stringList(options?.["allow-bases"]) ?? DEFAULT_ALLOW_BASES;
   const extra = stringList(options?.["extend-allow-bases"]) ?? [];
   const decorators = stringList(options?.["allow-decorators"]) ?? DEFAULT_ALLOW_DECORATORS;
-  const tree = parsePython(parser, src.text);
-  try {
-    const root = tree.rootNode;
-    const context: ClassContext = {
-      qualify: qualifierOf(importedNames(tree, src), src.module, classNames(root)),
-      inScope,
-      allowBase: nameMatcher([...bases, ...extra]),
-      allowDecorator: nameMatcher(decorators),
-    };
-    const target = adapterTarget(layers);
-    return portClasses(root, src.module, context).flatMap((cls) => {
-      if (cls.kind === "exempt") {
-        return [];
-      }
-      if (cls.kind === "concrete") {
-        return [reportClass(cls, src, target)];
-      }
-      const methods = concreteMethods(cls.node);
-      if (cls.kind === "derived") {
-        return methods.length > 0 ? [reportImplementation(cls, methods, src, target)] : [];
-      }
-      return methods.map((method) => reportMethod(cls, method, src, target));
-    });
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+  const tree = trees.treeOf(src);
+  const root = tree.rootNode;
+  const context: ClassContext = {
+    qualify: qualifierOf(importedNames(tree, src), src.module, classNames(root)),
+    inScope,
+    allowBase: nameMatcher([...bases, ...extra]),
+    allowDecorator: nameMatcher(decorators),
+  };
+  const target = adapterTarget(layers);
+  return portClasses(root, src.module, context).flatMap((cls) => {
+    if (cls.kind === "exempt") {
+      return [];
+    }
+    if (cls.kind === "concrete") {
+      return [reportClass(cls, src, target)];
+    }
+    const methods = concreteMethods(cls.node);
+    if (cls.kind === "derived") {
+      return methods.length > 0 ? [reportImplementation(cls, methods, src, target)] : [];
+    }
+    return methods.map((method) => reportMethod(cls, method, src, target));
+  });
 }
