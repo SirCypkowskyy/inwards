@@ -15,7 +15,10 @@ import type {
   ContextSpec,
   Diagnostic,
   DiagramDraft,
+  DiagramExport,
   DiagramInput,
+  DiagramKind,
+  DiagramNotation,
   DiagramSource,
   ExtractionAnswer,
   ExtractionBatch,
@@ -61,7 +64,10 @@ type PublicTypes = [
   ContextSpec,
   Diagnostic,
   DiagramDraft,
+  DiagramExport,
   DiagramInput,
+  DiagramKind,
+  DiagramNotation,
   DiagramSource,
   ExtractionAnswer,
   ExtractionBatch,
@@ -135,6 +141,7 @@ test("the runtime exports are unchanged", async () => {
     "ruleLevel",
     "stableMessage",
     "topLevelModules",
+    "writeDiagram",
   ]);
 });
 
@@ -166,7 +173,10 @@ test("index.ts re-exports exactly these names, types included", () => {
       "DOCS_BASE",
       "Diagnostic",
       "DiagramDraft",
+      "DiagramExport",
       "DiagramInput",
+      "DiagramKind",
+      "DiagramNotation",
       "DiagramSource",
       "Engine",
       "ExtractionAnswer",
@@ -232,6 +242,7 @@ test("index.ts re-exports exactly these names, types included", () => {
       "ruleLevel",
       "stableMessage",
       "topLevelModules",
+      "writeDiagram",
     ].sort(),
   );
 });

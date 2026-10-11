@@ -21,6 +21,8 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif|github] [--max
                     (--list-styles: the presets; --brief: also the architecture brief in AGENTS.md)
        inwards context [--config pyproject.toml] [--write]
                        (the architecture brief; --write: into AGENTS.md)
+       inwards diagram [--layers|--contexts] [--format mermaid|plantuml] [--config pyproject.toml]
+                       (the config as a marked Mermaid or PlantUML diagram)
        inwards import-config [FILE] [--write]
                              (import-linter contracts as [tool.inwards]; --write: into pyproject.toml)
        inwards import-diagram FILE [--write]
@@ -125,6 +127,27 @@ Prints the architecture brief for agents, built from [tool.inwards].
 
 --config FILE: the pyproject.toml to read, instead of the nearest one with [tool.inwards].
 --write: write it into AGENTS.md instead of printing it.
+"
+,
+}
+`;
+
+exports[`diagram --help prints that command's usage, exit 0 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Usage: inwards diagram [--layers|--contexts] [--format mermaid|plantuml] [--config pyproject.toml]
+
+Prints [tool.inwards] as a marked diagram that inwards import-diagram reads back
+and INW017 and INW018 accept: one node per layer with arrows pointing inwards, or
+one node or group per context with its public modules and depends-on arrows.
+
+--layers: the layers diagram (the default).
+--contexts: the contexts diagram.
+--format: mermaid (default) or plantuml.
+--config FILE: the pyproject.toml to read, instead of the nearest one with [tool.inwards].
+What the diagram can't show is listed on stderr.
 "
 ,
 }

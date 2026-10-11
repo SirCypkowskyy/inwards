@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c0a9c03006bdd7e2eda4f7cb04fc5b34e459cd22b12ce0b7b62d1fd696493758
+source_hash: 10229c8b9c9ed6c671bb487c265050e642cd9c999a215fef344b3ce3b5c2b2c9
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -455,7 +455,8 @@ src/
 │   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
 │   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
 │   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
-│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram)
+│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram),
+│   │   │                  #   write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
@@ -514,7 +515,7 @@ src/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
 │   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
-│   │   │                  #   import-diagram: thin, handed AppDeps
+│   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings

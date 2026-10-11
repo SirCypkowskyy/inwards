@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/diagrams.md
-source_hash: c3dd6528c8366b903f5457904d472044225e3727046ab524f78807990a289901
+source_hash: 24f137e462e83d226926f25b308e02b76b14da30420afcf9c2633120097c2b30
 ---
 
 # Diagramy architektury { #architecture-diagrams }
@@ -9,6 +9,7 @@ Inwards trzyma rysunek architektury w Mermaid albo PlantUML w zgodzie z `[tool.i
 
 - **Dokumentacja idzie za kodem.** [INW017](../rules/INW017.md) zgłasza nazwę w diagramie, której nie zna konfiguracja albo kod, a [INW018](../rules/INW018.md) strzałkę, która rysuje import zabroniony przez konfigurację.
 - **Dokumentacja steruje kodem.** `inwards import-diagram` zamienia diagram w pierwszą `[tool.inwards]`, jeden raz. Od tej chwili obie reguły trzymają je w zgodzie.
+- **Konfiguracja rysuje dokumentację.** `inwards diagram` wypisuje `[tool.inwards]` jako oznaczony diagram, który obie reguły akceptują, a `import-diagram` odczytuje z powrotem ([Narysuj konfigurację](#diagram)).
 
 `[tool.inwards]` pozostaje jedynym źródłem prawdy: diagram nigdy nie jest czytany jako konfiguracja w czasie sprawdzania.
 
@@ -100,6 +101,31 @@ inwards import-diagram docs/architecture.md --write    # append it to pyproject.
 
 Co jest odrzucane, z numerem linii: cykl między warstwami; kontekst albo węzeł `:::public` bez etykiety w cudzysłowie, bo kontekst wymaga modułów; drugi diagram tego samego rodzaju w pliku. Warstwa bez etykiety w cudzysłowie dostaje `modules = []` i uwagę na stderr: uzupełnij ją przed sprawdzeniem. Plik tylko z diagramem kontekstów dostaje jedną warstwę, `app`, która obejmuje każdy kontekst.
 
+## Narysuj konfigurację { #diagram }
+
+`inwards diagram` działa w drugą stronę: wypisuje `[tool.inwards]` jako oznaczony diagram, gotowy do pliku `.mmd` albo `.puml` lub do bloku kodu w dokumentacji.
+
+```sh
+inwards diagram                                  # the layers, as Mermaid
+inwards diagram --contexts                       # the contexts
+inwards diagram --format plantuml                # PlantUML, for either diagram
+inwards diagram --config services/pyproject.toml
+```
+
+- **Warstwy.** Jeden węzeł na warstwę, od najbardziej zewnętrznej, z jej modułem jako etykietą w cudzysłowie, i ciągła strzałka z każdej warstwy do każdej warstwy o jedno miejsce głębiej. Warstwa może importować każdą warstwę wewnątrz niej, więc te strzałki wystarczą, a najdłuższa ścieżka oddaje każdej warstwie jej miejsce: warstwy sąsiednie zostają sąsiednie.
+- **Konteksty.** Kontekst bez modułów `public` jest węzłem. Kontekst z nimi jest subgraphem (w PlantUML `package`), w którym każdy wpis to węzeł `:::public` (`<<public>>`), także wpis dokładny `=pkg.module`. Każde `depends-on` to strzałka z jednego kontekstu do drugiego.
+- **Nazwy.** Nazwa, która może być id węzła, jest tym id. Każda inna, na przykład `slices.domain` z szablonu, dostaje id zrobione z niej (`slices_domain`) i jest wskazywana przez swój pierwszy moduł, który INW017 i INW018 rozpoznają ([Oznacz diagram](#mark-a-diagram)). W PlantUML nazwa z łącznikiem albo taka, którą czytnik wziąłby za słowo kluczowe (`interface`, `package`), trafia w nawiasy: `[interface] as "shop.api"`.
+- **W obie strony.** Względem tej samej konfiguracji INW017 i INW018 nie znajdują w wyniku niczego, o ile istnieje każdy moduł, który konfiguracja wymienia (inaczej INW017 powtarza na diagramie zgłoszenie INW006), a `inwards import-diagram` odczytuje go z powrotem do tych samych warstw, miejsc i kontekstów. Testy sprawdzają jedno i drugie dla przykładowego pakietu każdego presetu i obu przykładowych aplikacji, w obu notacjach.
+- **To, czego diagram nie pokaże**, trafia na stderr, po linii na sprawę; kod wyjścia zostaje 0:
+    - Warstwa albo kontekst z dwoma lub więcej modułami. W Mermaid każdy moduł dostaje własną linię węzła i `import-diagram` czyta je wszystkie, ale Mermaid rysuje węzeł z ostatnią etykietą. Alias PlantUML nazywa jeden komponent, więc diagram zostawia pierwszy moduł. Tak samo kontekst narysowany jako subgraph albo pakiet.
+    - Warstwa albo kontekst nazwany jak słowo kluczowe Mermaid (`class`, `style`, `end`) nie może być węzłem Mermaid. `--format plantuml` go narysuje.
+    - Listy bibliotek, kształty, opcje reguł i `ignore`, tak jak przy `import-diagram`, oraz szablony, rysowane jako warstwy, na które się rozwijają.
+- **Kod wyjścia 2** dla `--layers` razem z `--contexts`, `--format` innego niż `mermaid` albo `plantuml` oraz `--contexts`, gdy konfiguracja nie deklaruje kontekstów.
+
+Żeby rysunek był sprawdzany, umieść go w pliku wymienionym w kluczu `diagrams`. Plik `.mmd` albo `.puml` mieści jeden diagram; dla obu umieść każdy w osobnym bloku kodu jednego pliku Markdown, który `import-diagram` też czyta jako całość.
+
+`inwards context` nie wypisuje diagramu: opis architektury już wymienia każdą warstwę z tym, co może importować, więc diagram by to powtarzał, a opis presetu fastapi jest już blisko swojego limitu 550 tokenów ([opis architektury](agents-md.md#the-architecture-brief-opt-in)).
+
 ## Przykład { #an-example }
 
 Projekt z czterema pakietami i jeszcze bez konfiguracji:
@@ -186,6 +212,27 @@ inwards check
 ```
 
 Projekt przechodzi, razem z diagramem. Gdyby później ktoś narysował strzałkę z `orders` do `billing`, byłoby to INW018, a import w kodzie między nimi INW001.
+
+`inwards diagram` rysuje konfigurację z powrotem. Każda warstwa wskazuje warstwy o jedno miejsce głębiej, więc `api` wskazuje obie warstwy sąsiednie, a one wskazują `domain`:
+
+<!-- e2e -->
+
+```sh
+inwards diagram
+```
+
+<!-- e2e -->
+
+```text
+%% inwards: layers
+flowchart TB
+  api["shop.api"]
+  orders["shop.orders"]
+  billing["shop.billing"]
+  domain["shop.domain"]
+  api --> orders & billing
+  orders & billing --> domain
+```
 
 Diagram kontekstów działa tak samo. Ten
 

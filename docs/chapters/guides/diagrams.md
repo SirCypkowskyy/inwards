@@ -4,6 +4,7 @@ Inwards keeps a Mermaid or PlantUML drawing of your architecture in step with `[
 
 - **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, and [INW018](../rules/INW018.md) an arrow that draws an import the config forbids.
 - **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the two rules keep them in step.
+- **The config draws the docs.** `inwards diagram` prints `[tool.inwards]` as a marked diagram that the two rules accept and `import-diagram` reads back ([Draw the config](#diagram)).
 
 `[tool.inwards]` stays the only source of truth: a diagram is never read as config while checking.
 
@@ -95,6 +96,31 @@ inwards import-diagram docs/architecture.md --write    # append it to pyproject.
 
 What is refused, with the line: a cycle among the layers; a context, or a `:::public` node, without a quoted label, because a context needs modules; a second diagram of one kind in the file. A layer without a quoted label gets `modules = []` and a note on stderr: fill it in before checking. A file with only a contexts diagram gets one layer, `app`, that holds every context.
 
+## Draw the config { #diagram }
+
+`inwards diagram` goes the other way: it prints `[tool.inwards]` as a marked diagram, ready for a `.mmd` or `.puml` file or a fenced block in the docs.
+
+```sh
+inwards diagram                                  # the layers, as Mermaid
+inwards diagram --contexts                       # the contexts
+inwards diagram --format plantuml                # PlantUML, for either diagram
+inwards diagram --config services/pyproject.toml
+```
+
+- **Layers.** One node per layer, outermost first, with its module as a quoted label, and a solid arrow from each layer to every layer one rank further in. A layer may import every layer inside it, so those arrows are enough, and the longest path gives each layer its rank back: siblings stay siblings.
+- **Contexts.** A context without `public` modules is a node. One with them is a subgraph (a PlantUML `package`) that holds a `:::public` (`<<public>>`) node for each entry, an exact `=pkg.module` entry included. Each `depends-on` is an arrow from one context to the other.
+- **Names.** A name that can be a node id is the id. Any other, such as a template's `slices.domain`, gets an id made from it (`slices_domain`) and is named by its first module, which INW017 and INW018 resolve ([Mark a diagram](#mark-a-diagram)). In PlantUML, a name with a hyphen, or one the reader would take for a keyword (`interface`, `package`), goes in brackets: `[interface] as "shop.api"`.
+- **Round trip.** Against the same config, INW017 and INW018 find nothing in the output, as long as every module the config names exists (otherwise INW017 repeats INW006's finding on the diagram), and `inwards import-diagram` reads it back to the same layers, ranks and contexts. The tests check both for every preset's scaffold and both example apps, in both notations.
+- **What it can't show** goes to stderr, one line each; the exit code stays 0:
+    - A layer or context with two or more modules. Mermaid gets one node line per module, and `import-diagram` reads them all, but Mermaid draws a node with its last label. A PlantUML alias names one component, so the diagram keeps the first module. So does a context drawn as a subgraph or package.
+    - A layer or context named after a Mermaid keyword (`class`, `style`, `end`) can't be a Mermaid node. `--format plantuml` draws it.
+    - Library lists, shapes, rule options and `ignore`, as for `import-diagram`, and templates, which are drawn as the layers they expand into.
+- **Exit code 2** for `--layers` together with `--contexts`, a `--format` other than `mermaid` or `plantuml`, or `--contexts` when the config declares no contexts.
+
+To check the drawing, put it in a file the `diagrams` key lists. A `.mmd` or `.puml` file holds one diagram; for both, put each in its own fenced block of one Markdown file, which `import-diagram` also reads as one.
+
+`inwards context` prints no diagram: the brief already lists every layer with what it may import, so a diagram would repeat it, and the fastapi preset's brief is near its 550-token budget already ([the brief](agents-md.md#the-architecture-brief-opt-in)).
+
 ## An example { #an-example }
 
 A project with four packages and no config yet:
@@ -181,6 +207,27 @@ inwards check
 ```
 
 The project passes, the diagram included. Later, an arrow drawn from `orders` to `billing` would be INW018, and a code import between them INW001.
+
+`inwards diagram` draws the config back. Each layer points at the layers of the next rank in, so `api` points at both siblings and they point at `domain`:
+
+<!-- e2e -->
+
+```sh
+inwards diagram
+```
+
+<!-- e2e -->
+
+```text
+%% inwards: layers
+flowchart TB
+  api["shop.api"]
+  orders["shop.orders"]
+  billing["shop.billing"]
+  domain["shop.domain"]
+  api --> orders & billing
+  orders & billing --> domain
+```
 
 A contexts diagram works the same way. This one
 
