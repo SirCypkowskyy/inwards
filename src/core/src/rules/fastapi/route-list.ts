@@ -11,7 +11,7 @@
 import type { GraphEdge, GraphNode, WiringGraph } from "./graph.ts";
 import { type Segment, segmentsOf } from "./path-match.ts";
 import type { FastApiProject } from "./project.ts";
-import type { FastApiFile, PathOperation } from "./records.ts";
+import type { FastApiFile, FastApiObject, PathOperation } from "./records.ts";
 
 /** A path operation as one list of routes holds it: where it answers, and to what. */
 export interface Route {
@@ -43,6 +43,8 @@ interface Position {
 /** What `flatten` reads and writes. */
 interface Walk {
   readonly graph: WiringGraph;
+  /** Tells whether a router's route class matches by method and path only (#392). */
+  readonly ordered: (object: FastApiObject) => boolean;
   readonly files: ReadonlyMap<PathOperation, FastApiFile>;
   readonly out: Route[];
 }
@@ -114,9 +116,9 @@ function itemsOf(node: GraphNode, walk: Walk): { items: Item[]; ordered: boolean
   const items = [...ops, ...edges].sort(
     (a, b) => a.file.path.localeCompare(b.file.path) || a.at - b.at,
   );
-  // A first-party router class may set its own route_class, which can match routes its own way (#358).
+  // A route class that overrides `matches` picks routes by more than method and path (#358, #392).
   const oneFile = new Set(items.map((item) => item.file.path)).size <= 1;
-  return { items, ordered: oneFile && !node.object.custom };
+  return { items, ordered: oneFile && walk.ordered(node.object) };
 }
 
 /**
@@ -163,6 +165,17 @@ function flatten(walk: Walk, name: string, position: Position, stack: readonly s
 }
 
 /**
+ * Tells, per router, whether its route class matches by method and path only (#392).
+ *
+ * @param scope - this check's FastAPI lookups.
+ * @returns a reader of the route order's meaning, per app or router.
+ */
+function orderOf(scope: FastApiProject): (object: FastApiObject) => boolean {
+  const classes = scope.routeClasses;
+  return (object: FastApiObject): boolean => classes.info(object).ordered;
+}
+
+/**
  * Lists the routes of every app in the project, and of every router that no
  * known app or router includes, each in the order FastAPI holds them.
  *
@@ -183,7 +196,12 @@ export function graphRoutes(scope: FastApiProject): Route[][] {
   );
   return roots.map(({ object }) => {
     const out: Route[] = [];
-    flatten({ graph, files, out }, object.name, { prefix: "", from: null, ordered: true }, []);
+    flatten(
+      { graph, files, out, ordered: orderOf(scope) },
+      object.name,
+      { prefix: "", from: null, ordered: true },
+      [],
+    );
     return out;
   });
 }
@@ -204,7 +222,7 @@ export function fileRoutes(file: FastApiFile, scope: FastApiProject): Route[][] 
     if (object !== null) {
       byRouter.set(object.name, [
         ...(byRouter.get(object.name) ?? []),
-        routeOf(op, file, "", !object.custom),
+        routeOf(op, file, "", scope.routeClasses.info(object).ordered),
       ]);
     }
   }

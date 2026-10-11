@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: ba7df1d91931f2ca1d21f9deba29db66f6b814551635b76202b1cc7d768bc757
+source_hash: 4a9d04734d80a216c46f8688fd367879b86c4590af7c93d96b9bbec05903f000
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -331,7 +331,7 @@ Czym były fałszywe alarmy i co zostało:
 
 full-stack-fastapi-template i python-ddd się nie zmieniły, a Saleora nie uruchamiano ponownie. Czym są nowe zgłoszenia:
 
-- **FAPI001.** 96 ze 131 zgłoszeń w Polarze dotyczy tras z tagiem `APITag.private`, które klasa tras Polara trzyma poza schematem produkcyjnym ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)). Z 35 na trasach publicznych 10 to fałszywe alarmy: 4 eksporty CSV i 6 endpointów OAuth2, których treść odpowiedzi definiują RFC. 11 zgłoszeń w fastapi-clean-example to trasy z `description=getdoc(...)`; FastAPI czyta docstring tylko wtedy, gdy nie ma `description=` ([Path Operation Configuration](https://fastapi.tiangolo.com/tutorial/path-operation-configuration/)), więc `description=` liczy się teraz jak docstring. Router, który każde śledzone dołączenie umieszcza pod aplikacją `FastAPI(openapi_url=None)`, pozostaje ukryty, gdy innego dołączenia nie da się prześledzić; bez tego back office Polara dodałby 115 fałszywych alarmów.
+- **FAPI001.** 96 ze 131 zgłoszeń w Polarze dotyczy tras z tagiem `APITag.private`, które klasa tras Polara trzyma poza schematem produkcyjnym (czytane od [#392](https://github.com/SirCypkowskyy/inwards/issues/392), niżej). Z 35 na trasach publicznych 10 to fałszywe alarmy: 4 eksporty CSV i 6 endpointów OAuth2, których treść odpowiedzi definiują RFC. 11 zgłoszeń w fastapi-clean-example to trasy z `description=getdoc(...)`; FastAPI czyta docstring tylko wtedy, gdy nie ma `description=` ([Path Operation Configuration](https://fastapi.tiangolo.com/tutorial/path-operation-configuration/)), więc `description=` liczy się teraz jak docstring. Router, który każde śledzone dołączenie umieszcza pod aplikacją `FastAPI(openapi_url=None)`, pozostaje ukryty, gdy innego dołączenia nie da się prześledzić; bez tego back office Polara dodałby 115 fałszywych alarmów.
 - **FAPI002.** Nadal milczy w obu: Polar dołącza swój router API przez parametr `add_versioned_routers(app, api_router, ...)`, a część routerów przez wywołania fabryk, fastapi-clean-example zaś dołącza każdy router przez wywołanie fabryki, więc dołączenia nad ich trasami są nieznane. [#391](https://github.com/SirCypkowskyy/inwards/issues/391) je śledzi (niżej).
 - **INW012.** 107 ze 135 zgłoszeń w Polarze leży w back office; 17 fałszywych alarmów w próbie to 15 stron renderowanych na serwerze i handlerów formularzy HTMX w back office, strumień zdarzeń wysyłanych przez serwer i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
 - **FAPI003, FAPI005.** Rozpoznanie większej liczby routerów najpierw dodało fałszywe alarmy: FAPI003 ostrzegało, że 72 routery Polara są niepodpięte, bo te same nieznane dołączenia ukrywają, jak są podpięte (śledzone od [#391](https://github.com/SirCypkowskyy/inwards/issues/391), niżej), a FAPI005 zgłaszało 2 trasy, które klasa tras Polara rozdziela według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)). Router zbudowany przez własną klasę albo fabrykę jest teraz dla obu reguł nieznany: FAPI003 go pomija, dopóki dołączenie, którego nie umie prześledzić, mogłoby dołączyć jego albo router nad nim (wywołanie fabryki tylko routery, które ta fabryka zwraca, każdy inny cel dowolny router), a FAPI005 nie czyta kolejności jego tras. Routery z konstruktora FastAPI zachowują wcześniejsze odpowiedzi.
@@ -351,6 +351,18 @@ Koszt, ze źródeł na laptopie opisanym wyżej, mediana 3 zimnych uruchomień n
 - **FAPI002.** Jedyne zgłoszenie w Polarze jest trafne: OAuth2 `authorize` rzuca 401 i nie deklaruje żadnych odpowiedzi. Większość pozostałych jego tras rzuca podklasy `PolarError`, obsługiwane przez handlery rejestrowane w `add_exception_handlers(app)`, na parametrze, którego FAPI002 nie śledzi, i odpowiadające `exc.status_code` ([#400](https://github.com/SirCypkowskyy/inwards/issues/400)). Routery fastapi-clean-example buduje fabryka wokół zewnętrznego `ErrorAwareRouter`, którego argumenty kluczowe są nieznane, a więc i deklarowane odpowiedzi.
 
 Koszt: mediana 5 zimnych uruchomień na Polarze ze wszystkimi regułami FAPI, 1711 ms przed i 1728 ms po, w granicach szumu. Szukanie wywołań funkcji w projekcie parsuje tylko pliki, które zawierają jej nazwę.
+
+**Klasy tras.** [#392](https://github.com/SirCypkowskyy/inwards/issues/392) czyta, co robi klasa tras routera, z `route_class=` albo z własnej klasy routera, która ją ustawia (zasady opisują [strona FAPI001](rules/FAPI001.md#known-limitations) i [FAPI005](rules/FAPI005.md#known-limitations)). Zgłoszenie rozważało trzy opcje: opcję reguły z tagami, które wykluczają trasę ze schematu, traktowanie każdej własnej klasy tras jako nieznanej albo zostawienie tego `modules` i wyciszeniom. Czytanie kodu samej klasy nie wymaga konfiguracji i milczy wszędzie tam, gdzie klasy nie da się odczytać, więc to weszło. Ta sama metoda, Polar z #391:
+
+| Reguła, Polar | Zgłoszenia przed → po | Obejrzane | Precyzja przed → po |
+|---|--:|--:|--:|
+| FAPI001 | 131 → 30 | wszystkie | 19 % → 67 % (20 z 30) |
+| FAPI002 | 1 → 1 | wszystkie | 1 z 1 |
+| FAPI005 | 0 → 0 | nie dotyczy | nie dotyczy |
+
+- **FAPI001.** `IncludedInSchemaAPIRoute` Polara ustawia `include_in_schema` na `settings.is_development()` dla trasy z tagiem `APITag.private`, na `True` dla `APITag.public` i na `False` w pozostałych przypadkach, sprawdzając najpierw tag prywatny. Wszystkie 101 zgłoszeń, które zniknęły, dotyczy tras prywatnych: 96 policzonych wyżej i 5, które przebieg #358 zaliczył do publicznych, a które mają `tags=[APITag.private]` w dekoratorze pod publicznym routerem. Pozostałe 10 fałszywych alarmów to te same 4 eksporty CSV i 6 endpointów OAuth2, których treść odpowiedzi definiują RFC. 77 routerów API Polara czyta się jako „schemat według tagów”; pozostałe 22 aplikacje i routery używają ustawień domyślnych FastAPI.
+- **FAPI005.** Klasa tras 77 routerów API zawiera `VersionedAPIRoute`, która nadpisuje `matches`, więc ich kolejność nadal nie jest czytana, a 2 pary rozdzielone według wersji w `webhook/endpoints.py` pozostają ciche. Wcześniej nie czytano kolejności żadnego routera zbudowanego przez własną klasę (#358). Teraz czytane są też routery back office, których klasą tras jest `TransactionalAPIRoute` (tylko opakowuje handler), bez zgłoszeń. 3 pary z `tests/kit/test_versioning.py` leżą w module testowym, który warstwy korpusu pomijają.
+- fastapi-clean-example i full-stack-fastapi-template się nie zmieniły: ich routery używają klasy tras FastAPI albo pochodzą z fabryk.
 
 **Koszt.** Każda reguła osobno, oprócz warstw z manifestu, zimne (`--no-cache`) i ciepłe uruchomienie, mediana z 5 uruchomień (3 dla polara i saleora), plik binarny darwin-arm64 na opisanym wyżej laptopie, przy pracujących równolegle innych agentach (load average 5 do 11). Milisekundy, zimne / ciepłe:
 
