@@ -16,3 +16,6 @@ corpus-result.json
 **/.impeccable/config.local.json
 **/.impeccable/review/
 **/.impeccable/mocks/
+
+# Temporary files `bun build --compile` leaves in the working directory (twice committed by mistake).
+*.bun-build
