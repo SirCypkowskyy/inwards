@@ -14,6 +14,7 @@ import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { type RouterBinding, routerBindings } from "../shared/fastapi-routers.ts";
+import { enclosingParameter } from "./callers.ts";
 import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./handlers.ts";
 import type {
   Context,
@@ -24,6 +25,7 @@ import type {
   FastApiObject,
   PathOperation,
   Registration,
+  SchemaRoute,
   Wiring,
 } from "./records.ts";
 import { type Argument, callSyntax, valueFrom } from "./values.ts";
@@ -48,6 +50,15 @@ const METHODS: ReadonlySet<string> = new Set([
   "trace",
 ]);
 
+/** The path operation decorators: one per HTTP method, and `api_route`. */
+const OPERATIONS: ReadonlySet<string> = new Set([...METHODS, "api_route"]);
+
+/** A string literal, f-strings included, whose path ends in `openapi.json`. */
+const SCHEMA_PATH = /openapi\.json["']$/u;
+
+/** The methods that add a route with a path as their first argument. */
+const ADD_ROUTE: ReadonlySet<string> = new Set(["add_api_route", "add_route"]);
+
 /** The records of one file while its calls are read. */
 interface Found {
   /** The qualified names of the file's own objects. */
@@ -57,6 +68,7 @@ interface Found {
   readonly handlers: ExceptionHandler[];
   readonly events: EventHandlerUse[];
   readonly dependencies: DependencyUse[];
+  readonly schemaRoutes: SchemaRoute[];
 }
 
 /**
@@ -79,6 +91,7 @@ export function extract(root: Node, context: Context): FastApiFile {
     handlers: objects.flatMap((o) => constructorHandlers(o, context)),
     events: [],
     dependencies: [],
+    schemaRoutes: [],
   };
   for (const call of root.descendantsOfType("call")) {
     const dependency = dependencyOf(call, context.qualify);
@@ -88,7 +101,7 @@ export function extract(root: Node, context: Context): FastApiFile {
       found.dependencies.push(dependency);
     }
   }
-  const { operations, wiring, handlers, events, dependencies } = found;
+  const { operations, wiring, handlers, events, dependencies, schemaRoutes } = found;
   return {
     path: file.path,
     module: file.module,
@@ -98,6 +111,7 @@ export function extract(root: Node, context: Context): FastApiFile {
     handlers,
     events,
     dependencies,
+    schemaRoutes,
   };
 }
 
@@ -105,7 +119,10 @@ export function extract(root: Node, context: Context): FastApiFile {
  * Records one call if it is a path operation decorator, an inclusion, a
  * mount or a handler registration. It counts only on a receiver that is one
  * of the file's objects or an imported name, so `session.mount(...)` on a
- * local HTTP session doesn't; `include_router` counts on any named receiver.
+ * local HTTP session doesn't; `include_router` counts on any named receiver,
+ * and `mount` on a parameter of a module-level function too, which the graph
+ * follows to what the function's callers pass (#391). A route whose path
+ * ends in `openapi.json` is also kept as a schema route.
  *
  * @param call - a `call` node.
  * @param context - the file, its qualifier and its functions.
@@ -117,11 +134,13 @@ function record(call: Node, context: Context, found: Found): void {
   const attribute = fn?.childForFieldName("attribute");
   const app = object ? context.qualify(object) : null;
   const method = attribute ? identifierName(attribute) : "";
-  if (!(attribute && app !== null && counts(app, method, context, found))) {
+  if (!(attribute && app !== null && counts({ app, object, method }, context, found))) {
     return;
   }
   const decorated = decoratedFunction(call);
-  if (decorated && (METHODS.has(method) || method === "api_route")) {
+  const operation = decorated !== null && OPERATIONS.has(method);
+  found.schemaRoutes.push(...schemaRouteOf(call, app, operation));
+  if (decorated && operation) {
     found.operations.push(operationOf(call, { method, receiver: app, fn: decorated }, context));
   } else if (decorated && method === "exception_handler") {
     found.handlers.push(
@@ -142,17 +161,45 @@ function record(call: Node, context: Context, found: Found): void {
  * Tells whether a call on a receiver counts: on one of the file's objects or
  * an imported name, and `include_router` on any name, since it is FastAPI's
  * own (a `register(app)` function's parameter, which FAPI003 treats as an
- * unknown receiver).
+ * unknown receiver). A `mount`, `add_api_route` or `add_route` on a
+ * parameter of a module-level function counts too, which the graph follows
+ * to the function's callers (#391).
  *
- * @param app - the receiver's qualified name.
- * @param method - the called attribute.
+ * @param on - the call's receiver and method.
+ * @param on.app - the receiver's qualified name.
+ * @param on.object - the receiver's node.
+ * @param on.method - the called attribute.
  * @param context - the file.
  * @param found - the records so far, with the file's own objects.
  * @returns true when the call is recorded.
  */
-function counts(app: string, method: string, context: Context, found: Found): boolean {
+function counts(
+  { app, object, method }: { app: string; object: Node | null; method: string },
+  context: Context,
+  found: Found,
+): boolean {
   const imported = !app.startsWith(`${context.file.module}.`);
-  return found.own.has(app) || imported || method === "include_router";
+  if (found.own.has(app) || imported || method === "include_router") {
+    return true;
+  }
+  const routed = method === "mount" || ADD_ROUTE.has(method);
+  return routed && object !== null && enclosingParameter(object) !== null;
+}
+
+/**
+ * Reads a route-adding call as a schema route when it serves an OpenAPI
+ * schema of its own: its path, f-strings included, ends in `openapi.json` (#391).
+ *
+ * @param call - the decorator or `add_api_route` call.
+ * @param receiver - the qualified app or router it is called on.
+ * @param operation - true when the call is a path operation decorator.
+ * @returns the schema route, or none.
+ */
+function schemaRouteOf(call: Node, receiver: string, operation: boolean): SchemaRoute[] {
+  const method = call.childForFieldName("function")?.childForFieldName("attribute")?.text ?? "";
+  const adds = operation || ADD_ROUTE.has(method);
+  const path = adds ? (argumentAt(call, 0, "path")?.text ?? "") : "";
+  return SCHEMA_PATH.test(path) ? [{ receiver, node: call }] : [];
 }
 
 /**

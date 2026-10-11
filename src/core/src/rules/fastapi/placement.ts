@@ -2,7 +2,8 @@
  * @file What a path operation's OpenAPI entry gets from above it: the
  * `responses=` keys, `tags=`, `include_in_schema=` and `dependencies=` of the
  * router or app it is declared on, of each `include_router` on the way to an
- * app, and of the app. Also reads a `responses=` value into the keys it
+ * app, and of the app, whose `openapi_url=None` hides its routes unless it
+ * serves a schema through a route of its own (#391). Also reads a `responses=` value into the keys it
  * declares. FAPI001 and FAPI002 read these; neither reports anything here.
  *
  * Every answer is "unknown" (null) as soon as one part isn't a literal Inwards
@@ -104,10 +105,16 @@ export function declaredBy(call: CallSyntax, scope: FastApiProject): ReadonlySet
  *   builds (#358) counts as shown: its keywords are unknown, but a factory
  *   that hides its router is rare, and treating it as hidden would hide every
  *   route of a project that builds routers that way (fastapi-clean-example).
+ * @param ownSchema - true when the app adds a route that serves a schema of
+ *   its own (#391): `openapi_url=None` then only stops FastAPI serving it,
+ *   and the routes are still in the schema the app serves.
  */
-export function hiddenBy(call: CallSyntax & { readonly factory?: boolean }): boolean {
+export function hiddenBy(
+  call: CallSyntax & { readonly factory?: boolean },
+  ownSchema = false,
+): boolean {
   const value = call.keywords.get("include_in_schema")?.value;
-  const noSchema = call.keywords.get("openapi_url")?.value.kind === "none";
+  const noSchema = !ownSchema && call.keywords.get("openapi_url")?.value.kind === "none";
   const unknown = call.splat && call.factory !== true;
   return unknown || noSchema || (value !== undefined && !(value.kind === "bool" && value.value));
 }
@@ -201,9 +208,24 @@ export function ownPlacement(object: FastApiObject, scope: FastApiProject): Plac
   return {
     responses: declaredBy(object, scope),
     tagged: object.splat ? null : object.keywords.has("tags"),
-    hidden: hiddenBy(object),
+    hidden: objectHidden(object, scope),
     dependencies: dependenciesOf(object.keywords.get("dependencies")),
   };
+}
+
+/**
+ * Tells whether an app or router leaves its routes out of the schema, as
+ * `hiddenBy` does, with an app that serves a schema of its own (a route
+ * ending in `openapi.json`, #391) counted as having one even with
+ * `openapi_url=None`. The project graph is asked only for such an app.
+ *
+ * @param object - the app or router.
+ * @param scope - the project lookups, whose graph knows the schema routes.
+ * @returns true when its routes are out of the schema.
+ */
+export function objectHidden(object: FastApiObject, scope: FastApiProject): boolean {
+  const off = object.kind === "app" && object.keywords.get("openapi_url")?.value.kind === "none";
+  return hiddenBy(object, off && scope.graph().schemaServers.has(object.name));
 }
 
 /**
