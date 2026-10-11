@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 9a2786a394ce1f9324750375587a72cf2c43d3c925f49998d38e590c0bb27d28
+source_hash: 5755a7667e14c11f8061fd38fed8b21bdbeb642588cf7f5b3c5f6a75ada76aa1
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -52,7 +52,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     Claude Code uruchamia [hooki](https://code.claude.com/docs/en/hooks) wokół wywołań narzędzi. Dla `PostToolUse` kod wyjścia 2 nie cofa edycji (ona już się wydarzyła), ale Claude widzi stderr hooka i na nie reaguje. Dla `Stop` kod wyjścia 2 każe Claude'owi dalej pracować zamiast kończyć turę. Dane wejściowe hooka zawierają `stop_hook_active`, a Claude Code i tak kończy turę po kilku kolejnych blokadach, więc zepsuty hook Stop nie może uwięzić sesji.
 
-    Żeby zamiast tego udostępnić konfigurację przez commitowany `.claude/settings.json`, napisz go ręcznie. Ta wersja zakłada, że `inwards` jest w `PATH`:
+    Żeby zamiast tego udostępnić konfigurację przez commitowany `.claude/settings.json`, uruchom `inwards init --agent claude --shared --launcher "uv run"` ([przewodnik](guides/claude-code.md#share-it-with-the-team)). Hooki i reguły deny trafiają wtedy do `.claude/settings.json`, serwer `inwards` uruchamiający `uv run inwards mcp` do `.mcp.json`, a do `.gitignore` tylko `.inwards/`. Commitowane pliki nie mogą zawierać ścieżki z konkretnej maszyny, więc `--shared` przyjmuje launcher albo zapisuje samo `inwards`, gdy jest w `PATH`, a w przeciwnym razie odmawia. Usuwa własne hooki Inwards z `.claude/settings.local.json`, bo Claude Code łączy listy hooków z plików ustawień i uruchamiałyby się dwa razy, i nigdy nie zastępuje własnych hooków zespołu ani serwera MCP `inwards`, który uruchamia coś innego. Bez launchera wynik wygląda tak:
 
     ```json title=".claude/settings.json"
     {
@@ -69,20 +69,24 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
-            "hooks": [
-              {
-                "type": "command",
-                "command": "inwards hook claude-code"
-              }
-            ]
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
           }
         ],
         "Stop": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
+      },
+      "permissions": {
+        "deny": [
+          "Edit(/.claude/settings*.json)",
+          "Edit(/.inwards/**)",
+          "Edit(/**/inwards-baseline.json)"
+        ]
       }
     }
     ```
+
+    Stop gate czyta pliki ustawień użytkownika, projektu i lokalny, więc liczą się hooki w dowolnym z nich.
 
     `inwards hook claude-code` czyta JSON hooka ze stdin, więc nie potrzebuje `jq` ani powłoki POSIX i działa tak samo na Windows. Po `PostToolUse` sprawdza ten jeden plik Pythona, który agent właśnie zapisał:
 
@@ -248,7 +252,7 @@ Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing 
 Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. Dwie funkcje przesuwają Inwards wcześniej w pętli:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) wypisuje mapę warstw, tego, co każda z nich może importować, tego, gdzie leżą porty, oraz reguły bibliotek i kontekstów, w mniej niż 300 tokenach. `inwards context --write` albo `inwards init --brief` utrzymuje ją w oznaczonej sekcji `AGENTS.md`. Jest opcjonalna, żeby design partnerzy mogli porównać przebiegi z nią i bez niej ([opis architektury](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły.
+- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły. Agent bez MCP dostaje tę samą stronę z `inwards rule CODE`, a `inwards rules` wypisuje reguły, które projekt włącza.
 
 ```mermaid
 flowchart LR

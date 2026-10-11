@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: d469807f939d2d8238be813e0a8e8fb75f9243d2eefc5276a95b5ae3f7b7e0f9
+source_hash: 8d38954684b1beb2c73a4a6f0ea78e3566bec692e03614a248d142c6d3c99614
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -221,6 +221,8 @@ Które reguły zgłaszają i jak głośno:
 - `[tool.inwards.rules.pure-domain]` przyjmuje też `deny`, listę tabel z `modules` (prefiksy albo selektory, jak wyżej) i `libraries` (nazwy importu, jak w `deny-libraries` warstwy). Moduły, do których pasuje wpis, nie mogą importować jego bibliotek, niezależnie od tego, czy należą do warstwy, a `allow-libraries` warstwy tego nie znosi ([INW005](../rules/INW005.md), [przewodnik po bibliotekach](libraries.md#prefix-deny)). Służy do pakietu, który nie jest całą warstwą, na przykład do kontraktu import-lintera „`mypackage.one` nie może importować `django`”.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
+
+`inwards rules` pokazuje, co z tej tabeli wynika: każdą regułę z kodem, nazwą, informacją, czy jest włączona, poziomem i kluczem, który o każdym z nich zdecydował, zapisanym jako klucz pod `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), albo `default`. Reguła ograniczona przez `modules` mówi gdzie (`only in src.*.router`). Czyta najbliższą konfigurację albo `--config FILE`, a bez konfiguracji wypisuje ustawienia domyślne. `--json` wypisuje to samo jako `inwards/rules@1`: każda reguła ma `source` i `severitySource`, każde z polem `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` albo `severity`) i swoimi `keys`. `inwards/rules@1` jest kontraktem, tak jak `inwards/diagnostics@1`: w ramach `@1` pola są tylko dodawane, a usunięcie albo zmiana nazwy pola podnosi wersję ([ADR-007](../05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)). `inwards rule INW013` wypisuje stronę jednej reguły ([poradnik MCP](mcp.md#explain_rule)).
 
 <!-- config: fragment -->
 
