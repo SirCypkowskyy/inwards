@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 2866bc853983e8fcb7848fdf0313aba12407638e1a2bd92c0ab7bcda45db00b9
+source_hash: ba7efd1236e2d079462e367bdd5ef9635bdaee585915df811eeeb91b62b83e06
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -11,7 +11,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 
 Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki automatycznej, posortuj według kodu, nazwy, kategorii albo statusu i przeglądaj je stronami. Pasek adresu zapamiętuje widok, więc link otwiera tę samą listę. Kategoria obejmuje swoje podkategorie: `imports` pokazuje też reguły z `imports › layers`.
 
-Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Każda kategoria ma też własną stronę, a nawigacja pokazuje pod nią jej reguły: [importy](imports/index.md), [układ](layout/index.md), [role](roles/index.md), [integralność](integrity/index.md), [diagramy](diagrams/index.md) i [FastAPI](fastapi/index.md). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
+Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Każda kategoria ma też własną stronę, a nawigacja pokazuje pod nią jej reguły: [importy](imports/index.md), [układ](layout/index.md), [role](roles/index.md), [integralność](integrity/index.md), [diagramy](diagrams/index.md) i [FastAPI](fastapi/index.md). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014, INW015 i INW020 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>
 
@@ -50,7 +50,7 @@ Gdzie leży kod: każdy własny moduł w jakiejś warstwie i każdy pakiet w ksz
 
 ## Role { #roles }
 
-Co robi kod w modułach danej roli: endpointy przekazują pracę dalej, w `async def` nie ma blokujących wywołań, porty są abstrakcyjne, jest jeden korzeń kompozycji, nazwy ORM trzymają konwencję. Te reguły oceniają kod według wyborów zespołu, więc są opt-in; [szablon](../guides/configuration.md#template-rules) może włączyć regułę dla roli, a niektóre presety też je włączają.
+Co robi kod w modułach danej roli: endpointy przekazują pracę dalej, w `async def` nie ma blokujących wywołań, porty są abstrakcyjne, adaptery deklarują swój port, jest jeden korzeń kompozycji, nazwy ORM trzymają konwencję. Te reguły oceniają kod według wyborów zespołu, więc są opt-in; [szablon](../guides/configuration.md#template-rules) może włączyć regułę dla roli, a niektóre presety też je włączają.
 
 <div class="inw-rules-fallback" markdown>
 
@@ -61,6 +61,7 @@ Co robi kod w modułach danej roli: endpointy przekazują pracę dalej, w `async
 | [INW014](INW014.md) | `ports-abstract` | Klasa w module portu, która nie jest ABC ani Protocol, albo metoda portu, której ciało wykonuje pracę | opt-in | błąd | clean, hexagonal | tak |
 | [INW015](INW015.md) | `construct-only-in` | Moduł spoza korzenia kompozycji, który w czasie działania importuje adapter wyjściowy albo inną chronioną rolę lub buduje jedną z jej klas | opt-in | błąd | clean, hexagonal | tak |
 | [INW016](INW016.md) | `orm-naming` | Nazwa tabeli, która nie jest w lower_case_snake i w liczbie pojedynczej, albo kolumna daty i czasu bez `_at` lub `_date`; uruchomienie dla całego projektu wymaga też konwencji nazw w `MetaData` | opt-in | błąd | fastapi | tak |
+| [INW020](INW020.md) | `adapter-conformance` | Publiczna klasa w module adaptera bez linii `_: Port = Adapter(...)` pod `if TYPE_CHECKING:`, taka linia wykonywana przy imporcie albo linia, której adnotacja nie nazywa żadnego portu | opt-in | błąd | clean, hexagonal | tak |
 
 </div>
 
@@ -136,9 +137,9 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 
 ### Reguły opt-in i opcje reguł { #opt-in-rules }
 
-Reguła, która w kolumnie Włączona ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md), [INW019](INW019.md) i [INW021](INW021.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, INW015 i INW016, reguły, które sprawdzają dokumentację względem konfiguracji i kodu, INW017, INW018 i INW019, konwencja, której trzymają się tylko niektóre projekty, INW021, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
+Reguła, która w kolumnie Włączona ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md), [INW019](INW019.md), [INW020](INW020.md) i [INW021](INW021.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, INW015, INW016 i INW020, reguły, które sprawdzają dokumentację względem konfiguracji i kodu, INW017, INW018 i INW019, konwencja, której trzymają się tylko niektóre projekty, INW021, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
 
-Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [INW021](INW021.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
+Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [INW020](INW020.md#configuration), [INW021](INW021.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
 
 <!-- config: fragment -->
 
@@ -147,7 +148,7 @@ Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<ru
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
 ```
 
-Reguły treści opt-in, INW012 do INW016 i reguły FAPI, oraz INW021 pomijają moduły testowe: moduł, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`, na przykład `app/tests/test_orders.py`, `tests/conftest.py` czy `app/orders_test.py`. Test celowo buduje jednorazową aplikację albo importuje adapter, więc zgłoszenie w nim rzadko warto poprawiać ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` w tabeli reguły przywraca je dla tej reguły. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `ignore` najwyższego poziomu nie zawęża reguł treści.
+Reguły treści opt-in, INW012 do INW016, INW020 i reguły FAPI, oraz INW021 pomijają moduły testowe: moduł, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`, na przykład `app/tests/test_orders.py`, `tests/conftest.py` czy `app/orders_test.py`. Test celowo buduje jednorazową aplikację albo importuje adapter, więc zgłoszenie w nim rzadko warto poprawiać ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` w tabeli reguły przywraca je dla tej reguły. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `ignore` najwyższego poziomu nie zawęża reguł treści.
 
 <!-- config: fragment -->
 
@@ -166,7 +167,7 @@ Tabela opcji nie włącza reguły. Tabela dla reguły wyłączonej (opt-in i nie
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW021 oraz reguły FAPI. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
+W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW020, INW021 oraz reguły FAPI. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
 
 ## Format strony { #page-format }
 

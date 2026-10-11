@@ -241,6 +241,21 @@
       "url": "INW016/"
     },
     {
+      "code": "INW020",
+      "name": "adapter-conformance",
+      "title": "INW020 adapter-conformance",
+      "summary": "Publiczna klasa w module adaptera bez linii `_: Port = Adapter(...)` pod `if TYPE_CHECKING:`, taka linia wykonywana przy imporcie albo linia, której adnotacja nie nazywa żadnego portu",
+      "description": "Każda klasa adaptera deklaruje port, który implementuje, linią `_: Port = Adapter(...)` pod `if TYPE_CHECKING:`, więc type checker sprawdza ją względem portu.",
+      "category": ["roles", "ports"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, błąd",
+      "presets": "clean, hexagonal",
+      "url": "INW020/"
+    },
+    {
       "code": "INW000",
       "name": "unsupported-encoding",
       "title": "INW000 unsupported-encoding",

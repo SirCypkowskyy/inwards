@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: f53b96d53940eff3add3f3209463dd4dfec40e2551087d4d9fb03a4d10669a96
+source_hash: 2d1cf02d8520d4ef33609e235765304165b5c3bb0be4755bfa71e3d8d54bd908
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -158,7 +158,7 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 
 !!! info "Stan"
     Pre-alpha.
-    Reguły INW000–INW019 i INW021 oraz reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
+    Reguły INW000–INW021 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Najnowsze wydanie to 0.7.0 (2026-10-11). Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako pięć wheeli platformowych (`uv add --dev inwards`) oraz do GitHub Releases z plikami binarnymi dla sześciu platform, tymi samymi wheelami i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Szczegóły są w [Instalacji](guides/install.md).
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.

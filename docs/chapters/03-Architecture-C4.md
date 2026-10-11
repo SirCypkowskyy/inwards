@@ -84,7 +84,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019, INW021 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019, INW020, INW021 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -116,7 +116,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>adapter-conformance: INW020<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -400,6 +400,7 @@ The rules are grouped by category, in the order the [rules index](rules/index.md
 | INW014 | `ports-abstract` | In a port module (one with a `ports` segment, or the modules `modules` selects), a top-level class that is neither an ABC (`abc.ABC`, `metaclass=ABCMeta`) nor a `typing.Protocol` and extends no class from a port module, a method of an ABC or Protocol whose body holds more than a docstring, `...`, `pass` or `raise NotImplementedError`, and a subclass of a port that implements it. Exceptions, Pydantic models, named tuples, typed dicts, enums and dataclasses are exempt (`allow-bases`, `extend-allow-bases`, `allow-decorators`). The fix names the adapter layer. One parse per port module that has a `class` | opt-in | error | clean, hexagonal | :material-check-circle: |
 | INW015 | `construct-only-in` | In a module a layer owns, outside `role` and `allowed-in`: an import of a `role` module that runs (`if TYPE_CHECKING:` bodies left out), on the imported name, and a call that builds a class defined in the role reached through a module outside it (a re-export or a module attribute), on the call. An import INW001 reports as outward gets INW001 alone. One parse per such file with an import, plus the role modules, `allowed-in` and the packages above the role when a capitalised callee leads there | opt-in | error | clean, hexagonal | :material-check-circle: |
 | INW016 | `orm-naming` | Table names (`__tablename__`, `Table("name", ...)`, the name SQLModel derives for a `table=True` class, Django's `Meta.db_table`) that aren't lower_case_snake or, with `table-name = "snake_singular"` (the default), read as an English plural; and datetime or date columns (`Mapped[datetime]`, `mapped_column`/`Column` with `DateTime`, `TIMESTAMP` or `Date`, SQLModel fields, Django's `DateTimeField`/`DateField`) whose database name doesn't end with `datetime-suffix` (`_at`) or `date-suffix` (`_date`). One finding per name, with the name to use. A whole-project run adds one finding when the project has SQLAlchemy tables and no `MetaData(naming_convention=...)`. One parse per file whose text names an ORM construct, whatever layer it is in (test modules aside) | opt-in | error | fastapi | :material-check-circle: |
+| INW020 | `adapter-conformance` | In an adapter module (one with an `adapters` segment, or the modules `modules` selects), a public top-level class with no conformance line, an annotated assignment `_: Port = Adapter(...)` or `_: type[Port] = Adapter` in a module-level `if TYPE_CHECKING:` block, on the class's name; such a line outside the block, on the line; and, with `ports` set, an annotation that isn't a class from those modules (`Any` and `object` always), on the annotation. Protocols, ABCs, private classes and INW014's exempt records need no line. One parse per adapter module that has a `class` | opt-in | error | clean, hexagonal | :material-check-circle: |
 
 ### Integrity { #catalogue-integrity }
 
@@ -460,7 +461,7 @@ src/
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
 │   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
-│   │   │   │              #   annotations.ts
+│   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)
 │   │   │   │              #   (parameter types), name-patterns.ts (fnmatch-style names)
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
@@ -481,6 +482,8 @@ src/
 │   │   │   │                            #   helpers.ts (same-module helpers), remote.ts (handlers
 │   │   │   │                            #   and view bases in other modules), metrics.ts,
 │   │   │   │                            #   signals.ts, wording.ts, check.ts
+│   │   │   ├── adapter-conformance/     # INW020: lines.ts (adapter classes, conformance lines),
+│   │   │   │                            #   wording.ts, check.ts
 │   │   │   ├── async-blocking/          # INW013: catalog.ts (blocking families), receivers.ts,
 │   │   │   │                            #   check.ts
 │   │   │   ├── construct-only-in/       # INW015: check.ts (imports), calls.ts (constructions
@@ -506,7 +509,7 @@ src/
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
-│   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
+│   │   │                  #   content-rules.ts INW013 to INW015 and INW020, orm-naming.ts INW016,
 │   │   │                  #   diagrams.ts INW017 to INW019,
 │   │   │                  #   package-boundaries.ts INW002, INW003 and INW021
 │   │   └── report/        # render.ts: text / concise / json / sarif; github.ts

@@ -1,0 +1,12 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW020 adapter-conformance the fix says how to add the line, or how to mark a helper 1`] = `
+{
+  "steps": [
+    "Import the port \`SqlOrderRepository\` implements under \`if TYPE_CHECKING:\` (\`from typing import TYPE_CHECKING\`), unless the module already imports it.",
+    "Add \`_: OrderRepository = SqlOrderRepository(...)\` in that block, at the end of the module; the arguments don't matter, since the line never runs. \`_: type[OrderRepository] = SqlOrderRepository\` works too. For a class that implements several ports, add one line per port.",
+    "If \`SqlOrderRepository\` is a helper, not an adapter, rename it \`_SqlOrderRepository\` or move it out of the adapter module. If it is a record on a base of the project's own, ask the user to add that base to \`extend-allow-bases\` in [tool.inwards.rules.adapter-conformance]. Don't edit [tool.inwards] yourself.",
+  ],
+  "summary": "Add \`_: OrderRepository = SqlOrderRepository(...)\` under \`if TYPE_CHECKING:\` at the end of the module.",
+}
+`;

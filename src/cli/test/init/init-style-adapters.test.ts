@@ -1,8 +1,10 @@
 /**
- * @file INW015 in the presets with a layer of driven adapters, clean and
- * hexagonal: the config names that layer as `role` and `bootstrap` as
- * `allowed-in`, the scaffold passes, and a driving module that builds the
- * in-memory repository itself gets an INW015 warning. Each test runs init on
+ * @file INW015 and INW020 in the presets with a layer of driven adapters,
+ * clean and hexagonal: the config names that layer as INW015's `role` and
+ * INW020's `modules`, and `bootstrap` as `allowed-in`; the scaffold passes,
+ * a driving module that builds the in-memory repository itself gets an
+ * INW015 warning, and the adapter without its conformance line an INW020
+ * warning. Each test runs init on
  * a fresh uv project, then edits the scaffold by hand; INW014 has its own
  * file, `init-style-ports.test.ts`.
  */
@@ -80,8 +82,11 @@ describe.each([
     const run = init(root, "--style", style, "--scaffold");
     expect({ init: run.code, check: findings(root) }).toEqual(PASSING);
     const text = readFileSync(join(root, "pyproject.toml"), "utf8");
-    expect(text).toContain('extend-select = ["INW014", "INW015"]');
-    expect(text).toContain('INW014 = "warning"\nINW015 = "warning"\n');
+    expect(text).toContain('extend-select = ["INW014", "INW015", "INW020"]');
+    expect(text).toContain('INW014 = "warning"\nINW015 = "warning"\nINW020 = "warning"\n');
+    expect(text).toContain(
+      `[tool.inwards.rules.adapter-conformance]\nmodules = ["my_app.${role}"]\nports = ["my_app.application.ports"]\n`,
+    );
     expect(text).toContain(
       `[tool.inwards.rules.construct-only-in]\nrole = ["my_app.${role}"]\nallowed-in = ["my_app.bootstrap"]\n`,
     );
@@ -105,6 +110,16 @@ describe.each([
       code: 1,
       found: [`INW006 error ${file}`, `INW015 warning ${file}`],
     });
+  });
+
+  test("the adapter without its conformance line is an INW020 warning", () => {
+    const root = scaffolded();
+    const file = `src/my_app/${role.replaceAll(".", "/")}/${ADAPTER_MODULE}.py`;
+    const text = readFileSync(join(root, file), "utf8");
+    const line = `\nif TYPE_CHECKING:\n    _: OrderRepository = ${ADAPTER}()\n`;
+    expect(text).toContain(line);
+    writeFileSync(join(root, file), text.replace(line, "\n"));
+    expect(graded(root)).toEqual({ code: 0, found: [`INW020 warning ${file}`] });
   });
 
   test("a driving module that imports the adapter directly is reported once", () => {

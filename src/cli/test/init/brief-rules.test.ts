@@ -74,7 +74,7 @@ role = ["shop.infrastructure"]
 
   test("gives each rule its key setting", () => {
     const brief = withRules(`[tool.inwards.rules]
-extend-select = ["INW012", "INW014", "INW015", "INW016", "FAPI001", "FAPI002", "FAPI003"]
+extend-select = ["INW012", "INW014", "INW015", "INW016", "INW020", "FAPI001", "FAPI002", "FAPI003"]
 [tool.inwards.rules.thin-endpoint]
 delegate-to = ["domain"]
 [tool.inwards.rules.ports-abstract]
@@ -82,6 +82,8 @@ modules = ["shop.domain.ports"]
 [tool.inwards.rules.construct-only-in]
 role = ["shop.infrastructure"]
 allowed-in = ["shop.api.main"]
+[tool.inwards.rules.adapter-conformance]
+modules = ["shop.infrastructure"]
 [tool.inwards.rules.orm-naming]
 table-name = "snake"
 date-suffix = false
@@ -106,6 +108,9 @@ entrypoints = ["shop.api.main:app"]
       "- INW015: only `shop.api.main` may import or build `shop.infrastructure`; elsewhere take it through a port",
     );
     expect(brief).toContain("- INW016: snake_case tables; datetime columns end in `_at`\n");
+    expect(brief).toContain(
+      "- INW020 in `shop.infrastructure`: every adapter class ends its module with `_: Port = Adapter(...)` under `if TYPE_CHECKING:`",
+    );
     expect(brief).toContain("- FAPI001: path operations need `status_code` on POST and `tags`");
     expect(brief).toContain("- FAPI002: declare every 4xx and 5xx a path operation raises");
     expect(brief).toContain("- FAPI003: include every `APIRouter` in `shop.api.main:app`;");

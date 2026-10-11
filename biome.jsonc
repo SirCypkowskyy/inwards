@@ -186,6 +186,20 @@
       }
     },
     {
+      // Every rule's options table is one spec here, read whole by the config
+      // parser, its errors and the schema test, so it grows by a few lines with
+      // each rule that takes options; it reached the 300-line limit with
+      // INW020 (#433).
+      "includes": ["src/core/src/config/rule-options.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 400 } }
+          }
+        }
+      }
+    },
+    {
       // The rule registry is one table with an eight-line entry per rule, and
       // every reporter, the docs check and SARIF read it whole. Splitting it
       // by rule family would only move entries to a second table to keep in

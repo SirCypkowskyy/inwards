@@ -139,6 +139,11 @@
         "name": "core-rule-construct-only-in",
         "patterns": ["src/core/src/rules/construct-only-in/**"]
       },
+      // INW020 adapter-conformance (#433, ADR-046): each adapter class declares its port.
+      {
+        "name": "core-rule-adapter-conformance",
+        "patterns": ["src/core/src/rules/adapter-conformance/**"]
+      },
       // INW016 orm-naming (#297): table and timestamp column names, from #98.
       { "name": "core-rule-orm-naming", "patterns": ["src/core/src/rules/orm-naming/**"] },
       // INW017 diagram-unknown-name (#344): names in marked diagrams.
@@ -359,6 +364,10 @@
         ]
       },
       {
+        "from": "core-rule-adapter-conformance",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
+      },
+      {
         "from": "core-rule-construct-only-in",
         "allow": [
           "core-contracts",
@@ -423,6 +432,7 @@
           "core-rule-async-blocking",
           "core-rule-ports-abstract",
           "core-rule-construct-only-in",
+          "core-rule-adapter-conformance",
           "core-rule-orm-naming",
           "core-diagram",
           "core-rule-diagram-unknown-name",
@@ -486,6 +496,7 @@
           "core-rule-async-blocking",
           "core-rule-ports-abstract",
           "core-rule-construct-only-in",
+          "core-rule-adapter-conformance",
           "core-rule-orm-naming",
           "core-diagram",
           "core-rule-diagram-unknown-name",
@@ -1024,6 +1035,10 @@
         },
         {
           "from": "core-rule-construct-only-in",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-adapter-conformance",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

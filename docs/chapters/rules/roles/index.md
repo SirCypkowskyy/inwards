@@ -1,6 +1,6 @@
 # Roles
 
-What the code inside a role's modules does: endpoints that hand their work on, no blocking calls in `async def`, abstract ports, a single composition root, and ORM names. These rules judge code against choices a team makes, so they are opt-in; a [template](../../guides/configuration.md#template-rules) can turn one on for a role, and so do some presets.
+What the code inside a role's modules does: endpoints that hand their work on, no blocking calls in `async def`, abstract ports, adapters that declare their port, a single composition root, and ORM names. These rules judge code against choices a team makes, so they are opt-in; a [template](../../guides/configuration.md#template-rules) can turn one on for a role, and so do some presets.
 
 <div class="inw-rule-category" markdown>
 
@@ -11,6 +11,7 @@ What the code inside a role's modules does: endpoints that hand their work on, n
 | [INW014](../INW014.md) | `ports-abstract` | A class in a port module that isn't an ABC or a Protocol, or a port method whose body does work | opt-in |
 | [INW015](../INW015.md) | `construct-only-in` | A module outside the composition root that imports an outbound adapter, or another guarded role, at runtime, or builds one of its classes | opt-in |
 | [INW016](../INW016.md) | `orm-naming` | A table name that isn't lower_case_snake and singular, or a datetime or date column without `_at` or `_date`; a whole-project run also wants a `MetaData` naming convention | opt-in |
+| [INW020](../INW020.md) | `adapter-conformance` | A public class in an adapter module with no `_: Port = Adapter(...)` line under `if TYPE_CHECKING:`, such a line that runs at import, or one whose annotation names no port | opt-in |
 
 </div>
 

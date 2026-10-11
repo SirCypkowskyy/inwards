@@ -13,6 +13,7 @@
 import type { Node } from "web-tree-sitter";
 import { identifierName, keywordOf, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import { qualifiedHead, topLevelClasses } from "../shared/classes.ts";
 import type { NameMatch } from "../shared/name-patterns.ts";
 
 /** The base that makes a class an ABC (`abc` docs). */
@@ -61,64 +62,6 @@ export interface ConcreteMethod {
   readonly name: string;
   /** The body's first statement that does work. */
   readonly statement: Node;
-}
-
-/**
- * Lists a module's top-level classes with their decorators.
- *
- * @param root - the module node.
- * @returns each `class_definition` with the decorator nodes above it, in source order.
- */
-function topLevelClasses(root: Node): { node: Node; decorators: Node[] }[] {
-  const classes: { node: Node; decorators: Node[] }[] = [];
-  for (const child of namedChildren(root)) {
-    const decorated = child.type === "decorated_definition";
-    const node = decorated ? child.childForFieldName("definition") : child;
-    if (node?.type === "class_definition") {
-      const decorators = decorated
-        ? namedChildren(child).filter((part) => part.type === "decorator")
-        : [];
-      classes.push({ node, decorators });
-    }
-  }
-  return classes;
-}
-
-/**
- * Lists the names a module binds to top-level classes.
- *
- * @param root - the module node.
- * @returns every name a top-level `class` statement binds, decorated or not.
- */
-export function classNames(root: Node): Set<string> {
-  const names = new Set<string>();
-  for (const { node } of topLevelClasses(root)) {
-    const name = node.childForFieldName("name");
-    if (name) {
-      names.add(identifierName(name));
-    }
-  }
-  return names;
-}
-
-/**
- * Qualifies a base or decorator expression: `Protocol[T]` reads as
- * `Protocol`, and `dataclass(frozen=True)` as `dataclass`.
- *
- * @param node - the expression.
- * @param qualify - the file's qualifier.
- * @returns the dotted name, or null for anything it can't name.
- */
-function qualifiedHead(node: Node, qualify: Qualify): string | null {
-  if (node.type === "subscript") {
-    const value = node.childForFieldName("value");
-    return value ? qualifiedHead(value, qualify) : null;
-  }
-  if (node.type === "call") {
-    const callee = node.childForFieldName("function");
-    return callee ? qualifiedHead(callee, qualify) : null;
-  }
-  return qualify(node);
 }
 
 /**
