@@ -5,16 +5,17 @@
  * as it does the import cycles: a project without a `MetaData` naming
  * convention, and a project that follows another naming scheme
  * consistently, whose one finding replaces the per-name ones (#361). Nothing is parsed while the rule is off, nor a file
- * whose encoding can hide code (INW000 reports it). No I/O: the caller
- * supplies the files.
+ * whose encoding can hide code (INW000 reports it), and a file the run
+ * parsed for another rule is not parsed again. No I/O: the caller supplies
+ * the files and the run's trees.
  */
-import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import { checkOrmNaming, projectFindings } from "../rules/orm-naming/check.ts";
 import type { Models } from "../rules/orm-naming/models.ts";
 import { foldKey } from "../rules/orm-naming/schemes.ts";
+import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 
 /**
@@ -31,20 +32,20 @@ function covers(src: SourceFile, config: InwardsConfig): boolean {
 /**
  * Finds INW016's per-file findings, whatever layer the file is in.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the source file, with normalised text.
  * @param config - the project's config, for its rules table.
  * @param read - where the models the check reads are kept, by file, for `ormProjectFindings`.
  * @returns the findings, before suppressions.
  */
 export function ormNamingFindings(
-  parser: Parser,
+  trees: FileTrees,
   src: SourceFile,
   config: InwardsConfig,
   read: Map<SourceFile, Models>,
 ): Diagnostic[] {
   return covers(src, config)
-    ? checkOrmNaming(parser, src, config.rules?.options?.["orm-naming"], read)
+    ? checkOrmNaming(trees, src, config.rules?.options?.["orm-naming"], read)
     : [];
 }
 
@@ -66,14 +67,14 @@ export interface OrmProject {
  * covers has a table, and the naming schemes the project follows instead
  * of the configured one.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param files - every file of the run, with normalised text, in order.
  * @param config - the project's config, for its rules table.
- * @param read - the models the per-file checks read, by file; a file missing here is parsed again.
+ * @param read - the models the per-file checks read, by file; a file missing here is read from the run's trees.
  * @returns the findings, and which per-name findings they replace.
  */
 export function ormProjectFindings(
-  parser: Parser,
+  trees: FileTrees,
   files: readonly SourceFile[],
   config: InwardsConfig,
   read: ReadonlyMap<SourceFile, Models>,
@@ -83,7 +84,7 @@ export function ormProjectFindings(
   }
   const readable = files.filter((src) => checkEncoding(src) === null);
   const { findings, folded } = projectFindings(
-    parser,
+    trees,
     readable,
     config.rules?.options?.["orm-naming"],
     { checked: (src: SourceFile): boolean => covers(src, config), read },

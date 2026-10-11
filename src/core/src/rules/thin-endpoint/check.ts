@@ -8,16 +8,16 @@
  * finding names them (#271). A decorated or same-file registered endpoint is
  * reported on its `def` line; a handler another first-party module defines
  * is reported on the registration that names it. A file that mentions no
- * framework and no configured decorator is never parsed. I/O-free: the
- * caller supplies the parser, the file, the config and the run's
- * first-party modules, read only when a registration names one.
+ * framework and no configured decorator is never parsed, and one that is
+ * gets the run's shared tree. I/O-free: the caller supplies the file, the
+ * config and the run's trees, which read another first-party module only
+ * when a registration names one.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import type { LayerSpec } from "../../config/layers.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { parsePython } from "../../python/parser.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
@@ -34,7 +34,7 @@ export interface ThinInputs {
   readonly options: RuleOptions | undefined;
   /** The configured layers, innermost first, for `delegate-to` and the fix steps. */
   readonly layers: readonly LayerSpec[];
-  /** The run's first-party modules, which a registration of another module's handler reads. */
+  /** The run's trees: the file's own, and the modules a registration of another module's handler reads. */
   readonly project: ModuleTrees;
 }
 
@@ -122,44 +122,36 @@ function report(
 
 /**
  * Checks one file's endpoints against INW012. The caller decides whether the
- * rule is on for the file; this parses only a file that may hold an endpoint,
- * and reads another module only when a registration in it names a handler there.
+ * rule is on for the file; this parses only a file that may hold an endpoint
+ * (once per run, through `inputs.project`), and reads another module only
+ * when a registration in it names a handler there.
  *
- * @param parser - parser with the Python grammar loaded.
  * @param src - the file, with normalised text.
  * @param inputs - the rule's options, the layers and the project index.
  * @returns one finding per endpoint that trips a signal, before suppressions and severities apply.
  */
-export function checkThinEndpoints(
-  parser: Parser,
-  src: SourceFile,
-  inputs: ThinInputs,
-): Diagnostic[] {
+export function checkThinEndpoints(src: SourceFile, inputs: ThinInputs): Diagnostic[] {
   const settings = thinSettings(inputs.options);
   if (!mayHoldEndpoints(src.text, settings.recognise)) {
     return [];
   }
-  const tree = parsePython(parser, src.text);
+  const tree = inputs.project.treeOf(src);
   const remote = new RemoteModules(inputs.project, settings.recognise);
-  try {
-    const view = fileView(tree, src, settings.recognise, {
-      base: (q: string): ViewKind | undefined => remote.baseKind(q),
-      routers: remote.routers,
-    });
-    const context = {
-      src,
-      settings,
-      layers: inputs.layers,
-    };
-    const own = view.found.endpoints.flatMap(({ fn, name, kind }) =>
-      report({ fn, name, kind, view }, context),
-    );
-    const registered = view.found.registrations.flatMap(({ handler, target, how, kind }) => {
-      const found = remote.resolve(target);
-      return found ? report({ ...found, kind }, context, { at: handler, how }) : [];
-    });
-    return [...own, ...registered].sort((a, b) => a.line - b.line || a.column - b.column);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+  const view = fileView(tree, src, settings.recognise, {
+    base: (q: string): ViewKind | undefined => remote.baseKind(q),
+    routers: remote.routers,
+  });
+  const context = {
+    src,
+    settings,
+    layers: inputs.layers,
+  };
+  const own = view.found.endpoints.flatMap(({ fn, name, kind }) =>
+    report({ fn, name, kind, view }, context),
+  );
+  const registered = view.found.registrations.flatMap(({ handler, target, how, kind }) => {
+    const found = remote.resolve(target);
+    return found ? report({ ...found, kind }, context, { at: handler, how }) : [];
+  });
+  return [...own, ...registered].sort((a, b) => a.line - b.line || a.column - b.column);
 }

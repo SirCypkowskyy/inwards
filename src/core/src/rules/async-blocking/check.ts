@@ -15,12 +15,11 @@
  * supplies the parser, the file, the options and the run's first-party
  * modules, each parsed and read once per run (#359).
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
-import { parsePython } from "../../python/parser.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import type { ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
@@ -218,33 +217,21 @@ export class AsyncBlockingRun {
  * for the file; this parses only a file that may hold a finding, and reads
  * another module only when an `async def` calls a function there.
  *
- * @param parser - parser with the Python grammar loaded.
  * @param src - the file, with normalised text.
- * @param run - the options and the run's view of the modules a hop reads.
+ * @param run - the options, the run's trees and its view of the modules a hop reads.
  * @returns the findings in source order, before suppressions and severities apply.
  */
-export function checkAsyncBlocking(
-  parser: Parser,
-  src: SourceFile,
-  run: AsyncBlockingRun,
-): Diagnostic[] {
+export function checkAsyncBlocking(src: SourceFile, run: AsyncBlockingRun): Diagnostic[] {
   const { settings, views } = run;
   if (!(mayBlock(src.text, settings) && run.mayFind(src))) {
     return [];
   }
-  // A file an earlier file's hop led to is parsed already; the run frees that tree.
-  const shared = run.trees.parsedAs(src);
-  const tree = shared ?? parsePython(parser, src.text);
-  try {
-    const walk = walkOf(tree, src, settings.families);
-    const hops = new Helpers(walk, { views, modules: settings.follow, helpers: run.helpers() });
-    return functionsIn(tree.rootNode)
-      .filter(isAsync)
-      .flatMap((fn) => checkFunction(fn, walk, hops))
-      .sort((a, b) => a.line - b.line || a.column - b.column);
-  } finally {
-    if (shared === undefined) {
-      tree.delete(); // WASM memory is not garbage collected
-    }
-  }
+  // The run's tree: another rule, or an earlier file's hop, may have parsed it already.
+  const tree = run.trees.treeOf(src);
+  const walk = walkOf(tree, src, settings.families);
+  const hops = new Helpers(walk, { views, modules: settings.follow, helpers: run.helpers() });
+  return functionsIn(tree.rootNode)
+    .filter(isAsync)
+    .flatMap((fn) => checkFunction(fn, walk, hops))
+    .sort((a, b) => a.line - b.line || a.column - b.column);
 }

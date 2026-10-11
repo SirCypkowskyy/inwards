@@ -9,14 +9,13 @@
  * consistently (`projectFindings`, with `schemes.ts`); the caller decides
  * which runs get them. A file that names no ORM construct is never parsed,
  * and neither is an Alembic migration. I/O-free: the caller supplies the
- * parser, the files and the options.
+ * run's trees, the files and the options.
  */
-import type { Parser } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { parsePython } from "../../python/parser.ts";
+import type { FileTrees } from "../shared/module-trees.ts";
 import {
   type Models,
   readModels,
@@ -186,17 +185,12 @@ function checkColumn(column: TimeColumn, settings: Settings, src: SourceFile): D
 /**
  * Parses a file and reads its models.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @returns its tables and columns.
  */
-function modelsOf(parser: Parser, src: SourceFile): Models {
-  const tree = parsePython(parser, src.text);
-  try {
-    return readModels(tree, src);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+function modelsOf(trees: FileTrees, src: SourceFile): Models {
+  return readModels(trees.treeOf(src), src);
 }
 
 /**
@@ -204,14 +198,14 @@ function modelsOf(parser: Parser, src: SourceFile): Models {
  * the rule is on for the file; this parses only a file whose text names a
  * table or column construct.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @param options - `[tool.inwards.rules.orm-naming]`, if set.
  * @param read - where the file's models are kept for the project-wide findings, when given.
  * @returns the findings in source order, before suppressions and severities apply.
  */
 export function checkOrmNaming(
-  parser: Parser,
+  trees: FileTrees,
   src: SourceFile,
   options: RuleOptions | undefined,
   read?: Map<SourceFile, Models>,
@@ -220,7 +214,7 @@ export function checkOrmNaming(
     return [];
   }
   const settings = settingsOf(options);
-  const models = modelsOf(parser, src);
+  const models = modelsOf(trees, src);
   read?.set(src, models);
   const { tables, columns } = models;
   return [
@@ -233,20 +227,15 @@ export function checkOrmNaming(
  * Tells whether a file sets a `MetaData` naming convention, parsing it only
  * when its text names one.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @returns true when it sets one.
  */
-function hasConvention(parser: Parser, src: SourceFile): boolean {
+function hasConvention(trees: FileTrees, src: SourceFile): boolean {
   if (!src.text.includes("naming_convention")) {
     return false;
   }
-  const tree = parsePython(parser, src.text);
-  try {
-    return setsNamingConvention(tree, src);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+  return setsNamingConvention(trees.treeOf(src), src);
 }
 
 /**
@@ -285,7 +274,7 @@ function conventionFinding(src: SourceFile, table: TableName): Diagnostic {
  * The models come from `read`, which the per-file checks of the same run
  * filled; a file the rule covers and `read` lacks is parsed here.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param files - every file of the run, with normalised text.
  * @param options - `[tool.inwards.rules.orm-naming]`, if set.
  * @param scope - which files count, and what was read of them.
@@ -294,7 +283,7 @@ function conventionFinding(src: SourceFile, table: TableName): Diagnostic {
  * @returns the findings, and the per-name findings they replace.
  */
 export function projectFindings(
-  parser: Parser,
+  trees: FileTrees,
   files: readonly SourceFile[],
   options: RuleOptions | undefined,
   scope: { checked: (src: SourceFile) => boolean; read: ReadonlyMap<SourceFile, Models> },
@@ -304,7 +293,7 @@ export function projectFindings(
   const columns: Placed<TimeColumn>[] = [];
   for (const src of files) {
     if (scope.checked(src) && mayDeclare(src)) {
-      const models = scope.read.get(src) ?? modelsOf(parser, src);
+      const models = scope.read.get(src) ?? modelsOf(trees, src);
       tables.push(...models.tables.map((item) => ({ src, item })));
       columns.push(...models.columns.map((item) => ({ src, item })));
     }
@@ -314,7 +303,7 @@ export function projectFindings(
   const wanted =
     first !== undefined &&
     options?.["require-naming-convention"] !== false &&
-    !files.some((src) => hasConvention(parser, src));
+    !files.some((src) => hasConvention(trees, src));
   return {
     findings: [...(wanted ? [conventionFinding(first.src, first.item)] : []), ...schemes.findings],
     folded: schemes.folded,
