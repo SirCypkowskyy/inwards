@@ -1,7 +1,8 @@
 /**
  * @file The three `inwards mcp` tools through the SDK's own client, in
  * process: `check_files` over the whole project, named paths and text not
- * yet written (in a package that doesn't exist yet), `explain_rule` serving
+ * yet written (in a package that doesn't exist yet), a listed diagram by
+ * path and as text (#348), `explain_rule` serving
  * the docs page, and `where_should_this_go` judging imports in each layer.
  * Each test works in its own throwaway project; nothing is written to it.
  */
@@ -92,6 +93,47 @@ test("check_files checks text not yet written, in a package that doesn't exist, 
   expect(both.data["summary"]).toMatchObject({ filesChecked: 2 });
 });
 
+test("check_files checks a listed diagram by path and as text, and writes nothing", async () => {
+  /**
+   * Draws a marked layers diagram whose domain node carries a label.
+   *
+   * @param label - the quoted label of the domain node.
+   * @returns the Markdown text.
+   */
+  function diagram(label: string): string {
+    return [
+      "```mermaid",
+      "%% inwards: layers",
+      "flowchart LR",
+      `  infrastructure --> domain["${label}"]`,
+      "```",
+      "",
+    ].join("\n");
+  }
+  const root = project({
+    "pyproject.toml": `${LAYERS}diagrams = ["docs/*.md"]\n\n[tool.inwards.rules]\nextend-select = ["INW017"]\n`,
+    "shop/domain/order.py": "",
+    "shop/infrastructure/db.py": "",
+    "docs/architecture.md": diagram("shop.domian"),
+  });
+  const client = await connect(root);
+  const onDisk = await call(client, "check_files", { paths: ["docs/architecture.md"] });
+  expect(findings(onDisk.data)).toEqual(["INW017 docs/architecture.md"]);
+  const fixed = await call(client, "check_files", {
+    contents: { "docs/architecture.md": diagram("shop.domain") },
+  });
+  expect(findings(fixed.data)).toEqual([]);
+  expect(fixed.data["notChecked"]).toBeUndefined();
+  const drafted = await call(client, "check_files", {
+    contents: { "docs/contexts.md": diagram("shop.nowhere") },
+  });
+  expect(findings(drafted.data)).toEqual(["INW017 docs/contexts.md"]);
+  expect(existsSync(join(root, "docs/contexts.md"))).toBe(false);
+  const unlisted = await call(client, "check_files", { contents: { "NOTES.md": "# x\n" } });
+  expect(findings(unlisted.data)).toEqual([]);
+  expect(unlisted.text).toContain("NOTES.md is not a diagram");
+});
+
 test("check_files caps the diagnostics, refuses non-Python contents, and reports a broken config", async () => {
   const root = project({
     "pyproject.toml": LAYERS,
@@ -104,7 +146,7 @@ test("check_files caps the diagnostics, refuses non-Python contents, and reports
   expect(capped.data["summary"]).toMatchObject({ violations: 2, omitted: 1 });
   const toml = await call(client, "check_files", { contents: { "pyproject.toml": "" } });
   expect(toml.isError).toBe(true);
-  expect(toml.text).toContain("Python files only");
+  expect(toml.text).toContain("pyproject.toml is neither");
   const broken = project({ "pyproject.toml": "[tool.inwards]\nlayers = 3\n", "a.py": "" });
   const answer = await call(await connect(broken), "check_files", {});
   expect(answer.isError).toBe(true);

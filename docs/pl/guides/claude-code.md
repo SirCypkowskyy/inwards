@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: af6613d8a0d4703f2e648f2c8dd8e41d76de268bef528069fd9fd93cea9f04db
+source_hash: f2b92db3d4c6d8c577045b1a8b8bc3182136f5c2651f5b1267c5ee88070a91b3
 ---
 
 # Claude Code { #claude-code }
@@ -8,7 +8,7 @@ source_hash: af6613d8a0d4703f2e648f2c8dd8e41d76de268bef528069fd9fd93cea9f04db
 !!! info "Zweryfikowano 2026-09-25"
     Ręcznie na Linuksie: `init` i jego wyjście oraz nieinteraktywna sesja (headless) `claude -p` w Claude Code 2.1.282, w której edycja konfiguracji została odrzucona, naruszenie zgłoszone, a Stop gate eskalował do użytkownika. Interaktywnego kroku `/hooks` nie uruchomiono. Na macOS (arm64) i Windows CI uruchamia `init` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia.
 
-Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje Claude. Nie pozwala zakończyć tury, dopóki zmiany z sesji łamią warstwę, i odrzuca edycje samych reguł. [Rozdział 4](../04-AI-Integration.md) wyjaśnia, jak to zaprojektowano.
+Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje Claude, i każdy [diagram architektury](diagrams.md#check) wymieniony w konfiguracji. Nie pozwala zakończyć tury, dopóki zmiany z sesji łamią warstwę, i odrzuca edycje samych reguł. [Rozdział 4](../04-AI-Integration.md) wyjaśnia, jak to zaprojektowano.
 
 ## Konfiguracja { #set-it-up }
 

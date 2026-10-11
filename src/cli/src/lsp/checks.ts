@@ -10,12 +10,25 @@
 import { dirname, resolve } from "node:path";
 import type { ConfigError, Diagnostic, Report } from "@inwards/core";
 import type { ProjectIo } from "../project/contracts.ts";
+import { configListsDiagram, DIAGRAM_FILE } from "../project/diagrams.ts";
 import { type CheckUnit, planCheck } from "../project/routing.ts";
 import type { Editor } from "./contracts.ts";
 import { isConfigError, messageOf } from "./convert.ts";
 
 /** The documents a check reads, as `inwards check` does: Python sources and stubs. */
-export const PYTHON: RegExp = /\.pyi?$/u;
+const PYTHON: RegExp = /\.pyi?$/u;
+
+/**
+ * Tells whether a document may be checked alone: a Python file, or a file
+ * named like a diagram (`DIAGRAM_FILE`), which `checkAlone` checks when its
+ * config lists it. Any other document shows the last whole pass's findings.
+ *
+ * @param path - the document's absolute path.
+ * @returns true for a Python or diagram file name.
+ */
+export function checkedAlone(path: string): boolean {
+  return PYTHON.test(path) || DIAGRAM_FILE.test(path);
+}
 
 /**
  * Runs one config's check, as `project/check.ts`'s `runCheck` does with its
@@ -127,13 +140,16 @@ export async function checkWorkspace(
 
 /**
  * Checks one document alone, as the PostToolUse hook checks an edit
- * (`edit: true`), with the config `inwards check` would route it to.
+ * (`edit: true`), with the config `inwards check` would route it to. A
+ * document that isn't Python is checked only where its config lists it as a
+ * diagram (#348), so its INW017 and INW018 findings follow the unsaved text.
  *
  * @param deps - the check and what routing reads.
  * @param path - the document's absolute path.
  * @param texts - the open documents' text, by absolute path.
- * @returns the findings in that file; none for a file that isn't Python,
- *   that no config covers, or whose config is broken (the whole pass reports that).
+ * @returns the findings in that file; none for a file that is neither Python
+ *   nor a listed diagram, that no config covers, or whose config is broken
+ *   (the whole pass reports that).
  * @throws when a check fails for a reason other than its config, or a
  *   pyproject.toml on the way can't be read.
  */
@@ -142,11 +158,15 @@ export async function checkAlone(
   path: string,
   texts: ReadonlyMap<string, string>,
 ): Promise<Diagnostic[]> {
-  if (!PYTHON.test(path)) {
+  if (!checkedAlone(path)) {
     return [];
   }
+  const python = PYTHON.test(path);
   const own: Diagnostic[] = [];
   for (const unit of planCheck({ ...deps.io, toml: deps.toml }, dirname(path), [path]).units) {
+    if (!(python || configListsDiagram(deps.io, unit.config, path))) {
+      continue;
+    }
     const base = dirname(unit.config);
     try {
       // biome-ignore lint/performance/noAwaitInLoops: one config at a time, in order.

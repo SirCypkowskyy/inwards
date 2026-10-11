@@ -1,5 +1,6 @@
 /**
- * @file The PostToolUse hook: after the agent writes a Python file, check that one
+ * @file The PostToolUse hook: after the agent writes a Python file, or a
+ * diagram file `[tool.inwards].diagrams` lists (#348), check that one
  * file, split what it finds into what blocks (new errors) and what is context
  * (warnings, violations the file already had at session start, rejected
  * suppressions, errors that just reached the escalation limit), record the
@@ -18,6 +19,7 @@ import { physicalRealpath } from "../paths/physical.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { findConfig } from "../project/config-discovery.ts";
+import { configListsDiagram } from "../project/diagrams.ts";
 import { projectPath } from "../project/snapshot.ts";
 import { agentSuppressions, rejectedNote } from "../session/agent-suppressions.ts";
 import type { Start } from "../session/contracts.ts";
@@ -38,6 +40,8 @@ const PYTHON_FILE = /\.pyi?$/u;
 
 /**
  * Checks the one file the agent just wrote and records the edit in the session.
+ * A file that isn't Python is checked only when its config lists it as a
+ * diagram, with INW017 or INW018 on; any other passes silently, as before.
  *
  * @param deps - the platform, this invocation's run log and the check runner.
  * @param input - the hook payload.
@@ -48,7 +52,7 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
   const { io } = deps;
   const toolInput = input["tool_input"];
   const file = isRecord(toolInput) ? toolInput["file_path"] : undefined;
-  if (typeof file !== "string" || !PYTHON_FILE.exec(file)) {
+  if (typeof file !== "string") {
     return 0;
   }
   const target = hookTarget(io, input["cwd"], file);
@@ -62,7 +66,9 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
   const id = input["session_id"];
   const start = isSessionId(id) ? readSessionStart(io, target.project, id) : undefined;
   const configPath = sessionConfig(io, dirname(target.file), target.project, start);
-  if (!configPath) {
+  if (
+    !(configPath && (PYTHON_FILE.test(file) || configListsDiagram(io, configPath, target.file)))
+  ) {
     return 0;
   }
   try {
