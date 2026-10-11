@@ -1,11 +1,13 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: af8802835a0be692db3ab6c771bf11eceef9e803f92b9efb690adc482803937a
+source_hash: d016fee779227f4a62f735715cf5bff56c9f59f2049b25695a265d2537e7e129
 ---
 
 # :material-format-list-checks: Reguły { #rules }
 
 Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia `docs:` w wyjściu tekstowym, pole `docs` w wyjściu JSON, `helpUri` w SARIF i link przy kodzie w edytorze. Każda strona mówi, co reguła zgłasza, dlaczego ma to znaczenie, gdy kod pisze agent AI, pokazuje przykład zgłoszony i poprawiony, opisuje, jak naprawić diagnostykę i jak skonfigurować regułę, oraz czego reguła jeszcze nie wyłapuje.
+
+`inwards rule INW001` wypisuje stronę reguły w terminalu, bez sieci, z pliku binarnego, którego używasz, a `inwards rules` pokazuje, które reguły włącza twoja konfiguracja, z jakim poziomem i dlaczego ([konfiguracja](../guides/configuration.md#rules)).
 
 Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki automatycznej, posortuj według kodu, nazwy albo statusu i przeglądaj je stronami. Pasek adresu zapamiętuje widok, więc link otwiera tę samą listę. Kategoria obejmuje swoje podkategorie: `imports` pokazuje też reguły z `imports › layers`.
 

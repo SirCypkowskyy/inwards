@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c26c7519996a8e08746fbc8190affbc0c984ff2f551cbaa9b6f4a87865e1f3d1
+source_hash: 7895dd8dbeff7625fb832c22d6141ec62545f91086dd1b59837a28f98a61888b
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -228,7 +228,7 @@ Pozostałe polecenia korzystają z tych samych elementów:
 
 - `inwards hook claude-code` czyta ze stdin dane hooka Claude Code i rozdziela je według zdarzenia: SessionStart zapisuje stan sesji, PreToolUse uruchamia shape guard i config guard, PostToolUse sprawdza edytowany plik, a Stop uruchamia Stop gate dla tego, co zmieniła sesja. [Rozdział 4](04-AI-Integration.md) opisuje każde z nich.
 - `inwards daemon` trzyma silnik w gotowości dla PostToolUse ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)). Hook wysyła mu przez lokalne gniazdo dane hooka, katalog roboczy i środowisko, po jednej linii JSON w każdą stronę; daemon uruchamia ten sam kod `hook claude-code` ze środowiskiem zbudowanym z tych danych i strumieniami, które zbierają wyjście, a hook wypisuje to wyjście i kończy się z jego kodem. Daemon trzyma tylko to, co identyfikuje treść: ekstrakcje według skrótu tekstu i odpowiedzi gita według identyfikatora commita. Bez odpowiedzi hook uruchamia się jednorazowo.
-- `inwards mcp` udostępnia trzy narzędzia klientowi MCP agenta przez stdio ([ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)). `check_files` uruchamia routing i sprawdzenie `inwards check` z niezapisanym jeszcze kodem Pythona od agenta nałożonym na dysk, `explain_rule` zwraca strony reguł wbudowane w plik binarny, a `where_should_this_go` sprawdza w każdej warstwie moduł zawierający tylko planowane importy. SDK i strony ładują się z osobnych chunków, tylko dla tego polecenia.
+- `inwards mcp` udostępnia trzy narzędzia klientowi MCP agenta przez stdio ([ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)). `check_files` uruchamia routing i sprawdzenie `inwards check` z niezapisanym jeszcze kodem Pythona od agenta nałożonym na dysk, `explain_rule` zwraca strony reguł wbudowane w plik binarny, a `where_should_this_go` sprawdza w każdej warstwie moduł zawierający tylko planowane importy. SDK i strony ładują się z osobnych chunków, tylko dla tego polecenia; `inwards rule CODE` wypisuje tę samą stronę z tego samego chunka, dla agentów bez klienta MCP.
 - `inwards init --agent claude|opencode|aider|agents-md` najpierw wylicza każdą zmianę plików, więc `--dry-run` może wypisać ją jako diff, a drugie uruchomienie niczego nie zmienia.
 - `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi [--scaffold]` zapisuje `[tool.inwards]` z presetu (i przykładowy pakiet z pasującymi do niego kształtami pakietów) tylko tam, gdzie jeszcze nic nie ma, a potem uruchamia sprawdzenie w tym samym procesie i wypisuje pakiet jako drzewo z opisami. W terminalu bez flag zamiast tego pyta kreator zbudowany na `@clack/prompts`; jest ładowany importem dynamicznym, który build umieszcza w osobnym fragmencie ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -479,7 +479,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook, daemon, server, mcp: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
