@@ -204,6 +204,7 @@
         "INW017",
         "INW018",
         "INW019",
+        "INW020",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -476,6 +477,9 @@
         "orm-naming": {
           "$ref": "#/definitions/ormNamingOptions"
         },
+        "adapter-conformance": {
+          "$ref": "#/definitions/adapterConformanceOptions"
+        },
         "diagram-unknown-name": {
           "$ref": "#/definitions/ruleOptions"
         },
@@ -656,6 +660,84 @@
           "markdownDescription": "In a whole-project run, report a project with SQLAlchemy or SQLModel tables and no MetaData(naming_convention=...).\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW016/)",
           "type": "boolean",
           "default": true
+        }
+      }
+    },
+    "adapterConformanceOptions": {
+      "description": "INW020 adapter-conformance's options, [tool.inwards.rules.adapter-conformance]. They don't turn the rule on: extend-select or select does. Without modules, the rule checks the modules with an adapters segment.",
+      "markdownDescription": "INW020 adapter-conformance's options, [tool.inwards.rules.adapter-conformance]. They don't turn the rule on: extend-select or select does. Without modules, the rule checks the modules with an adapters segment.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW020/)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
+        },
+        "ports": {
+          "description": "The port modules, as module prefixes or selectors as in layers[].modules. A conformance line's annotation must name a class from one of them. Without it, the port in a message is the one class the module imports from a module with a ports segment, and any annotation but Any and object counts.",
+          "markdownDescription": "The port modules, as module prefixes or selectors as in layers[].modules. A conformance line's annotation must name a class from one of them. Without it, the port in a message is the one class the module imports from a module with a ports segment, and any annotation but Any and object counts.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW020/)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "allow-bases": {
+          "description": "Bases that keep a class in an adapter module out of the check, by qualified name with * and ? wildcards; builtins are spelled bare (Exception). Replaces the default list of exceptions, pydantic.BaseModel, NamedTuple, TypedDict and enums.",
+          "markdownDescription": "Bases that keep a class in an adapter module out of the check, by qualified name with * and ? wildcards; builtins are spelled bare (Exception). Replaces the default list of exceptions, pydantic.BaseModel, NamedTuple, TypedDict and enums.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW020/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": [
+            "BaseException",
+            "Exception",
+            "*Error",
+            "*Exception",
+            "*Warning",
+            "pydantic.BaseModel",
+            "typing.NamedTuple",
+            "typing.TypedDict",
+            "typing_extensions.NamedTuple",
+            "typing_extensions.TypedDict",
+            "enum.*"
+          ]
+        },
+        "extend-allow-bases": {
+          "description": "Bases added to allow-bases (or to its default), by qualified name with * and ? wildcards.",
+          "markdownDescription": "Bases added to allow-bases (or to its default), by qualified name with * and ? wildcards.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW020/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": []
+        },
+        "allow-decorators": {
+          "description": "Class decorators that keep a class in an adapter module out of the check, by qualified name with * and ? wildcards. Replaces the default list of dataclass, pydantic and attrs decorators.",
+          "markdownDescription": "Class decorators that keep a class in an adapter module out of the check, by qualified name with * and ? wildcards. Replaces the default list of dataclass, pydantic and attrs decorators.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW020/)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^.\\s\\[\\]/\\\\:-]+(\\.[^.\\s\\[\\]/\\\\:-]+)*$"
+          },
+          "default": [
+            "dataclasses.dataclass",
+            "pydantic.dataclasses.dataclass",
+            "attrs.define",
+            "attrs.frozen",
+            "attrs.mutable",
+            "attr.s",
+            "attr.attrs",
+            "attr.define",
+            "attr.frozen"
+          ]
         }
       }
     },
@@ -1219,6 +1301,24 @@
                 "allOf": [
                   {
                     "$ref": "#/definitions/ormNamingOptions"
+                  },
+                  { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
+                ]
+              }
+            ]
+          },
+          "adapter-conformance": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": ["error", "warning"]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/adapterConformanceOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]

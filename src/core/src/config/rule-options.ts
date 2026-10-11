@@ -74,7 +74,7 @@ function depth(value: unknown, where: string): number {
 /**
  * Parses a non-empty list of module prefixes or selectors, checked like
  * `layers[].modules`: `modules` in every table, FAPI003's `allow-unmounted`,
- * INW015's `role` and `allowed-in`. INW013's `follow-modules` may be empty.
+ * INW015's `role` and `allowed-in`, INW020's `ports`. INW013's `follow-modules` may be empty.
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
@@ -190,7 +190,7 @@ export function delegateProblem(
   return undefined;
 }
 
-/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's bases and decorators. */
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's and INW020's bases and decorators. */
 const namePatterns = listMatching(
   NAME_PATTERN,
   'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
@@ -235,7 +235,7 @@ const SHARED: Readonly<Record<string, OptionParser>> = { modules: moduleEntries 
 
 /**
  * The opt-in content rules, which skip test modules unless their table sets
- * `check-tests = true` (#362): INW012 to INW016 and the FAPI family. The
+ * `check-tests = true` (#362): INW012 to INW016, INW020 and the FAPI family. The
  * import, layout and diagram rules don't take the key.
  */
 const CONTENT_RULES: ReadonlySet<string> = new Set([
@@ -244,6 +244,7 @@ const CONTENT_RULES: ReadonlySet<string> = new Set([
   "ports-abstract",
   "construct-only-in",
   "orm-naming",
+  "adapter-conformance",
   "endpoint-metadata",
   "undocumented-error-response",
   "router-wiring",
@@ -261,7 +262,7 @@ export const CHECK_TESTS = "check-tests";
  * Tells whether a rule is a content rule, one that skips test modules by default.
  *
  * @param rule - the rule's kebab-case name.
- * @returns true for INW012 to INW016 and the FAPI rules.
+ * @returns true for INW012 to INW016, INW020 and the FAPI rules.
  */
 export function skipsTests(rule: string): boolean {
   return CONTENT_RULES.has(rule);
@@ -312,6 +313,12 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "allow-decorators": namePatterns,
   },
   "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
+  "adapter-conformance": {
+    ports: moduleEntries,
+    "allow-bases": namePatterns,
+    "extend-allow-bases": namePatterns,
+    "allow-decorators": namePatterns,
+  },
   "orm-naming": {
     "table-name": oneOf(["snake", "snake_singular", false]),
     "datetime-suffix": suffix,

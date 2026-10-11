@@ -1,6 +1,6 @@
 /**
  * @file The opt-in rules part of the architecture brief (#336): one short line
- * per opt-in rule the config turns on (INW012 to INW016, the FAPI family),
+ * per opt-in rule the config turns on (INW012 to INW016, INW020, the FAPI family),
  * worded as what to do while writing code, with the rule's key setting
  * (INW012's `delegate-to`, INW015's `role` and `allowed-in`, INW014's port
  * modules) and the modules it is scoped to. It also owns the inline-code
@@ -57,6 +57,8 @@ const INSTRUCTIONS: Readonly<Record<string, Instruction>> = {
     ].filter((part) => part !== "");
     return parts.length === 0 ? undefined : parts.join("; ");
   },
+  INW020: (): string =>
+    "every adapter class ends its module with `_: Port = Adapter(...)` under `if TYPE_CHECKING:`",
   FAPI001: (table: RuleTable | undefined): string | undefined => {
     const parts = metadataParts(table);
     return parts.length === 0 ? undefined : `path operations need ${and(parts)}`;

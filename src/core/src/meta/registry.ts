@@ -33,10 +33,11 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule: INW000 to INW019, and the FAPI family without FAPI004. */
+/** Codes of every registered rule: INW000 to INW020, and the FAPI family without FAPI004. */
 type RuleCode =
   | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
   | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
+  | "INW020"
   | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
@@ -229,6 +230,16 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "A marked architecture diagram draws every import the code makes between the layers or contexts it shows.",
     docs: page("INW019"),
+  },
+  // Opt-in, the conformance line of ADR-046 (#433).
+  INW020: {
+    code: "INW020",
+    name: "adapter-conformance",
+    severity: "error",
+    default: "off",
+    summary:
+      "Every adapter class declares the port it implements with `_: Port = Adapter(...)` under `if TYPE_CHECKING:`, so the type checker checks it against the port.",
+    docs: page("INW020"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. FAPI004 stays
   // unused: the #185 spike said no-go, and codes are never renumbered.
