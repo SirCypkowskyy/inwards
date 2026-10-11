@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI003.md
-source_hash: 88fc0345b7ced156b99403dc63085fa5aa0bec0749d550ba41d43563421cf295
+source_hash: a3435ec20f3fddf4da5cd7a28dc4af10462ec89b030d0b94288e2129ec07b87e
 type: rule
 title: FAPI003 router-wiring
 description: Każdy APIRouter z trasami jest dołączony do aplikacji, a routery nie dołączają się nawzajem w cyklu.
@@ -166,6 +166,7 @@ check-order = true
 - `unresolved-includes` (domyślnie `"warn"`): co robi wywołanie `include_router`, którego celu Inwards nie umie rozwiązać. `"warn"` zamienia każdy niepodpięty router w ostrzeżenie, które wskazuje to wywołanie; `"silent"` je pomija.
 - `check-order` (domyślnie `true`): `false` wyłącza zgłaszanie dołączenia nad trasami.
 - `modules`, jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+- `check-tests`: `true` sprawia, że FAPI003 zgłasza też w modułach testowych, które domyślnie pomija ([tabele opcji](index.md#opt-in-rules)).
 
 Każda diagnostyka ma własną linię i można ją wyciszyć w linii przez `# inwards: ignore[FAPI003] reason="..."` w tej linii. Wyciszenie w linii `APIRouter(...)` liczy się jako użyte także w hooku, który tego routera nie zgłasza.
 

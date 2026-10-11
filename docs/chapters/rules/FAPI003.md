@@ -164,6 +164,7 @@ check-order = true
 - `unresolved-includes` (default `"warn"`): what an `include_router` call whose target Inwards can't resolve does. `"warn"` turns every unmounted router into a warning that names the call; `"silent"` drops them.
 - `check-order` (default `true`): `false` stops reporting an inclusion above the routes.
 - `modules`, as for every rule ([options tables](index.md#opt-in-rules)).
+- `check-tests`: `true` makes FAPI003 report in test modules too, which it skips by default ([options tables](index.md#opt-in-rules)).
 
 Every finding sits on a line of its own and can be suppressed inline with `# inwards: ignore[FAPI003] reason="..."` on that line. A suppression on an `APIRouter(...)` line counts as used in the hook too, which doesn't report the router.
 

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI002.md
-source_hash: e1d786ef86170945bf0b328659cb74613d169a87c1804954930ad5ac3cb5f6e3
+source_hash: ca893dcc7001ce4af0c8409cdabfece2b0428bf13c5673274fcd23552107cbc0
 type: rule
 title: FAPI002 undocumented-error-response
 description: Operacja ścieżki FastAPI może zwrócić kod błędu, bezpośrednio, przez funkcję pomocniczą albo zależność, albo przez handler wyjątków aplikacji, którego jej wpis OpenAPI nie deklaruje.
@@ -196,7 +196,7 @@ handled-counts-as-documented = false  # true: codes from app exception handlers 
 explicit-422 = "ignore"               # "report": a raised 422 must be declared too
 ```
 
-Nieznany klucz albo zła wartość to błąd konfiguracji, który podaje klucz. Jak każda reguła, przyjmuje też `modules` ([tabele opcji](index.md#opt-in-rules)). Diagnostykę można wyciszyć w linii dekoratora przez `# inwards: ignore[FAPI002] reason="..."`.
+Nieznany klucz albo zła wartość to błąd konfiguracji, który podaje klucz. Jak każda reguła, przyjmuje też `modules`, a jak każda reguła treści także `check-tests`, które sprawia, że zgłasza też w modułach testowych ([tabele opcji](index.md#opt-in-rules)). Diagnostykę można wyciszyć w linii dekoratora przez `# inwards: ignore[FAPI002] reason="..."`.
 
 `FAST004` Ruffa (w recenzji) obejmuje pierścień 0 z `responses=` w tym samym pliku. Gdy trafi do wydania, `report-direct-raises = false` sprawi, że obie reguły nie zgłoszą tego samego `raise`.
 

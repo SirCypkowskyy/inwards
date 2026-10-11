@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI009.md
-source_hash: 53a831eb03dd15b7fad2ba55a65e2a463545dd4ab692cafc29241ebc26a6e40e
+source_hash: 12a4b96d5085c499b6d7b531ed4d3b3645084eae27086c5edd74e488b4a4671e
 type: rule
 title: FAPI009 depends-called
 description: Depends i Security dostają funkcję zależności, a nie wynik jej wywołania przy imporcie.
@@ -154,7 +154,7 @@ Brak automatycznej poprawki (`autofix: false`). Usunięcie nawiasów zwykle jest
 
 ## Konfiguracja { #configuration }
 
-Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule, a `check-tests` jak w każdej regule treści ([tabele opcji](index.md#opt-in-rules)).
 
 Każde zgłoszenie można wyciszyć w kodzie przez `# inwards: ignore[FAPI009] reason="..."` w pierwszej linii wywołania `Depends(...)`.
 

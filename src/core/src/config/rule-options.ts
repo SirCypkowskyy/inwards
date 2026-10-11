@@ -1,8 +1,8 @@
 /**
  * @file Every rule's options table, `[tool.inwards.rules.<rule-name>]`: one
  * spec per rule, mapping each key the table may hold to the parser that
- * checks its value. `modules` is every rule's; a rule without its own entry
- * takes `modules` only. The config parser, its error messages and the schema
+ * checks its value. `modules` is every rule's, and `check-tests` every opt-in
+ * content rule's; a rule without its own entry takes those only. The config parser, its error messages and the schema
  * test all read these specs, so a new option is one line here (plus its
  * schema entry and docs). Values are kept as the TOML gave them, by key; each
  * rule reads its own with typed defaults. This module only validates, apart
@@ -233,6 +233,40 @@ function denyEntries(value: unknown, where: string): LibraryDeny[] {
 /** The keys every rule's table may hold. */
 const SHARED: Readonly<Record<string, OptionParser>> = { modules: moduleEntries };
 
+/**
+ * The opt-in content rules, which skip test modules unless their table sets
+ * `check-tests = true` (#362): INW012 to INW016 and the FAPI family. The
+ * import, layout and diagram rules don't take the key.
+ */
+const CONTENT_RULES: ReadonlySet<string> = new Set([
+  "thin-endpoint",
+  "async-blocking",
+  "ports-abstract",
+  "construct-only-in",
+  "orm-naming",
+  "endpoint-metadata",
+  "undocumented-error-response",
+  "router-wiring",
+  "route-shadowing",
+  "lifespan-events",
+  "yield-dependency-swallows",
+  "duplicate-operation-id",
+  "depends-called",
+]);
+
+/** The key that brings test modules back into a content rule's scope. */
+export const CHECK_TESTS = "check-tests";
+
+/**
+ * Tells whether a rule is a content rule, one that skips test modules by default.
+ *
+ * @param rule - the rule's kebab-case name.
+ * @returns true for INW012 to INW016 and the FAPI rules.
+ */
+export function skipsTests(rule: string): boolean {
+  return CONTENT_RULES.has(rule);
+}
+
 /** Each rule's own options, by rule name, then by key. */
 const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser>>>> = {
   "pure-domain": { deny: denyEntries },
@@ -297,10 +331,11 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
  * Lists the keys a rule's options table may hold.
  *
  * @param rule - the rule's kebab-case name.
- * @returns `modules` and the rule's own keys.
+ * @returns `modules`, `check-tests` for a content rule, and the rule's own keys.
  */
 export function optionKeys(rule: string): ReadonlySet<string> {
-  return new Set([...Object.keys(SHARED), ...Object.keys(RULE_OPTIONS[rule] ?? {})]);
+  const content = skipsTests(rule) ? [CHECK_TESTS] : [];
+  return new Set([...Object.keys(SHARED), ...content, ...Object.keys(RULE_OPTIONS[rule] ?? {})]);
 }
 
 /**
@@ -317,7 +352,11 @@ export function parseOptions(
   table: Record<string, unknown>,
   where: string,
 ): Record<string, OptionValue> {
-  const parsers = { ...SHARED, ...RULE_OPTIONS[rule] };
+  const parsers: Readonly<Record<string, OptionParser>> = {
+    ...SHARED,
+    ...(skipsTests(rule) ? { [CHECK_TESTS]: boolean } : {}),
+    ...RULE_OPTIONS[rule],
+  };
   const options: Record<string, OptionValue> = {};
   for (const key of Object.keys(table).sort()) {
     const parse = parsers[key];
