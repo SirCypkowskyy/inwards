@@ -312,6 +312,8 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "allow-bases": namePatterns,
     "extend-allow-bases": namePatterns,
     "allow-decorators": namePatterns,
+    interface: oneOf(["any", "protocol"]),
+    "allow-subclassing": boolean,
   },
   "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
   "orm-naming": {

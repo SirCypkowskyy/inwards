@@ -329,3 +329,135 @@ layers = [
     expect(await inw014(text)).toEqual([]);
   });
 });
+
+describe('INW014 interface = "protocol"', () => {
+  const AbcPort = `from abc import ABC, abstractmethod
+
+class UserRepository(ABC):
+    @abstractmethod
+    def get(self, user_id: int) -> "User": ...
+`;
+
+  test("an ABC port passes with the defaults and is reported on its name with the option", async () => {
+    expect(await inw014(AbcPort)).toEqual([]);
+    const found = await check(
+      AbcPort,
+      '[tool.inwards.rules]\nextend-select = ["INW014"]\n[tool.inwards.rules.ports-abstract]\ninterface = "protocol"',
+    );
+    const [finding] = found.filter((d) => d.code === "INW014");
+    expect(`${finding?.line}:${finding?.column} ${finding?.message}`).toBe(
+      '3:7 `UserRepository` in port module `shop.application.ports.users` is an ABC; ports here are `typing.Protocol` classes (`interface = "protocol"`), which adapters implement by their shape.',
+    );
+    expect(finding?.fix?.steps[0]).toBe(
+      "Replace `ABC` with `Protocol` (from `typing`) among the bases of `UserRepository`, and drop `@abstractmethod` from its methods: it matters only to subclasses.",
+    );
+  });
+
+  test("metaclass=ABCMeta counts as an ABC; a Protocol passes", async () => {
+    const meta =
+      "from abc import ABCMeta\n\nclass Repo(metaclass=ABCMeta):\n    def get(self): ...\n";
+    expect(await inw014(meta, 'interface = "protocol"')).toHaveLength(1);
+    expect(await inw014(PROTOCOL, 'interface = "protocol"')).toEqual([]);
+  });
+
+  test("a port that extends a port without listing Protocol is reported; one that lists it passes", async () => {
+    const text = `from typing import Protocol
+
+class Repository(Protocol):
+    def all(self) -> list[object]: ...
+
+class Users(Repository):
+    def by_email(self, email: str) -> object: ...
+
+class Orders(Repository, Protocol):
+    def by_user(self, user_id: int) -> list[object]: ...
+`;
+    expect(await inw014(text)).toEqual([]);
+    expect(await inw014(text, 'interface = "protocol"')).toEqual([
+      '6:7 `Users` in port module `shop.application.ports.users` extends the port `Repository` but doesn\'t list `Protocol` among its own bases, so the type checker treats it as a regular class; ports here are `typing.Protocol` classes (`interface = "protocol"`).',
+    ]);
+  });
+
+  test("an implementation in a port module is reported once, as an implementation", async () => {
+    const text = `from typing import Protocol
+
+class Repository(Protocol):
+    def all(self) -> list[object]: ...
+
+class InMemory(Repository):
+    def all(self) -> list[object]:
+        return []
+`;
+    const found = await inw014(text, 'interface = "protocol"');
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("and implements it");
+  });
+});
+
+describe("INW014 allow-subclassing = false", () => {
+  const Adapter = "shop/adapters/users.py";
+  const Off = "allow-subclassing = false";
+
+  const Subclass = `import shop.application.ports.orders
+from shop.application.ports.users import UserRepository
+from shop.application.ports import audit as ports_audit
+from shop.domain.model import Entity
+
+class SqlUsers(UserRepository, Entity):
+    def get(self, user_id):
+        return None
+
+class SqlOrders(shop.application.ports.orders.OrderRepository):
+    pass
+
+class Audit(ports_audit.AuditLog):
+    pass
+`;
+
+  test("an adapter that subclasses a port passes with the defaults", async () => {
+    expect(await inw014(Subclass, "", Adapter)).toEqual([]);
+  });
+
+  test("each port among an adapter's bases is reported on that base", async () => {
+    expect(await inw014(Subclass, Off, Adapter)).toEqual([
+      "6:16 `SqlUsers` in `shop.adapters.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+      "10:17 `SqlOrders` in `shop.adapters.users` subclasses the port `OrderRepository` from `shop.application.ports.orders`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+      "13:13 `Audit` in `shop.adapters.users` subclasses the port `AuditLog` from `shop.application.ports.audit`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+    ]);
+  });
+
+  test("the fix removes the base and adds a conformance line", async () => {
+    const found = await check(
+      Subclass,
+      `[tool.inwards.rules]\nextend-select = ["INW014"]\n[tool.inwards.rules.ports-abstract]\n${Off}`,
+      Adapter,
+    );
+    const [first] = found.filter((d) => d.code === "INW014");
+    expect(first?.fix?.steps).toEqual([
+      "Remove `UserRepository` from the bases of `SqlUsers`, and keep the methods it implements.",
+      "Add `_: UserRepository = SqlUsers(...)` under `if TYPE_CHECKING:` (from `typing`) at the end of the module, importing `UserRepository` there, so the type checker checks `SqlUsers` against the port.",
+    ]);
+  });
+
+  test("an exception from a port module, a port's own subclasses and test modules pass", async () => {
+    const errors = `from shop.application.ports.users import UserNotFoundError
+
+class MissingUser(UserNotFoundError):
+    pass
+`;
+    expect(await inw014(errors, Off, Adapter)).toEqual([]);
+    const narrower = `from typing import Protocol
+from shop.application.ports.base import Repository
+
+class Users(Repository, Protocol):
+    def all(self): ...
+`;
+    expect(await inw014(narrower, Off)).toEqual([]);
+    expect(await inw014(Subclass, Off, "tests/test_users.py")).toEqual([]);
+  });
+
+  test("a base from a module that isn't a port passes", async () => {
+    const text = "from shop.domain.model import Entity\n\nclass User(Entity):\n    pass\n";
+    expect(await inw014(text, Off, Adapter)).toEqual([]);
+  });
+});
