@@ -59,7 +59,7 @@ describe("vertical-slices", () => {
     expect(result).toEqual(PASSING);
     write(root, {
       [`${billing}/__init__.py`]: "",
-      [`${billing}/api.py`]: "from my_app.features.orders.order import Order\n",
+      [`${billing}/api.py`]: "from my_app.features.orders.models import Order\n",
     });
     addContext(
       root,
@@ -78,7 +78,7 @@ describe("vertical-slices", () => {
     const { root, result } = scaffolded("vertical-slices");
     expect(result).toEqual(PASSING);
     write(root, {
-      "src/my_app/bootstrap.py": "from my_app.features.orders.place_order import PlaceOrder\n",
+      "src/my_app/bootstrap.py": "from my_app.features.orders.commands import PlaceOrder\n",
     });
     expect(findings(root)).toEqual({ code: 1, findings: ["INW003 src/my_app/bootstrap.py"] });
   });
@@ -104,7 +104,7 @@ describe("bounded-contexts", () => {
     expect(result).toEqual(PASSING);
     write(root, {
       ...billingPackage,
-      [`${billing}/application/invoice.py`]: "from my_app.orders.domain.order import Order\n",
+      [`${billing}/application/invoice.py`]: "from my_app.orders.domain.models import Order\n",
     });
     addContext(root, ...billingContext);
     expect(findings(root)).toEqual({

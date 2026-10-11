@@ -40,11 +40,11 @@ describe("inwards init --scaffold never writes through a symlink or halfway", ()
     const outside = project({});
     const root = project(UV_PROJECT);
     mkdirSync(join(root, "src/my_app/domain"), { recursive: true });
-    symlinkSync(join(outside, "stolen.py"), join(root, "src/my_app/domain/order.py"));
+    symlinkSync(join(outside, "stolen.py"), join(root, "src/my_app/domain/models.py"));
     const before = tree(root);
     const run = init(root, "--style", "clean", "--scaffold");
     expect(run.code).toBe(2);
-    expect(run.stderr).toContain("\n  src/my_app/domain/order.py\n");
+    expect(run.stderr).toContain("\n  src/my_app/domain/models.py\n");
     expect(existsSync(join(outside, "stolen.py"))).toBe(false);
     expect(tree(root)).toEqual(before);
   });
@@ -58,7 +58,7 @@ describe("inwards init --scaffold never writes through a symlink or halfway", ()
     symlinkSync(outside, join(root, "src/my_app/domain"));
     const run = init(root, "--style", "hexagonal", "--scaffold");
     expect(run.code).toBe(2);
-    expect(run.stderr).toContain("src/my_app/domain/order.py");
+    expect(run.stderr).toContain("src/my_app/domain/models.py");
     expect(readdirSync(outside)).toEqual([]);
     expect(readFileSync(join(root, "pyproject.toml"), "utf8")).toBe(
       UV_PROJECT["pyproject.toml"] ?? "",

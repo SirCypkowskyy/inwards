@@ -252,6 +252,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | Protocol (`typing.Protocol`) | Protocol (protokół strukturalny) |
 | abstract method, method body (INW014) | metoda abstrakcyjna, ciało metody |
 | implementation (of a port) | implementacja (portu) |
+| command, query (CQRS use cases, `commands/`, `queries/`) | komenda, zapytanie |
+| private module (`_place_order.py`) | moduł prywatny |
 | DTO, value object | DTO, obiekt wartości |
 | test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
 | inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |
