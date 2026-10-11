@@ -9,7 +9,7 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha. The rules INW000 to INW019 and the FastAPI rules FAPI001 to FAPI009
+Status: pre-alpha. The rules INW000 to INW020 and the FastAPI rules FAPI001 to FAPI009
 (FAPI004 is unused) work end to end in the CLI and the editor; the
 [rules index](https://sircypkowskyy.github.io/inwards/rules/) says what each one checks.
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
