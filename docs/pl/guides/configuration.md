@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 7e0c4f79bcad19696e4c1bfc78a3fa75a16750ff5f2ff622e00c0ffea861490f
+source_hash: 21749cf1051051a425c8d5961ece437b4bdd9a2157e9558a41ab1028d2facadb
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -396,7 +396,7 @@ Szablon, z którego nikt nie korzysta, jest dozwolony. Cztery presety zapisują 
 
 Typ: lista wartości `"modules"` i `"contexts"`. Domyślnie: `["contexts"]`.
 
-Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu całego projektu: między kontekstami, między modułami, jedne i drugie albo żadne (`[]`). Wartość domyślna ma znaczenie dopiero wtedy, gdy zadeklarowano `contexts`, więc aktualizacja nie psuje projektu, który żyje z cyklami modułów; dodaj `"modules"`, żeby wyłapywać także je.
+Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu całego projektu: między kontekstami, między modułami, jedne i drugie albo żadne (`[]`). Wartość domyślna ma znaczenie dopiero wtedy, gdy zadeklarowano `contexts`, więc aktualizacja nie psuje projektu, który żyje z cyklami modułów; dodaj `"modules"`, żeby wyłapywać także je. Każdy preset `inwards init --style` zapisuje `["modules", "contexts"]` ([Instalacja](install.md#a-new-project-start-from-a-preset)).
 
 <!-- config: fragment -->
 
