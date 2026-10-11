@@ -20,7 +20,7 @@ import {
 import { labels } from "./rule-index-text.mjs";
 
 /** The key each column's header sorts by, in column order; "" for a column that doesn't sort. */
-const SORT_BY_COLUMN = ["code", "name", "", "status", ""];
+const SORT_BY_COLUMN = ["code", "name", "category", "status", ""];
 
 /** The browser in one `[data-inwards-rules]` container. */
 class RuleBrowser {
@@ -238,8 +238,8 @@ class RuleBrowser {
   }
 
   /**
-   * Builds one table row. The name cell also holds what the rule flags and
-   * its default, from the index table. Each cell carries its column name for
+   * Builds one table row. The name cell also holds what the rule flags, its
+   * default and the presets that turn it on, from the index table. Each cell carries its column name for
    * the stacked layout on a phone.
    *
    * @param {import("./rule-index-state.mjs").RuleRecord} rule - the rule.
@@ -255,6 +255,7 @@ class RuleBrowser {
           element("code", { class: "inw-rules__name" }, [rule.name]),
           element("span", { class: "inw-rules__summary" }, inlineCode(rule.summary)),
           element("span", { class: "inw-rules__default" }, [`${text.default}: ${rule.default}`]),
+          element("span", { class: "inw-rules__presets" }, [`${text.presets}: ${rule.presets}`]),
         ]),
       ],
       [rule.category.join(" › ")],

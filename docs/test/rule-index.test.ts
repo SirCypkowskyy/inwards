@@ -77,6 +77,11 @@ describe("rule browser state", () => {
     expect(paths).toContain("imports/contexts");
     expect(paths.indexOf("imports")).toBeLessThan(paths.indexOf("imports/layers"));
   });
+
+  test("top-level categories keep the index's section order", () => {
+    const tops = categoryPaths(rules).filter((path) => !path.includes("/"));
+    expect(tops).toEqual(["imports", "layout", "roles", "integrity", "diagrams", "fastapi"]);
+  });
 });
 
 describe("rule browser view", () => {
@@ -106,6 +111,15 @@ describe("rule browser view", () => {
     expect(view(rules, { ...DEFAULTS, q: "ROUTE shadow" }).rows.map((r) => r.code)).toEqual([
       "FAPI005",
     ]);
+  });
+
+  test("sorting by category follows the index's sections, codes ascending inside each", () => {
+    const codes = view(rules, { ...DEFAULTS, sort: "category", per: 0 }).rows.map((r) => r.code);
+    expect(codes.slice(0, 3)).toEqual(["INW001", "INW002", "INW003"]);
+    expect(codes.indexOf("INW011")).toBeLessThan(codes.indexOf("INW006"));
+    expect(codes.indexOf("INW016")).toBeLessThan(codes.indexOf("INW000"));
+    expect(codes.at(-1)?.startsWith("FAPI")).toBe(true);
+    expect(parseState("?sort=-category", rules).sort).toBe("-category");
   });
 
   test("sorting by name descending reverses the names", () => {

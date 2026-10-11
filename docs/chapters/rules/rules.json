@@ -1,20 +1,6 @@
 {
   "rules": [
     {
-      "code": "INW000",
-      "name": "unsupported-encoding",
-      "title": "INW000 unsupported-encoding",
-      "summary": "A declared source encoding under which a comment can be a real import",
-      "description": "A file in a layer declares a source encoding under which text Inwards reads as a comment can be a real import to Python. The file is reported instead of checked.",
-      "category": ["imports", "encoding"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "error",
-      "url": "INW000/"
-    },
-    {
       "code": "INW001",
       "name": "layer-dependency",
       "title": "INW001 layer-dependency",
@@ -26,6 +12,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "error",
+      "presets": "all",
       "url": "INW001/"
     },
     {
@@ -40,6 +27,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "error",
+      "presets": "all but django, fastapi",
       "url": "INW002/"
     },
     {
@@ -54,6 +42,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "error",
+      "presets": "all",
       "url": "INW003/"
     },
     {
@@ -68,6 +57,7 @@
       "severity": "error",
       "suppressible": false,
       "default": "error",
+      "presets": "all",
       "url": "INW004/"
     },
     {
@@ -82,63 +72,8 @@
       "severity": "error",
       "suppressible": true,
       "default": "error",
+      "presets": "all",
       "url": "INW005/"
-    },
-    {
-      "code": "INW006",
-      "name": "unassigned-module",
-      "title": "INW006 unassigned-module",
-      "summary": "First-party code outside every layer, and layer prefixes that match nothing",
-      "description": "First-party code must belong to a layer, and every layer prefix must match modules. Reports imports into code outside every layer, packages outside every layer, and dead prefixes.",
-      "category": ["layout", "layers"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": true,
-      "default": "error, some findings warn",
-      "url": "INW006/"
-    },
-    {
-      "code": "INW007",
-      "name": "package-shape",
-      "title": "INW007 package-shape",
-      "summary": "A package member its shape doesn't allow, or a name outside the packages it belongs in",
-      "description": "A package holds only the members its configured shape allows, and names stay in the packages they belong in.",
-      "category": ["layout", "shape"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "error, some findings warn",
-      "url": "INW007/"
-    },
-    {
-      "code": "INW008",
-      "name": "missing-member",
-      "title": "INW008 missing-member",
-      "summary": "A member a package's shape requires is missing",
-      "description": "A package holds every member its configured shape requires.",
-      "category": ["layout", "shape"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "error",
-      "url": "INW008/"
-    },
-    {
-      "code": "INW009",
-      "name": "suppression-comment",
-      "title": "INW009 suppression-comment",
-      "summary": "An inline suppression that hides nothing, or matches no finding",
-      "description": "An inline suppression names rules that can be suppressed, gives a reason, and hides a finding.",
-      "category": ["suppressions"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "error, unused ones warn",
-      "url": "INW009/"
     },
     {
       "code": "INW010",
@@ -152,6 +87,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "error",
+      "presets": "all",
       "url": "INW010/"
     },
     {
@@ -166,7 +102,53 @@
       "severity": "error",
       "suppressible": true,
       "default": "error",
+      "presets": "all",
       "url": "INW011/"
+    },
+    {
+      "code": "INW006",
+      "name": "unassigned-module",
+      "title": "INW006 unassigned-module",
+      "summary": "First-party code outside every layer, and layer prefixes that match nothing",
+      "description": "First-party code must belong to a layer, and every layer prefix must match modules. Reports imports into code outside every layer, packages outside every layer, and dead prefixes.",
+      "category": ["layout", "layers"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "error, some findings warn",
+      "presets": "all",
+      "url": "INW006/"
+    },
+    {
+      "code": "INW007",
+      "name": "package-shape",
+      "title": "INW007 package-shape",
+      "summary": "A package member its shape doesn't allow, or a name outside the packages it belongs in",
+      "description": "A package holds only the members its configured shape allows, and names stay in the packages they belong in.",
+      "category": ["layout", "shape"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "error, some findings warn",
+      "presets": "all",
+      "url": "INW007/"
+    },
+    {
+      "code": "INW008",
+      "name": "missing-member",
+      "title": "INW008 missing-member",
+      "summary": "A member a package's shape requires is missing",
+      "description": "A package holds every member its configured shape requires.",
+      "category": ["layout", "shape"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "error",
+      "presets": "all",
+      "url": "INW008/"
     },
     {
       "code": "INW012",
@@ -174,12 +156,13 @@
       "title": "INW012 thin-endpoint",
       "summary": "An HTTP endpoint that does the work itself: too many statements, branches or loops, database or HTTP calls of its own, or no call into the layer `delegate-to` names",
       "description": "An HTTP endpoint reads the request, calls one use case and shapes the response; the logic, queries and outgoing calls live in other layers.",
-      "category": ["layers", "endpoints"],
+      "category": ["roles", "endpoints"],
       "status": "stable",
       "autofix": false,
       "severity": "warning",
       "suppressible": true,
       "default": "opt-in, warning",
+      "presets": "fastapi",
       "url": "INW012/"
     },
     {
@@ -188,12 +171,13 @@
       "title": "INW013 async-blocking",
       "summary": "A synchronous database, cache or cloud call inside `async def`: a sync SQLAlchemy `Session`, `redis.Redis`, boto3 or a blocking driver",
       "description": "An async def makes no synchronous database, cache or cloud call, itself or through a sync helper it calls; a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
-      "category": ["async", "roles"],
+      "category": ["roles", "async"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "INW013/"
     },
     {
@@ -202,12 +186,13 @@
       "title": "INW014 ports-abstract",
       "summary": "A class in a port module that isn't an ABC or a Protocol, or a port method whose body does work",
       "description": "A port module holds only ABCs and Protocols whose methods have no body; implementations live in adapters.",
-      "category": ["ports", "roles"],
+      "category": ["roles", "ports"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "clean, hexagonal",
       "url": "INW014/"
     },
     {
@@ -216,12 +201,13 @@
       "title": "INW015 construct-only-in",
       "summary": "A module outside the composition root that imports an outbound adapter, or another guarded role, at runtime, or builds one of its classes",
       "description": "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
-      "category": ["roles", "ports-and-adapters"],
+      "category": ["roles", "composition-root"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "clean, hexagonal",
       "url": "INW015/"
     },
     {
@@ -230,13 +216,44 @@
       "title": "INW016 orm-naming",
       "summary": "A table name that isn't lower_case_snake and singular, or a datetime or date column without `_at` or `_date`; a whole-project run also wants a `MetaData` naming convention",
       "description": "ORM table names and the names of datetime and date columns follow the project's scheme, by default lower_case_snake singular tables, _at for datetimes and _date for dates, and SQLAlchemy models get a MetaData naming convention.",
-      "category": ["naming", "roles"],
+      "category": ["roles", "naming"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "INW016/"
+    },
+    {
+      "code": "INW000",
+      "name": "unsupported-encoding",
+      "title": "INW000 unsupported-encoding",
+      "summary": "A declared source encoding under which a comment can be a real import",
+      "description": "A file in a layer declares a source encoding under which text Inwards reads as a comment can be a real import to Python. The file is reported instead of checked.",
+      "category": ["integrity", "encoding"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "error",
+      "presets": "all",
+      "url": "INW000/"
+    },
+    {
+      "code": "INW009",
+      "name": "suppression-comment",
+      "title": "INW009 suppression-comment",
+      "summary": "An inline suppression that hides nothing, or matches no finding",
+      "description": "An inline suppression names rules that can be suppressed, gives a reason, and hides a finding.",
+      "category": ["integrity", "suppressions"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "error, unused ones warn",
+      "presets": "all",
+      "url": "INW009/"
     },
     {
       "code": "INW017",
@@ -250,6 +267,7 @@
       "severity": "warning",
       "suppressible": false,
       "default": "opt-in, warning",
+      "presets": "none",
       "url": "INW017/"
     },
     {
@@ -264,6 +282,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI001/"
     },
     {
@@ -278,6 +297,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI002/"
     },
     {
@@ -292,6 +312,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI003/"
     },
     {
@@ -306,6 +327,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI005/"
     },
     {
@@ -320,6 +342,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI006/"
     },
     {
@@ -334,6 +357,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI007/"
     },
     {
@@ -348,6 +372,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI008/"
     },
     {
@@ -362,6 +387,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, error",
+      "presets": "fastapi",
       "url": "FAPI009/"
     }
   ]

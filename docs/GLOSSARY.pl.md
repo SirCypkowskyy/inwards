@@ -179,6 +179,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | member (of a package) | element (pakietu) |
 | miss (prescan) | przeoczenie |
 | opt-in rule (default off) | reguła opt-in (domyślnie wyłączona) |
+| on by default (the rules index's On column); turned on by preset | domyślnie (kolumna Włączona); włącza ją preset |
+| rule categories (the first tag: imports, layout, roles, integrity, diagrams, fastapi) | kategorie reguł: importy, układ, role, integralność, diagramy, FastAPI (tag i kotwica zostają po angielsku) |
 | options table (`[tool.inwards.rules.<rule-name>]`) | tabela opcji |
 | owner (the repo's) | właściciel |
 | payload (hook input) | dane wejściowe (hooka) |
