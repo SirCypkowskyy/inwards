@@ -10,7 +10,7 @@
  * through `self`.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { descendantsOutside, identifierName, namedChildren } from "../../python/nodes.ts";
 import { parameterTypes, type TypeContext, typesOf } from "../shared/annotations.ts";
 import type { Family } from "./catalog.ts";
 
@@ -119,19 +119,18 @@ function withBound(
 }
 
 /**
- * Collects the bindings in a block, not descending into nested scopes.
+ * Collects a module's top-level bindings: its assignments and `with` items,
+ * not those inside compound statements or nested scopes.
  *
- * @param node - a block or statement.
+ * @param node - the module node, or one of its expression statements.
  * @param context - the file's qualifier and aliases.
  * @param families - the families to try.
- * @param deep - whether to look inside compound statements (a function body) or only at top-level statements (a module).
  * @returns each bound name with its source, in source order.
  */
 function bindingsIn(
   node: Node,
   context: TypeContext,
   families: readonly Family[],
-  deep: boolean,
 ): [string, Source][] {
   const found: [string, Source][] = [];
   for (const child of namedChildren(node)) {
@@ -143,11 +142,44 @@ function bindingsIn(
     } else if (child.type === "with_item") {
       found.push(...withBound(child, context, families));
     }
-    if (child.type !== "assignment" && (deep || child.type === "expression_statement")) {
-      found.push(...bindingsIn(child, context, families, deep));
+    if (child.type === "expression_statement") {
+      found.push(...bindingsIn(child, context, families));
     }
   }
   return found;
+}
+
+/** What a function body's bindings are made of. */
+const BINDINGS: ReadonlySet<string> = new Set(["assignment", "with_item"]);
+
+/** What `bodyBindings` doesn't look inside: other scopes, decorators, and an assignment's own parts. */
+const BINDINGS_PRUNE: ReadonlySet<string> = new Set([
+  ...NESTED_SCOPES,
+  "decorated_definition",
+  "assignment",
+]);
+
+/**
+ * Lists the blocking receivers a function body binds, inside compound
+ * statements too, but not inside nested scopes, decorators or an
+ * assignment's own parts. One walk inside WASM instead of one call per node
+ * (#359).
+ *
+ * @param body - the function's body.
+ * @param context - the file's qualifier and aliases.
+ * @param families - the families to try.
+ * @returns each bound name with its source, in source order.
+ */
+function bodyBindings(
+  body: Node,
+  context: TypeContext,
+  families: readonly Family[],
+): [string, Source][] {
+  return descendantsOutside(body, BINDINGS, BINDINGS_PRUNE).flatMap((node) =>
+    node.type === "assignment"
+      ? assigned(node, context, families)
+      : withBound(node, context, families),
+  );
 }
 
 /**
@@ -163,7 +195,7 @@ export function moduleReceivers(
   context: TypeContext,
   families: readonly Family[],
 ): Map<string, Source> {
-  return new Map(bindingsIn(root, context, families, false));
+  return new Map(bindingsIn(root, context, families));
 }
 
 /**
@@ -203,7 +235,7 @@ export function functionReceivers(
     }
   }
   const body = fn.childForFieldName("body");
-  for (const [name, source] of body ? bindingsIn(body, context, families, true) : []) {
+  for (const [name, source] of body ? bodyBindings(body, context, families) : []) {
     receivers.set(name, source);
   }
   return receivers;

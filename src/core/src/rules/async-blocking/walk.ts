@@ -8,12 +8,21 @@
  */
 import type { Node, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
-import { identifierName, moduleFunctions, namedChildren } from "../../python/nodes.ts";
+import { descendantsOutside, identifierName, moduleFunctions } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { qualifierFor } from "../../python/qualify.ts";
 import { moduleAliases, type TypeContext } from "../shared/annotations.ts";
 import type { Family } from "./catalog.ts";
 import { moduleReceivers, NESTED_SCOPES, type Source, valueSource } from "./receivers.ts";
+
+/** The node type `functionsIn` lists. */
+const FUNCTIONS: ReadonlySet<string> = new Set(["function_definition"]);
+
+/** The node type `callsIn` lists. */
+const CALLS: ReadonlySet<string> = new Set(["call"]);
+
+/** No subtree left out. */
+const NOTHING: ReadonlySet<string> = new Set();
 
 /** One module, read for INW013. */
 export interface Walk {
@@ -81,7 +90,7 @@ export function isAsync(fn: Node): boolean {
  */
 export function functionsIn(node: Node): Node[] {
   const own = node.type === "function_definition" ? [node] : [];
-  return [...own, ...namedChildren(node).flatMap(functionsIn)];
+  return [...own, ...descendantsOutside(node, FUNCTIONS, NOTHING)];
 }
 
 /**
@@ -92,12 +101,7 @@ export function functionsIn(node: Node): Node[] {
  * @returns the `call` nodes, outermost first.
  */
 export function callsIn(node: Node): Node[] {
-  return namedChildren(node).flatMap((child) => {
-    if (NESTED_SCOPES.has(child.type)) {
-      return [];
-    }
-    return child.type === "call" ? [child, ...callsIn(child)] : callsIn(child);
-  });
+  return descendantsOutside(node, CALLS, NESTED_SCOPES);
 }
 
 /**

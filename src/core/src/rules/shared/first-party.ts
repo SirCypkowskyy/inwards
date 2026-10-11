@@ -1,29 +1,21 @@
 /**
  * @file Reads other first-party modules for a content rule that follows a
  * name out of the checked file: INW012's handlers registered from another
- * module (#271) and INW013's sync helpers one hop away (#294). A module is
- * read and parsed only when a rule asks for a name in it, once per check of
- * the checked file, and only when the rule admits it by name (INW013's
- * `follow-modules`), and turned into the rule's own view of it; `follow`
- * walks re-exports (`from .views import create_order` in an `__init__.py`)
- * up to `MAX_HOPS` times. Every tree is freed by `dispose()`. It decides
- * nothing about what a rule reports, and reads files only through the
- * project port the caller passes.
+ * module (#271), INW013's sync helpers one hop away (#294) and INW015's
+ * classes built through a re-export. `ParsedModules` turns the run's trees
+ * (`module-trees.ts`, one parse per module per run, #359) into one rule's
+ * view of each module, only when the rule asks for a name in it and admits
+ * it by name (INW013's `follow-modules`); `follow` walks re-exports (`from
+ * .views import create_order` in an `__init__.py`) up to `MAX_HOPS` times.
+ * It decides nothing about what a rule reports, owns no tree, and reads
+ * files only through the run's trees.
  */
-import type { Node, Parser, Tree } from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
-import { normalizeSource, parsePython } from "../../python/parser.ts";
+import type { ModuleTrees } from "./module-trees.ts";
 
 /** How many re-exports a name is followed through (a re-export cycle ends here). */
 const MAX_HOPS = 4;
-
-/** What reading first-party modules needs from the project; `ProjectIndex` provides it. */
-export interface FirstPartySource {
-  /** Finds the first-party module that owns a dotted name, if any. */
-  readonly ownerOf: (target: string) => string | undefined;
-  /** Reads a first-party module's file, if one holds it. */
-  readonly sourceOf: (module: string) => SourceFile | undefined;
-}
 
 /** The part of a rule's view of a module that following re-exports reads. */
 export interface ModuleNames {
@@ -41,34 +33,30 @@ export interface Followed<V> {
 }
 
 /**
- * The other first-party modules one check reads, parsed on demand and kept
- * as a rule's view of each. Build one per check of a file and call
- * `dispose()` when done.
+ * One rule's view of the other first-party modules it reads, built on demand
+ * from the run's trees, once per module. Build one per check of a file, or
+ * one per run when the view of a module doesn't depend on the checked file
+ * (INW013's); the trees belong to the `ModuleTrees` it reads from.
  */
 export class ParsedModules<V extends ModuleNames> {
-  private readonly parser: Parser;
-  private readonly project: FirstPartySource;
+  private readonly trees: ModuleTrees;
   private readonly read: (tree: Tree, src: SourceFile) => V;
   private readonly admit: (module: string) => boolean;
-  private readonly trees: Tree[] = [];
   private readonly views = new Map<string, V | undefined>();
 
   /**
-   * Wraps the parser, the project and the rule's reader. Nothing is read yet.
+   * Wraps the run's trees and the rule's reader. Nothing is read yet.
    *
-   * @param parser - parser with the Python grammar loaded.
-   * @param project - finds and reads first-party modules.
-   * @param read - turns a parsed module into the rule's view; the tree stays alive until `dispose()`.
+   * @param trees - the run's first-party modules, parsed once each.
+   * @param read - turns a parsed module into the rule's view; the tree stays alive until the run ends.
    * @param admit - tells whether a module may be read at all, by its dotted name; every one by default.
    */
   constructor(
-    parser: Parser,
-    project: FirstPartySource,
+    trees: ModuleTrees,
     read: (tree: Tree, src: SourceFile) => V,
     admit: (module: string) => boolean = (): boolean => true,
   ) {
-    this.parser = parser;
-    this.project = project;
+    this.trees = trees;
     this.read = read;
     this.admit = admit;
   }
@@ -88,10 +76,12 @@ export class ParsedModules<V extends ModuleNames> {
   ): Followed<V> | undefined {
     let name = target;
     for (let hop = 0; hop < MAX_HOPS; hop += 1) {
-      const owner = this.project.ownerOf(name);
-      const view = owner === undefined ? undefined : this.viewOf(owner);
+      const owner = this.trees.ownerOf(name);
       const rest = owner === undefined ? "" : name.slice(owner.length + 1);
-      if (view === undefined || rest === "" || rest.includes(".")) {
+      // A method of a module-level object (`service.create`) is no definition: don't parse for it.
+      const view =
+        owner === undefined || rest === "" || rest.includes(".") ? undefined : this.viewOf(owner);
+      if (view === undefined) {
         return undefined;
       }
       const node = pick(view, rest);
@@ -108,7 +98,7 @@ export class ParsedModules<V extends ModuleNames> {
   }
 
   /**
-   * Reads and parses a first-party module once.
+   * Builds the rule's view of a first-party module, once for this object.
    *
    * @param module - a dotted module name.
    * @returns its view, or undefined when no file holds it or `admit` refuses it.
@@ -117,24 +107,9 @@ export class ParsedModules<V extends ModuleNames> {
     if (this.views.has(module)) {
       return this.views.get(module);
     }
-    const src = this.admit(module) ? this.project.sourceOf(module) : undefined;
-    let view: V | undefined;
-    if (src !== undefined) {
-      const text = normalizeSource(src.text);
-      const tree = parsePython(this.parser, text);
-      this.trees.push(tree);
-      view = this.read(tree, { ...src, text });
-    }
+    const parsed = this.admit(module) ? this.trees.moduleOf(module) : undefined;
+    const view = parsed === undefined ? undefined : this.read(parsed.tree, parsed.src);
     this.views.set(module, view);
     return view;
-  }
-
-  /** Frees every tree read so far; the views and nodes handed out are invalid afterwards. */
-  dispose(): void {
-    for (const tree of this.trees) {
-      tree.delete(); // WASM memory is not garbage collected
-    }
-    this.trees.length = 0;
-    this.views.clear();
   }
 }
