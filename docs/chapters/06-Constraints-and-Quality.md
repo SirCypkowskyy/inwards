@@ -331,7 +331,7 @@ full-stack-fastapi-template and python-ddd didn't change, and Saleor wasn't reru
 - **INW012.** 107 of Polar's 135 findings are in the back office; the 17 false ones in the sample are 15 server-rendered pages and HTMX form handlers there, a server-sent event stream and a webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
 - **FAPI003, FAPI005.** The same unknown inclusions make FAPI003 warn that 72 of Polar's routers are unmounted, each with the caveat that names the call it can't follow ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)); `unresolved-includes = "silent"` turns those off. FAPI005's 5 are routes Polar's route class dispatches by API version ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
 
-The cost, from source on the laptop above, median of 3 cold runs on Polar with one rule on: INW012 1,130 → 1,578 ms, FAPI001 1,327 → 1,698 ms, FAPI002 1,426 → 1,972 ms, for the 531 more path operations each rule now reads.
+The cost, from source on the laptop above, median of 3 cold runs on Polar with one rule on: INW012 1,118 → 1,401 ms, FAPI001 1,195 → 1,457 ms, FAPI002 1,188 → 1,725 ms (base `develop` at c38c5ae), for the 531 more path operations each rule now reads.
 
 **Cost.** Every rule alone on top of the manifest layering, cold (`--no-cache`) and warm, median of 5 runs (3 for polar and saleor), with the darwin-arm64 binary on the laptop above while other agents ran (load average 5 to 11). Milliseconds, cold / warm:
 

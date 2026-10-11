@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 69473f5208167d642583d9cb3a58596e92ceb5c93e11a4225010f9140babfe69
+source_hash: 8f46badcc8c4a09e58e382a03f552c4e386d2d0e5fff3b63acd87b51b53a1c59
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -336,7 +336,7 @@ full-stack-fastapi-template i python-ddd się nie zmieniły, a Saleora nie uruch
 - **INW012.** 107 ze 135 zgłoszeń w Polarze leży w back office; 17 fałszywych alarmów w próbie to 15 stron renderowanych na serwerze i handlerów formularzy HTMX w back office, strumień zdarzeń wysyłanych przez serwer i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
 - **FAPI003, FAPI005.** Te same nieznane dołączenia sprawiają, że FAPI003 ostrzega, że 72 routery Polara są niepodpięte, każde z zastrzeżeniem, które podaje wywołanie, którego nie umie prześledzić ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)); `unresolved-includes = "silent"` je wyłącza. 5 zgłoszeń FAPI005 to trasy, które klasa tras Polara rozdziela według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
 
-Koszt, ze źródeł na laptopie opisanym wyżej, mediana 3 zimnych uruchomień na Polarze z jedną regułą: INW012 1130 → 1578 ms, FAPI001 1327 → 1698 ms, FAPI002 1426 → 1972 ms, za 531 operacji ścieżki więcej, które każda reguła teraz czyta.
+Koszt, ze źródeł na laptopie opisanym wyżej, mediana 3 zimnych uruchomień na Polarze z jedną regułą: INW012 1118 → 1401 ms, FAPI001 1195 → 1457 ms, FAPI002 1188 → 1725 ms (baza: `develop` w c38c5ae), za 531 operacji ścieżki więcej, które każda reguła teraz czyta.
 
 **Koszt.** Każda reguła osobno, oprócz warstw z manifestu, zimne (`--no-cache`) i ciepłe uruchomienie, mediana z 5 uruchomień (3 dla polara i saleora), plik binarny darwin-arm64 na opisanym wyżej laptopie, przy pracujących równolegle innych agentach (load average 5 do 11). Milisekundy, zimne / ciepłe:
 
