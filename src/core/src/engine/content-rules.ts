@@ -34,6 +34,8 @@ import { thinEndpointFindings } from "./thin-endpoint.ts";
 export class ContentRun {
   readonly trees: ModuleTrees;
   private readonly options: InwardsConfig["rules"];
+  /** The files the run checks, from which INW013 decides whether its prefilter pays. */
+  private readonly files: readonly SourceFile[];
   private asyncBlocking: AsyncBlockingRun | undefined;
 
   /**
@@ -42,10 +44,17 @@ export class ContentRun {
    * @param parser - parser with the Python grammar loaded.
    * @param project - the project's module index, which reads the modules.
    * @param config - the project's config, for the rules' options.
+   * @param files - the files the run checks; none named by default (one file's check).
    */
-  constructor(parser: Parser, project: ProjectIndex, config: InwardsConfig) {
+  constructor(
+    parser: Parser,
+    project: ProjectIndex,
+    config: InwardsConfig,
+    files: readonly SourceFile[] = [],
+  ) {
     this.trees = new ModuleTrees(parser, project);
     this.options = config.rules;
+    this.files = files;
   }
 
   /**
@@ -57,6 +66,7 @@ export class ContentRun {
     this.asyncBlocking ??= new AsyncBlockingRun(
       this.options?.options?.["async-blocking"],
       this.trees,
+      this.files,
     );
     return this.asyncBlocking;
   }

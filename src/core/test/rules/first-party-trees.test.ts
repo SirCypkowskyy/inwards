@@ -1,7 +1,7 @@
 /**
  * @file The run's first-party modules (#359): `ModuleTrees` reads and parses
  * each module at most once, whichever rule or checked file asks, and hands
- * a checked file its tree back only for the same path and text. A call to a
+ * a checked file its tree back only for the same text. A call to a
  * method of a module-level object reads nothing, and a run of many files
  * gives INW013 the findings each file gets when it is checked alone, the
  * helper's own module included, which reuses the tree its callers parsed.
@@ -84,7 +84,7 @@ describe("ModuleTrees", () => {
     }
   });
 
-  test("hands a checked file its tree back only for the same path and text", () => {
+  test("hands a checked file its tree back only for the same text", () => {
     const { trees } = counted();
     try {
       const users = MODULES.get("shop.users");
@@ -94,7 +94,11 @@ describe("ModuleTrees", () => {
       expect(
         users && trees.parsedAs({ ...users, text: `${users.text}\n# edited\n` }),
       ).toBeUndefined();
-      expect(users && trees.parsedAs({ ...users, path: "shop/users.pyi" })).toBeUndefined();
+      // The CLI names a checked file from the working directory, the index from the root:
+      // the tree depends on the text alone.
+      expect(users && trees.parsedAs({ ...users, path: "server/shop/users.py" })).toBe(
+        parsed?.tree,
+      );
     } finally {
       trees.dispose();
     }
