@@ -19,7 +19,7 @@
 import type { Node } from "web-tree-sitter";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
 import { ownNodes } from "./function-body.ts";
 import { spanOf } from "./syntax.ts";
@@ -221,9 +221,7 @@ export function checkYieldSwallows(trees: FileTrees, src: SourceFile): Diagnosti
   if (!(YIELD.test(src.text) && EXCEPT.test(src.text))) {
     return [];
   }
-  return trees
-    .treeOf(src)
-    .rootNode.descendantsOfType("function_definition")
+  return moduleNodes(trees.treeOf(src).rootNode, "function_definition")
     .flatMap((fn) => (fn ? swallowsIn(fn, src) : []))
     .sort((a, b) => a.line - b.line);
 }

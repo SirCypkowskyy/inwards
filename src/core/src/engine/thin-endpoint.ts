@@ -11,7 +11,7 @@ import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ModuleTrees } from "../rules/shared/module-trees.ts";
-import { checkThinEndpoints } from "../rules/thin-endpoint/check.ts";
+import { checkThinEndpoints, type ThinEndpointRun } from "../rules/thin-endpoint/check.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 
 /**
@@ -23,17 +23,18 @@ import { checkEncoding } from "../rules/unsupported-encoding.ts";
  * @param src - the source file, with normalised text.
  * @param config - the project's config: its rules table and layers.
  * @param project - the run's trees: the file's own, and the modules of handlers registered from another module.
+ * @param run - gives INW012's state for the run, built when a file first needs it.
  * @returns the findings, before suppressions.
  */
 export function thinEndpointFindings(
   src: SourceFile,
   config: InwardsConfig,
   project: ModuleTrees,
+  run: () => ThinEndpointRun,
 ): Diagnostic[] {
   const { rules, layers } = config;
   if (ruleLevel("INW012", rules, src.module) === "off" || checkEncoding(src)) {
     return [];
   }
-  const options = rules?.options?.["thin-endpoint"];
-  return checkThinEndpoints(src, { options, layers, project });
+  return checkThinEndpoints(src, { run: run(), layers, project });
 }

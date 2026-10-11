@@ -199,7 +199,7 @@ export class FastApiModel {
       const src = owner === undefined ? undefined : this.project.sourceOf(owner);
       const [head = "", ...rest] =
         src === undefined ? [] : name.slice(src.module.length + 1).split(".");
-      if (src === undefined || head === "") {
+      if (src === undefined || head === "" || this.unbound(src, head, rest)) {
         return null;
       }
       // A file the check already handed in keeps its text (e.g. as it was at session start).
@@ -213,6 +213,27 @@ export class FastApiModel {
       name = [next, ...rest].join(".");
     }
     return null;
+  }
+
+  /**
+   * Tells, without parsing a module the model hasn't read, that none of its
+   * imports binds a name, so a dotted name through it (`service.list`, where
+   * `service` is defined in the module) leads nowhere: only an import would
+   * carry the walk on. FAPI002 asks this for nearly every call an endpoint
+   * makes, and parsing each service module it names was a quarter of the
+   * FastAPI rules' cost on Polar (#395).
+   *
+   * @param src - the module's file, as the project index reads it.
+   * @param head - the name's first segment in that module.
+   * @param rest - the segments after it; with none, the module's own definitions count and it must be read.
+   * @returns true when the name goes on past `head`, the module is unread and its imports don't bind `head`.
+   */
+  private unbound(src: SourceFile, head: string, rest: readonly string[]): boolean {
+    if (rest.length === 0 || this.parsed.has(src.path)) {
+      return false;
+    }
+    const names = this.trees.boundNames({ ...src, text: normalizeSource(src.text) });
+    return names !== undefined && !names.has(head);
   }
 
   /**

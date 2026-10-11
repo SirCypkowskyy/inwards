@@ -32,8 +32,9 @@ export interface RemoteHandler {
 }
 
 /**
- * The other modules one file's registrations name, read on demand. Build
- * one per check of a file.
+ * The other modules the checked files' registrations and router classes
+ * name, read on demand. Build one per run (`ThinEndpointRun`), so each
+ * module is read into a view once however many checked files lead to it.
  */
 export class RemoteModules {
   /** What first-party callees build, for the checked file's routers and the remote modules' (#358). */

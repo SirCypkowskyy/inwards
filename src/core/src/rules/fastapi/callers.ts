@@ -6,7 +6,7 @@
  * files, methods and `*args` or `**kwargs` parameters are unknown.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, keywordOf, namedChildren } from "../../python/nodes.ts";
+import { identifierName, keywordOf, moduleNodes, namedChildren } from "../../python/nodes.ts";
 
 /** Parameter nodes that end the positional ones: `*`, `*args` and `**kwargs`. */
 const KEYWORD_ONLY: ReadonlySet<string> = new Set([
@@ -36,7 +36,7 @@ export function parameterValues(fn: Node, parameter: Node, name: string): Node[]
     return null;
   }
   const own = identifierName(fnName);
-  const calls = root.descendantsOfType("call").filter((call) => {
+  const calls = moduleNodes(root, "call").filter((call) => {
     const callee = call?.childForFieldName("function");
     return callee?.type === "identifier" && identifierName(callee) === own;
   });
