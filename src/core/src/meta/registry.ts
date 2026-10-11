@@ -2,8 +2,10 @@
  * @file The rule registry: every rule's code, name, default severity, one-line
  * summary and docs link, in one place. Rule modules build their diagnostics
  * with `diagnostic()` and reporters list rules from `RULES`, so adding a rule
- * touches only its own module and this file. Whether a rule reports by default
- * lives here too; which rules a project turns on is `config/rule-settings.ts`.
+ * touches only its own module and this file, plus its docs page, whose first
+ * tag files it under a category (scripts/check-rule-pages.py lists them).
+ * Whether a rule reports by default lives here too; which rules a project
+ * turns on is `config/rule-settings.ts`.
  */
 
 import type { Diagnostic, Fix, Severity, SourceFile, Span } from "../contracts/records.ts";
@@ -219,8 +221,8 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
       "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
     docs: page("INW018"),
   },
-  // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
-  // #183 and #184; FAPI004 is reserved until the #185 spike says go.
+  // The FastAPI family (#186): opt-in, with its own prefix. FAPI004 stays
+  // unused: the #185 spike said no-go, and codes are never renumbered.
   FAPI001: {
     code: "FAPI001",
     name: "endpoint-metadata",

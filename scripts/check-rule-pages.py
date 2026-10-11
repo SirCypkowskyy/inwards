@@ -14,15 +14,20 @@ The contract, per page:
   `title` and `description`;
 - the Inwards keys: `code` (the file name), `name`, `severity`, `suppressible`
   and `autofix` (booleans), `status` (stable, in-development, in-review or
-  backlog), `tags` (the category path, parent first), `resource` (the rule's
+  backlog), `tags` (the category path, parent first, whose first tag is one
+  of CATEGORIES), `resource` (the rule's
   source file under src/core/src/, which must exist), `timestamp` or a
   `sources[].last_modified`, and `related_issues`;
 - an h1 with the code, then the sections What it does, Why is this bad,
   Example and Fix safety, each with text. Sections are found by their anchor
   (`what-it-does`, ...), which Polish headings keep with `{ #id }`. The
   Example section holds at least one flagged and one fixed code block;
-- a row in its language's rules/index.md table, whose name and inline
-  suppression cells agree with the front matter.
+- a seven-cell row in its language's rules/index.md, in the table under the
+  h2 whose anchor is the page's category (issue #337), with the sections in
+  CATEGORIES order. Its name, severity and inline suppression cells agree
+  with the front matter, and its on cell says "by default" or "opt-in"
+  (rule-pages.test.ts checks that cell, and the presets cell, against the
+  registry and the `inwards init` presets).
 
 A Polish page also carries the English page's metadata, apart from its
 translated `description` (src/cli/test/integration/rule-pages.test.ts checks
@@ -51,6 +56,14 @@ KEBAB = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 STATUSES = ("stable", "in-review", "in-development", "backlog")
 SEVERITIES = ("error", "warning")
 REQUIRED_SECTIONS = ("what-it-does", "why-is-this-bad", "example", "fix-safety")
+# The rule categories (issue #337), in the order the index and chapter 3 list
+# them. A rule's first tag is one of these, and a new rule picks one; add a
+# category here, to the index (both languages) and to chapter 3 together.
+CATEGORIES = ("imports", "layout", "roles", "integrity", "diagrams", "fastapi")
+# What the index's on cell says for a rule that reports without being selected, and for one that doesn't.
+ON_OFF = {"en": ("by default", "opt-in"), "pl": ("domyślnie", "opt-in")}
+# The word the index's severity cell starts with, per front matter severity.
+SEVERITY_WORDS = {"en": {"error": "error", "warning": "warning"}, "pl": {"error": "błąd", "warning": "ostrzeżenie"}}
 # What the index's inline suppression column says, per language.
 YES_NO = {"en": ("yes", "no"), "pl": ("tak", "nie")}
 # Keys a translation changes or adds; every other key must equal the English page's.
@@ -184,6 +197,8 @@ def check_meta(page: Page) -> list[str]:
         isinstance(tags, list) and bool(tags) and all(isinstance(t, str) and KEBAB.fullmatch(t) for t in tags),
         "the category path, parent first, as a list of kebab-case names",
     )
+    if isinstance(tags, list) and tags and tags[0] not in CATEGORIES:
+        problems.append(f"front matter: the first tag must be the rule's category, one of {', '.join(CATEGORIES)}; got {tags[0]!r}")
     resource = meta.get("resource")
     source = resource.removeprefix(SOURCE_PREFIX) if isinstance(resource, str) else ""
     need(
@@ -231,19 +246,36 @@ def check_body(page: Page) -> list[str]:
     return problems
 
 
-def index_rows(site: str, path: Path) -> dict[str, list[str]]:
-    """Read the rule tables of a site's rules/index.md: code -> its cells, in page order."""
-    rows: dict[str, list[str]] = {}
+def index_rows(site: str, path: Path) -> dict[str, tuple[str, list[str]]]:
+    """Read the rule tables of a site's rules/index.md: code -> (the h2 anchor above it, its cells), in page order."""
+    rows: dict[str, tuple[str, list[str]]] = {}
+    section = ""
     for line in path.read_text(encoding="utf-8").splitlines():
+        heading = HEADING.match(line)
+        if heading and len(heading["hashes"]) == 2:
+            explicit = ATTR_ID.search(heading["text"])
+            section = explicit["id"] if explicit else slugify(heading["text"])
         match = INDEX_ROW.match(line)
         if match:
-            rows[match["code"]] = split_row(line)
+            rows[match["code"]] = (section, split_row(line))
     return rows
 
 
-def rule_entry(page: Page, row: list[str]) -> dict:
+def check_sections(rows: dict[str, tuple[str, list[str]]]) -> list[str]:
+    """Check that the index lists its category sections in CATEGORIES order, each once."""
+    order = [section for section, _cells in rows.values()]
+    seen = [s for i, s in enumerate(order) if i == 0 or order[i - 1] != s]
+    problems = [f"rules/index.md: a rule table sits under '#{s}', which is no category" for s in seen if s not in CATEGORIES]
+    known = [s for s in seen if s in CATEGORIES]
+    if known != sorted(set(known), key=CATEGORIES.index):
+        problems.append(f"rules/index.md: the category sections must come once each, in the order {', '.join(CATEGORIES)}; found {', '.join(seen)}")
+    return problems
+
+
+def rule_entry(site: str, page: Page, row: list[str]) -> dict:
     """The rule browser's record of one rule: front matter plus its index row's text."""
     meta = page.meta
+    on_by_default = row[3] == ON_OFF[site][0]
     return {
         "code": meta["code"],
         "name": meta["name"],
@@ -255,7 +287,8 @@ def rule_entry(page: Page, row: list[str]) -> dict:
         "autofix": meta["autofix"],
         "severity": meta["severity"],
         "suppressible": meta["suppressible"],
-        "default": row[3],
+        "default": row[4] if on_by_default else f"{row[3]}, {row[4]}",
+        "presets": row[5],
         "url": f"{meta['code']}/",
     }
 
@@ -302,15 +335,26 @@ def main() -> int:
             page = Page(path)
             pages[site][path.stem] = page
             problems = page.problems or check_meta(page) + check_body(page)
-            row = rows.get(path.stem)
+            section, row = rows.get(path.stem, ("", []))
             yes, no = YES_NO[site]
-            if row is None or len(row) != 5:
-                problems.append(f"no five-cell row for {path.stem} in the table of rules/index.md")
+            tags = page.meta.get("tags")
+            category = tags[0] if isinstance(tags, list) and tags else None
+            if len(row) != 7:
+                problems.append(f"no seven-cell row for {path.stem} in a table of rules/index.md")
             elif not page.problems:
+                if section != category:
+                    problems.append(f"rules/index.md: the row sits under '#{section}', but the page's category is {category!r}")
                 if row[1] != f"`{page.meta.get('name')}`":
                     problems.append(f"rules/index.md: the name cell says {row[1]}, the front matter `{page.meta.get('name')}`")
-                if row[4] != (yes if page.meta.get("suppressible") else no):
-                    problems.append(f"rules/index.md: the inline suppression cell says '{row[4]}', but suppressible is {page.meta.get('suppressible')}")
+                if row[3] not in ON_OFF[site]:
+                    problems.append(f"rules/index.md: the on cell says '{row[3]}', not one of {', '.join(ON_OFF[site])}")
+                word = SEVERITY_WORDS[site].get(str(page.meta.get("severity")), "")
+                if not word or not row[4].startswith(word):
+                    problems.append(f"rules/index.md: the severity cell says '{row[4]}', but severity is {page.meta.get('severity')}")
+                if not row[5]:
+                    problems.append("rules/index.md: the presets cell is empty")
+                if row[6] != (yes if page.meta.get("suppressible") else no):
+                    problems.append(f"rules/index.md: the inline suppression cell says '{row[6]}', but suppressible is {page.meta.get('suppressible')}")
             for problem in problems:
                 report(path, problem)
             errors += len(problems)
@@ -318,6 +362,9 @@ def main() -> int:
                 failed.add(path)
         for code in sorted(set(rows) - set(pages[site])):
             report(directory / "index.md", f"the table lists {code}, which has no page")
+            errors += 1
+        for problem in check_sections(rows):
+            report(directory / "index.md", problem)
             errors += 1
 
     for code, page in pages["pl"].items():
@@ -338,7 +385,7 @@ def main() -> int:
     stale = 0
     for site, directory in SITES.items():
         rows = index_rows(site, directory / "index.md")
-        rules = [rule_entry(pages[site][code], row) for code, row in rows.items()]
+        rules = [rule_entry(site, pages[site][code], row) for code, (_section, row) in rows.items()]
         content = render(plain({"rules": rules})) + "\n"
         target = directory / DATA_FILE
         if args.write:
