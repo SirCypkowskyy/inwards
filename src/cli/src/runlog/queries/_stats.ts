@@ -1,11 +1,11 @@
 /**
  * @file `inwards stats`: the business-hypothesis numbers from the run log
  * (docs/chapters/08-Run-Log.md), next to the thresholds chapter 2 sets.
- * The log is read by `runs.ts` and the report printed by `commands/stats.ts`.
+ * The log is read by `_runs.ts` and the report printed by `runlog/cli.ts`.
  */
 
-import { parseTime } from "../platform/time.ts";
-import { errorsOf, preexisting, type RunLine, ruleCodes, stopRuns } from "./runs.ts";
+import { parseTime } from "../../platform/time.ts";
+import { errorsOf, preexisting, type RunLine, ruleCodes, stopRuns } from "./_runs.ts";
 
 /** How many first-reported violations were gone at the next hook run for the same file. */
 export interface RetryCount {

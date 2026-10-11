@@ -35,6 +35,7 @@ import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwar
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { changedBaselines } from "../project/baseline.ts";
+import { fingerprint } from "../project/fingerprint.ts";
 import {
   projectConfigs,
   projectLinks,
@@ -43,7 +44,6 @@ import {
 } from "../project/snapshot.ts";
 import { rejectedNote } from "../session/agent-suppressions.ts";
 import { uncommittedConfigs } from "../session/committed-config.ts";
-import { fingerprint } from "../session/fingerprint.ts";
 import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";
 import { createStartLookups } from "../session/lookups.ts";
 import { oldNote } from "../session/old-errors.ts";

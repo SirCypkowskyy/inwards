@@ -13,8 +13,8 @@
  */
 import { resolve } from "node:path";
 import { type Diagnostic, type Report, stableMessage } from "@inwards/core";
+import { fingerprint } from "../project/fingerprint.ts";
 import type { Check, Start } from "./contracts.ts";
-import { fingerprint } from "./fingerprint.ts";
 import type { StartLookups } from "./lookups.ts";
 
 /**
