@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: cb13e21eb518a4a456488fc1a2dc23107f5f2095c29ed86f124c5d650392d784
+source_hash: 5a724457b8bf370288fcc989157319e8b9189af15c55c7cf46e3fe74fb97b9f4
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -516,7 +516,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
+│   │   ├── commands/      # check, baseline, rules, hook, daemon, server, mcp, import-config,
 │   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
@@ -525,8 +525,11 @@ src/
 │   │   │                  #   agent suppressions, layout changes against the session start
 │   │   ├── project/       # running a check, the baseline, config discovery, project snapshots,
 │   │   │                  #   texts laid over the disk (overlay.ts), the whole-project checks
-│   │   │                  #   (whole.ts), the diagram files `diagrams` lists (diagrams.ts)
-│   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
+│   │   │                  #   (whole.ts), the diagram files `diagrams` lists (diagrams.ts),
+│   │   │                  #   violation fingerprints (fingerprint.ts)
+│   │   ├── runlog/        # the opt-in run log, a slice (ADR-047): index.ts its face, cli.ts
+│   │   │                  #   inwards stats, commands/ writes the log, queries/ reads it back
+│   │   │                  #   (stats, --export), adapters/ the export key and file
 │   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
 │   │   │                  #   the in-memory caches
 │   │   ├── lsp/           # inwards server: when to check what (session.ts), the whole pass

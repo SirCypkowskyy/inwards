@@ -165,6 +165,8 @@
       { "name": "cli-claude-code", "patterns": ["src/cli/src/claude-code/**"] },
       { "name": "cli-session", "patterns": ["src/cli/src/session/**"] },
       { "name": "cli-project", "patterns": ["src/cli/src/project/**"] },
+      // A slice's own adapters (ADR-047), before the slice: the first matching zone wins.
+      { "name": "cli-runlog-adapters", "patterns": ["src/cli/src/runlog/adapters/**"] },
       { "name": "cli-runlog", "patterns": ["src/cli/src/runlog/**"] },
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
       // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
@@ -576,8 +578,28 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
-          "cli-session"
+          "cli-project"
+        ]
+      },
+      // Its own slice and the engine only; compose.ts wires it in.
+      {
+        "from": "cli-runlog-adapters",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-runlog"
         ]
       },
       {
@@ -755,6 +777,7 @@
           "cli-project",
           "cli-session",
           "cli-runlog",
+          "cli-runlog-adapters",
           "cli-init",
           "cli-commands",
           "cli-daemon",
@@ -782,6 +805,7 @@
           "cli-adapters",
           "cli-commands",
           "cli-init",
+          "cli-runlog",
           "cli-platform"
         ]
       },

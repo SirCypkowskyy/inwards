@@ -9,17 +9,17 @@
  *
  * Line schema `inwards/run@1` (documented in docs/chapters/08-Run-Log.md):
  * `{ v, at, session_id, event, tool, files, lines, fingerprints, codes, severities, suppressed, rejected, exit, durationMs }`.
- * `inwards stats` (`runlog/stats.ts`) turns it into the hypothesis numbers.
+ * `inwards stats` (`runlog/queries/_stats.ts`) turns it into the hypothesis numbers.
  *
  * `createRunLog` holds what one invocation's handlers noted; `main.ts` makes
  * one per invocation and writes the line at the end.
  */
 import { dirname, join, resolve } from "node:path";
 import { CONFIG_DEFAULTS, type Diagnostic, parseConfig, type Report } from "@inwards/core";
-import type { Platform } from "../platform/contracts.ts";
-import { findConfig } from "../project/config-discovery.ts";
-import { projectPath } from "../project/snapshot.ts";
-import { fingerprint } from "../session/fingerprint.ts";
+import type { Platform } from "../../platform/contracts.ts";
+import { findConfig } from "../../project/config-discovery.ts";
+import { fingerprint } from "../../project/fingerprint.ts";
+import { projectPath } from "../../project/snapshot.ts";
 
 /** Size at which the log is rotated: 5 MiB. */
 const MAX_BYTES = 5_242_880;
