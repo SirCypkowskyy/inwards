@@ -75,7 +75,7 @@ Runs `inwards check` from the project directory and returns the [`inwards/diagno
 | Argument | Type | Meaning |
 |---|---|---|
 | `paths` | list of strings | Files or directories, relative to the project directory or absolute |
-| `contents` | object, path to text | Python source to check instead of what is on disk, by `.py` or `.pyi` path. The file need not exist yet |
+| `contents` | object, path to text | Python source to check instead of what is on disk, by `.py` or `.pyi` path, or a diagram the [`diagrams`](configuration.md#diagrams) key lists, by Markdown, Mermaid or PlantUML path. The file need not exist yet |
 | `maxDiagnostics` | positive integer | At most this many diagnostics, errors first; the summary still counts all of them |
 
 Without `paths` and `contents` it checks the whole project, including the whole-project rules such as import cycles (INW004). With them, it checks those files the way `inwards check PATHS` does. Each path goes to the nearest `[tool.inwards]` above it, and a uv workspace's members use their own configs.
@@ -105,7 +105,9 @@ the tool answers with the finding the hook would report after the edit (shortene
 }
 ```
 
-The baseline applies as in `inwards check`. A broken config, or a `contents` path that isn't Python, comes back as a tool error with the reason.
+A diagram works the same way, by path or as text: with [INW017 or INW018](diagrams.md#check) on, a file the `diagrams` key lists gets their findings on its own lines, so an agent can check a drawing before it saves it. A Markdown, Mermaid or PlantUML file the key doesn't list isn't checked, and the report's `notChecked` says so.
+
+The baseline applies as in `inwards check`. A broken config, or a `contents` path that is neither Python nor named like a diagram (`.md`, `.markdown`, `.mmd`, `.mermaid`, `.puml`, `.plantuml`, `.pu`, `.iuml`), comes back as a tool error with the reason.
 
 ## `explain_rule`
 
@@ -171,4 +173,4 @@ The structured content has `config`, `layers` (each with `name`, `modules` and `
 - An agent calls a tool when it decides to. The hooks and the Stop gate still catch what it didn't ask about, and CI catches the rest.
 - `where_should_this_go` names one new module per layer, under the layer's first literal prefix. A layer declared only with selectors (`shop.*.domain`) gets no candidate; pass `module` to judge a module in one slice.
 - The role words are English and few. A description in other words gets no hint, and the suggestion falls back to the innermost layer the imports pass in.
-- `contents` takes Python files only. An unsaved `pyproject.toml` or baseline isn't checked; the ones on disk are.
+- `contents` takes Python files and diagram files only. An unsaved `pyproject.toml` or baseline isn't checked; the ones on disk are.

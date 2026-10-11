@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: a124f1235b09abcbe26a4714e11b975f80010246fa975a14dc2c847008a79425
+source_hash: b4b2590521d18d12338d9c581c38334278c95b49d2d46dd0ceca256361307b19
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -88,13 +88,14 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     Stop gate czyta pliki ustawień użytkownika, projektu i lokalny, więc liczą się hooki w dowolnym z nich.
 
-    `inwards hook claude-code` czyta JSON hooka ze stdin, więc nie potrzebuje `jq` ani powłoki POSIX i działa tak samo na Windows. Po `PostToolUse` sprawdza ten jeden plik Pythona, który agent właśnie zapisał:
+    `inwards hook claude-code` czyta JSON hooka ze stdin, więc nie potrzebuje `jq` ani powłoki POSIX i działa tak samo na Windows. Po `PostToolUse` sprawdza ten jeden plik Pythona, który agent właśnie zapisał, albo ten jeden plik diagramu wymieniony w kluczu [`diagrams`](guides/configuration.md#diagrams):
 
     - **Naruszenie:** zwięzłe diagnostyki JSON na stderr, kod wyjścia 2.
     - **Naruszenie, które plik miał już na początku sesji:** kontekst, a nie blokada (kod wyjścia 0, notatka, która wymienia je jako już istniejące i każe agentowi zostawić je w spokoju, chyba że zadanie wymaga tego kodu). Naruszenie dodane przez edycję nadal blokuje, łącznie z drugą kopią starego importu. To, skąd bramka wie, co już było, opisuje niżej część o Stop gate.
     - **Same ostrzeżenia** (INW006: plik nie należy do żadnej warstwy): kod wyjścia 0, a ten sam JSON wraca do modelu jako `additionalContext`, więc edycja zostaje, ale agent się o tym dowiaduje.
     - **Kształt pakietu** ([przewodnik](guides/package-shape.md)): INW007 blokuje, gdy plik jest nowy w tej sesji, a dla pliku, który istniał na początku sesji pod tą samą ścieżką, bez dowiązania symbolicznego na tej ścieżce (tożsamość startowa z [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)), jest tylko kontekstem. Alias utworzony przez agenta albo plik z początku sesji podmieniony na dowiązanie nadal blokuje, tu i w Stop gate. INW008 dla pakietu edytowanego pliku (wciąż brakuje wymaganego elementu) jest zawsze kontekstem; egzekwuje go Stop gate.
-    - **Czysty plik, plik spoza Pythona albo każde inne zdarzenie hooka:** kod wyjścia 0, brak wyjścia.
+    - **Wymieniony diagram** ([przewodnik](guides/diagrams.md#check)), przy włączonej INW017 albo INW018: ich zgłoszenia, ostrzeżenie jako kontekst, a błąd podniesiony przez `severity` jako blokada, tak jak zgłoszenia w pliku Pythona. Każdy inny plik spoza Pythona kosztuje hook zajrzenie do konfiguracji, poniżej milisekundy, a sprawdzenie Pythona się nie zmienia ([#348](https://github.com/SirCypkowskyy/inwards/issues/348)). Domyślny zakres Stop gate nie sprawdza diagramów; zobacz przewodnik.
+    - **Czysty plik, plik spoza Pythona, którego klucz `diagrams` nie wymienia, albo każde inne zdarzenie hooka:** kod wyjścia 0, brak wyjścia.
     - **Zepsute `[tool.inwards]`:** komunikat trafia na stderr z kodem wyjścia 2, więc agent, który zepsuł konfigurację, się o tym dowiaduje. Gdy `[tool.inwards]` w ogóle nie ma, hook milczy, bo może być zainstalowany dla każdego projektu; config guard nie pozwala agentowi usunąć tabeli.
     - **Nieczytelne dane wejściowe albo błąd wewnętrzny:** kod wyjścia 1. Claude Code pokazuje to użytkownikowi, a nie modelowi.
     - **Plik spoza projektu** (`CLAUDE_PROJECT_DIR` albo katalog, w którym Claude Code uruchamia hook; nigdy `cwd` z samych danych wejściowych): pomijany, nawet gdy ścieżka sięga do niego przez `..` albo dowiązanie symboliczne. Dane wejściowe pochodzą od agenta, więc Inwards nie pozwala im decydować, co zostanie sprawdzone.

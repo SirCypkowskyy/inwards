@@ -133,6 +133,28 @@ exports[`check --format json reads the marked diagrams \`diagrams\` lists (INW01
 }
 `;
 
+exports[`PostToolUse checks an edited diagram that \`diagrams\` lists, and only that one: a warning is context 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"{\\"schema\\":\\"inwards/diagnostics@1\\",\\"summary\\":{\\"filesChecked\\":0,\\"violations\\":0,\\"warnings\\":1,\\"durationMs\\":0},\\"diagnostics\\":[{\\"code\\":\\"INW017\\",\\"rule\\":\\"diagram-unknown-name\\",\\"severity\\":\\"warning\\",\\"file\\":\\"docs/architecture.md\\",\\"module\\":\\"\\",\\"line\\":4,\\"column\\":22,\\"endLine\\":4,\\"endColumn\\":28,\\"message\\":\\"\\\\\\"domain\\\\\\" is labelled \\\\\\"shop.domian\\\\\\" in this layers diagram, and no module matches \\\\\\"shop.domian\\\\\\".\\",\\"fix\\":{\\"summary\\":\\"Change the label to \\\\\\"shop.domain\\\\\\".\\",\\"steps\\":[\\"\\\\\\"shop.domain\\\\\\" exists; if that is the module meant, use it.\\",\\"If the module was moved or renamed, update the diagram to match the code.\\",\\"If the diagram is right and [tool.inwards] is missing it, ask the user; don't edit [tool.inwards] yourself.\\"]},\\"docs\\":\\"https://sircypkowskyy.github.io/inwards/rules/INW017/\\"}]}"}}
+"
+,
+}
+`;
+
+exports[`PostToolUse checks an edited diagram that \`diagrams\` lists, and only that one: an error blocks 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"{"schema":"inwards/diagnostics@1","summary":{"filesChecked":0,"violations":1,"warnings":0,"durationMs":0},"diagnostics":[{"code":"INW017","rule":"diagram-unknown-name","severity":"error","file":"docs/architecture.md","module":"","line":4,"column":22,"endLine":4,"endColumn":28,"message":"\\"domain\\" is labelled \\"shop.domian\\" in this layers diagram, and no module matches \\"shop.domian\\".","fix":{"summary":"Change the label to \\"shop.domain\\".","steps":["\\"shop.domain\\" exists; if that is the module meant, use it.","If the module was moved or renamed, update the diagram to match the code.","If the diagram is right and [tool.inwards] is missing it, ask the user; don't edit [tool.inwards] yourself."]},"docs":"https://sircypkowskyy.github.io/inwards/rules/INW017/"}]}
+"
+,
+  "stdout": "",
+}
+`;
+
 exports[`check --format json --max-diagnostics 0 1`] = `
 {
   "code": 1,

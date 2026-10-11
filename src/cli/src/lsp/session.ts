@@ -2,14 +2,16 @@
  * @file The language server's policy (`inwards server`, ADR-041): when to check
  * what. A whole-project pass (`checkWorkspace`) runs at start, on a save,
  * when a workspace folder comes or goes, and when the file watchers report a
- * change that matters (`events.ts`), collected for 100 ms. A keystroke checks
- * only that document (`checkAlone`), and keeps the findings only a whole pass
+ * change that matters (`events.ts`), collected for 100 ms; saving a diagram
+ * runs none. A keystroke checks only that document (`checkAlone`), a diagram
+ * the `diagrams` key lists included (#348), and keeps the findings only a whole pass
  * can make (import cycles, cross-file FastAPI wiring) from the last pass.
  * Every check reads the config, the baseline and the listing again, so
  * nothing kept here can go stale; only the extraction cache bound into the
  * check lives longer. Checks run one at a time, in order. No I/O of its own.
  */
 import type { ConfigError, Diagnostic } from "@inwards/core";
+import { DIAGRAM_FILE } from "../project/diagrams.ts";
 import { checkAlone, checkWorkspace, type ServerDeps, without } from "./checks.ts";
 import type { FileChange, LanguageServer } from "./contracts.ts";
 import { messageOf } from "./convert.ts";
@@ -119,12 +121,13 @@ class Session implements LanguageServer {
 
   /**
    * Checks the workspace again soon after a save: other files' findings may
-   * depend on the saved one.
+   * depend on the saved one. A diagram's don't (#348): its own check already
+   * shows everything found in it, so saving one runs no pass.
    *
    * @param path - the saved document's absolute path.
    */
   saved(path: string): void {
-    if (this.#docs.has(path)) {
+    if (this.#docs.has(path) && !DIAGRAM_FILE.test(path)) {
       this.#schedulePass();
     }
   }

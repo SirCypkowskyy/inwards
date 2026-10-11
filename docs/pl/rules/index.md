@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: a30fc6f5421115bb24d1943b1d66aa11b0cc6391d1c50abae44bd6451dbb3874
+source_hash: 346674f2175ece4e3a03b9cc49a676dea9b93f9a39820f401af5d971a2b1777f
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -11,7 +11,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 
 Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki automatycznej, posortuj według kodu, nazwy, kategorii albo statusu i przeglądaj je stronami. Pasek adresu zapamiętuje widok, więc link otwiera tę samą listę. Kategoria obejmuje swoje podkategorie: `imports` pokazuje też reguły z `imports › layers`.
 
-Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
+Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Każda kategoria ma też własną stronę, a nawigacja pokazuje pod nią jej reguły: [importy](imports/index.md), [układ](layout/index.md), [role](roles/index.md), [integralność](integrity/index.md), [diagramy](diagrams/index.md) i [FastAPI](fastapi/index.md). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>
 
@@ -159,4 +159,4 @@ W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona:
 
 ## Format strony { #page-format }
 
-Każda strona reguły zaczyna się od front matter w formacie [OKF](https://okf.md/spec/): `type: rule`, `title`, `description`, `resource` (plik źródłowy reguły), `tags` (kategoria, najpierw nadrzędna), `timestamp` (kiedy reguła trafiła do kodu), `status` oraz pola Inwards `code`, `name`, `severity`, `suppressible`, `autofix` i `related_issues`. Każda strona ma też sekcje Co robi, Dlaczego to źle, Przykład (zgłoszony i poprawiony blok kodu) i Bezpieczeństwo poprawki oraz wiersz w tabeli na tej stronie. `uv run scripts/check-rule-pages.py` sprawdza to wszystko w obu językach, także w CI, i zapisuje plik `rules.json`, z którego czyta lista powyżej; po zmianie strony reguły albo wiersza tutaj uruchom go z `--write`. Test sprawdza, że każda zarejestrowana reguła ma stronę, a każda strona wskazuje zarejestrowaną regułę. Przykłady zgłoszone i poprawione też działają jako testy, sprawdzane względem wyjścia pokazanego na stronie.
+Każda strona reguły zaczyna się od front matter w formacie [OKF](https://okf.md/spec/): `type: rule`, `title`, `description`, `resource` (plik źródłowy reguły), `tags` (kategoria, najpierw nadrzędna), `timestamp` (kiedy reguła trafiła do kodu), `status` oraz pola Inwards `code`, `name`, `severity`, `suppressible`, `autofix` i `related_issues`. Każda strona ma też sekcje Co robi, Dlaczego to źle, Przykład (zgłoszony i poprawiony blok kodu) i Bezpieczeństwo poprawki oraz wiersz w tabeli na tej stronie i na stronie swojej kategorii (`rules/<category>/`), a także wpis w grupie swojej kategorii w nawigacji, w `docs/zensical.toml` i `docs/zensical.pl.toml`. `uv run scripts/check-rule-pages.py` sprawdza to wszystko w obu językach, także w CI, i zapisuje plik `rules.json`, z którego czyta lista powyżej; po zmianie strony reguły albo wiersza tutaj uruchom go z `--write`. Test sprawdza, że każda zarejestrowana reguła ma stronę, a każda strona wskazuje zarejestrowaną regułę. Przykłady zgłoszone i poprawione też działają jako testy, sprawdzane względem wyjścia pokazanego na stronie.

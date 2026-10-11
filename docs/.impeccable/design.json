@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T10:39:40+00:00",
+  "generatedAt": "2026-10-11T12:00:00+00:00",
   "title": "Design System: Inwards docs",
   "extensions": {
     "colorMeta": {
@@ -341,7 +341,15 @@
       "refersTo": "nav-item-active",
       "description": "The current page in Hunk at 700 on a 10% Hunk tint; every other item Ink.",
       "html": "<nav class=\"ds-nav\"><a href=\"#\">INW000 unsupported-encoding</a><a href=\"#\" aria-current=\"page\">INW001 layer-dependency</a><a href=\"#\">INW002 context-independence</a></nav>",
-      "css": ".ds-nav { display: flex; flex-direction: column; font: 400 15px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; } .ds-nav a { padding: 0.3em 0.6em; color: var(--inw-ink, #1b2229); text-decoration: none; border-radius: 4px; transition: color 150ms, background-color 150ms; } .ds-nav a:hover { color: var(--inw-hunk, #0b6784); } .ds-nav a[aria-current] { font-weight: 700; color: var(--inw-hunk, #0b6784); background: color-mix(in srgb, var(--inw-hunk, #0b6784) 10%, transparent); } .ds-nav a:focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; }"
+      "css": ".ds-nav { display: flex; flex-direction: column; font: 400 15px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; } .ds-nav a { padding: 0.3em 0.6em; color: var(--inw-ink, #1b2229); text-decoration: none; border-radius: 6px; transition: color 150ms, background-color 150ms; } .ds-nav a:hover { color: var(--inw-hunk, #0b6784); } .ds-nav a[aria-current] { font-weight: 700; color: var(--inw-hunk, #0b6784); background: color-mix(in srgb, var(--inw-hunk, #0b6784) 10%, transparent); } .ds-nav a:focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; }"
+    },
+    {
+      "name": "Rules Tree",
+      "kind": "nav",
+      "refersTo": "nav-tree-group",
+      "description": "The Rules sidebar as a tree: the section's index page as the root at 700, one group per rule category at 600 with a Graphite chevron before its name, the group's pages on a 1px Rule guide, and the current page in Hunk on a 10% tint. Desktop sidebar only; the drawer keeps the theme's nested list.",
+      "html": "<nav class=\"ds-tree\" aria-label=\"Rules\"><a class=\"ds-tree-root\" href=\"#\">Rules</a><div class=\"ds-tree-group\"><div class=\"ds-tree-row\"><button class=\"ds-tree-toggle\" aria-expanded=\"true\" aria-label=\"Imports\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M9 6l6 6-6 6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></svg></button><a href=\"#\">Imports</a></div><div class=\"ds-tree-children\"><a href=\"#\">INW001 layer-dependency</a><a href=\"#\" aria-current=\"page\">INW002 context-independence</a><a href=\"#\">INW003 public-api-only</a></div></div><div class=\"ds-tree-group\"><div class=\"ds-tree-row\"><button class=\"ds-tree-toggle\" aria-expanded=\"false\" aria-label=\"Layout\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M9 6l6 6-6 6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></svg></button><a href=\"#\">Layout</a></div></div></nav>",
+      "css": ".ds-tree { display: flex; flex-direction: column; font: 400 15px/1.4 \"Atkinson Hyperlegible Next\", Arial, sans-serif; } .ds-tree a { padding: 0.35em 0.6em; color: var(--inw-ink, #1b2229); text-decoration: none; border-radius: 6px; transition: color 150ms, background-color 150ms; } .ds-tree a:hover { color: var(--inw-hunk, #0b6784); } .ds-tree-root { font-weight: 700; } .ds-tree-row { display: flex; align-items: center; } .ds-tree-row a { flex: 1; padding-inline-start: 0.2em; font-weight: 600; } .ds-tree-toggle { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; color: var(--inw-graphite, #56616c); background: none; border: 0; border-radius: 6px; cursor: pointer; } .ds-tree-toggle:hover { color: var(--inw-ink, #1b2229); } .ds-tree-toggle svg { transition: transform 150ms; } .ds-tree-toggle[aria-expanded=\"true\"] svg { transform: rotate(90deg); } .ds-tree-children { display: flex; flex-direction: column; margin-inline-start: 13px; border-inline-start: 1px solid var(--inw-rule, #dfe3e8); } .ds-tree-children a { padding-inline-start: 0.75em; } .ds-tree a[aria-current] { font-weight: 700; color: var(--inw-hunk, #0b6784); background: color-mix(in srgb, var(--inw-hunk, #0b6784) 10%, transparent); } .ds-tree :is(a, button):focus-visible { outline: 2px solid var(--inw-hunk, #0b6784); outline-offset: 2px; }"
     },
     {
       "name": "Review Pane",
