@@ -9,83 +9,8 @@
  * It is opt-in, `modules` narrows it, and a suppression hides it.
  */
 import { describe, expect, test } from "bun:test";
-import type { Diagnostic } from "../../src/index.ts";
-import { Engine, parseConfig } from "../../src/index.ts";
 import { isSnake, singularOf, toSnake, withSuffix } from "../../src/rules/orm-naming/names.ts";
-import { file, grammars, indexOn } from "../support/helpers.ts";
-
-const LAYERS = `[tool.inwards]
-layers = [
-  { name = "domain", modules = ["shop.domain"] },
-  { name = "infrastructure", modules = ["shop.infrastructure"] },
-]
-`;
-
-const HEAD = `from datetime import date, datetime
-
-from sqlalchemy import Column, Date, DateTime, MetaData, Table
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-`;
-
-/** The path most cases check. */
-const MODELS = "shop/infrastructure/models.py";
-
-/**
- * Checks some files with a rules table.
- *
- * @param files - file text by path.
- * @param rules - the rules table and any options tables, TOML.
- * @param whole - true for a whole-project run.
- * @returns every diagnostic.
- */
-async function check(
-  files: Readonly<Record<string, string>>,
-  rules: string,
-  whole = false,
-): Promise<Diagnostic[]> {
-  const engine = await Engine.create(grammars(), parseConfig(`${LAYERS}\n${rules}\n`));
-  const texts = new Map(Object.entries(files));
-  const kinds = new Map<string, "file" | "dir">([...texts.keys()].map((p) => [p, "file"]));
-  const sources = [...texts].map(([path, text]) => file(path, text));
-  return engine.check(sources, indexOn(kinds, texts), undefined, { whole }).diagnostics;
-}
-
-/**
- * Checks files with INW016 on and keeps its findings.
- *
- * @param files - file text by path.
- * @param options - the `[tool.inwards.rules.orm-naming]` body, TOML.
- * @param whole - true for a whole-project run.
- * @returns `path:line:column message` for each INW016 finding.
- */
-async function inw016(
-  files: Readonly<Record<string, string>>,
-  options = "",
-  whole = false,
-): Promise<string[]> {
-  const table = `[tool.inwards.rules.orm-naming]\n${options}\n`;
-  const found = await check(
-    files,
-    `[tool.inwards.rules]\nextend-select = ["INW016"]\n${table}`,
-    whole,
-  );
-  return found
-    .filter((d) => d.code === "INW016")
-    .map((d) => `${d.file}:${d.line}:${d.column} ${d.message}`);
-}
-
-/**
- * Checks `MODELS` alone, after `HEAD`.
- *
- * @param body - the module after `HEAD`.
- * @param options - the options table's body.
- * @returns the findings, as `inw016` gives them, without the path.
- */
-async function models(body: string, options = ""): Promise<string[]> {
-  const found = await inw016({ [MODELS]: `${HEAD}${body}` }, options);
-  return found.map((line) => line.slice(MODELS.length + 1));
-}
+import { checkOrm, FIRST, HEAD, inw016, MODELS, models } from "../support/orm-naming.ts";
 
 /**
  * Checks files in a whole-project run with INW016 on and keeps each finding's full span.
@@ -94,15 +19,12 @@ async function models(body: string, options = ""): Promise<string[]> {
  * @returns `path:line:column-endLine:endColumn` for each INW016 finding, sorted.
  */
 async function spans(files: Readonly<Record<string, string>>): Promise<string[]> {
-  const found = await check(files, '[tool.inwards.rules]\nextend-select = ["INW016"]', true);
+  const found = await checkOrm(files, '[tool.inwards.rules]\nextend-select = ["INW016"]', true);
   return found
     .filter((d) => d.code === "INW016")
     .map((d) => `${d.file}:${d.line}:${d.column}-${d.endLine}:${d.endColumn}`)
     .sort();
 }
-
-/** The line in `HEAD` + body where a body's first line lands. */
-const FIRST: number = HEAD.split("\n").length;
 
 const FASTAPI_BAD = `class Base(DeclarativeBase):
     pass
@@ -129,7 +51,7 @@ class Post(Base):
 
 describe("INW016 orm-naming", () => {
   test("is off unless selected", async () => {
-    const found = await check({ [MODELS]: `${HEAD}${FASTAPI_BAD}` }, "");
+    const found = await checkOrm({ [MODELS]: `${HEAD}${FASTAPI_BAD}` }, "");
     expect(found.filter((d) => d.code === "INW016")).toEqual([]);
   });
 
@@ -146,7 +68,7 @@ describe("INW016 orm-naming", () => {
   });
 
   test("the fix renames through a migration", async () => {
-    const found = await check(
+    const found = await checkOrm(
       { [MODELS]: `${HEAD}${FASTAPI_BAD}` },
       '[tool.inwards.rules]\nextend-select = ["INW016"]',
     );
@@ -432,8 +354,16 @@ describe("INW016's naming heuristics", () => {
     ["due_date", "_at", "due_at"],
     ["birth_at", "_date", "birth_date"],
     ["updated_timestamp", "_at", "updated_at"],
-    ["at", "_at", "at_at"],
-  ])("%s with %s is %s", (name, suffix, wanted) => {
+    ["date_of_birth", "_date", "birth_date"],
+    ["date_joined", "_at", "joined_at"],
+    ["date_created", "_at", "created_at"],
+    ["start_date", "_date", "start_date"],
+    ["at", "_at", undefined],
+    ["date", "_at", undefined],
+    ["date_time", "_at", undefined],
+    ["timestamp", "_at", undefined],
+    ["start_date_utc", "_date", undefined],
+  ])("%s with %s is %p", (name, suffix, wanted) => {
     expect(withSuffix(name, suffix)).toBe(wanted);
   });
 });

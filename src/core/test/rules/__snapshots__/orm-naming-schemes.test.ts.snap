@@ -1,0 +1,14 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW016 on a project with another scheme (#361) the scheme finding counts the names and asks the user for the option 1`] = `
+[
+  {
+    "steps": [
+      "5 of 5 table names read as plural, such as \`accounts\`, \`orders\`, \`users\`; INW016 reports them here once instead of on each name.",
+      "If the plural is the project's choice, ask the user to set \`table-name = "snake"\` in [tool.inwards.rules.orm-naming]. Don't edit [tool.inwards] yourself.",
+      "To move to the singular instead, rename each table with a migration, such as Alembic's \`op.rename_table\`. Once fewer than 90% of the names are plural, each one is reported on its own.",
+    ],
+    "summary": "Ask the user to set \`table-name = "snake"\` in [tool.inwards.rules.orm-naming], or rename the tables to the singular.",
+  },
+]
+`;
