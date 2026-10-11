@@ -22,6 +22,7 @@ import type { ModuleTrees } from "../shared/module-trees.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
 import type { Kind, ViewKind } from "./frameworks.ts";
+import { isHealthCheck } from "./health.ts";
 import { RemoteModules } from "./remote.ts";
 import { type ThinSettings, thinSettings } from "./settings.ts";
 import { trip } from "./signals.ts";
@@ -146,12 +147,13 @@ export function checkThinEndpoints(src: SourceFile, inputs: ThinInputs): Diagnos
     settings,
     layers: inputs.layers,
   };
-  const own = view.found.endpoints.flatMap(({ fn, name, kind }) =>
-    report({ fn, name, kind, view }, context),
-  );
-  const registered = view.found.registrations.flatMap(({ handler, target, how, kind }) => {
+  const own = view.found.endpoints
+    .filter(({ name, route }) => !isHealthCheck(name, route))
+    .flatMap(({ fn, name, kind }) => report({ fn, name, kind, view }, context));
+  const registered = view.found.registrations.flatMap(({ handler, target, how, kind, route }) => {
     const found = remote.resolve(target);
-    return found ? report({ ...found, kind }, context, { at: handler, how }) : [];
+    const health = found !== null && isHealthCheck(found.name, route);
+    return found && !health ? report({ ...found, kind }, context, { at: handler, how }) : [];
   });
   return [...own, ...registered].sort((a, b) => a.line - b.line || a.column - b.column);
 }

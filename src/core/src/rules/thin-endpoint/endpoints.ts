@@ -31,6 +31,7 @@ import {
   standaloneDecorator,
   VIEW_METHODS,
 } from "./frameworks.ts";
+import { routeField, routeOf } from "./route-path.ts";
 import type { Recognise } from "./settings.ts";
 
 /** The frameworks whose apps and routers declare and register routes through methods. */
@@ -47,6 +48,8 @@ export interface Endpoint {
   readonly name: string;
   /** The framework that marked it, or `custom` for a configured decorator or base class. */
   readonly kind: Kind;
+  /** The route's path when the decorator or registration spells it as a literal, e.g. `/healthz`. */
+  readonly route?: string;
 }
 
 /** A route registered in this file whose handler lives in another module. */
@@ -59,6 +62,8 @@ export interface Registration {
   readonly how: string;
   /** The framework the registration belongs to. */
   readonly kind: Kind;
+  /** The route's path when the registration spells it as a literal. */
+  readonly route?: string;
 }
 
 /** The endpoints one file defines, and the routes it registers to other modules' functions. */
@@ -263,7 +268,7 @@ function registrationOf(
   const handler = how ? argumentAt(call, how.index, how.keyword) : null;
   const target = handler ? context.qualify(handler) : null;
   return how && handler && target !== null
-    ? { handler, target, how: how.how, kind: how.framework }
+    ? { handler, target, how: how.how, kind: how.framework, ...routeField(routeOf(call)) }
     : null;
 }
 
@@ -285,16 +290,21 @@ function decorated(
   for (const definition of root.descendantsOfType("decorated_definition")) {
     const fn = definition.childForFieldName("definition");
     const name = fn?.type === "function_definition" ? fn.childForFieldName("name") : null;
-    const kind = namedChildren(definition)
+    const marked = namedChildren(definition)
       .filter((child) => child.type === "decorator")
       .flatMap((decorator) => namedChildren(decorator).slice(0, 1))
-      .map((expression) => decoratorKind(expression, routers, custom, context))
-      .find((k) => k !== undefined);
-    if (fn && name && kind) {
+      .map((expression) => ({
+        expression,
+        marks: decoratorKind(expression, routers, custom, context),
+      }))
+      .find(({ marks }) => marks !== undefined);
+    const kind = marked?.marks;
+    if (fn && name && marked && kind) {
       const cls = fn.parent?.parent?.parent;
       const owner = cls?.type === "class_definition" ? cls.childForFieldName("name") : null;
       const own = identifierName(name);
-      found.push({ fn, name: owner ? `${identifierName(owner)}.${own}` : own, kind });
+      const full = owner ? `${identifierName(owner)}.${own}` : own;
+      found.push({ fn, name: full, kind, ...routeField(routeOf(marked.expression)) });
     }
   }
   return found;
@@ -387,7 +397,8 @@ export function findEndpoints(root: Node, context: EndpointContext): Found {
     if (registration && !local) {
       registrations.push(registration);
     } else if (fn && registration) {
-      registered.push({ fn, name: target.slice(prefix.length), kind: registration.kind });
+      const { kind, route } = registration;
+      registered.push({ fn, name: target.slice(prefix.length), kind, ...routeField(route) });
     }
   }
   const endpoints = unique([...ownEndpoints(root, routers, full), ...registered]);
