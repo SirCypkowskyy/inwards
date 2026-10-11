@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.6.0](https://github.com/SirCypkowskyy/inwards/compare/v0.5.0...v0.6.0) (2026-10-11)
+
+
+### Added
+
+* **cli:** add check --format github for Actions annotations ([#356](https://github.com/SirCypkowskyy/inwards/issues/356)) ([c7bb0bd](https://github.com/SirCypkowskyy/inwards/commit/c7bb0bd203700b36079ebc5eacfae03540edfc0c)), closes [#339](https://github.com/SirCypkowskyy/inwards/issues/339)
+* **cli:** add init --agent claude --shared for committed hooks and MCP ([#357](https://github.com/SirCypkowskyy/inwards/issues/357)) ([7a7e187](https://github.com/SirCypkowskyy/inwards/commit/7a7e18721cd7f0e3de210485a2d228fd8fe6ad9f)), closes [#342](https://github.com/SirCypkowskyy/inwards/issues/342)
+* **cli:** add inwards init --style auto that maps an existing project's packages ([#371](https://github.com/SirCypkowskyy/inwards/issues/371)) ([0cc09cb](https://github.com/SirCypkowskyy/inwards/commit/0cc09cbc3513adf91c79af9b25f1f42e20a08735)), closes [#343](https://github.com/SirCypkowskyy/inwards/issues/343)
+* **cli:** add inwards rules and inwards rule CODE ([#355](https://github.com/SirCypkowskyy/inwards/issues/355)) ([ffd74dc](https://github.com/SirCypkowskyy/inwards/commit/ffd74dc31912150f588506adc9899b3675170999)), closes [#341](https://github.com/SirCypkowskyy/inwards/issues/341)
+* **cli:** name the opt-in rules a project turns on in the architecture brief ([#352](https://github.com/SirCypkowskyy/inwards/issues/352)) ([bbb71a1](https://github.com/SirCypkowskyy/inwards/commit/bbb71a19d91e4845fa5a80d3436a3e90ace81559)), closes [#336](https://github.com/SirCypkowskyy/inwards/issues/336)
+* **cli:** turn on INW014 ports-abstract in the clean and hexagonal presets ([#326](https://github.com/SirCypkowskyy/inwards/issues/326)) ([d05dd3f](https://github.com/SirCypkowskyy/inwards/commit/d05dd3fa39407a9391ab89b67af5f0f08309b603)), closes [#317](https://github.com/SirCypkowskyy/inwards/issues/317)
+* **cli:** turn on INW015 construct-only-in in the clean and hexagonal presets ([#350](https://github.com/SirCypkowskyy/inwards/issues/350)) ([cf6746e](https://github.com/SirCypkowskyy/inwards/commit/cf6746e3772c137723c6e2e592eff04623c7908b)), closes [#325](https://github.com/SirCypkowskyy/inwards/issues/325)
+* **cli:** turn on INW016 and keep fastapi out of the domain core in the fastapi preset ([#363](https://github.com/SirCypkowskyy/inwards/issues/363)) ([16b2f30](https://github.com/SirCypkowskyy/inwards/commit/16b2f3059695b9fa860ffd35bed396e42204ad6d)), closes [#338](https://github.com/SirCypkowskyy/inwards/issues/338)
+* **cli:** turn on module cycles in every init preset ([#366](https://github.com/SirCypkowskyy/inwards/issues/366)) ([3f9cb26](https://github.com/SirCypkowskyy/inwards/commit/3f9cb26799fe5327f1b1754d6cf7462068763fcf)), closes [#340](https://github.com/SirCypkowskyy/inwards/issues/340)
+* **core:** turn opt-in rules on per template role ([#327](https://github.com/SirCypkowskyy/inwards/issues/327)) ([5bdf5ad](https://github.com/SirCypkowskyy/inwards/commit/5bdf5ad0e70a53581793f7644a35acb327f1fad9)), closes [#298](https://github.com/SirCypkowskyy/inwards/issues/298)
+* **rules:** add INW014 ports-abstract so port modules hold only ABCs and Protocols ([#312](https://github.com/SirCypkowskyy/inwards/issues/312)) ([05d95c1](https://github.com/SirCypkowskyy/inwards/commit/05d95c1f651af1b6071c09f59f8d020ae0cebe2e)), closes [#98](https://github.com/SirCypkowskyy/inwards/issues/98) [#295](https://github.com/SirCypkowskyy/inwards/issues/295)
+* **rules:** add INW015 construct-only-in so only the composition root imports and builds outbound adapters ([#313](https://github.com/SirCypkowskyy/inwards/issues/313)) ([f385d41](https://github.com/SirCypkowskyy/inwards/commit/f385d4111a70f2be598c899d0627e58697b8e74b)), closes [#98](https://github.com/SirCypkowskyy/inwards/issues/98) [#296](https://github.com/SirCypkowskyy/inwards/issues/296)
+* **rules:** add INW016 orm-naming for table names and datetime and date column suffixes ([#318](https://github.com/SirCypkowskyy/inwards/issues/318)) ([2331d42](https://github.com/SirCypkowskyy/inwards/commit/2331d427609aae1af7199288a192c6fdf8f7a1b0)), closes [#98](https://github.com/SirCypkowskyy/inwards/issues/98) [#297](https://github.com/SirCypkowskyy/inwards/issues/297)
+* **rules:** add INW017 diagram-unknown-name for marked Mermaid architecture diagrams ([#354](https://github.com/SirCypkowskyy/inwards/issues/354)) ([ab81e69](https://github.com/SirCypkowskyy/inwards/commit/ab81e69d56fd64ecec1a75008ac6bf5470a14404))
+* **rules:** add INW018 diagram-forbidden-edge and inwards import-diagram ([#365](https://github.com/SirCypkowskyy/inwards/issues/365)) ([bfb6a9f](https://github.com/SirCypkowskyy/inwards/commit/bfb6a9f8eb1c3299f9bd2a307d72445be41e950e)), closes [#332](https://github.com/SirCypkowskyy/inwards/issues/332) [#345](https://github.com/SirCypkowskyy/inwards/issues/345)
+* **rules:** read PlantUML component diagrams in INW017, INW018 and import-diagram ([#373](https://github.com/SirCypkowskyy/inwards/issues/373)) ([6d3ea63](https://github.com/SirCypkowskyy/inwards/commit/6d3ea6312fb9aa7ec1f96f8810fc97a43c87960b)), closes [#332](https://github.com/SirCypkowskyy/inwards/issues/332) [#346](https://github.com/SirCypkowskyy/inwards/issues/346)
+
+
+### Fixed
+
+* **cli:** give every command its own --help and one-line usage errors ([#351](https://github.com/SirCypkowskyy/inwards/issues/351)) ([f316ca3](https://github.com/SirCypkowskyy/inwards/commit/f316ca312528573f973eb55792cf74b16329c5e0)), closes [#335](https://github.com/SirCypkowskyy/inwards/issues/335)
+* **rules:** cut false positives of the opt-in rules found on the corpus ([#364](https://github.com/SirCypkowskyy/inwards/issues/364)) ([a99ea2a](https://github.com/SirCypkowskyy/inwards/commit/a99ea2a9e33306e708b26dd6a5df1f59878823bb)), closes [#182](https://github.com/SirCypkowskyy/inwards/issues/182)
+* **rules:** don't count TYPE_CHECKING imports as INW004 cycle edges ([#376](https://github.com/SirCypkowskyy/inwards/issues/376)) ([7897c79](https://github.com/SirCypkowskyy/inwards/commit/7897c79a61513627bb2c826d02372ccc12d5aa1b))
+* **rules:** report correct end positions for INW016 findings ([#374](https://github.com/SirCypkowskyy/inwards/issues/374)) ([67a4311](https://github.com/SirCypkowskyy/inwards/commit/67a431156eb1944d1f73a4437332034076613261)), closes [#370](https://github.com/SirCypkowskyy/inwards/issues/370)
+
+
+### Changed
+
+* **rules:** parse each module INW013 follows once per run ([#372](https://github.com/SirCypkowskyy/inwards/issues/372)) ([48cbce7](https://github.com/SirCypkowskyy/inwards/commit/48cbce77215936ab5d5ef00e230af84fdb60c2a6)), closes [#359](https://github.com/SirCypkowskyy/inwards/issues/359)
+
+
+### Documentation
+
+* add a getting-started guide for GitHub Copilot ([#314](https://github.com/SirCypkowskyy/inwards/issues/314)) ([71534ef](https://github.com/SirCypkowskyy/inwards/commit/71534ef014fdd420a98c0e624d1e593e986f8503)), closes [#67](https://github.com/SirCypkowskyy/inwards/issues/67)
+* add setup pages for Neovim, Zed and Helix ([#311](https://github.com/SirCypkowskyy/inwards/issues/311)) ([92e27cc](https://github.com/SirCypkowskyy/inwards/commit/92e27ccc2c3969803b50a62833cf9ec88c2ed4ee)), closes [#66](https://github.com/SirCypkowskyy/inwards/issues/66)
+* decide Inwards hooks for Copilot in ADR-044 ([#324](https://github.com/SirCypkowskyy/inwards/issues/324)) ([46fee50](https://github.com/SirCypkowskyy/inwards/commit/46fee5065605be1ea7d50da81d0a711e0e7d8da0)), closes [#316](https://github.com/SirCypkowskyy/inwards/issues/316)
+* point install and CI at PyPI and the public repository ([#353](https://github.com/SirCypkowskyy/inwards/issues/353)) ([2b06d29](https://github.com/SirCypkowskyy/inwards/commit/2b06d29c869d976fb81318820b3e35d0a430cc24)), closes [#334](https://github.com/SirCypkowskyy/inwards/issues/334)
+* **rules:** group the rule catalogue by category and show presets ([#368](https://github.com/SirCypkowskyy/inwards/issues/368)) ([5ab4ff8](https://github.com/SirCypkowskyy/inwards/commit/5ab4ff8c421b60f71e1c41f03b8b79c5349f8d2a)), closes [#337](https://github.com/SirCypkowskyy/inwards/issues/337)
+
 ## [0.5.0](https://github.com/SirCypkowskyy/inwards/compare/v0.4.0...v0.5.0) (2026-10-10)
 
 
