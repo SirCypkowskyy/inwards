@@ -1,6 +1,6 @@
 /**
  * @file The opt-in rules part of the architecture brief (#336): one short line
- * per opt-in rule the config turns on (INW012 to INW016, the FAPI family),
+ * per opt-in rule the config turns on (INW012 to INW016, INW021, the FAPI family),
  * worded as what to do while writing code, with the rule's key setting
  * (INW012's `delegate-to`, INW015's `role` and `allowed-in`, INW014's port
  * modules, `interface` and `allow-subclassing`) and the modules it is scoped to. It also owns the inline-code
@@ -60,6 +60,8 @@ const INSTRUCTIONS: Readonly<Record<string, Instruction>> = {
     ].filter((part) => part !== "");
     return parts.length === 0 ? undefined : parts.join("; ");
   },
+  INW021: (): string =>
+    "import a `_private` module only from inside its package; elsewhere import what the package's `__init__.py` re-exports",
   FAPI001: (table: RuleTable | undefined): string | undefined => {
     const parts = metadataParts(table);
     return parts.length === 0 ? undefined : `path operations need ${and(parts)}`;

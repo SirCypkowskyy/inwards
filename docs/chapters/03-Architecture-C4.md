@@ -84,7 +84,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019, INW021 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -116,7 +116,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -166,7 +166,7 @@ sequenceDiagram
         E-->>A: INW000
     else file names a loader (importlib, runpy, builtins, __import__, exec, eval, compile)
         E->>T: parse(full text)
-        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011
+        E->>R: INW001 + INW002 + INW003 + INW005 + INW006 + INW010 + INW011 + INW021
         R-->>E: diagnostics
         E-->>A: diagnostics
     else everything else
@@ -381,6 +381,7 @@ The rules are grouped by category, in the order the [rules index](rules/index.md
 | INW005 | `pure-domain` | A layer importing a third-party or standard-library module its `allow-libraries` / `deny-libraries` / `extend-deny-libraries` don't let it use, static or dynamic, in functions and behind `TYPE_CHECKING` too. The innermost of two or more layers denies frameworks, database and network clients and stdlib I/O (`sqlalchemy`, `fastapi`, `requests`, `subprocess`...) by default; `extend-deny-libraries` adds to that list, `deny-libraries` replaces it, and `[tool.inwards.rules.pure-domain].deny` denies libraries to module prefixes that aren't whole layers. First-party code is left to INW001 and INW006. See [Libraries per layer](guides/libraries.md) | by default | error | all | :material-check-circle: |
 | INW010 | `unknown-first-party` | A static import, in a layer, of a first-party module that doesn't exist, the typical agent hallucination (`from shop.domain.pricing import X` with no `pricing`), and a relative import that climbs above the top-level package, which Python always refuses. The module part is checked: `X` of `from X import name`, the whole name otherwise. Existence is probed on disk, so namespace packages, stubs and compiled extensions (`.so`, `.pyd`, `.pyx`) count; the fix lists the three closest modules in the same package. Such an import gets no INW006 as well, and an outward import INW001 reports gets no INW010. Packages that extend their `__path__` are skipped, and so are modules a build step writes (`generated`, by default `*_pb2`, `*_pb2_grpc` and `_version`, [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default)). See [ADR-025](05-ADR.md#adr-025-inw010-probes-the-disk-for-existence-and-checks-only-the-module-part-of-an-import) | by default | error | all | :material-check-circle: |
 | INW011 | `dynamic-import` | A dynamic import with a string-literal target that reaches an outer layer: `importlib.import_module`, `__import__` (also `builtins.` and `importlib.`), `runpy.run_module`, and import statements inside literal `exec` / `eval` / `compile` source (bytes whose declared encoding Inwards can't read are reported as unchecked). Import aliases, `name = loader` assignments, `getattr(m, "name")`, `m.__dict__["name"]` and `vars(m)["name"]` are followed; `+` between literals and f-strings with literal fields are folded. In every layer but the outermost, a target Inwards can't read is reported as unverifiable: a variable, an f-string field, a `\N{...}` escape, an argument hidden behind `*args` or `**kwargs`, a relative `import_module` whose `package` isn't known, `exec` or `eval` of a non-literal source ([ADR-026](05-ADR.md#adr-026-report-unreadable-dynamic-import-targets-in-inner-layers)). A common way to dodge INW001. Known gaps are listed above | by default | error | all | :material-check-circle: |
+| INW021 | `private-module` | An import, from outside the package, of a first-party module whose name below the top-level package starts with one underscore (dunders aren't private): private to the parent of its deepest such segment, so the package's `__init__.py`, siblings and subpackages may import it. Same import set as INW003, `TYPE_CHECKING` and readable dynamic imports included; an import INW003 reports on the same line gets INW003 alone. Reads unlayered modules too, scripts included; test modules skipped unless `check-tests` | opt-in | error | none | :material-check-circle: |
 
 ### Layout { #catalogue-layout }
 
@@ -447,6 +448,7 @@ src/
 │   │   ├── python/        # parser.ts (tree-sitter, import extraction), module-names.ts,
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
+│   │   │                  #   private-modules.ts (which module names are private)
 │   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
 │   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
 │   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
@@ -464,6 +466,7 @@ src/
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
 │   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
 │   │   │   ├── public-api-only.ts       # INW003: a context's public modules
+│   │   │   ├── private-module.ts        # INW021: _private modules stay in their package
 │   │   │   ├── import-cycles/           # INW004: graph.ts (Tarjan, shortest cycle), cycles.ts
 │   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
@@ -504,7 +507,8 @@ src/
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
-│   │   │                  #   diagrams.ts INW017 to INW019
+│   │   │                  #   diagrams.ts INW017 to INW019,
+│   │   │                  #   package-boundaries.ts INW002, INW003 and INW021
 │   │   └── report/        # render.ts: text / concise / json / sarif; github.ts
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts

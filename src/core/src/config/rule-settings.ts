@@ -241,7 +241,7 @@ function isSeverity(value: unknown): value is Severity {
  * lists it, or, without `select`, when it is on by default; `extend-select`
  * turns it on as well, and `ignore` turns it off whatever the rest says. An
  * options table's `modules` turns it off outside the modules it selects. An
- * opt-in content rule (INW012 to INW016, the FAPI rules) is off in a test
+ * opt-in content rule (INW012 to INW016, the FAPI rules) or INW021 is off in a test
  * module (`isTestModule`) unless its table sets `check-tests = true` (#362).
  *
  * @param code - a code such as `INW001`.
@@ -293,7 +293,7 @@ function isTestModule(module: string): boolean {
 
 /**
  * Tells whether a rule's options table leaves a module in its scope: inside
- * `modules` when that is set, and, for a content rule, not a test module
+ * `modules` when that is set, and, for a rule that skips tests, not a test module
  * unless `check-tests = true`.
  *
  * @param rule - the rule's kebab-case name.

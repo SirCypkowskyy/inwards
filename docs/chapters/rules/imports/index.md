@@ -1,6 +1,6 @@
 # Imports
 
-What a module may import: layers point inward, contexts import each other only as declared and only through their public modules, no cycles, no library a layer's config denies, no first-party module that doesn't exist, and no dynamic import that hides one of these. Every imports rule is on by default.
+What a module may import: layers point inward, contexts import each other only as declared and only through their public modules, no cycles, no library a layer's config denies, no first-party module that doesn't exist, no dynamic import that hides one of these, and no private module reached from outside its package. Every imports rule is on by default except INW021, which is opt-in.
 
 <div class="inw-rule-category" markdown>
 
@@ -13,6 +13,7 @@ What a module may import: layers point inward, contexts import each other only a
 | [INW005](../INW005.md) | `pure-domain` | A library import a layer's config doesn't allow, such as SQLAlchemy in the domain | by default |
 | [INW010](../INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | by default |
 | [INW011](../INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | by default |
+| [INW021](../INW021.md) | `private-module` | An import of a module whose name starts with `_` from outside the package that holds it | opt-in |
 
 </div>
 
