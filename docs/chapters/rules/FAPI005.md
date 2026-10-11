@@ -155,7 +155,7 @@ Unknown means silent. Nothing is reported when:
 - a router keeps its routes in several files, since their order isn't known;
 - a segment uses a converter Inwards doesn't know, other than an identical one;
 - another inclusion of the same router, under a prefix Inwards can't read or in another app, leaves the route reachable;
-- the router is built by a first-party router class or factory ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)), which may set its own `route_class` and match routes its own way: Polar's `VersionedAPIRoute` serves two routes with one method and path by API version ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+- the router's route class may match routes its own way ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)): Starlette's router runs the first route whose `matches` answers in full ([`routing.py`](https://github.com/Kludex/starlette/blob/96d5023c55b29224edb8d684868c49f681d079a9/starlette/routing.py), `Router.app`), so a first-party route class that overrides `matches`, `handle` or `__call__` can pick between routes with one method and path. Polar's `VersionedAPIRoute` serves two such routes by API version. The order is also unknown when the route class can't be read: a router a factory function returns, a `route_class=` that isn't a name, a third-party route class other than FastAPI's, or a first-party router class whose route class Inwards can't find. A first-party router class whose route class is FastAPI's, or one that overrides none of those methods (Polar's `TransactionalAPIRoute` in its back office), keeps its order read.
 
 More limits:
 

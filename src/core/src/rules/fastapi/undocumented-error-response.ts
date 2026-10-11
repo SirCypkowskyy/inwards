@@ -102,6 +102,10 @@ function undeclared(
   if (object === null || own === null || hiddenBy(op)) {
     return new Map();
   }
+  // A route class may keep the route out of the schema by its tags (#392).
+  if (scope.routeClasses.visibility(op, object) !== "shown") {
+    return new Map();
+  }
   const walk = new CodeWalk(scope, options.maxDepth, object);
   // A per-edit check reads the inclusions above a router only for a code its own router misses.
   if (scope.lazy && object.kind === "router") {
