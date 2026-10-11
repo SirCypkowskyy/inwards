@@ -2,7 +2,8 @@
  * @file Checking many files at once: the order the engine's per-file steps run
  * in over a whole list, and what only the whole list decides (the baseline
  * shortcut, FastAPI's cross-file findings, one unassigned-package warning per
- * package, import cycles, INW016's naming convention). `checkAllWith` is the same run with the parsing
+ * package, import cycles, INW016's naming convention and the naming scheme a
+ * project follows instead of the configured one). `checkAllWith` is the same run with the parsing
  * handed to an `ExtractionBatch` first (#61), such as worker threads. The
  * rules and their precedence stay in `engine.ts`; this module only orders
  * the steps the engine hands it.
@@ -25,7 +26,7 @@ import { type Collected, projectCycles } from "./cycles.ts";
 import { projectDiagramImports } from "./diagrams.ts";
 import type { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
-import { ormConventionFindings } from "./orm-naming.ts";
+import { type OrmProject, ormProjectFindings } from "./orm-naming.ts";
 import {
   type Checked,
   type Confirmed,
@@ -241,7 +242,9 @@ function finish(
   } finally {
     run.dispose();
   }
+  let orm: OrmProject = { findings: [], replaced: () => false };
   if (whole) {
+    orm = ormProjectFindings(steps.parser, sources, config, run.ormModels);
     /**
      * Reads a file's imports with the full parse, for INW004 and INW019.
      *
@@ -259,13 +262,15 @@ function finish(
         fullImports,
       }),
       ...projectDiagramImports(collected, { config, sources: diagrams, fullImports }),
-      ...ormConventionFindings(steps.parser, sources, config),
     );
   }
+  const kept = all.filter((d) => !orm.replaced(d));
   return {
-    diagnostics: applyRules(all, config.rules),
-    suppressed: suppressed.flatMap(({ diagnostic, reason }) =>
-      applyRules([diagnostic], config.rules).map((d) => ({ diagnostic: d, reason })),
-    ),
+    diagnostics: applyRules([...kept, ...orm.findings], config.rules),
+    suppressed: suppressed
+      .filter(({ diagnostic }) => !orm.replaced(diagnostic))
+      .flatMap(({ diagnostic, reason }) =>
+        applyRules([diagnostic], config.rules).map((d) => ({ diagnostic: d, reason })),
+      ),
   };
 }
