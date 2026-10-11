@@ -133,9 +133,7 @@ layers = [
 roles = ["models | schemas", "service"]
 `);
     const brief = architectureBrief({ config, style: undefined, ports: [] });
-    expect(brief).toContain(
-      "never import a layer listed after your own, nor a sibling of your own layer.",
-    );
+    expect(brief).toContain("never import a layer listed after your own, nor a sibling of yours.");
     expect(brief).toContain(
       "1. d.models (`app.*.models`): imports no other layer; not its sibling d.schemas",
     );
@@ -201,6 +199,20 @@ ignore = ["INW005"]
       expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
     },
   );
+
+  test.each([...STYLE_NAMES])("a %s preset config with --scaffold keeps its budget", (name) => {
+    const text = configTable(STYLES[name], {
+      pkg: "app",
+      root: "src",
+      version: "0.1.0",
+      ignore: [],
+      scaffold: true,
+      eol: "\n",
+    });
+    // --scaffold turns the contexts on, so the brief lists them too.
+    const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
+    expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
+  });
 });
 
 test("a preset whose ports layer became a selector names no ports module", () => {

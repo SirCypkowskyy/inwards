@@ -301,11 +301,11 @@ src/my_app/  (vertical-slices)
 ├── bootstrap.py       bootstrap: may import every other layer
 ├── features/
 │   └── */
-│       ├── api.py     features.api: may import shared, features.models, features.services, features.commands, features.queries
-│       ├── commands/  features.commands: may import shared, features.models, features.services; not its sibling features.queries
-│       ├── models.py  features.models: may import shared
-│       ├── queries/   features.queries: may import shared, features.models, features.services; not its sibling features.commands
-│       └── services/  features.services: may import shared, features.models
+│       ├── api.py     slice.api: may import shared, slice.models, slice.services, slice.commands, slice.queries
+│       ├── commands/  slice.commands: may import shared, slice.models, slice.services; not its sibling slice.queries
+│       ├── models.py  slice.models: may import shared
+│       ├── queries/   slice.queries: may import shared, slice.models, slice.services; not its sibling slice.commands
+│       └── services/  slice.services: may import shared, slice.models
 └── shared/            shared: imports no other layer
 
 inwards check: 0 violations, 0 warnings.
@@ -326,9 +326,9 @@ ignore = ["tests", "scripts", "migrations", "conftest"]
 # INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
 cycles = ["modules", "contexts"]
 layers = [
-  { name = "shared", modules = ["my_app.shared"] },                            # the shared kernel: code every slice may use
-  { name = "features", modules = ["my_app.features.*"], template = "slice" },  # every slice, layered by the slice template
-  { name = "bootstrap", modules = ["my_app.bootstrap"] },                      # composition root: wires the adapters into the use cases
+  { name = "shared", modules = ["my_app.shared"] },                         # the shared kernel: code every slice may use
+  { name = "slice", modules = ["my_app.features.*"], template = "slice" },  # every slice, layered by the slice template
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },                   # composition root: wires the adapters into the use cases
 ]
 
 # The layers inside every slice, innermost first, and the one module other code may import.
@@ -711,13 +711,13 @@ hexagonal: ports and adapters: the application talks to the world only through p
     shop.adapters     requires inbound/, outbound/: the inbound and outbound layers only; anything else is an error, since no layer would hold it
 
 vertical-slices: one package per feature, independent of each other, on a shared kernel
-  1. shared             shop.shared               the shared kernel: code every slice may use
-  2. features.models    shop.features.*.models    the slice's entities
-  3. features.services  shop.features.*.services  what the use cases call: ports and their adapters
-  4. features.commands  shop.features.*.commands  use cases that change state
-  4. features.queries   shop.features.*.queries   use cases that only read
-  5. features.api       shop.features.*.api       the slice's public module and driving adapter
-  6. bootstrap          shop.bootstrap            composition root: wires the adapters into the use cases
+  1. shared          shop.shared               the shared kernel: code every slice may use
+  2. slice.models    shop.features.*.models    the slice's entities
+  3. slice.services  shop.features.*.services  what the use cases call: ports and their adapters
+  4. slice.commands  shop.features.*.commands  use cases that change state
+  4. slice.queries   shop.features.*.queries   use cases that only read
+  5. slice.api       shop.features.*.api       the slice's public module and driving adapter
+  6. bootstrap       shop.bootstrap            composition root: wires the adapters into the use cases
   Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
   Gap: code only one slice uses may still move into shared, where every slice can reach it.
   Shapes, with --scaffold:
