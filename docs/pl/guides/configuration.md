@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 9ec2f1223fee089bccd19b68774cfcd40a2428763e07cda0c2090d5695eb2da4
+source_hash: 491b18111c20115994a3a23258c8ed362559f630073c8691ec239464459e9b4e
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -148,7 +148,7 @@ Najstarsza wersja Inwards, która może sprawdzać projekt. Starszy program koń
 
 Typ: lista nazw modułów. Domyślnie: brak.
 
-Moduły pominięte w ostrzeżeniu INW006 o kodzie poza wszystkimi warstwami, na przykład `tests` albo `migrations`. Wpis dopasowuje całe segmenty nazwy w dowolnym miejscu nazwy modułu: `migrations` obejmuje `shop.orders.migrations.0001_initial`, a `tests` obejmuje `shop.tests` tak samo jak `tests` najwyższego poziomu. Wpis zaczynający się od `/` pasuje tylko na początku nazwy: `/tests` obejmuje `tests.test_order`, ale nie `shop.tests.test_order`, które nadal dostaje ostrzeżenie. `inwards init` zapisuje domyślne wpisy bez `/`. Importy z warstwy do pominiętych modułów nadal są sprawdzane.
+Moduły pominięte w ostrzeżeniu INW006 o kodzie poza wszystkimi warstwami, na przykład `tests` albo `migrations`. Wpis dopasowuje całe segmenty nazwy w dowolnym miejscu nazwy modułu: `migrations` obejmuje `shop.orders.migrations.0001_initial`, a `tests` obejmuje `shop.tests` tak samo jak `tests` najwyższego poziomu. Wpis zaczynający się od `/` pasuje tylko na początku nazwy: `/tests` obejmuje `tests.test_order`, ale nie `shop.tests.test_order`, które nadal dostaje ostrzeżenie. `inwards init` zapisuje domyślne wpisy bez `/`. Importy z warstwy do pominiętych modułów nadal są sprawdzane, podobnie jak ich treść: reguły treści opt-in nie czytają `ignore`. Zamiast tego pomijają moduły testowe po nazwie (zob. `check-tests` w [`rules`](#rules)).
 
 <!-- config: fragment -->
 
@@ -218,6 +218,7 @@ Które reguły zgłaszają i jak głośno:
 - `ignore`: te reguły nie zgłaszają. Ma pierwszeństwo przed `select` i `extend-select`.
 - `severity`: tabela kodu reguły na `"error"` albo `"warning"`. Wszystkie cztery klucze przyjmują kody reguł, takie jak `"INW001"`. Nazwa reguły w ich miejscu, na przykład `"layer-dependency"`, to błąd konfiguracji, który podaje kod do wpisania.
 - `<rule-name>`: tabela opcji tej reguły, na przykład `[tool.inwards.rules.pure-domain]`. Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w `modules` warstwy, która ogranicza regułę do pasujących modułów. Niektóre reguły mają też własne opcje, opisane na stronie reguły: [`thin-endpoint`](../rules/INW012.md#configuration), [`async-blocking`](../rules/INW013.md#configuration), [`ports-abstract`](../rules/INW014.md#configuration), [`construct-only-in`](../rules/INW015.md#configuration), [`orm-naming`](../rules/INW016.md#configuration), [`endpoint-metadata`](../rules/FAPI001.md#configuration), [`undocumented-error-response`](../rules/FAPI002.md#configuration) i [`router-wiring`](../rules/FAPI003.md#configuration). Nieznany klucz albo klucz innej reguły to błąd konfiguracji, który go podaje. Tabela nie włącza reguły, a tabela dla reguły wyłączonej dostaje ostrzeżenie. [Szablon](#template-rules) może też włączyć reguły opt-in dla jednej ze swoich ról, co dodaje się do tych tabel.
+- `check-tests`, w tabeli opcji reguły treści opt-in (INW012 do INW016, FAPI001 do FAPI009): `true` sprawia, że reguła zgłasza też w modułach testowych. Domyślnie te reguły pomijają moduł, którego nazwa mówi, że to test: ostatni segment `test_*` albo `*_test`, albo segment `tests`, `test` lub `conftest` ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Wyciszenie w takim module nie jest zgłaszane jako nieużywane. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `check-tests` w ich tabelach to błąd konfiguracji.
 - `[tool.inwards.rules.pure-domain]` przyjmuje też `deny`, listę tabel z `modules` (prefiksy albo selektory, jak wyżej) i `libraries` (nazwy importu, jak w `deny-libraries` warstwy). Moduły, do których pasuje wpis, nie mogą importować jego bibliotek, niezależnie od tego, czy należą do warstwy, a `allow-libraries` warstwy tego nie znosi ([INW005](../rules/INW005.md), [przewodnik po bibliotekach](libraries.md#prefix-deny)). Służy do pakietu, który nie jest całą warstwą, na przykład do kontraktu import-lintera „`mypackage.one` nie może importować `django`”.
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).

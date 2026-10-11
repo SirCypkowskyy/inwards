@@ -495,19 +495,19 @@
           "$ref": "#/definitions/routerWiringOptions"
         },
         "route-shadowing": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/contentRuleOptions"
         },
         "lifespan-events": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/contentRuleOptions"
         },
         "yield-dependency-swallows": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/contentRuleOptions"
         },
         "duplicate-operation-id": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/contentRuleOptions"
         },
         "depends-called": {
-          "$ref": "#/definitions/ruleOptions"
+          "$ref": "#/definitions/contentRuleOptions"
         }
       }
     },
@@ -525,6 +525,29 @@
           "items": {
             "$ref": "#/definitions/layerEntry"
           }
+        }
+      }
+    },
+    "contentRuleOptions": {
+      "description": "A content rule's options, [tool.inwards.rules.<rule-name>]. They don't turn the rule on: extend-select or select does.",
+      "markdownDescription": "A content rule's options, [tool.inwards.rules.<rule-name>]. They don't turn the rule on: extend-select or select does.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "description": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.",
+          "markdownDescription": "Module prefixes or selectors, as in layers[].modules: the rule reports only in the modules they match.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#rules)",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/layerEntry"
+          }
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         }
       }
     },
@@ -577,6 +600,12 @@
       "properties": {
         "modules": {
           "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         },
         "table-name": {
           "description": "How table names are checked: lower_case_snake and singular (\"snake_singular\"), lower_case_snake only (\"snake\"), or not at all (false).",
@@ -639,6 +668,12 @@
         "modules": {
           "$ref": "#/definitions/ruleOptions/properties/modules"
         },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
+        },
         "extend-blocking-calls": {
           "description": "Calls that block when called inside async def, added to INW013's built-in list (sqlite3.connect, psycopg2.connect and the other DB-API drivers), by qualified name with * and ? wildcards.",
           "markdownDescription": "Calls that block when called inside async def, added to INW013's built-in list (sqlite3.connect, psycopg2.connect and the other DB-API drivers), by qualified name with * and ? wildcards.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW013/)",
@@ -677,6 +712,12 @@
       "properties": {
         "modules": {
           "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         },
         "allow-bases": {
           "description": "Bases that keep a class in a port module out of the check, by qualified name with * and ? wildcards; builtins are spelled bare (Exception). Replaces the default list of exceptions, pydantic.BaseModel, NamedTuple, TypedDict and enums.",
@@ -740,6 +781,12 @@
       "properties": {
         "modules": {
           "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         },
         "max-statements": {
           "description": "The most statements an endpoint's body may hold, nested ones included; guards that raise an HTTP error and the docstring don't count. false turns the check off.",
@@ -884,6 +931,12 @@
         "modules": {
           "$ref": "#/definitions/ruleOptions/properties/modules"
         },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
+        },
         "role": {
           "description": "The guarded modules, such as the outbound adapters, as module prefixes or selectors as in layers[].modules. Only the role itself and allowed-in may import them at runtime or build their classes.",
           "markdownDescription": "The guarded modules, such as the outbound adapters, as module prefixes or selectors as in layers[].modules. Only the role itself and allowed-in may import them at runtime or build their classes.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW015/)",
@@ -912,6 +965,12 @@
       "properties": {
         "modules": {
           "$ref": "#/definitions/ruleOptions/properties/modules"
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         },
         "entrypoints": {
           "description": "The apps unmounted routers are measured from, as module:name, where name is the app's variable or the top-level function that builds it. Default: every FastAPI() in the project.",
@@ -1231,7 +1290,7 @@
               {
                 "allOf": [
                   {
-                    "$ref": "#/definitions/ruleOptions"
+                    "$ref": "#/definitions/contentRuleOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]
@@ -1249,7 +1308,7 @@
               {
                 "allOf": [
                   {
-                    "$ref": "#/definitions/ruleOptions"
+                    "$ref": "#/definitions/contentRuleOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]
@@ -1267,7 +1326,7 @@
               {
                 "allOf": [
                   {
-                    "$ref": "#/definitions/ruleOptions"
+                    "$ref": "#/definitions/contentRuleOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]
@@ -1285,7 +1344,7 @@
               {
                 "allOf": [
                   {
-                    "$ref": "#/definitions/ruleOptions"
+                    "$ref": "#/definitions/contentRuleOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]
@@ -1357,7 +1416,7 @@
               {
                 "allOf": [
                   {
-                    "$ref": "#/definitions/ruleOptions"
+                    "$ref": "#/definitions/contentRuleOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]
@@ -1368,11 +1427,14 @@
       }
     },
     "templateConstructOnlyIn": {
-      "description": "INW015's options in a template: allowed-in. The template fills role with the role's modules.",
-      "markdownDescription": "INW015's options in a template: allowed-in. The template fills role with the role's modules.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#template-rules)",
+      "description": "INW015's options in a template: allowed-in and check-tests. The template fills role with the role's modules.",
+      "markdownDescription": "INW015's options in a template: allowed-in and check-tests. The template fills role with the role's modules.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#template-rules)",
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "check-tests": {
+          "$ref": "#/definitions/constructOnlyInOptions/properties/check-tests"
+        },
         "allowed-in": {
           "$ref": "#/definitions/constructOnlyInOptions/properties/allowed-in"
         }
@@ -1392,6 +1454,12 @@
           "items": {
             "$ref": "#/definitions/layerEntry"
           }
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         },
         "require-summary": {
           "description": "Require summary= or a docstring (\"summary-or-docstring\"), summary= itself (\"summary\"), or nothing (false).",
@@ -1453,6 +1521,12 @@
           "items": {
             "$ref": "#/definitions/layerEntry"
           }
+        },
+        "check-tests": {
+          "description": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.",
+          "markdownDescription": "Whether the rule also reports in test modules: test_*.py, *_test.py, conftest.py, and modules with a tests or test segment. Off by default, so the rule skips them.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/#opt-in-rules)",
+          "type": "boolean",
+          "default": false
         },
         "codes": {
           "description": "Which error codes must be declared: 4xx only, or 4xx and 5xx.",

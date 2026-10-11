@@ -141,6 +141,15 @@ A rule's options live in a table named after the rule, `[tool.inwards.rules.<rul
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
 ```
 
+The opt-in content rules, INW012 to INW016 and the FAPI rules, skip test modules: a module whose last name segment is `test_*` or `*_test`, or that has a `tests`, `test` or `conftest` segment, such as `app/tests/test_orders.py`, `tests/conftest.py` or `app/orders_test.py`. A test builds a throwaway app or imports an adapter on purpose, so a finding there is rarely worth fixing ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` in the rule's table brings them back for that rule. The other rules check test modules like any other module, and the top-level `ignore` doesn't scope the content rules.
+
+<!-- config: fragment -->
+
+```toml title="pyproject.toml"
+[tool.inwards.rules.async-blocking]
+check-tests = true  # INW013 also reports in tests/ and test_*.py
+```
+
 A [template](../guides/configuration.md#template-rules) can turn an opt-in rule on for one of its roles, such as `router = { async-blocking = true }`; it expands into `extend-select` and the rule's options table, with the role's modules in `modules`.
 
 An options table doesn't turn a rule on. A table for a rule that is off (opt-in and not selected, or listed in `ignore`) does nothing, so `inwards check` reports a warning at the table in `pyproject.toml`, under the rule's code; that lets a team stage a rule's options before turning it on.

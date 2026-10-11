@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI008.md
-source_hash: fb91f7eede5ef47a3c0baf4dfb851680bc1f03ff404c61c68adab5a4ed0d04ff
+source_hash: 8d3ce0d198d4117ff1e13c22cdee11650f7cfea5db04a2a93303deb4d4cbc3e7
 type: rule
 title: FAPI008 duplicate-operation-id
 description: Żadne dwie operacje ścieżki jednej aplikacji FastAPI nie mają tego samego jawnego operation_id, więc wygenerowani klienci dostają jedną metodę na operację.
@@ -139,7 +139,7 @@ Brak automatycznej poprawki (`autofix: false`). Która z dwóch zachowa nazwę i
 
 ## Konfiguracja { #configuration }
 
-Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule, a `check-tests` jak w każdej regule treści ([tabele opcji](index.md#opt-in-rules)).
 
 Każde zgłoszenie stoi na dekoratorze i można je wyciszyć w kodzie przez `# inwards: ignore[FAPI008] reason="..."` w tej linii.
 

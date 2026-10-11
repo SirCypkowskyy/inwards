@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: b14fd97cd0a8b48fe631fedca864d6e18c754042d60cdb0583dfe037b2e22e49
+source_hash: 3bce519537ea4a621b0e8635463a53d793384f34640d16bb6aa8781ad7e7ccdd
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1057,6 +1057,14 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - **Da się ją wyciszyć, w przeciwieństwie do INW004.** Każda diagnostyka FAPI003 ma własną linię (wywołanie `APIRouter(...)`, wywołanie `include_router`, które zamyka cykl), więc wyciszenie w niej dotyczy jednej decyzji. INW004 nie da się wyciszyć, bo komentarz stałby przy jednym z wielu importów.
 - **Tylko sprawdzane pliki, względem całego grafu.** Częściowe sprawdzenie (ścieżka w argumencie, Stop gate) buduje graf aplikacji i routerów ze wszystkich plików FastAPI w projekcie i zgłasza tylko w plikach, które sprawdza. Stop gate zgłasza więc router, który sesja utworzyła lub zmieniła, a router niepodpięty już na starcie sesji jest starym błędem.
 - **Hook edycji i edytor zgłaszają tylko diagnostyki z jednego pliku.** Utworzenie routera i podpięcie go do aplikacji to dwie edycje. Graf budują jednak wtedy, gdy plik wycisza FAPI003, żeby wyciszenie liczyło się jako użyte, a nie zamieniało w ostrzeżenie INW009, a potem odrzucają to, co znalazły.
+
+**Poprawka, 2026-10-11: reguły treści pomijają moduły testowe ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)).** Przebieg na korpusie z [#182](https://github.com/SirCypkowskyy/inwards/issues/182) zgłosił FAPI001 na dwóch jednorazowych aplikacjach, które budują testy Polara, i INW015 na teście python-ddd, który importuje logger z infrastruktury. Nikt nie poprawiłby żadnego z nich.
+
+- **Moduły testowe po nazwie, dla każdej reguły treści opt-in.** INW012 do INW016 i FAPI001 do FAPI009 nie zgłaszają w module, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`. Nazwa to wszystko, co silnik wie bez I/O, i odpowiada domyślnemu zbieraniu testów przez pytest. Reguły importów nadal sprawdzają moduły testowe: test, który importuje w poprzek warstw, wciąż warto znać.
+- **`check-tests = true`, osobno dla każdej reguły, przywraca je.** Klucz leży w tabeli opcji reguły obok `modules`, więc tabela reguł rozstrzyga go tak samo: reguła jest w tym module wyłączona, wyciszenie w nim nie jest zgłaszane jako nieużywane, a wpis baseline'u w nim jest uśpiony. Zespół, który chce INW013 w swoich asynchronicznych testach, włącza tę jedną regułę.
+- **`ignore` zostaje przy INW006.** Jego wpisy wskazują moduły poza warstwami, które nie potrzebują ostrzeżenia, a importy z nich nadal są sprawdzane; `inwards init` wpisuje do niego `scripts` i `migrations`. Gdyby reguły treści czytały `ignore`, zmieniłoby to, co sprawdzają istniejące konfiguracje, a testy obejmują już nazwy wyżej. Resztę załatwia `modules` i wyciszenie.
+
+Konsekwencje: ponowny przebieg na korpusie usuwa dokładnie te 3 zgłoszenia i nic więcej. Projekt, który uruchamiał regułę treści na swoich testach, przestaje widzieć te zgłoszenia, dopóki nie ustawi `check-tests`. Pomocnik testów spoza konwencji, na przykład `app/testing/factories.py`, nadal jest sprawdzany; wyłącza go `modules` albo wyciszenie. Alternatywy: czytanie `ignore` (odrzucone wyżej); jeden klucz najwyższego poziomu dla wszystkich reguł treści (jedna linia w projekcie, ale tabela reguł potrzebowałaby wartości spoza siebie, a zespół rzadko chce przywrócić w testach wszystkie reguły naraz); same dokumenty, polecające `modules` (to lista dozwolonych, więc pominięcie `tests` oznacza wypisanie wszystkich innych pakietów).
 
 ## ADR-038: Kopia startu sesji poza projektem, przeciw odtworzonemu SessionStart { #adr-038-a-witness-of-the-session-start-outside-the-project-against-a-replayed-sessionstart }
 

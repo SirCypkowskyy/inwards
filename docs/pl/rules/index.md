@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 9212997c66449c13b9e88bb5bb04142f0daf68af9d5571cf443c892308af749b
+source_hash: b0daca9d66901060e931ec377abbcf9dff917954ad2095ee789c6b3cf660955d
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -144,6 +144,15 @@ Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<ru
 ```toml title="pyproject.toml"
 [tool.inwards.rules.pure-domain]
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
+```
+
+Reguły treści opt-in, INW012 do INW016 i reguły FAPI, pomijają moduły testowe: moduł, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`, na przykład `app/tests/test_orders.py`, `tests/conftest.py` czy `app/orders_test.py`. Test celowo buduje jednorazową aplikację albo importuje adapter, więc zgłoszenie w nim rzadko warto poprawiać ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` w tabeli reguły przywraca je dla tej reguły. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `ignore` najwyższego poziomu nie zawęża reguł treści.
+
+<!-- config: fragment -->
+
+```toml title="pyproject.toml"
+[tool.inwards.rules.async-blocking]
+check-tests = true  # INW013 also reports in tests/ and test_*.py
 ```
 
 [Szablon](../guides/configuration.md#template-rules) może włączyć regułę opt-in dla jednej ze swoich ról, na przykład `router = { async-blocking = true }`; rozwija się to do `extend-select` i tabeli opcji reguły, z modułami roli w `modules`.

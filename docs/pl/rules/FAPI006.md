@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI006.md
-source_hash: f0cb6b7f731bc7e6f0eb8df6b614eff9454eb5cf9c60da141e5d134ecde289d4
+source_hash: 897edcf7d2d5186b131377a27b041a1b75b8eb900d9f7c62c739a0a601efcbda
 type: rule
 title: FAPI006 lifespan-events
 description: Aplikacje FastAPI używają menedżera kontekstu lifespan, a nie przestarzałych handlerów on_event, i nigdy obu naraz, więc każdy handler startu i zamknięcia się wykonuje.
@@ -138,7 +138,7 @@ Brak automatycznej poprawki (`autofix: false`). Scalenie handlerów w lifespan z
 
 ## Konfiguracja { #configuration }
 
-Waga: błąd, a zgłoszenia samej przestarzałości mają wagę ostrzeżenia. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+Waga: błąd, a zgłoszenia samej przestarzałości mają wagę ostrzeżenia. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule, a `check-tests` jak w każdej regule treści ([tabele opcji](index.md#opt-in-rules)).
 
 Każde zgłoszenie można wyciszyć w kodzie przez `# inwards: ignore[FAPI006] reason="..."` w linii rejestracji.
 
