@@ -3,7 +3,8 @@ name: SARIF
 # Dogfoods the CI template from docs/chapters/guides/ci.md on
 # examples/broken-app, whose one INW001 violation is there on purpose. The only
 # differences from the template: inwards runs from source, and exit code 1 is
-# the expected result, so the job fails when the violation goes missing.
+# the expected result, so the job fails when the violation or its annotation
+# goes missing.
 #
 # Code scanning on a private repository needs GitHub Code Security, which a
 # personal account can't buy, so the upload fails here with 403 until the
@@ -43,8 +44,11 @@ jobs:
           jq -e '[.runs[].results[] | select(.ruleId == "INW001")] | length == 1' inwards.sarif
       - name: Annotate the pull request
         run: |
-          jq -r '.runs[].results[] | .locations[0].physicalLocation as $l
-            | "::\(if .level == "error" then "error" else "warning" end) file=\($l.artifactLocation.uri),line=\($l.region.startLine),col=\($l.region.startColumn),title=\(.ruleId)::\(.message.text | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A"))"' inwards.sarif
+          status=0
+          bun run src/cli/src/main.ts check --config examples/broken-app/pyproject.toml --format github > annotations.txt || status=$?
+          cat annotations.txt
+          test "$status" -eq 1
+          grep -q '^::error file=examples/broken-app/shop/domain/order.py,line=3,.*title=INW001::' annotations.txt
       - name: Upload to code scanning
         uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         continue-on-error: ${{ github.event.repository.private }}
