@@ -76,7 +76,10 @@ export interface StyleContexts {
 export interface ExampleModules {
   entity: string;
   port: string;
-  useCase: string;
+  /** The package of use cases that change state; each lives in a private module its `__init__.py` re-exports. */
+  commands: string;
+  /** The package of use cases that only read, laid out like `commands`. */
+  queries: string;
   adapter: string;
   driving: string;
   bootstrap: string;
