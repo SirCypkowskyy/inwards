@@ -1,8 +1,9 @@
 /**
  * @file INW014 in the presets with an `application/ports/` package, clean and
- * hexagonal: the scaffold passes with the rule on as a warning, and a
- * concrete method or a concrete class planted in the scaffold's port module
- * gets an INW014 warning whose fix names the preset's adapter layer.
+ * hexagonal: the scaffold passes with the rule on as a warning and its
+ * Protocol-only options, a concrete method or a concrete class planted in
+ * the scaffold's port module gets an INW014 warning whose fix names the
+ * preset's adapter layer, and so does an adapter that subclasses the port.
  * Each test runs init on a fresh uv project, then edits the port by hand.
  */
 import { describe, expect, test } from "bun:test";
@@ -56,16 +57,34 @@ function portFindings(root: string): {
 }
 
 describe.each([
-  ["clean", "infrastructure"],
-  ["hexagonal", "outbound"],
-])("%s: INW014 ports-abstract", (style, adapters) => {
+  ["clean", "infrastructure", "infrastructure"],
+  ["hexagonal", "outbound", "adapters/outbound"],
+])("%s: INW014 ports-abstract", (style, adapters, adapterDir) => {
   test("is on as a warning, and the scaffold's port passes", () => {
     const { root, init: code, check } = scaffolded(style);
     expect({ init: code, check }).toEqual(PASSING);
     const text = readFileSync(join(root, "pyproject.toml"), "utf8");
     expect(text).toContain('extend-select = ["INW014", "INW015"]');
     expect(text).toContain('[tool.inwards.rules.severity]\nINW014 = "warning"\n');
-    expect(text).not.toContain("[tool.inwards.rules.ports-abstract]");
+    expect(text).toContain(
+      '[tool.inwards.rules.ports-abstract]\ninterface = "protocol"\nallow-subclassing = false\n',
+    );
+  });
+
+  test("an adapter that subclasses the port is an INW014 warning", () => {
+    const { root } = scaffolded(style);
+    const adapter = `src/my_app/${adapterDir}/in_memory_orders.py`;
+    const path = join(root, adapter);
+    const text = readFileSync(path, "utf8");
+    const plain = "class InMemoryOrderRepository:";
+    expect(text).toContain(plain);
+    writeFileSync(path, text.replace(plain, "class InMemoryOrderRepository(OrderRepository):"));
+    const { code, found, others } = portFindings(root);
+    expect({ code, others, files: found.map((f) => `${f.file} ${f.severity}`) }).toEqual({
+      code: 0,
+      others: 0,
+      files: [`${adapter} warning`],
+    });
   });
 
   test("a concrete method in the port module is an INW014 warning", () => {
