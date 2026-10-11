@@ -671,6 +671,21 @@
             "attr.define",
             "attr.frozen"
           ]
+        },
+        "interface": {
+          "description": "What a port class must be: \"any\" accepts ABCs and Protocols; \"protocol\" also reports an ABC in a port module, and a port that extends a port without listing Protocol among its own bases.",
+          "markdownDescription": "What a port class must be: \"any\" accepts ABCs and Protocols; \"protocol\" also reports an ABC in a port module, and a port that extends a port without listing Protocol among its own bases.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW014/)",
+          "enum": [
+            "any",
+            "protocol"
+          ],
+          "default": "any"
+        },
+        "allow-subclassing": {
+          "description": "Whether a class outside the port modules may list a class from a port module among its bases. false reports each such base: adapters implement ports by their shape, checked with _: Port = Adapter(...) under if TYPE_CHECKING:.",
+          "markdownDescription": "Whether a class outside the port modules may list a class from a port module among its bases. false reports each such base: adapters implement ports by their shape, checked with _: Port = Adapter(...) under if TYPE_CHECKING:.\n\n[Reference](https://sircypkowskyy.github.io/inwards/rules/INW014/)",
+          "type": "boolean",
+          "default": true
         }
       }
     },

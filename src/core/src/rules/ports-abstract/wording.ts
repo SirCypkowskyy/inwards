@@ -2,7 +2,10 @@
  * @file Words INW014's findings and fix steps: one for a concrete class in
  * a port module and one for a subclass of a port that implements it, both on
  * the class's name, and one for a method of an ABC or Protocol whose body
- * does work, on the method's name. Both fixes name where the implementation goes: the
+ * does work, on the method's name. With `interface = "protocol"` it words an
+ * ABC port and a port that extends a port without listing `Protocol`, and
+ * with `allow-subclassing = false` an adapter's base that is a port, on that
+ * base. The fixes for an implementation name where it goes: the
  * adapter layer of the project's layers when one is recognisable by name,
  * else an adapter module in general. Plain text from the records
  * `classes.ts` builds; it decides nothing about what is reported.
@@ -11,7 +14,7 @@ import type { Node } from "web-tree-sitter";
 import type { LayerSpec } from "../../config/layers.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import type { ConcreteMethod, PortClass } from "./classes.ts";
+import type { ConcreteMethod, PortBase, PortClass } from "./classes.ts";
 
 /**
  * Layer names that say "adapters", most specific first: the outbound
@@ -205,6 +208,81 @@ export function reportImplementation(
         `Move \`${cls.name}\` to ${destination(target)}, importing \`${base}\` from \`${src.module}\` there.`,
         `If \`${cls.name}\` is a test double, such as an in-memory fake, move it next to the tests instead.`,
         `If \`${cls.name}\` is meant to be a narrower port, list \`ABC\` or \`Protocol\` among its bases and give its methods the body \`...\`.`,
+      ],
+    },
+  });
+}
+
+/** Why a Protocol-only finding exists, quoted in its message. */
+const PROTOCOL_ONLY = 'ports here are `typing.Protocol` classes (`interface = "protocol"`)';
+
+/**
+ * Turns an ABC in a port module into a finding, under `interface = "protocol"`.
+ *
+ * @param cls - the port class whose bases list `ABC` or whose metaclass is `ABCMeta`.
+ * @param src - the checked file.
+ * @returns the finding, on the class's name.
+ */
+export function reportAbc(cls: PortClass, src: SourceFile): Diagnostic {
+  const name = cls.node.childForFieldName("name") ?? cls.node;
+  return diagnostic(RULES.INW014, src, {
+    span: spanOf(name),
+    message: `\`${cls.name}\` in port module \`${src.module}\` is an ABC; ${PROTOCOL_ONLY}, which adapters implement by their shape.`,
+    fix: {
+      summary: `Make \`${cls.name}\` a \`Protocol\` instead of an ABC.`,
+      steps: [
+        `Replace \`ABC\` with \`Protocol\` (from \`typing\`) among the bases of \`${cls.name}\`, and drop \`@abstractmethod\` from its methods: it matters only to subclasses.`,
+        `Remove \`${cls.name}\` from the bases of every adapter that subclasses it, and check the adapter against it with \`_: ${cls.name} = Adapter(...)\` under \`if TYPE_CHECKING:\`.`,
+      ],
+    },
+  });
+}
+
+/**
+ * Turns a port that extends a port without listing `Protocol` into a
+ * finding, under `interface = "protocol"`: the typing spec treats such a
+ * class as a regular class, not a protocol.
+ *
+ * @param cls - the derived class, whose methods do no work.
+ * @param src - the checked file.
+ * @returns the finding, on the class's name.
+ */
+export function reportNotProtocol(cls: PortClass, src: SourceFile): Diagnostic {
+  const name = cls.node.childForFieldName("name") ?? cls.node;
+  const base = cls.base ?? "a port";
+  return diagnostic(RULES.INW014, src, {
+    span: spanOf(name),
+    message: `\`${cls.name}\` in port module \`${src.module}\` extends the port \`${base}\` but doesn't list \`Protocol\` among its own bases, so the type checker treats it as a regular class; ${PROTOCOL_ONLY}.`,
+    fix: {
+      summary: `Add \`Protocol\` to the bases of \`${cls.name}\`.`,
+      steps: [
+        `Declare it as \`class ${cls.name}(${base}, Protocol):\`, importing \`Protocol\` from \`typing\`.`,
+        `If \`${cls.name}\` is an implementation, move it to an adapter module and remove \`${base}\` from its bases.`,
+      ],
+    },
+  });
+}
+
+/**
+ * Turns a base that is a port, on a class outside the port modules, into a
+ * finding, under `allow-subclassing = false`.
+ *
+ * @param base - the subclass, its base node and the base's qualified name.
+ * @param src - the checked file.
+ * @returns the finding, on the base.
+ */
+export function reportSubclass(base: PortBase, src: SourceFile): Diagnostic {
+  const cut = base.qualified.lastIndexOf(".");
+  const port = base.qualified.slice(cut + 1);
+  const owner = base.qualified.slice(0, cut);
+  return diagnostic(RULES.INW014, src, {
+    span: spanOf(base.node),
+    message: `\`${base.cls}\` in \`${src.module}\` subclasses the port \`${port}\` from \`${owner}\`. Ports here are implemented by shape (\`allow-subclassing = false\`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.`,
+    fix: {
+      summary: `Remove \`${port}\` from the bases of \`${base.cls}\`, and check it against the port with a \`TYPE_CHECKING\` line.`,
+      steps: [
+        `Remove \`${port}\` from the bases of \`${base.cls}\`, and keep the methods it implements.`,
+        `Add \`_: ${port} = ${base.cls}(...)\` under \`if TYPE_CHECKING:\` (from \`typing\`) at the end of the module, importing \`${port}\` there, so the type checker checks \`${base.cls}\` against the port.`,
       ],
     },
   });

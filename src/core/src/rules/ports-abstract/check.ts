@@ -7,7 +7,11 @@
  * an implementation, reported once on the class. Exceptions, DTOs and dataclasses are exempt
  * through `allow-bases` and `allow-decorators`. Without `modules`, the rule
  * checks the modules with a `ports` segment (`shop.application.ports.users`);
- * with it, the modules it selects. A file with no `class` is never parsed.
+ * with it, the modules it selects. `interface = "protocol"` also reports an
+ * ABC there, and a port that extends a port without listing `Protocol`;
+ * `allow-subclassing = false` reports, in any other module, a base that
+ * names a class from a port module, parsing only a file whose import
+ * skeleton imports one. A file with no `class` is never parsed.
  * I/O-free: the caller supplies the run's trees, the file, the options and
  * the layers.
  */
@@ -20,10 +24,26 @@ import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
-import type { FileTrees } from "../shared/module-trees.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import { nameMatcher } from "../shared/name-patterns.ts";
-import { type ClassContext, classNames, concreteMethods, portClasses } from "./classes.ts";
-import { adapterTarget, reportClass, reportImplementation, reportMethod } from "./wording.ts";
+import {
+  type ClassContext,
+  classNames,
+  concreteMethods,
+  type PortClass,
+  portBases,
+  portClasses,
+} from "./classes.ts";
+import {
+  type AdapterTarget,
+  adapterTarget,
+  reportAbc,
+  reportClass,
+  reportImplementation,
+  reportMethod,
+  reportNotProtocol,
+  reportSubclass,
+} from "./wording.ts";
 
 /** A `class` statement anywhere in a file's text. */
 const CLASS = /\bclass\b/u;
@@ -62,6 +82,9 @@ const DEFAULT_ALLOW_DECORATORS: readonly string[] = [
   "attr.define",
   "attr.frozen",
 ];
+
+/** What INW014 needs from the run's trees: a file's tree, and its imports without one. */
+type Trees = Pick<ModuleTrees, "treeOf" | "skeletonOf">;
 
 /** What INW014 needs from its options and the layers. */
 interface Inputs {
@@ -111,23 +134,71 @@ function qualifierOf(
 }
 
 /**
+ * Tells whether a file outside the port modules may subclass a port: the
+ * prescan's imports name a port module, or the prescan declines the file.
+ *
+ * @param trees - the run's trees.
+ * @param src - the file.
+ * @param inScope - the port-module test.
+ * @returns false only when no import can bring in a port.
+ */
+function importsPort(trees: Trees, src: SourceFile, inScope: (module: string) => boolean): boolean {
+  const imports = trees.skeletonOf(src);
+  return imports === undefined || imports.some((ref) => inScope(ref.from ?? ref.target));
+}
+
+/**
+ * Turns one class of a port module into its findings.
+ *
+ * @param cls - the class and its kind.
+ * @param src - the checked file.
+ * @param target - where implementations go, if known.
+ * @param protocolOnly - whether `interface = "protocol"` is set.
+ * @returns the class's findings, in source order.
+ */
+function classFindings(
+  cls: PortClass,
+  src: SourceFile,
+  target: AdapterTarget | undefined,
+  protocolOnly: boolean,
+): Diagnostic[] {
+  if (cls.kind === "exempt") {
+    return [];
+  }
+  if (cls.kind === "concrete") {
+    return [reportClass(cls, src, target)];
+  }
+  const methods = concreteMethods(cls.node);
+  if (cls.kind === "derived") {
+    if (methods.length > 0) {
+      return [reportImplementation(cls, methods, src, target)];
+    }
+    return protocolOnly ? [reportNotProtocol(cls, src)] : [];
+  }
+  const abc = protocolOnly && cls.kind === "abc" ? [reportAbc(cls, src)] : [];
+  return [...abc, ...methods.map((method) => reportMethod(cls, method, src, target))];
+}
+
+/**
  * Checks one file against INW014. The caller decides whether the rule is on
- * for the file's module; this decides whether it is a port module, and
- * parses it only when its text has a class.
+ * for the file's module; this decides whether it is a port module, or, with
+ * `allow-subclassing = false`, a module that may subclass a port, and parses
+ * it only when its text has a class.
  *
  * @param trees - the run's trees, which parse the file once per run.
  * @param src - the file, with normalised text.
  * @param inputs - the rule's options and the project's layers.
  * @returns the findings in source order, before suppressions and severities apply.
  */
-export function checkPortsAbstract(
-  trees: FileTrees,
-  src: SourceFile,
-  inputs: Inputs,
-): Diagnostic[] {
+export function checkPortsAbstract(trees: Trees, src: SourceFile, inputs: Inputs): Diagnostic[] {
   const { options, layers } = inputs;
   const inScope = scopeOf(stringList(options?.["modules"]));
-  if (!(inScope(src.module) && CLASS.test(src.text))) {
+  const port = inScope(src.module);
+  const subclassing = !port && options?.["allow-subclassing"] === false;
+  if (!((port || subclassing) && CLASS.test(src.text))) {
+    return [];
+  }
+  if (subclassing && !importsPort(trees, src, inScope)) {
     return [];
   }
   const bases = stringList(options?.["allow-bases"]) ?? DEFAULT_ALLOW_BASES;
@@ -141,18 +212,12 @@ export function checkPortsAbstract(
     allowBase: nameMatcher([...bases, ...extra]),
     allowDecorator: nameMatcher(decorators),
   };
+  if (subclassing) {
+    return portBases(root, src.module, context).map((base) => reportSubclass(base, src));
+  }
   const target = adapterTarget(layers);
-  return portClasses(root, src.module, context).flatMap((cls) => {
-    if (cls.kind === "exempt") {
-      return [];
-    }
-    if (cls.kind === "concrete") {
-      return [reportClass(cls, src, target)];
-    }
-    const methods = concreteMethods(cls.node);
-    if (cls.kind === "derived") {
-      return methods.length > 0 ? [reportImplementation(cls, methods, src, target)] : [];
-    }
-    return methods.map((method) => reportMethod(cls, method, src, target));
-  });
+  const protocolOnly = options?.["interface"] === "protocol";
+  return portClasses(root, src.module, context).flatMap((cls) =>
+    classFindings(cls, src, target, protocolOnly),
+  );
 }
