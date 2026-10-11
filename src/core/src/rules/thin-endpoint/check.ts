@@ -21,7 +21,7 @@ import { parsePython } from "../../python/parser.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
-import type { Kind } from "./frameworks.ts";
+import type { Kind, ViewKind } from "./frameworks.ts";
 import { RemoteModules } from "./remote.ts";
 import { type ThinSettings, thinSettings } from "./settings.ts";
 import { trip } from "./signals.ts";
@@ -142,7 +142,10 @@ export function checkThinEndpoints(
   const tree = parsePython(parser, src.text);
   const remote = new RemoteModules(inputs.project, settings.recognise);
   try {
-    const view = fileView(tree, src, settings.recognise, (q) => remote.baseKind(q));
+    const view = fileView(tree, src, settings.recognise, {
+      base: (q: string): ViewKind | undefined => remote.baseKind(q),
+      routers: remote.routers,
+    });
     const context = {
       src,
       settings,

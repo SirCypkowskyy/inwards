@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 75177eab209557fe4269ed8926792a5fa0db795f41aebf7871be247766d0f3da
+source_hash: a930e8a8d40090bb8a1eb30a6c6fe972ec660455328784d87cced519ebb32013
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -314,8 +314,29 @@ Czym były fałszywe alarmy i co zostało:
 - **INW012.** 8 z 14 fałszywych alarmów pierwszej próby to warunki ochronne, które rzucają błędy samego projektu (`raise ResourceNotFound()`, mapowane na 404 przez handler wyjątków całej aplikacji); liczenie ich jako warunków ochronnych kosztowało jedno trafne zgłoszenie, regułę biznesową zapisaną jako dwa warunki. 3 w obu próbach to pojedyncze `joinedload(...)` przekazane repozytorium. Zostały: HTML renderowany na serwerze w zagnieżdżonych blokach `with` (46 z 73 zgłoszeń leży w back office Polara), handlery formularzy HTMX, health checki i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)). Domyślne progi się sprawdziły: tylko 3 z 73 zgłoszeń przekraczają jeden sygnał o najwyżej 2 instrukcje, 1 gałąź albo 1 poziom.
 - **INW015.** 31 z 48 zgłoszeń to import klasy wyjątku z adaptera, żeby zmapować go na status HTTP. Zostały: stała importowana z adaptera i moduł testów ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)).
 - **INW016.** 21 zgłoszeń powtarzało kolumnę modelu w migracji Alembica. Pozostałe 152 są poprawne względem domyślnego schematu, ale 101 z nich to konsekwentnie mnogie nazwy tabel Polara; lepiej posłużyłoby jedno zgłoszenie dla całego projektu ([#361](https://github.com/SirCypkowskyy/inwards/issues/361)).
-- **FAPI001, FAPI002.** Back office Polara to aplikacja `FastAPI(openapi_url=None)`. Zostały: dwie aplikacje testowe w Polarze ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Obie reguły widzą w korpusie około 40 endpointów, bo routery Polara i fastapi-clean-example nie są rozpoznawane ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **FAPI001, FAPI002.** Back office Polara to aplikacja `FastAPI(openapi_url=None)`. Zostały: dwie aplikacje testowe w Polarze ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Obie reguły widziały w korpusie około 40 endpointów, bo routery Polara i fastapi-clean-example nie były rozpoznawane (zob. niżej).
 - **FAPI007.** Wszystkie 4 zgłoszenia to strumienie (zdarzenia wysyłane przez serwer w Polarze, iterator rabatów w Saleorze), nie zależności.
+
+**Routery budowane w czasie działania.** [#358](https://github.com/SirCypkowskyy/inwards/issues/358) nauczyło model FastAPI i INW012 routerów, których powyższe uruchomienie nie widziało: `APIRouter = get_api_router_class(APIRoute)` i `BackofficeRouter = get_api_router_class(TransactionalAPIRoute)` w Polarze oraz tras zadeklarowanych w fabrykach `make_*_router() -> APIRouter` w fastapi-clean-example. Nazwa jest rozwiązywana przez importy projektu, zamiast ufać każdemu wywołaniu czegoś o nazwie `APIRouter`, bo projekty OpenStack tak nazywają swoje routery WSGI ([strony reguł](rules/FAPI001.md#known-limitations) wymieniają, co się liczy). Ta sama metoda, ponowione 11 października 2026 względem `develop` w 716ae34:
+
+| Reguła, repozytorium | Widoczne operacje ścieżki | Zgłoszenia przed → po | Obejrzane | Precyzja po |
+|---|--:|--:|--:|--:|
+| FAPI001, Polar | 3 → 534 | 2 → 139 | wszystkie sklasyfikowane; 35 na trasach publicznych przeczytane | 25 ze 139 (18 %); 25 z 35 na trasach publicznych (71 %) |
+| FAPI001, fastapi-clean-example | 4 → 15 | 0 → 0 (11, zanim `description=` zaczęło się liczyć jak docstring) | wszystkie | brak zgłoszeń |
+| FAPI002, Polar i fastapi-clean-example | jak wyżej | 0 → 0 | n/d | n/d |
+| INW012, Polar (bez `decorators`) | 1 → 534 | 1 → 135 | 27, co piąte | 10 z 27 (37 %) |
+| INW012, fastapi-clean-example | 4 → 15 | 0 → 0 | n/d | brak zgłoszeń |
+| FAPI003, Polar | jak wyżej | 0 → 72 (ostrzeżenia) | wszystkie | żadne trafne |
+| FAPI005, Polar | jak wyżej | 0 → 5 | wszystkie | żadne trafne |
+
+full-stack-fastapi-template i python-ddd się nie zmieniły, a Saleora nie uruchamiano ponownie. Czym są nowe zgłoszenia:
+
+- **FAPI001.** 96 ze 139 zgłoszeń w Polarze dotyczy tras z tagiem `APITag.private`, które klasa tras Polara trzyma poza schematem produkcyjnym ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)), a 8 jego aplikacji testowych ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Z 35 na trasach publicznych 10 to fałszywe alarmy: 4 eksporty CSV i 6 endpointów OAuth2, których treść odpowiedzi definiują RFC. 11 zgłoszeń w fastapi-clean-example to trasy z `description=getdoc(...)`; FastAPI czyta docstring tylko wtedy, gdy nie ma `description=` ([Path Operation Configuration](https://fastapi.tiangolo.com/tutorial/path-operation-configuration/)), więc `description=` liczy się teraz jak docstring. Router, który każde śledzone dołączenie umieszcza pod aplikacją `FastAPI(openapi_url=None)`, pozostaje ukryty, gdy innego dołączenia nie da się prześledzić; bez tego back office Polara dodałby 115 fałszywych alarmów.
+- **FAPI002.** Nadal milczy w obu: Polar dołącza swój router API przez parametr `add_versioned_routers(app, api_router, ...)`, a część routerów przez wywołania fabryk, fastapi-clean-example zaś dołącza każdy router przez wywołanie fabryki, więc dołączenia nad ich trasami są nieznane ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)).
+- **INW012.** 107 ze 135 zgłoszeń w Polarze leży w back office; 17 fałszywych alarmów w próbie to 15 stron renderowanych na serwerze i handlerów formularzy HTMX w back office, strumień zdarzeń wysyłanych przez serwer i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
+- **FAPI003, FAPI005.** Te same nieznane dołączenia sprawiają, że FAPI003 ostrzega, że 72 routery Polara są niepodpięte, każde z zastrzeżeniem, które podaje wywołanie, którego nie umie prześledzić ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)); `unresolved-includes = "silent"` je wyłącza. 5 zgłoszeń FAPI005 to trasy, które klasa tras Polara rozdziela według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+
+Koszt, ze źródeł na laptopie opisanym wyżej, mediana 3 zimnych uruchomień na Polarze z jedną regułą: INW012 1130 → 1578 ms, FAPI001 1327 → 1698 ms, FAPI002 1426 → 1972 ms, za 531 operacji ścieżki więcej, które każda reguła teraz czyta.
 
 **Koszt.** Każda reguła osobno, oprócz warstw z manifestu, zimne (`--no-cache`) i ciepłe uruchomienie, mediana z 5 uruchomień (3 dla polara i saleora), plik binarny darwin-arm64 na opisanym wyżej laptopie, przy pracujących równolegle innych agentach (load average 5 do 11). Milisekundy, zimne / ciepłe:
 

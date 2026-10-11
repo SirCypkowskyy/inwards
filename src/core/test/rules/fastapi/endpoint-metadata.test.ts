@@ -115,6 +115,18 @@ async def list_orders() -> list[OrderOut]:
     ]);
   });
 
+  test("description= counts as a docstring does", async () => {
+    // fastapi-clean-example: `description=getdoc(ListUsers)` on every route (#358 corpus run).
+    const route = `
+@router.get("/orders", description=getdoc(ListOrders))
+async def list_orders() -> list[OrderOut]: ...
+`;
+    expect(await fapi001(route)).toEqual([]);
+    expect(await fapi001(route, 'require-summary = "summary"')).toEqual([
+      "app/orders.py:6 `list_orders` (GET /orders) has no summary in its OpenAPI metadata.",
+    ]);
+  });
+
   test("require-response-fields checks each responses= entry, and [] turns it off", async () => {
     const route = `
 @router.get("/orders/{id}", summary="Read", responses={404: {"model": Problem}, "409": {"description": "x"}})

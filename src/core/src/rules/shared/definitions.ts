@@ -1,8 +1,11 @@
 /**
  * @file The module-level classes and constants of one file, which the FAPI
- * rules follow besides functions: exception classes and their bases, status
- * code constants, and shared `responses=` dicts. It reads one tree and
- * resolves nothing; `model.ts` looks names up in what it returns.
+ * rules follow besides functions (exception classes and their bases, status
+ * code constants, shared `responses=` dicts), and which the router
+ * recognition shared with INW012 reads (`fastapi-routers.ts`): a router
+ * class built at run time is a constant, a first-party router subclass a
+ * class. It reads one tree and resolves nothing; the callers look names up
+ * in what it returns.
  */
 import type { Node } from "web-tree-sitter";
 import { identifierName, namedChildren } from "../../python/nodes.ts";

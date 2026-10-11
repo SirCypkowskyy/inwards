@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI001.md
-source_hash: 248c41b2d725d6588cb4bd178878c55aa4aedb1b705f630b1630dd988fb508b5
+source_hash: 301769e65a3c8391bcda7ed6d35c62acbd151fe65901685481ac79d1241edc00
 type: rule
 title: FAPI001 endpoint-metadata
 description: Operacja ścieżki FastAPI w schemacie OpenAPI nie ma metadanych, których wymaga projekt, na przykład podsumowania, modelu odpowiedzi albo jawnego kodu statusu.
@@ -22,7 +22,7 @@ related_issues: [186, 183]
 
 Zgłasza operację ścieżki FastAPI (`@router.get(...)`, `@app.post(...)`, `@router.api_route(...)`), której wpis OpenAPI nie ma metadanych wymaganych przez projekt. Jedna diagnostyka na endpoint, na jego dekoratorze, wymienia wszystko, czego brakuje. Domyślnie reguła wymaga:
 
-- podsumowania: `summary=` albo docstringu (FastAPI robi z niego opis, a podsumowanie wraca wtedy do nazwy funkcji);
+- podsumowania: `summary=` albo opisu, czyli `description=` lub docstringu (FastAPI czyta docstring, gdy nie ma `description=`, a podsumowanie wraca wtedy do nazwy funkcji);
 - modelu odpowiedzi: `response_model=` albo adnotacji typu zwracanego, z której FastAPI zbuduje schemat, czym nie są `Response` i jego podklasy. Trasa ze `status_code=204` jest zwolniona;
 - jawnego `status_code=` dla `POST` i `DELETE`, bo 200 rzadko pasuje do tworzenia albo usuwania;
 - pola `description` w każdym wpisie `responses=`.
@@ -151,8 +151,10 @@ require-operation-id = false              # an explicit operation_id=, for gener
 - Reguła sprawdza, czy podsumowanie istnieje, a nie czy jest dobre.
 - `include_in_schema=False` na `include_router(...)` gdzie indziej jest brane pod uwagę tylko przez dołączenia, które Inwards umie rozwiązać.
 - Trasy dodawane w czasie działania (`add_api_route`, pętle po konfiguracji) nie są widoczne.
-- **Aplikacja, która nie serwuje schematu** (`FastAPI(openapi_url=None)`), jest pomijana razem ze wszystkimi swoimi trasami, jak przy `include_in_schema=False`.
-- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 zgłoszenia przed regułą o `openapi_url`, 21 po niej, wszystkie obejrzane: 19 trafnych (`POST` albo `DELETE` bez jawnego kodu statusu, trasa bez podsumowania) i 2 na małych aplikacjach, które budują testy Polara ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). 450 endpointów Polara i 15 z fastapi-clean-example nie jest w ogóle widocznych ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **Aplikacja, która nie serwuje schematu** (`FastAPI(openapi_url=None)`), jest pomijana razem ze wszystkimi swoimi trasami, jak przy `include_in_schema=False`. Tak samo router, który każde dołączenie śledzone przez graf umieszcza pod taką aplikacją, nawet gdy innego dołączenia w projekcie nie da się prześledzić: back office Polara.
+- **Które routery się liczą** ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)). Trasa liczy się na nazwie powiązanej z `FastAPI(...)` albo `APIRouter(...)` z FastAPI, a gdy plik wywołuje na tej nazwie dekorator trasy, `include_router` albo inną metodę routera, także z własną klasą albo fabryką routera, którą Inwards rozwiązuje przez importy projektu: podklasą klasy FastAPI; `NAZWA = fabryka(...)` na poziomie modułu, gdy własna fabryka klas mówi albo pokazuje, że zwraca klasę routera (`-> type[APIRouter]` albo podklasa, którą definiuje i zwraca, jak `get_api_router_class` w Polarze); dowolnym `APIRouter = <wywołanie>` albo `FastAPI = <wywołanie>` na poziomie modułu; własną funkcją, która zwraca router, jeden krok w głąb; oraz nazwą zwracaną przez funkcję z adnotacją `-> APIRouter` (fabryki `make_*_router()` w fastapi-clean-example). Samo wywołanie czegoś, co nazywa się `APIRouter`, się nie liczy: projekty OpenStack tak nazywają swoje routery WSGI. Argumenty fabryki nie są słowami kluczowymi routera, więc prefiks, tagi i `responses=` routera z fabryki są nieznane, a jego trasy liczą się jako widoczne w schemacie. Plik, który nie zawiera żadnego słowa z filtra tekstowego (`fastapi`, `APIRouter`, `include_router`...), nie jest czytany.
+- **Klasy tras.** Własna klasa `route_class=`, która zmienia schemat, nie jest czytana: klasa Polara trzyma trasy z tagiem `APITag.private` poza schematem produkcyjnym, a FAPI001 nadal je zgłasza ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 zgłoszenia przed regułą o `openapi_url`, 21 po niej, wszystkie obejrzane: 19 trafnych (`POST` albo `DELETE` bez jawnego kodu statusu, trasa bez podsumowania) i 2 na małych aplikacjach, które budują testy Polara ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Od [#358](https://github.com/SirCypkowskyy/inwards/issues/358) reguła widzi też 534 operacje ścieżki Polara i 15 z fastapi-clean-example. Wszystkie 11 zgłoszeń w fastapi-clean-example dotyczyło tras z `description=getdoc(...)`, które teraz liczy się jak docstring, więc nie zostało żadne. 139 zgłoszeń w Polarze, wszystkie sklasyfikowane: 96 na trasach z tagiem `APITag.private` ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)), 8 na jego aplikacjach testowych ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)) i 35 na trasach publicznych, każde przeczytane: 25 trafnych (`POST` albo `DELETE` bez jawnego kodu statusu, wpis `responses=` bez opisu, trasa bez podsumowania) i 10 fałszywych alarmów (4 eksporty CSV i 6 endpointów OAuth2, których treść odpowiedzi definiują RFC).
 
 ## Źródła { #references }
 

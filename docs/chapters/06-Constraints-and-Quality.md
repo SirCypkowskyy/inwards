@@ -309,8 +309,29 @@ What the false positives were, and what is left:
 - **INW012.** 8 of the first sample's 14 false positives were guards that raise the project's own errors (`raise ResourceNotFound()`, mapped to 404 by an app-wide exception handler); counting them as guards lost one true positive, a business rule written as two guards. 3 across both samples were a single `joinedload(...)` passed to a repository. Left: server-rendered HTML in nested `with` blocks (46 of the 73 findings are in Polar's back office), HTMX form handlers, health checks and a webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)). The default thresholds held: only 3 of the 73 findings trip a single signal by 2 statements, 1 branch or 1 level or less.
 - **INW015.** 31 of 48 findings imported an exception class from an adapter to map it to an HTTP status. Left: a constant imported from an adapter, and a test module ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)).
 - **INW016.** 21 findings repeated a model's column in an Alembic migration. The 152 left are correct against the default scheme, but 101 are Polar's consistently plural table names; one project-wide finding would serve better ([#361](https://github.com/SirCypkowskyy/inwards/issues/361)).
-- **FAPI001, FAPI002.** Polar's back office is a `FastAPI(openapi_url=None)` app. Left: two test apps in Polar ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Both rules see about 40 endpoints in the corpus, because Polar's and fastapi-clean-example's routers aren't recognised ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **FAPI001, FAPI002.** Polar's back office is a `FastAPI(openapi_url=None)` app. Left: two test apps in Polar ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Both rules saw about 40 endpoints in the corpus, because Polar's and fastapi-clean-example's routers weren't recognised (see below).
 - **FAPI007.** All 4 findings were streams (Polar's server-sent events, Saleor's discount iterator), not dependencies.
+
+**Routers built at run time.** [#358](https://github.com/SirCypkowskyy/inwards/issues/358) taught the FastAPI model and INW012 the routers the run above missed: Polar's `APIRouter = get_api_router_class(APIRoute)` and `BackofficeRouter = get_api_router_class(TransactionalAPIRoute)`, and fastapi-clean-example's routes declared inside `make_*_router() -> APIRouter` factories. The name is resolved through the project's imports instead of trusting any callee called `APIRouter`, since OpenStack projects name their WSGI routers that ([the rule pages](rules/FAPI001.md#known-limitations) list what counts). Same method, rerun on 2026-10-11 against `develop` at 716ae34:
+
+| Rule, repo | Path operations seen | Findings before → after | Looked at | Precision after |
+|---|--:|--:|--:|--:|
+| FAPI001, Polar | 3 → 534 | 2 → 139 | all classified; the 35 on public routes read | 25 of 139 (18 %); 25 of the 35 on public routes (71 %) |
+| FAPI001, fastapi-clean-example | 4 → 15 | 0 → 0 (11 before `description=` counted as a docstring) | all | no findings |
+| FAPI002, Polar and fastapi-clean-example | as above | 0 → 0 | n/a | n/a |
+| INW012, Polar (no `decorators`) | 1 → 534 | 1 → 135 | 27, every fifth | 10 of 27 (37 %) |
+| INW012, fastapi-clean-example | 4 → 15 | 0 → 0 | n/a | no findings |
+| FAPI003, Polar | as above | 0 → 72 (warnings) | all | none true |
+| FAPI005, Polar | as above | 0 → 5 | all | none true |
+
+full-stack-fastapi-template and python-ddd didn't change, and Saleor wasn't rerun. What the new findings are:
+
+- **FAPI001.** 96 of Polar's 139 are on routes tagged `APITag.private`, which Polar's route class keeps out of its production schema ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)), and 8 on its test apps ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Of the 35 on public routes, 10 are false: 4 CSV exports and 6 OAuth2 endpoints whose bodies RFCs define. fastapi-clean-example's 11 were routes with `description=getdoc(...)`; FastAPI reads a docstring only when `description=` is absent ([Path Operation Configuration](https://fastapi.tiangolo.com/tutorial/path-operation-configuration/)), so `description=` now counts as one. A router that every followed inclusion puts under a `FastAPI(openapi_url=None)` app stays hidden when another inclusion can't be followed; without that, Polar's back office added 115 false findings.
+- **FAPI002.** Still silent on both: Polar includes its API router through a parameter of `add_versioned_routers(app, api_router, ...)` and some routers through factory calls, and fastapi-clean-example includes every router through a factory call, so the inclusions above their routes are unknown ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)).
+- **INW012.** 107 of Polar's 135 findings are in the back office; the 17 false ones in the sample are 15 server-rendered pages and HTMX form handlers there, a server-sent event stream and a webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
+- **FAPI003, FAPI005.** The same unknown inclusions make FAPI003 warn that 72 of Polar's routers are unmounted, each with the caveat that names the call it can't follow ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)); `unresolved-includes = "silent"` turns those off. FAPI005's 5 are routes Polar's route class dispatches by API version ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+
+The cost, from source on the laptop above, median of 3 cold runs on Polar with one rule on: INW012 1,130 → 1,578 ms, FAPI001 1,327 → 1,698 ms, FAPI002 1,426 → 1,972 ms, for the 531 more path operations each rule now reads.
 
 **Cost.** Every rule alone on top of the manifest layering, cold (`--no-cache`) and warm, median of 5 runs (3 for polar and saleor), with the darwin-arm64 binary on the laptop above while other agents ran (load average 5 to 11). Milliseconds, cold / warm:
 

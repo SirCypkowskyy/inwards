@@ -12,6 +12,8 @@
  * bases.
  */
 import type { Node } from "web-tree-sitter";
+import { definitionFinder } from "../shared/definition-finder.ts";
+import { RouterKinds } from "../shared/fastapi-routers.ts";
 import { ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { nameMatcher } from "../shared/name-patterns.ts";
@@ -34,6 +36,8 @@ export interface RemoteHandler {
  * one per check of a file.
  */
 export class RemoteModules {
+  /** What first-party callees build, for the checked file's routers and the remote modules' (#358). */
+  readonly routers: RouterKinds;
   private readonly modules: ParsedModules<FileView>;
   private readonly recognise: Recognise;
   /** The base classes being resolved, which ends an inheritance cycle across modules. */
@@ -47,10 +51,14 @@ export class RemoteModules {
    */
   constructor(project: ModuleTrees, recognise: Recognise) {
     this.recognise = recognise;
+    this.routers = new RouterKinds(definitionFinder(project));
     this.modules = new ParsedModules(
       project,
       (tree, src): FileView =>
-        fileView(tree, src, recognise, (q: string): ViewKind | undefined => this.baseKind(q)),
+        fileView(tree, src, recognise, {
+          base: (q: string): ViewKind | undefined => this.baseKind(q),
+          routers: this.routers,
+        }),
     );
   }
 
