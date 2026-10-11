@@ -13,6 +13,7 @@ import type { InwardsConfig } from "../config/parse.ts";
 import { applyRules } from "../config/rule-settings.ts";
 import type {
   Diagnostic,
+  DiagramSource,
   ExtractionBatch,
   ImportRef,
   SourceFile,
@@ -21,6 +22,7 @@ import type {
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { ContentRun, contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
+import { projectDiagramImports } from "./diagrams.ts";
 import type { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { ormConventionFindings } from "./orm-naming.ts";
@@ -88,6 +90,11 @@ export interface CheckOptions {
   whole?: boolean | undefined;
   /** True for a per-edit check, where FAPI003 reports one-file findings only. */
   edit?: boolean | undefined;
+  /**
+   * The files `diagrams` lists, with report paths, for INW019 on a
+   * whole-project run; the adapter reads them only when the rule is on.
+   */
+  diagrams?: readonly DiagramSource[] | undefined;
 }
 
 /** One file and its scan. */
@@ -181,7 +188,8 @@ function hiddenBy(
 /**
  * Confirms the scanned files in order, applies their suppressions and the
  * FastAPI cross-file findings, keeps each unassigned-package warning once,
- * adds the import cycles of a whole-project run, and applies
+ * adds the import cycles and the imports diagrams leave out of a
+ * whole-project run, and applies
  * `[tool.inwards.rules]` last.
  *
  * @param steps - the engine's per-file steps.
@@ -191,6 +199,7 @@ function hiddenBy(
  *   baseline shortcut skips (`hiddenBy`).
  * @param options.whole - true for a whole-project run.
  * @param options.edit - true for a per-edit check.
+ * @param options.diagrams - the files `diagrams` lists, for INW019.
  * @param options.hidden - the modules whose confirmation the baseline shortcut skips.
  * @returns the violations and the suppressed findings.
  */
@@ -198,7 +207,12 @@ function finish(
   steps: FileSteps,
   scanned: readonly Scanned[],
   project: ProjectIndex,
-  { whole = false, edit = false, hidden }: CheckOptions & { hidden: ReadonlySet<string> },
+  {
+    whole = false,
+    edit = false,
+    diagrams = [],
+    hidden,
+  }: CheckOptions & { hidden: ReadonlySet<string> },
 ): Checked {
   const { config } = steps;
   const all: Diagnostic[] = [];
@@ -228,13 +242,23 @@ function finish(
     run.dispose();
   }
   if (whole) {
+    /**
+     * Reads a file's imports with the full parse, for INW004 and INW019.
+     *
+     * @param file - a checked file.
+     * @param lastLine - the line by which its imports have ended.
+     * @returns its static imports.
+     */
+    function fullImports(file: SourceFile, lastLine: number): readonly ImportRef[] {
+      return steps.extractor.importsUpTo(file, lastLine);
+    }
     all.push(
       ...projectCycles(collected, {
         modes: config.cycles,
         contexts: config.contexts ?? [],
-        fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
-          steps.extractor.importsUpTo(file, lastLine),
+        fullImports,
       }),
+      ...projectDiagramImports(collected, { config, sources: diagrams, fullImports }),
       ...ormConventionFindings(steps.parser, sources, config),
     );
   }

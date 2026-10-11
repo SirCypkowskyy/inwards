@@ -57,6 +57,20 @@ describe("draftDiagrams: layers", () => {
     ]);
   });
 
+  test("a node written with two quoted labels gets both as modules, captions left out", () => {
+    const found = draft([
+      "%% inwards: layers",
+      "flowchart TD",
+      '  ui["shop.api"]',
+      '  ui["shop.cli"]',
+      '  ui["the interface"] --> domain["shop.domain"]',
+      '  ui["shop.api"]',
+    ]);
+    expect(typeof found === "string" ? found : found.layers.at(-1)).toEqual([
+      { name: "ui", modules: ["shop.api", "shop.cli"] },
+    ]);
+  });
+
   test("dotted links don't order layers", () => {
     const found = draft(["%% inwards: layers", "flowchart TD", "  a -.-> b"]);
     expect(

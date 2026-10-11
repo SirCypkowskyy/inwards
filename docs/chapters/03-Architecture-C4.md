@@ -84,7 +84,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -116,7 +116,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -413,6 +413,7 @@ The rules are grouped by category, in the order the [rules index](rules/index.md
 |---|---|---|---|---|---|---|
 | INW017 | `diagram-unknown-name` | In the Markdown and `.mmd` files `diagrams` lists, a Mermaid `flowchart` or `graph` marked `%% inwards: layers` or `%% inwards: contexts`: a node id that names no declared layer (or, in a contexts diagram, a top-level node or subgraph that names no context), and a quoted label that matches no module. `:::external` nodes are skipped. Whole-project runs, and a listed file that is edited (the hook), open (the language server) or named (`check_files`, `inwards check FILE`); the CLI reads the files and `engine/diagrams.ts` hands them to a hand-written line parser in `diagram/`. A `diagrams` entry that matches no file is reported in pyproject.toml. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
 | INW018 | `diagram-forbidden-edge` | In the same marked diagrams, a one-way solid or thick arrow that draws an import the config forbids: outward or between sibling layers in a layers diagram; in a contexts diagram, from one context into another its `depends-on` doesn't list, or into a node whose quoted label isn't one of the other context's `public` modules. Dotted links and `:::external` nodes are skipped; each forbidden pair is reported once per diagram. `inwards import-diagram` writes the config a diagram stands for. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
+| INW019 | `diagram-missing-dependency` | In the same marked diagrams, an import in the code from one drawn layer or context into another with no arrow for it: in a layers diagram no path of arrows, in a contexts diagram no direct arrow. Imports under `if TYPE_CHECKING:` count. The engine runs it on the imports a whole-project run collects for INW004 (`engine/diagrams.ts`), confirming a finding's file with the full parse; each missing pair is reported once per diagram, on the importing node. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
 
 ### FastAPI { #catalogue-fastapi }
 
@@ -450,7 +451,8 @@ src/
 │   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
 │   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
 │   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
-│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram)
+│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram),
+│   │   │                  #   write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
@@ -486,6 +488,7 @@ src/
 │   │   │   │                            #   wording.ts, check.ts
 │   │   │   ├── diagram-unknown-name/    # INW017: check.ts (names in marked diagrams)
 │   │   │   ├── diagram-forbidden-edge/  # INW018: check.ts (arrows in marked diagrams)
+│   │   │   ├── diagram-missing-dependency/  # INW019: check.ts (imports a diagram leaves out)
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
 │   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
@@ -501,7 +504,7 @@ src/
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
-│   │   │                  #   diagrams.ts INW017 and INW018
+│   │   │                  #   diagrams.ts INW017 to INW019
 │   │   └── report/        # render.ts: text / concise / json / sarif; github.ts
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
@@ -509,7 +512,7 @@ src/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
 │   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
-│   │   │                  #   import-diagram: thin, handed AppDeps
+│   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings

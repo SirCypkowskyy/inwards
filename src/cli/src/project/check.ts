@@ -9,6 +9,7 @@ import {
   type Checked,
   checkRequired,
   type Diagnostic,
+  type DiagramSource,
   Engine,
   type GrammarBinaries,
   type InwardsConfig,
@@ -28,7 +29,7 @@ import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ExtractionPool, ProjectIo } from "./contracts.ts";
-import { checkNamedDiagrams, DIAGRAM_FILE, splitTargets } from "./diagrams.ts";
+import { checkNamedDiagrams, DIAGRAM_FILE, readDiagrams, splitTargets } from "./diagrams.ts";
 import { atOrInside, type PlannedFile, planSources, readSources } from "./sources.ts";
 import { checkOnThreads, openPool } from "./threads.ts";
 import { wholeProjectFindings } from "./whole.ts";
@@ -260,6 +261,7 @@ interface CheckedFiles {
  * @param run.absent - top-level module names the index treats as missing.
  * @param run.whole - true for a whole-project run.
  * @param run.edit - true for a per-edit check.
+ * @param run.diagrams - the diagram files `diagrams` lists, for INW019 on a whole-project run.
  * @returns the source files, the baseline's accepted copies, the listing the
  *   index was built on, and the engine's findings.
  * @throws {ConfigError} when the baseline is invalid.
@@ -277,6 +279,7 @@ async function checkPlanned(
     absent: readonly string[];
     whole: boolean;
     edit: boolean;
+    diagrams: readonly DiagramSource[];
   },
 ): Promise<CheckedFiles> {
   const files = await readSources(io, run.planned, run.count, run.texts);
@@ -286,7 +289,7 @@ async function checkPlanned(
     : undefined;
   const listing = hideTopLevel(projectFiles(io, project, diskTexts(run, files)), run.absent);
   const index = project.engine.index(listing);
-  const options = { whole: run.whole, edit: run.edit };
+  const options = { whole: run.whole, edit: run.edit, diagrams: run.diagrams };
   const checked = await checkOnThreads(project.engine, pool, { files, index, accepted, options });
   return { files, accepted, listing, checked };
 }
@@ -298,9 +301,10 @@ async function checkPlanned(
  * projects such as uv workspace members (INW006), reports symlinks in layers
  * that hide code from the rules (INW006, `checkLinks`), every shaped
  * package's required members (INW008), the import cycles among the
- * checked files (INW004) and the marked diagrams `diagrams` lists (INW017,
- * INW018). A partial run checks a named file that `diagrams` lists as a
- * diagram (#348). With `required`, a partial run checks
+ * checked files (INW004) and the marked diagrams `diagrams` lists: their
+ * names (INW017), their arrows (INW018) and the imports they leave out
+ * (INW019). A partial run checks a named file that `diagrams` lists as a
+ * diagram with INW017 and INW018 (#348). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
  * Errors the config's baseline accepts are left out, unless `baseline` is
  * false; findings inline comments suppress go in `suppressed`, and a target
@@ -332,6 +336,7 @@ async function checkPlanned(
  *   and `inwards baseline`); the result is the same with any number (#61).
  * @returns the report, with forward-slash paths on every OS.
  * @throws {ConfigError} when the config or the baseline is invalid.
+ * @throws when a file `diagrams` lists can't be read.
  */
 export async function runCheck(
   io: ProjectIo,
@@ -369,6 +374,10 @@ export async function runCheck(
   const whole = targets === undefined;
   // Started before the reads, so the workers load the grammar meanwhile (#281).
   const pool = openPool(io, project.wasm, threads, count);
+  // Read before the check: INW019 judges the diagrams against the imports the engine collects.
+  const listed = whole
+    ? readDiagrams(io, project.configPath, project.config, { base, texts })
+    : { sources: [], unmatched: [] };
   const { files, accepted, listing, checked } = await checkPlanned(io, project, pool, {
     planned,
     count,
@@ -377,13 +386,20 @@ export async function runCheck(
     absent,
     whole,
     edit,
+    diagrams: listed.sources,
   }).finally(() => pool?.close());
   const { diagnostics, suppressed } = checked;
   const { diagrams } = named;
   const loaded = [...planned.map(({ abs }) => abs), ...diagrams];
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
-    const extra = wholeProjectFindings(io, project, { files, listing, base, shownRoot, texts });
+    const extra = wholeProjectFindings(io, project, {
+      files,
+      listing,
+      base,
+      shownRoot,
+      diagrams: listed,
+    });
     diagnostics.unshift(...extra.config);
     diagnostics.push(...extra.required);
   } else {

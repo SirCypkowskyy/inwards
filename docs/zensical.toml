@@ -84,6 +84,7 @@ nav = [
       "rules/diagrams/index.md",
       { "INW017 diagram-unknown-name" = "rules/INW017.md" },
       { "INW018 diagram-forbidden-edge" = "rules/INW018.md" },
+      { "INW019 diagram-missing-dependency" = "rules/INW019.md" },
     ] },
     { "FastAPI" = [
       "rules/fastapi/index.md",

@@ -37,6 +37,8 @@ export type {
   Suppressed,
   SuppressionComment,
 } from "./contracts/records.ts";
+export type { DiagramKind, DiagramNotation } from "./diagram/model.ts";
+export { type DiagramExport, writeDiagram } from "./diagram/write.ts";
 export { checkDiagrams, type DiagramInput, draftDiagrams } from "./engine/diagrams.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export { createExtractionWorker } from "./engine/extraction.ts";
