@@ -1,12 +1,21 @@
 /**
  * @file What a function's parameter can hold, read from the calls to the
- * function in the same file, for `kwargs.ts` (#242): its default and the
- * argument each call passes, by keyword or by position. It finds the value
- * nodes only; reading them as dicts is `kwargs.ts`'s job. Callers in other
- * files, methods and `*args` or `**kwargs` parameters are unknown.
+ * function: in the same file for `kwargs.ts` (#242), its default and the
+ * argument each call passes, by keyword or by position; and for one call the
+ * model found anywhere in the project, for the wiring graph (#391), which
+ * follows `app.include_router(api_router)` inside `def wire(app, api_router)`
+ * to what each call passes. It finds the value nodes only; reading them is
+ * the caller's job, and finding the calls in other files is the model's.
+ * Methods and `*args` or `**kwargs` parameters are unknown.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, keywordOf, moduleNodes, namedChildren } from "../../python/nodes.ts";
+import {
+  descendantsOutside,
+  identifierName,
+  keywordOf,
+  moduleNodes,
+  namedChildren,
+} from "../../python/nodes.ts";
 
 /** Parameter nodes that end the positional ones: `*`, `*args` and `**kwargs`. */
 const KEYWORD_ONLY: ReadonlySet<string> = new Set([
@@ -57,6 +66,71 @@ export function parameterValues(fn: Node, parameter: Node, name: string): Node[]
     values.push(...passed);
   }
   return values;
+}
+
+/**
+ * Finds the module-level function a name is a parameter of, where the name
+ * is used inside it: `app` and `api_router` in
+ * `def wire(app, api_router): app.include_router(api_router)`. A parameter
+ * the function's own scope binds again (`api_router = pick()`) or that is
+ * `*args` or `**kwargs` doesn't count: it no longer holds what a call passed.
+ *
+ * @param node - a node of a parsed file, such as a call's receiver or argument.
+ * @returns the function, the parameter node and its name, or null when the
+ *   node isn't a bare name, isn't in a function, or isn't such a parameter.
+ */
+export function enclosingParameter(node: Node): { fn: Node; parameter: Node; name: string } | null {
+  if (node.type !== "identifier") {
+    return null;
+  }
+  let fn = node.parent;
+  while (fn !== null && fn.type !== "function_definition") {
+    fn = fn.parent;
+  }
+  const holder = fn?.parent?.type === "decorated_definition" ? fn.parent : fn;
+  const name = identifierName(node);
+  const parameter = fn && holder?.parent?.type === "module" ? parameterNamed(fn, name) : null;
+  if (fn === null || parameter === null || KEYWORD_ONLY.has(parameter.type)) {
+    return null;
+  }
+  return rebinds(fn, name) ? null : { fn, parameter, name };
+}
+
+/**
+ * Tells whether a function's own scope assigns a name again.
+ *
+ * @param fn - the `function_definition`.
+ * @param name - the parameter's name, as the body would bind it.
+ * @returns true when an assignment, augmented assignment or `for` loop in the
+ *   body (nested functions and classes left out) binds it.
+ */
+function rebinds(fn: Node, name: string): boolean {
+  const body = fn.childForFieldName("body");
+  const types = new Set(["assignment", "augmented_assignment", "for_statement"]);
+  const scopes = new Set(["function_definition", "class_definition", "lambda"]);
+  return (body ? descendantsOutside(body, types, scopes) : []).some((statement) => {
+    const left = statement.childForFieldName("left");
+    const names =
+      left?.type === "identifier" ? [left] : (left?.descendantsOfType("identifier") ?? []);
+    return names.some((id) => id !== null && identifierName(id) === name);
+  });
+}
+
+/**
+ * Finds what one call to a function passes for one of its parameters: the
+ * argument, by keyword or by position, or the parameter's default.
+ *
+ * @param call - a call to the function.
+ * @param fn - the `function_definition`.
+ * @param parameter - the parameter node, from `enclosingParameter`.
+ * @param name - what the parameter is called.
+ * @returns the value node, or null when a splat may pass it or the call
+ *   leaves out a parameter that has no default.
+ */
+export function argumentFor(call: Node, fn: Node, parameter: Node, name: string): Node | null {
+  const passed = passedFor(call, name, positionOf(fn, parameter));
+  const [value] = passed ?? [];
+  return passed === null ? null : (value ?? parameter.childForFieldName("value"));
 }
 
 /**
