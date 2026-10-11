@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { cpSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { NAME_TABLE, propose } from "../../src/init/auto.ts";
-import { init, stable, tree } from "../support/init-style-helpers.ts";
+import { findings, init, stable, tree } from "../support/init-style-helpers.ts";
 import { inwards, project } from "../support/run.ts";
 import { tempDir } from "../support/temp.ts";
 
@@ -151,16 +151,23 @@ describe("inwards init --style auto", () => {
     expect(deadPrefixes(root)).toEqual([]);
   });
 
-  test.each(["clean-app", "broken-app"])(
-    "examples/%s without its config: every layer prefix matches a module",
-    (name) => {
+  // clean-app's domain/order.py and domain/ports.py import each other (the
+  // second behind TYPE_CHECKING, which INW004 counts): a real module cycle.
+  test.each([
+    ["clean-app", ["INW004 shop/domain/order.py"]],
+    ["broken-app", ["INW001 shop/domain/order.py"]],
+  ])(
+    "examples/%s without its config: every layer prefix matches a module, cycles on",
+    (name, found) => {
       const root = tempDir("inwards-auto-");
       cpSync(join(REPO, "examples", name, "shop"), join(root, "shop"), { recursive: true });
       writeFileSync(join(root, "pyproject.toml"), `[project]\nname = "${name}"\n`);
       const run = init(root, "--style", "auto", "--write");
       expect(run.code).toBe(0);
       expect(table(root)).toContain('{ name = "domain", modules = ["shop.domain"] },');
+      expect(table(root)).toContain('\ncycles = ["modules", "contexts"]\n');
       expect(deadPrefixes(root)).toEqual([]);
+      expect(findings(root).findings).toEqual(found);
     },
   );
 

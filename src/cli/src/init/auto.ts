@@ -9,6 +9,7 @@
  * writing, checking and asking are `auto-command.ts`'s.
  */
 import { tomlArray } from "./shapes.ts";
+import { CYCLES } from "./style-text.ts";
 
 /** A layer role the name table knows, innermost first in {@link ROLES}. */
 type Role = "kernel" | "domain" | "services" | "adapters" | "presentation" | "entry";
@@ -199,7 +200,8 @@ function presetFor(names: ReadonlySet<string>): AutoPreset {
  * Builds the `[tool.inwards]` table for a proposal: a header naming the
  * closest preset, one layer entry per mapped role with what it holds as a
  * comment (the kernel with `deny-libraries = []`, since settings and the
- * database need libraries), the tooling added to `ignore`, and the unmapped
+ * database need libraries), module and context cycles turned on as the
+ * presets do, the tooling added to `ignore`, and the unmapped
  * members as comments to move into a layer by hand.
  *
  * @param proposal - the mapped layers and the leftovers.
@@ -239,6 +241,7 @@ export function autoTable(
     `root = ${JSON.stringify(opts.root)}`,
     `required-version = ${JSON.stringify(opts.version)}`,
     `ignore = ${tomlArray([...opts.ignore, ...proposal.tooling])}`,
+    ...CYCLES,
     "layers = [",
     ...rows.map(([entry, what]) => `${(entry ?? "").padEnd(width)}  # ${what ?? ""}`),
     "]",

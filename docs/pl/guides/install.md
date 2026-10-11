@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 5989878d3254bae2ee752648ca90a617eca8528fe2ed1857b93641f8e4986fb6
+source_hash: 1f6d900a30d4bd4ea7d6d669e1838b96fc296a70ff53e7b333f0c8cbe3360e35
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -241,7 +241,7 @@ uvx inwards init --style auto --write  # appends it to pyproject.toml, then runs
 | `api`, `routes`, `routers`, `router`, `views`, `endpoints`, `presentation`, `web` | `presentation` |
 | `main`, `bootstrap`, `__main__`, `asgi`, `wsgi` | `bootstrap`, najbardziej zewnętrzna |
 
-Kolejność warstw wyznacza najbliższy preset: `hexagonal`, gdy jest pakiet `adapters`, `clean`, gdy jest nazwa używana tylko w czystej architekturze (`domain`, `entities`, `application`, `use_cases`, `infrastructure`), a w pozostałych przypadkach `layered`, w którym persistence leży pod services. Zapisywane są tylko warstwy, które dostały moduł, więc pierwsze sprawdzenie nie ma żadnego wyniku „matches no module”. Moduł, którego tabela nie zna, nie trafia do żadnej warstwy i jest wymieniony w komentarzu pod `layers`, żebyś go przydzielił; do tego czasu INW006 ostrzega o nim. Pakiet `alembic` trafia do `ignore`. Dla backendu [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) zapisuje to (tu bez linii `required-version`):
+Kolejność warstw wyznacza najbliższy preset: `hexagonal`, gdy jest pakiet `adapters`, `clean`, gdy jest nazwa używana tylko w czystej architekturze (`domain`, `entities`, `application`, `use_cases`, `infrastructure`), a w pozostałych przypadkach `layered`, w którym persistence leży pod services. Zapisywane są tylko warstwy, które dostały moduł, więc pierwsze sprawdzenie nie ma żadnego wyniku „matches no module”. Moduł, którego tabela nie zna, nie trafia do żadnej warstwy i jest wymieniony w komentarzu pod `layers`, żebyś go przydzielił; do tego czasu INW006 ostrzega o nim. Pakiet `alembic` trafia do `ignore`, a cykle modułów i kontekstów są włączone ([INW004](../rules/INW004.md)), jak w każdym presecie. Dla backendu [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) zapisuje to (tu bez linii `required-version`):
 
 ```toml title="pyproject.toml"
 [tool.inwards]
@@ -250,6 +250,8 @@ Kolejność warstw wyznacza najbliższy preset: `hexagonal`, gdy jest pakiet `ad
 # A module the name table put in the wrong layer can move to another one.
 root = "."
 ignore = ["tests", "scripts", "migrations", "conftest", "alembic"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "kernel", modules = ["app.core", "app.utils"], deny-libraries = [] },  # settings, the database and helpers every layer may use; any library
   { name = "domain", modules = ["app.models"] },                                  # entities, models and schemas
@@ -261,7 +263,7 @@ layers = [
 #   "app.initial_data"
 ```
 
-Pierwsze sprawdzenie znajduje potem 3 naruszenia, czyli importy `app.crud` i `app.models` w `app/core/db.py`, i raz ostrzega o `app.initial_data`. Bez `--write` i bez terminala init wypisuje tabelę na stdout, a mapowanie na stderr, i kończy się kodem 2, więc skrypt ani agent nie weźmie propozycji za zapisaną konfigurację; w terminalu pyta przed zapisem. `--dry-run`, `--agent` i `--brief` działają jak przy innych stylach, a `--scaffold` tu nie ma zastosowania. Jak każdy styl, nigdy nie nadpisuje istniejącego `[tool.inwards]`.
+Pierwsze sprawdzenie znajduje potem 3 naruszenia, czyli importy `app.crud` i `app.models` w `app/core/db.py`, i raz ostrzega o `app.initial_data`; cykli importów nie ma. Bez `--write` i bez terminala init wypisuje tabelę na stdout, a mapowanie na stderr, i kończy się kodem 2, więc skrypt ani agent nie weźmie propozycji za zapisaną konfigurację; w terminalu pyta przed zapisem. `--dry-run`, `--agent` i `--brief` działają jak przy innych stylach, a `--scaffold` tu nie ma zastosowania. Jak każdy styl, nigdy nie nadpisuje istniejącego `[tool.inwards]`.
 
 Kod, który już łamie swoje warstwy, nie przechodzi pierwszego sprawdzenia. Żeby mimo to wdrożyć Inwards, zaakceptuj to, co jest dziś, i blokuj tylko nowe naruszenia:
 

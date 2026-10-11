@@ -25,9 +25,9 @@ export const MISSING = "(missing)";
  * (#340). ADR-032 keeps modules off by default so an upgrade doesn't fail a
  * project that lives with cycles; a project init sets up has no such history.
  * The linear presets keep `"contexts"` too, so contexts added later are
- * covered without editing the list.
+ * covered without editing the list. `--style auto` writes the same lines.
  */
-const CYCLES: readonly string[] = [
+export const CYCLES: readonly string[] = [
   "# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.",
   `cycles = ${array(["modules", "contexts"])}`,
 ];

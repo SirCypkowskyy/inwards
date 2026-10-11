@@ -236,7 +236,7 @@ uvx inwards init --style auto --write  # appends it to pyproject.toml, then runs
 | `api`, `routes`, `routers`, `router`, `views`, `endpoints`, `presentation`, `web` | `presentation` |
 | `main`, `bootstrap`, `__main__`, `asgi`, `wsgi` | `bootstrap`, the outermost |
 
-The closest preset orders the layers: `hexagonal` when there is an `adapters` package, `clean` when a name only clean architecture uses is there (`domain`, `entities`, `application`, `use_cases`, `infrastructure`), and `layered` otherwise, where persistence sits below the services. Only layers that got a module are written, so the first check has no "matches no module" finding. A module the table doesn't know goes in no layer and is listed in a comment under `layers` for you to place; INW006 warns about it until you do. An `alembic` package goes to `ignore`. On the backend of [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) it writes this, shown here without its `required-version` line:
+The closest preset orders the layers: `hexagonal` when there is an `adapters` package, `clean` when a name only clean architecture uses is there (`domain`, `entities`, `application`, `use_cases`, `infrastructure`), and `layered` otherwise, where persistence sits below the services. Only layers that got a module are written, so the first check has no "matches no module" finding. A module the table doesn't know goes in no layer and is listed in a comment under `layers` for you to place; INW006 warns about it until you do. An `alembic` package goes to `ignore`, and module and context cycles are turned on ([INW004](../rules/INW004.md)) as in every preset. On the backend of [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) it writes this, shown here without its `required-version` line:
 
 ```toml title="pyproject.toml"
 [tool.inwards]
@@ -245,6 +245,8 @@ The closest preset orders the layers: `hexagonal` when there is an `adapters` pa
 # A module the name table put in the wrong layer can move to another one.
 root = "."
 ignore = ["tests", "scripts", "migrations", "conftest", "alembic"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "kernel", modules = ["app.core", "app.utils"], deny-libraries = [] },  # settings, the database and helpers every layer may use; any library
   { name = "domain", modules = ["app.models"] },                                  # entities, models and schemas
@@ -256,7 +258,7 @@ layers = [
 #   "app.initial_data"
 ```
 
-The first check then finds 3 violations, the imports of `app.crud` and `app.models` in `app/core/db.py`, and warns once about `app.initial_data`. Without `--write` and without a terminal, init prints the table on stdout and the mapping on stderr and exits 2, so a script or an agent can't take the proposal for a written config; on a terminal it asks before writing. `--dry-run`, `--agent` and `--brief` work as with the other styles, and `--scaffold` doesn't apply. Like every style, it never rewrites an existing `[tool.inwards]`.
+The first check then finds 3 violations, the imports of `app.crud` and `app.models` in `app/core/db.py`, and warns once about `app.initial_data`; it has no import cycle. Without `--write` and without a terminal, init prints the table on stdout and the mapping on stderr and exits 2, so a script or an agent can't take the proposal for a written config; on a terminal it asks before writing. `--dry-run`, `--agent` and `--brief` work as with the other styles, and `--scaffold` doesn't apply. Like every style, it never rewrites an existing `[tool.inwards]`.
 
 A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:
 
