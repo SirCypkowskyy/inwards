@@ -1,7 +1,7 @@
 # GitHub Actions
 
 !!! info "Verified 2026-10-11"
-    `inwards check --format github` is pinned by an E2E snapshot, its escaping by unit tests against the rules `@actions/core` uses. The code scanning workflow's check, `--format github` annotation and upload steps run on every pull request in this repository ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), on `examples/broken-app`), with Inwards built from source. The install step was run by hand outside GitHub Actions: `uv tool install inwards==0.6.0` from PyPI, then `inwards check --format github` on `examples/broken-app`. The pre-commit hook was run with `uvx pre-commit run --all-files` (pre-commit 4.6.2) and `inwards==0.6.0` on a scratch project.
+    `inwards check --format github` is pinned by an E2E snapshot, its escaping by unit tests against the rules `@actions/core` uses. The code scanning workflow's check, `--format github` annotation and upload steps run on every pull request in this repository ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), on `examples/broken-app`), with Inwards built from source. The install step was run by hand outside GitHub Actions: `uv tool install inwards==0.7.0` from PyPI, then `inwards check --format github` on `examples/broken-app`. The pre-commit hook was run with `uvx pre-commit run --all-files` (pre-commit 4.6.2) and `inwards==0.7.0` on a scratch project.
 
 Agent hooks catch a violation while the agent works; CI catches the ones that get past them, such as a hand edit or an agent without hooks. The workflow below fails the pull request when an import breaks a layer and puts the violation on the line that caused it.
 
@@ -25,7 +25,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
       - name: Install Inwards
         run: |
-          uv tool install inwards==0.6.0 # pin the release; bump it on purpose
+          uv tool install inwards==0.7.0 # pin the release; bump it on purpose
           uv tool dir --bin >> "$GITHUB_PATH"
       - name: Check
         run: inwards check --format github
@@ -82,7 +82,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
       - name: Install Inwards
         run: |
-          uv tool install inwards==0.6.0 # pin the release; bump it on purpose
+          uv tool install inwards==0.7.0 # pin the release; bump it on purpose
           uv tool dir --bin >> "$GITHUB_PATH"
       - name: Check
         id: check
@@ -122,7 +122,7 @@ repos:
         name: inwards
         entry: inwards check --format concise
         language: python
-        additional_dependencies: ["inwards==0.6.0"]
+        additional_dependencies: ["inwards==0.7.0"]
         pass_filenames: false
         files: (\.py|pyproject\.toml|inwards-baseline\.json)$
 ```
@@ -130,7 +130,7 @@ repos:
 - `pass_filenames: false` checks the whole project, so the whole-project rules (dead layer prefixes, import cycles, symlinks in layers) run too, and a commit that only touches `pyproject.toml` is checked against the new config. A cold whole check of the 496,000-line benchmark repo takes 0.4 s on one core ([chapter 6](../06-Constraints-and-Quality.md)). To check only the staged files, drop the line; the whole-project rules then wait for CI.
 - `files` runs the hook when a Python file, a `pyproject.toml` or the baseline changes, and skips it otherwise.
 - `--format concise` prints one line per finding. A violation fails the hook with exit 1, which stops the commit; a warning doesn't.
-- Bump `inwards==0.6.0` on purpose, as in CI. A local hook has no `rev`, so `pre-commit autoupdate` leaves it alone.
+- Bump `inwards==0.7.0` on purpose, as in CI. A local hook has no `rev`, so `pre-commit autoupdate` leaves it alone.
 - When Inwards is already a uv dev dependency, `entry: uv run inwards check --format concise` with `language: system` uses the locked version instead, and no `additional_dependencies`.
 
 ## Generated modules

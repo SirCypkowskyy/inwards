@@ -1,12 +1,12 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: d6a9dd82f960f2ff9a3e03cfd92d9283bac7fd109f0a3c2c095234bba1874b22
+source_hash: caf0c4e8cd8ddd2153fe3f8785bb8d6967fa40d9b3741af83663053592fa2f80
 ---
 
 # Instalacja Inwards { #install-inwards }
 
 !!! info "Zweryfikowano 2026-10-11"
-    Z wersją 0.6.0 na macOS (arm64): `uvx inwards@0.6.0 --version`; `uv add --dev inwards`, a potem `uv run inwards init --style layered` i `uv run inwards check`; `uvx inwards init --style hexagonal --scaffold` w nowym projekcie z `uv init --package`; `uvx inwards init --style auto` na projekcie testowym i na backendzie full-stack-fastapi-template; oraz pobranie przez `curl` ze sprawdzeniem sumy kontrolnej i `gh attestation verify`. Budowanie ze źródeł ręcznie na Linuksie x64 2026-09-25. Na Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tym systemie wciąż jest do zrobienia. Rozszerzenie VS Code 2026-10-10: VSIX dla platformy zainstalowany w VS Code 1.141 na macOS (arm64) pokazał INW007, sprawdzone skryptem `src/vscode-extension/scripts/try-in-vscode.ts`; Linux i Windows wciąż są do sprawdzenia.
+    Z wersją 0.7.0 na macOS (arm64): `uvx inwards@0.7.0 --version`; `uv add --dev inwards`, a potem `uv run inwards init --style layered` i `uv run inwards check`; `uvx inwards init --style hexagonal --scaffold` w nowym projekcie z `uv init --package`; `uvx inwards init --style auto` na projekcie testowym i na backendzie full-stack-fastapi-template; oraz pobranie przez `curl` ze sprawdzeniem sumy kontrolnej i `gh attestation verify`. Budowanie ze źródeł ręcznie na Linuksie x64 2026-09-25. Na Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tym systemie wciąż jest do zrobienia. Rozszerzenie VS Code 2026-10-10: VSIX dla platformy zainstalowany w VS Code 1.141 na macOS (arm64) pokazał INW007, sprawdzone skryptem `src/vscode-extension/scripts/try-in-vscode.ts`; Linux i Windows wciąż są do sprawdzenia.
 
 Inwards to jeden plik wykonywalny, bez środowiska uruchomieniowego do instalowania. Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako wheele platformowe i do [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) jako pliki binarne; [changelog](https://github.com/SirCypkowskyy/inwards/blob/main/CHANGELOG.md) mówi, co zmieniło każde z nich. W projekcie Pythona najkrótsza droga prowadzi przez uv. Możesz też zbudować Inwards ze źródeł.
 
@@ -20,14 +20,14 @@ uv run inwards init --style layered   # write the layers: see "Configure the lay
 uv run inwards check
 ```
 
-`uv add` zapisuje w `pyproject.toml` dolne ograniczenie, na przykład `inwards>=0.6.0`, a w `uv.lock` dokładną wersję, więc wszyscy w projekcie używają tego samego wydania, dopóki ktoś nie uruchomi `uv lock --upgrade-package inwards`. Działa też `pip install inwards`.
+`uv add` zapisuje w `pyproject.toml` dolne ograniczenie, na przykład `inwards>=0.7.0`, a w `uv.lock` dokładną wersję, więc wszyscy w projekcie używają tego samego wydania, dopóki ktoś nie uruchomi `uv lock --upgrade-package inwards`. Działa też `pip install inwards`.
 
 Żeby wypróbować Inwards bez dodawania go do projektu albo założyć nowy projekt, uruchom go przez `uvx`. Trzyma on kopię w pamięci podręcznej uv i niczego nie dodaje do projektu:
 
 ```sh
 uvx inwards --version
 uvx inwards init --style hexagonal --scaffold
-uvx inwards@0.6.0 check   # one exact release
+uvx inwards@0.7.0 check   # one exact release
 ```
 
 Żeby podłączyć agenta w takim projekcie, przekaż `init` flagę `--launcher "uv run"` (`uv run inwards init --agent claude --launcher "uv run"`): hooki i sekcja w `AGENTS.md` podają wtedy `uv run inwards` i nie zawierają ścieżki. Bez niej `init` zapisuje ścieżkę pliku binarnego, jako który działa; w projekcie leży ona w `.venv` i różni się między worktree'ami, a pod `uvx` leży w pamięci podręcznej uv, o czym `init` ostrzega.
@@ -48,7 +48,7 @@ Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/rele
 | macOS Intel | `inwards-darwin-x64` |
 | Windows x64 | `inwards-windows-x64.exe` |
 
-Adresy z `latest/download` poniżej zawsze wskazują najnowsze wydanie; żeby przypiąć konkretne, użyj zamiast tego `releases/download/v0.6.0`.
+Adresy z `latest/download` poniżej zawsze wskazują najnowsze wydanie; żeby przypiąć konkretne, użyj zamiast tego `releases/download/v0.7.0`.
 
 === "Linux / macOS"
 
@@ -245,7 +245,7 @@ Kolejność warstw wyznacza najbliższy preset: `hexagonal`, gdy jest pakiet `ad
 
 ```toml title="pyproject.toml"
 [tool.inwards]
-# Mapped from app's modules by inwards init --style auto (Inwards 0.6.0); closest preset: layered.
+# Mapped from app's modules by inwards init --style auto (Inwards 0.7.0); closest preset: layered.
 # Layers are listed innermost first: each may import itself and the layers above it.
 # A module the name table put in the wrong layer can move to another one.
 root = "."
