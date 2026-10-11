@@ -7,9 +7,9 @@
  */
 import { pathToFileURL } from "node:url";
 import type { ConfigError, Diagnostic } from "@inwards/core";
-import { checkedAlone } from "./checks.ts";
+import { checkedAlone } from "./_checks.ts";
+import { configDiagnostic, toLsp } from "./_convert.ts";
 import type { Editor, LspDiagnostic } from "./contracts.ts";
-import { configDiagnostic, toLsp } from "./convert.ts";
 
 /** An open document and what was last found in it. */
 export interface OpenDoc {
