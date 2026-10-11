@@ -59,6 +59,27 @@ Enforced by:
 When a change seems to need a new edge, move the shared piece down (into
 `rules/shared/`, `lookup/` or `python/`) rather than widening a rule's zone.
 
+## Slice names (ADR-047)
+
+The engine is moving to vertical slices one step at a time (ADR-047 in
+chapter 5 lists the 15 steps). Until a folder's step lands, it keeps the
+layout above. A migrated slice holds only these names:
+
+- `index.ts`: the slice's public face, re-exports only. `engine/` and the
+  other slices import this, never a private module.
+- `_name.ts`: private to the folder it sits in. A rule keeps its repeated
+  names (`_check.ts`, `_wording.ts`).
+- `contracts.ts`: the records and ports the slice owns.
+- `*.d.ts` typings, and subfolders (mini-domains) with their own `index.ts`.
+
+Biome refuses an import of another folder's `_x.ts` (`noRestrictedImports`
+in the engine's override): `./_x.ts` and `../_x.ts` pass, `../other/_x.ts`
+and `./sub/_x.ts` fail. Tests aren't covered, so a unit test may import the
+private modules of the slice it mirrors. `noBarrelFile` is off for every
+`index.ts`. `test/architecture.test.ts` probes the pattern, and its
+`MIGRATED_SLICES` list holds the folders the naming check walks: a move PR
+adds its folder there.
+
 ## Lifetimes that are deliberate
 
 - **The grammar loads once per process** (`python/parser.ts`).
