@@ -25,6 +25,7 @@ INW013   async-blocking               off    error     opt-in, off by default
 INW014   ports-abstract               off    error     opt-in, off by default
 INW015   construct-only-in            off    error     opt-in, off by default
 INW016   orm-naming                   off    error     opt-in, off by default
+INW017   diagram-unknown-name         off    warning   opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -63,6 +64,7 @@ INW013   async-blocking               on     error     templates.domain.rules.ro
 INW014   ports-abstract               off    error     opt-in, off by default
 INW015   construct-only-in            off    error     opt-in, off by default
 INW016   orm-naming                   on     warning   templates.domain.rules.models; severity: templates.domain.rules.models; only in src.*.models
+INW017   diagram-unknown-name         off    warning   opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -384,6 +386,23 @@ exports[`rules --json prints inwards/rules@1 1`] = `
         "kind": "template",
       },
       "summary": "ORM table names and the names of datetime and date columns follow the project's scheme: lower_case_snake singular tables, _at for datetimes, _date for dates.",
+    },
+    {
+      "code": "INW017",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW017/",
+      "enabled": false,
+      "name": "diagram-unknown-name",
+      "severity": "warning",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A node in a marked architecture diagram names a layer or context [tool.inwards] declares, and its quoted label a module that exists.",
     },
     {
       "code": "FAPI001",

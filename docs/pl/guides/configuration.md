@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 02fa21afbb10be937b7079b3eb7edea7ba6af7a6a32d7c25a3c3afda3977a099
+source_hash: 7e0c4f79bcad19696e4c1bfc78a3fa75a16750ff5f2ff622e00c0ffea861490f
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -222,7 +222,7 @@ Które reguły zgłaszają i jak głośno:
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
 
-`inwards rules` pokazuje, co z tej tabeli wynika: każdą regułę z kodem, nazwą, informacją, czy jest włączona, poziomem i kluczem, który o każdym z nich zdecydował, zapisanym jako klucz pod `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), albo `default`. Reguła ograniczona przez `modules` mówi gdzie (`only in src.*.router`). Czyta najbliższą konfigurację albo `--config FILE`, a bez konfiguracji wypisuje ustawienia domyślne. `--json` wypisuje to samo jako `inwards/rules@1`: każda reguła ma `source` i `severitySource`, każde z polem `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` albo `severity`) i swoimi `keys`. Tak jak `inwards/diagnostics@1` jest to kontrakt: pola są tylko dodawane, a zmiana nazwy albo usunięcie pola wymaga nowej wersji schematu ([ADR-007](../05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)). `inwards rule INW013` wypisuje stronę jednej reguły ([poradnik MCP](mcp.md#explain_rule)).
+`inwards rules` pokazuje, co z tej tabeli wynika: każdą regułę z kodem, nazwą, informacją, czy jest włączona, poziomem i kluczem, który o każdym z nich zdecydował, zapisanym jako klucz pod `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), albo `default`. Reguła ograniczona przez `modules` mówi gdzie (`only in src.*.router`). Czyta najbliższą konfigurację albo `--config FILE`, a bez konfiguracji wypisuje ustawienia domyślne. `--json` wypisuje to samo jako `inwards/rules@1`: każda reguła ma `source` i `severitySource`, każde z polem `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` albo `severity`) i swoimi `keys`. `inwards/rules@1` jest kontraktem, tak jak `inwards/diagnostics@1`: w ramach `@1` pola są tylko dodawane, a usunięcie albo zmiana nazwy pola podnosi wersję ([ADR-007](../05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)). `inwards rule INW013` wypisuje stronę jednej reguły ([poradnik MCP](mcp.md#explain_rule)).
 
 <!-- config: fragment -->
 
@@ -403,6 +403,20 @@ Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu ca
 ```toml
 [tool.inwards]
 cycles = ["modules", "contexts"]
+```
+
+### `diagrams` { #diagrams }
+
+Typ: lista ścieżek. Domyślnie: brak.
+
+Pliki Markdown i Mermaid, których diagramy architektury [INW017](../rules/INW017.md) sprawdza względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`: blok kodu `mermaid` w pliku Markdown albo cały plik `.mmd` lub `.mermaid`. Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. INW017 to reguła opt-in, więc włącz ją przez `extend-select`. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+diagrams = ["docs/architecture.md", "docs/**/*.mmd"]
+rules = { extend-select = ["INW017"] }
 ```
 
 ## Monorepo i workspace'y uv { #monorepos }

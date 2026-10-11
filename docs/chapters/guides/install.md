@@ -154,7 +154,7 @@ Seven presets exist, each listed innermost first. `inwards init --list-styles` p
 | Style | Layers | What it can't forbid |
 |---|---|---|
 | `layered` | domain, persistence, services, presentation, bootstrap | presentation calling persistence directly (open layers) |
-| `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importing infrastructure |
+| `clean` | domain, application, infrastructure, presentation, bootstrap | presentation calling a port instead of a use case |
 | `hexagonal` | domain, application, outbound (`adapters.outbound`) and inbound (`adapters.inbound`) as [siblings](configuration.md#sibling-layers), bootstrap | an inbound adapter calling a port instead of a use case |
 | `vertical-slices` | shared, features, bootstrap; each slice under `features` is a context whose public module is `api` | code only one slice uses moving into `shared` |
 | `bounded-contexts` | `app.*` with the `context` template: domain, application, infrastructure, api inside each context; bootstrap | a context's `api` re-exporting its domain entities |
@@ -163,7 +163,9 @@ Seven presets exist, each listed innermost first. `inwards init --list-styles` p
 
 Each layer may import itself and the layers before it, so a layer-only config can't express the gaps in the last column; the table's comment names the gap. `bootstrap.py` is the composition root, the one module that sees every layer. In `hexagonal`, the inbound and outbound adapters share one place in the order, so neither may import the other.
 
-`clean` and `hexagonal` also turn on [INW014](../rules/INW014.md) with `extend-select`, as a warning through a `[tool.inwards.rules.severity]` line: a module in `application/ports/` may hold only ABCs and Protocols, and a method there only a docstring, `...`, `pass` or `raise NotImplementedError`. The rule's default scope, every module with a `ports` segment, already covers that package, so the preset sets no options. The scaffold's `OrderRepository` is a Protocol and passes. A concrete class or a method that does work in `application/ports/orders.py` gets a warning whose fix names the adapter layer, `infrastructure` in `clean` and `outbound` in `hexagonal`.
+`clean` and `hexagonal` also turn on [INW014](../rules/INW014.md) with `extend-select`, as a warning through a `[tool.inwards.rules.severity]` line: a module in `application/ports/` may hold only ABCs and Protocols, and a method there only a docstring, `...`, `pass` or `raise NotImplementedError`. The rule's default scope, every module with a `ports` segment, already covers that package, so the preset sets no options for it. The scaffold's `OrderRepository` is a Protocol and passes. A concrete class or a method that does work in `application/ports/orders.py` gets a warning whose fix names the adapter layer, `infrastructure` in `clean` and `outbound` in `hexagonal`.
+
+Both presets turn on [INW015](../rules/INW015.md) too, also as a warning: only `bootstrap.py` may import and build the driven adapters. Its `[tool.inwards.rules.construct-only-in]` table sets `role` to the adapter layer's package (`app.infrastructure` in `clean`, `app.adapters.outbound` in `hexagonal`) and `allowed-in` to `app.bootstrap`. The scaffold builds `InMemoryOrderRepository` in `bootstrap.py` only, so it passes. In `clean`, a presentation module that imports the repository gets a warning, which closes the gap this preset used to name. In `hexagonal`, inbound and outbound adapters are siblings, so INW001 already reports that import as an error and INW015 doesn't repeat it; INW015 still reports an adapter built through a re-export, such as one from the package's `__init__.py`.
 
 The last four presets keep packages apart with [contexts](configuration.md#contexts), and describe the packages with a [template](configuration.md#templates):
 

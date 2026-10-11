@@ -71,6 +71,7 @@ nav = [
     { "INW014 ports-abstract" = "rules/INW014.md" },
     { "INW015 construct-only-in" = "rules/INW015.md" },
     { "INW016 orm-naming" = "rules/INW016.md" },
+    { "INW017 diagram-unknown-name" = "rules/INW017.md" },
     { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },

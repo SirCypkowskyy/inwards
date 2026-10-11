@@ -239,6 +239,20 @@
       "url": "INW016/"
     },
     {
+      "code": "INW017",
+      "name": "diagram-unknown-name",
+      "title": "INW017 diagram-unknown-name",
+      "summary": "A node in a marked Mermaid architecture diagram that names no declared layer or context, or whose quoted label matches no module (whole-project runs)",
+      "description": "A node in a marked architecture diagram names a layer or context [tool.inwards] declares, and its quoted label a module that exists.",
+      "category": ["diagrams", "docs"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "warning",
+      "suppressible": false,
+      "default": "opt-in, warning",
+      "url": "INW017/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",
