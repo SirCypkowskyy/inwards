@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: ba9310a32ddbf1c5c830fc54e4d6502ff79655de0eef08ddb071f3c219ef536f
+source_hash: ba7efd1236e2d079462e367bdd5ef9635bdaee585915df811eeeb91b62b83e06
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -17,7 +17,7 @@ Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [
 
 ## Importy { #imports }
 
-Co moduł może importować: warstwy wskazują do środka, konteksty importują się nawzajem tylko tak, jak to zadeklarowano, i tylko przez swoje moduły publiczne, bez cykli, bez biblioteki, której zabrania konfiguracja warstwy, bez własnego modułu, który nie istnieje, i bez importu dynamicznego, który ukrywa któreś z tych naruszeń. Każda reguła z tej kategorii jest domyślnie włączona.
+Co moduł może importować: warstwy wskazują do środka, konteksty importują się nawzajem tylko tak, jak to zadeklarowano, i tylko przez swoje moduły publiczne, bez cykli, bez biblioteki, której zabrania konfiguracja warstwy, bez własnego modułu, który nie istnieje, bez importu dynamicznego, który ukrywa któreś z tych naruszeń, i bez sięgania do modułu prywatnego spoza jego pakietu. Każda reguła z tej kategorii jest domyślnie włączona poza INW021, która jest opt-in.
 
 <div class="inw-rules-fallback" markdown>
 
@@ -30,6 +30,7 @@ Co moduł może importować: warstwy wskazują do środka, konteksty importują 
 | [INW005](INW005.md) | `pure-domain` | Import biblioteki, na który konfiguracja warstwy nie pozwala, np. SQLAlchemy w domenie | domyślnie | błąd | wszystkie | tak |
 | [INW010](INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | domyślnie | błąd | wszystkie | tak |
 | [INW011](INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | domyślnie | błąd | wszystkie | tak |
+| [INW021](INW021.md) | `private-module` | Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera | opt-in | błąd | żaden | tak |
 
 </div>
 
@@ -136,9 +137,9 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 
 ### Reguły opt-in i opcje reguł { #opt-in-rules }
 
-Reguła, która w kolumnie Włączona ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md), [INW019](INW019.md) i [INW020](INW020.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, INW015, INW016 i INW020, reguły, które sprawdzają dokumentację względem konfiguracji i kodu, INW017, INW018 i INW019, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
+Reguła, która w kolumnie Włączona ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md), [INW019](INW019.md), [INW020](INW020.md) i [INW021](INW021.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, INW015, INW016 i INW020, reguły, które sprawdzają dokumentację względem konfiguracji i kodu, INW017, INW018 i INW019, konwencja, której trzymają się tylko niektóre projekty, INW021, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
 
-Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [INW020](INW020.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
+Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [INW020](INW020.md#configuration), [INW021](INW021.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
 
 <!-- config: fragment -->
 
@@ -147,7 +148,7 @@ Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<ru
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
 ```
 
-Reguły treści opt-in, INW012 do INW016, INW020 i reguły FAPI, pomijają moduły testowe: moduł, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`, na przykład `app/tests/test_orders.py`, `tests/conftest.py` czy `app/orders_test.py`. Test celowo buduje jednorazową aplikację albo importuje adapter, więc zgłoszenie w nim rzadko warto poprawiać ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` w tabeli reguły przywraca je dla tej reguły. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `ignore` najwyższego poziomu nie zawęża reguł treści.
+Reguły treści opt-in, INW012 do INW016, INW020 i reguły FAPI, oraz INW021 pomijają moduły testowe: moduł, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`, na przykład `app/tests/test_orders.py`, `tests/conftest.py` czy `app/orders_test.py`. Test celowo buduje jednorazową aplikację albo importuje adapter, więc zgłoszenie w nim rzadko warto poprawiać ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` w tabeli reguły przywraca je dla tej reguły. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `ignore` najwyższego poziomu nie zawęża reguł treści.
 
 <!-- config: fragment -->
 
@@ -166,7 +167,7 @@ Tabela opcji nie włącza reguły. Tabela dla reguły wyłączonej (opt-in i nie
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW020 oraz reguły FAPI. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
+W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW020, INW021 oraz reguły FAPI. Wyciszenie bez powodu, z nieznanym kodem albo z kodem, którego nie da się wyciszyć, niczego nie ukrywa i jest zgłaszane jako [INW009](INW009.md). Hooki Claude Code pomijają wyciszenie, które agent dodał w trakcie sesji, chyba że ustawiono `agent-suppressions = "allow"`.
 
 ## Format strony { #page-format }
 

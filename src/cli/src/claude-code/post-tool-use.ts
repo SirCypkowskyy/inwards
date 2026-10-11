@@ -20,10 +20,10 @@ import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import { configListsDiagram } from "../project/diagrams.ts";
+import { fingerprint } from "../project/fingerprint.ts";
 import { projectPath } from "../project/snapshot.ts";
 import { agentSuppressions, rejectedNote } from "../session/agent-suppressions.ts";
 import type { Start } from "../session/contracts.ts";
-import { fingerprint } from "../session/fingerprint.ts";
 import { createStartLookups } from "../session/lookups.ts";
 import { oldErrors, oldNote } from "../session/old-errors.ts";
 import {

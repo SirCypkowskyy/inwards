@@ -1,11 +1,11 @@
 ---
 source: docs/chapters/rules/imports/index.md
-source_hash: 32d96e2a3069320a10e773094405c819c17a14cd446a422d5a078ea330847421
+source_hash: 4b8a7497868bd280e35c290b334ef76305ef59e16e96b174c60a3e80c1da1d7e
 ---
 
 # Importy { #imports }
 
-Co moduł może importować: warstwy wskazują do środka, konteksty importują się nawzajem tylko tak, jak to zadeklarowano, i tylko przez swoje moduły publiczne, bez cykli, bez biblioteki, której zabrania konfiguracja warstwy, bez własnego modułu, który nie istnieje, i bez importu dynamicznego, który ukrywa któreś z tych naruszeń. Każda reguła z tej kategorii jest domyślnie włączona.
+Co moduł może importować: warstwy wskazują do środka, konteksty importują się nawzajem tylko tak, jak to zadeklarowano, i tylko przez swoje moduły publiczne, bez cykli, bez biblioteki, której zabrania konfiguracja warstwy, bez własnego modułu, który nie istnieje, bez importu dynamicznego, który ukrywa któreś z tych naruszeń, i bez sięgania do modułu prywatnego spoza jego pakietu. Każda reguła z tej kategorii jest domyślnie włączona poza INW021, która jest opt-in.
 
 <div class="inw-rule-category" markdown>
 
@@ -18,6 +18,7 @@ Co moduł może importować: warstwy wskazują do środka, konteksty importują 
 | [INW005](../INW005.md) | `pure-domain` | Import biblioteki, na który konfiguracja warstwy nie pozwala, np. SQLAlchemy w domenie | domyślnie |
 | [INW010](../INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | domyślnie |
 | [INW011](../INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | domyślnie |
+| [INW021](../INW021.md) | `private-module` | Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera | opt-in |
 
 </div>
 

@@ -60,6 +60,7 @@ nav = [
       { "INW005 pure-domain" = "rules/INW005.md" },
       { "INW010 unknown-first-party" = "rules/INW010.md" },
       { "INW011 dynamic-import" = "rules/INW011.md" },
+      { "INW021 private-module" = "rules/INW021.md" },
     ] },
     { "Layout" = [
       "rules/layout/index.md",

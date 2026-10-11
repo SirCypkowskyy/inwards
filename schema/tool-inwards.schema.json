@@ -205,6 +205,7 @@
         "INW018",
         "INW019",
         "INW020",
+        "INW021",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -479,6 +480,9 @@
         },
         "adapter-conformance": {
           "$ref": "#/definitions/adapterConformanceOptions"
+        },
+        "private-module": {
+          "$ref": "#/definitions/contentRuleOptions"
         },
         "diagram-unknown-name": {
           "$ref": "#/definitions/ruleOptions"
@@ -1385,6 +1389,24 @@
                 "allOf": [
                   {
                     "$ref": "#/definitions/routerWiringOptions"
+                  },
+                  { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
+                ]
+              }
+            ]
+          },
+          "private-module": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": ["error", "warning"]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/contentRuleOptions"
                   },
                   { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
                 ]

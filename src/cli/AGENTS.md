@@ -12,11 +12,11 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
-| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `diagram`, `import-config`, `import-diagram`, `rules` for `inwards rules` and `inwards rule`, `daemon`, `mcp`), `rule-sources` for which config key turns each rule on, `append-table` for appending an imported `[tool.inwards]` table, `usage` for the help text, `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
+| `commands/` | one module per command (`check`, `baseline`, `hook`, `context`, `diagram`, `import-config`, `import-diagram`, `rules` for `inwards rules` and `inwards rule`, `daemon`, `mcp`), `rule-sources` for which config key turns each rule on, `append-table` for appending an imported `[tool.inwards]` table, `usage` for the help text, `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
 | `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings` and `hook-host` (whether the agent still has Inwards wired in), and `protocol` (shared by all of them) | read the environment or the filesystem itself |
-| `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), violation fingerprints, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
-| `project/` | running a check, which files it reads and under which module names, then reading them (`sources`: one batch from 1,000 files, #281), the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), how many threads parse a full check (`threads`, ADR-040), texts laid over the disk for one check, files not yet written included (`overlay`, for `inwards mcp`), the files `diagrams` names (`diagrams`), and the checks only a whole-project run makes (`whole`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
-| `runlog/` | the run log, reading it back, stats, `--export` | keep notes in a module global |
+| `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
+| `project/` | running a check, which files it reads and under which module names, then reading them (`sources`: one batch from 1,000 files, #281), the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), how many threads parse a full check (`threads`, ADR-040), texts laid over the disk for one check, files not yet written included (`overlay`, for `inwards mcp`), the files `diagrams` names (`diagrams`), violation fingerprints (`fingerprint`, shared by the session record, escalation and the run log), and the checks only a whole-project run makes (`whole`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
+| `runlog/` | an ADR-047 slice: `index.ts` its face (`statsCommand`, `createRunLog`, `RunLog`, and the readers the tests use), `cli.ts` the `inwards stats` handler, `contracts.ts` (`ExportFiles`, `StatsDeps`), `commands/` writing the run log (`_record`), `queries/` reading it back (`_runs`), the numbers (`_stats`) and `--export` (`_export`), and `adapters/export-files.ts` for the export key and file | keep notes in a module global, or let `queries/` import `commands/` |
 | `init/` | `inwards init`: agent wiring (`claude` with its `.mcp.json` in `mcp-json`, `opencode`, `agents`), `--style`, `--style auto`'s name table and command (`auto`, `auto-command`), the scaffold plan, the report, presets and the text their templates add (`template-text`), the architecture brief (`--brief`, `inwards context`) with its opt-in rules part (`brief-rules`), marked sections in Markdown files (`section`), import-linter contracts as `[tool.inwards]` (`import-linter/`, for `inwards import-config`), and a read diagram as `[tool.inwards]` (`diagram-table`, for `inwards import-diagram`) | write files itself (`InitFiles` does) |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
 | `daemon/` | the hook daemon's side of ADR-039: the `inwards-daemon/1` wire format and the daemon's file names (`protocol`), the hook's side (`viaDaemon` and `askDaemon` in `client`), the request handler (`server`), the caches kept between requests (`memory`), and the `DaemonLink` and `DaemonHost` contracts | do I/O (the socket, the record and the lock are `adapters/daemon-*.ts`) |
@@ -24,7 +24,7 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | `mcp/` | the MCP server's policy (`inwards mcp`, ADR-042): the three tools (`check-files`, `explain-rule` with `rule-page`, `where` with `where-answer` and `hints`), their arguments and answers (`contracts`), and running them one at a time (`tools`) | import the SDK or Zod, or touch a stream (that is `adapters/mcp-connection.ts`) |
 | `platform/` | the contracts for everything outside the process, `print()`, and `time.ts`, the one place that may name `Date` to parse a recorded timestamp | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
-| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), the MCP connection over stdio (`mcp-connection`) and the rule pages it serves (`rule-pages`, embedded as text); `compose.ts` wires them into `AppDeps` | hold policy |
+| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), the MCP connection over stdio (`mcp-connection`) and the rule pages it serves (`rule-pages`, embedded as text); `compose.ts` wires them into `AppDeps` | hold policy |
 
 ## Dependency rules
 
@@ -35,8 +35,8 @@ Everything below `main.ts` receives what it touches as parameters: the
 narrowest `Pick<>` they need, so a signature says what it touches.
 
 Imports go downwards only: `platform`, `json` and `paths` are leaves, then
-`project`, then `session`, then `runlog`, then `claude-code` and `init`,
-then `commands`. `daemon/` sits beside them, below `commands/`, and imports
+`project`, then `session` and `runlog` (neither imports the other), then
+`claude-code` and `init`, then `commands`. `daemon/` sits beside them, below `commands/`, and imports
 only `platform` and `json` (and the engine's API); `commands/` and the
 `daemon-*` adapters use it. `lsp/` sits beside it too and imports `platform`,
 `json`, `paths` and `project` (for `planCheck`), and `commands/deps.ts` for
@@ -122,6 +122,12 @@ walks: a move PR adds its folder there.
    `adapters/compose.ts` until step 14. The architecture test checks that
    only `cli-main` allows an adapters zone.
 4. Add the folder to `MIGRATED_SLICES`.
+
+`runlog/` (#421) followed these steps with two differences. Its `cli.ts`
+takes `StatsDeps` from its own `contracts.ts` instead of `AppDeps`, so the
+slice never imports `commands/deps.ts` and `index.ts` can re-export both the
+handler and `RunLog`. And it splits into `commands/` (writing the log) and
+`queries/` (reading it back), each a mini-domain with its own `index.ts`.
 
 ## State lifetimes
 

@@ -2,16 +2,14 @@
  * @file The `inwards stats` command: finds the project, reads its run logs, and
  * prints the hypothesis numbers, each next to its chapter-2 threshold.
  * With `--export` it writes the merged log instead, optionally redacted;
- * everything it touches comes in as `AppDeps`.
+ * everything it touches comes in as `StatsDeps`, the part of `AppDeps` it reads.
  */
 import { dirname, join, resolve } from "node:path";
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { projectConfigs } from "../project/snapshot.ts";
-import { exportRunLogs } from "../runlog/export.ts";
-import { logDirs, readRunLogs } from "../runlog/runs.ts";
-import { computeStats, type Stats } from "../runlog/stats.ts";
-import type { AppDeps } from "./deps.ts";
+import type { StatsDeps } from "./contracts.ts";
+import { computeStats, exportRunLogs, logDirs, readRunLogs, type Stats } from "./queries/index.ts";
 
 const PERCENT = 100;
 
@@ -32,7 +30,7 @@ const PERCENT = 100;
  * @throws {ConfigError} when the export target is a log or the export key can't be used.
  */
 export function statsCommand(
-  deps: AppDeps,
+  deps: StatsDeps,
   format: string,
   dir: string | undefined,
   sharing: { export?: string | undefined; redact?: boolean | undefined } = {},

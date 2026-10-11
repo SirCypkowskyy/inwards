@@ -7,8 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { nodeFileReader } from "../../src/adapters/filesystem.ts";
-import { readRunLogs } from "../../src/runlog/runs.ts";
-import { computeStats, type Stats } from "../../src/runlog/stats.ts";
+import { computeStats, readRunLogs, type Stats } from "../../src/runlog/index.ts";
 import { inwards, LAYERS, project } from "../support/run.ts";
 import { edit, LOG, line, statsOf, withLog } from "../support/stats-helpers.ts";
 

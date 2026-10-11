@@ -18,10 +18,10 @@
 import { createHmac } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { ConfigError } from "@inwards/core";
-import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
-import { parseTime } from "../platform/time.ts";
-import type { ExportFiles } from "./contracts.ts";
-import { parseLine, type RunLine } from "./runs.ts";
+import type { FileReader, PathProbe, Runtime } from "../../platform/contracts.ts";
+import { parseTime } from "../../platform/time.ts";
+import type { ExportFiles } from "../contracts.ts";
+import { parseLine, type RunLine } from "./_runs.ts";
 
 const LINE_BREAK = /\r?\n/u;
 /** Hex digits kept from an HMAC: 64 bits tell a project's files and violations apart. */

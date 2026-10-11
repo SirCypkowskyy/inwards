@@ -12,7 +12,7 @@ The rules fall into six categories, described below in this order: [imports](#im
 
 ## Imports { #imports }
 
-What a module may import: layers point inward, contexts import each other only as declared and only through their public modules, no cycles, no library a layer's config denies, no first-party module that doesn't exist, and no dynamic import that hides one of these. Every imports rule is on by default.
+What a module may import: layers point inward, contexts import each other only as declared and only through their public modules, no cycles, no library a layer's config denies, no first-party module that doesn't exist, no dynamic import that hides one of these, and no private module reached from outside its package. Every imports rule is on by default except INW021, which is opt-in.
 
 <div class="inw-rules-fallback" markdown>
 
@@ -25,6 +25,7 @@ What a module may import: layers point inward, contexts import each other only a
 | [INW005](INW005.md) | `pure-domain` | A library import a layer's config doesn't allow, such as SQLAlchemy in the domain | by default | error | all | yes |
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | by default | error | all | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | by default | error | all | yes |
+| [INW021](INW021.md) | `private-module` | An import of a module whose name starts with `_` from outside the package that holds it | opt-in | error | none | yes |
 
 </div>
 
@@ -131,9 +132,9 @@ Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `
 
 ### Opt-in rules and rule options { #opt-in-rules }
 
-A rule whose On column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md), [INW019](INW019.md) and [INW020](INW020.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, the rules that judge the content of a role's modules, such as INW013, INW015, INW016 and INW020, the rules that check docs against the config and the code, INW017, INW018 and INW019, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
+A rule whose On column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md), [INW019](INW019.md), [INW020](INW020.md) and [INW021](INW021.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, the rules that judge the content of a role's modules, such as INW013, INW015, INW016 and INW020, the rules that check docs against the config and the code, INW017, INW018 and INW019, a convention only some projects follow, INW021, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
 
-A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [INW020](INW020.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
+A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [INW020](INW020.md#configuration), [INW021](INW021.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
 
 <!-- config: fragment -->
 
@@ -142,7 +143,7 @@ A rule's options live in a table named after the rule, `[tool.inwards.rules.<rul
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
 ```
 
-The opt-in content rules, INW012 to INW016, INW020 and the FAPI rules, skip test modules: a module whose last name segment is `test_*` or `*_test`, or that has a `tests`, `test` or `conftest` segment, such as `app/tests/test_orders.py`, `tests/conftest.py` or `app/orders_test.py`. A test builds a throwaway app or imports an adapter on purpose, so a finding there is rarely worth fixing ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` in the rule's table brings them back for that rule. The other rules check test modules like any other module, and the top-level `ignore` doesn't scope the content rules.
+The opt-in content rules, INW012 to INW016, INW020 and the FAPI rules, and INW021 skip test modules: a module whose last name segment is `test_*` or `*_test`, or that has a `tests`, `test` or `conftest` segment, such as `app/tests/test_orders.py`, `tests/conftest.py` or `app/orders_test.py`. A test builds a throwaway app or imports an adapter on purpose, so a finding there is rarely worth fixing ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` in the rule's table brings them back for that rule. The other rules check test modules like any other module, and the top-level `ignore` doesn't scope the content rules.
 
 <!-- config: fragment -->
 
@@ -161,7 +162,7 @@ To accept one finding for good, put a suppression on the line it points at, with
 from shop.infrastructure.legacy import LegacyClient  # inwards: ignore[INW001] reason="old billing adapter, removed in #210"
 ```
 
-Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW020 and the FAPI rules. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
+Rules that point at a line of Python can be suppressed this way: INW001, INW002, INW003, INW005, INW006, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW020, INW021 and the FAPI rules. A suppression without a reason, with an unknown code or with a code that can't be suppressed hides nothing and is reported as [INW009](INW009.md). The Claude Code hooks ignore a suppression the agent added during the session unless `agent-suppressions = "allow"`.
 
 ## Page format
 

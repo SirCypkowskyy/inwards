@@ -33,11 +33,11 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule: INW000 to INW020, and the FAPI family without FAPI004. */
+/** Codes of every registered rule: INW000 to INW021, and the FAPI family without FAPI004. */
 type RuleCode =
   | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
   | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
-  | "INW020"
+  | `INW02${0 | 1}`
   | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
@@ -240,6 +240,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "Every adapter class declares the port it implements with `_: Port = Adapter(...)` under `if TYPE_CHECKING:`, so the type checker checks it against the port.",
     docs: page("INW020"),
+  },
+  INW021: {
+    code: "INW021",
+    name: "private-module",
+    severity: "error",
+    default: "off",
+    summary:
+      "A module whose name starts with `_` is imported only from inside the package that holds it.",
+    docs: page("INW021"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. FAPI004 stays
   // unused: the #185 spike said no-go, and codes are never renumbered.
