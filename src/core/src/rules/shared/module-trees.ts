@@ -1,11 +1,12 @@
 /**
- * @file The first-party modules one run reads on the content rules' behalf
- * (#359): each is read and parsed at most once, whichever rule and checked
- * file asks first, because a large async codebase calls the same helper
- * modules from hundreds of files. The engine builds one per run and frees
- * every tree with `dispose()` at its end. It reads files only through the
- * project port the caller passes, and builds no rule's view of them
- * (`first-party.ts` does).
+ * @file The syntax trees one run shares across its content rules (#359,
+ * #387): the first-party modules they follow into and the checked files
+ * themselves. Each text is parsed at most once per run, whichever rule,
+ * checked file or hop asks first, because a large codebase has INW012,
+ * INW013, INW015, INW016 and the FastAPI rules reading the same files. The
+ * engine builds one per run and frees every tree with `dispose()` at its
+ * end. It reads files only through the project port the caller passes, and
+ * builds no rule's view of them (`first-party.ts` does).
  */
 import type { Parser, Tree } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../../contracts/records.ts";
@@ -22,6 +23,12 @@ export interface FirstPartySource {
   readonly modules?: ReadonlySet<string>;
 }
 
+/** Hands out a file's syntax tree; the owner, not the caller, frees it. */
+export interface FileTrees {
+  /** Gives the tree of a file (normalised text), parsed at most once per run and valid until it ends. */
+  readonly treeOf: (src: SourceFile) => Tree;
+}
+
 /** A first-party module as one run parsed it. */
 export interface ParsedModule {
   readonly tree: Tree;
@@ -30,17 +37,20 @@ export interface ParsedModule {
 }
 
 /**
- * The first-party modules one run reads on the content rules' behalf, each
- * parsed at most once, whichever rule and checked file asks first. The
- * engine builds one per run (a `check` of many files, or one file's check)
- * and calls `dispose()` at its end; until then the trees stay alive, so the
- * nodes the rules' views hold stay valid.
+ * The trees one run parses on the content rules' behalf, the checked files'
+ * and the first-party modules' they follow into, each text parsed at most
+ * once, whichever rule and file asks first. The engine builds one per run (a
+ * `check` of many files, or one file's check) and calls `dispose()` at its
+ * end; until then the trees stay alive, so the nodes the rules' views hold
+ * stay valid.
  */
-export class ModuleTrees {
+export class ModuleTrees implements FileTrees {
   private readonly parser: Parser;
   private readonly project: FirstPartySource;
   private readonly parsed = new Map<string, ParsedModule | undefined>();
   private readonly sources = new Map<string, SourceFile | undefined>();
+  /** Every tree of the run by the text it was parsed from: the tree depends on the text alone. */
+  private readonly trees = new Map<string, Tree>();
 
   /**
    * Wraps the parser and the project. Nothing is read yet.
@@ -74,8 +84,7 @@ export class ModuleTrees {
       return this.parsed.get(module);
     }
     const src = this.sourceOf(module);
-    const parsed =
-      src === undefined ? undefined : { tree: parsePython(this.parser, src.text), src };
+    const parsed = src === undefined ? undefined : { tree: this.treeOf(src), src };
     this.parsed.set(module, parsed);
     return parsed;
   }
@@ -119,27 +128,31 @@ export class ModuleTrees {
   }
 
   /**
-   * Finds the tree of a file the run already parsed as a first-party module,
-   * so a rule that checks the file needn't parse it again. Never parses.
+   * Gives the tree of a file's text, parsing it only when no rule, checked
+   * file or hop of the run has parsed the same text yet.
    *
    * The tree depends on the text alone, so the paths needn't agree: the CLI
    * names a checked file from the working directory and the index from the
-   * config root.
+   * config root, and a checked file and the module a hop reads share one tree.
    *
-   * @param src - the checked file, with normalised text.
-   * @returns the run's tree when it parsed the same module from the same text,
-   *   else undefined; the run frees it, not the caller.
+   * @param src - the file, with normalised text.
+   * @returns its tree; the run frees it, not the caller.
    */
-  parsedAs(src: SourceFile): Tree | undefined {
-    const parsed = this.parsed.get(src.module);
-    return parsed?.src.text === src.text ? parsed.tree : undefined;
+  treeOf(src: SourceFile): Tree {
+    let tree = this.trees.get(src.text);
+    if (tree === undefined) {
+      tree = parsePython(this.parser, src.text);
+      this.trees.set(src.text, tree);
+    }
+    return tree;
   }
 
   /** Frees every tree read so far; the views and nodes handed out are invalid afterwards. */
   dispose(): void {
-    for (const parsed of this.parsed.values()) {
-      parsed?.tree.delete(); // WASM memory is not garbage collected
+    for (const tree of this.trees.values()) {
+      tree.delete(); // WASM memory is not garbage collected
     }
+    this.trees.clear();
     this.parsed.clear();
     this.sources.clear();
   }

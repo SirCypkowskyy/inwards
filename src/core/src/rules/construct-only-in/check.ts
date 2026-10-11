@@ -11,14 +11,13 @@
  * re-export) is reported on the call (`calls.ts`). INW001 and INW015 can
  * both see an outward import; the engine passes `deferred` so INW001 keeps
  * it. Only modules a layer owns are checked: tests and scripts build
- * adapters on purpose. I/O-free: the caller supplies the parser, the file,
- * the options and the project index.
+ * adapters on purpose. I/O-free: the caller supplies the file, the options
+ * and the run's trees, which find, read and parse the modules.
  */
-import type { Parser } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import { extractImports, parsePython } from "../../python/parser.ts";
+import { extractImports } from "../../python/parser.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { constructions, inEntries, isExceptionName } from "./calls.ts";
 import { reportConstruction, reportImport, type Scope } from "./wording.ts";
@@ -28,7 +27,7 @@ const IMPORT = /\bimport\b/u;
 
 /** What INW015 needs besides the file and its options. */
 export interface ConstructInputs {
-  /** The run's first-party modules: finds them, and reads them once per run. */
+  /** The run's trees and first-party modules: finds them, and parses each text once per run. */
   readonly project: ModuleTrees;
   /** Tells whether another rule (INW001) reports an import in INW015's place. */
   readonly deferred: (ref: ImportRef) => boolean;
@@ -52,14 +51,12 @@ function scopeOf(options: RuleOptions | undefined): Scope {
  * for the file and that a layer owns it; this skips a module in the role or
  * in `allowed-in`, and parses only a file with an import.
  *
- * @param parser - parser with the Python grammar loaded.
  * @param src - the file, with normalised text.
  * @param options - `[tool.inwards.rules.construct-only-in]`, if set.
  * @param inputs - the project index and the imports INW001 keeps.
  * @returns the findings in source order, before suppressions and severities apply.
  */
 export function checkConstructOnlyIn(
-  parser: Parser,
   src: SourceFile,
   options: RuleOptions | undefined,
   inputs: ConstructInputs,
@@ -70,25 +67,21 @@ export function checkConstructOnlyIn(
     return [];
   }
   const { project, deferred } = inputs;
-  const tree = parsePython(parser, src.text);
-  try {
-    const found: Diagnostic[] = [];
-    const covered: string[] = [];
-    for (const ref of extractImports(tree, src)) {
-      const owner = ref.target === "" ? undefined : project.ownerOf(ref.target);
-      if (owner === undefined || !inEntries(scope.role, owner) || ref.typeChecking === true) {
-        continue;
-      }
-      covered.push(ref.target);
-      const caught = ref.from !== undefined && isExceptionName(ref.target);
-      if (!(caught || deferred(ref))) {
-        found.push(reportImport(src, ref, owner, scope));
-      }
+  const tree = project.treeOf(src);
+  const found: Diagnostic[] = [];
+  const covered: string[] = [];
+  for (const ref of extractImports(tree, src)) {
+    const owner = ref.target === "" ? undefined : project.ownerOf(ref.target);
+    if (owner === undefined || !inEntries(scope.role, owner) || ref.typeChecking === true) {
+      continue;
     }
-    const calls = constructions(tree, src, { project, scope, covered });
-    found.push(...calls.map((call) => reportConstruction(src, call, scope)));
-    return found.sort((a, b) => a.line - b.line || a.column - b.column);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
+    covered.push(ref.target);
+    const caught = ref.from !== undefined && isExceptionName(ref.target);
+    if (!(caught || deferred(ref))) {
+      found.push(reportImport(src, ref, owner, scope));
+    }
   }
+  const calls = constructions(tree, src, { project, scope, covered });
+  found.push(...calls.map((call) => reportConstruction(src, call, scope)));
+  return found.sort((a, b) => a.line - b.line || a.column - b.column);
 }

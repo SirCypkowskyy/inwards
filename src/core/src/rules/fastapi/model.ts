@@ -5,18 +5,20 @@
  * through `ProjectIndex`, which reads each file lazily. The application is
  * never imported or run.
  *
- * A file is parsed once per text, and only when it mentions FastAPI at all
- * (`mentionsFastApi`) or a name leads to it. Its tree is kept until
- * `dispose()`, because the records hand out syntax nodes (a path
- * operation's function, a keyword's value) for the rules to walk. The model
- * reports nothing; deciding what is wrong is the rules' job.
+ * A file is read once per text, and only when it mentions FastAPI at all
+ * (`mentionsFastApi`) or a name leads to it. Its tree comes from the run's
+ * shared trees (`FileTrees`), which parse each text once for every content
+ * rule and keep it until the run ends, because the records hand out syntax
+ * nodes (a path operation's function, a keyword's value) for the rules to
+ * walk. The model reports nothing; deciding what is wrong is the rules' job.
  */
-import type { Node, Parser, Tree } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { moduleFunctions } from "../../python/nodes.ts";
-import { importedNames, normalizeSource, parsePython } from "../../python/parser.ts";
+import { importedNames, normalizeSource } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import type { FileTrees } from "../shared/module-trees.ts";
 import { type ModuleDefinitions, moduleDefinitions } from "./definitions.ts";
 import { extract } from "./extract.ts";
 import type { FastApiFile, FastApiObject } from "./records.ts";
@@ -42,10 +44,9 @@ export type Definition =
       readonly qualify: Qualify;
     };
 
-/** One parsed file, kept until `dispose()`. */
+/** One parsed file, kept until `dispose()`; the run's trees own its tree. */
 interface Parsed {
   readonly text: string;
-  readonly tree: Tree;
   /** What each imported name refers to. */
   readonly names: ReadonlyMap<string, string>;
   /** Module-level functions by name. */
@@ -69,32 +70,32 @@ export function mentionsFastApi(text: string): boolean {
 
 /**
  * The project's FastAPI model, built file by file on demand and cached per
- * file. Build one per check with the engine's parser and the check's
- * `ProjectIndex`, and call `dispose()` when done: it frees the syntax trees
- * whose nodes the records hold.
+ * file. Build one per check with the run's trees and the check's
+ * `ProjectIndex`, and call `dispose()` when done. The records hold syntax
+ * nodes, so they stay valid only until the run's trees are freed.
  */
 export class FastApiModel {
-  private readonly parser: Parser;
+  private readonly trees: FileTrees;
   private readonly project: ProjectIndex;
   private readonly parsed = new Map<string, Parsed>();
   /** Paths whose text came from `fileModel`, the adapter's view, which a disk read must not replace. */
   private readonly pinned = new Set<string>();
 
   /**
-   * Wraps a parser and a project index. Nothing is read or parsed yet.
+   * Wraps the run's trees and a project index. Nothing is read or parsed yet.
    *
-   * @param parser - parser with the Python grammar loaded.
+   * @param trees - the run's trees, which parse each text once and free it at the run's end.
    * @param project - the project's module index, which reads files on demand.
    */
-  constructor(parser: Parser, project: ProjectIndex) {
-    this.parser = parser;
+  constructor(trees: FileTrees, project: ProjectIndex) {
+    this.trees = trees;
     this.project = project;
   }
 
   /**
    * Reads one file's FastAPI records. A file that fails the pre-filter isn't
-   * parsed. A new text for the same path replaces the cached parse and frees
-   * the old one, whose nodes are then invalid. That text then wins over the
+   * parsed. A new text for the same path replaces the cached records; the
+   * old tree stays with the run's trees. That text then wins over the
    * one the project index reads for the same path, so an unsaved editor
    * buffer isn't swapped for the file on disk while a rule walks it.
    *
@@ -169,17 +170,14 @@ export class FastApiModel {
     return null;
   }
 
-  /** Frees every syntax tree the model holds; the nodes it handed out are invalid afterwards. */
+  /** Drops every file's records; the run's trees, not the model, free the syntax trees. */
   dispose(): void {
-    for (const { tree } of this.parsed.values()) {
-      tree.delete(); // WASM memory is not garbage collected
-    }
     this.parsed.clear();
     this.pinned.clear();
   }
 
   /**
-   * Parses a file once per text, and reads its records when it passes the pre-filter.
+   * Reads a file once per text, from the run's tree of it, and its records when it passes the pre-filter.
    *
    * @param file - the source file, with normalised text.
    * @param own - true when the text is the adapter's own (`fileModel`); a
@@ -191,8 +189,7 @@ export class FastApiModel {
     if (cached && (cached.text === file.text || (!own && this.pinned.has(file.path)))) {
       return cached;
     }
-    cached?.tree.delete();
-    const tree = parsePython(this.parser, file.text);
+    const tree = this.trees.treeOf(file);
     const names = importedNames(tree, file);
     const functions = moduleFunctions(tree.rootNode);
     const qualify = qualifierFor(names, file.module);
@@ -200,7 +197,7 @@ export class FastApiModel {
       ? extract(tree.rootNode, { file, qualify, functions })
       : null;
     const definitions = moduleDefinitions(tree.rootNode);
-    const parsed = { text: file.text, tree, names, functions, definitions, qualify, model };
+    const parsed = { text: file.text, names, functions, definitions, qualify, model };
     this.parsed.set(file.path, parsed);
     return parsed;
   }

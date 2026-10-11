@@ -3,8 +3,9 @@
  * the checked files through it, and hands each one its FAPI001 to FAPI009
  * findings before its suppression comments apply. The project lookups
  * (`FastApiProject`: handlers, classes, the app and router graph) are shared
- * by the rules and read the rest of the project only when a rule asks. With
- * every FAPI rule off, nothing is read or parsed; a file that doesn't mention
+ * by the rules and read the rest of the project only when a rule asks. Every
+ * tree comes from the run's shared trees, so a file the content rules parse
+ * too is parsed once. With every FAPI rule off, nothing is read or parsed; a file that doesn't mention
  * FastAPI is never parsed for them, and neither is one INW000 refuses. FAPI007
  * is the exception: it reads any file that spells both `yield` and `except`,
  * since a dependency module needn't import FastAPI.
@@ -17,7 +18,6 @@
  * check, FAPI002 builds the graph only for a route that has a code its own
  * decorator and router don't declare.
  */
-import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { type RuleOptions, ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
@@ -35,6 +35,7 @@ import type { FastApiFile } from "../rules/fastapi/records.ts";
 import { checkFileShadowing, checkGraphShadowing } from "../rules/fastapi/route-shadowing.ts";
 import { checkFileWiring, checkGraphWiring } from "../rules/fastapi/router-wiring.ts";
 import { checkYieldSwallows } from "../rules/fastapi/yield-dependency-swallows.ts";
+import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { mentionsSuppression } from "../rules/suppression-comment.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 import { type Confirmed, withFound } from "./stages.ts";
@@ -52,7 +53,7 @@ const NONE: FastApiFound = { found: new Map(), hidden: new Set() };
 /**
  * Finds the FAPI rules' findings in the checked files.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once and free them at the run's end.
  * @param project - the project's module index; the lookups read other
  *   FastAPI files of the project through it when a rule asks.
  * @param files - the checked files, with normalised text.
@@ -62,7 +63,7 @@ const NONE: FastApiFound = { found: new Map(), hidden: new Set() };
  * @returns the findings by file, and the ones to drop after suppressions.
  */
 export function fastApiFindings(
-  parser: Parser,
+  trees: FileTrees,
   project: ProjectIndex,
   files: readonly SourceFile[],
   { config, edit }: { config: InwardsConfig; edit: boolean },
@@ -82,7 +83,7 @@ export function fastApiFindings(
   ) {
     return NONE;
   }
-  const model = new FastApiModel(parser, project);
+  const model = new FastApiModel(trees, project);
   try {
     const own = files.flatMap((src) => {
       const m = checkEncoding(src) ? null : model.fileModel(src);
@@ -100,7 +101,7 @@ export function fastApiFindings(
       found.set(src.path, fileFindings({ src, m, scope }, { on, edit, rules, settings }));
     }
     for (const src of on.yields ? files.filter((file) => !checkEncoding(file)) : []) {
-      const swallows = checkYieldSwallows(parser, src);
+      const swallows = checkYieldSwallows(trees, src);
       found.set(src.path, [...(found.get(src.path) ?? []), ...swallows]);
     }
     const extra = graphFindings(scope, own, { edit, on, settings }, found);
