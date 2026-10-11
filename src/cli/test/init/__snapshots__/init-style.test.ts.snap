@@ -3,25 +3,28 @@
 exports[`inwards init --style X --scaffold on a fresh uv project layered: exit 0, then check reports 0 violations and 0 warnings 1`] = `
 {
   "check": {
-    "filesChecked": 11,
+    "filesChecked": 14,
     "violations": 0,
     "warnings": 0,
   },
   "created": [
     "src/my_app/bootstrap.py",
     "src/my_app/domain/__init__.py",
-    "src/my_app/domain/order.py",
+    "src/my_app/domain/models.py",
     "src/my_app/persistence/__init__.py",
     "src/my_app/persistence/in_memory_orders.py",
     "src/my_app/persistence/orders.py",
     "src/my_app/presentation/__init__.py",
     "src/my_app/presentation/cli.py",
     "src/my_app/services/__init__.py",
-    "src/my_app/services/place_order.py",
+    "src/my_app/services/commands/__init__.py",
+    "src/my_app/services/commands/_place_order.py",
+    "src/my_app/services/queries/__init__.py",
+    "src/my_app/services/queries/_get_order.py",
     "tests/test_place_order.py",
   ],
   "stdout": 
-"inwards init: wrote the layered preset to pyproject.toml and 11 example files.
+"inwards init: wrote the layered preset to pyproject.toml and 14 example files.
 
 src/my_app/  (layered)
 ├── bootstrap.py   bootstrap: may import every other layer
@@ -68,7 +71,7 @@ allow = ["__main__.py", "_version.py"]
 exports[`inwards init --style X --scaffold on a fresh uv project clean: exit 0, then check reports 0 violations and 0 warnings 1`] = `
 {
   "check": {
-    "filesChecked": 13,
+    "filesChecked": 16,
     "violations": 0,
     "warnings": 0,
   },
@@ -77,10 +80,13 @@ exports[`inwards init --style X --scaffold on a fresh uv project clean: exit 0, 
     "src/my_app/application/ports/__init__.py",
     "src/my_app/application/ports/orders.py",
     "src/my_app/application/use_cases/__init__.py",
-    "src/my_app/application/use_cases/place_order.py",
+    "src/my_app/application/use_cases/commands/__init__.py",
+    "src/my_app/application/use_cases/commands/_place_order.py",
+    "src/my_app/application/use_cases/queries/__init__.py",
+    "src/my_app/application/use_cases/queries/_get_order.py",
     "src/my_app/bootstrap.py",
     "src/my_app/domain/__init__.py",
-    "src/my_app/domain/order.py",
+    "src/my_app/domain/models.py",
     "src/my_app/infrastructure/__init__.py",
     "src/my_app/infrastructure/in_memory_orders.py",
     "src/my_app/presentation/__init__.py",
@@ -88,7 +94,7 @@ exports[`inwards init --style X --scaffold on a fresh uv project clean: exit 0, 
     "tests/test_place_order.py",
   ],
   "stdout": 
-"inwards init: wrote the clean preset to pyproject.toml and 13 example files.
+"inwards init: wrote the clean preset to pyproject.toml and 16 example files.
 
 src/my_app/  (clean)
 ├── application/     application: may import domain
@@ -156,7 +162,7 @@ extra = "warning"
 exports[`inwards init --style X --scaffold on a fresh uv project hexagonal: exit 0, then check reports 0 violations and 0 warnings 1`] = `
 {
   "check": {
-    "filesChecked": 14,
+    "filesChecked": 17,
     "violations": 0,
     "warnings": 0,
   },
@@ -170,14 +176,17 @@ exports[`inwards init --style X --scaffold on a fresh uv project hexagonal: exit
     "src/my_app/application/ports/__init__.py",
     "src/my_app/application/ports/orders.py",
     "src/my_app/application/use_cases/__init__.py",
-    "src/my_app/application/use_cases/place_order.py",
+    "src/my_app/application/use_cases/commands/__init__.py",
+    "src/my_app/application/use_cases/commands/_place_order.py",
+    "src/my_app/application/use_cases/queries/__init__.py",
+    "src/my_app/application/use_cases/queries/_get_order.py",
     "src/my_app/bootstrap.py",
     "src/my_app/domain/__init__.py",
-    "src/my_app/domain/order.py",
+    "src/my_app/domain/models.py",
     "tests/test_place_order.py",
   ],
   "stdout": 
-"inwards init: wrote the hexagonal preset to pyproject.toml and 14 example files.
+"inwards init: wrote the hexagonal preset to pyproject.toml and 17 example files.
 
 src/my_app/  (hexagonal)
 ├── adapters/
@@ -255,7 +264,7 @@ allow = []
 exports[`inwards init --style X --scaffold on a fresh uv project vertical-slices: exit 0, then check reports 0 violations and 0 warnings 1`] = `
 {
   "check": {
-    "filesChecked": 11,
+    "filesChecked": 14,
     "violations": 0,
     "warnings": 0,
   },
@@ -265,15 +274,18 @@ exports[`inwards init --style X --scaffold on a fresh uv project vertical-slices
     "src/my_app/features/orders/__init__.py",
     "src/my_app/features/orders/api.py",
     "src/my_app/features/orders/cli.py",
+    "src/my_app/features/orders/commands/__init__.py",
+    "src/my_app/features/orders/commands/_place_order.py",
     "src/my_app/features/orders/in_memory_orders.py",
-    "src/my_app/features/orders/order.py",
-    "src/my_app/features/orders/place_order.py",
-    "src/my_app/features/orders/repository.py",
+    "src/my_app/features/orders/models.py",
+    "src/my_app/features/orders/ports.py",
+    "src/my_app/features/orders/queries/__init__.py",
+    "src/my_app/features/orders/queries/_get_order.py",
     "src/my_app/shared/__init__.py",
     "tests/test_place_order.py",
   ],
   "stdout": 
-"inwards init: wrote the vertical-slices preset to pyproject.toml and 11 example files.
+"inwards init: wrote the vertical-slices preset to pyproject.toml and 14 example files.
 
 src/my_app/  (vertical-slices)
 ├── bootstrap.py  bootstrap: may import every other layer
@@ -345,7 +357,7 @@ require = ["api"]
 exports[`inwards init --style X --scaffold on a fresh uv project bounded-contexts: exit 0, then check reports 0 violations and 0 warnings 1`] = `
 {
   "check": {
-    "filesChecked": 12,
+    "filesChecked": 15,
     "violations": 0,
     "warnings": 0,
   },
@@ -354,17 +366,20 @@ exports[`inwards init --style X --scaffold on a fresh uv project bounded-context
     "src/my_app/orders/__init__.py",
     "src/my_app/orders/api.py",
     "src/my_app/orders/application/__init__.py",
-    "src/my_app/orders/application/place_order.py",
+    "src/my_app/orders/application/commands/__init__.py",
+    "src/my_app/orders/application/commands/_place_order.py",
     "src/my_app/orders/application/ports.py",
+    "src/my_app/orders/application/queries/__init__.py",
+    "src/my_app/orders/application/queries/_get_order.py",
     "src/my_app/orders/domain/__init__.py",
-    "src/my_app/orders/domain/order.py",
+    "src/my_app/orders/domain/models.py",
     "src/my_app/orders/infrastructure/__init__.py",
     "src/my_app/orders/infrastructure/cli.py",
     "src/my_app/orders/infrastructure/in_memory_orders.py",
     "tests/test_place_order.py",
   ],
   "stdout": 
-"inwards init: wrote the bounded-contexts preset to pyproject.toml and 12 example files.
+"inwards init: wrote the bounded-contexts preset to pyproject.toml and 15 example files.
 
 src/my_app/  (bounded-contexts)
 ├── */
