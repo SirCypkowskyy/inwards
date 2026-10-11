@@ -15,6 +15,7 @@ export const COMMANDS = [
   "baseline",
   "init",
   "context",
+  "diagram",
   "import-config",
   "import-diagram",
   "rules",
@@ -107,6 +108,21 @@ and the MCP server into .mcp.json; needs --launcher or inwards on PATH.
 
 ${CONFIG_OPTION}
 --write: write it into AGENTS.md instead of printing it.`,
+  },
+  diagram: {
+    synopsis: [
+      "diagram [--layers|--contexts] [--format mermaid|plantuml] [--config pyproject.toml]",
+    ],
+    note: "(the config as a marked Mermaid or PlantUML diagram)",
+    about: `Prints [tool.inwards] as a marked diagram that inwards import-diagram reads back
+and INW017 and INW018 accept: one node per layer with arrows pointing inwards, or
+one node or group per context with its public modules and depends-on arrows.
+
+--layers: the layers diagram (the default).
+--contexts: the contexts diagram.
+--format: mermaid (default) or plantuml.
+${CONFIG_OPTION}
+What the diagram can't show is listed on stderr.`,
   },
   "import-config": {
     synopsis: ["import-config [FILE] [--write]"],

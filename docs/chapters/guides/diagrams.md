@@ -4,6 +4,7 @@ Inwards keeps a Mermaid or PlantUML drawing of your architecture in step with `[
 
 - **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, [INW018](../rules/INW018.md) an arrow that draws an import the config forbids, and [INW019](../rules/INW019.md) an import in the code that the diagram doesn't draw.
 - **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the rules keep them in step.
+- **The config draws the docs.** `inwards diagram` prints `[tool.inwards]` as a marked diagram that INW017 and INW018 accept and `import-diagram` reads back ([Draw the config](#diagram)).
 
 `[tool.inwards]` stays the only source of truth: a diagram is never read as config while checking.
 
@@ -68,7 +69,17 @@ diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 extend-select = ["INW017", "INW018", "INW019"]
 ```
 
-All three are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. INW019 compares the diagram with the imports the run collects: in a layers diagram a path of arrows draws an import, in a contexts diagram it takes a direct arrow, and an import under `if TYPE_CHECKING:` counts. They run on whole-project runs: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`.
+All three are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. They run wherever a listed diagram is checked:
+
+- **A whole-project run**: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`. Only this run reports a `diagrams` entry that matches no file.
+- **A named file**: `inwards check docs/architecture.md`. A Markdown, Mermaid or PlantUML file the key doesn't list isn't checked, and the report says so.
+- **The [Claude Code hook](claude-code.md)**, after the agent edits a listed diagram (PostToolUse). A warning goes back to the agent as context; an error blocks the edit, as a code violation does. An edit of any other non-Python file costs a look at the config and nothing more. On the benchmark's 2,100-file synthetic project, on an M1 Pro, the hook took 37 ms p50 one-shot for a listed diagram (it lists the project's modules for INW017's labels) and 16.5 ms for another Markdown file, against 16.1 ms before.
+- **The editor**: `inwards server` checks an open listed diagram on every keystroke, from the unsaved text ([Editors](editors.md#diagrams)).
+- **[MCP `check_files`](mcp.md#check_files)**, by path or as text in `contents`.
+
+The Stop gate's default scope (`stop-gate = "changed"`) checks the Python files the session changed, and no diagrams. A warning never blocks, so there is nothing to gate on by default; with the rules raised to errors, a diagram the agent broke has already blocked its own edit, and `stop-gate = "project"` checks every listed diagram at Stop as well. Editing Python code doesn't check a diagram again: a package renamed in the code shows up in the drawing on the next whole-project run, in CI or at a project-scope Stop.
+
+INW019 compares the diagram with the imports the run collects: in a layers diagram a path of arrows draws an import, in a contexts diagram it takes a direct arrow, and an import under `if TYPE_CHECKING:` counts. It runs on whole-project runs only, since one edited or named file doesn't show the imports of the rest of the project.
 
 ## Start from a diagram { #import-diagram }
 
@@ -86,6 +97,31 @@ inwards import-diagram docs/architecture.md --write    # append it to pyproject.
 - **Checked first.** The table must parse as an Inwards config, or the command stops with exit code 2 and says why: two layers with the same quoted label, a `public` node outside its context's module.
 
 What is refused, with the line: a cycle among the layers; a context, or a `:::public` node, without a quoted label, because a context needs modules; a second diagram of one kind in the file. A layer without a quoted label gets `modules = []` and a note on stderr: fill it in before checking. A file with only a contexts diagram gets one layer, `app`, that holds every context.
+
+## Draw the config { #diagram }
+
+`inwards diagram` goes the other way: it prints `[tool.inwards]` as a marked diagram, ready for a `.mmd` or `.puml` file or a fenced block in the docs.
+
+```sh
+inwards diagram                                  # the layers, as Mermaid
+inwards diagram --contexts                       # the contexts
+inwards diagram --format plantuml                # PlantUML, for either diagram
+inwards diagram --config services/pyproject.toml
+```
+
+- **Layers.** One node per layer, outermost first, with its module as a quoted label, and a solid arrow from each layer to every layer one rank further in. A layer may import every layer inside it, so those arrows are enough, and the longest path gives each layer its rank back: siblings stay siblings.
+- **Contexts.** A context without `public` modules is a node. One with them is a subgraph (a PlantUML `package`) that holds a `:::public` (`<<public>>`) node for each entry, an exact `=pkg.module` entry included. Each `depends-on` is an arrow from one context to the other.
+- **Names.** A name that can be a node id is the id. Any other, such as a template's `slices.domain`, gets an id made from it (`slices_domain`) and is named by its first module, which INW017 and INW018 resolve ([Mark a diagram](#mark-a-diagram)). In PlantUML, a name with a hyphen, or one the reader would take for a keyword (`interface`, `package`), goes in brackets: `[interface] as "shop.api"`.
+- **Round trip.** Against the same config, INW017 and INW018 find nothing in the output, as long as every module the config names exists (otherwise INW017 repeats INW006's finding on the diagram), and `inwards import-diagram` reads it back to the same layers, ranks and contexts. The tests check both for every preset's scaffold and both example apps, in both notations.
+- **What it can't show** goes to stderr, one line each; the exit code stays 0:
+    - A layer or context with two or more modules. Mermaid gets one node line per module, and `import-diagram` reads them all, but Mermaid draws a node with its last label. A PlantUML alias names one component, so the diagram keeps the first module. So does a context drawn as a subgraph or package.
+    - A layer or context named after a Mermaid keyword (`class`, `style`, `end`) can't be a Mermaid node. `--format plantuml` draws it.
+    - Library lists, shapes, rule options and `ignore`, as for `import-diagram`, and templates, which are drawn as the layers they expand into.
+- **Exit code 2** for `--layers` together with `--contexts`, a `--format` other than `mermaid` or `plantuml`, or `--contexts` when the config declares no contexts.
+
+To check the drawing, put it in a file the `diagrams` key lists. A `.mmd` or `.puml` file holds one diagram; for both, put each in its own fenced block of one Markdown file, which `import-diagram` also reads as one.
+
+`inwards context` prints no diagram: the brief already lists every layer with what it may import, so a diagram would repeat it, and the fastapi preset's brief is near its 550-token budget already ([the brief](agents-md.md#the-architecture-brief-opt-in)).
 
 ## An example { #an-example }
 
@@ -173,6 +209,27 @@ inwards check
 ```
 
 The project passes, the diagram included. Later, an arrow drawn from `orders` to `billing` would be INW018, and a code import between them INW001.
+
+`inwards diagram` draws the config back. Each layer points at the layers of the next rank in, so `api` points at both siblings and they point at `domain`:
+
+<!-- e2e -->
+
+```sh
+inwards diagram
+```
+
+<!-- e2e -->
+
+```text
+%% inwards: layers
+flowchart TB
+  api["shop.api"]
+  orders["shop.orders"]
+  billing["shop.billing"]
+  domain["shop.domain"]
+  api --> orders & billing
+  orders & billing --> domain
+```
 
 A contexts diagram works the same way. This one
 
@@ -293,5 +350,7 @@ Where Inwards differs:
 - **Mermaid flowcharts and PlantUML component diagrams only.** C4, `architecture-beta` and other PlantUML diagram types aren't read.
 - **PlantUML is read one line at a time.** A statement split over lines (a component description that runs onto the next line) isn't followed, and a link to a component by its display name, rather than its alias, names a different node.
 - **What a diagram can't say stays out.** Library lists, shapes, selectors other than a node's label, rule options and `ignore` are written by hand after the import.
+- **Imports the diagram doesn't draw** are reported by [INW019](../rules/INW019.md) on whole-project runs only, never at edit time.
 - **Imports between layers and contexts, not modules.** INW019 doesn't compare an arrow between two module nodes inside one context with the imports between those modules.
-- **Whole-project runs only.** The per-edit hook and the editor don't show diagram findings.
+- **A code edit doesn't check the diagrams.** The hook and the editor check a diagram when it is edited; a rename in the Python code reaches the drawing on the next whole-project run.
+- **Paths are matched as written.** A `diagrams` entry is compared with the path the agent or the editor gives, letter case included, so on a case-insensitive file system (macOS, Windows) `Docs/Architecture.md` doesn't match `docs/architecture.md` in the hook or the editor. The whole-project run walks the disk and isn't affected.

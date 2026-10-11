@@ -38,7 +38,7 @@ const CHECK_FILES = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "Python source to check instead of what is on disk, by .py or .pyi path. The file need not exist yet: check code before writing it.",
+      "Python source to check instead of what is on disk, by .py or .pyi path. The file need not exist yet: check code before writing it. A Markdown, Mermaid or PlantUML file that [tool.inwards].diagrams lists can be given too.",
     ),
   maxDiagnostics: z
     .number()

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c089c4b88ae1219f4dabf30546af2d53e9d1d697d9c8b3398445cb19f53cf29c
+source_hash: f601e308b07ff028aac41c689dfc844b19d63d239c873fea5591c02d95e9ae08
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -416,7 +416,7 @@ Reguły są pogrupowane według kategorii, w kolejności, której używa [indeks
 
 | Kod | Nazwa | Co wyłapuje | Włączona | Poziom | Włącza ją preset | Stan |
 |---|---|---|---|---|---|---|
-| INW017 | `diagram-unknown-name` | W plikach Markdown i `.mmd`, które wymienia `diagrams`, `flowchart` albo `graph` w Mermaid oznaczony `%% inwards: layers` lub `%% inwards: contexts`: identyfikator węzła, który nie nazywa żadnej zadeklarowanej warstwy (albo, w diagramie kontekstów, węzeł lub subgraph na najwyższym poziomie, który nie nazywa żadnego kontekstu), i etykieta w cudzysłowie, do której nie pasuje żaden moduł. Węzły `:::external` są pomijane. Tylko przy sprawdzaniu całego projektu; CLI czyta pliki, a `engine/diagrams.ts` przekazuje je do ręcznie napisanego parsera linii w `diagram/`. Wpis `diagrams`, do którego nie pasuje żaden plik, jest zgłaszany w pyproject.toml. Zobacz [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
+| INW017 | `diagram-unknown-name` | W plikach Markdown i `.mmd`, które wymienia `diagrams`, `flowchart` albo `graph` w Mermaid oznaczony `%% inwards: layers` lub `%% inwards: contexts`: identyfikator węzła, który nie nazywa żadnej zadeklarowanej warstwy (albo, w diagramie kontekstów, węzeł lub subgraph na najwyższym poziomie, który nie nazywa żadnego kontekstu), i etykieta w cudzysłowie, do której nie pasuje żaden moduł. Węzły `:::external` są pomijane. Przy sprawdzaniu całego projektu oraz dla wymienionego pliku, który jest edytowany (hook), otwarty (serwer języka) albo podany (`check_files`, `inwards check FILE`); CLI czyta pliki, a `engine/diagrams.ts` przekazuje je do ręcznie napisanego parsera linii w `diagram/`. Wpis `diagrams`, do którego nie pasuje żaden plik, jest zgłaszany w pyproject.toml. Zobacz [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 | INW018 | `diagram-forbidden-edge` | W tych samych oznaczonych diagramach ciągła albo pogrubiona strzałka w jedną stronę, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi w diagramie warstw; w diagramie kontekstów z jednego kontekstu do innego, którego nie wymienia jego `depends-on`, albo do węzła, którego etykieta w cudzysłowie nie jest jednym z modułów `public` tamtego kontekstu. Przerywane krawędzie i węzły `:::external` są pomijane; każda zabroniona para jest zgłaszana raz na diagram. `inwards import-diagram` zapisuje konfigurację, którą przedstawia diagram. Zob. [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 | INW019 | `diagram-missing-dependency` | W tych samych oznaczonych diagramach import w kodzie z jednej narysowanej warstwy albo jednego kontekstu do innego, dla którego nie ma strzałki: w diagramie warstw brak ścieżki strzałek, w diagramie kontekstów brak bezpośredniej strzałki. Importy pod `if TYPE_CHECKING:` się liczą. Uruchamia ją silnik na importach, które uruchomienie dla całego projektu zbiera dla INW004 (`engine/diagrams.ts`), i potwierdza plik zgłoszenia pełnym parsowaniem; każda brakująca para jest zgłaszana raz na diagram, przy węźle, który importuje. Zob. [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 
@@ -456,7 +456,8 @@ src/
 │   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
 │   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
 │   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
-│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram)
+│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram),
+│   │   │                  #   write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
@@ -516,7 +517,7 @@ src/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
 │   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
-│   │   │                  #   import-diagram: thin, handed AppDeps
+│   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings

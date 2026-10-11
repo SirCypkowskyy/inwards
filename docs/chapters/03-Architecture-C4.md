@@ -411,7 +411,7 @@ The rules are grouped by category, in the order the [rules index](rules/index.md
 
 | Code | Name | What it catches | On | Severity | Turned on by preset | Status |
 |---|---|---|---|---|---|---|
-| INW017 | `diagram-unknown-name` | In the Markdown and `.mmd` files `diagrams` lists, a Mermaid `flowchart` or `graph` marked `%% inwards: layers` or `%% inwards: contexts`: a node id that names no declared layer (or, in a contexts diagram, a top-level node or subgraph that names no context), and a quoted label that matches no module. `:::external` nodes are skipped. Whole-project runs only; the CLI reads the files and `engine/diagrams.ts` hands them to a hand-written line parser in `diagram/`. A `diagrams` entry that matches no file is reported in pyproject.toml. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
+| INW017 | `diagram-unknown-name` | In the Markdown and `.mmd` files `diagrams` lists, a Mermaid `flowchart` or `graph` marked `%% inwards: layers` or `%% inwards: contexts`: a node id that names no declared layer (or, in a contexts diagram, a top-level node or subgraph that names no context), and a quoted label that matches no module. `:::external` nodes are skipped. Whole-project runs, and a listed file that is edited (the hook), open (the language server) or named (`check_files`, `inwards check FILE`); the CLI reads the files and `engine/diagrams.ts` hands them to a hand-written line parser in `diagram/`. A `diagrams` entry that matches no file is reported in pyproject.toml. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
 | INW018 | `diagram-forbidden-edge` | In the same marked diagrams, a one-way solid or thick arrow that draws an import the config forbids: outward or between sibling layers in a layers diagram; in a contexts diagram, from one context into another its `depends-on` doesn't list, or into a node whose quoted label isn't one of the other context's `public` modules. Dotted links and `:::external` nodes are skipped; each forbidden pair is reported once per diagram. `inwards import-diagram` writes the config a diagram stands for. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
 | INW019 | `diagram-missing-dependency` | In the same marked diagrams, an import in the code from one drawn layer or context into another with no arrow for it: in a layers diagram no path of arrows, in a contexts diagram no direct arrow. Imports under `if TYPE_CHECKING:` count. The engine runs it on the imports a whole-project run collects for INW004 (`engine/diagrams.ts`), confirming a finding's file with the full parse; each missing pair is reported once per diagram, on the importing node. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | warning | none | :material-check-circle: |
 
@@ -451,7 +451,8 @@ src/
 │   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
 │   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
 │   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
-│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram)
+│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram),
+│   │   │                  #   write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
@@ -511,7 +512,7 @@ src/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
 │   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
-│   │   │                  #   import-diagram: thin, handed AppDeps
+│   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings

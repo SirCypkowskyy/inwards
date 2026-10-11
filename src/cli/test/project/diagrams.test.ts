@@ -61,7 +61,7 @@ test("plain paths and globs are read once each, with report paths and the entrie
   const { dir, configPath, config } = setUp(
     '["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/architecture.md", "missing.md", "nowhere/*.md"]',
   );
-  const listed = readDiagrams(recording([]), configPath, config, dir);
+  const listed = readDiagrams(recording([]), configPath, config, { base: dir });
   expect(listed.sources.map((s) => s.path)).toEqual([
     "README.md",
     "docs/architecture.md",
@@ -73,7 +73,7 @@ test("plain paths and globs are read once each, with report paths and the entrie
 
 test("report paths are relative to the base, not the config", () => {
   const { dir, configPath, config } = setUp('["docs/architecture.md"]');
-  const listed = readDiagrams(recording([]), configPath, config, join(dir, "docs"));
+  const listed = readDiagrams(recording([]), configPath, config, { base: join(dir, "docs") });
   expect(listed.sources.map((s) => s.path)).toEqual(["architecture.md"]);
 });
 
@@ -83,7 +83,7 @@ test("INW018 or INW019 alone reads the diagrams too", () => {
       '["README.md"]',
       `\n[tool.inwards.rules]\nextend-select = ["${code}"]\n`,
     );
-    const read = readDiagrams(recording([]), configPath, config, dir).sources;
+    const read = readDiagrams(recording([]), configPath, config, { base: dir }).sources;
     expect([code, read.length]).toEqual([code, 1]);
   }
 });
@@ -91,7 +91,7 @@ test("INW018 or INW019 alone reads the diagrams too", () => {
 test("nothing is read while INW017, INW018 and INW019 are off", () => {
   const { dir, configPath, config } = setUp('["README.md"]', "");
   const reads: string[] = [];
-  expect(readDiagrams(recording(reads), configPath, config, dir)).toEqual({
+  expect(readDiagrams(recording(reads), configPath, config, { base: dir })).toEqual({
     sources: [],
     unmatched: [],
   });
