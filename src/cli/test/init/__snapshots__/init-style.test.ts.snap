@@ -336,6 +336,14 @@ layers = [
 roles = ["models", "services", "commands | queries", "api"]
 public = ["api"]
 
+[tool.inwards.rules]
+# A module whose name starts with _ is imported only from inside its package (INW021), as a warning to start with: commands/ and queries/ re-export their private modules from __init__.py.
+extend-select = ["INW021"]
+
+# Delete a line to report that rule at its own severity, an error for most findings.
+[tool.inwards.rules.severity]
+INW021 = "warning"
+
 # Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
 # Add an entry like this for every slice; one without an entry is not kept apart.
 [[tool.inwards.contexts]]
@@ -719,6 +727,7 @@ vertical-slices: one package per feature, independent of each other, on a shared
   5. slice.api       shop.features.*.api       the slice's public module and driving adapter
   6. bootstrap       shop.bootstrap            composition root: wires the adapters into the use cases
   Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
+  Turns on INW021 as a warning.
   Gap: code only one slice uses may still move into shared, where every slice can reach it.
   Shapes, with --scaffold:
     shop             requires shared/, features/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it

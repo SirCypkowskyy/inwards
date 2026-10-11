@@ -25,7 +25,7 @@ What a module may import: layers point inward, contexts import each other only a
 | [INW005](INW005.md) | `pure-domain` | A library import a layer's config doesn't allow, such as SQLAlchemy in the domain | by default | error | all | yes |
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | by default | error | all | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | by default | error | all | yes |
-| [INW021](INW021.md) | `private-module` | An import of a module whose name starts with `_` from outside the package that holds it | opt-in | error | none | yes |
+| [INW021](INW021.md) | `private-module` | An import of a module whose name starts with `_` from outside the package that holds it | opt-in | error | vertical-slices | yes |
 
 </div>
 
