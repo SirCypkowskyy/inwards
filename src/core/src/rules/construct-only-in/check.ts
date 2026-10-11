@@ -20,7 +20,7 @@ import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { extractImports, importStatements, parsePython } from "../../python/parser.ts";
-import type { FirstPartySource } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import { constructions, inEntries, isExceptionName } from "./calls.ts";
 import { reportConstruction, reportImport, type Scope } from "./wording.ts";
 
@@ -29,8 +29,8 @@ const IMPORT = /\bimport\b/u;
 
 /** What INW015 needs besides the file and its options. */
 export interface ConstructInputs {
-  /** Finds and reads first-party modules. */
-  readonly project: FirstPartySource;
+  /** The run's first-party modules: finds them, and reads them once per run. */
+  readonly project: ModuleTrees;
   /** Tells whether another rule (INW001) reports an import in INW015's place. */
   readonly deferred: (ref: ImportRef) => boolean;
 }
@@ -154,7 +154,7 @@ export function checkConstructOnlyIn(
         found.push(reportImport(src, ref, owner, scope));
       }
     }
-    const calls = constructions(tree, src, { parser, project, scope, covered });
+    const calls = constructions(tree, src, { project, scope, covered });
     found.push(...calls.map((call) => reportConstruction(src, call, scope)));
     return found.sort((a, b) => a.line - b.line || a.column - b.column);
   } finally {

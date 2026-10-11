@@ -17,6 +17,43 @@ export function namedChildren(node: Node): Node[] {
 }
 
 /**
+ * Lists the descendants of a node of some types, in pre-order, leaving out
+ * everything below a node of a `prune` type, in one walk inside WASM.
+ *
+ * A recursion over `namedChildren` crosses into WASM for every node, which
+ * on a large file costs more than the parse (#359). `descendantsOfType`
+ * returns the wanted and pruning nodes in pre-order, so a node that starts
+ * before the end of the last pruning node is below it. A node of a `prune`
+ * type is itself kept when it is also `wanted`; the node passed in is never
+ * kept or pruned.
+ *
+ * @param node - the subtree's root.
+ * @param wanted - the types to return.
+ * @param prune - the types whose subtrees are left out.
+ * @returns the wanted nodes, outermost first.
+ */
+export function descendantsOutside(
+  node: Node,
+  wanted: ReadonlySet<string>,
+  prune: ReadonlySet<string>,
+): Node[] {
+  const found: Node[] = [];
+  let prunedUntil = -1;
+  for (const hit of node.descendantsOfType([...wanted, ...prune])) {
+    if (!hit || hit.id === node.id || hit.startIndex < prunedUntil) {
+      continue;
+    }
+    if (wanted.has(hit.type)) {
+      found.push(hit);
+    }
+    if (prune.has(hit.type)) {
+      prunedUntil = hit.endIndex;
+    }
+  }
+  return found;
+}
+
+/**
  * Spells an identifier the way Python does: NFKC-normalised.
  *
  * @param node - a name as tree-sitter parsed it (an `identifier` node).

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 6832f5e4d5308625c0be97502023e6abe5f91d60475c0956710af227409b58c9
+source_hash: 1744c2072c03451c0e16454e2c07eecb66dc712b7e70f67342d8773c77a28d48
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -335,7 +335,7 @@ Czym były fałszywe alarmy i co zostało:
 Pozostałe reguły FAPI kosztują mniej więcej tyle co FAPI001. Kolumna ciepła prawie się nie różni, bo pamięć podręczna ekstrakcji trzyma importy, a nie drzewa, które parsują reguły treści. Wyróżniły się dwa koszty:
 
 - **INW012 na Saleorze trwało 8,0 s**, wobec 1,1 s bez niego (oba uruchomione ze źródeł): prawie każdy plik wspomina Django, więc każdy dostawał pełne parsowanie, a każda klasa z bazą z kodu projektu czytała moduł tej bazy. Plik Django potrzebuje teraz kształtu widoku przed parsowaniem (`@api_view`, `@action`, `path(...)`, `re_path(...)` albo metody handlera w rodzaju `def get(`, chyba że `modules` zawęża regułę), a bazy rozwiązuje tylko klasa z metodą handlera. Saleor z INW012 zszedł do 1,3 s, z tymi samymi 2 zgłoszeniami.
-- **INW013 na Polarze trwa 7,8 s**, około 13 razy dłużej niż sprawdzenie bez niego: krok do innego modułu parsuje ten moduł od nowa dla każdego pliku, który do niego woła. Śledzi to [#359](https://github.com/SirCypkowskyy/inwards/issues/359).
+- **INW013 na Polarze trwało 7,8 s**, około 13 razy dłużej niż sprawdzenie bez niego: krok do innego modułu parsował ten moduł od nowa dla każdego pliku, który do niego wołał. Od [#359](https://github.com/SirCypkowskyy/inwards/issues/359) każdy moduł odczytany w kroku jest parsowany i czytany raz na uruchomienie, wywołanie metody obiektu z poziomu modułu (`service.create(...)`) niczego nie czyta, sprawdzany plik, który krok już sparsował, nie jest parsowany ponownie, a przejścia po ciele funkcji działają wewnątrz WASM. Pomiar przed i po w jednej sesji, naprzemiennie oba pliki binarne, mediana z 5, zimne / ciepłe: Polar z INW013 zszedł z 7 238 / 6 971 ms do 3 526 / 3 182 ms, a ze wszystkimi regułami opt-in z 8 790 / 9 068 ms do 4 984 / 5 052 ms, wobec 454 / 321 ms bez żadnej. Pozostałe cztery repozytoria zmieniły się o mniej niż 10 ms, a zgłoszenia w JSON są identyczne. INW013 wciąż dodaje na Polarze około 3 s: 865 jego plików ma `async def` i każdy dostaje pełne parsowanie (około 1,3 s z tych 3 s). Śledzi to [#369](https://github.com/SirCypkowskyy/inwards/issues/369).
 
 **Hook.** [#182](https://github.com/SirCypkowskyy/inwards/issues/182) wymagało braku mierzalnego spowolnienia hooka na plikach bez endpointów i najwyżej jednego pełnego parsowania na plikach z nimi. `inwards check --no-cache <plik>`, po 21 naprzemiennych uruchomień, milisekundy p50 / p95:
 

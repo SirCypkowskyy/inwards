@@ -39,7 +39,7 @@ import {
   type FileSteps,
   type Suppressing,
 } from "./batch.ts";
-import { contentFindings } from "./content-rules.ts";
+import { ContentRun, contentFindings } from "./content-rules.ts";
 import { type ExtractionOptions, Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
 import { moduleIndex } from "./module-index.ts";
@@ -158,12 +158,17 @@ export class Engine {
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
     const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
-    const confirmed = withFound(
-      withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
-      contentFindings(this.parser, src, this.config, project),
-    );
-    const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
-    return applyRules(kept, this.config.rules);
+    const run = new ContentRun(this.parser, project, this.config);
+    try {
+      const confirmed = withFound(
+        withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
+        contentFindings(this.parser, src, this.config, run),
+      );
+      const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
+      return applyRules(kept, this.config.rules);
+    } finally {
+      run.dispose();
+    }
   }
 
   /**

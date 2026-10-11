@@ -10,16 +10,17 @@
  * project index and up to a few re-exports. An exception class is skipped:
  * raising one builds no adapter. Another module is read only
  * when it is in the role, in `allowed-in`, or a package above the role
- * whose `__init__.py` may re-export it, once per check of the file. No I/O:
+ * whose `__init__.py` may re-export it, and parsed once per run. No I/O:
  * the project port reads the modules.
  */
-import type { Node, Parser, Tree } from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
 import { entryReach, matchEntry } from "../../config/layer-selector.ts";
 import type { SourceFile } from "../../contracts/records.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
-import { type FirstPartySource, type ModuleNames, ParsedModules } from "../shared/first-party.ts";
+import { type ModuleNames, ParsedModules } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import type { Construction, Scope } from "./wording.ts";
 
 /** A name Python code gives a class: it starts with a capital letter. */
@@ -147,8 +148,8 @@ function callsIn(node: Node): Node[] {
 
 /** What `constructions` needs besides the checked file's tree. */
 export interface CallInputs {
-  readonly parser: Parser;
-  readonly project: FirstPartySource;
+  /** The run's first-party modules. */
+  readonly project: ModuleTrees;
   readonly scope: Scope;
   /** The targets of the file's role imports, whose calls the import form covers. */
   readonly covered: readonly string[];
@@ -160,32 +161,28 @@ export interface CallInputs {
  *
  * @param tree - the checked file's syntax tree.
  * @param src - the checked file.
- * @param inputs - the parser, the project, the role and the covered imports.
+ * @param inputs - the run's first-party modules, the role and the covered imports.
  * @returns one entry per such call, in source order.
  */
 export function constructions(tree: Tree, src: SourceFile, inputs: CallInputs): Construction[] {
-  const { parser, project, scope, covered } = inputs;
+  const { project, scope, covered } = inputs;
   const qualify: Qualify = qualifierFor(importedNames(tree, src), src.module);
-  const modules = new ParsedModules(parser, project, readClasses, (m) => admitted(m, scope));
-  try {
-    return callsIn(tree.rootNode).flatMap((call): Construction[] => {
-      const callee = call.childForFieldName("function");
-      const last = callee?.type === "attribute" ? callee.childForFieldName("attribute") : callee;
-      const qualified = callee ? qualify(callee) : null;
-      if (!(callee && last && qualified && buildsAdapter(identifierName(last)))) {
-        return [];
-      }
-      if (coveredBy(qualified, covered) || project.ownerOf(qualified) === src.module) {
-        return [];
-      }
-      const found = modules.follow(qualified, (view, rest) => view.classes.get(rest));
-      const home = found?.view.src.module;
-      if (!(found && home !== undefined && inEntries(scope.role, home))) {
-        return [];
-      }
-      return [{ call, written: callee.text, defined: `${home}.${found.rest}` }];
-    });
-  } finally {
-    modules.dispose();
-  }
+  const modules = new ParsedModules(project, readClasses, (m) => admitted(m, scope));
+  return callsIn(tree.rootNode).flatMap((call): Construction[] => {
+    const callee = call.childForFieldName("function");
+    const last = callee?.type === "attribute" ? callee.childForFieldName("attribute") : callee;
+    const qualified = callee ? qualify(callee) : null;
+    if (!(callee && last && qualified && buildsAdapter(identifierName(last)))) {
+      return [];
+    }
+    if (coveredBy(qualified, covered) || project.ownerOf(qualified) === src.module) {
+      return [];
+    }
+    const found = modules.follow(qualified, (view, rest) => view.classes.get(rest));
+    const home = found?.view.src.module;
+    if (!(found && home !== undefined && inEntries(scope.role, home))) {
+      return [];
+    }
+    return [{ call, written: callee.text, defined: `${home}.${found.rest}` }];
+  });
 }
