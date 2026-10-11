@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 65e38c0d1ece6c0517460c05782277f7f319d25ad839460bec5e244d4e226692
+source_hash: 31f44eb1532ce7dd02797d415912657e4152f664e9fd596cf8f78f255d8b681c
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -54,7 +54,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
 | [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja | :material-check-circle: Przyjęty, INW017 od [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 i `import-diagram` od [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
-| [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon | :material-help-circle-outline: Proponowany, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
+| [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon | :material-check-circle: Przyjęty, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1402,7 +1402,7 @@ W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, al
 
 ## ADR-046: Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon { #adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template }
 
-**Stan:** Proponowany · 2026-10-11 · [#407](https://github.com/SirCypkowskyy/inwards/issues/407) · scaffoldy [#406](https://github.com/SirCypkowskyy/inwards/issues/406)
+**Stan:** Przyjęty · 2026-10-11 · [#407](https://github.com/SirCypkowskyy/inwards/issues/407) · scaffoldy [#406](https://github.com/SirCypkowskyy/inwards/issues/406)
 
 **Kontekst.** Konwencje właściciela (2026-10-11) dla projektu w Pythonie: pionowe wycinki podzielone według domen, z pakietem `shared/`; te same nazwy modułów w każdym wycinku (`models.py`, `api.py`, `services/`, którego `__init__.py` reeksportuje z modułów prywatnych, takich jak `_user.py`, oraz `commands/` i `queries/` dla CQRS); porty to klasy `typing.Protocol`, nigdy ABC i nigdy dziedziczone; każdy moduł adaptera kończy się blokiem `if TYPE_CHECKING:` z linią `_: Port = Adapter(...)`, żeby type checker sprawdził adapter względem jego portu. [#406](https://github.com/SirCypkowskyy/inwards/issues/406) wprowadza je do scaffoldów. Spike miał ustalić, których z nich inwards może pilnować i jak.
 

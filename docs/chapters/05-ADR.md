@@ -49,7 +49,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | The VS Code extension bundles the binary, one VSIX per platform | :material-check-circle: Accepted |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot through an `inwards hook copilot` entry point and a committed hooks file | :material-check-circle: Accepted, built after the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records |
 | [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Architecture diagrams are checked against `[tool.inwards]`, never read as config | :material-check-circle: Accepted, INW017 since [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 and `import-diagram` since [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
-| [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Structural ports, conformance lines and private modules are opt-in rules, CQRS slices a template | :material-help-circle-outline: Proposed, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
+| [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Structural ports, conformance lines and private modules are opt-in rules, CQRS slices a template | :material-check-circle: Accepted, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1398,7 +1398,7 @@ In VS Code's Local harness the exit codes mean what they mean to Claude Code, bu
 
 ## ADR-046: Structural ports, conformance lines and private modules are opt-in rules, CQRS slices a template
 
-**Status:** Proposed · 2026-10-11 · [#407](https://github.com/SirCypkowskyy/inwards/issues/407) · scaffolds [#406](https://github.com/SirCypkowskyy/inwards/issues/406)
+**Status:** Accepted · 2026-10-11 · [#407](https://github.com/SirCypkowskyy/inwards/issues/407) · scaffolds [#406](https://github.com/SirCypkowskyy/inwards/issues/406)
 
 **Context.** The owner's conventions (2026-10-11) for a Python project: vertical slices split by domain, with a `shared/` package; the same module names in every slice (`models.py`, `api.py`, `services/` whose `__init__.py` re-exports from private modules such as `_user.py`, and `commands/` and `queries/` for CQRS); ports are `typing.Protocol` classes, never ABCs and never subclassed; and every adapter module ends with `if TYPE_CHECKING:` and `_: Port = Adapter(...)`, so the type checker checks the adapter against its port. [#406](https://github.com/SirCypkowskyy/inwards/issues/406) puts them in the scaffolds. The spike asked which of them inwards can enforce, and how.
 
