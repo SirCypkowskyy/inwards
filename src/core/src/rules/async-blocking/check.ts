@@ -34,6 +34,12 @@ import { report, reportHop } from "./wording.ts";
 /** An `async def` anywhere in a file's text. */
 const ASYNC_DEF = /\basync\s+def\b/u;
 
+/** The fewest files with an `async def` a run needs for the prefilter to pay. */
+const PREFILTER_FILES = 200;
+
+/** The prefilter needs one file in this many to have an `async def`. */
+const PREFILTER_SHARE = 20;
+
 /** A wildcard in a pattern's first segment, which no text filter can rule out. */
 const WILDCARD = /[*?]/u;
 
@@ -86,6 +92,26 @@ function mayBlock(text: string, settings: Settings): boolean {
 }
 
 /**
+ * Tells whether INW013's prefilter (`prefilter.ts`) pays for a run: it reads
+ * every listed module once and parses those that name a blocking type, so it
+ * pays when the run would otherwise parse many files with an `async def`, and
+ * they are a fair share of the run (#369). Saleor, with 12 such files in
+ * 4,324, checks faster without it; Polar, with 865 in 1,831, five times
+ * faster with it. Findings are the same either way.
+ *
+ * @param files - the files the run checks.
+ * @returns true when at least `PREFILTER_FILES` of them, and one in
+ *   `PREFILTER_SHARE`, have an `async def`.
+ */
+function prefilterPays(files: readonly SourceFile[]): boolean {
+  if (files.length < PREFILTER_FILES) {
+    return false;
+  }
+  const asynchronous = files.filter((file) => ASYNC_DEF.test(file.text)).length;
+  return asynchronous >= PREFILTER_FILES && asynchronous * PREFILTER_SHARE >= files.length;
+}
+
+/**
  * Checks one `async def`: its own blocking calls, and the sync helpers it calls.
  *
  * @param fn - its `function_definition` node.
@@ -122,8 +148,8 @@ export class AsyncBlockingRun {
   readonly views: ParsedModules<Walk>;
   /** The run's trees, which may already hold the checked file. */
   readonly trees: ModuleTrees;
-  /** True when the run may read every listed module to skip files (`prefilter.ts`). */
-  private readonly prefilter: boolean;
+  /** The files the run checks, which decide whether the prefilter pays (`prefilterPays`). */
+  private readonly files: readonly SourceFile[];
   /** The prefilter once built; null when it can't apply to this run. */
   private reach: BlockingReach | null | undefined;
 
@@ -132,14 +158,17 @@ export class AsyncBlockingRun {
    *
    * @param options - `[tool.inwards.rules.async-blocking]`, if set.
    * @param trees - the run's first-party modules, which a hop reads.
-   * @param prefilter - true for a run over many files, where reading every
-   *   listed module once costs less than parsing every file with an `async def`.
+   * @param files - the files the run checks; none by default, which leaves the prefilter off.
    */
-  constructor(options: RuleOptions | undefined, trees: ModuleTrees, prefilter = false) {
+  constructor(
+    options: RuleOptions | undefined,
+    trees: ModuleTrees,
+    files: readonly SourceFile[] = [],
+  ) {
     this.settings = settingsOf(options);
     this.trees = trees;
     this.views = followModules(trees, this.settings.families, this.settings.follow);
-    this.prefilter = prefilter;
+    this.files = files;
   }
 
   /**
@@ -175,7 +204,7 @@ export class AsyncBlockingRun {
       const { follow, patterns } = this.settings;
       // With `follow-modules = []` no hop leaves the file, and `mayBlock` has already decided.
       const segments =
-        this.prefilter && follow?.length !== 0
+        follow?.length !== 0 && prefilterPays(this.files)
           ? blockingSegments([...BUILT_IN_NAMES, ...patterns])
           : undefined;
       this.reach = (segments && BlockingReach.of(this.trees, this.views, segments)) ?? null;

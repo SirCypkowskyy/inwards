@@ -175,7 +175,7 @@ function blockingRun(options?: RuleOptions): {
   trees: ModuleTrees;
 } {
   const trees = new ModuleTrees(parser, indexOn(DISK, TEXTS));
-  return { run: new AsyncBlockingRun(options, trees, true), trees };
+  return { run: new AsyncBlockingRun(options, trees, [...TEXTS.keys()].map(source)), trees };
 }
 
 /**
