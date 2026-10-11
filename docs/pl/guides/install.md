@@ -1,18 +1,44 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 10e1fccde7b6c70d0dbcc4109d5f750de05ce9f815521990dfabb6d669df1d23
+source_hash: 6605eedc743dab75ddf2d25f4ff907d1f22ab4b5806e347ab207e0bf6b8e3dd2
 ---
 
 # Instalacja Inwards { #install-inwards }
 
-!!! info "Zweryfikowano 2026-09-25"
-    Budowanie ze źródeł i każde następne polecenie, ręcznie na Linuksie x64. Na macOS (arm64) i Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tych systemach wciąż jest do zrobienia. Kroków z `curl` i `Invoke-WebRequest` nie da się wypróbować, dopóki repozytorium jest prywatne; `gh release download` działa. Rozszerzenie VS Code 2026-10-10: VSIX dla platformy zainstalowany w VS Code 1.141 na macOS (arm64) pokazał INW007, sprawdzone skryptem `src/vscode-extension/scripts/try-in-vscode.ts`; Linux i Windows wciąż są do sprawdzenia.
+!!! info "Zweryfikowano 2026-10-11"
+    Z wersją 0.5.0 na macOS (arm64): `uvx inwards@0.5.0 --version`; `uv add --dev inwards`, a potem `uv run inwards init --style layered` i `uv run inwards check`; `uvx inwards init --style hexagonal --scaffold` w nowym projekcie z `uv init --package`; oraz pobranie przez `curl` ze sprawdzeniem sumy kontrolnej i `gh attestation verify`. Budowanie ze źródeł ręcznie na Linuksie x64 2026-09-25. Na Windows CI uruchamia `init`, `check` i hook ze skompilowanym plikiem binarnym przed każdym wydaniem; ręczne sprawdzenie na tym systemie wciąż jest do zrobienia. Rozszerzenie VS Code 2026-10-10: VSIX dla platformy zainstalowany w VS Code 1.141 na macOS (arm64) pokazał INW007, sprawdzone skryptem `src/vscode-extension/scripts/try-in-vscode.ts`; Linux i Windows wciąż są do sprawdzenia.
 
-Inwards to jeden plik wykonywalny, bez środowiska uruchomieniowego do instalowania. Najnowsze wydanie to wersja przedpremierowa v0.1.0-rc.1; pierwsze pełne wydanie przyjdzie z jednym z późniejszych kamieni milowych. Możesz też zbudować Inwards ze źródeł.
+Inwards to jeden plik wykonywalny, bez środowiska uruchomieniowego do instalowania. Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako wheele platformowe i do [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) jako pliki binarne; [changelog](https://github.com/SirCypkowskyy/inwards/blob/main/CHANGELOG.md) mówi, co zmieniło każde z nich. W projekcie Pythona najkrótsza droga prowadzi przez uv. Możesz też zbudować Inwards ze źródeł.
+
+## Jako zależność deweloperska uv { #as-a-uv-dev-dependency }
+
+Każde wydanie ma na PyPI po jednym wheelu na platformę, z plikiem binarnym w środku, tak jak dystrybuowany jest Ruff (Linux z glibc, macOS i Windows; na Alpine użyj [pliku binarnego](#from-a-release)). uv wybiera wheel dla każdej platformy, a `inwards` trafia do środowiska wirtualnego projektu:
+
+```sh
+uv add --dev inwards
+uv run inwards init --style layered   # write the layers: see "Configure the layers" below
+uv run inwards check
+```
+
+`uv add` zapisuje w `pyproject.toml` dolne ograniczenie, na przykład `inwards>=0.5.0`, a w `uv.lock` dokładną wersję, więc wszyscy w projekcie używają tego samego wydania, dopóki ktoś nie uruchomi `uv lock --upgrade-package inwards`. Działa też `pip install inwards`.
+
+Żeby wypróbować Inwards bez dodawania go do projektu albo założyć nowy projekt, uruchom go przez `uvx`. Trzyma on kopię w pamięci podręcznej uv i niczego nie dodaje do projektu:
+
+```sh
+uvx inwards --version
+uvx inwards init --style hexagonal --scaffold
+uvx inwards@0.5.0 check   # one exact release
+```
+
+Żeby podłączyć agenta w takim projekcie, przekaż `init` flagę `--launcher "uv run"` (`uv run inwards init --agent claude --launcher "uv run"`): hooki i sekcja w `AGENTS.md` podają wtedy `uv run inwards` i nie zawierają ścieżki. Bez niej `init` zapisuje ścieżkę pliku binarnego, jako który działa; w projekcie leży ona w `.venv` i różni się między worktree'ami, a pod `uvx` leży w pamięci podręcznej uv, o czym `init` ostrzega.
+
+`uv add --dev inwards` bierze najnowsze pełne wydanie i pomija wersje przedpremierowe. Żeby wypróbować wersję przedpremierową, która jest na PyPI, poproś o nią wprost: `uv add --dev --prerelease allow inwards`. `inwards --version` wypisuje wydanie, z którego zbudowano plik binarny, bez przyrostka wersji przedpremierowej (`0.2.0` dla `0.2.0rc1`).
+
+Wydania trafiają na PyPI przez [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi).
 
 ## Z wydania { #from-a-release }
 
-Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) ma jeden plik binarny na platformę, wheele platformowe, rozszerzenie VS Code (`.vsix` dla każdej platformy, [niżej](#vs-code)) i `SHA256SUMS`. Atestacje buildów dojdą, gdy repozytorium stanie się publiczne.
+Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) ma jeden plik binarny na platformę, wheele platformowe, rozszerzenie VS Code (`.vsix` dla każdej platformy, [niżej](#vs-code)) i `SHA256SUMS`.
 
 | Platforma | Plik |
 |---|---|
@@ -22,12 +48,15 @@ Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/rele
 | macOS Intel | `inwards-darwin-x64` |
 | Windows x64 | `inwards-windows-x64.exe` |
 
+Adresy z `latest/download` poniżej zawsze wskazują najnowsze wydanie; żeby przypiąć konkretne, użyj zamiast tego `releases/download/v0.5.0`.
+
 === "Linux / macOS"
 
     ```sh
-    VERSION=v0.1.0-rc.1; FILE=inwards-linux-x64   # pick your file from the table
-    curl -LO "https://github.com/SirCypkowskyy/inwards/releases/download/$VERSION/$FILE"
-    curl -LO "https://github.com/SirCypkowskyy/inwards/releases/download/$VERSION/SHA256SUMS"
+    FILE=inwards-linux-x64   # pick your file from the table
+    BASE=https://github.com/SirCypkowskyy/inwards/releases/latest/download
+    curl -fLO "$BASE/$FILE"
+    curl -fLO "$BASE/SHA256SUMS"
     sha256sum --check --ignore-missing SHA256SUMS   # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
     mkdir -p ~/.local/bin && install -m 755 "$FILE" ~/.local/bin/inwards
     inwards --version
@@ -35,96 +64,24 @@ Każde wydanie w [GitHub Releases](https://github.com/SirCypkowskyy/inwards/rele
 
     Jeśli powłoka nie znajduje `inwards`, dodaj `~/.local/bin` do `PATH` w profilu powłoki (`export PATH="$HOME/.local/bin:$PATH"`).
 
-    Dopóki repozytorium jest prywatne, GitHub odpowiada na te adresy kodem 404. Pobierz pliki przez GitHub CLI, a potem kontynuuj od linii z `sha256sum`:
-
-    ```sh
-    gh release download "$VERSION" --repo SirCypkowskyy/inwards --pattern "$FILE" --pattern SHA256SUMS
-    ```
-
 === "Windows (PowerShell)"
 
     ```powershell
-    $Version = "v0.1.0-rc.1"; $File = "inwards-windows-x64.exe"
-    Invoke-WebRequest "https://github.com/SirCypkowskyy/inwards/releases/download/$Version/$File" -OutFile inwards.exe
-    Invoke-WebRequest "https://github.com/SirCypkowskyy/inwards/releases/download/$Version/SHA256SUMS" -OutFile SHA256SUMS
+    $File = "inwards-windows-x64.exe"
+    $Base = "https://github.com/SirCypkowskyy/inwards/releases/latest/download"
+    Invoke-WebRequest "$Base/$File" -OutFile inwards.exe
+    Invoke-WebRequest "$Base/SHA256SUMS" -OutFile SHA256SUMS
     (Get-FileHash inwards.exe -Algorithm SHA256).Hash.ToLower()   # compare with the line for $File in SHA256SUMS
     .\inwards.exe --version
     ```
 
     Umieść `inwards.exe` w katalogu, który jest w `PATH`.
 
-Gdy atestacje zostaną opublikowane, `gh attestation verify <file> --repo SirCypkowskyy/inwards` sprawdzi, czy plik binarny zbudował workflow wydań tego repozytorium.
-
-## Jako zależność deweloperska uv { #as-a-uv-dev-dependency }
-
-Każde wydanie ma też po jednym wheelu na platformę, z plikiem binarnym w środku, tak jak dystrybuowany jest Ruff (Linux z glibc, macOS i Windows; na Alpine użyj pliku binarnego). uv instaluje go jak każdy inny pakiet, a `inwards` trafia do środowiska wirtualnego projektu.
-
-### Z PyPI (od pierwszego wydania na PyPI) { #from-pypi-from-the-first-pypi-release }
-
-Na PyPI nie ma jeszcze żadnego wydania. Gdy się pojawi, instalacja zajmie jedną linię, a uv wybierze wheel dla każdej platformy:
-
-```sh
-uv add --dev inwards
-uv run inwards check
-uvx inwards --version   # one-off, no project
-```
-
-Do tego czasu `inwards` na PyPI to rezerwacja nazwy w wersji 0.0.0: `--version` mówi, że linter nie został jeszcze wydany, a każde inne polecenie kończy się kodem 2. Użyj wheeli z wydania na GitHubie, opisanych niżej. Wydania trafiają na PyPI przez [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); pierwsze przyjdzie z jednym z późniejszych kamieni milowych, nie z v0.1.0-rc.1.
-
-Żeby podłączyć agenta w takim projekcie, przekaż `init` flagę `--launcher "uv run"` (`uv run inwards init --agent claude --launcher "uv run"`): hooki i sekcja w `AGENTS.md` podają wtedy `uv run inwards` i nie zawierają ścieżki. Bez niej `init` zapisuje ścieżkę pliku binarnego, jako który działa; w projekcie leży ona w `.venv` i różni się między worktree'ami, a pod `uvx` leży w pamięci podręcznej uv, o czym `init` ostrzega.
-
-`uv add --dev inwards` bierze najnowsze pełne wydanie i pomija wersje przedpremierowe. Żeby wypróbować wersję przedpremierową, która jest na PyPI, poproś o nią wprost: `uv add --dev "inwards>=0.2.0rc1"`.
-
-### Z wydania na GitHubie { #from-a-github-release }
-
-```sh
-TAG=v0.1.0-rc.1; VER=0.1.0rc1   # the release, and its Python version
-uv add --dev "inwards @ https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl"
-uv run inwards check
-uvx --from "https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl" inwards --version   # one-off, no project
-```
-
-Wybierz wheel dla swojej platformy: `manylinux_2_17_x86_64`, `manylinux_2_17_aarch64`, `macosx_13_0_arm64`, `macosx_13_0_x86_64` albo `win_amd64`. Zespołowi pracującemu na kilku platformach daj uv po jednym źródle na platformę w `pyproject.toml`. Wymień wszystkie pięć: na platformie, do której nie pasuje żaden znacznik, uv wraca do PyPI, a tam do pierwszego wydania na PyPI jest tylko rezerwacja nazwy.
-
-```toml title="pyproject.toml"
-[dependency-groups]
-dev = ["inwards"]
-
-[tool.uv.sources]
-inwards = [
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_x86_64.whl", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_arm64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'arm64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_x86_64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'x86_64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-win_amd64.whl", marker = "sys_platform == 'win32'" },
-]
-```
-
-Żaden znacznik nie odróżnia glibc od musl, więc na Alpine `uv sync` zatrzymuje się z komunikatem „incompatible platform”; tam użyj pliku binarnego.
-
-!!! warning "Dopóki repozytorium jest prywatne"
-    GitHub udostępnia pliki wydań prywatnego repozytorium tylko przez swoje API, którego uv nie potrafi wywołać, więc te adresy zwracają 404 nawet z tokenem. Pobierz wheele przez GitHub CLI i każ uv szukać w tym katalogu. uv wybierze wtedy wheel dla każdej platformy:
-
-    ```sh
-    gh release download v0.1.0-rc.1 --repo SirCypkowskyy/inwards --pattern '*.whl' --dir wheels
-    ```
-
-    ```toml title="pyproject.toml"
-    [tool.uv]
-    find-links = ["wheels"]
-    prerelease = "allow"
-    ```
-
-    ```sh
-    uv add --dev inwards
-    uv run inwards --version
-    ```
-
-`inwards --version` wypisuje wydanie, z którego zbudowano plik binarny, bez przyrostka wersji przedpremierowej (`0.1.0` dla `0.1.0rc1`).
+Każdy plik binarny ma też atestację pochodzenia buildu: `gh attestation verify <file> --repo SirCypkowskyy/inwards` sprawdza, czy zbudował go workflow wydań tego repozytorium.
 
 ## Ze źródeł { #from-source }
 
-Potrzebujesz [Buna](https://bun.sh) 1.4.2 (wersji z `.bun-version`) i dostępu do repozytorium.
+Potrzebujesz [Buna](https://bun.sh) 1.4.2 (wersji z `.bun-version`).
 
 ```sh
 git clone https://github.com/SirCypkowskyy/inwards && cd inwards
@@ -152,7 +109,7 @@ Rozszerzenie jest cienkim klientem: uruchamia `inwards server` i pokazuje to, co
 | Windows x64 | `win32-x64` | `inwards-vscode-win32-x64-<tag>.vsix` |
 | każda inna | | `inwards-vscode-universal-<tag>.vsix`, bez pliku binarnego: dodaj `inwards` do `PATH` albo ustaw `inwards.path` |
 
-`.github/workflows/vscode-publish.yml` wysyła te pliki do Visual Studio Marketplace i Open VSX (dla VSCodium, Cursora i innych edytorów, które z niego korzystają), gdy właściciel opublikuje pełne wydanie; rozszerzenia nie ma jeszcze w żadnym z rejestrów. Do tego czasu zainstaluj plik dla swojej platformy z wydania nowszego niż v0.1.0-rc.1 (ta wersja przedpremierowa ma jeszcze stary pojedynczy `.vsix` z własnym serwerem):
+`.github/workflows/vscode-publish.yml` wysyła te pliki do Visual Studio Marketplace i Open VSX (dla VSCodium, Cursora i innych edytorów, które z niego korzystają), gdy właściciel opublikuje pełne wydanie; rozszerzenia nie ma jeszcze w żadnym z rejestrów. Do tego czasu zainstaluj plik dla swojej platformy z wydania:
 
 ```sh
 code --install-extension inwards-vscode-darwin-arm64-vX.Y.Z.vsix
@@ -177,7 +134,7 @@ Gdy rozszerzenie nie znajdzie pliku binarnego (ustawione `inwards.path` wskazuje
 
 ```sh
 uv init --package app && cd app
-inwards init --style hexagonal --scaffold
+uvx inwards init --style hexagonal --scaffold
 ```
 
 ```text
@@ -196,8 +153,6 @@ inwards check: 0 violations, 0 warnings.
 Try the example: uv run python -m app.bootstrap book 2
 Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 ```
-
-Gdy Inwards trafi na PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), druga linia zmieni się w `uvx inwards init --style hexagonal --scaffold` i nie trzeba będzie niczego wcześniej instalować.
 
 Istnieje siedem presetów, każdy z warstwami wymienionymi od najbardziej wewnętrznej. `inwards init --list-styles` wypisuje je razem z ich pakietami.
 

@@ -1,12 +1,12 @@
 ---
 source: docs/chapters/guides/copilot.md
-source_hash: 8758d22b07eba932844c029cf670abb3fe9bd1ee020ebaeb31da28c257331071
+source_hash: a67cf55effe4bfccbf558c292c39c6fe63a4b09432f7b882ebaebe772c84c9f5
 ---
 
 # GitHub Copilot { #github-copilot }
 
 !!! info "Zweryfikowano 2026-10-10"
-    Na macOS (arm64), ze skompilowanym plikiem binarnym na `examples/broken-app`: `inwards init --agent agents-md` oraz `inwards mcp` uruchomione tak, jak uruchamia go poniższy wpis w `.mcp.json`, który odpowiedział na `tools/list` i `check_files`. Workflow z krokami przygotowania parsuje się jako YAML. Nie uruchamiano żadnej sesji Copilota, ani w VS Code, ani na GitHubie, a workflow nie działał na GitHubie. Ustawienia Copilota, nazwy plików i ograniczenia na tej stronie pochodzą z dokumentacji VS Code i GitHuba z tego dnia.
+    Na macOS (arm64), ze skompilowanym plikiem binarnym na `examples/broken-app`: `inwards init --agent agents-md` oraz `inwards mcp` uruchomione tak, jak uruchamia go poniższy wpis w `.mcp.json`, który odpowiedział na `tools/list` i `check_files`. Workflow z krokami przygotowania parsuje się jako YAML. Nie uruchamiano żadnej sesji Copilota, ani w VS Code, ani na GitHubie, a workflow nie działał na GitHubie. Ustawienia Copilota, nazwy plików i ograniczenia na tej stronie pochodzą z dokumentacji VS Code i GitHuba z tego dnia; to, co sekcja Hooki mówi o plikach hooków Copilot CLI, pochodzi z opisu hooków GitHuba czytanego 2026-10-11.
 
 Copilot nie ma hooka, do którego Inwards mógłby się podłączyć tak jak do [hooków Claude Code](claude-code.md). Zamiast tego spotyka Inwards w czterech miejscach:
 
@@ -58,7 +58,7 @@ Sprawdź, czy działa:
 
 ### Hooki { #hooks }
 
-VS Code ma hooki agentów w wersji preview, ale Inwards jeszcze ich nie obsługuje. Jego hook (`inwards hook claude-code`) czyta dane wejściowe i nazwy narzędzi Claude Code. Harness Local w VS Code potrafi czytać hooki z plików ustawień Claude Code (`chat.useClaudeHooks`, domyślnie wyłączone), ale ignoruje ich matchery i inaczej nazywa narzędzia, a harness Copilota używa własnego formatu hooków. Nie podpinaj żadnego z nich pod `inwards hook claude-code`: config guard i Stop gate widziałyby wywołania narzędzi, których nie rozpoznają.
+VS Code ma hooki agentów w wersji preview, ale Inwards jeszcze ich nie obsługuje. Jego hook (`inwards hook claude-code`) czyta dane wejściowe i nazwy narzędzi Claude Code. Harness Local w VS Code potrafi czytać hooki z plików ustawień Claude Code (`chat.useClaudeHooks`, domyślnie wyłączone), ale ignoruje ich matchery i inaczej nazywa narzędzia, a harness Copilota używa własnego formatu hooków. Nie podpinaj żadnego z nich pod `inwards hook claude-code`: config guard i Stop gate widziałyby wywołania narzędzi, których nie rozpoznają. Copilot CLI też czyta `.claude/settings.json` i `.claude/settings.local.json`, więc w projekcie podłączonym przez `inwards init --agent claude-code` już uruchamia ten hook, a ani config guard, ani Stop gate tam nie działają: Copilot traktuje kod wyjścia 2 hooka jako ostrzeżenie dla użytkownika, nie blokadę. [ADR-044](../05-ADR.md#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) opisuje, co oferuje każda powierzchnia Copilota, i planowany `inwards hook copilot`.
 
 ## Agent Copilota w chmurze { #cloud-agent }
 
@@ -111,7 +111,7 @@ Agent w chmurze (cloud agent, wcześniej nazywany coding agent) pracuje nad issu
 
 4. Dodaj [workflow GitHub Actions](ci.md), żeby naruszenie oblewało pull request. Domyślnie workflow nie uruchamiają się na pull requeście, do którego pushuje Copilot, dopóki ktoś z prawem zapisu nie kliknie **Approve and run workflows**; administrator repozytorium może wyłączyć to zatwierdzanie w ustawieniach agenta w chmurze. Gdy sprawdzenie nie przejdzie, wspomnij `@copilot` w komentarzu do pull requesta i poproś o naprawienie naruszeń Inwards; log zadania i adnotacje podają regułę i kroki naprawy.
 
-Agent w chmurze uruchamia też hooki z `.github/hooks/*.json`, we własnym formacie Copilota. Tak jak w VS Code, Inwards nie ma jeszcze dla nich adaptera.
+Agent w chmurze uruchamia też hooki z `.github/hooks/*.json`, we własnym formacie Copilota. Tak jak w VS Code, Inwards nie ma jeszcze dla nich adaptera; [ADR-044](../05-ADR.md#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) go planuje.
 
 ## Ograniczenia { #limits }
 

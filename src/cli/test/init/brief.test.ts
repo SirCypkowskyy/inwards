@@ -175,7 +175,7 @@ ignore = ["INW005"]
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
       expect(brief).toContain(`(the ${name} preset)`);
       expect(brief).toContain(`declare a \`typing.Protocol\` in ${PRESET_PORTS[name]}`);
-      // fastapi has eleven layers, nine of them the template's roles, each listing what it may import.
+      // fastapi has eleven layers, nine of them the template's roles, and ten opt-in rules on.
       expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
     },
   );
@@ -194,7 +194,7 @@ test("a preset whose ports layer became a selector names no ports module", () =>
   const text = table.replace('"app.application"', '"app.*.application"');
   expect(text).toContain('"app.*.application"');
   const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
-  expect(brief).not.toContain("ports`");
+  expect(brief).not.toContain(".ports`");
   expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
 });
 

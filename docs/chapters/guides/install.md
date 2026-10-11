@@ -1,13 +1,39 @@
 # Install Inwards
 
-!!! info "Verified 2026-09-25"
-    The from-source build and every command after it, by hand on Linux x64. On macOS (arm64) and Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The `curl` and `Invoke-WebRequest` steps can't be tried while the repository is private; `gh release download` works. The VS Code extension on 2026-10-10: a platform VSIX installed in VS Code 1.141 on macOS (arm64) showed INW007, checked with `src/vscode-extension/scripts/try-in-vscode.ts`; Linux and Windows are still open.
+!!! info "Verified 2026-10-11"
+    With 0.5.0 on macOS (arm64): `uvx inwards@0.5.0 --version`; `uv add --dev inwards`, then `uv run inwards init --style layered` and `uv run inwards check`; `uvx inwards init --style hexagonal --scaffold` in a new `uv init --package` project; and the `curl` download with its checksum and `gh attestation verify`. The from-source build by hand on Linux x64 on 2026-09-25. On Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The VS Code extension on 2026-10-10: a platform VSIX installed in VS Code 1.141 on macOS (arm64) showed INW007, checked with `src/vscode-extension/scripts/try-in-vscode.ts`; Linux and Windows are still open.
 
-Inwards is one executable with no runtime to install. The latest release is the pre-release v0.1.0-rc.1; the first full release comes with a later milestone. You can also build from source.
+Inwards is one executable with no runtime to install. Every release goes to [PyPI](https://pypi.org/project/inwards/) as platform wheels and to [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) as binaries; the [changelog](https://github.com/SirCypkowskyy/inwards/blob/main/CHANGELOG.md) lists what each one changed. In a Python project, uv is the shortest way in. You can also build from source.
+
+## As a uv dev dependency
+
+Each release has one wheel per platform on PyPI with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the [binary](#from-a-release)). uv picks the wheel for each platform, and `inwards` lands in the project's virtual environment:
+
+```sh
+uv add --dev inwards
+uv run inwards init --style layered   # write the layers: see "Configure the layers" below
+uv run inwards check
+```
+
+`uv add` writes a lower bound such as `inwards>=0.5.0` to `pyproject.toml` and the exact version to `uv.lock`, so everyone on the project runs the same release until someone runs `uv lock --upgrade-package inwards`. `pip install inwards` works too.
+
+To try Inwards without adding it to a project, or to set up a new one, run it with `uvx`. It keeps a copy in uv's cache and adds nothing to the project:
+
+```sh
+uvx inwards --version
+uvx inwards init --style hexagonal --scaffold
+uvx inwards@0.5.0 check   # one exact release
+```
+
+To wire an agent in such a project, pass `--launcher "uv run"` to `init` (`uv run inwards init --agent claude --launcher "uv run"`): the hooks and the `AGENTS.md` section then say `uv run inwards` and hold no path. Without it, `init` records the path of the binary it runs as, which in a project is inside `.venv` and differs per worktree, and under `uvx` is in uv's cache, which `init` warns about.
+
+`uv add --dev inwards` takes the newest full release and skips pre-releases. To try a pre-release that is on PyPI, ask for it: `uv add --dev --prerelease allow inwards`. `inwards --version` prints the release it was built from without the pre-release suffix (`0.2.0` for `0.2.0rc1`).
+
+Releases reach PyPI through [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi).
 
 ## From a release
 
-Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (a `.vsix` per platform, [below](#vs-code)) and `SHA256SUMS`. Build attestations are added once the repository is public.
+Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) has one binary per platform, the platform wheels, the VS Code extension (a `.vsix` per platform, [below](#vs-code)) and `SHA256SUMS`.
 
 | Platform | File |
 |---|---|
@@ -17,12 +43,15 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 | macOS Intel | `inwards-darwin-x64` |
 | Windows x64 | `inwards-windows-x64.exe` |
 
+The `latest/download` URLs below always point at the newest release; to pin one, use `releases/download/v0.5.0` instead.
+
 === "Linux / macOS"
 
     ```sh
-    VERSION=v0.1.0-rc.1; FILE=inwards-linux-x64   # pick your file from the table
-    curl -LO "https://github.com/SirCypkowskyy/inwards/releases/download/$VERSION/$FILE"
-    curl -LO "https://github.com/SirCypkowskyy/inwards/releases/download/$VERSION/SHA256SUMS"
+    FILE=inwards-linux-x64   # pick your file from the table
+    BASE=https://github.com/SirCypkowskyy/inwards/releases/latest/download
+    curl -fLO "$BASE/$FILE"
+    curl -fLO "$BASE/SHA256SUMS"
     sha256sum --check --ignore-missing SHA256SUMS   # macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
     mkdir -p ~/.local/bin && install -m 755 "$FILE" ~/.local/bin/inwards
     inwards --version
@@ -30,96 +59,24 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 
     If `inwards` isn't found, add `~/.local/bin` to `PATH` in your shell profile (`export PATH="$HOME/.local/bin:$PATH"`).
 
-    While the repository is private, GitHub answers these URLs with 404. Download with the GitHub CLI instead, then continue from the `sha256sum` line:
-
-    ```sh
-    gh release download "$VERSION" --repo SirCypkowskyy/inwards --pattern "$FILE" --pattern SHA256SUMS
-    ```
-
 === "Windows (PowerShell)"
 
     ```powershell
-    $Version = "v0.1.0-rc.1"; $File = "inwards-windows-x64.exe"
-    Invoke-WebRequest "https://github.com/SirCypkowskyy/inwards/releases/download/$Version/$File" -OutFile inwards.exe
-    Invoke-WebRequest "https://github.com/SirCypkowskyy/inwards/releases/download/$Version/SHA256SUMS" -OutFile SHA256SUMS
+    $File = "inwards-windows-x64.exe"
+    $Base = "https://github.com/SirCypkowskyy/inwards/releases/latest/download"
+    Invoke-WebRequest "$Base/$File" -OutFile inwards.exe
+    Invoke-WebRequest "$Base/SHA256SUMS" -OutFile SHA256SUMS
     (Get-FileHash inwards.exe -Algorithm SHA256).Hash.ToLower()   # compare with the line for $File in SHA256SUMS
     .\inwards.exe --version
     ```
 
     Put `inwards.exe` in a folder on your `PATH`.
 
-Once attestations are published, `gh attestation verify <file> --repo SirCypkowskyy/inwards` checks that a binary was built by this repository's release workflow.
-
-## As a uv dev dependency
-
-Each release also has one wheel per platform with the binary inside, the way Ruff ships (glibc Linux, macOS and Windows; on Alpine use the binary). uv installs it like any other package, and `inwards` lands in the project's virtual environment.
-
-### From PyPI (from the first PyPI release)
-
-No release is on PyPI yet. Once one is, installing takes one line, and uv picks the wheel for each platform:
-
-```sh
-uv add --dev inwards
-uv run inwards check
-uvx inwards --version   # one-off, no project
-```
-
-Until then, `inwards` on PyPI is a 0.0.0 name placeholder: `--version` says the linter isn't released yet and every other command exits 2. Use the wheels from a GitHub release below. Releases reach PyPI through [trusted publishing](../03-Architecture-C4.md#publishing-to-pypi); the first one comes with a later milestone, not with v0.1.0-rc.1.
-
-To wire an agent in such a project, pass `--launcher "uv run"` to `init` (`uv run inwards init --agent claude --launcher "uv run"`): the hooks and the `AGENTS.md` section then say `uv run inwards` and hold no path. Without it, `init` records the path of the binary it runs as, which in a project is inside `.venv` and differs per worktree, and under `uvx` is in uv's cache, which `init` warns about.
-
-`uv add --dev inwards` takes the newest full release and skips pre-releases. To try a pre-release that is on PyPI, ask for it: `uv add --dev "inwards>=0.2.0rc1"`.
-
-### From a GitHub release
-
-```sh
-TAG=v0.1.0-rc.1; VER=0.1.0rc1   # the release, and its Python version
-uv add --dev "inwards @ https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl"
-uv run inwards check
-uvx --from "https://github.com/SirCypkowskyy/inwards/releases/download/$TAG/inwards-$VER-py3-none-manylinux_2_17_x86_64.whl" inwards --version   # one-off, no project
-```
-
-Pick the wheel for your platform: `manylinux_2_17_x86_64`, `manylinux_2_17_aarch64`, `macosx_13_0_arm64`, `macosx_13_0_x86_64` or `win_amd64`. For a team on several platforms, give uv one source per platform in `pyproject.toml`. List all five: on a platform no marker matches, uv falls back to PyPI, which holds only a placeholder until the first PyPI release.
-
-```toml title="pyproject.toml"
-[dependency-groups]
-dev = ["inwards"]
-
-[tool.uv.sources]
-inwards = [
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_x86_64.whl", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-manylinux_2_17_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_arm64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'arm64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-macosx_13_0_x86_64.whl", marker = "sys_platform == 'darwin' and platform_machine == 'x86_64'" },
-  { url = "https://github.com/SirCypkowskyy/inwards/releases/download/v0.1.0-rc.1/inwards-0.1.0rc1-py3-none-win_amd64.whl", marker = "sys_platform == 'win32'" },
-]
-```
-
-No marker tells glibc from musl, so on Alpine `uv sync` stops with "incompatible platform"; use the binary there.
-
-!!! warning "While the repository is private"
-    GitHub serves a private repository's release files only through its API, which uv can't call, so these URLs return 404 even with a token. Download the wheels with the GitHub CLI and tell uv to look in that folder. uv then picks the wheel for each platform:
-
-    ```sh
-    gh release download v0.1.0-rc.1 --repo SirCypkowskyy/inwards --pattern '*.whl' --dir wheels
-    ```
-
-    ```toml title="pyproject.toml"
-    [tool.uv]
-    find-links = ["wheels"]
-    prerelease = "allow"
-    ```
-
-    ```sh
-    uv add --dev inwards
-    uv run inwards --version
-    ```
-
-`inwards --version` prints the release it was built from without the pre-release suffix (`0.1.0` for `0.1.0rc1`).
+Each binary also has a build provenance attestation: `gh attestation verify <file> --repo SirCypkowskyy/inwards` checks that it was built by this repository's release workflow.
 
 ## From source
 
-You need [Bun](https://bun.sh) 1.4.2 (the version in `.bun-version`) and access to the repository.
+You need [Bun](https://bun.sh) 1.4.2 (the version in `.bun-version`).
 
 ```sh
 git clone https://github.com/SirCypkowskyy/inwards && cd inwards
@@ -147,7 +104,7 @@ The extension is a thin client: it starts `inwards server` and shows what it rep
 | Windows x64 | `win32-x64` | `inwards-vscode-win32-x64-<tag>.vsix` |
 | anything else | | `inwards-vscode-universal-<tag>.vsix`, no binary: put `inwards` on `PATH` or set `inwards.path` |
 
-`.github/workflows/vscode-publish.yml` uploads these files to the Visual Studio Marketplace and Open VSX (for VSCodium, Cursor and other editors that use it) when the owner publishes a full release; the extension is on neither registry yet. Until then, install the file for your platform from a release made after v0.1.0-rc.1 (that pre-release still has the old single `.vsix` with its own server):
+`.github/workflows/vscode-publish.yml` uploads these files to the Visual Studio Marketplace and Open VSX (for VSCodium, Cursor and other editors that use it) when the owner publishes a full release; the extension is on neither registry yet. Until then, install the file for your platform from a release:
 
 ```sh
 code --install-extension inwards-vscode-darwin-arm64-vX.Y.Z.vsix
@@ -172,7 +129,7 @@ When no binary is found (a set `inwards.path` that points at nothing, or the uni
 
 ```sh
 uv init --package app && cd app
-inwards init --style hexagonal --scaffold
+uvx inwards init --style hexagonal --scaffold
 ```
 
 ```text
@@ -191,8 +148,6 @@ inwards check: 0 violations, 0 warnings.
 Try the example: uv run python -m app.bootstrap book 2
 Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 ```
-
-Once Inwards is on PyPI ([#32](https://github.com/SirCypkowskyy/inwards/issues/32)), the second line becomes `uvx inwards init --style hexagonal --scaffold`, with nothing to install first.
 
 Seven presets exist, each listed innermost first. `inwards init --list-styles` prints them with their packages.
 
