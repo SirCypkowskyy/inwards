@@ -27,7 +27,15 @@ The contract, per page:
   CATEGORIES order. Its name, severity and inline suppression cells agree
   with the front matter, and its on cell says "by default" or "opt-in"
   (rule-pages.test.ts checks that cell, and the presets cell, against the
-  registry and the `inwards init` presets).
+  registry and the `inwards init` presets);
+- a row in its category's page, rules/<category>/index.md (issue #381), whose
+  code, name, what-it-flags and on cells match the index row, and no row in
+  another category's page;
+- an entry in its category's group of the Rules section in both Zensical
+  configs' nav (issue #381). The section holds the index, then one group per
+  category in CATEGORIES order, each opening with its category page, so the
+  sidebar draws the rules as a tree. scripts/check-docs-nav.py runs the same
+  nav check through `nav_problems`.
 
 A Polish page also carries the English page's metadata, apart from its
 translated `description` (src/cli/test/integration/rule-pages.test.ts checks
@@ -41,12 +49,15 @@ import json
 import os
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 SITES = {"en": REPO / "docs/chapters/rules", "pl": REPO / "docs/pl/rules"}
+# Each site's Zensical config, whose nav holds the rules tree (issue #381).
+CONFIGS = {"en": REPO / "docs/zensical.toml", "pl": REPO / "docs/zensical.pl.toml"}
 DATA_FILE = "rules.json"
 SOURCE_PREFIX = "https://github.com/SirCypkowskyy/inwards/blob/develop/"
 
@@ -74,6 +85,8 @@ HEADING = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<text>.*?)\s*$")
 ATTR_ID = re.compile(r"\s*\{[^}]*#(?P<id>[\w-]+)[^}]*\}\s*$")
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 INDEX_ROW = re.compile(r"^\|\s*\[(?P<code>[A-Z]+[0-9]{3})\]\((?P=code)\.md\)\s*\|")
+CATEGORY_ROW = re.compile(r"^\|\s*\[(?P<code>[A-Z]+[0-9]{3})\]\(\.\./(?P=code)\.md\)\s*\|")
+RULE_PAGE = re.compile(r"rules/(?P<code>[A-Z]+[0-9]{3})\.md")
 
 
 class Page:
@@ -272,6 +285,119 @@ def check_sections(rows: dict[str, tuple[str, list[str]]]) -> list[str]:
     return problems
 
 
+def category_rows(path: Path) -> dict[str, list[str]]:
+    """Read a category page's rule table: code -> its cells (code, name, what it flags, on)."""
+    if not path.is_file():
+        return {}
+    rows = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = CATEGORY_ROW.match(line)
+        if match:
+            rows[match["code"]] = split_row(line)
+    return rows
+
+
+def check_category_pages(site: str, categories: dict[str, str], rows: dict[str, tuple[str, list[str]]]) -> list[tuple[Path, str]]:
+    """Check each category page of a site: it exists and lists exactly its category's rules, as the index does."""
+    problems = []
+    for category in CATEGORIES:
+        path = SITES[site] / category / "index.md"
+        if not path.is_file():
+            problems.append((path, f"missing: the page of the '{category}' category, which the nav opens its group with"))
+            continue
+        listed = category_rows(path)
+        for code, cells in listed.items():
+            if categories.get(code) != category:
+                problems.append((path, f"lists {code}, whose category is {categories.get(code)!r}, not '{category}'"))
+                continue
+            index_cells = rows.get(code, ("", []))[1]
+            if len(index_cells) == 7 and cells != [f"[{code}](../{code}.md)", *index_cells[1:4]]:
+                problems.append((path, f"the row of {code} must repeat the index row's code, name, what-it-flags and on cells"))
+        for code in sorted(c for c, cat in categories.items() if cat == category and c not in listed):
+            problems.append((path, f"no row for {code}: a rule's category page lists it (| [{code}](../{code}.md) | ...)"))
+    return problems
+
+
+def rules_section(nav: list) -> list | None:
+    """Find the nav section that holds rules/index.md, the Rules tab, and return its entries."""
+    for entry in nav:
+        if isinstance(entry, dict):
+            for value in entry.values():
+                if isinstance(value, list) and any(item == "rules/index.md" or (isinstance(item, dict) and "rules/index.md" in item.values()) for item in value):
+                    return value
+    return None
+
+
+def nav_pages_in(entry: object) -> list[str]:
+    """List the page paths in a nav entry, at any depth, in order."""
+    if isinstance(entry, str):
+        return [entry]
+    if isinstance(entry, list):
+        return [page for item in entry for page in nav_pages_in(item)]
+    if isinstance(entry, dict):
+        return nav_pages_in(list(entry.values()))
+    return []
+
+
+def nav_problems(site: str, categories: dict[str, str]) -> list[str]:
+    """Check a site's nav draws the rules as a tree: one group per category, in order, each holding its rules.
+
+    `categories` maps a rule code to its category (the page's first tag). The
+    Rules section must hold rules/index.md and then exactly one group per
+    category, in CATEGORIES order; a group opens with rules/<category>/index.md
+    (its title links there, through navigation.indexes) and lists the pages of
+    that category's rules, and only those. A rule page anywhere else in the nav
+    is a problem too, so a new rule can't land outside its group.
+    """
+    nav = tomllib.loads(CONFIGS[site].read_text(encoding="utf-8"))["project"].get("nav", [])
+    section = rules_section(nav)
+    if section is None:
+        return ["nav: no section holds rules/index.md"]
+    problems = []
+    groups: dict[str, list[str]] = {}
+    order = []
+    for entry in section:
+        pages = nav_pages_in(entry)
+        if not isinstance(entry, dict) or not any(isinstance(v, list) for v in entry.values()):
+            if pages != ["rules/index.md"]:
+                problems.append(f"the Rules section holds {', '.join(pages)} outside a category group")
+            continue
+        first = pages[0] if pages else ""
+        match = re.fullmatch(r"rules/(?P<category>[a-z-]+)/index\.md", first)
+        if not match or match["category"] not in CATEGORIES:
+            problems.append(f"the Rules group {', '.join(entry)} must open with rules/<category>/index.md for one of {', '.join(CATEGORIES)}")
+            continue
+        order.append(match["category"])
+        groups[match["category"]] = pages[1:]
+    if order != list(CATEGORIES):
+        problems.append(f"the Rules groups must be {', '.join(CATEGORIES)}, in that order; found {', '.join(order) or 'none'}")
+    for category, pages in groups.items():
+        for page in pages:
+            found = RULE_PAGE.fullmatch(page)
+            if not found:
+                problems.append(f"the {category} group holds {page}, which is no rule page")
+            elif categories.get(found["code"]) != category:
+                problems.append(f"{page} sits in the {category} group, but its category is {categories.get(found['code'])!r}")
+    placed = {RULE_PAGE.fullmatch(p)["code"] for pages in groups.values() for p in pages if RULE_PAGE.fullmatch(p)}
+    elsewhere = {m["code"] for p in nav_pages_in(nav) if (m := RULE_PAGE.fullmatch(p))} - placed
+    for code in sorted(set(categories) - placed):
+        where = "outside its group" if code in elsewhere else "missing"
+        problems.append(f"rules/{code}.md is {where}: list it in the {categories[code]} group of the Rules section")
+    return problems
+
+
+def category_of(page: Page) -> str:
+    """A rule page's category, the first tag of its front matter, or "" when it has none."""
+    tags = page.meta.get("tags")
+    return tags[0] if isinstance(tags, list) and tags and isinstance(tags[0], str) else ""
+
+
+def site_categories(site: str) -> dict[str, str]:
+    """Map each rule page of a site to its category (pages without one are left out)."""
+    pages = (Page(path) for path in sorted(SITES[site].glob("*.md")) if path.name != "index.md")
+    return {page.path.stem: category_of(page) for page in pages if category_of(page)}
+
+
 def rule_entry(site: str, page: Page, row: list[str]) -> dict:
     """The rule browser's record of one rule: front matter plus its index row's text."""
     meta = page.meta
@@ -337,8 +463,7 @@ def main() -> int:
             problems = page.problems or check_meta(page) + check_body(page)
             section, row = rows.get(path.stem, ("", []))
             yes, no = YES_NO[site]
-            tags = page.meta.get("tags")
-            category = tags[0] if isinstance(tags, list) and tags else None
+            category = category_of(page) or None
             if len(row) != 7:
                 problems.append(f"no seven-cell row for {path.stem} in a table of rules/index.md")
             elif not page.problems:
@@ -365,6 +490,13 @@ def main() -> int:
             errors += 1
         for problem in check_sections(rows):
             report(directory / "index.md", problem)
+            errors += 1
+        categories = {code: category_of(page) for code, page in pages[site].items() if category_of(page)}
+        for path, problem in check_category_pages(site, categories, rows):
+            report(path, problem)
+            errors += 1
+        for problem in nav_problems(site, categories):
+            report(CONFIGS[site], problem)
             errors += 1
 
     for code, page in pages["pl"].items():
