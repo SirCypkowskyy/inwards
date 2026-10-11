@@ -208,7 +208,7 @@ function finish(
   const sources = scanned.map(({ src }) => src);
   const wired = fastApiFindings(steps.parser, project, sources, { config, edit });
   // One parse per first-party module the content rules follow into, for the whole run (#359).
-  const run = new ContentRun(steps.parser, project, config);
+  const run = new ContentRun(steps.parser, project, config, scanned.length);
   try {
     for (const { src, scan } of scanned) {
       const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));

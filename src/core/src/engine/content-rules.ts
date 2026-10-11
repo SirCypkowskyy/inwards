@@ -26,6 +26,14 @@ import { ormNamingFindings } from "./orm-naming.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
 
 /**
+ * The fewest files a run checks for INW013's prefilter (#369), which reads
+ * every listed module once and parses those that name a blocking type, so
+ * that it can skip the other files with an `async def`. A smaller run, such
+ * as a hook's, parses its few files instead. Findings are the same either way.
+ */
+const PREFILTER_FILES = 200;
+
+/**
  * What the content rules share over one run: the first-party modules they
  * follow into, parsed once each, and INW013's view of them. The engine
  * builds one per run (`checkFile`, or a `check` of many files) and calls
@@ -34,6 +42,8 @@ import { thinEndpointFindings } from "./thin-endpoint.ts";
 export class ContentRun {
   readonly trees: ModuleTrees;
   private readonly options: InwardsConfig["rules"];
+  /** How many files the run checks, which decides whether INW013's prefilter pays. */
+  private readonly files: number;
   private asyncBlocking: AsyncBlockingRun | undefined;
 
   /**
@@ -42,10 +52,12 @@ export class ContentRun {
    * @param parser - parser with the Python grammar loaded.
    * @param project - the project's module index, which reads the modules.
    * @param config - the project's config, for the rules' options.
+   * @param files - how many files the run checks; one by default.
    */
-  constructor(parser: Parser, project: ProjectIndex, config: InwardsConfig) {
+  constructor(parser: Parser, project: ProjectIndex, config: InwardsConfig, files = 1) {
     this.trees = new ModuleTrees(parser, project);
     this.options = config.rules;
+    this.files = files;
   }
 
   /**
@@ -57,6 +69,7 @@ export class ContentRun {
     this.asyncBlocking ??= new AsyncBlockingRun(
       this.options?.options?.["async-blocking"],
       this.trees,
+      this.files >= PREFILTER_FILES,
     );
     return this.asyncBlocking;
   }

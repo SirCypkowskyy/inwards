@@ -24,8 +24,9 @@ import { parsePython } from "../../python/parser.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import type { ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
-import { configuredFamily, FAMILIES, type Family, LIBRARIES } from "./catalog.ts";
+import { BUILT_IN_NAMES, configuredFamily, FAMILIES, type Family, LIBRARIES } from "./catalog.ts";
 import { followModules, Helpers } from "./hop.ts";
+import { BlockingReach, blockingSegments } from "./prefilter.ts";
 import { functionReceivers } from "./receivers.ts";
 import { blockingCall, callsIn, functionsIn, isAsync, type Walk, walkOf } from "./walk.ts";
 import { report, reportHop } from "./wording.ts";
@@ -121,17 +122,65 @@ export class AsyncBlockingRun {
   readonly views: ParsedModules<Walk>;
   /** The run's trees, which may already hold the checked file. */
   readonly trees: ModuleTrees;
+  /** True when the run may read every listed module to skip files (`prefilter.ts`). */
+  private readonly prefilter: boolean;
+  /** The prefilter once built; null when it can't apply to this run. */
+  private reach: BlockingReach | null | undefined;
 
   /**
    * Reads the options and wraps the run's trees. Nothing is parsed yet.
    *
    * @param options - `[tool.inwards.rules.async-blocking]`, if set.
    * @param trees - the run's first-party modules, which a hop reads.
+   * @param prefilter - true for a run over many files, where reading every
+   *   listed module once costs less than parsing every file with an `async def`.
    */
-  constructor(options: RuleOptions | undefined, trees: ModuleTrees) {
+  constructor(options: RuleOptions | undefined, trees: ModuleTrees, prefilter = false) {
     this.settings = settingsOf(options);
     this.trees = trees;
     this.views = followModules(trees, this.settings.families, this.settings.follow);
+    this.prefilter = prefilter;
+  }
+
+  /**
+   * Tells whether a checked file may hold a finding, by the run's prefilter
+   * (`prefilter.ts`), built on the first call. Without one, every file may.
+   *
+   * @param src - the checked file, with normalised text.
+   * @returns false only when parsing the file can't find anything.
+   */
+  mayFind(src: SourceFile): boolean {
+    const reach: BlockingReach | undefined = this.reachOf();
+    return reach === undefined || reach.mayFind(src);
+  }
+
+  /**
+   * The names a call that passes no receiver must end in to reach a helper
+   * that blocks, by the run's prefilter.
+   *
+   * @returns the helpers' names and aliases, or undefined without a prefilter.
+   */
+  helpers(): ReadonlySet<string> | undefined {
+    return this.reachOf()?.helpers;
+  }
+
+  /**
+   * Builds the run's prefilter on first use, when the run asked for one and
+   * hops may leave the file.
+   *
+   * @returns the prefilter, or undefined when it doesn't apply.
+   */
+  private reachOf(): BlockingReach | undefined {
+    if (this.reach === undefined) {
+      const { follow, patterns } = this.settings;
+      // With `follow-modules = []` no hop leaves the file, and `mayBlock` has already decided.
+      const segments =
+        this.prefilter && follow?.length !== 0
+          ? blockingSegments([...BUILT_IN_NAMES, ...patterns])
+          : undefined;
+      this.reach = (segments && BlockingReach.of(this.trees, this.views, segments)) ?? null;
+    }
+    return this.reach ?? undefined;
   }
 }
 
@@ -151,7 +200,7 @@ export function checkAsyncBlocking(
   run: AsyncBlockingRun,
 ): Diagnostic[] {
   const { settings, views } = run;
-  if (!mayBlock(src.text, settings)) {
+  if (!(mayBlock(src.text, settings) && run.mayFind(src))) {
     return [];
   }
   // A file an earlier file's hop led to is parsed already; the run frees that tree.
@@ -159,7 +208,7 @@ export function checkAsyncBlocking(
   const tree = shared ?? parsePython(parser, src.text);
   try {
     const walk = walkOf(tree, src, settings.families);
-    const hops = new Helpers(walk, { views, modules: settings.follow });
+    const hops = new Helpers(walk, { views, modules: settings.follow, helpers: run.helpers() });
     return functionsIn(tree.rootNode)
       .filter(isAsync)
       .flatMap((fn) => checkFunction(fn, walk, hops))

@@ -175,22 +175,60 @@ function notCheckedOf(
  * index. Nothing is touched until the engine asks; the listing uses the same
  * walk as `inwards check`, and `listDir` reads one directory (INW010), as
  * `portions` does the other uv workspace members' import roots and the
- * project virtualenv's site-packages.
+ * project virtualenv's site-packages. A file the check has just read from
+ * disk isn't read again: INW013's prefilter reads every listed module (#369).
  *
  * @param io - probes, walks and reads the project.
  * @param project - the loaded project.
+ * @param read - texts the check read from disk, by absolute path; none by default.
  * @returns the probe, listing and reader, with root-relative forward-slash paths.
  */
-function projectFiles(io: ProjectIo, project: Project): ProjectFiles {
+function projectFiles(
+  io: ProjectIo,
+  project: Project,
+  read: ReadonlyMap<string, string> = new Map(),
+): ProjectFiles {
   const root = project.lexicalRoot;
   return {
     kind: (rel: string): ReturnType<PathKind> => io.probe.kind(join(root, rel)),
     list: (): string[] =>
       io.walk.pythonFiles([root], project.layerDirs).map((abs) => posix(relative(root, abs))),
-    read: (rel: string): string => io.read.text(join(root, rel)),
+    read: (rel: string): string => {
+      const abs = join(root, rel);
+      return read.get(abs) ?? io.read.text(abs);
+    },
     listDir: (rel: string): ReturnType<ListDir> => io.read.list(join(root, rel)),
     ...(project.portions ? { portions: project.portions } : {}),
   };
+}
+
+/**
+ * Collects the texts the check read from disk, by absolute path, leaving out
+ * the files whose content `texts` replaced: the index reads those from disk.
+ *
+ * @param run - the planned files, in order, and the content that replaced some.
+ * @param run.planned - the files from `planSources`.
+ * @param run.texts - content checked instead of what is on disk, by absolute path.
+ * @param files - the source files `readSources` gave, one per planned source, in order.
+ * @returns each file's text as read from disk.
+ */
+function diskTexts(
+  {
+    planned,
+    texts,
+  }: { planned: readonly PlannedFile[]; texts: ReadonlyMap<string, string> | undefined },
+  files: readonly SourceFile[],
+): Map<string, string> {
+  const read = new Map<string, string>();
+  let at = 0;
+  for (const { abs, sources } of planned) {
+    const file = files[at];
+    at += sources.length;
+    if (file !== undefined && sources.length > 0 && texts?.has(abs) !== true) {
+      read.set(abs, file.text);
+    }
+  }
+  return read;
 }
 
 /** What `checkPlanned` gives back to `runCheck`. */
@@ -240,7 +278,7 @@ async function checkPlanned(
   const accepted = run.baseline
     ? readBaseline(io, project.configPath, project.config.rules)
     : undefined;
-  const listing = hideTopLevel(projectFiles(io, project), run.absent);
+  const listing = hideTopLevel(projectFiles(io, project, diskTexts(run, files)), run.absent);
   const index = project.engine.index(listing);
   const options = { whole: run.whole, edit: run.edit };
   const checked = await checkOnThreads(project.engine, pool, { files, index, accepted, options });
