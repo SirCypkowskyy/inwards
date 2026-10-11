@@ -7,7 +7,7 @@
  * are the endpoints. It reads one tree; the caller resolves other modules.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import type { NameMatch } from "../shared/name-patterns.ts";
 import {
@@ -165,7 +165,7 @@ const ANY_VIEW_METHOD: ReadonlySet<string> = new Set(
  */
 export function viewMethods(root: Node, context: ClassContext): ViewMethod[] {
   const classes = moduleClasses(root);
-  return root.descendantsOfType("class_definition").flatMap((cls) => {
+  return moduleNodes(root, "class_definition").flatMap((cls) => {
     const methods = methodsOf(cls);
     const className = cls.childForFieldName("name");
     // Only a class with a method some view kind handles can hold an endpoint,

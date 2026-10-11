@@ -15,6 +15,9 @@ import { ContentRun, contentFindings } from "../src/engine/content-rules.ts";
 import { fastApiFindings } from "../src/engine/fastapi.ts";
 import { ormProjectFindings } from "../src/engine/orm-naming.ts";
 import { Engine } from "../src/index.ts";
+import { moduleNodes } from "../src/python/nodes.ts";
+import { importedNames } from "../src/python/parser.ts";
+import { skeletonNames } from "../src/python/prescan.ts";
 import { file, grammars, indexOn, parser } from "./support/helpers.ts";
 
 const CONFIG = parseConfig(`[tool.inwards]
@@ -158,5 +161,123 @@ describe("one parse per text across the content rules", () => {
     const alone = files.flatMap((src) => engine.checkFile(src, indexOn(DISK, TEXTS)));
     const together = engine.check(files, indexOn(DISK, TEXTS), undefined, { edit: true });
     expect(lines(together.diagnostics)).toEqual(lines(alone));
+  });
+});
+
+/** A router whose endpoint calls through two first-party names (#395). */
+const ITEMS = `from fastapi import APIRouter
+
+from app.core.service import items
+from app.core.shim import tools
+
+router = APIRouter()
+
+
+@router.get("/items/{item_id}", summary="Item", response_model=dict)
+def read_item(item_id: int) -> dict:
+    tools.not_found(item_id)
+    return items.load(item_id)
+`;
+
+/** Defines \`items\` itself, so \`items.load\` leads nowhere the model can follow. */
+const SERVICE = `class ItemService:
+    def load(self, item_id):
+        return {"id": item_id}
+
+
+items = ItemService()
+`;
+
+/** Re-exports a module under another name, so \`tools.not_found\` goes on through it. */
+const SHIM = `from app.core import real as tools
+
+VERSION = 1
+`;
+
+/** The function the re-export leads to, which raises a code the route doesn't declare. */
+const REAL = `from fastapi import HTTPException
+
+
+def not_found(item_id):
+    raise HTTPException(status_code=404, detail="missing")
+`;
+
+const LOOKUPS = new Map([
+  ["app/api/items.py", ITEMS],
+  ["app/core/service.py", SERVICE],
+  ["app/core/shim.py", SHIM],
+  ["app/core/real.py", REAL],
+]);
+
+describe("lookups that skip a parse (#395)", () => {
+  test("moduleNodes lists what descendantsOfType lists, once per tree", () => {
+    const tree = parser.parse(ORDERS);
+    if (tree === null) {
+      throw new Error("no tree");
+    }
+    try {
+      const root = tree.rootNode;
+      for (const type of [
+        "call",
+        "assignment",
+        "function_definition",
+        "class_definition",
+      ] as const) {
+        const want = root.descendantsOfType(type).flatMap((n) => (n ? [n.startIndex] : []));
+        expect(moduleNodes(root, type).map((n) => n.startIndex)).toEqual(want);
+      }
+      expect(moduleNodes(tree.rootNode, "call")).toBe(moduleNodes(root, "call"));
+    } finally {
+      tree.delete();
+    }
+  });
+
+  test("the import skeleton binds the names the full parse binds", () => {
+    const src = file(
+      "app/api/orders.py",
+      "from . import views as v\nimport os.path\n\n\ndef f():\n    from app.core.db import helper as h\n    return h\n",
+    );
+    const tree = parser.parse(src.text);
+    if (tree === null) {
+      throw new Error("no tree");
+    }
+    try {
+      expect(skeletonNames(parser, src)).toEqual(importedNames(tree, src));
+    } finally {
+      tree.delete();
+    }
+    expect(skeletonNames(parser, file("app/x.py", "x = 1; import os\n"))).toBeNull();
+  });
+
+  test("FAPI002 follows a name an import binds and parses no module it only passes through", () => {
+    const config = parseConfig(`[tool.inwards]
+layers = [
+  { name = "core", modules = ["app.core"] },
+  { name = "api", modules = ["app.api"] },
+]
+
+[tool.inwards.rules]
+extend-select = ["FAPI002"]
+`);
+    const disk = new Map<string, "file" | "dir">([
+      ...[...DISK].filter(([path]) => !TEXTS.has(path)),
+      ...[...LOOKUPS.keys()].map((path): [string, "file"] => [path, "file"]),
+    ]);
+    const counts = new Map<string, number>();
+    const project = indexOn(disk, LOOKUPS);
+    const files = [file("app/api/items.py", ITEMS)];
+    const run = new ContentRun(counting(counts), project, config, files);
+    let found: Diagnostic[];
+    try {
+      found = [
+        ...fastApiFindings(run.trees, project, files, { config, edit: false }).found.values(),
+      ].flat();
+    } finally {
+      run.dispose();
+    }
+    expect(found.map((d) => d.code)).toEqual(["FAPI002"]);
+    expect(found[0]?.message).toContain("404");
+    expect(counts.has(SERVICE)).toBe(false);
+    expect([ITEMS, SHIM, REAL].map((text) => counts.get(text))).toEqual([1, 1, 1]);
   });
 });

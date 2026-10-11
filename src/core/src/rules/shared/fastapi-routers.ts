@@ -15,7 +15,7 @@
  * definitions; each rule's adapter reads and parses them. It reports nothing.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import {
   ownCallBindings,
@@ -311,15 +311,15 @@ export class RouterKinds {
  */
 function routerUses(root: Node): Set<string> {
   const used = new Set<string>();
-  for (const call of root.descendantsOfType("call")) {
-    const fn = call?.childForFieldName("function");
+  for (const call of moduleNodes(root, "call")) {
+    const fn = call.childForFieldName("function");
     const object = fn?.type === "attribute" ? fn.childForFieldName("object") : null;
     const attribute = fn?.childForFieldName("attribute");
     const method = attribute ? identifierName(attribute) : "";
     if (object?.type === "identifier" && ROUTER_METHODS.has(method)) {
       used.add(identifierName(object));
     }
-    const args = method === "include_router" ? call?.childForFieldName("arguments") : null;
+    const args = method === "include_router" ? call.childForFieldName("arguments") : null;
     const [first] = args ? namedChildren(args) : [];
     if (first?.type === "identifier") {
       used.add(identifierName(first));
@@ -384,41 +384,46 @@ export function routerBindings(
   kinds: RouterKinds | undefined,
 ): RouterBinding[] {
   const used = kinds ? routerUses(root) : new Set<string>();
-  const bindings = new Map<number, RouterBinding>();
-  for (const assignment of root.descendantsOfType("assignment")) {
-    const binding = assignment ? bindingOf(assignment, qualify, used, kinds) : null;
-    if (binding) {
-      bindings.set(binding.assignment.startIndex, binding);
-    }
-  }
-  const annotated = kinds ? annotatedReturns(root, qualify, kinds) : [];
-  for (const binding of annotated.filter(({ local }) => used.has(local))) {
-    if (!bindings.has(binding.assignment.startIndex)) {
-      bindings.set(binding.assignment.startIndex, binding);
-    }
+  const bindings = new Map<number, RouterBinding>(
+    moduleNodes(root, "assignment").flatMap((assignment) => {
+      const binding = bindingOf(assignment, qualify, used, kinds);
+      return binding ? [[assignment.startIndex, binding] as const] : [];
+    }),
+  );
+  const annotated = kinds ? annotatedReturns(root, qualify, kinds, used) : [];
+  for (const binding of annotated.filter((b) => !bindings.has(b.assignment.startIndex))) {
+    bindings.set(binding.assignment.startIndex, binding);
   }
   return [...bindings.values()].sort((a, b) => a.assignment.startIndex - b.assignment.startIndex);
 }
 
 /**
  * Finds the names functions return when their return annotation is a router
- * class: `def make_router() -> APIRouter: router = wrap(); ...; return router`.
+ * class and the file uses them as routers:
+ * `def make_router() -> APIRouter: router = wrap(); ...; return router`.
+ * Only such a function's annotation is resolved, since that can parse
+ * another module (`-> Subscription` leads to the models) (#395).
  *
  * @param root - the module node.
  * @param qualify - qualifies a name through the file's imports.
  * @param kinds - tells whether the annotation is a router class.
- * @returns the bindings of the returned names, marked as a factory's.
+ * @param used - the names the file uses as routers.
+ * @returns the bindings of the returned names the file uses, marked as a factory's.
  */
-function annotatedReturns(root: Node, qualify: Qualify, kinds: RouterKinds): RouterBinding[] {
-  return root.descendantsOfType("function_definition").flatMap((fn) => {
-    const type = fn ? returnType(fn, qualify) : null;
-    const kind = fn && type !== null ? kinds.classKind(type) : null;
-    if (!fn || kind === null) {
-      return [];
-    }
-    const names = returnedNames(fn);
-    return ownCallBindings(fn)
-      .filter(({ local }) => names.has(local))
-      .map((binding) => ({ ...binding, kind, factory: true, custom: true }));
+function annotatedReturns(
+  root: Node,
+  qualify: Qualify,
+  kinds: RouterKinds,
+  used: ReadonlySet<string>,
+): RouterBinding[] {
+  return moduleNodes(root, "function_definition").flatMap((fn) => {
+    const type = used.size > 0 ? returnType(fn, qualify) : null;
+    const names = type === null ? [] : [...returnedNames(fn)].filter((n) => used.has(n));
+    const kind = type !== null && names.length > 0 ? kinds.classKind(type) : null;
+    return kind === null
+      ? []
+      : ownCallBindings(fn)
+          .filter(({ local }) => names.includes(local))
+          .map((binding) => ({ ...binding, kind, factory: true, custom: true }));
   });
 }

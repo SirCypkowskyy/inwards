@@ -15,7 +15,7 @@
  */
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { type RouterKinds, routerBindings } from "../shared/fastapi-routers.ts";
 import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
@@ -156,7 +156,7 @@ function routerNames(
     : []) {
     names.get("fastapi")?.add(`${context.module}.${local}`);
   }
-  for (const assignment of names.has("flask") ? root.descendantsOfType("assignment") : []) {
+  for (const assignment of names.has("flask") ? moduleNodes(root, "assignment") : []) {
     const left = assignment.childForFieldName("left");
     const right = assignment.childForFieldName("right");
     const callee = right?.type === "call" ? right.childForFieldName("function") : null;
@@ -287,7 +287,7 @@ function decorated(
 ): Endpoint[] {
   const custom = nameMatcher(context.recognise.decorators);
   const found: Endpoint[] = [];
-  for (const definition of root.descendantsOfType("decorated_definition")) {
+  for (const definition of moduleNodes(root, "decorated_definition")) {
     const fn = definition.childForFieldName("definition");
     const name = fn?.type === "function_definition" ? fn.childForFieldName("name") : null;
     const marked = namedChildren(definition)
@@ -389,7 +389,7 @@ export function findEndpoints(root: Node, context: EndpointContext): Found {
   const registrations: Registration[] = [];
   const prefix = `${context.module}.`;
   const registers = active.has("fastapi") || active.has("flask") || active.has("django");
-  for (const call of registers ? root.descendantsOfType("call") : []) {
+  for (const call of registers ? moduleNodes(root, "call") : []) {
     const registration = registrationOf(call, routers, full);
     const target = registration?.target ?? "";
     const local = target.startsWith(prefix);
