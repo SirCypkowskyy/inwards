@@ -116,11 +116,12 @@
     white-space: nowrap;
   }
 
-  /* The name cell: the name, what the rule flags, and its default in
-     Graphite, one per line. */
+  /* The name cell: the name, what the rule flags, then its default and the
+     presets that turn it on in Graphite, one per line. */
   .inw-rules__name,
   .inw-rules__summary,
-  .inw-rules__default {
+  .inw-rules__default,
+  .inw-rules__presets {
     display: block;
     inline-size: fit-content;
   }
@@ -129,7 +130,8 @@
     margin-block-start: 0.3em;
   }
 
-  .inw-rules__default {
+  .inw-rules__default,
+  .inw-rules__presets {
     color: var(--inw-graphite);
   }
 

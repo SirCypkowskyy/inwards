@@ -200,12 +200,16 @@ function severities(value: unknown): Record<string, Severity> | undefined {
  *
  * @param code - the code as written.
  * @param key - the key it is listed under.
- * @throws {ConfigError} for an unknown code, or INW000 outside `select`.
+ * @throws {ConfigError} for an unknown code (naming the code when a rule's
+ *   name was written instead), or INW000 outside `select`.
  */
 function checkCode(code: string, key: string): void {
   if (!Object.hasOwn(RULES, code)) {
+    const named = ruleFor(code);
     throw new ConfigError(
-      `Unknown rule code "${code}" in tool.inwards.rules.${key}. This Inwards knows ${Object.keys(RULES).join(", ")}.`,
+      named === undefined
+        ? `Unknown rule code "${code}" in tool.inwards.rules.${key}. This Inwards knows ${Object.keys(RULES).join(", ")}.`
+        : `"${code}" in tool.inwards.rules.${key} is a rule name, not a code: did you mean "${named.code}"?`,
     );
   }
   if (code === FIXED && key !== "select") {

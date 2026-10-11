@@ -41,10 +41,14 @@ export interface InitFlags {
   scaffold?: boolean | undefined;
   package?: string | undefined;
   launcher?: string | undefined;
+  /** `--shared`: Claude Code's hooks in the committed `.claude/settings.json`, and `.mcp.json` (#342). */
+  shared?: boolean | undefined;
   /** `--brief`: also write the architecture brief into AGENTS.md (#58). */
   brief?: boolean | undefined;
   "list-styles"?: boolean | undefined;
   "dry-run"?: boolean | undefined;
+  /** `--write`: write the table `--style auto` proposes instead of only printing it (#343). */
+  write?: boolean | undefined;
 }
 
 /** What to do, once flags or the picker have decided. */
@@ -95,6 +99,13 @@ export interface Picker {
    * @returns the plan, or undefined when the user cancels.
    */
   pick: (target: Target, flags: InitFlags) => Promise<InitPlan | undefined>;
+  /**
+   * Asks a yes-or-no question, such as whether to write what `--style auto` proposes.
+   *
+   * @param message - the question.
+   * @returns true for yes; false for no or when the user cancels.
+   */
+  confirm: (message: string) => Promise<boolean>;
 }
 
 /** What `inwards init` needs besides the platform. */
@@ -110,6 +121,13 @@ export interface InitDeps {
    * @returns the document, or undefined when it doesn't parse.
    */
   toml: (text: string) => unknown;
+  /**
+   * Looks a command up on `PATH`, as a shell would, for `--shared` without a launcher.
+   *
+   * @param command - a bare command name, e.g. `inwards`.
+   * @returns the path it resolves to, or undefined when it isn't on `PATH`.
+   */
+  onPath: (command: string) => string | undefined;
 }
 
 /** Everything an init function is given. */

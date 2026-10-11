@@ -2,13 +2,17 @@
  * @file The compiled binary end to end against the recorded Claude Code hook
  * payloads in `support/fixtures/claude-code`. The exit codes and output are
  * pinned in a snapshot, and garbage on stdin is a clean exit 1. A PreToolUse
- * Write of a Python file the package shape forbids is denied (#96).
+ * Write of a Python file the package shape forbids is denied (#96), and a
+ * whole-project check reads the marked diagrams `diagrams` lists (#344). The
+ * Stop gate accepts hooks that live only in the committed
+ * `.claude/settings.json` (`init --shared`, #342) and refuses once they are gone.
  */
 import { expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { VERSION } from "@inwards/core";
 import { inwards, LAYERS, payload, project, type RunResult } from "../support/run.ts";
+import { git, ID } from "../support/stop-helpers.ts";
 
 // The contract agents and CI depend on: exit codes and output for every
 // recorded payload, every machine format and the error paths. Any change fails
@@ -55,17 +59,55 @@ test.each(fixtures)("hook claude-code < %s", (name) => {
   expect(run(root, ["hook", "claude-code"], payload(name, root))).toMatchSnapshot();
 });
 
-test.each(["json", "sarif", "concise"])("check --format %s", (format) => {
+test.each(["json", "sarif", "concise", "github"])("check --format %s", (format) => {
   expect(run(root, ["check", "--format", format])).toMatchSnapshot();
+});
+
+test("check --format json reads the marked diagrams `diagrams` lists (INW017)", () => {
+  const drawn = project({
+    "pyproject.toml": `${LAYERS}diagrams = ["docs/*.md", "docs/missing.mmd"]
+
+[tool.inwards.rules]
+extend-select = ["INW017"]
+`,
+    ...files,
+    "shop/infrastructure/db.py": "",
+    "docs/architecture.md": [
+      "# Architecture",
+      "",
+      "```mermaid",
+      "%% inwards: layers",
+      "flowchart LR",
+      '  infra --> domain["shop.domian"]',
+      "  infra --> pg[(Postgres)]:::external",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  expect(run(drawn, ["check", "--format", "json"])).toMatchSnapshot();
 });
 
 test.each([
   ["json", "0"],
   ["concise", "0"],
   ["sarif", "1"],
+  ["github", "0"],
   ["text", "some"],
 ])("check --format %s --max-diagnostics %s", (format, max) => {
   expect(run(root, ["check", "--format", format, "--max-diagnostics", max])).toMatchSnapshot();
+});
+
+test("check --format github names files from GITHUB_WORKSPACE", () => {
+  const repo = project({
+    "packages/api/pyproject.toml": LAYERS,
+    "packages/api/shop/domain/order.py": "import shop.infrastructure.db\n",
+    "packages/api/shop/infrastructure/db.py": "",
+  });
+  const { code, stdout } = inwards(["check", "--format", "github"], {
+    cwd: join(repo, "packages/api"),
+    env: { GITHUB_WORKSPACE: repo },
+  });
+  expect({ code, stdout: stable(stdout) }).toMatchSnapshot();
 });
 
 test.each([
@@ -118,4 +160,32 @@ allow = ["router", "service", "utils"]
 
 test("hook with garbage on stdin", () => {
   expect(run(root, ["hook", "claude-code"], "not json")).toMatchSnapshot();
+});
+
+test("Stop gate with the hooks only in the committed .claude/settings.json", () => {
+  const shared = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": "X = 1\n" });
+  git(shared, "init", "-q");
+  git(shared, "add", "-A");
+  git(shared, "commit", "-qm", "start");
+  expect(run(shared, ["init", "--agent", "claude", "--shared", "--launcher", "uv run"]).code).toBe(
+    0,
+  );
+  /**
+   * Sends one recorded hook payload for the test session.
+   *
+   * @param name - the fixture, e.g. `stop`.
+   * @param extra - payload fields to override.
+   * @returns the masked exit code and output.
+   */
+  function hook(name: string, extra: Record<string, unknown> = {}): RunResult {
+    return run(
+      shared,
+      ["hook", "claude-code"],
+      payload(name, shared, { session_id: ID, ...extra }),
+    );
+  }
+  expect(hook("session-start", { source: "startup" })).toMatchSnapshot("session start");
+  expect(hook("stop")).toMatchSnapshot("project-scope hooks pass");
+  rmSync(join(shared, ".claude", "settings.json"));
+  expect(hook("stop")).toMatchSnapshot("hooks missing everywhere");
 });

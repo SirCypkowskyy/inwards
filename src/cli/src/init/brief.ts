@@ -2,7 +2,7 @@
  * @file The architecture brief (`inwards context`, `inwards init --brief`, #58):
  * a short Markdown summary of `[tool.inwards]` for AGENTS.md, so an agent
  * knows the layers, the allowed import directions, where ports live, and any
- * library or context rules before it writes an import, rather than after a
+ * library, context or opt-in rules before it writes code, rather than after a
  * violation. It builds the text deterministically from the parsed config, the
  * preset named in init's comment, and a probe for `ports` modules; it reads
  * through the platform's probe and reader and never writes a file itself.
@@ -16,6 +16,7 @@ import {
   ruleLevel,
 } from "@inwards/core";
 import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import { code, list, optInSection } from "./brief-rules.ts";
 import type { Change } from "./contracts.ts";
 import { STYLES } from "./presets.ts";
 import { readIfThere, upsertSection } from "./section.ts";
@@ -23,6 +24,8 @@ import { allowedImports, expandLayers, isStyle, type Style } from "./styles.ts";
 
 /** The markers around the brief in AGENTS.md, apart from the check section's. */
 const BRIEF_MARKERS = { begin: "<!-- inwards-brief:begin -->", end: "<!-- inwards-brief:end -->" };
+/** The most inner layers a layer's line names; past it, the line gives their numbers. */
+const NAMED_IMPORTS = 3;
 /** The comment `init --style` writes into `[tool.inwards]`, naming the preset. */
 const PRESET_COMMENT = /^# Preset "(?<name>[a-z-]+)" \(inwards init --style /mu;
 
@@ -43,7 +46,8 @@ interface BriefInput {
 
 /**
  * Writes the brief: the layers innermost first with what each may import,
- * where ports live, and the library and context rules when configured and on.
+ * where ports live, the library and context rules when configured and on, and
+ * the opt-in rules the config turns on.
  *
  * @param input - the config, the preset and the ports.
  * @returns Markdown without markers, ending without a line break.
@@ -53,7 +57,9 @@ export function architectureBrief(input: BriefInput): string {
   const preset = style === undefined ? "" : ` (the ${style.name} preset)`;
   const where = ports.length === 0 ? "the inner layer" : ports.map(code).join(" or ");
   const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
-  const siblings = hasSiblings ? ", nor a sibling of your own layer" : "";
+  const numbered = numbersLayers(config.layers);
+  const groups = numbered ? ` (sibling groups: ${siblingGroups(config.layers).join("; ")})` : "";
+  const siblings = hasSiblings ? `, nor a sibling of your own layer${groups}` : "";
   const lines = [
     "## Architecture brief (Inwards)",
     "",
@@ -61,12 +67,13 @@ export function architectureBrief(input: BriefInput): string {
     "",
     ...config.layers.map(
       (layer, i) =>
-        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${allowedImports(config.layers, i)}`,
+        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${layerImports(config.layers, i, numbered)}`,
     ),
     "",
     `Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in ${where} and implement it in the outer layer.`,
     ...librarySection(config),
     ...contextSection(config),
+    ...optInSection(config),
   ];
   return lines.join("\n");
 }
@@ -88,7 +95,7 @@ function librarySection(config: InwardsConfig): string[] {
     return rule === undefined ? [] : [`- ${layer.name}: ${rule}`];
   });
   for (const { modules, libraries } of libraryDenies(config.rules?.options?.["pure-domain"])) {
-    rules.push(`- ${list(modules)}: not ${list(libraries)}`);
+    rules.push(`- ${siblingModules(modules)}: not ${list(libraries)}`);
   }
   return rules.length === 0 ? [] : ["", "Libraries (INW005):", ...rules];
 }
@@ -128,40 +135,167 @@ function contextSection(config: InwardsConfig): string[] {
   if (config.contexts === undefined || off) {
     return [];
   }
-  const header =
-    ruleLevel("INW002", config.rules) === "off"
-      ? "Contexts (INW003): import only another context's public modules."
-      : "Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.";
+  const independent = ruleLevel("INW002", config.rules) !== "off";
+  const header = independent
+    ? "Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules."
+    : "Contexts (INW003): import only another context's public modules.";
   return [
     "",
     header,
     ...config.contexts.map((ctx) => {
-      const pub = ctx.public.length === 0 ? "nothing public" : `public ${list(ctx.public)}`;
+      const pub = ctx.public.length === 0 ? "nothing public" : `public ${publicList(ctx)}`;
       const deps =
         ctx.dependsOn.length === 0 ? "no dependencies" : `depends on ${ctx.dependsOn.join(", ")}`;
-      return `- ${ctx.name} (${list(ctx.modules)}): ${pub}; ${deps}`;
+      return `- ${ctx.name} (${list(ctx.modules)}): ${independent ? `${pub}; ${deps}` : pub}`;
     }),
   ];
 }
 
 /**
- * Formats names as inline code, comma separated.
+ * Formats a context's public modules. When it has one module and two or more
+ * public modules inside it, they share it as a prefix in braces
+ * (`` `app.posts.{router,service}` ``), which keeps a template context's line short.
  *
- * @param names - module or library names.
- * @returns e.g. `` `a`, `b` ``.
+ * @param ctx - one configured context.
+ * @param ctx.modules - its module prefixes.
+ * @param ctx.public - its public modules, at least one.
+ * @returns the modules as inline code.
  */
-function list(names: readonly string[]): string {
-  return names.map(code).join(", ");
+function publicList(ctx: { modules: readonly string[]; public: readonly string[] }): string {
+  const [only, ...more] = ctx.modules;
+  if (only === undefined || more.length > 0) {
+    return list(ctx.public);
+  }
+  return braced(`${only}.`, ctx.public) ?? list(ctx.public);
 }
 
 /**
- * Formats one name as inline code.
+ * Formats modules that share one parent, such as a deny entry's template
+ * roles, the way {@link publicList} does: `` `app.*.{models,service}` ``.
  *
- * @param name - a module or library name.
- * @returns the name in backticks.
+ * @param modules - module names or selectors.
+ * @returns the modules as inline code, braced when two or more share their parent.
  */
-function code(name: string): string {
-  return `\`${name}\``;
+function siblingModules(modules: readonly string[]): string {
+  /**
+   * Cuts a module's last segment off.
+   *
+   * @param m - a dotted module name.
+   * @returns its parent with the trailing dot, or "" for a top-level name.
+   */
+  function parent(m: string): string {
+    return m.slice(0, m.lastIndexOf(".") + 1);
+  }
+  const prefix = parent(modules[0] ?? "");
+  const shared = modules.every((m) => parent(m) === prefix);
+  return (shared ? braced(prefix, modules) : undefined) ?? list(modules);
+}
+
+/**
+ * Writes two or more modules under one prefix in braces.
+ *
+ * @param prefix - the shared prefix, ending in a dot.
+ * @param modules - dotted module names, each expected to start with the prefix.
+ * @returns e.g. `` `app.posts.{router,service}` ``, or undefined when fewer than two modules or one lies outside the prefix.
+ */
+function braced(prefix: string, modules: readonly string[]): string | undefined {
+  const inside = modules.filter((m) => prefix !== "" && m.startsWith(prefix));
+  if (modules.length < 2 || inside.length !== modules.length) {
+    return undefined;
+  }
+  return code(`${prefix}{${inside.map((m) => m.slice(prefix.length)).join(",")}}`);
+}
+
+/**
+ * Finds a layer's place in the order.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @param k - the layer's index.
+ * @returns its rank, or its index when the layers have no ranks.
+ */
+function rankOf(layers: readonly LayerSpec[], k: number): number {
+  return layers[k]?.rank ?? k;
+}
+
+/**
+ * Numbers the layers below one layer's rank, as the brief's list does.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @param k - the layer's index.
+ * @returns their 1-based numbers, ascending.
+ */
+function innerOf(layers: readonly LayerSpec[], k: number): number[] {
+  return layers.flatMap((_, j) => (rankOf(layers, j) < rankOf(layers, k) ? [j + 1] : []));
+}
+
+/**
+ * Tells whether the brief refers to layers by number: once a layer has more
+ * than `NAMED_IMPORTS` inner layers, as a template's deep roles do.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @returns true when some line gives numbers instead of names.
+ */
+function numbersLayers(layers: readonly LayerSpec[]): boolean {
+  return layers.some((_, k) => innerOf(layers, k).length > NAMED_IMPORTS);
+}
+
+/**
+ * Lists each group of sibling layers by number, for the brief's opening
+ * sentence when it refers to layers by number.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @returns e.g. `2-4` and `5-6`, one per rank that two or more layers share.
+ */
+function siblingGroups(layers: readonly LayerSpec[]): string[] {
+  const byRank = new Map<number, number[]>();
+  layers.forEach((_, k) => {
+    const rank = rankOf(layers, k);
+    byRank.set(rank, [...(byRank.get(rank) ?? []), k + 1]);
+  });
+  return [...byRank.values()].filter((group) => group.length > 1).map(ranges);
+}
+
+/**
+ * Says what one layer may import. Up to `NAMED_IMPORTS` inner layers are named;
+ * more are given by their numbers in the brief's list (`layers 1-9`), which
+ * keeps a template's deep roles to one short line each. When the brief gives
+ * numbers, its opening sentence lists the sibling groups once, so a line
+ * leaves its siblings out instead of repeating their long names.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @param i - the layer's index.
+ * @param numbered - whether the brief refers to layers by number ({@link numbersLayers}).
+ * @returns e.g. `may import layers 1-4`, or `may import domain; not its sibling inbound` in a short brief.
+ */
+function layerImports(layers: readonly LayerSpec[], i: number, numbered: boolean): string {
+  const named = allowedImports(layers, i);
+  if (!numbered || named.startsWith("may import every")) {
+    return named;
+  }
+  const inner = innerOf(layers, i);
+  if (inner.length <= NAMED_IMPORTS) {
+    return named.split("; ")[0] ?? named;
+  }
+  return `may import layers ${ranges(inner)}`;
+}
+
+/**
+ * Writes ascending numbers as ranges.
+ *
+ * @param numbers - distinct positive integers, ascending.
+ * @returns e.g. `1-4, 6` for 1, 2, 3, 4 and 6.
+ */
+function ranges(numbers: readonly number[]): string {
+  const runs: [number, number][] = [];
+  for (const n of numbers) {
+    const last = runs.at(-1);
+    if (last !== undefined && last[1] === n - 1) {
+      last[1] = n;
+    } else {
+      runs.push([n, n]);
+    }
+  }
+  return runs.map(([from, to]) => (from === to ? `${from}` : `${from}-${to}`)).join(", ");
 }
 
 /**

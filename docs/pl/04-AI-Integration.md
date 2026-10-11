@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: d311f9ba983864e1f16e00044da0d84c620c8d2e8a76383a890c90ffdc0e2907
+source_hash: a124f1235b09abcbe26a4714e11b975f80010246fa975a14dc2c847008a79425
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -52,7 +52,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     Claude Code uruchamia [hooki](https://code.claude.com/docs/en/hooks) wokół wywołań narzędzi. Dla `PostToolUse` kod wyjścia 2 nie cofa edycji (ona już się wydarzyła), ale Claude widzi stderr hooka i na nie reaguje. Dla `Stop` kod wyjścia 2 każe Claude'owi dalej pracować zamiast kończyć turę. Dane wejściowe hooka zawierają `stop_hook_active`, a Claude Code i tak kończy turę po kilku kolejnych blokadach, więc zepsuty hook Stop nie może uwięzić sesji.
 
-    Żeby zamiast tego udostępnić konfigurację przez commitowany `.claude/settings.json`, napisz go ręcznie. Ta wersja zakłada, że `inwards` jest w `PATH`:
+    Żeby zamiast tego udostępnić konfigurację przez commitowany `.claude/settings.json`, uruchom `inwards init --agent claude --shared --launcher "uv run"` ([przewodnik](guides/claude-code.md#share-it-with-the-team)). Hooki i reguły deny trafiają wtedy do `.claude/settings.json`, serwer `inwards` uruchamiający `uv run inwards mcp` do `.mcp.json`, a do `.gitignore` tylko `.inwards/`. Commitowane pliki nie mogą zawierać ścieżki z konkretnej maszyny, więc `--shared` przyjmuje launcher albo zapisuje samo `inwards`, gdy jest w `PATH`, a w przeciwnym razie odmawia. Usuwa własne hooki Inwards z `.claude/settings.local.json`, bo Claude Code łączy listy hooków z plików ustawień i uruchamiałyby się dwa razy, i nigdy nie zastępuje własnych hooków zespołu ani serwera MCP `inwards`, który uruchamia coś innego. Bez launchera wynik wygląda tak:
 
     ```json title=".claude/settings.json"
     {
@@ -69,20 +69,24 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
-            "hooks": [
-              {
-                "type": "command",
-                "command": "inwards hook claude-code"
-              }
-            ]
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
           }
         ],
         "Stop": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
+      },
+      "permissions": {
+        "deny": [
+          "Edit(/.claude/settings*.json)",
+          "Edit(/.inwards/**)",
+          "Edit(/**/inwards-baseline.json)"
+        ]
       }
     }
     ```
+
+    Stop gate czyta pliki ustawień użytkownika, projektu i lokalny, więc liczą się hooki w dowolnym z nich.
 
     `inwards hook claude-code` czyta JSON hooka ze stdin, więc nie potrzebuje `jq` ani powłoki POSIX i działa tak samo na Windows. Po `PostToolUse` sprawdza ten jeden plik Pythona, który agent właśnie zapisał:
 
@@ -132,9 +136,9 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
 === ":material-microsoft-visual-studio-code: Copilot (VS Code)"
 
-    W trybie agenta Copilot może czytać diagnostyki obszaru roboczego publikowane przez rozszerzenia. Z zainstalowanym rozszerzeniem Inwards naruszenie warstwy pojawia się w panelu Problems jak każdy inny błąd, a agent widzi je bez hooka.
+    Copilot nie ma hooka, z którego Inwards mógłby skorzystać. W VS Code rozszerzenie umieszcza każde naruszenie w panelu Problems, a agent widzi je, gdy czyta ten panel (narzędzie `#read/problems`) albo uruchamia sprawdzenie, o które prosi `AGENTS.md`. `inwards mcp` daje mu [narzędzia MCP](guides/mcp.md).
 
-    Dla agenta kodującego Copilot, który pracuje nad pull requestami na GitHubie, egzekwowanie odbywa się w CI. Dodaj `inwards check --format sarif` do workflow i zainstaluj plik binarny w `.github/workflows/copilot-setup-steps.yml`, żeby agent mógł go uruchomić przed pushem.
+    Agent Copilota w chmurze (cloud agent), który pracuje na GitHubie i otwiera pull requesty, czyta ten sam `AGENTS.md`, dostaje Inwards z `.github/workflows/copilot-setup-steps.yml`, a warstw pilnuje sprawdzenie w CI na jego pull requeście. [Poradnik GitHub Copilot](guides/copilot.md) opisuje konfigurację obu.
 
 === ":material-file-document-edit-outline: Codex, Cursor i inni"
 
@@ -164,6 +168,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 | `text` | Ludzie, Aider | `file:line:col: CODE message`, potem ponumerowane kroki naprawy |
 | `json` | Agenci, skrypty | `inwards/diagnostics@1`: `summary` + `diagnostics[]`, każda z `fix.summary` i `fix.steps[]` |
 | `sarif` | GitHub code scanning ([workflow](guides/ci.md)), przeglądarki SARIF w IDE | SARIF 2.1.0. Kroki naprawy trafiają do `message.text` i `properties.fix` |
+| `github` | GitHub Actions ([workflow](guides/ci.md#the-workflow)) | Jedno polecenie workflow `::error` albo `::warning` na diagnostykę, z krokami naprawy i linkiem do dokumentacji w treści i ścieżkami od korzenia repozytorium, potem linia podsumowania |
 | `concise` | Agenci z budżetem tokenów | Jedna linia na diagnostykę: położenie, kod, komunikat (podaje import, jeśli reguła go ma) i pierwszy krok naprawy. Podziały linii, na przykład w zawiniętym `from x import (…)` cytowanym w poprawce, są zamieniane na spacje. Potem linia podsumowania. Nigdy nie jest kolorowany |
 
 <figure markdown="span">
@@ -171,9 +176,9 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
   <figcaption>JSON, który dostaje agent: wersjonowane podsumowanie i uporządkowane kroki naprawy. Wyjście przekierowane do potoku jest zwięzłe; tutaj <code>jq</code> tylko je ładnie formatuje.</figcaption>
 </figure>
 
-`--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst i `concise` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
+`--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst, `concise` i `github` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
 
-`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`, każdy osobno. Pomija sprawdzenia, które potrzebują całego projektu: martwe prefiksy i selektory warstw, zagnieżdżone projekty i dowiązania symboliczne w warstwach (INW006), selektory kształtów (INW007), wymagane elementy pakietów z kształtem (INW008) i cykle importów (INW004). Do nich uruchom `inwards check` bez ścieżek; `--help` mówi to samo. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, a SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
+`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`, każdy osobno. Pomija sprawdzenia, które potrzebują całego projektu: martwe prefiksy i selektory warstw, zagnieżdżone projekty i dowiązania symboliczne w warstwach (INW006), selektory kształtów (INW007), wymagane elementy pakietów z kształtem (INW008) i cykle importów (INW004). Do nich uruchom `inwards check` bez ścieżek; `--help` mówi to samo. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`, a `github` wypisuje dla każdej polecenie `::warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
 
 ### Pisanie diagnostyk dla modelu { #writing-diagnostics-for-a-model }
 
@@ -248,7 +253,7 @@ Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing 
 Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. Dwie funkcje przesuwają Inwards wcześniej w pętli:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) wypisuje mapę warstw, tego, co każda z nich może importować, tego, gdzie leżą porty, oraz reguły bibliotek i kontekstów, w mniej niż 300 tokenach. `inwards context --write` albo `inwards init --brief` utrzymuje ją w oznaczonej sekcji `AGENTS.md`. Jest opcjonalna, żeby design partnerzy mogli porównać przebiegi z nią i bez niej ([opis architektury](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły.
+- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły. Agent bez MCP dostaje tę samą stronę z `inwards rule CODE`, a `inwards rules` wypisuje reguły, które projekt włącza.
 
 ```mermaid
 flowchart LR

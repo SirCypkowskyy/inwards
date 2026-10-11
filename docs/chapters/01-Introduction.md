@@ -80,10 +80,11 @@ To phase rules in, a `[tool.inwards.rules]` table sets which rules report and ho
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]      # these rules never report (optional)
 severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent (optional)
-# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+# extend-select = ["INW012"]       # turn opt-in rules on, next to the defaults (optional)
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule that is on by default)
 ```
 
-Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select`. INW000 always reports as an error, because a file whose declared encoding can hide imports isn't checked at all, and the Stop gate's check that no layer was moved away during the session ignores the table too. `inwards check`, the hooks, the Stop gate and the VS Code extension all apply the table; the extension reads it again whenever `pyproject.toml` changes, and shows a config error (an unknown code, say) on `pyproject.toml`. It is part of `[tool.inwards]`, so the config guard stops an agent from changing it. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) covers the baseline and SARIF.
+Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `ignore` wins over `select` and `extend-select`. Most rules are on by default; the opt-in ones (the [roles](rules/index.md#roles), [diagrams](rules/index.md#diagrams) and [FastAPI](rules/index.md#fastapi) rules) report only once `extend-select` or `select` names them. INW000 always reports as an error, because a file whose declared encoding can hide imports isn't checked at all, and the Stop gate's check that no layer was moved away during the session ignores the table too. `inwards check`, the hooks, the Stop gate and the VS Code extension all apply the table; the extension reads it again whenever `pyproject.toml` changes, and shows a config error (an unknown code, say) on `pyproject.toml`. It is part of `[tool.inwards]`, so the config guard stops an agent from changing it. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) covers the baseline and SARIF.
 
 `generated` lists modules that a build step writes, such as protoc's `orders_pb2` or the `_version` module setuptools-scm writes. A developer's checkout has them and a fresh CI checkout doesn't, so INW010 doesn't report an import of one that isn't on disk. Patterns match whole name segments anywhere, as `ignore` does, and a segment may use `*` and `?`: `*_pb2` covers `shop.api.orders_pb2`, and `shop.gen` covers everything under `shop/gen/`. Without the key the list is `["*_pb2", "*_pb2_grpc", "_version"]`; setting it replaces that list, and `generated = []` turns it off. A bracket set or a pattern made only of wildcards is a config error. [GitHub Actions](guides/ci.md#generated-modules) and [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default) have the details.
 
@@ -121,7 +122,7 @@ A suppression with no reason, an unknown code or a malformed comment hides nothi
 
     ---
 
-    A single executable compiled with Bun. Drop it in CI, a pre-commit hook or an agent hook, or add it with `uv add --dev` as a platform wheel with the binary inside.
+    A single executable compiled with Bun. Drop it in [CI](guides/ci.md), a [pre-commit hook](guides/ci.md#pre-commit) or an agent hook, or add it with `uv add --dev` as a platform wheel with the binary inside.
 
 -   :material-microsoft-visual-studio-code:{ .lg .middle } __Same rules in the editor__
 
@@ -152,7 +153,7 @@ The structure follows C4 for the architecture and plain ADRs for decisions.
 
 !!! info "Status"
     Pre-alpha.
-    Eight rules work end to end in the CLI, the engine and the editor (`inwards server`): INW001 (layer direction), INW011 (dynamic imports), INW005 ([libraries per layer](guides/libraries.md): no frameworks or I/O in the domain by default), INW006 (code outside every layer, dead prefixes), INW010 (imports of first-party modules that don't exist), INW007 and INW008 ([package shape](guides/package-shape.md): allowed, forbidden and required members) and INW000 (a declared source encoding that could hide imports).
+    The rules INW000 to INW018 and the FastAPI rules FAPI001 to FAPI009 (FAPI004 is unused) work end to end in the CLI, the engine and the editor (`inwards server`); the [rules index](rules/index.md) groups them by category and says what each one checks.
     `inwards init --agent claude` installs the Claude Code hooks: a check after each edit, a Stop gate over what the session changed, a config guard, and escalation to the user. For Aider, `init` prints the `lint-cmd` line to add; for other agents it writes an `AGENTS.md` section. On a new project, `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` writes the layers, and `--scaffold` adds an example package that passes the check.
-    Each release is a GitHub Release with binaries for six platforms, five platform wheels and the VS Code extension, one VSIX per platform with the binary inside. The only one so far is the pre-release v0.1.0-rc.1.
+    The latest release is 0.5.0 (2026-10-10). Each release goes to [PyPI](https://pypi.org/project/inwards/) as five platform wheels (`uv add --dev inwards`), and to GitHub Releases with binaries for six platforms, the same wheels and the VS Code extension, one VSIX per platform with the binary inside. [Install](guides/install.md) has the details.
     Everything marked :material-progress-clock: in these docs is planned, not built.

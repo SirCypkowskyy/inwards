@@ -9,6 +9,7 @@
  * from `stringList` and `libraryDenies`, which read a list back with its type.
  */
 import { isSelector, selectorProblem } from "./layer-selector.ts";
+import { boolean, isStringList, listMatching, listOf, oneOf, suffix } from "./option-parsers.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 /**
@@ -56,64 +57,6 @@ const ENTRYPOINT =
   /^[\p{XID_Start}_]\p{XID_Continue}*(?:\.[\p{XID_Start}_]\p{XID_Continue}*)*:[\p{XID_Start}_]\p{XID_Continue}*$/u;
 
 /**
- * Tells whether a raw value is a list of strings.
- *
- * @param value - a raw TOML value.
- * @returns true for an array whose entries are all strings, empty included.
- */
-function isStringList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((e) => typeof e === "string");
-}
-
-/**
- * Parses `true` or `false`.
- *
- * @param value - the raw value.
- * @param where - the key's dotted path.
- * @returns the value, unchanged.
- * @throws {ConfigError} for anything else.
- */
-function boolean(value: unknown, where: string): boolean {
-  if (typeof value !== "boolean") {
-    throw new ConfigError(`${where} must be true or false.`);
-  }
-  return value;
-}
-
-/**
- * Makes a parser for one of a few literal values.
- *
- * @param values - the allowed values.
- * @returns the parser.
- */
-function oneOf(values: readonly (string | boolean)[]): OptionParser {
-  return (value: unknown, where: string): OptionValue => {
-    if (!((typeof value === "string" || typeof value === "boolean") && values.includes(value))) {
-      const listed = values.map((v) => JSON.stringify(v)).join(", ");
-      throw new ConfigError(`${where} must be one of ${listed}.`);
-    }
-    return value;
-  };
-}
-
-/**
- * Makes a parser for a list of distinct strings drawn from a fixed set, empty included.
- *
- * @param values - the allowed entries.
- * @returns the parser.
- */
-function listOf(values: readonly string[]): OptionParser {
-  return (value: unknown, where: string): OptionValue => {
-    const ok = isStringList(value) && value.every((e) => values.includes(e));
-    if (!ok || new Set(value).size !== value.length) {
-      const listed = values.map((v) => `"${v}"`).join(", ");
-      throw new ConfigError(`${where} must be a list of distinct entries from ${listed}.`);
-    }
-    return value;
-  };
-}
-
-/**
  * Parses an integer from 0 to `MAX_DEPTH`.
  *
  * @param value - the raw value.
@@ -130,8 +73,8 @@ function depth(value: unknown, where: string): number {
 
 /**
  * Parses a non-empty list of module prefixes or selectors, checked like
- * `layers[].modules`: `modules` in every table, and FAPI003's `allow-unmounted`.
- * INW013's `follow-modules` may be empty.
+ * `layers[].modules`: `modules` in every table, FAPI003's `allow-unmounted`,
+ * INW015's `role` and `allowed-in`. INW013's `follow-modules` may be empty.
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
@@ -205,22 +148,6 @@ function limit(value: unknown, where: string): number | false {
 }
 
 /**
- * Makes a parser for a list of strings that each match a pattern, empty included.
- *
- * @param pattern - what every entry must match.
- * @param example - how the message describes a good entry.
- * @returns the parser.
- */
-function listMatching(pattern: RegExp, example: string): OptionParser {
-  return (value: unknown, where: string): OptionValue => {
-    if (!(isStringList(value) && value.every((e) => pattern.test(e)))) {
-      throw new ConfigError(`${where} must be a list of ${example}.`);
-    }
-    return value;
-  };
-}
-
-/**
  * Parses INW012's `delegate-to`: a non-empty list of layer names or module
  * prefixes and selectors. Which entries name a layer is known only once the
  * layers are parsed, so `delegateProblem` checks the rest then.
@@ -263,7 +190,7 @@ export function delegateProblem(
   return undefined;
 }
 
-/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types. */
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's bases and decorators. */
 const namePatterns = listMatching(
   NAME_PATTERN,
   'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
@@ -345,6 +272,19 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
     "follow-modules": (value: unknown, where: string): string[] =>
       moduleEntries(value, where, true),
   },
+  "ports-abstract": {
+    "allow-bases": namePatterns,
+    "extend-allow-bases": namePatterns,
+    "allow-decorators": namePatterns,
+  },
+  "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
+  "orm-naming": {
+    "table-name": oneOf(["snake", "snake_singular", false]),
+    "datetime-suffix": suffix,
+    "date-suffix": suffix,
+    "allow-tables": listMatching(/\S/u, 'table names such as "news" or "user_settings"'),
+    "require-naming-convention": boolean,
+  },
   "router-wiring": {
     entrypoints,
     "allow-unmounted": moduleEntries,
@@ -418,12 +358,6 @@ export function stringList(value: OptionValue | undefined): readonly string[] | 
   if (typeof value !== "object") {
     return undefined;
   }
-  const strings: string[] = [];
-  for (const entry of value) {
-    if (typeof entry !== "string") {
-      return undefined;
-    }
-    strings.push(entry);
-  }
-  return strings;
+  const strings = [...value].filter((entry): entry is string => typeof entry === "string");
+  return strings.length === value.length ? strings : undefined;
 }

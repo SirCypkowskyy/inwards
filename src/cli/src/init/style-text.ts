@@ -1,7 +1,7 @@
 /**
  * @file The text a preset turns into: the `[tool.inwards]` table
  * `inwards init --style` writes (layers with sibling groups and templates,
- * the templates, the rules it turns off or on, its contexts and, with `--scaffold`,
+ * module and context cycles turned on, the templates, the rules it turns off or on, its contexts and, with `--scaffold`,
  * its shapes), the `--list-styles` listing, and the annotated tree init and
  * the picker draw. Pure: what is on disk comes in through a callback.
  */
@@ -14,9 +14,23 @@ import {
   STYLE_NAMES,
   type Style,
   type StyleLayer,
+  type StyleOptIn,
 } from "./styles.ts";
+import { roleDenies, templateNotes, templateRulesLines } from "./template-text.ts";
 
 export const MISSING = "(missing)";
+
+/**
+ * Every preset turns on INW004 for module cycles as well as context cycles
+ * (#340). ADR-032 keeps modules off by default so an upgrade doesn't fail a
+ * project that lives with cycles; a project init sets up has no such history.
+ * The linear presets keep `"contexts"` too, so contexts added later are
+ * covered without editing the list. `--style auto` writes the same lines.
+ */
+export const CYCLES: readonly string[] = [
+  "# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.",
+  `cycles = ${array(["modules", "contexts"])}`,
+];
 
 /**
  * What a module below the package is: on disk as a file or a directory,
@@ -131,7 +145,10 @@ export function describeStyles(pkg: string): string {
       ...(rules === undefined ? [] : [`  Turns off ${rules.codes.join(", ")}. ${rules.why}`]),
       ...(style.optIn === undefined
         ? []
-        : [`  Turns on ${style.optIn.codes.join(", ")} as warnings.`]),
+        : [
+            `  Turns on ${style.optIn.codes.join(", ")} as ${style.optIn.codes.length === 1 ? "a warning" : "warnings"}.`,
+          ]),
+      ...templateNotes(style, pkg),
       `  Gap: ${style.gap}.`,
       "  Shapes, with --scaffold:",
       ...describeShapes(style.shapes, pkg),
@@ -199,8 +216,9 @@ function extraLines(style: Style, pkg: string, scaffold: boolean): string[] {
       lines.push(`roles = ${array(roleRanks(template.roles))}`);
     }
     lines.push(`public = ${array(template.public)}`);
+    lines.push(...templateRulesLines(template));
   }
-  lines.push(...rulesLines(style));
+  lines.push(...rulesLines(style, pkg));
   const { contexts } = style;
   if (contexts !== undefined) {
     lines.push("", ...contexts.why.map((line) => `# ${line}`));
@@ -240,34 +258,61 @@ function roleRanks(roles: readonly { name: string; sibling?: true }[]): string[]
 /**
  * Writes `[tool.inwards.rules]`: the rules the preset turns off, the opt-in
  * rules it turns on, a severity table that makes each of them a warning (one
- * line per rule, so a user deletes a line to report the rule at its own severity again), and their
- * options tables.
+ * line per rule, so a user deletes a line to report the rule at its own severity again), their
+ * options tables, and the libraries its templates deny to some roles (INW005's `deny`).
  *
  * @param style - the preset.
+ * @param pkg - the project's import package, for options that name modules.
  * @returns the lines, after a blank line, or none when the preset sets no rules.
  */
-function rulesLines(style: Style): string[] {
+function rulesLines(style: Style, pkg: string): string[] {
   const { ignoreRules: off, optIn: on } = style;
-  if (off === undefined && on === undefined) {
+  const denies = roleDenies(style, pkg);
+  if (off === undefined && on === undefined && denies.length === 0) {
     return [];
   }
   const lines = ["", "[tool.inwards.rules]"];
   if (off !== undefined) {
     lines.push(`# ${off.why}`, `ignore = ${array(off.codes)}`);
   }
-  if (on === undefined) {
-    return lines;
+  if (on !== undefined) {
+    lines.push(...optInLines(on, pkg));
   }
-  lines.push(
+  if (denies.length > 0) {
+    lines.push(
+      "",
+      ...denies.map((deny) => `# ${deny.why}`),
+      "[tool.inwards.rules.pure-domain]",
+      "deny = [",
+      ...denies.map(
+        (deny) => `  { modules = ${array(deny.modules)}, libraries = ${array(deny.libraries)} },`,
+      ),
+      "]",
+    );
+  }
+  return lines;
+}
+
+/**
+ * Writes the opt-in rules a preset turns on: `extend-select`, a severity
+ * table making each a warning, and their options tables.
+ *
+ * @param on - the preset's opt-in rules.
+ * @param pkg - the project's import package, for options that name modules.
+ * @returns the lines, to follow the `[tool.inwards.rules]` header.
+ */
+function optInLines(on: StyleOptIn, pkg: string): string[] {
+  const lines = [
     `# ${on.why}`,
     `extend-select = ${array(on.codes)}`,
     "",
     "# Delete a line to report that rule at its own severity, an error for most findings.",
     "[tool.inwards.rules.severity]",
     ...on.codes.map((code) => `${code} = "warning"`),
-  );
+  ];
   for (const table of on.options) {
-    lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...table.lines);
+    const options = typeof table.lines === "function" ? table.lines(pkg) : table.lines;
+    lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...options);
   }
   return lines;
 }
@@ -315,6 +360,7 @@ export function configTable(
     `root = ${JSON.stringify(opts.root)}`,
     `required-version = ${JSON.stringify(opts.version)}`,
     `ignore = ${array(opts.ignore)}`,
+    ...CYCLES,
     "layers = [",
     ...layerLines(style, opts.pkg),
     "]",

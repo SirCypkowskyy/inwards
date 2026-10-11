@@ -24,6 +24,40 @@ export interface SourceFile {
   text: string;
 }
 
+/**
+ * A Markdown or Mermaid file a `diagrams` entry names, read by the adapter
+ * for the diagram rules (INW017, ADR-045).
+ */
+export interface DiagramSource {
+  /** Path as the user should see it. */
+  path: string;
+  text: string;
+}
+
+/** A layer `inwards import-diagram` read from a layers diagram. */
+export interface DraftDiagramLayer {
+  name: string;
+  /** The node's quoted label; empty when the node has none. */
+  modules: string[];
+}
+
+/** A context `inwards import-diagram` read from a contexts diagram. */
+export interface DraftDiagramContext {
+  name: string;
+  modules: string[];
+  public: string[];
+  dependsOn: string[];
+}
+
+/** The `[tool.inwards]` a marked diagram stands for (`inwards import-diagram`, ADR-045). */
+export interface DiagramDraft {
+  /** The places in the layer order, innermost first; a place of two or more layers is a sibling group. */
+  layers: DraftDiagramLayer[][];
+  contexts: DraftDiagramContext[];
+  /** What the user should finish by hand, one sentence each. */
+  notes: string[];
+}
+
 export interface ImportRef extends Span {
   /**
    * Fully resolved dotted target, e.g. `shop.infrastructure.db.OrderTable`.
@@ -38,6 +72,13 @@ export interface ImportRef extends Span {
    * target is a module (`import X`, `from X import *`, dynamic imports).
    */
   from?: string;
+  /**
+   * Set when the import sits in the body of an `if TYPE_CHECKING:` or
+   * `elif TYPE_CHECKING:` (also `typing.TYPE_CHECKING`), which never runs
+   * (#375). Only the full parse sets it: the prescan's skeleton keeps import
+   * lines alone, so it can't tell, and its references never carry it.
+   */
+  typeChecking?: true;
 }
 
 /** Machine-actionable repair advice. Written for an LLM first, a human second. */

@@ -1,0 +1,9 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`INW014 ports-abstract the fix names the adapter layer's module 1`] = `
+[
+  "Replace the body of \`UserRepository.save\` with \`...\`, keeping its docstring, and mark it \`@abstractmethod\`.",
+  "Put the code in a class in \`shop.adapters\` (layer \`adapters\`) that subclasses \`UserRepository\`, and implement \`save\` there.",
+  "Code every adapter shares belongs in a helper in the adapter layer or a domain service, not in the port.",
+]
+`;

@@ -8,6 +8,7 @@
 import { Language, type Node, Parser, type Tree, type TreeCursor } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../contracts/records.ts";
 import { packageOf, resolveRelative } from "./module-names.ts";
+import { underTypeChecking } from "./type-checking.ts";
 
 /**
  * The engine never touches the file system to find its grammars. Each adapter
@@ -254,8 +255,9 @@ function visitForImports(
 /**
  * Lists every import in a parsed file.
  * Includes imports nested in functions, classes and `if TYPE_CHECKING:`
- * blocks, since those still create a dependency. Relative imports are
- * resolved against the file's module.
+ * blocks, since those still create a dependency; the last are marked
+ * `typeChecking`, for the rules that care whether an import runs (INW004,
+ * INW015). Relative imports are resolved against the file's module.
  *
  * @param tree - the parsed file.
  * @param file - the file the tree came from; its module resolves relative imports.
@@ -264,7 +266,12 @@ function visitForImports(
 export function extractImports(tree: Tree, file: SourceFile): ImportRef[] {
   const refs: ImportRef[] = [];
   for (const stmt of importStatements(tree)) {
-    refs.push(...(stmt.type === "import_statement" ? plainImports(stmt) : fromImports(stmt, file)));
+    const found = stmt.type === "import_statement" ? plainImports(stmt) : fromImports(stmt, file);
+    refs.push(
+      ...(underTypeChecking(stmt)
+        ? found.map((ref) => ({ ...ref, typeChecking: true as const }))
+        : found),
+    );
   }
   return refs;
 }

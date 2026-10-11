@@ -132,5 +132,21 @@ function equivalentCommand(plan: InitPlan, flags: InitFlags): string {
     .join(" ");
 }
 
+/**
+ * Asks a yes-or-no question on the terminal, defaulting to no.
+ *
+ * @param message - the question.
+ * @returns true for yes; false for no, Ctrl-C or Escape.
+ */
+async function confirm(message: string): Promise<boolean> {
+  const clack = await import("@clack/prompts");
+  const answer = await clack.confirm({ message, initialValue: false });
+  if (clack.isCancel(answer)) {
+    cancelled(clack.cancel);
+    return false;
+  }
+  return answer;
+}
+
 /** The picker behind the `Picker` contract. */
-export const terminalPicker: Picker = { pick };
+export const terminalPicker: Picker = { pick, confirm };

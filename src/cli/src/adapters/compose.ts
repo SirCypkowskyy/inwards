@@ -117,6 +117,7 @@ export function compose(workerEntry?: string): AppDeps {
       picker: terminalPicker,
       entry,
       toml: parseToml,
+      onPath: (command: string): string | undefined => Bun.which(command) ?? undefined,
     },
     toml: parseToml,
     daemon: nodeDaemon(io, entry),

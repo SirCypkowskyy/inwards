@@ -6,7 +6,8 @@
  * edge can join two groups into one. So every file with an edge inside a
  * cyclic group that only the skeleton read is read again with the full
  * parse, and the cycles are found again, until each group stands on imports
- * the full parse found. Projects without cycles never pay for it, and it
+ * the full parse found. The same read drops a skeleton edge that sits under
+ * `if TYPE_CHECKING:`, which only the full parse can tell (#375). Projects without cycles never pay for it, and it
  * stays cheap: a file that holds only imports, comments and blank lines up to
  * its last import needs no parse, since its skeleton is its text there
  * (`onlyImportsUpTo`); and since the skeleton never misses an import, the

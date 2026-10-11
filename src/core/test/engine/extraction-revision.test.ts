@@ -18,6 +18,7 @@ const REPO = resolve(import.meta.dir, "../../../..");
 const FILES = [
   "src/core/src/python/parser.ts",
   "src/core/src/python/prescan.ts",
+  "src/core/src/python/type-checking.ts",
   "src/core/src/python/reparse.ts",
   "src/core/src/python/module-names.ts",
   "src/core/src/rules/suppression-comment.ts",
@@ -40,6 +41,13 @@ const RECORDED: Readonly<Record<string, string>> = {
   "12": "98d73e3db7a4c4d3aa328c572362b274a51ec15fb79e84a2ea0b4a0f103113c4",
   "13": "c28e083953bf85affefacb59c8785b89d4a724b26948bcd21d090135b1d6db0f",
   "14": "f1ec25a062423754b42a1c40f6af407ac1b86d943497de4df9756e9c1765cdd2",
+  "15": "92d37ca8993e40ab7c0bfc5abf846c85f8d0bb7c7d1904f643509a69867a08a1",
+  "16": "9c2b33839bdedcf5363caab703528b970b413cbc613a9faa4650ac27cd391dd1",
+  "17": "1c202fe103ee76673d04edb818c36be825433f9112893619ccc7e21ea992b70d",
+  "18": "814697701241cad8c5a65dd27ec9813996dfa57515ba2cbf2f873839e5c29efc",
+  "19": "211b6fa42d59f26602a21c1e023205009438a53d5bec77829898818c69a646b0",
+  "20": "71068dafd8525296c5b1d96c653d241366d2afa709f36f0aee0ce7c56fefcf00",
+  "21": "e4c76b1e8046bf4d07ee26e060961050d47d6a6a11379862398b5f04221300e6",
 };
 
 test("the extraction revision changes with the code it describes", () => {

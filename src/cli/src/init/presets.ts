@@ -1,6 +1,7 @@
 /**
  * @file The seven architecture presets behind `inwards init --style`: layered,
- * clean and hexagonal, which are layers only, and vertical-slices,
+ * clean and hexagonal, which are layers only (clean and hexagonal turn on
+ * INW014 and INW015 for their ports and driven adapters), and vertical-slices,
  * bounded-contexts, django and fastapi, which add templates and contexts
  * (fastapi, which also turns on the FastAPI rules, is `fastapi-preset.ts`'s).
  * Each names the one import its config can't forbid (its `gap`). Pure data;
@@ -9,9 +10,16 @@
 import { djangoModules } from "./django.ts";
 import { FASTAPI } from "./fastapi-preset.ts";
 import { ADAPTERS, topShape, USE_CASES } from "./shapes.ts";
-import { BOOTSTRAP, contextsWhy, runBootstrap, type Style, type StyleName } from "./styles.ts";
+import {
+  BOOTSTRAP,
+  contextsWhy,
+  portsAndAdapters,
+  runBootstrap,
+  type Style,
+  type StyleName,
+} from "./styles.ts";
 
-/** The fields the linear presets share: no templates, contexts or rules. */
+/** The fields the linear presets share: no templates, contexts or rules turned off. */
 const LINEAR: Pick<
   Style,
   "templates" | "contexts" | "ignoreRules" | "optIn" | "companion" | "tryIt"
@@ -49,6 +57,7 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
   },
   clean: {
     ...LINEAR,
+    optIn: portsAndAdapters("infrastructure"),
     name: "clean",
     summary: "entities at the centre, use cases around them, frameworks outside",
     layers: [
@@ -67,10 +76,11 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
       bootstrap: "bootstrap",
     },
     shapes: [topShape(["domain/", "application/", "infrastructure/", "presentation/"]), USE_CASES],
-    gap: "presentation may import infrastructure; leave the wiring to bootstrap",
+    gap: "presentation may call a port directly instead of a use case",
   },
   hexagonal: {
     ...LINEAR,
+    optIn: portsAndAdapters("adapters.outbound"),
     name: "hexagonal",
     summary: "ports and adapters: the application talks to the world only through ports",
     layers: [

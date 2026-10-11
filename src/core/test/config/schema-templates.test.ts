@@ -1,11 +1,31 @@
 /**
- * @file Paired negative cases for templates and sibling layers (#97) in the
+ * @file Paired negative cases for templates, their rules (#298) and sibling layers (#97) in the
  * `[tool.inwards]` JSON Schema, kept beside `schema-negatives.test.ts`. Each
  * structural mistake fails both the schema and the parser. Each relation only
  * the expansion can see fails the parser alone.
  */
 import { describe, expect, test } from "bun:test";
-import { MINIMAL, parserError, schemaErrors } from "../support/config-schema.ts";
+import { optionKeys } from "../../src/config/rule-options.ts";
+import { RULES } from "../../src/meta/registry.ts";
+import {
+  MINIMAL,
+  parserError,
+  type Schema,
+  schema,
+  schemaErrors,
+} from "../support/config-schema.ts";
+
+/**
+ * Follows a `$ref` (also one wrapped in `allOf`) to its definition.
+ *
+ * @param node - a schema node.
+ * @returns the definition it points to, or the node itself.
+ */
+function deref(node: Schema): Schema {
+  const ref = node.$ref ?? node.allOf?.find((part) => part.$ref !== undefined)?.$ref;
+  const name = ref?.split("/").at(-1);
+  return name === undefined ? node : (schema.definitions?.[name] ?? node);
+}
 
 /**
  * Builds a config from the minimal one plus extra TOML.
@@ -117,5 +137,108 @@ describe("relations only the expansion shows fail the parser only", () => {
   ])("%s", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).toEqual([]);
+  });
+});
+
+/**
+ * Builds a config whose one layer entry uses template `t`, with roles
+ * `models` and `router`, and the given `rules` table body.
+ *
+ * @param rules - the body of `[tool.inwards.templates.t.rules]`.
+ * @returns the config text.
+ */
+function withRules(rules: string): string {
+  return `${withLayer('{ name = "d", modules = ["shop.*"], template = "t" }')}[tool.inwards.templates.t]\nroles = ["models", "router"]\n\n[tool.inwards.templates.t.rules]\n${rules}\n`;
+}
+
+/**
+ * Names the options a template fills for a rule, which its table may not set.
+ *
+ * @param name - the rule's name.
+ * @returns `modules`, and `role` for INW015.
+ */
+function filled(name: string): string[] {
+  return name === "construct-only-in" ? ["modules", "role"] : ["modules"];
+}
+
+describe("template rules (#298)", () => {
+  test("agree with the parser on the rules a template can name and their keys", () => {
+    const template = schema.properties?.["templates"]?.additionalProperties;
+    const rules = deref(typeof template === "object" ? template : {});
+    const roles = deref(rules.properties?.["rules"] ?? {}).additionalProperties;
+    const byRule = (typeof roles === "object" ? roles : {}).properties ?? {};
+    const optIn = Object.values(RULES)
+      .filter((rule) => rule.default === "off")
+      .map((rule) => rule.name);
+    expect(Object.keys(byRule).sort()).toEqual([...optIn].sort());
+    // A rule's own options table, with modules refused by a propertyNames clause.
+    const noModules = '{"type":"object","propertyNames":{"not":{"const":"modules"}}}';
+    const keys = optIn.map((name) => {
+      const table = (byRule[name]?.anyOf ?? []).at(-1) ?? {};
+      const refused = JSON.stringify(table.allOf ?? []).includes(noModules) ? ["modules"] : [];
+      const allowed = Object.keys(deref(table).properties ?? {});
+      return [name, allowed.filter((key) => !refused.includes(key)).sort()];
+    });
+    expect(keys).toEqual(
+      optIn.map((name) => [
+        name,
+        [...optionKeys(name)].filter((key) => !filled(name).includes(key)).sort(),
+      ]),
+    );
+  });
+
+  test.each([
+    [
+      "rules that aren't a table",
+      withRules("").replace("[tool.inwards.templates.t.rules]\n", 'rules = ["x"]\n'),
+    ],
+    ["a role that isn't a table", withRules('router = "async-blocking"')],
+    ["a role key that isn't a module name", withRules('"a b" = { async-blocking = true }')],
+    ["an unknown rule", withRules("router = { async-blocking-io = true }")],
+    ["a rule code", withRules("router = { INW013 = true }")],
+    ["a rule that is on by default", withRules("router = { layer-dependency = true }")],
+    ["false", withRules("router = { async-blocking = false }")],
+    ["an unknown severity", withRules('router = { async-blocking = "fatal" }')],
+    ["modules in a template table", withRules('router = { async-blocking = { modules = ["x"] } }')],
+    [
+      "INW015's role in a template table",
+      withRules('router = { construct-only-in = { role = ["x"] } }'),
+    ],
+    [
+      "an option another rule owns",
+      withRules("router = { async-blocking = { max-statements = 3 } }"),
+    ],
+    ["a bad option value", withRules("router = { thin-endpoint = { max-statements = -1 } }")],
+  ])("%s fails both", (_what, text) => {
+    expect(parserError(text)).toBeDefined();
+    expect(schemaErrors(text)).not.toEqual([]);
+  });
+
+  test.each([
+    ["a role the template doesn't list", withRules("service = { async-blocking = true }")],
+    [
+      "rules in a template without roles",
+      `${MINIMAL}[tool.inwards.templates.t]\nrules = { router = { async-blocking = true } }\n`,
+    ],
+    [
+      "rules in a template no layer entry uses",
+      `${MINIMAL}[tool.inwards.templates.t]\nroles = ["router"]\nrules = { router = { async-blocking = true } }\n`,
+    ],
+    [
+      "two roles that disagree on an option",
+      withRules(
+        "router = { thin-endpoint = { max-statements = 3 } }\nmodels = { thin-endpoint = { max-statements = 4 } }",
+      ),
+    ],
+  ])("%s fails the parser only", (_what, text) => {
+    expect(parserError(text)).toBeDefined();
+    expect(schemaErrors(text)).toEqual([]);
+  });
+
+  test("true, a severity and options tables pass both", () => {
+    const text =
+      withRules(`router = { async-blocking = true, thin-endpoint = { max-statements = 8 }, construct-only-in = { allowed-in = ["shop.main"] } }
+models = { orm-naming = "warning", ports-abstract = {} }`);
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 });

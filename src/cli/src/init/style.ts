@@ -3,13 +3,15 @@
  * (`--list-styles`, `--style`, `--agent`, `--scaffold`, `--package`, `--brief`), asks
  * with the picker on a terminal when nothing was chosen, then writes a
  * preset's `[tool.inwards]`, the example scaffold and an agent's wiring, and
- * prints the annotated tree with a check's result. Everything it touches
- * comes in through the `InitContext`; it refuses rather than overwrites.
+ * prints the annotated tree with a check's result. `--style auto`, which maps
+ * the modules a project already has, is `auto-command.ts`'s. Everything it
+ * touches comes in through the `InitContext`; it refuses rather than overwrites.
  */
 import { dirname } from "node:path";
 import { parseConfig, VERSION } from "@inwards/core";
 import { print } from "../platform/print.ts";
 import { agentChanges, apply, DEFAULT_IGNORE, initCommand, PRERELEASE } from "./agents.ts";
+import { autoCommand } from "./auto-command.ts";
 import { withBrief } from "./brief.ts";
 import {
   AGENTS,
@@ -23,20 +25,25 @@ import {
 import { STYLES } from "./presets.ts";
 import { report, type Setup } from "./report.ts";
 import { planScaffold } from "./scaffold.ts";
+import { appendSeparator } from "./section.ts";
 import { fullModule } from "./shapes.ts";
 import { configTable, describeStyles } from "./style-text.ts";
 import { expandLayers, isStyle, STYLE_NAMES, type Style, type StyleName } from "./styles.ts";
 import { findTarget, noPackage, shown, sourceRoot } from "./target.ts";
 
-const HOW = `  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--brief] [--dry-run]
-  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--brief] [--dry-run]    (the project already has [tool.inwards])
+const HOW = `  inwards init --style auto [--package NAME] [--write] [--agent ${AGENTS.join("|")}] [--shared] [--brief] [--dry-run]
+  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--shared] [--brief] [--dry-run]
+  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--shared] [--brief] [--dry-run]    (the project already has [tool.inwards])
   inwards init --brief [--dry-run]    (only the architecture brief in AGENTS.md)
   inwards init --list-styles`;
 
+/** `--style auto`: map the modules the project has instead of writing a preset (#343). */
+const AUTO = "auto";
+
 /**
  * Runs `inwards init` with whatever flags were given: `--list-styles`, the
- * picker (no `--style`, `--agent` or `--brief`, on a terminal), `--style` with or
- * without `--agent`, `--agent` alone exactly as before, or `--brief` alone.
+ * picker (no `--style`, `--agent` or `--brief`, on a terminal), `--style auto`,
+ * `--style` with or without `--agent`, `--agent` alone exactly as before, or `--brief` alone.
  *
  * @param ctx - the platform, the check runner and init's writer and picker.
  * @param paths - positionals after `init`; there must be none.
@@ -60,10 +67,13 @@ export async function initMain(
   if (flags.agent !== undefined && !isAgent(flags.agent)) {
     return print(ctx.io.streams, `${usage}\n\n--agent must be one of: ${AGENTS.join(", ")}`, 2);
   }
+  if (flags.style === AUTO) {
+    return await autoCommand(ctx, flags, dryRun);
+  }
   if (flags.style !== undefined && !isStyle(flags.style)) {
     return print(
       ctx.io.streams,
-      `inwards init: --style must be one of: ${STYLE_NAMES.join(", ")}`,
+      `inwards init: --style must be one of: ${AUTO}, ${STYLE_NAMES.join(", ")}`,
       2,
     );
   }
@@ -72,7 +82,7 @@ export async function initMain(
   if (style === undefined && agent !== undefined) {
     return flags.scaffold === true || flags.package !== undefined
       ? print(ctx.io.streams, "inwards init: --scaffold and --package need --style.", 2)
-      : initCommand(ctx, { agent, launcher: flags.launcher, brief }, dryRun);
+      : initCommand(ctx, { ...startFlags(flags), agent, brief }, dryRun);
   }
   if (style !== undefined) {
     return await styleCommand(
@@ -83,7 +93,11 @@ export async function initMain(
     );
   }
   if (brief) {
-    return initCommand(ctx, { agent: undefined, launcher: undefined, brief }, dryRun);
+    return initCommand(
+      ctx,
+      { agent: undefined, launcher: undefined, shared: false, brief },
+      dryRun,
+    );
   }
   return await interactive(ctx, flags, dryRun);
 }
@@ -123,7 +137,7 @@ async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean):
   if (plan.style === undefined) {
     return plan.agent === undefined
       ? 0
-      : initCommand(ctx, { agent: plan.agent, launcher: flags.launcher, brief: false }, dryRun);
+      : initCommand(ctx, { ...startFlags(flags), agent: plan.agent, brief: false }, dryRun);
   }
   return await styleCommand(ctx, { ...plan, style: plan.style }, flags, dryRun);
 }
@@ -188,7 +202,7 @@ async function styleCommand(
   const wired =
     plan.agent === undefined
       ? []
-      : agentChanges(ctx, { agent: plan.agent, launcher: flags.launcher }, project);
+      : agentChanges(ctx, { ...startFlags(flags), agent: plan.agent }, project);
   const wiring =
     typeof wired === "string" || flags.brief !== true
       ? wired
@@ -278,7 +292,7 @@ function withTable(
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const version = VERSION.replace(PRERELEASE, "");
   const table = configTable(style, { pkg, root, version, ignore: DEFAULT_IGNORE, scaffold, eol });
-  const after = `${text}${separator(text, eol)}${table}`;
+  const after = `${text}${appendSeparator(text, eol)}${table}`;
   const want = expandLayers(style)
     .map((layer) => `${layer.name}=${fullModule(pkg, layer.module)}`)
     .join(" ");
@@ -296,20 +310,6 @@ function withTable(
 }
 
 /**
- * Picks what goes between the end of pyproject.toml and the new table: one blank line.
- *
- * @param text - the file's text.
- * @param eol - its line ending.
- * @returns "", one line ending or two.
- */
-export function separator(text: string, eol: string): string {
-  if (text === "" || text.endsWith(`${eol}${eol}`)) {
-    return "";
-  }
-  return text.endsWith(eol) ? eol : `${eol}${eol}`;
-}
-
-/**
  * Finds the project init works on, or says why there is none.
  *
  * @param ctx - the platform and init's TOML parser.
@@ -319,4 +319,14 @@ export function separator(text: string, eol: string): string {
 function lookUpTarget(ctx: InitContext, flags: InitFlags): Target | number {
   const target = findTarget({ ...ctx.io, toml: ctx.init.toml }, flags.package);
   return typeof target === "string" ? print(ctx.io.streams, `inwards init: ${target}`, 2) : target;
+}
+
+/**
+ * Picks the flags that say how an agent starts Inwards.
+ *
+ * @param flags - the parsed options.
+ * @returns `--launcher` as given, and whether `--shared` was.
+ */
+function startFlags(flags: InitFlags): { launcher: string | undefined; shared: boolean } {
+  return { launcher: flags.launcher, shared: flags.shared === true };
 }

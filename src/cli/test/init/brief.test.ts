@@ -153,6 +153,28 @@ deny = [{ modules = ["shop.domain.pricing", "shop.*.jobs"], libraries = ["numpy"
     );
   });
 
+  test("braces a prefix deny's modules when they share their parent (#338)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules.pure-domain]
+deny = [{ modules = ["shop.*.models", "shop.*.service"], libraries = ["fastapi"] }]
+`);
+    expect(architectureBrief({ config, style: undefined, ports: [] })).toContain(
+      "- `shop.*.{models,service}`: not `fastapi`",
+    );
+  });
+
+  test("leaves a context's dependencies out when INW002 is off (#338)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules]
+ignore = ["INW002"]
+[[tool.inwards.contexts]]
+name = "billing"
+modules = ["shop.billing"]
+public = ["shop.billing.api"]
+`);
+    const brief = architectureBrief({ config, style: undefined, ports: [] });
+    expect(brief).toContain("- billing (`shop.billing`): public `shop.billing.api`");
+    expect(brief).not.toContain("no dependencies");
+  });
+
   test("leaves out the rules that are turned off", () => {
     const config = parseConfig(`${LAYERS}[tool.inwards.rules]
 ignore = ["INW005"]
@@ -175,7 +197,7 @@ ignore = ["INW005"]
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
       expect(brief).toContain(`(the ${name} preset)`);
       expect(brief).toContain(`declare a \`typing.Protocol\` in ${PRESET_PORTS[name]}`);
-      // fastapi has eleven layers, nine of them the template's roles, each listing what it may import.
+      // fastapi has eleven layers, nine of them the template's roles, and ten opt-in rules on.
       expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
     },
   );
@@ -194,7 +216,7 @@ test("a preset whose ports layer became a selector names no ports module", () =>
   const text = table.replace('"app.application"', '"app.*.application"');
   expect(text).toContain('"app.*.application"');
   const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
-  expect(brief).not.toContain("ports`");
+  expect(brief).not.toContain(".ports`");
   expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
 });
 

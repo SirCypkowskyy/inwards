@@ -1,7 +1,8 @@
 /**
  * @file The extraction cache on disk (#56), read back. An entry comes back
  * only for the exact identity it was written for, and a corrupt, oversized,
- * reshaped or mismatched entry reads as a miss. A symlink, a file or a FIFO
+ * reshaped or mismatched entry reads as a miss; an import's `typeChecking`
+ * mark survives the round trip. A symlink, a file or a FIFO
  * where the cache expects a directory or an entry turns the cache off or
  * reads as a miss; pruning and failed writes are in `extraction-prune.test.ts`.
  */
@@ -36,6 +37,17 @@ describe("reading back", () => {
     expect(again?.get(id("import shop.db  \n"))).toBeUndefined();
   });
 
+  test("an import marked as under TYPE_CHECKING comes back marked", () => {
+    const root = tempDir("inwards-cache-");
+    const value = {
+      full: [
+        { ...SPAN, target: "shop.db", statement: "import shop.db", typeChecking: true as const },
+      ],
+    };
+    fileExtractionCache(root, WASM)?.set(id("import shop.db\n"), value);
+    expect(fileExtractionCache(root, WASM)?.get(id("import shop.db\n"))).toEqual(value);
+  });
+
   test("other grammars get their own namespace", () => {
     const root = tempDir("inwards-cache-");
     fileExtractionCache(root, WASM)?.set(id("x = 1\n"), VALUE);
@@ -56,6 +68,10 @@ describe("reading back", () => {
       JSON.stringify({ ...entry, value: { full: [{ target: "x" }] } }),
       JSON.stringify({ ...entry, value: { comments: [{ span: SPAN, codes: [1] }] } }),
       JSON.stringify({ ...entry, value: { skeleton: [{ ...SPAN, line: 0, target: "a" }] } }),
+      JSON.stringify({
+        ...entry,
+        value: { full: [{ ...SPAN, target: "a", statement: "import a", typeChecking: false }] },
+      }),
       JSON.stringify({ ...entry, textHash: createHash("sha256").update("y").digest("hex") }),
       JSON.stringify({ ...entry, module: "shop.other" }),
       JSON.stringify({ ...entry, format: "0" }),

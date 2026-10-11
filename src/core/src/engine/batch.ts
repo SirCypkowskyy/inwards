@@ -2,7 +2,7 @@
  * @file Checking many files at once: the order the engine's per-file steps run
  * in over a whole list, and what only the whole list decides (the baseline
  * shortcut, FastAPI's cross-file findings, one unassigned-package warning per
- * package, import cycles). `checkAllWith` is the same run with the parsing
+ * package, import cycles, INW016's naming convention). `checkAllWith` is the same run with the parsing
  * handed to an `ExtractionBatch` first (#61), such as worker threads. The
  * rules and their precedence stay in `engine.ts`; this module only orders
  * the steps the engine hands it.
@@ -19,10 +19,11 @@ import type {
   Suppressed,
 } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
-import { contentFindings } from "./content-rules.ts";
+import { ContentRun, contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import type { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
+import { ormConventionFindings } from "./orm-naming.ts";
 import {
   type Checked,
   type Confirmed,
@@ -206,19 +207,25 @@ function finish(
   const collected: Collected[] = [];
   const sources = scanned.map(({ src }) => src);
   const wired = fastApiFindings(steps.parser, project, sources, { config, edit });
-  for (const { src, scan } of scanned) {
-    const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));
-    const imports = confirmed.imports ?? scan.imports;
-    if (imports !== undefined) {
-      collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
+  // One parse per first-party module the content rules follow into, for the whole run (#359).
+  const run = new ContentRun(steps.parser, project, config);
+  try {
+    for (const { src, scan } of scanned) {
+      const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));
+      const imports = confirmed.imports ?? scan.imports;
+      if (imports !== undefined) {
+        collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
+      }
+      const extra = withFound(
+        withFastApi(confirmed, src, wired),
+        contentFindings(steps.parser, src, config, run),
+      );
+      const own = steps.suppressIn(src, extra);
+      suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
+      all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }
-    const extra = withFound(
-      withFastApi(confirmed, src, wired),
-      contentFindings(steps.parser, src, config, project),
-    );
-    const own = steps.suppressIn(src, extra);
-    suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
-    all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
+  } finally {
+    run.dispose();
   }
   if (whole) {
     all.push(
@@ -228,6 +235,7 @@ function finish(
         fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
           steps.extractor.importsUpTo(file, lastLine),
       }),
+      ...ormConventionFindings(steps.parser, sources, config),
     );
   }
   return {

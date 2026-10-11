@@ -2,8 +2,10 @@
  * @file The rule registry: every rule's code, name, default severity, one-line
  * summary and docs link, in one place. Rule modules build their diagnostics
  * with `diagnostic()` and reporters list rules from `RULES`, so adding a rule
- * touches only its own module and this file. Whether a rule reports by default
- * lives here too; which rules a project turns on is `config/rule-settings.ts`.
+ * touches only its own module and this file, plus its docs page, whose first
+ * tag files it under a category (scripts/check-rule-pages.py lists them).
+ * Whether a rule reports by default lives here too; which rules a project
+ * turns on is `config/rule-settings.ts`.
  */
 
 import type { Diagnostic, Fix, Severity, SourceFile, Span } from "../contracts/records.ts";
@@ -31,30 +33,11 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule. */
+/** Codes of every registered rule: INW000 to INW018, and the FAPI family without FAPI004. */
 type RuleCode =
-  | "INW000"
-  | "INW001"
-  | "INW002"
-  | "INW003"
-  | "INW004"
-  | "INW005"
-  | "INW006"
-  | "INW007"
-  | "INW008"
-  | "INW009"
-  | "INW010"
-  | "INW011"
-  | "INW012"
-  | "INW013"
-  | "FAPI001"
-  | "FAPI002"
-  | "FAPI003"
-  | "FAPI005"
-  | "FAPI006"
-  | "FAPI007"
-  | "FAPI008"
-  | "FAPI009";
+  | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
+  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
+  | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
  * The URL of a rule's docs page. Diagnostics (text, JSON, SARIF `helpUri`,
@@ -188,8 +171,58 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
       "An async def makes no synchronous database, cache or cloud call: a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
     docs: page("INW013"),
   },
-  // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
-  // #183 and #184; FAPI004 is reserved until the #185 spike says go.
+  // Opt-in, a role-scoped content rule from #98 (#295).
+  INW014: {
+    code: "INW014",
+    name: "ports-abstract",
+    severity: "error",
+    default: "off",
+    summary:
+      "A port module holds only ABCs and Protocols whose methods have no body; implementations live in adapters.",
+    docs: page("INW014"),
+  },
+  // Opt-in, the role rule that keeps adapters in the composition root (#296).
+  INW015: {
+    code: "INW015",
+    name: "construct-only-in",
+    severity: "error",
+    default: "off",
+    summary:
+      "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
+    docs: page("INW015"),
+  },
+  // Opt-in, one of #98's role-scoped content rules (#297).
+  INW016: {
+    code: "INW016",
+    name: "orm-naming",
+    severity: "error",
+    default: "off",
+    summary:
+      "ORM table names and the names of datetime and date columns follow the project's scheme: lower_case_snake singular tables, _at for datetimes, _date for dates.",
+    docs: page("INW016"),
+  },
+  // Opt-in and a warning: docs drift shouldn't block the Stop gate by default
+  // (#332, ADR-045). INW019 is reserved for imports a diagram doesn't draw.
+  INW017: {
+    code: "INW017",
+    name: "diagram-unknown-name",
+    severity: "warning",
+    default: "off",
+    summary:
+      "A node in a marked architecture diagram names a layer or context [tool.inwards] declares, and its quoted label a module that exists.",
+    docs: page("INW017"),
+  },
+  INW018: {
+    code: "INW018",
+    name: "diagram-forbidden-edge",
+    severity: "warning",
+    default: "off",
+    summary:
+      "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
+    docs: page("INW018"),
+  },
+  // The FastAPI family (#186): opt-in, with its own prefix. FAPI004 stays
+  // unused: the #185 spike said no-go, and codes are never renumbered.
   FAPI001: {
     code: "FAPI001",
     name: "endpoint-metadata",

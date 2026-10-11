@@ -27,6 +27,10 @@ same PR that first needs it.
 - **Translate**: prose, headings, table text, admonition titles, image alt
   text and captions, Mermaid labels that are prose (node and edge labels,
   subgraph titles), `aria-label`s, and hand-written SVG text on the pages.
+  A diagram marked `%% inwards: layers` or `%% inwards: contexts` (or
+  `' inwards: layers` or `' inwards: contexts` in PlantUML) is a code
+  block that INW017 and INW018 read: its ids and quoted labels (module prefixes) stay
+  as written.
 - **Cross-links** inside `docs/pl/` point to Polish pages (same relative
   paths as in English). Images, CSS and scripts come from the English site:
   a Polish page references `../assets/...` one level further up than the
@@ -63,8 +67,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW013, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW018, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
+| Naming styles | lower_case_snake, snake case, camel case | INW016's table and column schemes |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
 | CLI commands and flags | `inwards check`, `--format json`, `--agent claude`, ... | |
 | File and config names | `pyproject.toml`, `[tool.inwards]`, `AGENTS.md`, `escalate-after`, ... | |
@@ -84,6 +89,9 @@ baseline'u); multi-word names are left uninflected where possible.
 | worker, worker pool | worker (workera, workery), pula workerów | |
 | catch-all (an `Exception` handler) | catch-all | "handler catch-all dla `Exception`" |
 | health check | health-check | "aplikacja health-check" |
+| harness (agent harness: Copilot, Local in VS Code), matcher (hook) | harness (harnessu), matcher (matchera) | |
+| Problems panel (VS Code) | panel Problems | |
+| runtimepath, quickfix (Neovim) | runtimepath, quickfix | "w swoim runtimepath", "w oknie quickfix" |
 
 ## Fixed Polish terms
 
@@ -93,6 +101,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
 | agent loop | pętla agenta |
+| annotation (GitHub Actions) | adnotacja |
 | architecture linter | linter architektury |
 | architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
@@ -111,6 +120,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | thread, worker thread (ADR-040) | wątek, wątek roboczy (worker); the main thread: wątek główny |
 | extraction job | zadanie ekstrakcji |
 | corpus | korpus |
+| precision (of a rule), true positive, false positive | precyzja, trafne zgłoszenie, fałszywy alarm |
+| sample, sampled precision | próba, precyzja w próbie |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
 | contract (import-linter) | kontrakt |
@@ -164,12 +175,15 @@ baseline'u); multi-word names are left uninflected where possible.
 | sibling (module, package; import-linter's layers) | moduł sąsiedni, sąsiedni pakiet |
 | sibling layers (a nested array in `layers`, `a \| b` in a template's roles) | warstwy sąsiednie |
 | template (`[tool.inwards.templates]`); role (a template's `roles`) | szablon; rola |
+| a template's rules (`[tool.inwards.templates.<name>.rules]`); the top-level table (`[tool.inwards.rules]` and its options tables) | reguły szablonu, reguły dla roli; tabela najwyższego poziomu |
 | rank (of a layer among siblings) | miejsce (w kolejności warstw) |
 | cache (uv's, bunx's) | pamięć podręczna (uv, bunx) |
 | dev dependency | zależność deweloperska |
 | member (of a package) | element (pakietu) |
 | miss (prescan) | przeoczenie |
 | opt-in rule (default off) | reguła opt-in (domyślnie wyłączona) |
+| on by default (the rules index's On column); turned on by preset | domyślnie (kolumna Włączona); włącza ją preset |
+| rule categories (the first tag: imports, layout, roles, integrity, diagrams, fastapi) | kategorie reguł: importy, układ, role, integralność, diagramy, FastAPI (tag i kotwica zostają po angielsku) |
 | options table (`[tool.inwards.rules.<rule-name>]`) | tabela opcji |
 | owner (the repo's) | właściciel |
 | payload (hook input) | dane wejściowe (hooka) |
@@ -202,9 +216,41 @@ baseline'u); multi-word names are left uninflected where possible.
 | async client, sync client | klient asynchroniczny, klient synchroniczny |
 | re-export (`from .views import f` in `__init__.py`) | reeksport |
 | one hop (INW013, following a call into a sync helper) | jeden krok (w głąb funkcji pomocniczej) |
+| table name, column name (INW016) | nazwa tabeli, nazwa kolumny |
+| naming convention (`MetaData(naming_convention=...)`, INW016) | konwencja nazw |
+| constraint (unique, check, foreign key, primary key) | ograniczenie (unikalności, check, klucza obcego, klucza głównego) |
+| singular, plural | liczba pojedyncza, liczba mnoga |
+| mass noun | rzeczownik niepoliczalny |
+| migration (Alembic) | migracja |
+| loader option (SQLAlchemy `joinedload`, `selectinload`) | opcja ładowania (loader option) |
+| server-rendered HTML | HTML renderowany na serwerze |
+| architecture diagram, marked diagram (INW017) | diagram architektury, oznaczony diagram |
+| marker comment (`%% inwards: layers`) | komentarz-znacznik, znacznik |
+| node, edge, link (Mermaid) | węzeł, krawędź |
+| solid arrow, dotted link (Mermaid; INW018) | ciągła strzałka, przerywana krawędź |
+| forbidden edge (INW018) | zabroniona krawędź |
+| head, tail (of an arrow) | grot, początek (strzałki) |
+| round trip (`import-diagram`, then `check`) | test w obie strony |
+| subgraph (Mermaid) | subgraph (subgraphu, subgraphy) |
+| component (PlantUML) | komponent |
+| package (PlantUML group) | pakiet (`package`) |
+| stereotype (`<<public>>`, PlantUML) | stereotyp |
+| alias (`as`, PlantUML) | alias |
+| slice (ArchUnitPython) | wycinek |
+| label, caption (of a node) | etykieta, podpis |
+| docs drift (a diagram that no longer matches the config) | rozjazd dokumentacji |
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |
+| port module (INW014) | moduł portu |
+| abstract base class, ABC (`abc.ABC`) | abstrakcyjna klasa bazowa, ABC |
+| Protocol (`typing.Protocol`) | Protocol (protokół strukturalny) |
+| abstract method, method body (INW014) | metoda abstrakcyjna, ciało metody |
+| implementation (of a port) | implementacja (portu) |
+| DTO, value object | DTO, obiekt wartości |
+| test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
+| inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |
+| guarded role (INW015's `role`), build an adapter | chroniona rola, budować adapter |
 | pre-release | wersja przedpremierowa (pre-release) |
 | probe (the file system) | sondować, sondowanie |
 | promotion (PR `develop` → `main`) | promocja |
@@ -263,6 +309,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | violation | naruszenie |
 | wall time | czas rzeczywisty |
 | warning | ostrzeżenie |
+| workflow command (GitHub Actions, `::error`) | polecenie workflow |
 | workspace (uv) | workspace (uv) |
 | workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |
@@ -275,6 +322,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | platform package (one VSIX per platform) | pakiet dla platformy |
 | thin client | cienki klient |
 | file watcher (editor) | obserwator plików |
+| cloud agent (Copilot, formerly coding agent) | agent w chmurze (cloud agent) |
+| setup steps (`copilot-setup-steps.yml`) | kroki przygotowania |
+| project root (the directory an editor starts a language server in), root marker | katalog główny projektu, znacznik katalogu głównego |
+| dev extension (Zed) | rozszerzenie deweloperskie (dev extension) |
+| headless (an editor run without its UI) | bez interfejsu (headless) |
 | whole pass (language server: `inwards check` over the workspace) | przebieg całego projektu, przebieg |
 | MCP server (`inwards mcp`), MCP client | serwer MCP, klient MCP |
 | tool (MCP) | narzędzie |

@@ -55,6 +55,8 @@
       { "name": "core-python", "patterns": ["src/core/src/python/**"] },
       { "name": "core-lookup", "patterns": ["src/core/src/lookup/**"] },
       { "name": "core-rules-shared", "patterns": ["src/core/src/rules/shared/**"] },
+      // The Mermaid reader for marked architecture diagrams (#344, ADR-045).
+      { "name": "core-diagram", "patterns": ["src/core/src/diagram/**"] },
       {
         "name": "core-rule-unsupported-encoding",
         "patterns": [
@@ -126,6 +128,25 @@
       { "name": "core-rule-thin-endpoint", "patterns": ["src/core/src/rules/thin-endpoint/**"] },
       // INW013 async-blocking (#293): the first of #98's role-scoped content rules.
       { "name": "core-rule-async-blocking", "patterns": ["src/core/src/rules/async-blocking/**"] },
+      // INW014 ports-abstract (#295): port modules hold only ABCs and Protocols.
+      { "name": "core-rule-ports-abstract", "patterns": ["src/core/src/rules/ports-abstract/**"] },
+      // INW015 construct-only-in (#296): only the composition root imports and builds a role.
+      {
+        "name": "core-rule-construct-only-in",
+        "patterns": ["src/core/src/rules/construct-only-in/**"]
+      },
+      // INW016 orm-naming (#297): table and timestamp column names, from #98.
+      { "name": "core-rule-orm-naming", "patterns": ["src/core/src/rules/orm-naming/**"] },
+      // INW017 diagram-unknown-name (#344): names in marked diagrams.
+      {
+        "name": "core-rule-diagram-unknown-name",
+        "patterns": ["src/core/src/rules/diagram-unknown-name/**"]
+      },
+      // INW018 diagram-forbidden-edge (#345): arrows in marked diagrams.
+      {
+        "name": "core-rule-diagram-forbidden-edge",
+        "patterns": ["src/core/src/rules/diagram-forbidden-edge/**"]
+      },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -176,6 +197,7 @@
       { "from": "core-config", "allow": ["core-contracts", "core-meta"] },
       { "from": "core-python", "allow": ["core-contracts"] },
       { "from": "core-lookup", "allow": ["core-contracts", "core-python"] },
+      { "from": "core-diagram", "allow": ["core-contracts"] },
       {
         "from": "core-rules-shared",
         "allow": ["core-contracts", "core-meta", "core-config", "core-python"]
@@ -303,6 +325,40 @@
         ]
       },
       {
+        "from": "core-rule-ports-abstract",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-construct-only-in",
+        "allow": [
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared"
+        ]
+      },
+      {
+        "from": "core-rule-diagram-unknown-name",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
+      },
+      {
+        "from": "core-rule-diagram-forbidden-edge",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
+      },
+      {
+        "from": "core-rule-orm-naming",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
+      },
+      {
         "from": "core-rule-thin-endpoint",
         "allow": [
           "core-contracts",
@@ -337,6 +393,12 @@
           "core-rule-fastapi",
           "core-rule-thin-endpoint",
           "core-rule-async-blocking",
+          "core-rule-ports-abstract",
+          "core-rule-construct-only-in",
+          "core-rule-orm-naming",
+          "core-diagram",
+          "core-rule-diagram-unknown-name",
+          "core-rule-diagram-forbidden-edge",
           "core-baseline"
         ]
       },
@@ -391,6 +453,12 @@
           "core-rule-fastapi",
           "core-rule-thin-endpoint",
           "core-rule-async-blocking",
+          "core-rule-ports-abstract",
+          "core-rule-construct-only-in",
+          "core-rule-orm-naming",
+          "core-diagram",
+          "core-rule-diagram-unknown-name",
+          "core-rule-diagram-forbidden-edge",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -844,6 +912,30 @@
         },
         {
           "from": "core-rule-async-blocking",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-ports-abstract",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-construct-only-in",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-orm-naming",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-diagram",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-diagram-unknown-name",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-diagram-forbidden-edge",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

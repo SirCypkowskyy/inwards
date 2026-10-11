@@ -66,11 +66,16 @@ describe("the cycle stands on the full parse", () => {
   test("imports after a docstring or inside a block still make a cycle", () => {
     for (const a of [
       '"""The a module."""\nfrom shop.domain import (\n    b,\n)\n\nX = 1\n',
-      "from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    import shop.domain.b\n",
+      "from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    pass\nelse:\n    import shop.domain.b\n",
       "def f():\n    import shop.domain.b\n    return 1\n",
     ]) {
       expect([a, cycles(a, B).length]).toEqual([a, 1]);
     }
+  });
+
+  test("an import the skeleton reads but the full parse finds under TYPE_CHECKING makes no cycle", () => {
+    const a = "from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    import shop.domain.b\n";
+    expect(cycles(a, B)).toEqual([]);
   });
 
   test("an import line inside a string, or after a syntax error, makes no cycle", () => {

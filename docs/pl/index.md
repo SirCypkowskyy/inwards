@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/index.md
-source_hash: c7609ef23de83819c01d0fd2fdab36124a3785ae97fdaac05994594697a5b598
+source_hash: 0f2242cebf55139836dc10e78c295b8ccc50aeddc988c496e81f414be040c6a6
 template: home.html
 hide:
   - navigation
@@ -211,4 +211,4 @@ Inni agenci: [OpenCode](guides/opencode.md), [Aider](guides/aider.md), [`AGENTS.
 
 </nav>
 
-<p class="inw-status" markdown>Pre-alpha. Najnowsze wydanie: [0.4.0 na PyPI](https://pypi.org/project/inwards/).</p>
+<p class="inw-status" markdown>Pre-alpha. Najnowsze wydanie: [0.5.0 na PyPI](https://pypi.org/project/inwards/), 2026-10-10. Reguły: [INW000–INW016, FAPI001–FAPI009](rules/index.md).</p>
