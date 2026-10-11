@@ -21,7 +21,8 @@ import type { FileReader, Runtime } from "../platform/contracts.ts";
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;
 /** `inwards`, or a release asset name kept as downloaded, e.g. `inwards-linux-x64-musl`. */
-const INWARDS_BINARY = /^inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?$/iu;
+export const INWARDS_BINARY: RegExp =
+  /^inwards(?:-(?:linux|darwin|windows)-(?:x64|arm64)(?:-musl)?)?$/iu;
 /**
  * A launcher `init --launcher` accepts: a Python or JavaScript tool runner,
  * then up to seven words that are a subcommand (`run`, `exec`, `x`, `tool`),

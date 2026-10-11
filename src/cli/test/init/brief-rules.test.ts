@@ -105,7 +105,7 @@ entrypoints = ["shop.api.main:app"]
     expect(brief).toContain(
       "- INW015: only `shop.api.main` may import or build `shop.infrastructure`; elsewhere take it through a port",
     );
-    expect(brief).toContain("- INW016: snake_case table names, datetime columns end in `_at`\n");
+    expect(brief).toContain("- INW016: snake_case tables; datetime columns end in `_at`\n");
     expect(brief).toContain("- FAPI001: path operations need `status_code` on POST and `tags`");
     expect(brief).toContain("- FAPI002: declare every 4xx and 5xx a path operation raises");
     expect(brief).toContain("- FAPI003: include every `APIRouter` in `shop.api.main:app`;");
@@ -132,7 +132,7 @@ router = { async-blocking = true }
   });
 });
 
-test("a fastapi project's layers past the third name what they may import by number", () => {
+test("a fastapi project's layers past the third name what they may import by number, and the sibling groups once", () => {
   const style = STYLES["fastapi"];
   const text = configTable(style, {
     pkg: "app",
@@ -143,12 +143,9 @@ test("a fastapi project's layers past the third name what they may import by num
     eol: "\n",
   });
   const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
-  expect(brief).toContain(
-    "2. domain.constants (`app.*.constants`): may import kernel; not its siblings",
-  );
-  expect(brief).toContain(
-    "5. domain.models (`app.*.models`): may import layers 1-4; not its sibling domain.schemas",
-  );
+  expect(brief).toContain("nor a sibling of your own layer (sibling groups: 2-4; 5-6).");
+  expect(brief).toContain("2. domain.constants (`app.*.constants`): may import kernel\n");
+  expect(brief).toContain("5. domain.models (`app.*.models`): may import layers 1-4\n");
   expect(brief).toContain("10. domain.router (`app.*.router`): may import layers 1-9\n");
   expect(brief).toContain("11. main (`app.main`): may import every other layer");
 });
@@ -164,8 +161,12 @@ test("with --style fastapi --scaffold, the brief lists the opt-in rules and stay
   );
   expect(text).toContain("- FAPI009: pass `Depends(get_db)`, not `Depends(get_db())`");
   expect(text).toContain(
-    "- posts (`app.posts`): public `app.posts.{router,service,schemas,dependencies,constants,exceptions}`",
+    "- posts (`app.posts`): public `app.posts.{router,service,schemas,dependencies,constants,exceptions}`\n",
   );
+  expect(text).toContain(
+    "- INW016 in `app.*.models`: singular snake_case tables; datetime/date columns end in `_at`/`_date`",
+  );
+  expect(text).toContain("- `app.*.{models,schemas,utils,service}`: not `fastapi`, `starlette`");
   const brief = text.slice(text.indexOf(BEGIN) + BEGIN.length, text.indexOf(END));
   expect(tokens(brief)).toBeLessThan(550);
 });

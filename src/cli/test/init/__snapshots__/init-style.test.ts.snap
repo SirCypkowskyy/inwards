@@ -44,6 +44,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "domain", modules = ["my_app.domain"] },              # entities shared by every layer
   { name = "persistence", modules = ["my_app.persistence"] },    # repositories and their Protocols
@@ -109,6 +111,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "domain", modules = ["my_app.domain"] },                  # entities and business rules, no I/O
   { name = "application", modules = ["my_app.application"] },        # use cases and the ports they need
@@ -198,6 +202,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "domain", modules = ["my_app.domain"] },                 # entities and business rules, no I/O
   { name = "application", modules = ["my_app.application"] },       # use cases and the ports they need
@@ -288,6 +294,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "shared", modules = ["my_app.shared"] },        # the shared kernel: code every slice may use
   { name = "features", modules = ["my_app.features"] },    # one package per slice, each a context
@@ -373,6 +381,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "context", modules = ["my_app.*"], template = "context" },  # every bounded context, layered by the context template
   { name = "bootstrap", modules = ["my_app.bootstrap"] },              # composition root: wires the adapters into the use cases
@@ -449,6 +459,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "app", modules = ["my_app.*"], template = "django-app", deny-libraries = [] },  # every Django app, layered by the django-app template; models import django.db
   { name = "project", modules = ["my_app"] },                                              # settings, the root URLconf, and app modules outside the roles (admin, apps)
@@ -555,6 +567,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "kernel", modules = ["my_app"], deny-libraries = [] },            # the shared modules: settings, the base model, exceptions, the database
   { name = "domain", modules = ["my_app.*"], template = "fastapi-domain" },  # every domain package, layered by the fastapi-domain template
@@ -565,6 +579,10 @@ layers = [
 [tool.inwards.templates.fastapi-domain]
 roles = ["constants | exceptions | config", "models | schemas", "utils", "service", "dependencies", "router"]
 public = ["router", "service", "schemas", "dependencies", "constants", "exceptions"]
+
+# fastapi-best-practices' table and column names in every domain's models (INW016), as a warning to start with.
+[tool.inwards.templates.fastapi-domain.rules]
+models = { orm-naming = "warning" }
 
 [tool.inwards.rules]
 # Domains may use each other's public modules without declaring it; INW003 keeps them to those.
@@ -592,6 +610,12 @@ report-direct-raises = false
 # An endpoint hands its work to its domain's service module.
 [tool.inwards.rules.thin-endpoint]
 delegate-to = ["domain.service"]
+
+# The business logic and what it uses don't import the web framework: raise the domain's exceptions, and leave HTTP to the router and dependencies (INW005).
+[tool.inwards.rules.pure-domain]
+deny = [
+  { modules = ["my_app.*.models", "my_app.*.schemas", "my_app.*.utils", "my_app.*.service"], libraries = ["fastapi", "starlette"] },
+]
 
 # Each domain is a context: other domains and main.py may import only its public modules.
 # Add an entry like this for every domain; one without an entry is not kept apart.
@@ -704,6 +728,8 @@ fastapi: fastapi-best-practices: one package per domain on a kernel of shared mo
   Each domain is a context: other domains and main.py may import only its public modules.
   Turns off INW002. Domains may use each other's public modules without declaring it; INW003 keeps them to those.
   Turns on FAPI001, FAPI002, FAPI003, FAPI005, FAPI006, FAPI007, FAPI008, FAPI009, INW012, INW013 as warnings.
+  Turns on INW016 in fastapi-domain's models, as a warning.
+  Denies fastapi, starlette to shop.*.models, shop.*.schemas, shop.*.utils, shop.*.service (INW005).
   Gap: a router may use the models directly instead of going through the service.
   Shapes, with --scaffold:
     shop    requires main.py; allows */, config.py, database.py, exceptions.py, models.py, pagination.py, __main__.py, _version.py: domain packages, the kernel's shared modules and the app only; anything else is an error

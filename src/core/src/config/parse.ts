@@ -1,6 +1,6 @@
 /**
  * @file Parses `[tool.inwards]` from pyproject.toml into an `InwardsConfig`: the
- * layers, `ignore`, `generated`, `namespace-packages`, the per-rule settings, shapes and names, and
+ * layers, `ignore`, `generated`, `namespace-packages`, `diagrams`, the per-rule settings, shapes and names, and
  * the hook settings (`escalate-after`, `run-log`, `stop-gate`,
  * `agent-suppressions`). Unknown keys and wrong types throw `ConfigError`, so
  * a typo fails loudly instead of quietly turning a rule off.
@@ -16,6 +16,7 @@ import { VERSION } from "../meta/product.ts";
 import { type ContextSpec, parseContexts } from "./contexts.ts";
 import { type CycleMode, parseCycles } from "./cycles.ts";
 import { CONFIG_DEFAULTS } from "./defaults.ts";
+import { parseDiagrams } from "./diagrams.ts";
 import { parseGenerated } from "./generated.ts";
 import {
   type AgentSuppressions,
@@ -101,6 +102,12 @@ export interface InwardsConfig {
   contexts?: ContextSpec[];
   /** Which import cycles INW004 reports (`cycles`, see `cycles.ts`); absent when not set. */
   cycles?: CycleMode[];
+  /**
+   * Markdown and Mermaid files whose marked diagrams INW017 checks
+   * (`diagrams`, see `diagrams.ts`): paths relative to the config file, with
+   * globs. Absent when not set or empty.
+   */
+  diagrams?: string[];
 }
 
 /** A pre-release suffix such as `-rc.1`: an rc of 0.1.0 counts as 0.1.0. */
@@ -126,6 +133,7 @@ export const TABLE_KEYS: ReadonlySet<string> = new Set([
   "contexts",
   "cycles",
   "templates",
+  "diagrams",
 ]);
 
 /** Any mention of the tool, used only when the TOML can't be parsed. */
@@ -221,6 +229,7 @@ export function parseConfig(pyprojectText: string): InwardsConfig {
     ...agentSuppressionsKey(raw["agent-suppressions"]),
     ...parseContexts(withContextTemplates(raw["contexts"], templates)),
     ...parseCycles(raw["cycles"]),
+    ...parseDiagrams(raw["diagrams"]),
   };
   const delegates = stringList(config.rules?.options?.["thin-endpoint"]?.["delegate-to"]) ?? [];
   const problem = delegateProblem(delegates, new Set(parsed.map((layer) => layer.name)));

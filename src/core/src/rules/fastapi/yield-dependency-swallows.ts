@@ -11,7 +11,8 @@
  * `except`, which covers every dependency. Generators decorated with
  * `contextmanager`, `asynccontextmanager` or `fixture` are skipped, since
  * swallowing is how a context manager suppresses an error on purpose and a
- * test fixture never sees the test's exception. An `except` passes when
+ * test fixture never sees the test's exception. So are streams, generators
+ * that yield more than once or in a loop: a dependency yields once. An `except` passes when
  * every path through it raises, as Inwards can tell: a `raise` in the block,
  * or an `if`/`else`, `with` or `try` whose every branch raises.
  */
@@ -130,6 +131,34 @@ function decoratedAway(fn: Node): boolean {
   return decorators.some((d) => d.type === "decorator" && NOT_DEPENDENCY.test(d.text));
 }
 
+/** Loops: a `yield` inside one makes the generator a stream. */
+const LOOPS: ReadonlySet<string> = new Set(["for_statement", "while_statement"]);
+
+/**
+ * Tells whether a generator is a stream rather than a dependency: it yields
+ * more than once, or in a loop. FastAPI runs a dependency's code up to its
+ * one `yield` and the rest after the response, so neither shape is one; the
+ * #182 corpus run found only such streams behind FAPI007's findings (Polar's
+ * server-sent events, Saleor's discount iterator).
+ *
+ * @param fn - a `function_definition` node.
+ * @param yields - the function's own `yield` nodes.
+ * @returns true for a generator with two or more yields, or one inside a `for` or `while` of its own.
+ */
+function isStream(fn: Node, yields: readonly Node[]): boolean {
+  if (yields.length > 1) {
+    return true;
+  }
+  return yields.some((y) => {
+    for (let node = y.parent; node !== null && node.id !== fn.id; node = node.parent) {
+      if (LOOPS.has(node.type)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
 /**
  * Builds the finding for one `except` clause.
  *
@@ -163,7 +192,7 @@ function report(clause: Node, label: string, src: SourceFile): Diagnostic {
  */
 function swallowsIn(fn: Node, src: SourceFile): Diagnostic[] {
   const yields = ownNodes(fn, new Set(["yield"]));
-  if (yields.length === 0 || decoratedAway(fn)) {
+  if (yields.length === 0 || decoratedAway(fn) || isStream(fn, yields)) {
     return [];
   }
   const name = fn.childForFieldName("name");

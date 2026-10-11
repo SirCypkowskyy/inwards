@@ -31,6 +31,7 @@ import {
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import type { PathKind } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
+import { matchesAny } from "../shared/entry-matches.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";
 import { holdsLayer, moduleEvidence, unassignedPackage } from "./imports.ts";
 
@@ -330,29 +331,6 @@ function sameFile(lost: readonly [string, string], found: readonly [string, stri
  */
 function lastSegment(module: string): string {
   return module.split(".").at(-1) ?? module;
-}
-
-/**
- * Tells whether a layer entry matches any module, whatever the precedence.
- *
- * @param prefix - a layer prefix or selector.
- * @param modules - module names.
- * @returns true when a module equals the prefix or lies inside it, or the selector matches one.
- */
-function matchesAny(prefix: string, modules: ReadonlySet<string>): boolean {
-  if (isSelector(prefix)) {
-    return [...modules].some((module) => matchEntry(prefix, module) !== undefined);
-  }
-  if (modules.has(prefix)) {
-    return true;
-  }
-  const inside = `${prefix}.`;
-  for (const module of modules) {
-    if (module.startsWith(inside)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**

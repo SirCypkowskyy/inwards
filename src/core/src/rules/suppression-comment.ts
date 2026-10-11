@@ -43,10 +43,18 @@ const EXAMPLE = '# inwards: ignore[INW001] reason="why this import is allowed"';
  * Rules a comment can't suppress: INW000 marks a file that isn't checked at
  * all, INW004 is about the whole project (a one-file check can't tell whether
  * a suppressed cycle still exists; the baseline accepts one), INW007 and
- * INW008 are about the package tree (configure the shape instead), and
- * INW009 is about the suppressions themselves.
+ * INW008 are about the package tree (configure the shape instead),
+ * INW009 is about the suppressions themselves, and INW017 is about diagrams,
+ * which hold no Python comment (mark the node `:::external` instead).
  */
-const FIXED: ReadonlySet<string> = new Set(["INW000", "INW004", "INW007", "INW008", "INW009"]);
+const FIXED: ReadonlySet<string> = new Set([
+  "INW000",
+  "INW004",
+  "INW007",
+  "INW008",
+  "INW009",
+  "INW017",
+]);
 
 /**
  * Tells whether a file may hold a suppression comment, before any parse.

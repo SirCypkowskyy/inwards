@@ -55,6 +55,8 @@
       { "name": "core-python", "patterns": ["src/core/src/python/**"] },
       { "name": "core-lookup", "patterns": ["src/core/src/lookup/**"] },
       { "name": "core-rules-shared", "patterns": ["src/core/src/rules/shared/**"] },
+      // The Mermaid reader for marked architecture diagrams (#344, ADR-045).
+      { "name": "core-diagram", "patterns": ["src/core/src/diagram/**"] },
       {
         "name": "core-rule-unsupported-encoding",
         "patterns": [
@@ -135,6 +137,11 @@
       },
       // INW016 orm-naming (#297): table and timestamp column names, from #98.
       { "name": "core-rule-orm-naming", "patterns": ["src/core/src/rules/orm-naming/**"] },
+      // INW017 diagram-unknown-name (#344): names in marked diagrams.
+      {
+        "name": "core-rule-diagram-unknown-name",
+        "patterns": ["src/core/src/rules/diagram-unknown-name/**"]
+      },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -185,6 +192,7 @@
       { "from": "core-config", "allow": ["core-contracts", "core-meta"] },
       { "from": "core-python", "allow": ["core-contracts"] },
       { "from": "core-lookup", "allow": ["core-contracts", "core-python"] },
+      { "from": "core-diagram", "allow": ["core-contracts"] },
       {
         "from": "core-rules-shared",
         "allow": ["core-contracts", "core-meta", "core-config", "core-python"]
@@ -334,6 +342,10 @@
         ]
       },
       {
+        "from": "core-rule-diagram-unknown-name",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
+      },
+      {
         "from": "core-rule-orm-naming",
         "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
       },
@@ -375,6 +387,8 @@
           "core-rule-ports-abstract",
           "core-rule-construct-only-in",
           "core-rule-orm-naming",
+          "core-diagram",
+          "core-rule-diagram-unknown-name",
           "core-baseline"
         ]
       },
@@ -432,6 +446,8 @@
           "core-rule-ports-abstract",
           "core-rule-construct-only-in",
           "core-rule-orm-naming",
+          "core-diagram",
+          "core-rule-diagram-unknown-name",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -897,6 +913,14 @@
         },
         {
           "from": "core-rule-orm-naming",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-diagram",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-diagram-unknown-name",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

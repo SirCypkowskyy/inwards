@@ -239,6 +239,20 @@
       "url": "INW016/"
     },
     {
+      "code": "INW017",
+      "name": "diagram-unknown-name",
+      "title": "INW017 diagram-unknown-name",
+      "summary": "Węzeł w oznaczonym diagramie architektury w Mermaid, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie nie pasuje do żadnego modułu (sprawdzenie całego projektu)",
+      "description": "Węzeł w oznaczonym diagramie architektury nazywa warstwę albo kontekst zadeklarowany w [tool.inwards], a jego etykieta w cudzysłowie moduł, który istnieje.",
+      "category": ["diagrams", "docs"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "warning",
+      "suppressible": false,
+      "default": "opt-in, ostrzeżenie",
+      "url": "INW017/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

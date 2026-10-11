@@ -31,9 +31,9 @@ import { configTable, describeStyles } from "./style-text.ts";
 import { expandLayers, isStyle, STYLE_NAMES, type Style, type StyleName } from "./styles.ts";
 import { findTarget, noPackage, shown, sourceRoot } from "./target.ts";
 
-const HOW = `  inwards init --style auto [--package NAME] [--write] [--agent ${AGENTS.join("|")}] [--brief] [--dry-run]
-  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--brief] [--dry-run]
-  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--brief] [--dry-run]    (the project already has [tool.inwards])
+const HOW = `  inwards init --style auto [--package NAME] [--write] [--agent ${AGENTS.join("|")}] [--shared] [--brief] [--dry-run]
+  inwards init --style ${STYLE_NAMES.join("|")} [--scaffold] [--package NAME] [--agent ${AGENTS.join("|")}] [--launcher CMD] [--shared] [--brief] [--dry-run]
+  inwards init --agent ${AGENTS.join("|")} [--launcher CMD] [--shared] [--brief] [--dry-run]    (the project already has [tool.inwards])
   inwards init --brief [--dry-run]    (only the architecture brief in AGENTS.md)
   inwards init --list-styles`;
 
@@ -82,7 +82,7 @@ export async function initMain(
   if (style === undefined && agent !== undefined) {
     return flags.scaffold === true || flags.package !== undefined
       ? print(ctx.io.streams, "inwards init: --scaffold and --package need --style.", 2)
-      : initCommand(ctx, { agent, launcher: flags.launcher, brief }, dryRun);
+      : initCommand(ctx, { ...startFlags(flags), agent, brief }, dryRun);
   }
   if (style !== undefined) {
     return await styleCommand(
@@ -93,7 +93,11 @@ export async function initMain(
     );
   }
   if (brief) {
-    return initCommand(ctx, { agent: undefined, launcher: undefined, brief }, dryRun);
+    return initCommand(
+      ctx,
+      { agent: undefined, launcher: undefined, shared: false, brief },
+      dryRun,
+    );
   }
   return await interactive(ctx, flags, dryRun);
 }
@@ -133,7 +137,7 @@ async function interactive(ctx: InitContext, flags: InitFlags, dryRun: boolean):
   if (plan.style === undefined) {
     return plan.agent === undefined
       ? 0
-      : initCommand(ctx, { agent: plan.agent, launcher: flags.launcher, brief: false }, dryRun);
+      : initCommand(ctx, { ...startFlags(flags), agent: plan.agent, brief: false }, dryRun);
   }
   return await styleCommand(ctx, { ...plan, style: plan.style }, flags, dryRun);
 }
@@ -198,7 +202,7 @@ async function styleCommand(
   const wired =
     plan.agent === undefined
       ? []
-      : agentChanges(ctx, { agent: plan.agent, launcher: flags.launcher }, project);
+      : agentChanges(ctx, { ...startFlags(flags), agent: plan.agent }, project);
   const wiring =
     typeof wired === "string" || flags.brief !== true
       ? wired
@@ -315,4 +319,14 @@ function withTable(
 function lookUpTarget(ctx: InitContext, flags: InitFlags): Target | number {
   const target = findTarget({ ...ctx.io, toml: ctx.init.toml }, flags.package);
   return typeof target === "string" ? print(ctx.io.streams, `inwards init: ${target}`, 2) : target;
+}
+
+/**
+ * Picks the flags that say how an agent starts Inwards.
+ *
+ * @param flags - the parsed options.
+ * @returns `--launcher` as given, and whether `--shared` was.
+ */
+function startFlags(flags: InitFlags): { launcher: string | undefined; shared: boolean } {
+  return { launcher: flags.launcher, shared: flags.shared === true };
 }

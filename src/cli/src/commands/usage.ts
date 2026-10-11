@@ -16,6 +16,8 @@ export const COMMANDS = [
   "init",
   "context",
   "import-config",
+  "rules",
+  "rule",
   "stats",
   "hook",
   "daemon",
@@ -46,7 +48,8 @@ const CONFIG_OPTION =
 const HELP: Readonly<Record<Command, CommandHelp>> = {
   check: {
     synopsis: [
-      "check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]",
+      // biome-ignore lint/security/noSecrets: a usage synopsis, not a credential
+      "check [PATHS...] [--format text|concise|json|sarif|github] [--max-diagnostics N]",
       "      [--config pyproject.toml] [--log] [--no-cache]",
     ],
     note: "(PATHS: those files only; whole-project checks such as dead layer\nprefixes, import cycles and symlinks in layers run without PATHS)",
@@ -54,7 +57,8 @@ const HELP: Readonly<Record<Command, CommandHelp>> = {
 
 PATHS: check those files or directories only; whole-project checks such as
 dead layer prefixes, import cycles and symlinks in layers run without PATHS.
---format: text (default), concise, json (inwards/diagnostics@1) or sarif.
+--format: text (default), concise, json (inwards/diagnostics@1), sarif, or github
+(GitHub Actions annotations, paths from the repository root).
 --max-diagnostics N: print at most N findings (not with sarif).
 ${CONFIG_OPTION}
 --log: append this run to .inwards/runs.jsonl even when the run log is off.
@@ -76,7 +80,7 @@ ${CONFIG_OPTION}
       `init --style ${STYLE_NAMES.join("|")}`,
       "     [--scaffold] [--package NAME] [--agent ...] [--dry-run]",
       "init --style auto [--package NAME] [--write] [--agent ...] [--dry-run]",
-      `init --agent ${AGENTS.join("|")} [--launcher "uv run"] [--dry-run]`,
+      `init --agent ${AGENTS.join("|")} [--launcher "uv run"] [--shared] [--dry-run]`,
       "init --brief [--dry-run]",
       "init --list-styles [--package NAME]",
     ],
@@ -90,6 +94,8 @@ table; --write (or a yes on a terminal) adds it to pyproject.toml.
 --scaffold: also write the preset's example package; --package NAME names it.
 --agent: wire the hook (claude), the plugin (opencode), the lint command (aider)
 or the instructions (agents-md); --launcher sets the command that runs inwards.
+--shared: with --agent claude, write the hooks into the committed .claude/settings.json
+and the MCP server into .mcp.json; needs --launcher or inwards on PATH.
 --brief: also write the architecture brief into AGENTS.md.
 --dry-run: print the changes instead of writing them.`,
   },
@@ -109,6 +115,28 @@ ${CONFIG_OPTION}
 FILE: the import-linter config (.importlinter, setup.cfg or pyproject.toml);
 without it, the first one found in the working directory.
 --write: append the table to the pyproject.toml beside FILE.`,
+  },
+  rules: {
+    synopsis: ["rules [--config pyproject.toml] [--json]"],
+    note: "(every rule: on or off, severity, and the config key behind it)",
+    about: `Lists every rule with its code, name, whether it is on, its severity, and what
+decided both: the default, a [tool.inwards.rules] key (select, extend-select,
+ignore, severity) or a template role's rules table. Without a config, the defaults.
+
+${CONFIG_OPTION}
+--json: print inwards/rules@1 instead of the table.`,
+  },
+  rule: {
+    synopsis: ["rule CODE|NAME [--full] [--json]"],
+    note: "(a rule's docs page, offline)",
+    about: `Prints a rule's docs page, built into the binary: what it reports, why, an
+example and how to fix it. The same text as the MCP tool explain_rule.
+
+CODE|NAME: a rule code (INW001) or name (layer-dependency), in any case.
+--full: every section of the page, configuration and known limitations included.
+--json: print the page's fields and sections as JSON.
+
+Exit codes: 0 printed, 2 usage error or unknown rule.`,
   },
   stats: {
     synopsis: ["stats [DIR] [--format text|json] [--export FILE [--redact]]"],

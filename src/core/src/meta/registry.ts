@@ -31,10 +31,10 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule: INW000 to INW016, and the FAPI family without FAPI004. */
+/** Codes of every registered rule: INW000 to INW017, and the FAPI family without FAPI004. */
 type RuleCode =
   | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
-  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6}`
+  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}`
   | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
@@ -198,6 +198,17 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "ORM table names and the names of datetime and date columns follow the project's scheme: lower_case_snake singular tables, _at for datetimes, _date for dates.",
     docs: page("INW016"),
+  },
+  // Opt-in and a warning: docs drift shouldn't block the Stop gate by default
+  // (#332, ADR-045). INW018 and INW019 are reserved for the diagram's edges (#345).
+  INW017: {
+    code: "INW017",
+    name: "diagram-unknown-name",
+    severity: "warning",
+    default: "off",
+    summary:
+      "A node in a marked architecture diagram names a layer or context [tool.inwards] declares, and its quoted label a module that exists.",
+    docs: page("INW017"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.

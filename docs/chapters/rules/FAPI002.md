@@ -211,6 +211,7 @@ Unknown means silent: FAPI002 prefers a missed finding to a wrong one.
 - A generator function called by name (the body of a `StreamingResponse`) isn't read, since the call doesn't run it.
 - Where several inclusions lead to one router, a code declared on any of them counts.
 - To find what sits above a router, FAPI002 reads every FastAPI file of the project once per check. In the per-edit hook it does so only for a route with a code its own decorator and router don't declare.
+- **Measured on the corpus** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [chapter 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 18 findings before the `openapi_url` rule, 17 after; 8 looked at, all true (each claimed code is raised by the endpoint or a dependency). The removed one was on Polar's back office, an app with `openapi_url=None`. Polar's own router class hides most of its endpoints ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 
 ## References
 

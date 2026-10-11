@@ -3,8 +3,7 @@
  * the text that makes a file worth parsing for it, the constructors of its
  * apps and routers, the methods that declare or register a route, the
  * decorators and view base classes that mark an endpoint, which methods of
- * a view class handle requests, and the errors and calls that map a failure
- * to HTTP. Plain data and name tests on qualified names; it reads no syntax.
+ * a view class handle requests, and the calls that raise an HTTP error. Plain data and name tests on qualified names; it reads no syntax.
  */
 
 /** A framework whose endpoints INW012 recognises. Starlette goes with FastAPI, DRF with Django. */
@@ -127,20 +126,6 @@ export const VIEW_METHODS: Readonly<Record<ViewKind, ReadonlySet<string>>> = {
   ]),
 };
 
-/** The packages whose exceptions map a failure to an HTTP response when raised. */
-const HTTP_ERROR_PACKAGES: readonly string[] = [
-  "werkzeug.exceptions.",
-  "litestar.exceptions.",
-  "rest_framework.exceptions.",
-];
-
-/** Django's own exceptions that become an HTTP response. */
-const DJANGO_HTTP_ERRORS: ReadonlySet<string> = new Set([
-  "django.http.Http404",
-  "django.http.response.Http404",
-  "django.core.exceptions.PermissionDenied",
-]);
-
 /** The packages of Django's and DRF's view classes. */
 const DJANGO_VIEW_PACKAGES = /^(?:django\.views|rest_framework\.(?:views|generics|viewsets))\./u;
 
@@ -221,22 +206,6 @@ export function frameworkBase(
  */
 export function inFrameworkPackage(qualified: string): boolean {
   return FRAMEWORK_PACKAGES.test(qualified);
-}
-
-/**
- * Tells whether an exception maps a failure to HTTP when raised: any
- * `HTTPException`, Werkzeug's, Litestar's and DRF's exceptions, and
- * Django's `Http404` and `PermissionDenied`.
- *
- * @param qualified - the raised exception's qualified name.
- * @returns true for an HTTP error.
- */
-export function isHttpError(qualified: string): boolean {
-  return (
-    qualified.split(".").at(-1) === "HTTPException" ||
-    DJANGO_HTTP_ERRORS.has(qualified) ||
-    HTTP_ERROR_PACKAGES.some((prefix) => qualified.startsWith(prefix))
-  );
 }
 
 /**

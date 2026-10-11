@@ -25,7 +25,7 @@ export const CLAUDE_USER_DIR: string = tempDir("inwards-claude-user-");
 export const TEST_ENV: Record<string, string | undefined> = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(
-      ([name]) => name !== "CLAUDE_PROJECT_DIR" && name !== "INWARDS_RUN_LOG",
+      ([name]) => !["CLAUDE_PROJECT_DIR", "INWARDS_RUN_LOG", "GITHUB_WORKSPACE"].includes(name),
     ),
   ),
   NO_COLOR: "",

@@ -17,7 +17,7 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
     inwards init --agent claude
     ```
 
-    This writes four hooks (SessionStart, PreToolUse, PostToolUse, Stop) and two `permissions.deny` rules into `.claude/settings.local.json`. That file holds this machine's path to the binary, so `init` adds it to `.gitignore`, together with `.inwards/`. It also pins `required-version` and a default `ignore` list in `[tool.inwards]`. Running it again changes nothing.
+    This writes four hooks (SessionStart, PreToolUse, PostToolUse, Stop) and three `permissions.deny` rules into `.claude/settings.local.json`. That file holds this machine's path to the binary, so `init` adds it to `.gitignore`, together with `.inwards/`. It also pins `required-version` and a default `ignore` list in `[tool.inwards]`. Running it again changes nothing.
 
     If Inwards is a uv dev dependency, record the launcher instead of a path:
 
@@ -27,7 +27,26 @@ With the hooks installed, Inwards checks every Python file Claude writes. It won
 
     Each hook then runs `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code` in the shell, from the project root, so it uses the project's own environment in every worktree and on every machine. `--launcher` takes a tool runner (`uv`, `uvx`, `poetry`, `pdm`, `hatch`, `pipx`, `rye`, `pixi`, `bunx`, `npx` or `python`) with its subcommand and options, in plain words only (letters, digits and `_ . : @ = + / -`), because it goes into a shell command unquoted. The Stop gate counts only such hooks as Inwards' own, so `echo inwards hook claude-code` can't stand in for one.
 
+    To share the hooks with the team instead, see [Share it with the team](#share-it-with-the-team).
+
 3. Start a new Claude Code session in the project (or run `/clear`). Hooks installed mid-session still work, but the Stop gate needs the session start it records.
+
+## Share it with the team
+
+`--shared` writes the setup into files you commit, so everyone who clones the project gets the hooks and the [MCP server](mcp.md) without running `init`:
+
+```sh
+uv run inwards init --agent claude --shared --launcher "uv run"
+```
+
+- The four hooks and the `permissions.deny` rules go into `.claude/settings.json`, the project settings Claude Code reads for everyone in the repository ([Claude Code settings](https://code.claude.com/docs/en/settings#settings-files)).
+- An `inwards` server goes into `.mcp.json` under `mcpServers`, as `{"command": "uv", "args": ["run", "inwards", "mcp"]}`. Claude Code asks each user to approve a project's servers the first time ([Claude Code MCP](https://code.claude.com/docs/en/mcp)).
+- `.gitignore` gets only `.inwards/`; commit `.claude/settings.json` and `.mcp.json`.
+- If `.claude/settings.local.json` holds Inwards hooks from an earlier `init`, `--shared` takes them out and keeps the rest of that file. Claude Code merges hook lists from every settings file, so they would otherwise run twice. A later `init --agent claude` without `--shared` warns about the same thing.
+
+Committed files can't hold your machine's path to the binary, so `--shared` needs `--launcher`, or `inwards` on `PATH`: without a launcher it writes the bare command `inwards hook claude-code` and `{"command": "inwards", "args": ["mcp"]}`, and refuses with exit 2 when `inwards` isn't on `PATH`. Every teammate then needs it on theirs too, which is why a launcher with Inwards as a dev dependency is the safer choice.
+
+Running it again changes nothing. Your team's own hooks and MCP servers stay as they are; an `inwards` server in `.mcp.json` that runs something other than `inwards mcp` stops `init` with exit 2 instead of being replaced. The Stop gate looks for its hooks in the user, project and local settings files, so hooks that live only in `.claude/settings.json` count.
 
 ## Check it works
 
@@ -72,6 +91,8 @@ inwards daemon          # run it in the foreground (--idle SECONDS sets the idle
 | The turn ends with "unresolved architecture problems" | The same violation survived `escalate-after` attempts (default 3). Claude should ask you how to proceed. The list is also handed to the next session. |
 | `init` warns that the path "is in uv's cache" (or bunx's) | You ran it with `uvx` or `bunx`, so the path it would record disappears on `uv cache clean` or the next version. Add Inwards to the project and run `uv run inwards init --agent claude --launcher "uv run"`, or install the release binary and run `init` with it. |
 | An `inwards daemon` process keeps running | That's the [hook daemon](#the-hook-daemon). It exits after 10 minutes without an edit; `inwards daemon stop` ends it now, and `INWARDS_DAEMON=0` keeps the hooks from starting it. |
-| Windows: the hook doesn't start | `init` writes the hook in exec form with the absolute path of the binary, so no shell or `PATH` is involved. If you moved the binary, run `init` again. With `--launcher`, the hook runs in Claude Code's shell, Git Bash on Windows. |
+| Windows: the hook doesn't start | `init` writes the hook in exec form with the absolute path of the binary, so no shell or `PATH` is involved. If you moved the binary, run `init` again. With `--launcher` or `--shared`, the hook runs in Claude Code's shell, Git Bash on Windows, and the launcher (or `inwards`) must be on that shell's `PATH`. |
+| `init --shared` exits 2 asking for a launcher | Without `--launcher`, `--shared` needs `inwards` on `PATH`, since the committed files can't hold this machine's path. Pass `--launcher "uv run"` (with Inwards as a uv dev dependency), or install Inwards on `PATH`. |
+| Every Inwards hook runs twice | The hooks are in both `.claude/settings.json` and `.claude/settings.local.json`, and Claude Code runs both. Run `inwards init --agent claude --shared` again, which takes them out of the local file. |
 
-To share the setup with the team through the committed `.claude/settings.json`, see the shell-form example in [chapter 4](../04-AI-Integration.md). It needs `inwards` on every developer's `PATH`.
+To share the setup with the team through the committed `.claude/settings.json`, see [Share it with the team](#share-it-with-the-team).

@@ -50,7 +50,7 @@ interface Planned {
  * wiring `--agent` and `--brief` as the other styles do.
  *
  * @param ctx - the platform, the check runner and init's writer and picker.
- * @param flags - the parsed options: `--package`, `--agent`, `--launcher`, `--brief`, `--write`.
+ * @param flags - the parsed options: `--package`, `--agent`, `--launcher`, `--shared`, `--brief`, `--write`.
  * @param dryRun - print every change as a diff instead of writing (`--dry-run`).
  * @returns 0 once written or printed as a diff (or declined on a terminal); 2 for
  *   a usage error, a project it can't map, or a proposal printed without `--write`
@@ -226,7 +226,7 @@ function unmappedHint(left: number): string {
  * @param config - the pyproject.toml change, for the brief.
  * @param opts - the agent and the flags.
  * @param opts.agent - `--agent`, if given.
- * @param opts.flags - `--launcher` and `--brief`.
+ * @param opts.flags - `--launcher`, `--shared` and `--brief`.
  * @returns the edits that change something, or why the wiring can't be done.
  * @throws when a file can't be read.
  */
@@ -236,13 +236,13 @@ function agentEdits(
   { agent, flags }: { agent: Agent | undefined; flags: InitFlags },
 ): Change[] | string {
   const project = dirname(config.path);
-  const wired =
-    agent === undefined ? [] : agentChanges(ctx, { agent, launcher: flags.launcher }, project);
-  const wiring =
+  const wiring = { agent, launcher: flags.launcher, shared: flags.shared === true };
+  const wired = agent === undefined ? [] : agentChanges(ctx, { ...wiring, agent }, project);
+  const edits =
     typeof wired === "string" || flags.brief !== true
       ? wired
       : withBrief(ctx.io, wired, { path: config.path, text: config.after });
-  return typeof wiring === "string" ? wiring : wiring.filter((c) => c.before !== c.after);
+  return typeof edits === "string" ? edits : edits.filter((c) => c.before !== c.after);
 }
 
 /**

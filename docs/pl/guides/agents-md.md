@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: 4df47755eba8fd93c91bdc7cdfc15ef05843afb35e653431a4ab99b25135d9fa
+source_hash: 9d84e9e1a21420c8fc990e1f9b92bf628196ce16c187807ec2fa5ad86140149c
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -58,7 +58,7 @@ Sekcja powyżej każe agentowi sprawdzić pracę po fakcie. Opis architektury (b
 inwards context
 ```
 
-Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`), a publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``). Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami i dziesięcioma regułami opt-in ma się zmieścić poniżej 550. Ze znacznikami, które dodaje `--write`, wygląda tak:
+Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540). Ze znacznikami, które dodaje `--write`, wygląda tak:
 
 ```markdown
 <!-- inwards-brief:begin -->
@@ -86,6 +86,7 @@ Każda reguła opt-in włączona w konfiguracji (INW012 do INW016 i reguły FAPI
 Opt-in rules:
 - INW012: endpoints stay thin: call into `domain.service`; no queries or outgoing calls
 - INW013: no blocking calls in `async def`: use async clients or a plain `def`
+- INW016 in `app.*.models`: singular snake_case tables; datetime/date columns end in `_at`/`_date`
 - FAPI001: path operations need a summary or docstring, a response model, `status_code` on POST/DELETE and `description` per `responses` entry
 - FAPI002: declare every 4xx a path operation raises in `responses`
 - FAPI003: include every `APIRouter` in an app; no include cycles

@@ -7,6 +7,7 @@
 export { baselineKey, stableMessage } from "./baseline/accepted.ts";
 export { type ContextSpec, contextOf } from "./config/contexts.ts";
 export { CONFIG_DEFAULTS } from "./config/defaults.ts";
+export { diagramBase, diagramMatches } from "./config/diagrams.ts";
 export type { AgentSuppressions } from "./config/hook-keys.ts";
 export type { LayerSpec } from "./config/layers.ts";
 export { declaresInwards, type InwardsConfig, inwardsTable, parseConfig } from "./config/parse.ts";
@@ -21,6 +22,7 @@ export { ConfigError } from "./config/toml.ts";
 export type {
   CachedExtraction,
   Diagnostic,
+  DiagramSource,
   ExtractionAnswer,
   ExtractionBatch,
   ExtractionCache,
@@ -34,6 +36,7 @@ export type {
   Suppressed,
   SuppressionComment,
 } from "./contracts/records.ts";
+export { checkDiagrams, type DiagramInput } from "./engine/diagrams.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export { createExtractionWorker } from "./engine/extraction.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";

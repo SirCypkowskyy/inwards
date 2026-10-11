@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/claude-code.md
-source_hash: 444e7fc76e87da338abd19d043d215bd92b0f76767b35fdfab2e174909e79d7f
+source_hash: af6613d8a0d4703f2e648f2c8dd8e41d76de268bef528069fd9fd93cea9f04db
 ---
 
 # Claude Code { #claude-code }
@@ -22,7 +22,7 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
     inwards init --agent claude
     ```
 
-    To zapisuje cztery hooki (SessionStart, PreToolUse, PostToolUse, Stop) i dwie reguły `permissions.deny` w `.claude/settings.local.json`. Ten plik zawiera ścieżkę do pliku binarnego na tej maszynie, więc `init` dodaje go do `.gitignore`, razem z `.inwards/`. Przypina też `required-version` i domyślną listę `ignore` w `[tool.inwards]`. Ponowne uruchomienie niczego nie zmienia.
+    To zapisuje cztery hooki (SessionStart, PreToolUse, PostToolUse, Stop) i trzy reguły `permissions.deny` w `.claude/settings.local.json`. Ten plik zawiera ścieżkę do pliku binarnego na tej maszynie, więc `init` dodaje go do `.gitignore`, razem z `.inwards/`. Przypina też `required-version` i domyślną listę `ignore` w `[tool.inwards]`. Ponowne uruchomienie niczego nie zmienia.
 
     Jeśli Inwards jest zależnością deweloperską uv, zapisz launcher zamiast ścieżki:
 
@@ -32,7 +32,26 @@ Z zainstalowanymi hookami Inwards sprawdza każdy plik Pythona, który zapisuje 
 
     Każdy hook uruchamia wtedy w powłoce `cd "$CLAUDE_PROJECT_DIR" && uv run inwards hook claude-code`, z katalogu głównego projektu, więc korzysta z własnego środowiska projektu w każdym worktree i na każdej maszynie. `--launcher` przyjmuje narzędzie uruchamiające (`uv`, `uvx`, `poetry`, `pdm`, `hatch`, `pipx`, `rye`, `pixi`, `bunx`, `npx` albo `python`) z podkomendą i opcjami, i to tylko jako zwykłe słowa (litery, cyfry i `_ . : @ = + / -`), bo trafia do polecenia powłoki bez cudzysłowów. Bramka Stop uznaje za hooki Inwards tylko takie polecenia, więc `echo inwards hook claude-code` nie może ich zastąpić.
 
+    Żeby zamiast tego udostępnić hooki zespołowi, zobacz [Udostępnij zespołowi](#share-it-with-the-team).
+
 3. Rozpocznij nową sesję Claude Code w projekcie (albo uruchom `/clear`). Hooki zainstalowane w trakcie sesji też działają, ale Stop gate potrzebuje zapisu początku sesji.
+
+## Udostępnij zespołowi { #share-it-with-the-team }
+
+`--shared` zapisuje konfigurację w plikach, które commitujesz, więc każdy, kto sklonuje projekt, dostaje hooki i [serwer MCP](mcp.md) bez uruchamiania `init`:
+
+```sh
+uv run inwards init --agent claude --shared --launcher "uv run"
+```
+
+- Cztery hooki i reguły `permissions.deny` trafiają do `.claude/settings.json`, czyli ustawień projektu, które Claude Code czyta dla każdego w repozytorium ([ustawienia Claude Code](https://code.claude.com/docs/en/settings#settings-files)).
+- Serwer `inwards` trafia do `.mcp.json` pod `mcpServers`, jako `{"command": "uv", "args": ["run", "inwards", "mcp"]}`. Claude Code za pierwszym razem prosi każdego użytkownika o zatwierdzenie serwerów projektu ([MCP w Claude Code](https://code.claude.com/docs/en/mcp)).
+- Do `.gitignore` trafia tylko `.inwards/`; commituj `.claude/settings.json` i `.mcp.json`.
+- Jeśli `.claude/settings.local.json` zawiera hooki Inwards z wcześniejszego `init`, `--shared` je stamtąd usuwa i zostawia resztę pliku. Claude Code łączy listy hooków ze wszystkich plików ustawień, więc inaczej uruchamiałyby się dwa razy. Późniejsze `init --agent claude` bez `--shared` ostrzega przed tym samym.
+
+Commitowane pliki nie mogą zawierać ścieżki do pliku binarnego na twojej maszynie, więc `--shared` potrzebuje `--launcher` albo `inwards` w `PATH`: bez launchera zapisuje samo polecenie `inwards hook claude-code` i `{"command": "inwards", "args": ["mcp"]}`, a gdy `inwards` nie ma w `PATH`, odmawia z kodem wyjścia 2. Wtedy każda osoba w zespole też musi mieć go w swoim `PATH`, dlatego launcher z Inwards jako zależnością deweloperską jest bezpieczniejszym wyborem.
+
+Ponowne uruchomienie niczego nie zmienia. Własne hooki i serwery MCP zespołu zostają bez zmian; serwer `inwards` w `.mcp.json`, który uruchamia coś innego niż `inwards mcp`, zatrzymuje `init` z kodem wyjścia 2, zamiast zostać zastąpiony. Stop gate szuka swoich hooków w plikach ustawień użytkownika, projektu i lokalnym, więc hooki tylko w `.claude/settings.json` się liczą.
 
 ## Sprawdź, czy działa { #check-it-works }
 
@@ -77,6 +96,8 @@ inwards daemon          # run it in the foreground (--idle SECONDS sets the idle
 | Tura kończy się komunikatem „unresolved architecture problems” | To samo naruszenie przetrwało `escalate-after` prób (domyślnie 3). Claude powinien zapytać cię, co dalej. Lista trafia też do następnej sesji. |
 | `init` ostrzega, że ścieżka „is in uv's cache” (albo bunx's) | Uruchomiono go przez `uvx` albo `bunx`, więc ścieżka, którą by zapisał, znika po `uv cache clean` albo przy następnej wersji. Dodaj Inwards do projektu i uruchom `uv run inwards init --agent claude --launcher "uv run"` albo zainstaluj plik binarny z wydania i uruchom nim `init`. |
 | Proces `inwards daemon` ciągle działa | To [daemon hooków](#the-hook-daemon). Kończy się po 10 minutach bez edycji; `inwards daemon stop` kończy go od razu, a `INWARDS_DAEMON=0` sprawia, że hooki go nie uruchamiają. |
-| Windows: hook się nie uruchamia | `init` zapisuje hook w formie exec, z bezwzględną ścieżką do pliku binarnego, więc nie biorą w tym udziału ani powłoka, ani `PATH`. Jeśli przeniesiono plik binarny, uruchom ponownie `init`. Z `--launcher` hook działa w powłoce Claude Code, na Windows w Git Bash. |
+| Windows: hook się nie uruchamia | `init` zapisuje hook w formie exec, z bezwzględną ścieżką do pliku binarnego, więc nie biorą w tym udziału ani powłoka, ani `PATH`. Jeśli przeniesiono plik binarny, uruchom ponownie `init`. Z `--launcher` albo `--shared` hook działa w powłoce Claude Code, na Windows w Git Bash, a launcher (albo `inwards`) musi być w `PATH` tej powłoki. |
+| `init --shared` kończy się kodem 2 i prosi o launcher | Bez `--launcher` `--shared` potrzebuje `inwards` w `PATH`, bo commitowane pliki nie mogą zawierać ścieżki z tej maszyny. Podaj `--launcher "uv run"` (z Inwards jako zależnością deweloperską uv) albo zainstaluj Inwards w `PATH`. |
+| Każdy hook Inwards uruchamia się dwa razy | Hooki są i w `.claude/settings.json`, i w `.claude/settings.local.json`, a Claude Code uruchamia oba. Uruchom ponownie `inwards init --agent claude --shared`, który usuwa je z pliku lokalnego. |
 
-Żeby udostępnić tę konfigurację zespołowi przez commitowany plik `.claude/settings.json`, zobacz przykład w formie powłokowej w [rozdziale 4](../04-AI-Integration.md). Wymaga on `inwards` w `PATH` każdego programisty.
+Żeby udostępnić tę konfigurację zespołowi przez commitowany plik `.claude/settings.json`, zobacz [Udostępnij zespołowi](#share-it-with-the-team).

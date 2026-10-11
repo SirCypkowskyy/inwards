@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI007.md
-source_hash: 19bf43cd2f9aed0276411882634f8a74ad438f14f7caa9cd852366027c5fe371
+source_hash: 469fc4c0e72cc1d21388efb96dce0156d155f616abf0a3bdd1c51d4f8381bc3e
 type: rule
 title: FAPI007 yield-dependency-swallows
 description: Zależność z yield rzuca ponownie to, co łapią jej klauzule except, więc błąd w endpoincie nie jest ukryty przed serwerem.
@@ -152,11 +152,12 @@ Każde zgłoszenie można wyciszyć w kodzie przez `# inwards: ignore[FAPI007] r
 
 ## Znane ograniczenia { #known-limitations }
 
-- **Generatory, które nie są zależnościami**, też są zgłaszane: zwykłe `def lines(): try: yield ... except ...: log()`, do którego nic nie wrzuca wyjątku, nigdy nie widzi błędu endpointu. Wycisz je w kodzie albo oznacz dekoratorem, jeśli to menedżer kontekstu.
+- **Generatory, które nie są zależnościami**, też są zgłaszane, gdy mają jedno `yield`: zwykłe `def line(): try: yield ... except ...: log()`, do którego nic nie wrzuca wyjątku, nigdy nie widzi błędu endpointu. Wycisz je w kodzie albo oznacz dekoratorem, jeśli to menedżer kontekstu. Generator, który ma więcej niż jedno `yield` albo `yield` w pętli `for` lub `while`, jest strumieniem i jest pomijany, bo zależność ma jedno `yield`; zależność z `yield` w dwóch gałęziach (`if x: yield a` / `else: yield b`) jest pomijana razem z nimi.
 - **Handler, który rzuca przez wywołanie** (`fail(exc)`, gdzie `fail` zawsze rzuca), nie jest dla Inwards `raise`, więc jest zgłaszany.
 - **`raise`, do którego prowadzą tylko niektóre ścieżki** (`if x: raise`), jest zgłaszany; ten na każdej gałęzi `if` / `else` przechodzi.
 - **Klauzula dla wąskiego wyjątku** (`except KeyError:`) jest sprawdzana jak każda inna: błędy innych typów przechodzą dalej, ale ten jest połykany.
 - **`return` w klauzuli** przed `raise` kończy ścieżkę bez rzucenia i jest zgłaszany.
+- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 4 zgłoszenia, zanim strumienie zaczęły być pomijane, wszystkie fałszywe (zdarzenia wysyłane przez serwer w Polarze, iterator rabatów w Saleorze), i żadne po tym.
 
 ## Źródła { #references }
 

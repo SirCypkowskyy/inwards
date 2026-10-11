@@ -285,6 +285,65 @@ The #61 base measured 1.48 to 1.62 s on saleor across six sessions that day, and
 
 **What stays on the main thread.** Timed from source on saleor with four threads: about 45 ms to walk and name the files, 70 ms to read them, then the engine: 260 ms for the skeleton batch (shared with the workers), 127 ms for the scans, 135 ms for the full-parse batch (shared), 60 ms to confirm and report and 33 ms for the whole-run checks. The scans and the confirmations are the rules, which stay on one thread by design ([ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)).
 
+### Precision of the opt-in rules
+
+The opt-in content rules (INW012 to INW016, FAPI001 to FAPI009) shipped with tests on fixtures only. [#182](https://github.com/SirCypkowskyy/inwards/issues/182) turned them on over the five corpus repos at their pinned commits, triaged the findings by hand, fixed the largest false-positive classes, and timed each rule.
+
+**Method.** Each repo ran with its manifest layering plus `select` of every opt-in rule. INW015 needs a role, so fastapi-clean-example got `role = ["app.outbound"]`, `allowed-in = ["app.main"]` and python-ddd `role = ["modules.*.infrastructure", "seedwork.infrastructure"]`, `allowed-in = ["config", "api.main", "cli"]`. Polar's routers come from a class built at run time ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)), so INW012 saw one of its 450 endpoints until a second run added `decorators = ["polar.*.router.get", "polar.*.router.post", "polar.*.router.patch", "polar.*.router.put", "polar.*.router.delete"]`. A finding is a true positive when what it claims is true and a reader of the rule's page would want it fixed; a finding that is true to the letter but not worth fixing, such as a health check that pings the database, counts as false. Where a rule had more findings than could be read, every fifth one was looked at.
+
+| Rule | Findings before → after | Looked at | Precision before → after | Fix in #182 |
+|---|--:|--:|--:|---|
+| INW012, Polar with `decorators` | 108 → 73 | 22 before, 25 after | 36 % → 68 % | any `raise` is a guard; loader options aren't denied calls |
+| INW012, the other repos | 4 → 4 | all | 3 of 4 | none needed |
+| INW013 | 1 → 1 | all | 1 of 1 | none needed |
+| INW014 | 0 → 0 | n/a | n/a | none needed |
+| INW015 | 48 → 17 | all | 31 % → 88 % | exception classes of the role aren't reported |
+| INW016 | 173 → 152 | every column finding and table name | 88 % → 100 % against the default scheme | Alembic migrations aren't read |
+| FAPI001 | 22 → 21 | all | 86 % → 90 % | an app with `openapi_url=None` has no schema |
+| FAPI002 | 18 → 17 | 8 | all true | the same |
+| FAPI007 | 4 → 0 | all | 0 % → no findings | a generator that yields twice or in a loop is a stream |
+| FAPI003, FAPI005, FAPI006, FAPI008, FAPI009 | 0 → 0 | n/a | n/a | none needed |
+
+What the false positives were, and what is left:
+
+- **INW012.** 8 of the first sample's 14 false positives were guards that raise the project's own errors (`raise ResourceNotFound()`, mapped to 404 by an app-wide exception handler); counting them as guards lost one true positive, a business rule written as two guards. 3 across both samples were a single `joinedload(...)` passed to a repository. Left: server-rendered HTML in nested `with` blocks (46 of the 73 findings are in Polar's back office), HTMX form handlers, health checks and a webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)). The default thresholds held: only 3 of the 73 findings trip a single signal by 2 statements, 1 branch or 1 level or less.
+- **INW015.** 31 of 48 findings imported an exception class from an adapter to map it to an HTTP status. Left: a constant imported from an adapter, and a test module ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)).
+- **INW016.** 21 findings repeated a model's column in an Alembic migration. The 152 left are correct against the default scheme, but 101 are Polar's consistently plural table names; one project-wide finding would serve better ([#361](https://github.com/SirCypkowskyy/inwards/issues/361)).
+- **FAPI001, FAPI002.** Polar's back office is a `FastAPI(openapi_url=None)` app. Left: two test apps in Polar ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Both rules see about 40 endpoints in the corpus, because Polar's and fastapi-clean-example's routers aren't recognised ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **FAPI007.** All 4 findings were streams (Polar's server-sent events, Saleor's discount iterator), not dependencies.
+
+**Cost.** Every rule alone on top of the manifest layering, cold (`--no-cache`) and warm, median of 5 runs (3 for polar and saleor), with the darwin-arm64 binary on the laptop above while other agents ran (load average 5 to 11). Milliseconds, cold / warm:
+
+| Rule | template | clean-example | python-ddd | polar | saleor |
+|---|--:|--:|--:|--:|--:|
+| none | 44 / 34 | 75 / 55 | 82 / 77 | 603 / 501 | 931 / 1,034 |
+| INW012 | 79 / 79 | 93 / 84 | 91 / 83 | 1,119 / 955 | 1,284 / 1,117 |
+| INW013 | 43 / 38 | 115 / 116 | 113 / 113 | 7,826 / 7,246 | 954 / 924 |
+| INW014 | 42 / 34 | 77 / 60 | 82 / 80 | 592 / 499 | 923 / 907 |
+| INW015 | n/a | 105 / 106 | 113 / 125 | n/a | n/a |
+| INW016 | 49 / 44 | 80 / 61 | 90 / 88 | 778 / 619 | 1,187 / 1,251 |
+| FAPI001 | 79 / 79 | 81 / 88 | 109 / 105 | 1,299 / 1,173 | 1,357 / 1,319 |
+| FAPI002 | 89 / 89 | 88 / 81 | 109 / 108 | 1,426 / 1,180 | 1,481 / 1,475 |
+| FAPI007 | 65 / 64 | 81 / 75 | 91 / 91 | 1,326 / 1,197 | 1,362 / 1,490 |
+| every opt-in rule | 130 / 130 | 175 / 189 | 178 / 171 | 9,299 / 9,157 | 2,089 / 2,189 |
+
+The other FAPI rules cost about what FAPI001 does. The warm column barely differs, because the extraction cache holds imports, not the trees the content rules parse. Two costs stood out:
+
+- **INW012 on Saleor took 8.0 s**, against 1.1 s without it (both run from source): nearly every file mentions Django, so each got a full parse, and each class with a first-party base read that base's module. A Django file now needs a view's shape before the parse (`@api_view`, `@action`, `path(...)`, `re_path(...)` or a `def get(`-style handler method, unless `modules` scopes the rule), and only a class with a handler method resolves its bases. Saleor with INW012 went to 1.3 s, with the same 2 findings.
+- **INW013 on Polar takes 7.8 s**, about 13 times the check without it: a hop into another module parses that module again for every file that calls into it. Tracked in [#359](https://github.com/SirCypkowskyy/inwards/issues/359).
+
+**The hook.** [#182](https://github.com/SirCypkowskyy/inwards/issues/182) asked for no measurable hook regression on files without endpoints and one full parse at most on files with them. `inwards check --no-cache <file>`, 21 alternating runs each, milliseconds p50 / p95:
+
+| File | Endpoints | INW012 off | INW012 on |
+|---|---|--:|--:|
+| saleor `order/actions.py` (2,110 lines, mentions Django) | none | 33 / 35 | 33 / 35 |
+| polar `subscription/service.py` (4,482 lines) | none | 60 / 61 | 61 / 64 |
+| saleor `thumbnail/views.py` | none (its 2 views are registered in `urls.py`) | 32 / 33 | 33 / 34 |
+| polar `subscription/endpoints.py` (`decorators` set) | 9 | 29 / 31 | 43 / 50 |
+| template `api/routes/items.py` | 5 | 26 / 27 | 32 / 34 |
+
+Before the Django prefilter, `order/actions.py` took 53 / 54 ms with INW012 on. A file with endpoints pays one full parse, which the prescan otherwise skips.
+
 ### Performance roadmap
 
 | Step | Expected effect | Targets |

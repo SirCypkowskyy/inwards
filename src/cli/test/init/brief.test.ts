@@ -153,6 +153,28 @@ deny = [{ modules = ["shop.domain.pricing", "shop.*.jobs"], libraries = ["numpy"
     );
   });
 
+  test("braces a prefix deny's modules when they share their parent (#338)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules.pure-domain]
+deny = [{ modules = ["shop.*.models", "shop.*.service"], libraries = ["fastapi"] }]
+`);
+    expect(architectureBrief({ config, style: undefined, ports: [] })).toContain(
+      "- `shop.*.{models,service}`: not `fastapi`",
+    );
+  });
+
+  test("leaves a context's dependencies out when INW002 is off (#338)", () => {
+    const config = parseConfig(`${LAYERS}[tool.inwards.rules]
+ignore = ["INW002"]
+[[tool.inwards.contexts]]
+name = "billing"
+modules = ["shop.billing"]
+public = ["shop.billing.api"]
+`);
+    const brief = architectureBrief({ config, style: undefined, ports: [] });
+    expect(brief).toContain("- billing (`shop.billing`): public `shop.billing.api`");
+    expect(brief).not.toContain("no dependencies");
+  });
+
   test("leaves out the rules that are turned off", () => {
     const config = parseConfig(`${LAYERS}[tool.inwards.rules]
 ignore = ["INW005"]

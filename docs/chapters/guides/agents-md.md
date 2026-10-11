@@ -53,7 +53,7 @@ The section above tells the agent to check its work after the fact. The brief te
 inwards context
 ```
 
-It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005), the contexts with their public modules and dependencies (INW002, INW003), and the opt-in rules the config turns on. Rules turned off in `[tool.inwards.rules]` are left out. A layer with more than three layers inside it names them by their numbers in the list (`may import layers 1-9`), and a context's public modules inside its one module share that prefix (`` `app.posts.{router,service}` ``). For the repository's example config (`examples/clean-app`) it is 678 characters, about 170 tokens; a test keeps the example and every preset under 300 tokens (at four characters per token), except the fastapi preset, with eleven layers and ten opt-in rules, under 550. With the markers `--write` adds, it reads:
+It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005), the contexts with their public modules and dependencies (INW002, INW003), and the opt-in rules the config turns on. Rules turned off in `[tool.inwards.rules]` are left out. A layer with more than three layers inside it names them by their numbers in the list (`may import layers 1-9`); a brief that does so names the sibling groups once in its first sentence (`sibling groups: 2-4; 5-6`) instead of on every line. A context's public modules inside its one module share that prefix (`` `app.posts.{router,service}` ``), and so do the modules of a `deny` entry with one parent (`` `app.*.{models,service}` ``). With INW002 off, the contexts leave out their dependencies. For the repository's example config (`examples/clean-app`) it is 678 characters, about 170 tokens; a test keeps the example and every preset under 300 tokens (at four characters per token), except the fastapi preset, with eleven layers, a `deny` entry and eleven opt-in rules, under 550 (about 540). With the markers `--write` adds, it reads:
 
 ```markdown
 <!-- inwards-brief:begin -->
@@ -81,6 +81,7 @@ Each opt-in rule the config turns on (INW012 to INW016 and the FAPI rules, throu
 Opt-in rules:
 - INW012: endpoints stay thin: call into `domain.service`; no queries or outgoing calls
 - INW013: no blocking calls in `async def`: use async clients or a plain `def`
+- INW016 in `app.*.models`: singular snake_case tables; datetime/date columns end in `_at`/`_date`
 - FAPI001: path operations need a summary or docstring, a response model, `status_code` on POST/DELETE and `description` per `responses` entry
 - FAPI002: declare every 4xx a path operation raises in `responses`
 - FAPI003: include every `APIRouter` in an app; no include cycles

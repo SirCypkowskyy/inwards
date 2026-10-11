@@ -51,6 +51,13 @@ export interface StyleTemplate {
   roles: readonly StyleRole[];
   /** Module names inside each context that other code may import (INW003). */
   public: readonly string[];
+  /** Opt-in rules per role, written as `[tool.inwards.templates.<name>.rules]`: role, then rule name and its value. */
+  rules?: {
+    why: string;
+    roles: Readonly<Record<string, Readonly<Record<string, "warning" | "error" | true>>>>;
+  };
+  /** Libraries some roles may not import, written as INW005's `deny` with one selector per role for each entry that uses the template. */
+  deny?: { why: string; roles: readonly string[]; libraries: readonly string[] };
 }
 
 /** The preset's contexts (INW002, INW003): one per package that repeats the template. */

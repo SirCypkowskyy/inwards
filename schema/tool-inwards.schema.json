@@ -88,6 +88,16 @@
       "uniqueItems": true,
       "default": ["contexts"]
     },
+    "diagrams": {
+      "description": "Markdown and Mermaid files whose marked diagrams (%% inwards: layers or %% inwards: contexts) INW017 checks against the config and the code: paths relative to the config file, with * and ? in a segment and ** for any number of directories.",
+      "markdownDescription": "Markdown and Mermaid files whose marked diagrams (`%% inwards: layers` or `%% inwards: contexts`) INW017 checks against the config and the code: paths relative to the config file, with `*` and `?` in a segment and `**` for any number of directories.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#diagrams)",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!(?:.*/)?\\.\\.(?:/|$))(?!.*//)"
+      }
+    },
     "shape": {
       "description": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.",
       "markdownDescription": "Package shapes: which members a package may, must and must not hold (INW007, INW008). The first matching entry wins.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
@@ -191,6 +201,7 @@
         "INW014",
         "INW015",
         "INW016",
+        "INW017",
         "FAPI001",
         "FAPI002",
         "FAPI003",
@@ -462,6 +473,9 @@
         },
         "orm-naming": {
           "$ref": "#/definitions/ormNamingOptions"
+        },
+        "diagram-unknown-name": {
+          "$ref": "#/definitions/ruleOptions"
         },
         "endpoint-metadata": {
           "$ref": "#/definitions/endpointMetadataOptions"
@@ -1253,6 +1267,24 @@
             ]
           },
           "duplicate-operation-id": {
+            "anyOf": [
+              {
+                "const": true
+              },
+              {
+                "enum": ["error", "warning"]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/ruleOptions"
+                  },
+                  { "type": "object", "propertyNames": { "not": { "const": "modules" } } }
+                ]
+              }
+            ]
+          },
+          "diagram-unknown-name": {
             "anyOf": [
               {
                 "const": true

@@ -47,7 +47,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     Claude Code runs [hooks](https://code.claude.com/docs/en/hooks) around tool calls. For `PostToolUse`, exit code 2 doesn't undo the edit (it already happened), but Claude sees the hook's stderr and reacts to it. For `Stop`, exit code 2 keeps Claude working instead of ending the turn. The hook input includes `stop_hook_active`, and Claude Code ends the turn anyway after several consecutive blocks, so a broken stop hook can't trap the session.
 
-    To share the setup through the committed `.claude/settings.json` instead, write it by hand. This version relies on `inwards` being on `PATH`:
+    To share the setup through the committed `.claude/settings.json` instead, run `inwards init --agent claude --shared --launcher "uv run"` ([guide](guides/claude-code.md#share-it-with-the-team)). The hooks and deny rules then go into `.claude/settings.json`, an `inwards` server running `uv run inwards mcp` goes into `.mcp.json`, and `.gitignore` gets only `.inwards/`. Committed files can't hold a machine's path, so `--shared` takes a launcher, or writes the bare `inwards` when it is on `PATH` and refuses otherwise. It takes Inwards' own hooks out of `.claude/settings.local.json`, because Claude Code merges hook lists across settings files and they would run twice, and it never replaces a team's own hooks or an `inwards` MCP server that runs something else. Without a launcher, the result is:
 
     ```json title=".claude/settings.json"
     {
@@ -64,20 +64,24 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
-            "hooks": [
-              {
-                "type": "command",
-                "command": "inwards hook claude-code"
-              }
-            ]
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
           }
         ],
         "Stop": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
+      },
+      "permissions": {
+        "deny": [
+          "Edit(/.claude/settings*.json)",
+          "Edit(/.inwards/**)",
+          "Edit(/**/inwards-baseline.json)"
+        ]
       }
     }
     ```
+
+    The Stop gate reads the user, project and local settings files, so hooks in any one of them count.
 
     `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote:
 
@@ -159,6 +163,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 | `text` | Humans, Aider | `file:line:col: CODE message`, then numbered fix steps |
 | `json` | Agents, scripts | `inwards/diagnostics@1`: `summary` + `diagnostics[]`, each with `fix.summary` and `fix.steps[]` |
 | `sarif` | GitHub code scanning ([workflow](guides/ci.md)), IDE viewers | SARIF 2.1.0. Fix steps go in `message.text` and `properties.fix` |
+| `github` | GitHub Actions ([workflow](guides/ci.md#the-workflow)) | One `::error` or `::warning` workflow command per diagnostic, with the fix steps and docs link in the message and paths from the repository root, then the summary line |
 | `concise` | Agents on a token budget | One line per diagnostic: location, code, the message (it names the import, where the rule has one), and the first fix step. Line breaks, such as a wrapped `from x import (…)` quoted in the fix, are folded into spaces. Then the summary line. Never coloured |
 
 <figure markdown="span">
@@ -166,9 +171,9 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
   <figcaption>The JSON an agent receives: a versioned summary and ordered fix steps. Piped output is compact; <code>jq</code> only pretty-prints it here.</figcaption>
 </figure>
 
-`--max-diagnostics N` prints at most N diagnostics, errors before warnings, and says what it left out. Text and `concise` add a line such as `Not shown: 3 violations, 1 warning.`; JSON adds `summary.omitted`. The summary counts and the exit code still cover every diagnostic. SARIF refuses the flag, because code scanning should see every finding.
+`--max-diagnostics N` prints at most N diagnostics, errors before warnings, and says what it left out. Text, `concise` and `github` add a line such as `Not shown: 3 violations, 1 warning.`; JSON adds `summary.omitted`. The summary counts and the exit code still cover every diagnostic. SARIF refuses the flag, because code scanning should see every finding.
 
-`inwards check PATHS...` checks only the Python files under `root`, one by one. The checks that need the whole project are left out: dead layer prefixes and selectors, nested projects and symlinks in layers (INW006), shape selectors (INW007), the required members of shaped packages (INW008) and import cycles (INW004). Run `inwards check` without paths for those; `--help` says the same. A named path that gives no file to check, because it lies outside `root` or holds no Python file, gets a line such as `warning: tools/x.py is outside root "src" and was not checked.` JSON lists these in a top-level `notChecked` array of `path` and `message`, and SARIF puts them in `invocations[0].toolExecutionNotifications` at level `warning`. The other paths are still checked. If none of the named paths gave a file, the summary line reads `Nothing checked: 0 files` instead of `All clear` and the exit code is 2.
+`inwards check PATHS...` checks only the Python files under `root`, one by one. The checks that need the whole project are left out: dead layer prefixes and selectors, nested projects and symlinks in layers (INW006), shape selectors (INW007), the required members of shaped packages (INW008) and import cycles (INW004). Run `inwards check` without paths for those; `--help` says the same. A named path that gives no file to check, because it lies outside `root` or holds no Python file, gets a line such as `warning: tools/x.py is outside root "src" and was not checked.` JSON lists these in a top-level `notChecked` array of `path` and `message`, SARIF puts them in `invocations[0].toolExecutionNotifications` at level `warning`, and `github` prints a `::warning` command for each. The other paths are still checked. If none of the named paths gave a file, the summary line reads `Nothing checked: 0 files` instead of `All clear` and the exit code is 2.
 
 ### Writing diagnostics for a model
 
@@ -243,7 +248,7 @@ Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy
 Fixing a violation costs a retry. Avoiding it costs nothing. Two features move Inwards earlier in the loop:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) prints a map of the layers, what each one may import, where ports live, and the library and context rules, in under 300 tokens. `inwards context --write` or `inwards init --brief` keeps it in a marked section of `AGENTS.md`. It is opt-in, so design partners can compare runs with and without it ([the brief](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page.
+- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page. An agent without MCP gets the same page from `inwards rule CODE`, and `inwards rules` lists the rules the project turns on.
 
 ```mermaid
 flowchart LR
