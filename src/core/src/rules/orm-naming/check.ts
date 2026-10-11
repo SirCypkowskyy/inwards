@@ -8,14 +8,13 @@
  * naming convention (`conventionFinding`); the caller decides which runs
  * get it. A file that names no ORM construct is never parsed, and neither
  * is an Alembic migration. I/O-free: the
- * caller supplies the parser, the files and the options.
+ * caller supplies the run's trees, the files and the options.
  */
-import type { Parser } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { parsePython } from "../../python/parser.ts";
+import type { FileTrees } from "../shared/module-trees.ts";
 import {
   type Models,
   readModels,
@@ -172,19 +171,14 @@ function checkColumn(column: TimeColumn, settings: Settings, src: SourceFile): D
 }
 
 /**
- * Parses a file and reads its models.
+ * Reads a file's models from the run's tree of it.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @returns its tables and columns.
  */
-function modelsOf(parser: Parser, src: SourceFile): Models {
-  const tree = parsePython(parser, src.text);
-  try {
-    return readModels(tree, src);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+function modelsOf(trees: FileTrees, src: SourceFile): Models {
+  return readModels(trees.treeOf(src), src);
 }
 
 /**
@@ -192,13 +186,13 @@ function modelsOf(parser: Parser, src: SourceFile): Models {
  * the rule is on for the file; this parses only a file whose text names a
  * table or column construct.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @param options - `[tool.inwards.rules.orm-naming]`, if set.
  * @returns the findings in source order, before suppressions and severities apply.
  */
 export function checkOrmNaming(
-  parser: Parser,
+  trees: FileTrees,
   src: SourceFile,
   options: RuleOptions | undefined,
 ): Diagnostic[] {
@@ -206,7 +200,7 @@ export function checkOrmNaming(
     return [];
   }
   const settings = settingsOf(options);
-  const { tables, columns } = modelsOf(parser, src);
+  const { tables, columns } = modelsOf(trees, src);
   return [
     ...tables.flatMap((table) => checkTable(table, settings, src)),
     ...columns.flatMap((column) => checkColumn(column, settings, src)),
@@ -217,20 +211,15 @@ export function checkOrmNaming(
  * Tells whether a file sets a `MetaData` naming convention, parsing it only
  * when its text names one.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @returns true when it sets one.
  */
-function hasConvention(parser: Parser, src: SourceFile): boolean {
+function hasConvention(trees: FileTrees, src: SourceFile): boolean {
   if (!src.text.includes("naming_convention")) {
     return false;
   }
-  const tree = parsePython(parser, src.text);
-  try {
-    return setsNamingConvention(tree, src);
-  } finally {
-    tree.delete(); // WASM memory is not garbage collected
-  }
+  return setsNamingConvention(trees.treeOf(src), src);
 }
 
 /**
@@ -239,14 +228,14 @@ function hasConvention(parser: Parser, src: SourceFile): boolean {
  * on the first such table of the files `checked` accepts, in the order given.
  * A convention in any file counts, whether the rule covers that file or not.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param files - every file of the run, with normalised text.
  * @param options - `[tool.inwards.rules.orm-naming]`, if set.
  * @param checked - tells whether the rule covers a file.
  * @returns the finding, or none.
  */
 export function conventionFinding(
-  parser: Parser,
+  trees: FileTrees,
   files: readonly SourceFile[],
   options: RuleOptions | undefined,
   checked: (src: SourceFile) => boolean,
@@ -254,13 +243,13 @@ export function conventionFinding(
   if (options?.["require-naming-convention"] === false) {
     return [];
   }
-  if (files.some((src) => hasConvention(parser, src))) {
+  if (files.some((src) => hasConvention(trees, src))) {
     return [];
   }
   for (const src of files) {
     const table =
       checked(src) && MAY_DECLARE_TABLE.test(src.text)
-        ? modelsOf(parser, src).tables.find((t) => t.sqlalchemy)
+        ? modelsOf(trees, src).tables.find((t) => t.sqlalchemy)
         : undefined;
     if (table) {
       return [

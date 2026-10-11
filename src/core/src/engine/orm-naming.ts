@@ -4,14 +4,15 @@
  * project-wide finding for a project without a `MetaData` naming
  * convention, which only a whole-project run adds (`batch.ts`), as it does
  * the import cycles. Nothing is parsed while the rule is off, nor a file
- * whose encoding can hide code (INW000 reports it). No I/O: the caller
- * supplies the files.
+ * whose encoding can hide code (INW000 reports it), and a file the run
+ * parsed for another rule is not parsed again. No I/O: the caller supplies
+ * the files and the run's trees.
  */
-import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import { checkOrmNaming, conventionFinding } from "../rules/orm-naming/check.ts";
+import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 
 /**
@@ -28,18 +29,18 @@ function covers(src: SourceFile, config: InwardsConfig): boolean {
 /**
  * Finds INW016's per-file findings, whatever layer the file is in.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param src - the source file, with normalised text.
  * @param config - the project's config, for its rules table.
  * @returns the findings, before suppressions.
  */
 export function ormNamingFindings(
-  parser: Parser,
+  trees: FileTrees,
   src: SourceFile,
   config: InwardsConfig,
 ): Diagnostic[] {
   return covers(src, config)
-    ? checkOrmNaming(parser, src, config.rules?.options?.["orm-naming"])
+    ? checkOrmNaming(trees, src, config.rules?.options?.["orm-naming"])
     : [];
 }
 
@@ -48,13 +49,13 @@ export function ormNamingFindings(
  * `MetaData(naming_convention=...)` among them, and a table in a file the
  * rule covers.
  *
- * @param parser - parser with the Python grammar loaded.
+ * @param trees - the run's trees, which parse each text once per run.
  * @param files - every file of the run, with normalised text, in order.
  * @param config - the project's config, for its rules table.
  * @returns the finding, or none.
  */
 export function ormConventionFindings(
-  parser: Parser,
+  trees: FileTrees,
   files: readonly SourceFile[],
   config: InwardsConfig,
 ): Diagnostic[] {
@@ -62,7 +63,7 @@ export function ormConventionFindings(
     return [];
   }
   const readable = files.filter((src) => checkEncoding(src) === null);
-  return conventionFinding(parser, readable, config.rules?.options?.["orm-naming"], (src) =>
+  return conventionFinding(trees, readable, config.rules?.options?.["orm-naming"], (src) =>
     covers(src, config),
   );
 }

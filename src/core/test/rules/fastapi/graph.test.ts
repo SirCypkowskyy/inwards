@@ -9,6 +9,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { WiringGraph } from "../../../src/rules/fastapi/graph.ts";
 import { FastApiModel } from "../../../src/rules/fastapi/model.ts";
 import type { FastApiFile } from "../../../src/rules/fastapi/records.ts";
+import { ModuleTrees } from "../../../src/rules/shared/module-trees.ts";
 import { indexOn, parser } from "../../support/helpers.ts";
 
 const TEXTS: ReadonlyMap<string, string> = new Map([
@@ -60,7 +61,8 @@ const DISK = new Map<string, "file" | "dir">([
 ]);
 
 const index = indexOn(DISK, TEXTS);
-const model = new FastApiModel(parser, index);
+const trees = new ModuleTrees(parser, index);
+const model = new FastApiModel(trees, index);
 const files = [...index.modules].flatMap((m): FastApiFile[] => {
   const found = model.moduleModel(m);
   return found === null ? [] : [found];
@@ -69,6 +71,7 @@ const graph = WiringGraph.build(model, files, index.ownerOf);
 
 afterAll(() => {
   model.dispose();
+  trees.dispose();
 });
 
 describe("the wiring graph", () => {
