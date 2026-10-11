@@ -3,7 +3,9 @@
  * fastapi-best-practices layout, with every domain package layered by one
  * template on a kernel of shared modules, and the FastAPI rules, INW012
  * (endpoints hand their work to the domain's service) and INW013 (no
- * blocking call in an `async def`) turned on as warnings.
+ * blocking call in an `async def`) turned on as warnings. The template also
+ * turns INW016 on for every domain's models and denies `fastapi` and
+ * `starlette` to the roles below the router's (INW005).
  * It also words the Ruff config that init prints beside the
  * preset and never writes. Pure data; the example's modules are
  * `fastapi.ts`'s.
@@ -56,6 +58,15 @@ export const FASTAPI: Style = {
         { name: "router", role: "the endpoints", file: true },
       ],
       public: ["router", "service", "schemas", "dependencies", "constants", "exceptions"],
+      rules: {
+        why: "fastapi-best-practices' table and column names in every domain's models (INW016), as a warning to start with.",
+        roles: { models: { "orm-naming": "warning" } },
+      },
+      deny: {
+        why: "The business logic and what it uses don't import the web framework: raise the domain's exceptions, and leave HTTP to the router and dependencies (INW005).",
+        roles: ["models", "schemas", "utils", "service"],
+        libraries: ["fastapi", "starlette"],
+      },
     },
   ],
   contexts: {
