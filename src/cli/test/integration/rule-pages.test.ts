@@ -8,8 +8,8 @@ import { expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DOCS_BASE, RULES } from "@inwards/core";
-import { STYLES } from "../../src/init/presets.ts";
-import { STYLE_NAMES } from "../../src/init/styles.ts";
+import { STYLES } from "../../src/init/_presets.ts";
+import { STYLE_NAMES } from "../../src/init/_styles.ts";
 
 // #49: every rule has a docs page, in English and in Polish, and every
 // diagnostic links to its own. The pages' front matter follows OKF

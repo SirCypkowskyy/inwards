@@ -9,9 +9,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseConfig, RULES } from "@inwards/core";
-import { architectureBrief, briefFor } from "../../src/init/brief.ts";
-import { STYLES } from "../../src/init/presets.ts";
-import { configTable } from "../../src/init/style-text.ts";
+import { STYLES } from "../../src/init/_presets.ts";
+import { configTable } from "../../src/init/_style-text.ts";
+import { architectureBrief, briefFor } from "../../src/init/brief/_brief.ts";
 import { inwards, LAYERS, project } from "../support/run.ts";
 
 const BEGIN = "<!-- inwards-brief:begin -->";

@@ -9,7 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import { cpSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { NAME_TABLE, propose } from "../../src/init/auto.ts";
+import { NAME_TABLE, propose } from "../../src/init/_auto.ts";
 import { findings, init, stable, tree } from "../support/init-style-helpers.ts";
 import { inwards, project } from "../support/run.ts";
 import { tempDir } from "../support/temp.ts";

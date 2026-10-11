@@ -9,7 +9,7 @@
  */
 import type { Platform } from "../platform/contracts.ts";
 import type { CheckRunner } from "../session/contracts.ts";
-import type { StyleName } from "./styles.ts";
+import type { StyleName } from "./_styles.ts";
 
 /** The agents `inwards init --agent` can wire Inwards into. */
 export const AGENTS = ["claude", "opencode", "aider", "agents-md"] as const;
@@ -68,7 +68,7 @@ export interface Target {
   pkg: string | undefined;
 }
 
-/** Writing what init planned (see `adapters/init-files.ts`). */
+/** Writing what init planned (see `adapters/files.ts`). */
 export interface InitFiles {
   /**
    * Writes one file, creating its directory: the agent wiring init edits in place.

@@ -515,8 +515,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, rules, hook, daemon, mcp, import-config,
-│   │   │                  #   import-diagram, diagram: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, rules, hook, daemon, mcp: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
@@ -537,12 +536,16 @@ src/
 │   │   │                  #   adapters/connection.ts is the LSP connection over stdio
 │   │   ├── mcp/           # inwards mcp: the three tools (check-files.ts, explain-rule.ts,
 │   │   │                  #   where.ts), queued one at a time (tools.ts)
-│   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
+│   │   ├── init/          # inwards init, a slice (ADR-047): index.ts its face, cli.ts the init
+│   │   │                  #   handler; agents, --style, the scaffold plan, the report, presets
+│   │   │                  #   (_*.ts); brief/ (inwards context), diagram/ (inwards diagram and
+│   │   │                  #   import-diagram), import-linter/ (inwards import-config);
+│   │   │                  #   adapters/ the init file writer and the style picker
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
-│   │                      #   the grammars, the picker, the daemon's socket and files,
+│   │                      #   the grammars, the daemon's socket and files,
 │   │                      #   the MCP connection over stdio (mcp-connection.ts) and the
 │   │                      #   embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps

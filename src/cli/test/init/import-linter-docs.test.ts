@@ -10,10 +10,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseConfig } from "@inwards/core";
 import Ajv from "ajv";
-import { convert } from "../../src/init/import-linter/convert.ts";
-import type { Outcome } from "../../src/init/import-linter/model.ts";
-import { readIni, readToml } from "../../src/init/import-linter/read.ts";
-import { renderToml } from "../../src/init/import-linter/render.ts";
+import { convert } from "../../src/init/import-linter/_convert.ts";
+import type { Outcome } from "../../src/init/import-linter/_model.ts";
+import { readIni, readToml } from "../../src/init/import-linter/_read.ts";
+import { renderToml } from "../../src/init/import-linter/_render.ts";
 
 const REPO = resolve(import.meta.dir, "../../../..");
 const FIXTURES = join(import.meta.dir, "../support/fixtures/import-linter");
