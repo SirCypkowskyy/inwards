@@ -398,6 +398,20 @@ Which import cycles [INW004](../rules/INW004.md) reports on whole-project runs: 
 cycles = ["modules", "contexts"]
 ```
 
+### `diagrams` { #diagrams }
+
+Type: list of paths. Default: none.
+
+Markdown and Mermaid files whose architecture diagrams [INW017](../rules/INW017.md) checks against `[tool.inwards]` and the code on whole-project runs. Each entry is a path relative to the pyproject.toml; a segment may use `*`, `?` and `[seq]`, and `**` stands for any number of directories. An entry can't be absolute or climb out with `..`. In a listed file, only a Mermaid `flowchart` or `graph` that opens with `%% inwards: layers` or `%% inwards: contexts` is read: a fenced `mermaid` block in a Markdown file, or the whole of a `.mmd` or `.mermaid` file. The diagram is checked, never read as config. INW017 is opt-in, so turn it on with `extend-select`. [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) has the details.
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+diagrams = ["docs/architecture.md", "docs/**/*.mmd"]
+rules = { extend-select = ["INW017"] }
+```
+
 ## Monorepos and uv workspaces { #monorepos }
 
 Inwards follows [uv workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/): the member list lives in `[tool.uv.workspace]` at the workspace root, and each member keeps its own `[tool.inwards]` in its own `pyproject.toml`. There is no Inwards key for it ([ADR-035](../05-ADR.md#adr-035-inwards-check-follows-uv-workspace-members-each-with-its-own-config)).

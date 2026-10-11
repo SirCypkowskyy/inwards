@@ -2,7 +2,8 @@
  * @file The compiled binary end to end against the recorded Claude Code hook
  * payloads in `support/fixtures/claude-code`. The exit codes and output are
  * pinned in a snapshot, and garbage on stdin is a clean exit 1. A PreToolUse
- * Write of a Python file the package shape forbids is denied (#96).
+ * Write of a Python file the package shape forbids is denied (#96), and a
+ * whole-project check reads the marked diagrams `diagrams` lists (#344).
  */
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
@@ -57,6 +58,30 @@ test.each(fixtures)("hook claude-code < %s", (name) => {
 
 test.each(["json", "sarif", "concise"])("check --format %s", (format) => {
   expect(run(root, ["check", "--format", format])).toMatchSnapshot();
+});
+
+test("check --format json reads the marked diagrams `diagrams` lists (INW017)", () => {
+  const drawn = project({
+    "pyproject.toml": `${LAYERS}diagrams = ["docs/*.md", "docs/missing.mmd"]
+
+[tool.inwards.rules]
+extend-select = ["INW017"]
+`,
+    ...files,
+    "shop/infrastructure/db.py": "",
+    "docs/architecture.md": [
+      "# Architecture",
+      "",
+      "```mermaid",
+      "%% inwards: layers",
+      "flowchart LR",
+      '  infra --> domain["shop.domian"]',
+      "  infra --> pg[(Postgres)]:::external",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  expect(run(drawn, ["check", "--format", "json"])).toMatchSnapshot();
 });
 
 test.each([

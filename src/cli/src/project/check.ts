@@ -7,23 +7,16 @@
 import { dirname, join, relative, resolve } from "node:path";
 import {
   type Checked,
-  checkLinks,
-  checkNestedProjects,
-  checkPrefixes,
   checkRequired,
-  checkRuleOptions,
-  checkSelectors,
   type Diagnostic,
   Engine,
   type GrammarBinaries,
   type InwardsConfig,
   type ListDir,
   layerPackages,
-  membersFrom,
   type PathKind,
   type ProjectFiles,
   type ProjectIndex,
-  packagesOf,
   parseConfig,
   probeMembers,
   type Report,
@@ -35,9 +28,9 @@ import type { PathProbe, Runtime } from "../platform/contracts.ts";
 import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ExtractionPool, ProjectIo } from "./contracts.ts";
-import { layerLinks, linksUnder } from "./links.ts";
 import { atOrInside, type PlannedFile, planSources, readSources } from "./sources.ts";
 import { checkOnThreads, openPool } from "./threads.ts";
+import { wholeProjectFindings } from "./whole.ts";
 import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
@@ -260,8 +253,9 @@ async function checkPlanned(
  * selectors against the modules found (INW006, INW007), warns about nested
  * projects such as uv workspace members (INW006), reports symlinks in layers
  * that hide code from the rules (INW006, `checkLinks`), every shaped
- * package's required members (INW008) and the import cycles among the
- * checked files (INW004). With `required`, a partial run checks
+ * package's required members (INW008), the import cycles among the
+ * checked files (INW004) and the names in the marked diagrams `diagrams`
+ * lists (INW017). With `required`, a partial run checks
  * the required members of each target's package, listing its directory once.
  * Errors the config's baseline accepts are left out, unless `baseline` is
  * false; findings inline comments suppress go in `suppressed`, and a target
@@ -342,27 +336,9 @@ export async function runCheck(
   const loaded = planned.map(({ abs }) => abs);
   const shownRoot = posix(relative(base, project.lexicalRoot));
   if (targets === undefined) {
-    const modules = new Set(files.map((file) => file.module));
-    const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
-    const paths = files.map(rootPathOf);
-    const packages = packagesOf(paths);
-    diagnostics.unshift(
-      ...checkPrefixes(project.config, modules, pyproject),
-      ...checkSelectors(project.config, packages, pyproject),
-      ...checkRuleOptions(project.config.rules, pyproject),
-      ...checkNestedProjects(project.config, pyproject, { modules, kind: listing.kind, shownRoot }),
-      ...checkLinks(project.config, {
-        links: linksUnder(
-          io.probe,
-          layerLinks(io, project.configPath, project.config),
-          project.lexicalRoot,
-          project.config,
-        ),
-        modules,
-        shownRoot,
-      }),
-    );
-    diagnostics.push(...checkRequired(project.config, packages, membersFrom(paths), shownRoot));
+    const extra = wholeProjectFindings(io, project, { files, listing, base, shownRoot });
+    diagnostics.unshift(...extra.config);
+    diagnostics.push(...extra.required);
   } else if (required) {
     diagnostics.push(...requiredAround(io, project, files, shownRoot));
   }

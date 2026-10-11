@@ -24,6 +24,16 @@ export interface SourceFile {
   text: string;
 }
 
+/**
+ * A Markdown or Mermaid file a `diagrams` entry names, read by the adapter
+ * for the diagram rules (INW017, ADR-045).
+ */
+export interface DiagramSource {
+  /** Path as the user should see it. */
+  path: string;
+  text: string;
+}
+
 export interface ImportRef extends Span {
   /**
    * Fully resolved dotted target, e.g. `shop.infrastructure.db.OrderTable`.
