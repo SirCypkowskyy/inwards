@@ -27,7 +27,8 @@ same PR that first needs it.
 - **Translate**: prose, headings, table text, admonition titles, image alt
   text and captions, Mermaid labels that are prose (node and edge labels,
   subgraph titles), `aria-label`s, and hand-written SVG text on the pages.
-  A diagram marked `%% inwards: layers` or `%% inwards: contexts` is a code
+  A diagram marked `%% inwards: layers` or `%% inwards: contexts` (or
+  `' inwards: layers` or `' inwards: contexts` in PlantUML) is a code
   block that INW017 and INW018 read: its ids and quoted labels (module prefixes) stay
   as written.
 - **Cross-links** inside `docs/pl/` point to Polish pages (same relative
@@ -229,6 +230,11 @@ baseline'u); multi-word names are left uninflected where possible.
 | head, tail (of an arrow) | grot, początek (strzałki) |
 | round trip (`import-diagram`, then `check`) | test w obie strony |
 | subgraph (Mermaid) | subgraph (subgraphu, subgraphy) |
+| component (PlantUML) | komponent |
+| package (PlantUML group) | pakiet (`package`) |
+| stereotype (`<<public>>`, PlantUML) | stereotyp |
+| alias (`as`, PlantUML) | alias |
+| slice (ArchUnitPython) | wycinek |
 | label, caption (of a node) | etykieta, podpis |
 | docs drift (a diagram that no longer matches the config) | rozjazd dokumentacji |
 | repository (the pattern) | repozytorium |

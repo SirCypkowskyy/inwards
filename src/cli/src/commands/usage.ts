@@ -116,11 +116,11 @@ without it, the first one found in the working directory.
   },
   "import-diagram": {
     synopsis: ["import-diagram FILE [--write]"],
-    note: "(a marked Mermaid diagram as [tool.inwards]; --write: into pyproject.toml)",
-    about: `Converts the marked Mermaid diagrams in FILE (%% inwards: layers, %% inwards: contexts)
-into a [tool.inwards] table and prints it.
+    note: "(a marked Mermaid or PlantUML diagram as [tool.inwards]; --write: into pyproject.toml)",
+    about: `Converts the marked diagrams in FILE (Mermaid: %% inwards: layers or contexts;
+PlantUML: ' inwards: layers or contexts) into a [tool.inwards] table and prints it.
 
-FILE: a Markdown file with mermaid blocks, or a .mmd file.
+FILE: a Markdown file with mermaid or plantuml blocks, a .mmd file, or a .puml file.
 --write: append the table to pyproject.toml in the working directory.`,
   },
   rules: {

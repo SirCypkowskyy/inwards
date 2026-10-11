@@ -23,7 +23,7 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif|github] [--max
        inwards import-config [FILE] [--write]
                              (import-linter contracts as [tool.inwards]; --write: into pyproject.toml)
        inwards import-diagram FILE [--write]
-                              (a marked Mermaid diagram as [tool.inwards]; --write: into pyproject.toml)
+                              (a marked Mermaid or PlantUML diagram as [tool.inwards]; --write: into pyproject.toml)
        inwards rules [--config pyproject.toml] [--json]
                      (every rule: on or off, severity, and the config key behind it)
        inwards rule CODE|NAME [--full] [--json]    (a rule's docs page, offline)
@@ -150,10 +150,10 @@ exports[`import-diagram --help prints that command's usage, exit 0 1`] = `
   "stdout": 
 "Usage: inwards import-diagram FILE [--write]
 
-Converts the marked Mermaid diagrams in FILE (%% inwards: layers, %% inwards: contexts)
-into a [tool.inwards] table and prints it.
+Converts the marked diagrams in FILE (Mermaid: %% inwards: layers or contexts;
+PlantUML: ' inwards: layers or contexts) into a [tool.inwards] table and prints it.
 
-FILE: a Markdown file with mermaid blocks, or a .mmd file.
+FILE: a Markdown file with mermaid or plantuml blocks, a .mmd file, or a .puml file.
 --write: append the table to pyproject.toml in the working directory.
 "
 ,

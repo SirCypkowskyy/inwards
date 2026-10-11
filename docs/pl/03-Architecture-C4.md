@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: ca5d816f8572e3ec9a35005aeae334b1f8ec5d03ca9ce88006fcc517c6abe0b4
+source_hash: 66a6f40d64e013e1d87393dfb48094b98fbfdd0f8a9d5fc170490dcb0ff32478
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -423,8 +423,10 @@ src/
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
 │   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
-│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), model.ts,
-│   │   │                  #   names.ts (what a node names), draft.ts (import-diagram)
+│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
+│   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
+│   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
+│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/

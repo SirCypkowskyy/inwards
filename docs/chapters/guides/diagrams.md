@@ -1,6 +1,6 @@
 # Architecture diagrams { #architecture-diagrams }
 
-Inwards keeps a Mermaid drawing of your architecture in step with `[tool.inwards]`, in both directions ([ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config)):
+Inwards keeps a Mermaid or PlantUML drawing of your architecture in step with `[tool.inwards]`, in both directions ([ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config)):
 
 - **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, and [INW018](../rules/INW018.md) an arrow that draws an import the config forbids.
 - **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the two rules keep them in step.
@@ -25,6 +25,35 @@ A layer's rank is the longest path of solid arrows from it to a layer that point
 
 A layer or context whose name can't be a Mermaid id (a template's `slices.domain`) is named by a node whose quoted label is one of its `modules` entries.
 
+### PlantUML { #plantuml }
+
+A PlantUML component diagram counts the same way, with a `'` comment as the marker: `' inwards: layers` or `' inwards: contexts`, among the comment lines right after `@startuml`. Inwards reads each `@startuml` ... `@enduml` of a `.puml`, `.plantuml`, `.pu` or `.iuml` file, and each fenced `plantuml` or `puml` block in Markdown, where `@startuml` may be left out.
+
+```text title="docs/layers.puml"
+@startuml
+' inwards: layers
+component [shop.api] as api
+component [shop.orders] as orders
+component [shop.domain] as domain
+database Postgres as db <<external>>
+[api] --> [orders]
+[orders] --> [domain]
+[api] --> [db]
+@enduml
+```
+
+| In the diagram | `' inwards: layers` | `' inwards: contexts` |
+|---|---|---|
+| `[name]`, `component name` | a layer name | outside a package: a context name |
+| `package name { }`, and `node`, `folder`, `frame`, `cloud`, `rectangle` groups | (a group, no meaning) | a context; its name is the context name |
+| `[pkg.module] as name`, `"pkg.module" as name` | the layer's module prefix or selector | the context's module, or a module inside it |
+| Solid arrow `a --> b`, `a -> b`, `b <-- a`, `a -up-> b`, `a -[#red]-> b` | `a` may import `b` | the context of `a` depends on the context of `b` |
+| `<<public>>` | | a `public` entry of the context; on the context itself, all of it |
+| `<<external>>` | skipped | skipped |
+| Dotted `..>`, plain `--`, two-way `<-->`, `-[dashed]->`, `--\|>` | no meaning | no meaning |
+
+With an `as` alias, the alias is the name and the text in brackets or quotes is the module, like a quoted Mermaid label; without one, the bracket text is the name and there is no module. A name with spaces (`[Order handling] as orders`) is a caption. Colors, `skinparam`, `<style>`, notes, titles, `left to right direction`, interfaces and `!include` lines are skipped, and so is a line the reader can't follow.
+
 ## Check a diagram { #check }
 
 List the files and turn the rules on:
@@ -33,7 +62,7 @@ List the files and turn the rules on:
 
 ```toml title="pyproject.toml"
 [tool.inwards]
-diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd"]
+diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 
 [tool.inwards.rules]
 extend-select = ["INW017", "INW018"]
@@ -50,7 +79,7 @@ inwards import-diagram docs/architecture.md            # print the table on stdo
 inwards import-diagram docs/architecture.md --write    # append it to pyproject.toml
 ```
 
-- **Input.** One Markdown file (each marked `mermaid` block in it) or one `.mmd` file, with at most one layers diagram and one contexts diagram.
+- **Input.** One Markdown file (each marked `mermaid` and `plantuml` block in it), one `.mmd` file or one `.puml` file, with at most one layers diagram and one contexts diagram.
 - **Output.** The table lists the file in `diagrams` and turns INW017 and INW018 on, so the diagram stays checked. A file outside the working directory isn't listed, since `diagrams` entries can't climb out with `..`.
 - **`--write`** appends the table to `pyproject.toml` in the working directory. It refuses, with exit code 2 and nothing written, when there is no `pyproject.toml` or it already has `[tool.inwards]`: it never overwrites or merges. Print the table instead and merge it by hand.
 - **`root`.** When the packages live in `src/`, the table gets `root = "src"`, as `inwards init` would pick it.
@@ -177,9 +206,92 @@ public = ["shop.catalog.api"]
 depends-on = []
 ```
 
+## Coming from ArchUnitPython { #archunitpython }
+
+[ArchUnitPython](https://github.com/LukasNiessen/ArchUnitPython) checks code against a PlantUML component diagram inside a pytest test (`project_slices(...).should().adhere_to_diagram_in_file(...)`). Inwards reads the same diagrams: `component [x]`, `[a] --> [b]` and `[a] -> [b]`, which is all its parser reads, plus everything in the [PlantUML table](#plantuml). The diagrams in ArchUnitPython's own tests and README are part of the reader's test suite.
+
+To move a diagram over, mark it, give each component its module, and import it once:
+
+1. Add `' inwards: contexts` after `@startuml`. ArchUnitPython's arrows allow direct dependencies, not transitive ones, and so does a context's `depends-on` ([INW002](../rules/INW002.md)).
+2. Turn each `component [x]` into `component [package.x] as x <<public>>`. ArchUnitPython finds a component's code through the slice pattern in the test (`defined_by("src/(**)/**")`); Inwards needs the module in the diagram. `<<public>>` keeps ArchUnitPython's meaning that a component may import any module of a component it points at; without it, [INW003](../rules/INW003.md) allows only the modules you mark public.
+3. Run `inwards import-diagram`, then `inwards check`.
+
+A project laid out like ArchUnitPython's sample project, with three slices of one package:
+
+<!-- e2e -->
+
+```toml title="archunit/pyproject.toml"
+[project]
+name = "sample"
+version = "0.1.0"
+```
+
+<!-- e2e -->
+
+```python title="archunit/sample/controllers/users.py"
+from sample.services.users import find_user
+```
+
+<!-- e2e -->
+
+```python title="archunit/sample/services/users.py"
+from sample.models.user import User
+
+
+def find_user() -> User:
+    return User()
+```
+
+<!-- e2e -->
+
+```python title="archunit/sample/models/user.py"
+class User:
+    pass
+```
+
+ArchUnitPython's diagram, marked and with modules:
+
+<!-- e2e -->
+
+```text title="archunit/architecture.puml"
+@startuml
+' inwards: contexts
+  component [sample.controllers] as controllers <<public>>
+  component [sample.services] as services <<public>>
+  component [sample.models] as models <<public>>
+  [controllers] --> [services]
+  [services] --> [models]
+@enduml
+```
+
+<!-- e2e -->
+
+```sh
+cd archunit
+inwards import-diagram architecture.puml --write
+inwards check
+```
+
+<!-- e2e -->
+
+```text
+inwards import-diagram: read 1 layer and 3 contexts from architecture.puml.
+```
+
+Each component becomes a context with its arrows as `depends-on`, one layer, `app`, holds them all, and `inwards check` passes, the diagram included. Later, an import from `sample.models` into `sample.controllers` is INW002 in the code, and an arrow `[models] --> [controllers]` drawn in the diagram is INW018.
+
+Where Inwards differs:
+
+- **The diagram isn't the check.** ArchUnitPython judges the code against the diagram on every test run. Inwards checks the code against `[tool.inwards]` and the diagram against `[tool.inwards]`, so the two can't drift apart without a finding, and the hook, the editor and the agent brief all read the one config.
+- **Code outside every component.** ArchUnitPython reports a dependency of a slice the diagram doesn't name, unless the test calls `ignoring_orphan_slices()`. Inwards leaves imports with an end outside every context alone, as `ignoring_orphan_slices()` does; INW006 warns about a module outside every layer.
+- **Packages and other arrows.** ArchUnitPython ignores `package`, `..>` and styled arrows such as `-[#red]->`. In Inwards a package is a context in a contexts diagram, `..>` means no import, and a styled solid arrow is an arrow.
+- **Layers too.** Marked `' inwards: layers` instead, the same diagram ranks its components as layers, where a layer may import every layer inside it, not only the one its arrow points at.
+- **No `should_not()`.** A contexts diagram already forbids every arrow it doesn't draw, so a forbidden dependency needs no diagram of its own.
+
 ## Limits { #limits }
 
-- **Mermaid flowcharts only.** C4, `architecture-beta` and PlantUML diagrams aren't read yet.
-- **What Mermaid can't say stays out.** Library lists, shapes, selectors other than a node's label, rule options and `ignore` are written by hand after the import.
+- **Mermaid flowcharts and PlantUML component diagrams only.** C4, `architecture-beta` and other PlantUML diagram types aren't read.
+- **PlantUML is read one line at a time.** A statement split over lines (a component description that runs onto the next line) isn't followed, and a link to a component by its display name, rather than its alias, names a different node.
+- **What a diagram can't say stays out.** Library lists, shapes, selectors other than a node's label, rule options and `ignore` are written by hand after the import.
 - **Imports the diagram doesn't draw** aren't reported yet; that is INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
 - **Whole-project runs only.** The per-edit hook and the editor don't show diagram findings.
