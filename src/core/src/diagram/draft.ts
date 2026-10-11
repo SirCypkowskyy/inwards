@@ -4,7 +4,8 @@
  * longest path of solid arrows to a sink, with same-rank layers as siblings,
  * and the contexts of a `contexts` diagram, with `depends-on` from the
  * arrows between them and `public` from their `:::public` (`<<public>>`)
- * nodes. A node's quoted label (a PlantUML alias's name) is its module.
+ * nodes. A node's quoted labels (a PlantUML alias's name) are its modules,
+ * one per line it is written on.
  * It refuses what has no config: a cycle, a context or public node without a
  * module, two diagrams of one kind. Pure: the CLI renders, checks and writes
  * the table.
@@ -15,7 +16,7 @@ import type {
   DraftDiagramContext,
   DraftDiagramLayer,
 } from "../contracts/records.ts";
-import type { Diagram } from "./model.ts";
+import type { Diagram, NodeMention, SubgraphMention } from "./model.ts";
 import { EXTERNAL, idsWithClass, PUBLIC, quotedLabel, topLevel } from "./names.ts";
 import { notationOf } from "./notation.ts";
 import { readDiagrams } from "./read.ts";
@@ -100,10 +101,9 @@ function draftLayers(diagram: Diagram): Pick<DiagramDraft, "layers" | "notes"> |
   const pkg = examplePackage(diagram);
   const syntax = notationOf(diagram.notation);
   for (const id of ids) {
-    const module = moduleLabel(diagram, id);
     const rank = rankOf(id, targets, ranks);
     const place = places[rank] ?? [];
-    place.push({ name: id, modules: module === undefined ? [] : [module] });
+    place.push({ name: id, modules: moduleLabels(diagram, id) });
     places[rank] = place;
   }
   const layers = places.filter((place) => place.length > 0);
@@ -214,15 +214,15 @@ function draftContexts(diagram: Diagram): DraftDiagramContext[] | string {
     if (topLevel(diagram, name) !== name || external.has(name)) {
       continue;
     }
-    const module = moduleLabel(diagram, name);
-    if (module === undefined) {
+    const modules = moduleLabels(diagram, name);
+    if (modules.length === 0) {
       const syntax = notationOf(diagram.notation);
       const how = diagram.subgraphs.some((s) => s.id === name)
         ? syntax.groupNode(name, `${pkg}.${name}`)
         : syntax.node(name, `${pkg}.${name}`);
       return `${diagram.path}:${line}: context "${name}" has no module: give it ${syntax.moduleLabel} such as ${how}.`;
     }
-    contexts.push({ name, modules: [module], public: [], dependsOn: [] });
+    contexts.push({ name, modules, public: [], dependsOn: [] });
   }
   const problem = addPublic(diagram, contexts, firstLine);
   if (problem !== undefined) {
@@ -269,13 +269,13 @@ function addPublic(
     if (context === undefined || external.has(id)) {
       continue;
     }
-    const module = id === context.name ? context.modules[0] : moduleLabel(diagram, id);
-    if (module === undefined) {
+    const modules = id === context.name ? context.modules : moduleLabels(diagram, id);
+    if (modules.length === 0) {
       const syntax = notationOf(diagram.notation);
       const example = syntax.node(id, `${context.modules[0] ?? EXAMPLE_PACKAGE}.${id}`);
       return `${diagram.path}:${firstLine.get(id) ?? diagram.markerLine}: public node "${id}" in context "${context.name}" has no module: give it ${syntax.moduleLabel} such as ${example}.`;
     }
-    context.public.push(module);
+    context.public.push(...modules);
   }
   return undefined;
 }
@@ -306,7 +306,37 @@ function addDependsOn(
 }
 
 /**
- * Takes a node's quoted label as its module, unless it is a caption.
+ * Takes every quoted label a node is written with as one of its modules, in
+ * the order written, leaving out captions: `api["shop.api"]` on one line and
+ * `api["shop.cli"]` on another give a layer two modules (#349).
+ *
+ * @param diagram - the diagram it is in.
+ * @param id - the node or subgraph id.
+ * @returns the module prefixes or selectors; empty when it has none.
+ */
+function moduleLabels(diagram: Diagram, id: string): string[] {
+  const mentions: readonly (NodeMention | SubgraphMention)[] = [
+    ...diagram.subgraphs,
+    ...diagram.nodes,
+  ];
+  const labels = mentions.flatMap((m) =>
+    m.id === id && m.label?.quoted === true && isModule(m.label.text) ? [m.label.text] : [],
+  );
+  return [...new Set(labels)];
+}
+
+/**
+ * Tells whether a quoted label is a module rather than a caption.
+ *
+ * @param label - the label text.
+ * @returns false for an empty label or one with whitespace.
+ */
+function isModule(label: string): boolean {
+  return label !== "" && !WHITESPACE.test(label);
+}
+
+/**
+ * Takes a node's first quoted label as its module, unless it is a caption.
  *
  * @param diagram - the diagram it is in.
  * @param id - the node or subgraph id.
@@ -314,7 +344,7 @@ function addDependsOn(
  */
 function moduleLabel(diagram: Diagram, id: string): string | undefined {
   const label = quotedLabel(diagram, id);
-  return label === undefined || label === "" || WHITESPACE.test(label) ? undefined : label;
+  return label === undefined || !isModule(label) ? undefined : label;
 }
 
 /**

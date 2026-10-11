@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 206a012bbac2703ebf5190777ebdd3556a0ef0614f24da05eafb412e53717bca
+source_hash: fb23adcff661b3caefc54de517567d2805cfe67b21dfca442a223702512400d0
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -409,7 +409,7 @@ cycles = ["modules", "contexts"]
 
 Typ: lista ścieżek. Domyślnie: brak.
 
-Pliki Markdown, Mermaid i PlantUML, których diagramy architektury [INW017](../rules/INW017.md) (nazwy) i [INW018](../rules/INW018.md) (strzałki) sprawdzają względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`, w bloku kodu `mermaid` w pliku Markdown albo w całym pliku `.mmd` lub `.mermaid`, oraz diagram PlantUML oznaczony `' inwards: layers` albo `' inwards: contexts`, w bloku kodu `plantuml` albo w pliku `.puml`, `.plantuml`, `.pu` lub `.iuml` ([PlantUML](diagrams.md#plantuml)). Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. Obie reguły są opt-in, więc włącz je przez `extend-select`; [`inwards import-diagram`](diagrams.md#import-diagram) zapisuje pierwszą `[tool.inwards]` na podstawie diagramu. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
+Pliki Markdown, Mermaid i PlantUML, których diagramy architektury [INW017](../rules/INW017.md) (nazwy) i [INW018](../rules/INW018.md) (strzałki) sprawdzają względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`, w bloku kodu `mermaid` w pliku Markdown albo w całym pliku `.mmd` lub `.mermaid`, oraz diagram PlantUML oznaczony `' inwards: layers` albo `' inwards: contexts`, w bloku kodu `plantuml` albo w pliku `.puml`, `.plantuml`, `.pu` lub `.iuml` ([PlantUML](diagrams.md#plantuml)). Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. Obie reguły są opt-in, więc włącz je przez `extend-select`; [`inwards import-diagram`](diagrams.md#import-diagram) zapisuje pierwszą `[tool.inwards]` na podstawie diagramu, a [`inwards diagram`](diagrams.md#diagram) rysuje diagram na podstawie konfiguracji. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
 
 <!-- config: fragment -->
 
