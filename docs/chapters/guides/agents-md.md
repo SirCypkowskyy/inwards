@@ -53,7 +53,7 @@ The section above tells the agent to check its work after the fact. The brief te
 inwards context
 ```
 
-It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005) and the contexts with their public modules and dependencies (INW002, INW003). Rules turned off in `[tool.inwards.rules]` are left out. For the repository's example config (`examples/clean-app`) it is 678 characters, about 170 tokens; a test keeps the example and every preset under 300 (at four characters per token). With the markers `--write` adds, it reads:
+It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005), the contexts with their public modules and dependencies (INW002, INW003), and the opt-in rules the config turns on. Rules turned off in `[tool.inwards.rules]` are left out. A layer with more than three layers inside it names them by their numbers in the list (`may import layers 1-9`), and a context's public modules inside its one module share that prefix (`` `app.posts.{router,service}` ``). For the repository's example config (`examples/clean-app`) it is 678 characters, about 170 tokens; a test keeps the example and every preset under 300 tokens (at four characters per token), except the fastapi preset, with eleven layers and ten opt-in rules, under 550. With the markers `--write` adds, it reads:
 
 ```markdown
 <!-- inwards-brief:begin -->
@@ -74,6 +74,22 @@ Libraries (INW005):
 ```
 
 Ports are the `ports` package or module directly inside a layer's module on disk (`shop/domain/ports.py` here). For a config `inwards init --style` wrote, the brief also names the preset and its ports module (`app.application.ports` for clean and hexagonal) before `--scaffold` creates it; it finds the preset by the comment init put in the table, so deleting that comment drops the name.
+
+Each opt-in rule the config turns on (INW012 to INW016 and the FAPI rules, through `extend-select`, `select` or a [template role](configuration.md#template-rules)) adds one line under "Opt-in rules:". The line says what to do while writing code, with the rule's key setting: INW012's `delegate-to`, INW014's port modules (its `modules`, or else every `ports` module), INW015's `role` and `allowed-in`, INW016's naming scheme, FAPI001's required metadata, FAPI002's `codes` and FAPI003's `entrypoints`. A rule scoped by `modules` names them (`INW013 in app.*.router`). INW015 checks nothing without a `role`, so it gets no line then. Under `inwards init --style fastapi` they read:
+
+```markdown
+Opt-in rules:
+- INW012: endpoints stay thin: call into `domain.service`; no queries or outgoing calls
+- INW013: no blocking calls in `async def`: use async clients or a plain `def`
+- FAPI001: path operations need a summary or docstring, a response model, `status_code` on POST/DELETE and `description` per `responses` entry
+- FAPI002: declare every 4xx a path operation raises in `responses`
+- FAPI003: include every `APIRouter` in an app; no include cycles
+- FAPI005: declare `/items/me` before `/items/{id}`, so no route is shadowed
+- FAPI006: startup and shutdown go in a lifespan, not `on_event`
+- FAPI007: a dependency with `yield` re-raises what it catches
+- FAPI008: each `operation_id` is unique within its app
+- FAPI009: pass `Depends(get_db)`, not `Depends(get_db())`
+```
 
 To keep it in `AGENTS.md`, between its own markers next to the check section:
 

@@ -2,7 +2,7 @@
  * @file The architecture brief (`inwards context`, `inwards init --brief`, #58):
  * a short Markdown summary of `[tool.inwards]` for AGENTS.md, so an agent
  * knows the layers, the allowed import directions, where ports live, and any
- * library or context rules before it writes an import, rather than after a
+ * library, context or opt-in rules before it writes code, rather than after a
  * violation. It builds the text deterministically from the parsed config, the
  * preset named in init's comment, and a probe for `ports` modules; it reads
  * through the platform's probe and reader and never writes a file itself.
@@ -16,6 +16,7 @@ import {
   ruleLevel,
 } from "@inwards/core";
 import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import { code, list, optInSection } from "./brief-rules.ts";
 import type { Change } from "./contracts.ts";
 import { STYLES } from "./presets.ts";
 import { readIfThere, upsertSection } from "./section.ts";
@@ -23,6 +24,8 @@ import { allowedImports, expandLayers, isStyle, type Style } from "./styles.ts";
 
 /** The markers around the brief in AGENTS.md, apart from the check section's. */
 const BRIEF_MARKERS = { begin: "<!-- inwards-brief:begin -->", end: "<!-- inwards-brief:end -->" };
+/** The most inner layers a layer's line names; past it, the line gives their numbers. */
+const NAMED_IMPORTS = 3;
 /** The comment `init --style` writes into `[tool.inwards]`, naming the preset. */
 const PRESET_COMMENT = /^# Preset "(?<name>[a-z-]+)" \(inwards init --style /mu;
 
@@ -43,7 +46,8 @@ interface BriefInput {
 
 /**
  * Writes the brief: the layers innermost first with what each may import,
- * where ports live, and the library and context rules when configured and on.
+ * where ports live, the library and context rules when configured and on, and
+ * the opt-in rules the config turns on.
  *
  * @param input - the config, the preset and the ports.
  * @returns Markdown without markers, ending without a line break.
@@ -61,12 +65,13 @@ export function architectureBrief(input: BriefInput): string {
     "",
     ...config.layers.map(
       (layer, i) =>
-        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${allowedImports(config.layers, i)}`,
+        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${layerImports(config.layers, i)}`,
     ),
     "",
     `Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in ${where} and implement it in the outer layer.`,
     ...librarySection(config),
     ...contextSection(config),
+    ...optInSection(config),
   ];
   return lines.join("\n");
 }
@@ -136,7 +141,7 @@ function contextSection(config: InwardsConfig): string[] {
     "",
     header,
     ...config.contexts.map((ctx) => {
-      const pub = ctx.public.length === 0 ? "nothing public" : `public ${list(ctx.public)}`;
+      const pub = ctx.public.length === 0 ? "nothing public" : `public ${publicList(ctx)}`;
       const deps =
         ctx.dependsOn.length === 0 ? "no dependencies" : `depends on ${ctx.dependsOn.join(", ")}`;
       return `- ${ctx.name} (${list(ctx.modules)}): ${pub}; ${deps}`;
@@ -145,23 +150,74 @@ function contextSection(config: InwardsConfig): string[] {
 }
 
 /**
- * Formats names as inline code, comma separated.
+ * Formats a context's public modules. When it has one module and two or more
+ * public modules inside it, they share it as a prefix in braces
+ * (`` `app.posts.{router,service}` ``), which keeps a template context's line short.
  *
- * @param names - module or library names.
- * @returns e.g. `` `a`, `b` ``.
+ * @param ctx - one configured context.
+ * @param ctx.modules - its module prefixes.
+ * @param ctx.public - its public modules, at least one.
+ * @returns the modules as inline code.
  */
-function list(names: readonly string[]): string {
-  return names.map(code).join(", ");
+function publicList(ctx: { modules: readonly string[]; public: readonly string[] }): string {
+  const [only, ...more] = ctx.modules;
+  const prefix = `${only}.`;
+  if (only === undefined || more.length > 0 || ctx.public.length < 2) {
+    return list(ctx.public);
+  }
+  const inside = ctx.public.filter((m) => m.startsWith(prefix)).map((m) => m.slice(prefix.length));
+  return inside.length === ctx.public.length
+    ? code(`${prefix}{${inside.join(",")}}`)
+    : list(ctx.public);
 }
 
 /**
- * Formats one name as inline code.
+ * Says what one layer may import. Up to `NAMED_IMPORTS` inner layers are named;
+ * more are given by their numbers in the brief's list (`layers 1-9`), which
+ * keeps a template's deep roles to one short line each.
  *
- * @param name - a module or library name.
- * @returns the name in backticks.
+ * @param layers - the configured layers, in the brief's order.
+ * @param i - the layer's index.
+ * @returns e.g. `may import layers 1-4; not its sibling domain.schemas`.
  */
-function code(name: string): string {
-  return `\`${name}\``;
+function layerImports(layers: readonly LayerSpec[], i: number): string {
+  const named = allowedImports(layers, i);
+  /**
+   * Finds a layer's place in the order.
+   *
+   * @param k - the layer's index.
+   * @returns its rank, or its index when the layers have no ranks.
+   */
+  function rankOf(k: number): number {
+    return layers[k]?.rank ?? k;
+  }
+  const inner = layers.flatMap((_, k) => (rankOf(k) < rankOf(i) ? [k + 1] : []));
+  if (inner.length <= NAMED_IMPORTS || named.startsWith("may import every")) {
+    return named;
+  }
+  const siblings = layers.filter((_, k) => k !== i && rankOf(k) === rankOf(i)).map((l) => l.name);
+  const base = `may import layers ${ranges(inner)}`;
+  const plural = siblings.length > 1 ? "siblings" : "sibling";
+  return siblings.length === 0 ? base : `${base}; not its ${plural} ${siblings.join(", ")}`;
+}
+
+/**
+ * Writes ascending numbers as ranges.
+ *
+ * @param numbers - distinct positive integers, ascending.
+ * @returns e.g. `1-4, 6` for 1, 2, 3, 4 and 6.
+ */
+function ranges(numbers: readonly number[]): string {
+  const runs: [number, number][] = [];
+  for (const n of numbers) {
+    const last = runs.at(-1);
+    if (last !== undefined && last[1] === n - 1) {
+      last[1] = n;
+    } else {
+      runs.push([n, n]);
+    }
+  }
+  return runs.map(([from, to]) => (from === to ? `${from}` : `${from}-${to}`)).join(", ");
 }
 
 /**

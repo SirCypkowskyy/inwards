@@ -1,7 +1,7 @@
 # GitHub Copilot
 
 !!! info "Verified 2026-10-10"
-    On macOS (arm64), with the compiled binary on `examples/broken-app`: `inwards init --agent agents-md`, and `inwards mcp` started the way the `.mcp.json` entry below starts it, answering `tools/list` and `check_files`. The setup workflow parses as YAML. No Copilot session was run, in VS Code or on GitHub, and the workflow hasn't run on GitHub. The Copilot settings, file names and limits on this page come from the VS Code and GitHub docs of that date.
+    On macOS (arm64), with the compiled binary on `examples/broken-app`: `inwards init --agent agents-md`, and `inwards mcp` started the way the `.mcp.json` entry below starts it, answering `tools/list` and `check_files`. The setup workflow parses as YAML. No Copilot session was run, in VS Code or on GitHub, and the workflow hasn't run on GitHub. The Copilot settings, file names and limits on this page come from the VS Code and GitHub docs of that date; the Hooks section's facts about the Copilot CLI's hook files come from GitHub's hooks reference read on 2026-10-11.
 
 Copilot has no hook that Inwards can plug into the way the [Claude Code hooks](claude-code.md) do. It meets Inwards in four places instead:
 
@@ -53,7 +53,7 @@ Check it works:
 
 ### Hooks { #hooks }
 
-VS Code has agent hooks in preview, but Inwards doesn't support them yet. Its hook (`inwards hook claude-code`) reads Claude Code's payloads and tool names. VS Code's Local harness can read hooks from Claude Code's settings files (`chat.useClaudeHooks`, off by default), but it ignores their matchers and names its tools differently, and the Copilot harness uses Copilot's own hook format. Don't point either at `inwards hook claude-code`: the config guard and the Stop gate would see tool calls they don't recognise.
+VS Code has agent hooks in preview, but Inwards doesn't support them yet. Its hook (`inwards hook claude-code`) reads Claude Code's payloads and tool names. VS Code's Local harness can read hooks from Claude Code's settings files (`chat.useClaudeHooks`, off by default), but it ignores their matchers and names its tools differently, and the Copilot harness uses Copilot's own hook format. Don't point either at `inwards hook claude-code`: the config guard and the Stop gate would see tool calls they don't recognise. The Copilot CLI reads `.claude/settings.json` and `.claude/settings.local.json` too, so in a project wired with `inwards init --agent claude-code` it already runs that hook, and neither the guard nor the Stop gate holds there: Copilot takes the hook's exit 2 as a warning for the user, not a block. [ADR-044](../05-ADR.md#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) has what each Copilot surface offers and the planned `inwards hook copilot`.
 
 ## Copilot cloud agent { #cloud-agent }
 
@@ -106,7 +106,7 @@ The cloud agent (earlier called the coding agent) works on an issue in a GitHub 
 
 4. Add the [GitHub Actions workflow](ci.md) so a violation fails the pull request. By default, workflows don't run on a pull request Copilot pushes to until someone with write access clicks **Approve and run workflows**; a repository admin can turn that approval off in the cloud agent's settings. When the check fails, mention `@copilot` in a pull request comment and ask it to fix the Inwards violations; the job log and the annotations name the rule and the fix steps.
 
-The cloud agent also runs hooks from `.github/hooks/*.json`, in Copilot's own format. As in VS Code, Inwards has no adapter for them yet.
+The cloud agent also runs hooks from `.github/hooks/*.json`, in Copilot's own format. As in VS Code, Inwards has no adapter for them yet; [ADR-044](../05-ADR.md#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) plans one.
 
 ## Limits
 

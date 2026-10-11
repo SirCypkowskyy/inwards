@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: ded1e1833656974992f5e6aa6a35eb7190bdd7883ed596aceb5df60e6783a2cb
+source_hash: 4df47755eba8fd93c91bdc7cdfc15ef05843afb35e653431a4ab99b25135d9fa
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -58,7 +58,7 @@ Sekcja powyżej każe agentowi sprawdzić pracę po fakcie. Opis architektury (b
 inwards context
 ```
 
-Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005) i konteksty z ich publicznymi modułami i zależnościami (INW002, INW003). Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 (przy czterech znakach na token). Ze znacznikami, które dodaje `--write`, wygląda tak:
+Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`), a publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``). Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami i dziesięcioma regułami opt-in ma się zmieścić poniżej 550. Ze znacznikami, które dodaje `--write`, wygląda tak:
 
 ```markdown
 <!-- inwards-brief:begin -->
@@ -79,6 +79,22 @@ Libraries (INW005):
 ```
 
 Porty to pakiet albo moduł `ports` leżący bezpośrednio w module warstwy na dysku (tutaj `shop/domain/ports.py`). Dla konfiguracji zapisanej przez `inwards init --style` opis podaje też nazwę presetu i jego moduł portów (`app.application.ports` dla clean i hexagonal), zanim `--scaffold` go utworzy; preset rozpoznaje po komentarzu, który init umieszcza w tabeli, więc usunięcie tego komentarza usuwa też nazwę.
+
+Każda reguła opt-in włączona w konfiguracji (INW012 do INW016 i reguły FAPI, przez `extend-select`, `select` albo [regułę dla roli](configuration.md#template-rules)) dodaje jedną linię pod „Opt-in rules:”. Linia mówi, co robić przy pisaniu kodu, i podaje kluczowe ustawienie reguły: `delegate-to` dla INW012, moduły portów dla INW014 (jej `modules`, a bez nich każdy moduł `ports`), `role` i `allowed-in` dla INW015, schemat nazw dla INW016, wymagane metadane dla FAPI001, `codes` dla FAPI002 i `entrypoints` dla FAPI003. Reguła zawężona przez `modules` je wymienia (`INW013 in app.*.router`). INW015 bez `role` niczego nie sprawdza, więc wtedy nie dostaje linii. Po `inwards init --style fastapi` wyglądają tak:
+
+```markdown
+Opt-in rules:
+- INW012: endpoints stay thin: call into `domain.service`; no queries or outgoing calls
+- INW013: no blocking calls in `async def`: use async clients or a plain `def`
+- FAPI001: path operations need a summary or docstring, a response model, `status_code` on POST/DELETE and `description` per `responses` entry
+- FAPI002: declare every 4xx a path operation raises in `responses`
+- FAPI003: include every `APIRouter` in an app; no include cycles
+- FAPI005: declare `/items/me` before `/items/{id}`, so no route is shadowed
+- FAPI006: startup and shutdown go in a lifespan, not `on_event`
+- FAPI007: a dependency with `yield` re-raises what it catches
+- FAPI008: each `operation_id` is unique within its app
+- FAPI009: pass `Depends(get_db)`, not `Depends(get_db())`
+```
 
 Żeby trzymać go w `AGENTS.md`, między własnymi znacznikami obok sekcji sprawdzenia:
 
