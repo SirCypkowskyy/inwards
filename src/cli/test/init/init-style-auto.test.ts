@@ -151,10 +151,10 @@ describe("inwards init --style auto", () => {
     expect(deadPrefixes(root)).toEqual([]);
   });
 
-  // clean-app's domain/order.py and domain/ports.py import each other (the
-  // second behind TYPE_CHECKING, which INW004 counts): a real module cycle.
+  // clean-app's domain/ports.py imports domain/order.py back only under
+  // TYPE_CHECKING, which INW004 doesn't count (#375), so it checks clean.
   test.each([
-    ["clean-app", ["INW004 shop/domain/order.py"]],
+    ["clean-app", []],
     ["broken-app", ["INW001 shop/domain/order.py"]],
   ])(
     "examples/%s without its config: every layer prefix matches a module, cycles on",
