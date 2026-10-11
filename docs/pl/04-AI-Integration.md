@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 9a2786a394ce1f9324750375587a72cf2c43d3c925f49998d38e590c0bb27d28
+source_hash: ada7c3eeb98c4e5a16525e04df085c709b4fe7aa8acf2b7253dc5808a2685f44
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -248,7 +248,7 @@ Agenci wymyślają wiarygodnie wyglądające moduły: `from shop.domain.pricing 
 Naprawa naruszenia kosztuje ponowną próbę. Uniknięcie go nic nie kosztuje. Dwie funkcje przesuwają Inwards wcześniej w pętli:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) wypisuje mapę warstw, tego, co każda z nich może importować, tego, gdzie leżą porty, oraz reguły bibliotek i kontekstów, w mniej niż 300 tokenach. `inwards context --write` albo `inwards init --brief` utrzymuje ją w oznaczonej sekcji `AGENTS.md`. Jest opcjonalna, żeby design partnerzy mogli porównać przebiegi z nią i bez niej ([opis architektury](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły.
+- **`inwards mcp`** ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) to serwer MCP z trzema narzędziami. `where_should_this_go` przyjmuje opis („SQL repository for orders”) i importy, których kod będzie potrzebował, i odpowiada warstwą oraz ścieżką modułu, po sprawdzeniu tych importów w każdej warstwie. `check_files` sprawdza kod, zanim zostanie zapisany, a `explain_rule` zwraca stronę dokumentacji reguły. Agent bez MCP dostaje tę samą stronę z `inwards rule CODE`, a `inwards rules` wypisuje reguły, które projekt włącza.
 
 ```mermaid
 flowchart LR

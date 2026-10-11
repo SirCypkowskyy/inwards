@@ -16,6 +16,8 @@ export const COMMANDS = [
   "init",
   "context",
   "import-config",
+  "rules",
+  "rule",
   "stats",
   "hook",
   "daemon",
@@ -106,6 +108,28 @@ ${CONFIG_OPTION}
 FILE: the import-linter config (.importlinter, setup.cfg or pyproject.toml);
 without it, the first one found in the working directory.
 --write: append the table to the pyproject.toml beside FILE.`,
+  },
+  rules: {
+    synopsis: ["rules [--config pyproject.toml] [--json]"],
+    note: "(every rule: on or off, severity, and the config key behind it)",
+    about: `Lists every rule with its code, name, whether it is on, its severity, and what
+decided both: the default, a [tool.inwards.rules] key (select, extend-select,
+ignore, severity) or a template role's rules table. Without a config, the defaults.
+
+${CONFIG_OPTION}
+--json: print inwards/rules@1 instead of the table.`,
+  },
+  rule: {
+    synopsis: ["rule CODE|NAME [--full] [--json]"],
+    note: "(a rule's docs page, offline)",
+    about: `Prints a rule's docs page, built into the binary: what it reports, why, an
+example and how to fix it. The same text as the MCP tool explain_rule.
+
+CODE|NAME: a rule code (INW001) or name (layer-dependency), in any case.
+--full: every section of the page, configuration and known limitations included.
+--json: print the page's fields and sections as JSON.
+
+Exit codes: 0 printed, 2 usage error or unknown rule.`,
   },
   stats: {
     synopsis: ["stats [DIR] [--format text|json] [--export FILE [--redact]]"],
