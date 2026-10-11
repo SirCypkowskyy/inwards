@@ -18,7 +18,7 @@ import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { parsePython } from "../../python/parser.ts";
-import type { ModuleTrees } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
 import type { Kind } from "./frameworks.ts";

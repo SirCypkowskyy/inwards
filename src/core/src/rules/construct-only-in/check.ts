@@ -20,7 +20,7 @@ import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { extractImports, importStatements, parsePython } from "../../python/parser.ts";
-import type { ModuleTrees } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import { constructions, inEntries, isExceptionName } from "./calls.ts";
 import { reportConstruction, reportImport, type Scope } from "./wording.ts";
 

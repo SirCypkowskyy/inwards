@@ -19,7 +19,8 @@ import type { SourceFile } from "../../contracts/records.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
-import { type ModuleNames, type ModuleTrees, ParsedModules } from "../shared/first-party.ts";
+import { type ModuleNames, ParsedModules } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import type { Construction, Scope } from "./wording.ts";
 
 /** A name Python code gives a class: it starts with a capital letter. */

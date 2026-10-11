@@ -12,7 +12,8 @@
  * bases.
  */
 import type { Node } from "web-tree-sitter";
-import { type ModuleTrees, ParsedModules } from "../shared/first-party.ts";
+import { ParsedModules } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import { nameMatcher } from "../shared/name-patterns.ts";
 import { viewKind } from "./classes.ts";
 import { frameworksIn, type ViewKind } from "./frameworks.ts";

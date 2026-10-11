@@ -12,7 +12,8 @@
  * they don't count. A file with no `async def` is never parsed, and neither
  * is one that names no blocking library and no configured pattern when
  * `follow-modules = []` keeps the check to the file. I/O-free: the caller
- * supplies the parser, the file, the options and the project index.
+ * supplies the parser, the file, the options and the run's first-party
+ * modules, each parsed and read once per run (#359).
  */
 import type { Node, Parser } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
@@ -21,9 +22,10 @@ import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { parsePython } from "../../python/parser.ts";
 import { parameterTypes } from "../shared/annotations.ts";
-import type { ModuleTrees } from "../shared/first-party.ts";
+import type { ParsedModules } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import { configuredFamily, FAMILIES, type Family, LIBRARIES } from "./catalog.ts";
-import { Helpers } from "./hop.ts";
+import { followModules, Helpers } from "./hop.ts";
 import { functionReceivers } from "./receivers.ts";
 import { blockingCall, callsIn, functionsIn, isAsync, type Walk, walkOf } from "./walk.ts";
 import { report, reportHop } from "./wording.ts";
@@ -110,35 +112,61 @@ function checkFunction(fn: Node, walk: Walk, helpers: Helpers): Diagnostic[] {
 }
 
 /**
+ * INW013 for one run: its options read once, and its view of the other
+ * first-party modules, which every checked file of the run shares (#359).
+ * The engine builds one per run, after the run's `ModuleTrees`.
+ */
+export class AsyncBlockingRun {
+  readonly settings: Settings;
+  readonly views: ParsedModules<Walk>;
+  /** The run's trees, which may already hold the checked file. */
+  readonly trees: ModuleTrees;
+
+  /**
+   * Reads the options and wraps the run's trees. Nothing is parsed yet.
+   *
+   * @param options - `[tool.inwards.rules.async-blocking]`, if set.
+   * @param trees - the run's first-party modules, which a hop reads.
+   */
+  constructor(options: RuleOptions | undefined, trees: ModuleTrees) {
+    this.settings = settingsOf(options);
+    this.trees = trees;
+    this.views = followModules(trees, this.settings.families, this.settings.follow);
+  }
+}
+
+/**
  * Checks one file against INW013. The caller decides whether the rule is on
  * for the file; this parses only a file that may hold a finding, and reads
  * another module only when an `async def` calls a function there.
  *
  * @param parser - parser with the Python grammar loaded.
  * @param src - the file, with normalised text.
- * @param options - `[tool.inwards.rules.async-blocking]`, if set.
- * @param project - the run's first-party modules, which a hop reads.
+ * @param run - the options and the run's view of the modules a hop reads.
  * @returns the findings in source order, before suppressions and severities apply.
  */
 export function checkAsyncBlocking(
   parser: Parser,
   src: SourceFile,
-  options: RuleOptions | undefined,
-  project: ModuleTrees,
+  run: AsyncBlockingRun,
 ): Diagnostic[] {
-  const settings = settingsOf(options);
+  const { settings, views } = run;
   if (!mayBlock(src.text, settings)) {
     return [];
   }
-  const tree = parsePython(parser, src.text);
+  // A file an earlier file's hop led to is parsed already; the run frees that tree.
+  const shared = run.trees.parsedAs(src);
+  const tree = shared ?? parsePython(parser, src.text);
   try {
     const walk = walkOf(tree, src, settings.families);
-    const hops = new Helpers(walk, { project, modules: settings.follow });
+    const hops = new Helpers(walk, { views, modules: settings.follow });
     return functionsIn(tree.rootNode)
       .filter(isAsync)
       .flatMap((fn) => checkFunction(fn, walk, hops))
       .sort((a, b) => a.line - b.line || a.column - b.column);
   } finally {
-    tree.delete(); // WASM memory is not garbage collected
+    if (shared === undefined) {
+      tree.delete(); // WASM memory is not garbage collected
+    }
   }
 }

@@ -2,31 +2,20 @@
  * @file Reads other first-party modules for a content rule that follows a
  * name out of the checked file: INW012's handlers registered from another
  * module (#271), INW013's sync helpers one hop away (#294) and INW015's
- * classes built through a re-export. `ModuleTrees` reads and parses each
- * module at most once per run, for every rule and every checked file
- * (#359): a large async codebase calls the same helper modules from
- * hundreds of files. `ParsedModules` turns those trees into one rule's view
- * of each module, only when the rule asks for a name in it and admits it by
- * name (INW013's `follow-modules`); `follow` walks re-exports (`from .views
- * import create_order` in an `__init__.py`) up to `MAX_HOPS` times. The run
- * frees every tree with `ModuleTrees.dispose()`. It decides nothing about
- * what a rule reports, and reads files only through the project port the
- * caller passes.
+ * classes built through a re-export. `ParsedModules` turns the run's trees
+ * (`module-trees.ts`, one parse per module per run, #359) into one rule's
+ * view of each module, only when the rule asks for a name in it and admits
+ * it by name (INW013's `follow-modules`); `follow` walks re-exports (`from
+ * .views import create_order` in an `__init__.py`) up to `MAX_HOPS` times.
+ * It decides nothing about what a rule reports, owns no tree, and reads
+ * files only through the run's trees.
  */
-import type { Node, Parser, Tree } from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
-import { normalizeSource, parsePython } from "../../python/parser.ts";
+import type { ModuleTrees } from "./module-trees.ts";
 
 /** How many re-exports a name is followed through (a re-export cycle ends here). */
 const MAX_HOPS = 4;
-
-/** What reading first-party modules needs from the project; `ProjectIndex` provides it. */
-export interface FirstPartySource {
-  /** Finds the first-party module that owns a dotted name, if any. */
-  readonly ownerOf: (target: string) => string | undefined;
-  /** Reads a first-party module's file, if one holds it. */
-  readonly sourceOf: (module: string) => SourceFile | undefined;
-}
 
 /** The part of a rule's view of a module that following re-exports reads. */
 export interface ModuleNames {
@@ -43,79 +32,11 @@ export interface Followed<V> {
   readonly rest: string;
 }
 
-/** A first-party module as one run parsed it. */
-interface ParsedModule {
-  readonly tree: Tree;
-  /** Its file, with normalised text. */
-  readonly src: SourceFile;
-}
-
-/**
- * The first-party modules one run reads on the content rules' behalf, each
- * parsed at most once, whichever rule and checked file asks first. The
- * engine builds one per run (a `check` of many files, or one file's check)
- * and calls `dispose()` at its end; until then the trees stay alive, so the
- * nodes the rules' views hold stay valid.
- */
-export class ModuleTrees {
-  private readonly parser: Parser;
-  private readonly project: FirstPartySource;
-  private readonly parsed = new Map<string, ParsedModule | undefined>();
-
-  /**
-   * Wraps the parser and the project. Nothing is read yet.
-   *
-   * @param parser - parser with the Python grammar loaded.
-   * @param project - finds and reads first-party modules.
-   */
-  constructor(parser: Parser, project: FirstPartySource) {
-    this.parser = parser;
-    this.project = project;
-  }
-
-  /**
-   * Finds the first-party module that owns a dotted name.
-   *
-   * @param target - a dotted name, e.g. `shop.api.views.create_order`.
-   * @returns the module, or undefined when no first-party module owns it.
-   */
-  ownerOf(target: string): string | undefined {
-    return this.project.ownerOf(target);
-  }
-
-  /**
-   * Reads and parses a first-party module, once per run.
-   *
-   * @param module - a dotted module name.
-   * @returns its tree and normalised file, or undefined when no file holds it.
-   */
-  moduleOf(module: string): ParsedModule | undefined {
-    if (this.parsed.has(module)) {
-      return this.parsed.get(module);
-    }
-    const src = this.project.sourceOf(module);
-    let parsed: ParsedModule | undefined;
-    if (src !== undefined) {
-      const text = normalizeSource(src.text);
-      parsed = { tree: parsePython(this.parser, text), src: { ...src, text } };
-    }
-    this.parsed.set(module, parsed);
-    return parsed;
-  }
-
-  /** Frees every tree read so far; the views and nodes handed out are invalid afterwards. */
-  dispose(): void {
-    for (const parsed of this.parsed.values()) {
-      parsed?.tree.delete(); // WASM memory is not garbage collected
-    }
-    this.parsed.clear();
-  }
-}
-
 /**
  * One rule's view of the other first-party modules it reads, built on demand
- * from the run's trees. Build one per check of a file; the trees belong to
- * the `ModuleTrees` it reads from.
+ * from the run's trees, once per module. Build one per check of a file, or
+ * one per run when the view of a module doesn't depend on the checked file
+ * (INW013's); the trees belong to the `ModuleTrees` it reads from.
  */
 export class ParsedModules<V extends ModuleNames> {
   private readonly trees: ModuleTrees;
@@ -156,9 +77,11 @@ export class ParsedModules<V extends ModuleNames> {
     let name = target;
     for (let hop = 0; hop < MAX_HOPS; hop += 1) {
       const owner = this.trees.ownerOf(name);
-      const view = owner === undefined ? undefined : this.viewOf(owner);
       const rest = owner === undefined ? "" : name.slice(owner.length + 1);
-      if (view === undefined || rest === "" || rest.includes(".")) {
+      // A method of a module-level object (`service.create`) is no definition: don't parse for it.
+      const view =
+        owner === undefined || rest === "" || rest.includes(".") ? undefined : this.viewOf(owner);
+      if (view === undefined) {
         return undefined;
       }
       const node = pick(view, rest);
@@ -175,7 +98,7 @@ export class ParsedModules<V extends ModuleNames> {
   }
 
   /**
-   * Builds the rule's view of a first-party module once per check of a file.
+   * Builds the rule's view of a first-party module, once for this object.
    *
    * @param module - a dotted module name.
    * @returns its view, or undefined when no file holds it or `admit` refuses it.

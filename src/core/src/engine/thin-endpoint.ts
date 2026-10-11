@@ -11,7 +11,7 @@ import type { Parser } from "web-tree-sitter";
 import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
-import type { ModuleTrees } from "../rules/shared/first-party.ts";
+import type { ModuleTrees } from "../rules/shared/module-trees.ts";
 import { checkThinEndpoints } from "../rules/thin-endpoint/check.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 
