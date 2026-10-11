@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: 5755a7667e14c11f8061fd38fed8b21bdbeb642588cf7f5b3c5f6a75ada76aa1
+source_hash: a124f1235b09abcbe26a4714e11b975f80010246fa975a14dc2c847008a79425
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -168,6 +168,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 | `text` | Ludzie, Aider | `file:line:col: CODE message`, potem ponumerowane kroki naprawy |
 | `json` | Agenci, skrypty | `inwards/diagnostics@1`: `summary` + `diagnostics[]`, każda z `fix.summary` i `fix.steps[]` |
 | `sarif` | GitHub code scanning ([workflow](guides/ci.md)), przeglądarki SARIF w IDE | SARIF 2.1.0. Kroki naprawy trafiają do `message.text` i `properties.fix` |
+| `github` | GitHub Actions ([workflow](guides/ci.md#the-workflow)) | Jedno polecenie workflow `::error` albo `::warning` na diagnostykę, z krokami naprawy i linkiem do dokumentacji w treści i ścieżkami od korzenia repozytorium, potem linia podsumowania |
 | `concise` | Agenci z budżetem tokenów | Jedna linia na diagnostykę: położenie, kod, komunikat (podaje import, jeśli reguła go ma) i pierwszy krok naprawy. Podziały linii, na przykład w zawiniętym `from x import (…)` cytowanym w poprawce, są zamieniane na spacje. Potem linia podsumowania. Nigdy nie jest kolorowany |
 
 <figure markdown="span">
@@ -175,9 +176,9 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
   <figcaption>JSON, który dostaje agent: wersjonowane podsumowanie i uporządkowane kroki naprawy. Wyjście przekierowane do potoku jest zwięzłe; tutaj <code>jq</code> tylko je ładnie formatuje.</figcaption>
 </figure>
 
-`--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst i `concise` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
+`--max-diagnostics N` wypisuje najwyżej N diagnostyk, błędy przed ostrzeżeniami, i informuje, co pominięto. Tekst, `concise` i `github` dodają linię taką jak `Not shown: 3 violations, 1 warning.`; JSON dodaje `summary.omitted`. Liczniki w podsumowaniu i kod wyjścia wciąż obejmują każdą diagnostykę. SARIF odrzuca tę flagę, bo code scanning powinien widzieć każdy wynik.
 
-`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`, każdy osobno. Pomija sprawdzenia, które potrzebują całego projektu: martwe prefiksy i selektory warstw, zagnieżdżone projekty i dowiązania symboliczne w warstwach (INW006), selektory kształtów (INW007), wymagane elementy pakietów z kształtem (INW008) i cykle importów (INW004). Do nich uruchom `inwards check` bez ścieżek; `--help` mówi to samo. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, a SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
+`inwards check PATHS...` sprawdza tylko pliki Pythona pod `root`, każdy osobno. Pomija sprawdzenia, które potrzebują całego projektu: martwe prefiksy i selektory warstw, zagnieżdżone projekty i dowiązania symboliczne w warstwach (INW006), selektory kształtów (INW007), wymagane elementy pakietów z kształtem (INW008) i cykle importów (INW004). Do nich uruchom `inwards check` bez ścieżek; `--help` mówi to samo. Podana ścieżka, która nie daje żadnego pliku do sprawdzenia, bo leży poza `root` albo nie zawiera pliku Pythona, dostaje linię taką jak `warning: tools/x.py is outside root "src" and was not checked.` JSON wymienia takie ścieżki w tablicy `notChecked` najwyższego poziomu, z polami `path` i `message`, SARIF umieszcza je w `invocations[0].toolExecutionNotifications` z poziomem `warning`, a `github` wypisuje dla każdej polecenie `::warning`. Pozostałe ścieżki są sprawdzane normalnie. Jeśli żadna z podanych ścieżek nie dała pliku, linia podsumowania brzmi `Nothing checked: 0 files` zamiast `All clear`, a kod wyjścia to 2.
 
 ### Pisanie diagnostyk dla modelu { #writing-diagnostics-for-a-model }
 

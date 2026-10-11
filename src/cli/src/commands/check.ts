@@ -5,8 +5,10 @@
  * allowed), 1 errors, 2 usage or config error, which includes a named path
  * that doesn't exist and paths that gave no file to check at all.
  */
-import { resolve } from "node:path";
-import { type Format, render } from "@inwards/core";
+import { posix as posixPath, relative, resolve } from "node:path";
+import { type Format, type Report, render } from "@inwards/core";
+import { isInside, posix } from "../paths/lexical.ts";
+import type { PathProbe } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { diskCacheWanted } from "../project/check.ts";
 import { commandConfig, NO_CONFIG } from "../project/config-discovery.ts";
@@ -14,7 +16,7 @@ import { type CheckPlan, planCheck } from "../project/routing.ts";
 import { runPlan } from "./check-runs.ts";
 import type { AppDeps } from "./deps.ts";
 
-const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif"];
+const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif", "github"];
 const WHOLE_NUMBER = /^\d+$/u;
 
 /** The options `inwards check` reads. */
@@ -29,7 +31,7 @@ export interface CheckOptions {
  * Tells whether a `--format` value is one the reporters support.
  *
  * @param value - the raw option value.
- * @returns true for `text`, `concise`, `json` or `sarif`.
+ * @returns true for `text`, `concise`, `json`, `sarif` or `github`.
  */
 function isFormat(value: string): value is Format {
   return FORMATS.some((format) => format === value);
@@ -65,6 +67,39 @@ function planOf(deps: AppDeps, paths: string[], config: string | undefined): Che
 }
 
 /**
+ * Makes the report's file paths relative to the GitHub Actions checkout, as
+ * workflow command annotations need: a check run in `packages/api` reports
+ * `domain/x.py`, and the annotation must say `packages/api/domain/x.py`.
+ * Outside Actions, or from a directory outside the checkout, the paths stay
+ * relative to the working directory. Both directories are compared with
+ * symlinks resolved, since the working directory always comes resolved.
+ *
+ * @param probe - resolves symlinks.
+ * @param report - the merged report, paths relative to `cwd`.
+ * @param cwd - the working directory.
+ * @param workspace - `GITHUB_WORKSPACE`, if set.
+ * @returns the report with its diagnostics' paths rebased.
+ */
+function fromWorkspace(
+  probe: PathProbe,
+  report: Report,
+  cwd: string,
+  workspace: string | undefined,
+): Report {
+  const root = workspace === undefined ? undefined : probe.realpath(workspace);
+  const here = probe.realpath(cwd) ?? cwd;
+  if (root === undefined || !isInside(root, here)) {
+    return report;
+  }
+  const prefix = posix(relative(root, here));
+  const diagnostics = report.diagnostics.map((d) => ({
+    ...d,
+    file: posixPath.join(prefix, d.file),
+  }));
+  return { ...report, diagnostics };
+}
+
+/**
  * Runs `inwards check` and writes the report to stdout.
  * Without `--config`, the configs come from `planCheck`: the nearest
  * pyproject.toml with `[tool.inwards]` above the working directory, or at a
@@ -74,6 +109,7 @@ function planOf(deps: AppDeps, paths: string[], config: string | undefined): Che
  * output by a line per config.
  *
  * Output is indented only on a TTY, since agents and hooks read a pipe.
+ * `github` output names files from the Actions checkout (`GITHUB_WORKSPACE`).
  * Colour follows FORCE_COLOR first, then NO_COLOR, then the TTY check.
  *
  * @param deps - the platform, the run log and the check runner.
@@ -122,8 +158,12 @@ export async function checkCommand(
   const pretty = io.runtime.stdoutIsTTY;
   const color = io.runtime.forceColor ? true : pretty && !io.runtime.noColor;
   const maxDiagnostics = max === undefined ? undefined : Number(max);
-  io.streams.out(`${render(merged, format, { pretty, color, maxDiagnostics })}\n`);
-  if (lines.length > 0 && (format === "text" || format === "concise")) {
+  const report =
+    format === "github"
+      ? fromWorkspace(io.probe, merged, io.runtime.cwd, io.runtime.githubWorkspace)
+      : merged;
+  io.streams.out(`${render(report, format, { pretty, color, maxDiagnostics })}\n`);
+  if (lines.length > 0 && format !== "json" && format !== "sarif") {
     io.streams.out(`${lines.join("\n")}\n`);
   }
   return exit;

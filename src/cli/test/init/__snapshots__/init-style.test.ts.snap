@@ -44,6 +44,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "domain", modules = ["my_app.domain"] },              # entities shared by every layer
   { name = "persistence", modules = ["my_app.persistence"] },    # repositories and their Protocols
@@ -109,6 +111,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "domain", modules = ["my_app.domain"] },                  # entities and business rules, no I/O
   { name = "application", modules = ["my_app.application"] },        # use cases and the ports they need
@@ -198,6 +202,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "domain", modules = ["my_app.domain"] },                 # entities and business rules, no I/O
   { name = "application", modules = ["my_app.application"] },       # use cases and the ports they need
@@ -288,6 +294,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "shared", modules = ["my_app.shared"] },        # the shared kernel: code every slice may use
   { name = "features", modules = ["my_app.features"] },    # one package per slice, each a context
@@ -373,6 +381,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "context", modules = ["my_app.*"], template = "context" },  # every bounded context, layered by the context template
   { name = "bootstrap", modules = ["my_app.bootstrap"] },              # composition root: wires the adapters into the use cases
@@ -449,6 +459,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "app", modules = ["my_app.*"], template = "django-app", deny-libraries = [] },  # every Django app, layered by the django-app template; models import django.db
   { name = "project", modules = ["my_app"] },                                              # settings, the root URLconf, and app modules outside the roles (admin, apps)
@@ -555,6 +567,8 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 root = "src"
 required-version = "<VERSION>"
 ignore = ["tests", "scripts", "migrations", "conftest"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
 layers = [
   { name = "kernel", modules = ["my_app"], deny-libraries = [] },            # the shared modules: settings, the base model, exceptions, the database
   { name = "domain", modules = ["my_app.*"], template = "fastapi-domain" },  # every domain package, layered by the fastapi-domain template

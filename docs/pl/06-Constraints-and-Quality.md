@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: e9f2717a006af2a5820bb1575f90ddaff350dc17c7beeafa6aceffc7dee4e1a5
+source_hash: 6832f5e4d5308625c0be97502023e6abe5f91d60475c0956710af227409b58c9
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -289,6 +289,65 @@ Baza z #61 mierzyła na saleorze od 1,48 do 1,62 s w sześciu sesjach tego dnia,
 **Linux.** Plik binarny linux-arm64 w kontenerze Ubuntu 24.04 na tym samym laptopie, po siedem uruchomień. Przypięty do czterech rdzeni, gdzie domyślnie działa jeden wątek, nic się nie zmieniło: saleor 1,24 s przed i po, polar 0,68 s, repozytorium syntetyczne 0,42 s, w trybie starszego kodu 2,27 s. Linux tanio odpowiada na `realpath` i odczyty plików ze swoich pamięci podręcznych, więc usunięta szeregowa część była kosztem macOS. Przypięty do ośmiu rdzeni (trzy wątki) saleor przyspieszył z 0,92 do 0,87 s, a repozytorium w trybie starszego kodu z 1,43 do 1,37 s. Trzykrotne przyspieszenie na 4 vCPU, o które prosiło #61, pozostaje poza zasięgiem: maszyna z 4 rdzeniami zostaje przy jednym wątku, a ten wątek spędza czas na parsowaniu i regułach.
 
 **Co zostaje w wątku głównym.** Zmierzone ze źródeł na saleorze przy czterech wątkach: około 45 ms na przejście drzewa i nazwanie plików, 70 ms na ich przeczytanie, potem silnik: 260 ms na partię szkieletów (dzieloną z workerami), 127 ms na skany, 135 ms na partię pełnych parsowań (dzieloną), 60 ms na potwierdzenia i raport oraz 33 ms na kontrole całego uruchomienia. Skany i potwierdzenia to reguły, które z założenia zostają w jednym wątku ([ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)).
+
+### Precyzja reguł opt-in { #precision-of-the-opt-in-rules }
+
+Reguły treści opt-in (od INW012 do INW016, od FAPI001 do FAPI009) weszły z testami tylko na przykładach. [#182](https://github.com/SirCypkowskyy/inwards/issues/182) włączyło je na pięciu repozytoriach korpusu w przypiętych commitach, ręcznie oceniło zgłoszenia, poprawiło największe klasy fałszywych alarmów i zmierzyło czas każdej reguły.
+
+**Metoda.** Każde repozytorium działało z warstwami z manifestu i `select` wszystkich reguł opt-in. INW015 potrzebuje roli, więc fastapi-clean-example dostało `role = ["app.outbound"]`, `allowed-in = ["app.main"]`, a python-ddd `role = ["modules.*.infrastructure", "seedwork.infrastructure"]`, `allowed-in = ["config", "api.main", "cli"]`. Routery Polara pochodzą z klasy budowanej w czasie działania ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)), więc INW012 widziało jeden z jego 450 endpointów, dopóki drugie uruchomienie nie dodało `decorators = ["polar.*.router.get", "polar.*.router.post", "polar.*.router.patch", "polar.*.router.put", "polar.*.router.delete"]`. Zgłoszenie jest trafne, gdy to, co twierdzi, jest prawdą i czytelnik strony reguły chciałby je poprawić; zgłoszenie prawdziwe co do litery, ale niewarte poprawki, takie jak health check, który pinguje bazę, liczy się jako fałszywe. Gdy reguła miała więcej zgłoszeń, niż dało się przeczytać, obejrzane zostało co piąte.
+
+| Reguła | Zgłoszenia przed → po | Obejrzane | Precyzja przed → po | Poprawka w #182 |
+|---|--:|--:|--:|---|
+| INW012, Polar z `decorators` | 108 → 73 | 22 przed, 25 po | 36 % → 68 % | każde `raise` to warunek ochronny; opcje ładowania nie są zabronionymi wywołaniami |
+| INW012, pozostałe repozytoria | 4 → 4 | wszystkie | 3 z 4 | niepotrzebna |
+| INW013 | 1 → 1 | wszystkie | 1 z 1 | niepotrzebna |
+| INW014 | 0 → 0 | n/d | n/d | niepotrzebna |
+| INW015 | 48 → 17 | wszystkie | 31 % → 88 % | klasy wyjątków z roli nie są zgłaszane |
+| INW016 | 173 → 152 | każde zgłoszenie kolumny i nazwa tabeli | 88 % → 100 % względem domyślnego schematu | migracje Alembica nie są czytane |
+| FAPI001 | 22 → 21 | wszystkie | 86 % → 90 % | aplikacja z `openapi_url=None` nie ma schematu |
+| FAPI002 | 18 → 17 | 8 | wszystkie trafne | ta sama |
+| FAPI007 | 4 → 0 | wszystkie | 0 % → brak zgłoszeń | generator z dwoma `yield` albo `yield` w pętli to strumień |
+| FAPI003, FAPI005, FAPI006, FAPI008, FAPI009 | 0 → 0 | n/d | n/d | niepotrzebna |
+
+Czym były fałszywe alarmy i co zostało:
+
+- **INW012.** 8 z 14 fałszywych alarmów pierwszej próby to warunki ochronne, które rzucają błędy samego projektu (`raise ResourceNotFound()`, mapowane na 404 przez handler wyjątków całej aplikacji); liczenie ich jako warunków ochronnych kosztowało jedno trafne zgłoszenie, regułę biznesową zapisaną jako dwa warunki. 3 w obu próbach to pojedyncze `joinedload(...)` przekazane repozytorium. Zostały: HTML renderowany na serwerze w zagnieżdżonych blokach `with` (46 z 73 zgłoszeń leży w back office Polara), handlery formularzy HTMX, health checki i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)). Domyślne progi się sprawdziły: tylko 3 z 73 zgłoszeń przekraczają jeden sygnał o najwyżej 2 instrukcje, 1 gałąź albo 1 poziom.
+- **INW015.** 31 z 48 zgłoszeń to import klasy wyjątku z adaptera, żeby zmapować go na status HTTP. Zostały: stała importowana z adaptera i moduł testów ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)).
+- **INW016.** 21 zgłoszeń powtarzało kolumnę modelu w migracji Alembica. Pozostałe 152 są poprawne względem domyślnego schematu, ale 101 z nich to konsekwentnie mnogie nazwy tabel Polara; lepiej posłużyłoby jedno zgłoszenie dla całego projektu ([#361](https://github.com/SirCypkowskyy/inwards/issues/361)).
+- **FAPI001, FAPI002.** Back office Polara to aplikacja `FastAPI(openapi_url=None)`. Zostały: dwie aplikacje testowe w Polarze ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Obie reguły widzą w korpusie około 40 endpointów, bo routery Polara i fastapi-clean-example nie są rozpoznawane ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **FAPI007.** Wszystkie 4 zgłoszenia to strumienie (zdarzenia wysyłane przez serwer w Polarze, iterator rabatów w Saleorze), nie zależności.
+
+**Koszt.** Każda reguła osobno, oprócz warstw z manifestu, zimne (`--no-cache`) i ciepłe uruchomienie, mediana z 5 uruchomień (3 dla polara i saleora), plik binarny darwin-arm64 na opisanym wyżej laptopie, przy pracujących równolegle innych agentach (load average 5 do 11). Milisekundy, zimne / ciepłe:
+
+| Reguła | template | clean-example | python-ddd | polar | saleor |
+|---|--:|--:|--:|--:|--:|
+| żadna | 44 / 34 | 75 / 55 | 82 / 77 | 603 / 501 | 931 / 1 034 |
+| INW012 | 79 / 79 | 93 / 84 | 91 / 83 | 1 119 / 955 | 1 284 / 1 117 |
+| INW013 | 43 / 38 | 115 / 116 | 113 / 113 | 7 826 / 7 246 | 954 / 924 |
+| INW014 | 42 / 34 | 77 / 60 | 82 / 80 | 592 / 499 | 923 / 907 |
+| INW015 | n/d | 105 / 106 | 113 / 125 | n/d | n/d |
+| INW016 | 49 / 44 | 80 / 61 | 90 / 88 | 778 / 619 | 1 187 / 1 251 |
+| FAPI001 | 79 / 79 | 81 / 88 | 109 / 105 | 1 299 / 1 173 | 1 357 / 1 319 |
+| FAPI002 | 89 / 89 | 88 / 81 | 109 / 108 | 1 426 / 1 180 | 1 481 / 1 475 |
+| FAPI007 | 65 / 64 | 81 / 75 | 91 / 91 | 1 326 / 1 197 | 1 362 / 1 490 |
+| wszystkie reguły opt-in | 130 / 130 | 175 / 189 | 178 / 171 | 9 299 / 9 157 | 2 089 / 2 189 |
+
+Pozostałe reguły FAPI kosztują mniej więcej tyle co FAPI001. Kolumna ciepła prawie się nie różni, bo pamięć podręczna ekstrakcji trzyma importy, a nie drzewa, które parsują reguły treści. Wyróżniły się dwa koszty:
+
+- **INW012 na Saleorze trwało 8,0 s**, wobec 1,1 s bez niego (oba uruchomione ze źródeł): prawie każdy plik wspomina Django, więc każdy dostawał pełne parsowanie, a każda klasa z bazą z kodu projektu czytała moduł tej bazy. Plik Django potrzebuje teraz kształtu widoku przed parsowaniem (`@api_view`, `@action`, `path(...)`, `re_path(...)` albo metody handlera w rodzaju `def get(`, chyba że `modules` zawęża regułę), a bazy rozwiązuje tylko klasa z metodą handlera. Saleor z INW012 zszedł do 1,3 s, z tymi samymi 2 zgłoszeniami.
+- **INW013 na Polarze trwa 7,8 s**, około 13 razy dłużej niż sprawdzenie bez niego: krok do innego modułu parsuje ten moduł od nowa dla każdego pliku, który do niego woła. Śledzi to [#359](https://github.com/SirCypkowskyy/inwards/issues/359).
+
+**Hook.** [#182](https://github.com/SirCypkowskyy/inwards/issues/182) wymagało braku mierzalnego spowolnienia hooka na plikach bez endpointów i najwyżej jednego pełnego parsowania na plikach z nimi. `inwards check --no-cache <plik>`, po 21 naprzemiennych uruchomień, milisekundy p50 / p95:
+
+| Plik | Endpointy | INW012 wyłączone | INW012 włączone |
+|---|---|--:|--:|
+| saleor `order/actions.py` (2 110 linii, wspomina Django) | brak | 33 / 35 | 33 / 35 |
+| polar `subscription/service.py` (4 482 linie) | brak | 60 / 61 | 61 / 64 |
+| saleor `thumbnail/views.py` | brak (jego 2 widoki rejestruje `urls.py`) | 32 / 33 | 33 / 34 |
+| polar `subscription/endpoints.py` (z `decorators`) | 9 | 29 / 31 | 43 / 50 |
+| template `api/routes/items.py` | 5 | 26 / 27 | 32 / 34 |
+
+Przed filtrem dla Django `order/actions.py` z włączonym INW012 trwało 53 / 54 ms. Plik z endpointami płaci jedno pełne parsowanie, które prescan w innym razie pomija.
 
 ### Plan poprawy wydajności { #performance-roadmap }
 

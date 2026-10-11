@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: dbd04e4c1ed36ed6f2c934df57565a21a6e568c18a8a91dcf9022b7817b25406
+source_hash: ebab82c1ce13a2852ce17cbc769daca03836009de80175ce42cb0ba5edb7a58a
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -875,6 +875,7 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 
 - :material-plus-circle-outline: Na syntetycznym repozytorium (2100 plików), gdzie losowe importy generatora wkładają większość modułów każdej warstwy do jednej cyklicznej grupy, szukanie cykli razem z potwierdzaniem dało zimne sprawdzenie całego projektu 1,51 s wobec 1,35 s bez niego (mediany 8 naprzemiennych uruchomień z `INWARDS_NO_CACHE=1`, średnie obciążenie około 1,1). Pełne parsowanie każdego pliku w grupie trwało zamiast tego około 7 s. Szukanie znalazło cztery cykle. Zimne sprawdzenie przekracza na tej maszynie budżet 1 s z szukaniem i bez niego.
 - :material-plus-circle-outline: Cykl między kontekstami jest wykrywany nawet wtedy, gdy `depends-on` pozwala na oba kierunki.
+- :material-plus-circle-outline: Projekt zakładany przez `inwards init --style` nie ma cykli, na których mógłby się wyłożyć, więc każdy preset zapisuje `cycles = ["modules", "contexts"]` ([#340](https://github.com/SirCypkowskyy/inwards/issues/340)).
 - :material-minus-circle-outline: Edytor i hook po edycji nie pokazują cykli; bramka Stop pokazuje je tylko w trybie projektu.
 - :material-minus-circle-outline: Import podmodułu uruchamia też `__init__` jego pakietu; ten niejawny krok nie jest krawędzią, więc cykl, który zamyka się tylko przez `__init__`, nie jest wykrywany.
 - :material-minus-circle-outline: Bez kontekstów pliki poza wszystkimi warstwami nie są parsowane, więc cykle przez nie nie są widoczne.

@@ -391,7 +391,7 @@ A template nobody uses is allowed. Four presets write a template and contexts fo
 
 Type: list of `"modules"` and `"contexts"`. Default: `["contexts"]`.
 
-Which import cycles [INW004](../rules/INW004.md) reports on whole-project runs: between contexts, between modules, both, or none (`[]`). The default only matters once `contexts` are declared, so upgrading doesn't fail a project that lives with module cycles; add `"modules"` to catch those too.
+Which import cycles [INW004](../rules/INW004.md) reports on whole-project runs: between contexts, between modules, both, or none (`[]`). The default only matters once `contexts` are declared, so upgrading doesn't fail a project that lives with module cycles; add `"modules"` to catch those too. Every `inwards init --style` preset writes `["modules", "contexts"]` ([Install](install.md#a-new-project-start-from-a-preset)).
 
 <!-- config: fragment -->
 

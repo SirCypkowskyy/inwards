@@ -193,6 +193,23 @@ async def b(): ...
     expect(await reported(files, "FAPI001")).toEqual([]);
   });
 
+  test("skips an app that serves no OpenAPI schema, openapi_url=None", async () => {
+    // Polar's server-rendered backoffice (#182 corpus run) is such an app.
+    const app = `from fastapi import FastAPI
+
+app = FastAPI(openapi_url=None)
+
+
+@app.post("/orders")
+async def create(): ...
+`;
+    expect(await reported({ "app/__init__.py": "", "app/main.py": app }, "FAPI001")).toEqual([]);
+    const served = app.replace("FastAPI(openapi_url=None)", 'FastAPI(openapi_url="/schema.json")');
+    expect(
+      await reported({ "app/__init__.py": "", "app/main.py": served }, "FAPI001"),
+    ).toHaveLength(1);
+  });
+
   test("api_route checks every method it lists", async () => {
     const route = `
 @router.api_route("/orders", methods=["GET", "POST"], summary="Orders")
