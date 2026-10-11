@@ -787,7 +787,9 @@
       },
       {
         "from": "cli-test",
+        // core-dev: the slice naming check (src/core/test/support/slices.ts) both packages share.
         "allow": [
+          "core-dev",
           "core-api",
           "core-contracts",
           "core-meta",

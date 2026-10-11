@@ -54,6 +54,8 @@ class Order(models.Model):
 
     item = models.CharField(max_length=200)
     quantity = models.PositiveIntegerField()
+
+    objects = models.Manager()
 `,
     ],
     [

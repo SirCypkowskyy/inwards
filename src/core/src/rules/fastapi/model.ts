@@ -12,7 +12,7 @@
  * nodes (a path operation's function, a keyword's value) for the rules to
  * walk. The model reports nothing; deciding what is wrong is the rules' job.
  */
-import type { Node } from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { moduleFunctions } from "../../python/nodes.ts";
@@ -21,6 +21,7 @@ import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { type ModuleDefinitions, moduleDefinitions } from "../shared/definitions.ts";
 import { type FoundDefinition, RouterKinds } from "../shared/fastapi-routers.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
+import { type CallSite, CallSites } from "./call-sites.ts";
 import { extract } from "./extract.ts";
 import type { FastApiFile, FastApiObject } from "./records.ts";
 
@@ -84,6 +85,14 @@ export class FastApiModel {
   private readonly kinds = new RouterKinds((qualified) => this.definitionOf(qualified));
   /** Paths whose text came from `fileModel`, the adapter's view, which a disk read must not replace. */
   private readonly pinned = new Set<string>();
+  /** Finds a function's calls across the project, for the graph's parameters (#391). */
+  private readonly callSites = new CallSites({
+    modules: (): Iterable<string> => this.project.modules,
+    sourceOf: (module: string): SourceFile | undefined => this.project.sourceOf(module),
+    parse: (src: SourceFile): Parsed => this.parse({ ...src, text: normalizeSource(src.text) }),
+    treeOf: (src: SourceFile): Tree => this.trees.treeOf(src),
+    resolve: (qualified: string): Definition | null => this.resolve(qualified),
+  });
 
   /**
    * Wraps the run's trees and a project index. Nothing is read or parsed yet.
@@ -258,11 +267,23 @@ export class FastApiModel {
     return model;
   }
 
+  /**
+   * Finds every call to a first-party module-level function in the project
+   * (#391), so a parameter of it can be followed one hop (`call-sites.ts`).
+   *
+   * @param qualified - the function's qualified name, e.g. `app.wiring.wire`.
+   * @returns the calls with their files' qualifiers, or null when they can't all be known.
+   */
+  callsTo(qualified: string): readonly CallSite[] | null {
+    return this.callSites.callsTo(qualified);
+  }
+
   /** Drops every file's records; the run's trees, not the model, free the syntax trees. */
   dispose(): void {
     this.parsed.clear();
     this.models.clear();
     this.pinned.clear();
+    this.callSites.clear();
   }
 
   /**

@@ -68,11 +68,11 @@ describe("inwards init --style X --scaffold on a fresh uv project", () => {
 
   test("a file the scaffold would create makes it exit 2, list the file and write nothing", () => {
     const mine = "# my own order\n";
-    const root = project({ ...UV_PROJECT, "src/my_app/domain/order.py": mine });
+    const root = project({ ...UV_PROJECT, "src/my_app/domain/models.py": mine });
     const before = tree(root);
     const run = init(root, "--style", "layered", "--scaffold");
     expect(run.code).toBe(2);
-    expect(run.stderr).toContain("\n  src/my_app/domain/order.py\n");
+    expect(run.stderr).toContain("\n  src/my_app/domain/models.py\n");
     expect(tree(root)).toEqual(before);
   });
 
@@ -90,7 +90,7 @@ describe("inwards init --style X --scaffold on a fresh uv project", () => {
     expect(init(root, "--style", "hexagonal", "--scaffold").code).toBe(0);
     expect(checkSummary(root)).toEqual({
       code: 0,
-      summary: { filesChecked: 14, violations: 0, warnings: 0 },
+      summary: { filesChecked: 17, violations: 0, warnings: 0 },
     });
   });
 });
@@ -162,7 +162,7 @@ describe("inwards init --style", () => {
     // No src/ directory: a flat layout, so the root is the project directory.
     expect(readFileSync(join(root, "pyproject.toml"), "utf8")).toContain('root = "."');
     expect(existsSync(join(root, "shop", "bootstrap.py"))).toBe(true);
-    expect(checkSummary(root).summary).toEqual({ filesChecked: 15, violations: 0, warnings: 0 });
+    expect(checkSummary(root).summary).toEqual({ filesChecked: 18, violations: 0, warnings: 0 });
   });
 
   test("without a pyproject.toml, init exits 2 and suggests uv init --package", () => {

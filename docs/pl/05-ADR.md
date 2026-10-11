@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3bce519537ea4a621b0e8635463a53d793384f34640d16bb6aa8781ad7e7ccdd
+source_hash: b091294eed4ac59d4575118ceec73c28b4008b1fc63ebc1b374540042189c9da
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -54,6 +54,8 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
 | [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja | :material-check-circle: Przyjęty, INW017 od [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 i `import-diagram` od [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
+| [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon | :material-check-circle: Przyjęty, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
+| [047](#adr-047-typescript-in-vertical-slices-moved-one-small-pr-at-a-time) | TypeScript w pionowych wycinkach, przenoszony małymi PR-ami | :material-check-circle: Przyjęty |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1398,3 +1400,184 @@ W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, al
 - *Sprawdzać każdy blok Mermaid w repozytorium:* diagramy procesów i sekwencji dawałyby fałszywe zgłoszenia, a projekt nie mógłby trzymać diagramu poglądowego.
 - *Użyć parsera samego Mermaida:* potrzebuje DOM i środowiska jison, czyli więcej niż wszystkie zależności silnika razem.
 - *Domyślnie błędy:* literówka w dokumentacji blokowałaby Stop gate agenta przy kodzie, który jest w porządku.
+
+## ADR-046: Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon { #adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template }
+
+**Stan:** Przyjęty · 2026-10-11 · [#407](https://github.com/SirCypkowskyy/inwards/issues/407) · scaffoldy [#406](https://github.com/SirCypkowskyy/inwards/issues/406)
+
+**Kontekst.** Konwencje właściciela (2026-10-11) dla projektu w Pythonie: pionowe wycinki podzielone według domen, z pakietem `shared/`; te same nazwy modułów w każdym wycinku (`models.py`, `api.py`, `services/`, którego `__init__.py` reeksportuje z modułów prywatnych, takich jak `_user.py`, oraz `commands/` i `queries/` dla CQRS); porty to klasy `typing.Protocol`, nigdy ABC i nigdy dziedziczone; każdy moduł adaptera kończy się blokiem `if TYPE_CHECKING:` z linią `_: Port = Adapter(...)`, żeby type checker sprawdził adapter względem jego portu. [#406](https://github.com/SirCypkowskyy/inwards/issues/406) wprowadza je do scaffoldów. Spike miał ustalić, których z nich inwards może pilnować i jak.
+
+Co mówią Python i narzędzia (stan na 2026-10-11):
+
+- **Protokoły są strukturalne.** Klasa implementuje protokół, gdy ma jego składowe; dziedziczenie po nim jest dozwolone, ale niepotrzebne do sprawdzania typów, a jawna podklasa dziedziczy domyślne ciała metod protokołu ([specyfikacja typowania, Protocols](https://typing.python.org/en/latest/spec/protocol.html#explicitly-declaring-implementation)). Podklasa protokołu jest protokołem tylko wtedy, gdy sama wymienia `Protocol` wśród swoich baz; inaczej zostaje „zdegradowana” do zwykłej klasy ([Merging and extending protocols](https://typing.python.org/en/latest/spec/protocol.html#merging-and-extending-protocols)).
+- **`TYPE_CHECKING` ma w czasie działania wartość `False`**, a statyczne type checkery przyjmują `True` ([`typing.TYPE_CHECKING`](https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING)), więc `_: Port = Adapter(...)` pod nim niczego nie buduje, a mimo to jest sprawdzane.
+- **Zgodność sprawdza type checker, nie Ruff.** ty zgłasza wartość, której nie da się przypisać do zadeklarowanego typu, jako [`invalid-assignment`](https://docs.astral.sh/ty/reference/rules/#invalid-assignment); mypy i pyright mają to samo sprawdzenie. Zmienna z adnotacją `type[Proto]` przyjmuje konkretną klasę, której instancje implementują protokół ([type[] and class objects vs protocols](https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols)). Ruff nie sprawdza typów; w tej linii zgłasza tylko niezdefiniowaną nazwę (`F821`).
+- **Reguła Ruffa o prywatnych importach pomija własne moduły projektu.** [PLC2701 `import-private-name`](https://docs.astral.sh/ruff/rules/import-private-name/) jest w trybie preview, pomija importy względne i importy używane tylko w adnotacjach, a także każdy import, którego pakiet najwyższego poziomu jest pakietem importującego pliku ([źródło](https://github.com/astral-sh/ruff/blob/main/crates/ruff_linter/src/rules/pylint/rules/import_private_name.rs)). W obrębie jednego projektu `from app.users.services._user import X` w `app.orders` nigdy nie jest zgłaszane.
+- **INW014** już sprawdza, że moduł portu zawiera tylko ABC i Protocol z metodami bez ciała, a warstwy sąsiednie INW001 ([ADR-036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand)) już zabraniają importów między rolami `a | b` szablonu.
+
+Pomiar na pięciu repozytoriach z `bench/corpus.json`, skryptem w Pythonie na `ast` (2026-10-11):
+
+| Sprawdzenie | fastapi-clean-example | polar | full-stack-fastapi-template, python-ddd, saleor |
+|---|---|---|---|
+| ABC w modułach `ports` | 0 (każdy port to Protocol) | brak modułów `ports` | brak |
+| Klasy poza modułami portów dziedziczące po porcie | 9 baz w 8 klasach adapterów i 1 atrapa w testach | 57 podklas Protocol, żadna z modułu portu | 0 |
+| Linie `_: Port = Adapter(...)` pod `TYPE_CHECKING` | 0 | 0 | 0 |
+| Publiczne, niewyłączone klasy w modułach `adapters` | 8, wszystkie to adaptery | 4: 1 adapter, 2 dataclassy, 1 model Pydantic na własnej bazie projektu | 0 |
+| Importy modułu `_private` spoza jego pakietu | 0 | 42: 32 w testach, 2 w skryptach, 8 w `polar` | 0 (brak modułów prywatnych) |
+| Moduły `queries` importujące `commands` | 0 | 0 | 0 |
+
+Żaden projekt z korpusu nie stosuje konwencji linii zgodności, a moduły prywatne ma tylko polar; te konwencje to wybór zespołu, więc każde sprawdzenie poniżej jest opt-in.
+
+**Decyzja.**
+
+- **Porty: dwie opcje INW014, bez nowego kodu.** `interface = "any"` (domyślnie, tak jak dziś) albo `"protocol"` w `[tool.inwards.rules.ports-abstract]` mówi, czym musi być klasa portu. Przy `"protocol"` ABC w module portu jest zgłaszana na swojej nazwie, podobnie jak klasa, która rozszerza port, ale sama nie wymienia `Protocol`, bo type checker traktuje ją jak zwykłą klasę. `allow-subclassing = false` (domyślnie `true`) zgłasza klasę w dowolnym miejscu poza modułami portów, która wśród swoich baz ma klasę z modułu portu; diagnostyka stoi na tej bazie. Bazy są rozwiązywane przez importy samego pliku, jak dziś w INW014, więc sprawdzenie dalej działa na jednym pliku naraz, a plik jest parsowany tylko wtedy, gdy jego szkielet importów importuje moduł portu. Moduły testów są pomijane, jak w każdej regule treści ([ADR-037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix)), więc atrapa w testach dziedzicząca po porcie przechodzi.
+    - Komunikaty: ``` `OrderRepository` in port module `shop.application.ports.orders` is an ABC; ports here are `typing.Protocol` classes (`interface = "protocol"`), which adapters implement by their shape. ``` oraz ``` `SqlOrderRepository` in `shop.infrastructure.orders` subclasses the port `OrderRepository` from `shop.application.ports.orders`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built. ```
+    - Poprawka: dla ABC zamienić `ABC` na `Protocol` wśród baz i usunąć `@abstractmethod`, które ma znaczenie tylko dla podklas; dla podklasy usunąć port z baz i dodać `_: OrderRepository = SqlOrderRepository(...)` pod `if TYPE_CHECKING:` na końcu modułu.
+    - Opis architektury (brief): linia INW014 mówi `` `ports` modules hold only `typing.Protocol` classes whose methods have no body ``, a przy `allow-subclassing = false` dodaje `; adapters never subclass them`.
+- **Zgodność: nowa reguła INW020 `adapter-conformance`.** Kategoria roles, opt-in, błąd po włączeniu. Każda publiczna klasa najwyższego poziomu (jej nazwa nie zaczyna się od `_`) w module adaptera potrzebuje co najmniej jednej linii zgodności w bloku `if TYPE_CHECKING:` (albo `if typing.TYPE_CHECKING:`) na poziomie modułu: przypisania z adnotacją, którego wartością jest wywołanie klasy (`Adapter(...)` z dowolnymi argumentami, także `Adapter[T](...)`) albo sama klasa przy adnotacji `type[Port]`. Nazwa celu jest dowolna; konwencją jest `_`. Trzy diagnostyki:
+    - **Brak linii zgodności**, na nazwie klasy: ``` `SqlOrderRepository` in adapter module `shop.infrastructure.orders` declares no port it implements. Add `_: OrderRepository = SqlOrderRepository(...)` under `if TYPE_CHECKING:` at the end of the module, so the type checker checks the class against its port. ``` Port w komunikacie to jedyna klasa, którą moduł importuje z modułu portu, jeśli jest dokładnie jedna; w przeciwnym razie `<Port>`. Kroki poprawki: zaimportować port pod `if TYPE_CHECKING:`; dodać linię; jeśli klasa jest pomocnicza, a nie adapterem, zmienić jej nazwę na `_Name` albo przenieść ją poza moduł adaptera.
+    - **Linia zgodności, która się wykonuje**, na tej linii: to samo przypisanie z adnotacją na poziomie modułu poza `if TYPE_CHECKING:` buduje adapter przy imporcie.
+    - **Adnotacja, która nie wskazuje portu**, na adnotacji, tylko gdy ustawiono `ports`: adnotacja nie rozwiązuje się przez importy pliku do klasy w jednym z tych modułów. Bez `ports` liczy się każda adnotacja oprócz `Any` i `object`.
+    - Opcje w `[tool.inwards.rules.adapter-conformance]`: `modules`, moduły adapterów (domyślnie moduły z segmentem `adapters`, tak jak INW014 domyślnie bierze segment `ports`); `ports`, selektory modułów portów; `allow-bases`, `extend-allow-bases` i `allow-decorators` z domyślnymi wartościami INW014, więc wyjątki, enumy, modele Pydantic, typed dicty, named tuple i dataclassy nie potrzebują linii; `check-tests`.
+    - Czego nie sprawdza: czy klasa pasuje do portu. To zadanie type checkera i powód, dla którego linia istnieje. Klasa może implementować kilka portów, po jednej linii na każdy; INW020 wymaga co najmniej jednej.
+    - Koszt: jedno parsowanie na plik adaptera, którego tekst zawiera `class`; żaden inny plik nie jest czytany, więc działa w hooku po każdej edycji i w edytorze.
+    - Opis architektury: `` - INW020 in `shop.infrastructure`: every adapter class ends its module with `_: Port = Adapter(...)` under `if TYPE_CHECKING:` ``.
+- **Moduły prywatne: nowa reguła INW021 `private-module`.** Kategoria imports, opt-in (pierwsza reguła opt-in w tej kategorii, więc zdanie „domyślnie włączone” w jej opisie dostaje wyjątek), błąd po włączeniu. Własna ścieżka modułu, której segment poniżej pakietu najwyższego poziomu zaczyna się od jednego podkreślenia (`app.users.services._user` albo cokolwiek pod `app.users._internal`), jest prywatna dla pakietu, który ten segment zawiera (`app.users.services`, `app.users`). INW021 zgłasza jej import z każdego modułu spoza tego pakietu; `__init__.py` pakietu, moduły sąsiednie i podpakiety mogą ją importować. Nazwy dunder (`__init__`, `__main__`) nie są prywatne. Zbiór importów jest taki jak w INW003: zwykłe, `from`, względne i z gwiazdką, importy w funkcjach i pod `TYPE_CHECKING` (taki import też wiąże importującego z prywatną ścieżką) oraz `from pkg import _x`, gdy `pkg._x` jest modułem. Import, który INW003 już zgłasza w tej samej linii, nie jest zgłaszany drugi raz.
+    - Komunikat: ``` `app.orders.api` imports `app.users.services._user`, a private module of `app.users.services`. A module whose name starts with `_` is for its own package; other code imports what the package's `__init__.py` re-exports. ```
+    - Poprawka: zaimportować nazwę z `app.users.services` i reeksportować ją w `app/users/services/__init__.py`, jeśli jeszcze jej tam nie ma; jeśli moduł ma służyć innym pakietom, zmienić jego nazwę na taką bez podkreślenia.
+    - Opcje: `modules` (gdzie reguła zgłasza) i `check-tests`. Testy są domyślnie pomijane: 32 z 42 diagnostyk w polar to testy sięgające do prywatnych modułów workera.
+    - Poza zakresem: prywatne *nazwy* (`from app.users.services import _helper`, gdy `_helper` jest funkcją) zostają Ruffowi. PLC2701 pomija je w obrębie jednego pakietu najwyższego poziomu, a inwards nie czyta nazw modułu docelowego. Prywatne moduły bibliotek zewnętrznych też należą do Ruffa.
+    - [#331](https://github.com/SirCypkowskyy/inwards/issues/331) (publiczne moduły kontekstów według konwencji podkreślenia) używa tej samej definicji prywatnego segmentu, więc obie zmiany się zgadzają, gdy działają razem.
+    - Opis architektury: `` - INW021: import a `_private` module only from inside its package; elsewhere import what the package's `__init__.py` re-exports ``.
+- **Wycinki CQRS: szablon w presecie `vertical-slices`, bez nowej reguły.** Szablon `slice` presetu dostaje `roles = ["models", "services", "commands | queries", "api"]`, `public = ["api"]` jak dotąd i `require = ["__init__", "api"]`; wpis warstwy `features` go używa, więc każda rola jest warstwą, a `commands` i `queries` są sąsiadami. INW001 zgłasza wtedy import `commands` w `queries` i odwrotnie jako import „from sibling layer”, z komunikatem i linią opisu architektury, które INW001 już ma. Preset włącza INW021 jako ostrzeżenie, bo `services/__init__.py` reeksportuje moduły prywatne. Tego, czy zapytanie coś zapisuje albo czy komenda zwraca dane, nie da się wyczytać z importów ani nazw, więc żadna reguła tego nie sprawdza.
+- **Presety dla portów i adapterów.** `clean` i `hexagonal` ustawiają w INW014 `interface = "protocol"` i `allow-subclassing = false` oraz włączają INW020 jako ostrzeżenie, z `modules` ustawionym na ich adaptery wyjściowe i `ports` na ich pakiet portów, tak jak dziś INW014 i INW015. Scaffoldy z [#406](https://github.com/SirCypkowskyy/inwards/issues/406) już stosują te konwencje, więc każdy scaffold dalej przechodzi sprawdzenie własnym presetem bez diagnostyk.
+- **Kody.** INW020 i INW021 to kolejne wolne kody (rejestr ma INW000 do INW019). Trafiają do rejestru razem z implementacją, nie wcześniej ([ADR-037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix)).
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Każdą konwencję da się włączyć osobno, a każda diagnostyka mówi, z której pochodzi: nazwą opcji w INW014, kodem reguły w pozostałych przypadkach.
+- :material-plus-circle-outline: Inwards sprawdza, że linia zgodności istnieje, a type checker sprawdza to, co ona mówi, więc żadne z narzędzi nie powtarza drugiego.
+- :material-plus-circle-outline: Każde nowe sprawdzenie działa na jednym pliku naraz, więc hook po edycji, edytor i MCP zgłaszają problem przy edycji, która go wprowadziła.
+- :material-minus-circle-outline: INW020 nie odróżni adaptera od klasy pomocniczej w module adaptera; klasa pomocnicza potrzebuje podkreślenia, dozwolonej bazy albo węższego `modules`. W korpusie to 1 z 10 klas, które reguła by zgłosiła (model kursora w polar na własnej bazie Pydantic).
+- :material-minus-circle-outline: Projekt, który celowo dziedziczy po portach, jak fastapi-clean-example we wszystkich 8 adapterach, dostaje 9 diagnostyk INW014 po ustawieniu `allow-subclassing = false` i 8 diagnostyk INW020 po włączeniu INW020; specyfikacja typowania dopuszcza ten styl, więc oba sprawdzenia są domyślnie wyłączone.
+- :material-minus-circle-outline: INW021 jest surowsza niż praktyka samego polar: 8 importów w jego kodzie i 2 w skryptach sięga do prywatnego modułu innego pakietu.
+- :material-minus-circle-outline: Gdy role wycinka stają się warstwami, komunikaty i opis architektury nazywają je `features.models` i tak dalej, a rola, której nie ma żaden wycinek, jest pustą warstwą (INW006), jak mówi [ADR-036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) dla każdego szablonu.
+
+**Alternatywy.**
+
+- *Nowa reguła dla portów tylko z Protocol:* sprawdzenie portów, które inaczej niż INW014 rozumie, czym jest port, byłoby mylące; opcja zostawia jedną regułę i jeden zakres.
+- *Rozpoznawać adaptery przez dopasowanie strukturalne do portów:* wymaga typów składowych z innych plików, czyli pracy type checkera; linia przekazuje tę pracę type checkerowi.
+- *Rozpoznawać adaptery po imporcie portu:* w tej konwencji port jest importowany tylko dla linii zgodności, więc brak linii zwykle oznacza też brak importu, a reguła przeoczyłaby dokładnie ten przypadek, dla którego istnieje.
+- *Liczyć jawne dziedziczenie jako deklarację zgodności:* specyfikacja mówi tylko, że type checker *może* ostrzec o składowej, której jawna podklasa nie ma, a konwencja właściciela i tak zabrania dziedziczenia.
+- *Moduły prywatne jako opcja INW003:* INW003 wymaga kontekstów; prywatność pakietu obowiązuje w każdym projekcie, z kontekstami albo bez.
+- *Zostawić moduły prywatne Ruffowi:* PLC2701 jest w preview i pomija każdy własny import z tego samego pakietu najwyższego poziomu, a to jest właśnie ten przypadek.
+- *Reguła dla `commands`/`queries`:* role sąsiednie już zabraniają tych importów, a reszty CQRS nie widać w importach.
+## ADR-047: TypeScript w pionowych wycinkach, przenoszony małymi PR-ami { #adr-047-typescript-in-vertical-slices-moved-one-small-pr-at-a-time }
+
+**Stan:** Przyjęty · 2026-10-11 · [#408](https://github.com/SirCypkowskyy/inwards/issues/408)
+
+**Kontekst.** Właściciel ustalił konwencje dla projektów w Pythonie w [#405](https://github.com/SirCypkowskyy/inwards/issues/405)–[#407](https://github.com/SirCypkowskyy/inwards/issues/407): pionowe wycinki według domen, pakiet `shared/` na to, co wycinki dzielą, minidomeny wewnątrz wycinka, te same nazwy modułów w każdym wycinku, moduły prywatne za publiczną fasadą, komendy i zapytania tam, gdzie wycinek ma jedno i drugie, oraz fabryki do składania zależności. Własny TypeScript Inwards powinien się ich trzymać. Inwards nie sprawdza TypeScriptu, więc kształtu muszą pilnować strefy fallow, Biome i testy architektury. Część kodu jest już pocięta na wycinki, reszta na poziome warstwy:
+
+| Pakiet | Już wycinek | Poziomo |
+|---|---|---|
+| `src/core` | każda reguła w `rules/` (13 folderów, 7 pojedynczych plików), `diagram/`, `baseline/`, `report/` | `contracts/`, `meta/`, `python/`, `lookup/` (używane wszędzie), `config/` (opcje każdej reguły), `engine/` (fasada i runner dla każdej rodziny reguł) |
+| `src/cli` | `claude-code/`, `session/`, `daemon/`, `lsp/`, `mcp/`, `runlog/`, `init/`, `project/` | `commands/` (17 modułów, po jednym na komendę, z każdej domeny), `adapters/` (27 modułów, I/O każdej domeny), `platform/`, `json/`, `paths/` |
+| `src/vscode-extension` | `src/client/` (3 pliki) | brak |
+
+Jedna funkcja CLI leży więc w trzech folderach: `inwards server` to `commands/server.ts`, `lsp/` i `adapters/lsp-connection.ts`. Żaden folder nie ma też publicznej fasady: moduł może zaimportować dowolny moduł folderu, na który pozwala mu strefa. W CLI granicę folderu przekracza około 260 linii importów, w silniku około 390. Wiele PR-ów zmienia `src/` naraz (reguły FastAPI w #401, scaffoldy w #406), więc przeniesienie wszystkiego w jednym PR kłóciłoby się z każdym z nich.
+
+**Decyzja.**
+
+- **Docelowa mapa silnika.** `index.ts` zostaje publicznym API. `contracts/`, `meta/`, `python/` i `lookup/` przechodzą do `shared/`, wspólnego jądra, którego może używać każdy wycinek. `config/`, `diagram/`, `baseline/` i `report/` są wycinkami. Każda reguła jest folderem w `rules/` (7 reguł z jednego pliku staje się folderami), a `rules/shared/` zostaje zestawem narzędzi rodziny reguł. `engine/` zostaje fasadą, razem z runnerami rodzin: kolejność reguł należy do silnika (`src/core/AGENTS.md`), a runnery używają `engine/stages.ts` oraz modułów INW000 i INW009, których reguła importować nie może.
+- **Docelowa mapa CLI.**
+
+    | Folder | Zawiera |
+    |---|---|
+    | `main.ts`, `compose.ts`, `deps.ts`, `usage.ts` | korzeń: argv i cykl życia procesu, składanie zależności (`compose.ts` przechodzi wyżej z `adapters/`), `AppDeps` i tekst pomocy (z `commands/`) |
+    | `shared/` | `platform/`, `json/`, `paths/` oraz `adapters/` z I/O używanym przez kilka wycinków (system plików, git, runtime, stdio, TOML, gramatyki, przechodzenie po plikach, typy `.d.ts`) |
+    | `check/` | dzisiejszy `project/`, komendy `check`, `check-runs` i `baseline`, adaptery `baseline-files` i `extraction-*`, `fingerprint` (z `session/`) i `CheckRunner` (z `session/contracts.ts`) |
+    | `hook/` | trzy minidomeny, `claude-code/`, `session/` i `daemon/`, do tego komendy `hook` i `daemon` oraz adaptery `daemon-*` i `state-files`; `claude-code/protocol.ts` staje się `hook/contracts.ts`, który importuje `eval/` |
+    | `runlog/` | dzisiejszy `runlog/`, komenda `stats`, adapter `export-files` |
+    | `init/` | dzisiejszy `init/`, komendy `context`, `import-config`, `import-diagram`, `diagram` i `append-table`, adaptery `init-files` i `picker` |
+    | `rules/` | komenda `rules`, `rule-sources`, `mcp/rule-page.ts`, adapter `rule-pages` |
+    | `lsp/` | dzisiejszy `lsp/`, komenda `server`, adapter `lsp-connection` |
+    | `mcp/` | dzisiejszy `mcp/`, komenda `mcp`, adapter `mcp-connection` |
+
+    Wycinki zależą od siebie w jedną stronę: `shared` pod wszystkim; `check` od `shared`; `runlog`, `rules` i `lsp` od `check`; `mcp` od `check` i `rules`; `hook` od `check` i `runlog`; `init` od `check` i `hook`. `commands/` i `adapters/` znikają.
+- **Rozszerzenie zostaje bez zmian.** `src/client/` to już jeden wycinek z trzema plikami.
+- **Nazwy powtarzane w każdym wycinku.**
+
+    | Nazwa | Znaczy | Pilnuje |
+    |---|---|---|
+    | `index.ts` | publiczna fasada wycinka lub minidomeny; tylko reeksporty | wzorzec modułów prywatnych niżej; „tylko reeksporty” sprawdza review |
+    | `_name.ts` | prywatny dla folderu, w którym leży | `noRestrictedImports` w Biome |
+    | `contracts.ts` | porty i rekordy, które wycinek posiada, publiczne (ta nazwa jest już w 6 folderach CLI) | test nazw |
+    | `cli.ts` | obsługa `inwards <komenda>` w wycinku CLI, zamiast `commands/` | test nazw |
+    | `adapters/` | I/O wycinka CLI; importuje je tylko korzeń, a `index.ts` wycinka nigdy ich nie reeksportuje | strefy fallow; resztę obejmuje zakaz I/O w Biome |
+    | `<minidomena>/` | podfolder z własnym `index.ts` i tymi samymi zasadami poziom niżej | test nazw |
+    | `commands/`, `queries/` | zapisy i odczyty tego samego stanu, tylko tam, gdzie wycinek ma jedno i drugie i rozchodzą się: `runlog/` (`record` wobec `runs`, `stats`, `export`) i `hook/session/` (rekord startu, kopie i świadek wobec starych błędów, wyciszeń i zmian układu); nigdzie indziej | Biome: `../commands/**` jest odrzucane, więc `queries/` nie zaimportuje `commands/` |
+    | `create*` | fabryka stanu na jedno wywołanie, eksportowana z `index.ts` wycinka (istnieją `createRunLog`, `createStartLookups` i `createTools`) | testy stanu w `architecture.test.ts` |
+    | `compose.ts` | jedyne miejsce, gdzie adaptery powstają i są składane (`nodePlatform`, `nodeDaemon`, `nodeLsp`, `nodeMcp`) | fallow: strefę `adapters` może importować tylko strefa korzenia |
+    | `shared/` | to, czego używa kilka wycinków; nie importuje żadnego wycinka | krawędzie stref fallow |
+
+    W silniku `index.ts` reguły eksportuje to, co wywołuje `engine/`, a jej moduły prywatne zachowują dzisiejsze powtarzane nazwy (`_check.ts`, `_wording.ts`, już w 8 folderach reguł).
+- **Jak pilnują tego narzędzia.**
+    - *Biome, moduły prywatne.* Każde nadpisanie, które ustawia `noRestrictedImports` dla `src/core/src/**` albo plików polityki CLI, dostaje ten wzorzec:
+
+        ```jsonc
+        "patterns": [
+          { "group": ["**/_*", "!./_*", "!../_*", "!../../_*"],
+            "message": "A module named _x.ts is private to its folder; import the slice's index.ts." }
+        ]
+        ```
+
+        `./_x.ts` (ten sam folder) i `../_x.ts` (z minidomeny do jej wycinka) przechodzą; `../check/_x.ts`, `./session/_x.ts` i `../../hook/_x.ts` nie. Ten eksperyment uruchomił go na Biome 2.5.15. Biome nie łączy opcji jednej reguły z kilku nadpisań: późniejsze nadpisanie, które ustawia `noRestrictedImports`, zastępuje wcześniejsze opcje dla plików, które obejmuje, więc wzorzec powtarza się w każdym takim nadpisaniu (w dwóch: silnika, które dziś nie ustawia `noRestrictedImports`, i polityki CLI). Testy leżą poza tymi nadpisaniami, więc test jednostkowy może importować moduły prywatne wycinka, któremu odpowiada.
+    - *Biome, barrele.* Grupa `performance` jest na poziomie błędu, więc `noBarrelFile` odrzuca każdy `index.ts`, który reeksportuje. Dziś jedno nadpisanie wyłącza tę regułę dla `src/core/src/index.ts`; jego `includes` rozszerza się do `src/*/src/**/index.ts`, z uzasadnieniem, że fasada wycinka jest barrelem celowo. `noReExportAll` zostaje włączone, więc `index.ts` wymienia to, co eksportuje.
+    - *Biome, I/O.* Nadpisanie polityki CLI zmienia się z listy folderów na `src/cli/src/**` bez `src/cli/src/*.ts` (korzeń) i `src/cli/src/**/adapters/**`, więc nowy folder dostaje zakaz I/O bez dopisywania go do listy. Nadpisanie silnika pod tym względem się nie zmienia.
+    - *Biome, komendy i zapytania.* Wzorzec `../commands/**` dołącza do listy, gdy zniknie własny folder `commands/` CLI (ostatni import korzenia z niego przenosi się w tym samym kroku).
+    - *fallow.* Jedna strefa na wycinek (`src/cli/src/check/**`) i, wpisana przed nią, bo wygrywa pierwsza pasująca strefa, jedna na adaptery wycinka (`src/cli/src/check/adapters/**`). Strefa wycinka pozwala na strefy `shared`, wycinki pod nim i strefy silnika; strefa adapterów pozwala na własny wycinek, `shared` i silnik; strefę adapterów może importować tylko strefa korzenia (`src/cli/src/*.ts`). fallow nie upilnuje modułów prywatnych: od wersji 3.31 ocenia import przez barrel według strefy modułu, który deklaruje symbol ([#262](https://github.com/SirCypkowskyy/inwards/issues/262)), więc strefa dla plików `_*.ts` odrzucałaby każdy import przez `index.ts`. Strefy zostają na poziomie wycinków, a specyfikator importu sprawdza Biome. `requireAllFiles` dalej odrzuca plik w folderze bez strefy. W silniku znikają wzorce reguł z jednego pliku (`rules/x.ts`), a przeniesienie jądra zmienia jego wzorce stref i listę dla `eval/` w `.fallow-core-api.jsonc`.
+    - *Testy architektury.* Sonda Biome: plik importujący `_x.ts` innego wycinka nie przechodzi, własny `_x.ts` przechodzi. Test nazw: w każdym przeniesionym wycinku każdy plik to `index.ts`, `contracts.ts`, `cli.ts`, `_*.ts` albo `*.d.ts`, a każdy podfolder ma `index.ts` albo jest `adapters/`. Lista przeniesionych wycinków w teście rośnie z każdym krokiem, więc folder jeszcze nieprzeniesiony nie zawodzi, a przeniesiony nie wróci do starego kształtu. Istniejące sondy stref i I/O dostają nowe ścieżki.
+    - *`check:cycles`* łapie moduł prywatny, który importuje `index.ts` własnego wycinka.
+- **Co się nie zmienia.** Eksporty `@inwards/core` (`test/api.test.ts` przechodzi bez zmian w każdym kroku); `inwards/diagnostics@1`, `inwards-daemon/1`, kody wyjścia, flagi CLI i treść snapshotów E2E; typy kontraktów (zmieniają się tylko ich pliki); osobne chunki dla `@clack/prompts`, SDK MCP i stron reguł, bo `compose.ts` zachowuje ich dynamiczny `import()`, a żaden `index.ts` nie reeksportuje adaptera; rozszerzenie; adresy stron reguł (zmienia się tylko `resource:` w ich front matter). Zakaz I/O w silniku oraz podział CLI na politykę i adaptery zostają tak samo ścisłe.
+- **Migracja.** Piętnaście małych PR-ów, każdy zielony sam w sobie, zgłoszonych jako pod-zadania [#7](https://github.com/SirCypkowskyy/inwards/issues/7), z których każde czeka na kroki, od których zależy. Najpierw egzekwowanie, które niczego nie zmienia; potem wycinki, których inne PR-y dotykają najmniej; najbardziej ruchliwe foldery (`project/`, hook, jądro CLI, jądro silnika) na końcu, każdy w spokojnym momencie, gdy kolejka PR-ów jest prawie pusta. PR z przeniesieniem to `git mv` plus przepisanie importów skryptem, więc rebase uruchamia skrypt ponownie zamiast ręcznie łączyć importy.
+
+    | Krok | Co się przenosi | Ryzyko | Rozmiar | Zadanie |
+    |---|---|---|---|---|
+    | 1 | Nic: wzorce Biome, wyjątek dla barreli, nowe `includes` nadpisania I/O, sonda i test nazw z pustą listą | niskie: tylko konfiguracja i testy | S | [#417](https://github.com/SirCypkowskyy/inwards/issues/417) |
+    | 2 | `lsp/` w CLI z `server` i `lsp-connection`, pierwszy `cli.ts` i `adapters/` wycinka | niskie | S | [#418](https://github.com/SirCypkowskyy/inwards/issues/418) |
+    | 3 | `mcp/` w CLI z `mcp` i `mcp-connection` | niskie | S | [#419](https://github.com/SirCypkowskyy/inwards/issues/419) |
+    | 4 | `rules/` w CLI: `rules`, `rule-sources`, `rule-page`, `rule-pages` | niskie; po kroku 3 | S | [#420](https://github.com/SirCypkowskyy/inwards/issues/420) |
+    | 5 | `runlog/` w CLI ze `stats` i `export-files`, podzielony na `commands/` i `queries/`; najpierw `fingerprint` przechodzi do `project/` | niskie | S | [#421](https://github.com/SirCypkowskyy/inwards/issues/421) |
+    | 6 | Silnik: 7 reguł z jednego pliku staje się folderami; `resource:` ich stron (EN i PL) | niskie | S | [#422](https://github.com/SirCypkowskyy/inwards/issues/422) |
+    | 7 | Silnik: każdy folder reguły poza `fastapi/` dostaje `index.ts` i nazwy z `_`; `engine/` importuje fasady | średnie: każdy otwarty PR z regułą | M | [#423](https://github.com/SirCypkowskyy/inwards/issues/423) |
+    | 8 | Silnik: `config/`, `diagram/`, `baseline/`, `report/` dostają `index.ts` i nazwy z `_` | średnie: około 100 linii importów | M | [#424](https://github.com/SirCypkowskyy/inwards/issues/424) |
+    | 9 | `init/` w CLI z pięcioma komendami i dwoma adapterami; nazwy z `_` w 34 modułach | średnie; po scaleniu #406 | M | [#425](https://github.com/SirCypkowskyy/inwards/issues/425) |
+    | 10 | Silnik: `rules/fastapi/` jako wycinek z minidomeną `model/` | średnie; po scaleniu #401 | M | [#426](https://github.com/SirCypkowskyy/inwards/issues/426) |
+    | 11 | `project/` w CLI staje się `check/` z komendami, adapterami i `CheckRunner` | wysokie: około 50 linii importów, wejście wątku roboczego w `main.ts` i budowanie binarki | M | [#427](https://github.com/SirCypkowskyy/inwards/issues/427) |
+    | 12 | `hook/` w CLI z `claude-code/` i `session/` (podzielonym na `commands/` i `queries/`); `protocol.ts` staje się `hook/contracts.ts` | wysokie: snapshoty E2E hooka i `eval/` | M | [#428](https://github.com/SirCypkowskyy/inwards/issues/428) |
+    | 13 | `hook/daemon/` w CLI z komendą `daemon` i adapterami `daemon-*` | średnie | S | [#429](https://github.com/SirCypkowskyy/inwards/issues/429) |
+    | 14 | `shared/` i korzeń CLI; znikają `commands/` i `adapters/`; wzorzec `../commands/**` | wysokie: około 120 linii importów | M | [#430](https://github.com/SirCypkowskyy/inwards/issues/430) |
+    | 15 | Jądro silnika do `shared/` | wysokie: około 240 linii importów; można go pominąć osobno | M | [#431](https://github.com/SirCypkowskyy/inwards/issues/431) |
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Funkcja CLI leży w jednym folderze: `inwards server` to `lsp/` (polityka, obsługa komendy i adapter), a jego testy to `test/lsp/`.
+- :material-plus-circle-outline: Powierzchnią wycinka jest jego `index.ts`, więc moduł prywatny można zmienić bez przeszukiwania innych folderów.
+- :material-plus-circle-outline: Repozytorium używa tych samych nazw, których uczą scaffoldy ([#406](https://github.com/SirCypkowskyy/inwards/issues/406)).
+- :material-plus-circle-outline: Nowy folder CLI dostaje zakaz I/O od razu, a nie dopiero gdy ktoś go dopisze.
+- :material-minus-circle-outline: Około 650 linii importów zostaje przepisanych w 15 PR-ach, a otwarty PR, który zmienia przeniesiony plik, robi rebase przez zmianę nazwy. `git log --follow` śledzi przeniesienia; blame przez mocno zmieniony plik może się zgubić.
+- :material-minus-circle-outline: `.fallowrc.jsonc` dostaje około 8 stref adapterów, a każda lista dozwolonych stref adaptera dalej powtarza strefy silnika.
+- :material-minus-circle-outline: Wzorzec modułów prywatnych powtarza się w każdym nadpisaniu Biome, które ustawia `noRestrictedImports`; nowe nadpisanie bez niego wyłącza sprawdzanie dla swoich plików, a sonda obejmuje tylko foldery, które sprawdza.
+- :material-minus-circle-outline: `noBarrelFile` jest wyłączone dla każdego `index.ts`, więc fasada wycinka kosztuje Buna tyle co barrel: import jednej nazwy ładuje cały wycinek. CLI to jeden bundle, więc liczy się tylko praca przy starcie wewnątrz wycinka, a osobne chunki zostają osobne.
+- :material-minus-circle-outline: Zasadę „`index.ts` tylko reeksportuje” sprawdza review; żadne narzędzie jej nie pilnuje.
+- :material-minus-circle-outline: Każdy krok zmienia też mapę kodu w rozdziale 3, przewodnik pakietu (pliki `AGENTS.md` mają jednego właściciela naraz) i, przy regułach, `resource:` na maksymalnie 28 stronach reguł w obu językach.
+
+**Alternatywy.**
+
+- *Przenieść wszystko w jednym PR:* kłóci się z każdym otwartym PR-em w `src/` i wymaga jednego review około 400 plików.
+- *Zostawić `commands/` i `adapters/` i tylko dodać pliki `index.ts`:* taniej, ale funkcja dalej leży w trzech folderach.
+- *Pilnować modułów prywatnych strefami fallow:* fallow rozwiązuje import przez barrel do strefy modułu, który deklaruje symbol, więc nie odróżni barrela od bezpośredniego importu.
+- *„Importuj tylko `index.ts`” zamiast nazw z `_`:* bez zmian nazw, ale wzorzec Biome musiałby wymieniać jako wyjątki każdy folder jądra i `contracts.ts`, i różniłby się od konwencji dla Pythona.
+- *Przenieść runnery rodzin z silnika do wycinków reguł:* potrzebują `engine/stages.ts` i modułów dwóch innych reguł, których reguła importować nie może.
+- *Podzielić `meta/registry.ts` na wpis w każdym wycinku reguły:* rejestr jest jedną tabelą celowo (`biome.jsonc` mówi dlaczego), a reportery, SARIF i sprawdzanie dokumentacji czytają go w całości.
+- *Zostawić jądro silnika na najwyższym poziomie:* oszczędza około 240 linii importów, ale zostawia drugą nazwę dla tej samej idei; to ostatni krok, więc właściciel może go pominąć osobno.
