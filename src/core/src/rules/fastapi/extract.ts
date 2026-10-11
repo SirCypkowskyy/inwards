@@ -165,14 +165,14 @@ function counts(app: string, method: string, context: Context, found: Found): bo
  * @returns the app or router record, its keywords read from the call.
  */
 function objectOf(binding: RouterBinding, context: Context): FastApiObject {
-  const { assignment, local, call, kind, factory } = binding;
+  const { assignment, local, call, kind, factory, custom } = binding;
   const topLevel = assignment.parent?.parent?.type === "module";
   const syntax = callSyntax(call, context.qualify);
   // An app's `**kwargs` that only carries `exception_handlers` hides no other keyword (#242).
   const splat = factory || (syntax.splat && !(kind === "app" && splatsOnlyHandlers(call)));
   const keywords = factory ? new Map() : syntax.keywords;
   const name = `${context.file.module}.${local}`;
-  return { kind, name, local, topLevel, node: call, keywords, splat, factory };
+  return { kind, name, local, topLevel, node: call, keywords, splat, factory, custom };
 }
 
 /**

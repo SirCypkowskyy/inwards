@@ -321,15 +321,15 @@ What the false positives were, and what is left:
 | FAPI002, Polar and fastapi-clean-example | as above | 0 → 0 | n/a | n/a |
 | INW012, Polar (no `decorators`) | 1 → 526 | 1 → 135 | 27, every fifth | 10 of 27 (37 %) |
 | INW012, fastapi-clean-example | 4 → 15 | 0 → 0 | n/a | no findings |
-| FAPI003, Polar | as above | 0 → 72 (warnings) | all | none true |
-| FAPI005, Polar | as above | 0 → 2 | all | none true |
+| FAPI003, Polar | as above | 0 → 0 (72 warnings before the fix below) | all | n/a |
+| FAPI005, Polar | as above | 0 → 0 (2 before the fix below) | all | n/a |
 
 full-stack-fastapi-template and python-ddd didn't change, and Saleor wasn't rerun. What the new findings are:
 
 - **FAPI001.** 96 of Polar's 131 are on routes tagged `APITag.private`, which Polar's route class keeps out of its production schema ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)). Of the 35 on public routes, 10 are false: 4 CSV exports and 6 OAuth2 endpoints whose bodies RFCs define. fastapi-clean-example's 11 were routes with `description=getdoc(...)`; FastAPI reads a docstring only when `description=` is absent ([Path Operation Configuration](https://fastapi.tiangolo.com/tutorial/path-operation-configuration/)), so `description=` now counts as one. A router that every followed inclusion puts under a `FastAPI(openapi_url=None)` app stays hidden when another inclusion can't be followed; without that, Polar's back office added 115 false findings.
 - **FAPI002.** Still silent on both: Polar includes its API router through a parameter of `add_versioned_routers(app, api_router, ...)` and some routers through factory calls, and fastapi-clean-example includes every router through a factory call, so the inclusions above their routes are unknown ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)).
 - **INW012.** 107 of Polar's 135 findings are in the back office; the 17 false ones in the sample are 15 server-rendered pages and HTMX form handlers there, a server-sent event stream and a webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
-- **FAPI003, FAPI005.** The same unknown inclusions make FAPI003 warn that 72 of Polar's routers are unmounted, each with the caveat that names the call it can't follow ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)); `unresolved-includes = "silent"` turns those off. FAPI005's 2 are routes Polar's route class dispatches by API version ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+- **FAPI003, FAPI005.** Recognising more routers first added false alarms: FAPI003 warned that 72 of Polar's routers were unmounted, because the same unknown inclusions hide how they are wired ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)), and FAPI005 reported 2 routes Polar's route class dispatches by API version ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)). A router a first-party class or factory builds is now unknown to both: FAPI003 skips it while an inclusion it can't follow could include it or a router above it (a factory call only the routers that factory returns, any other target any router), and FAPI005 doesn't read its route order. Routers FastAPI's own constructor builds keep the older answers.
 
 The cost, from source on the laptop above, median of 3 cold runs on Polar with one rule on: INW012 1,118 → 1,401 ms, FAPI001 1,195 → 1,457 ms, FAPI002 1,188 → 1,725 ms (base `develop` at c38c5ae), for the 525 more path operations each rule now reads.
 

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: c59862e27e6d7bb29d27d90821d3e563ce5f2d9ad6e3fc043722770d0a9ff1b9
+source_hash: 2e69a542a5616f4c99894505137eeceb0546333137db7e97034f25317b5abb39
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -326,15 +326,15 @@ Czym były fałszywe alarmy i co zostało:
 | FAPI002, Polar i fastapi-clean-example | jak wyżej | 0 → 0 | n/d | n/d |
 | INW012, Polar (bez `decorators`) | 1 → 526 | 1 → 135 | 27, co piąte | 10 z 27 (37 %) |
 | INW012, fastapi-clean-example | 4 → 15 | 0 → 0 | n/d | brak zgłoszeń |
-| FAPI003, Polar | jak wyżej | 0 → 72 (ostrzeżenia) | wszystkie | żadne trafne |
-| FAPI005, Polar | jak wyżej | 0 → 2 | wszystkie | żadne trafne |
+| FAPI003, Polar | jak wyżej | 0 → 0 (72 ostrzeżenia przed poprawką opisaną niżej) | wszystkie | n/d |
+| FAPI005, Polar | jak wyżej | 0 → 0 (2 przed poprawką opisaną niżej) | wszystkie | n/d |
 
 full-stack-fastapi-template i python-ddd się nie zmieniły, a Saleora nie uruchamiano ponownie. Czym są nowe zgłoszenia:
 
 - **FAPI001.** 96 ze 131 zgłoszeń w Polarze dotyczy tras z tagiem `APITag.private`, które klasa tras Polara trzyma poza schematem produkcyjnym ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)). Z 35 na trasach publicznych 10 to fałszywe alarmy: 4 eksporty CSV i 6 endpointów OAuth2, których treść odpowiedzi definiują RFC. 11 zgłoszeń w fastapi-clean-example to trasy z `description=getdoc(...)`; FastAPI czyta docstring tylko wtedy, gdy nie ma `description=` ([Path Operation Configuration](https://fastapi.tiangolo.com/tutorial/path-operation-configuration/)), więc `description=` liczy się teraz jak docstring. Router, który każde śledzone dołączenie umieszcza pod aplikacją `FastAPI(openapi_url=None)`, pozostaje ukryty, gdy innego dołączenia nie da się prześledzić; bez tego back office Polara dodałby 115 fałszywych alarmów.
 - **FAPI002.** Nadal milczy w obu: Polar dołącza swój router API przez parametr `add_versioned_routers(app, api_router, ...)`, a część routerów przez wywołania fabryk, fastapi-clean-example zaś dołącza każdy router przez wywołanie fabryki, więc dołączenia nad ich trasami są nieznane ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)).
 - **INW012.** 107 ze 135 zgłoszeń w Polarze leży w back office; 17 fałszywych alarmów w próbie to 15 stron renderowanych na serwerze i handlerów formularzy HTMX w back office, strumień zdarzeń wysyłanych przez serwer i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)).
-- **FAPI003, FAPI005.** Te same nieznane dołączenia sprawiają, że FAPI003 ostrzega, że 72 routery Polara są niepodpięte, każde z zastrzeżeniem, które podaje wywołanie, którego nie umie prześledzić ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)); `unresolved-includes = "silent"` je wyłącza. 2 zgłoszenia FAPI005 to trasy, które klasa tras Polara rozdziela według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+- **FAPI003, FAPI005.** Rozpoznanie większej liczby routerów najpierw dodało fałszywe alarmy: FAPI003 ostrzegało, że 72 routery Polara są niepodpięte, bo te same nieznane dołączenia ukrywają, jak są podpięte ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)), a FAPI005 zgłaszało 2 trasy, które klasa tras Polara rozdziela według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)). Router zbudowany przez własną klasę albo fabrykę jest teraz dla obu reguł nieznany: FAPI003 go pomija, dopóki dołączenie, którego nie umie prześledzić, mogłoby dołączyć jego albo router nad nim (wywołanie fabryki tylko routery, które ta fabryka zwraca, każdy inny cel dowolny router), a FAPI005 nie czyta kolejności jego tras. Routery z konstruktora FastAPI zachowują wcześniejsze odpowiedzi.
 
 Koszt, ze źródeł na laptopie opisanym wyżej, mediana 3 zimnych uruchomień na Polarze z jedną regułą: INW012 1118 → 1401 ms, FAPI001 1195 → 1457 ms, FAPI002 1188 → 1725 ms (baza: `develop` w c38c5ae), za 525 operacji ścieżki więcej, które każda reguła teraz czyta.
 

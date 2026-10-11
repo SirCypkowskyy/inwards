@@ -94,6 +94,56 @@ router = ${factory}("/orders")
 ${FAT}`;
 }
 
+/**
+ * Checks a project with FAPI003 on and lists where it reports.
+ *
+ * @param files - file texts by path; `app/__init__.py` is added.
+ * @returns `path:line` for each FAPI003 finding.
+ */
+async function lines(files: Readonly<Record<string, string>>): Promise<string[]> {
+  const diagnostics = await checkProject(
+    { "app/__init__.py": "", ...files },
+    '[tool.inwards.rules]\nextend-select = ["FAPI003"]',
+  );
+  return diagnostics.filter((d) => d.code === "FAPI003").map((d) => `${d.file}:${d.line}`);
+}
+
+/**
+ * Writes a router module that declares one method and path twice, as Polar's versioned routes do.
+ *
+ * @param head - the import that brings `APIRouter` in.
+ * @returns the module.
+ */
+function twice(head: string): string {
+  return `${head}
+
+router = APIRouter()
+
+
+@router.post("/endpoints", summary="Create")
+async def create() -> int: ...
+
+
+@router.post("/endpoints", summary="Create v2")
+async def create_v2() -> int: ...
+`;
+}
+
+/**
+ * Counts FAPI005's findings on a project whose `app/orders.py` is given.
+ *
+ * @param orders - the router module.
+ * @returns how many FAPI005 findings there are.
+ */
+async function shadowed(orders: string): Promise<number> {
+  const files = { "app/__init__.py": "", "app/kit.py": KIT, "app/routing.py": ROUTING };
+  const diagnostics = await checkProject(
+    { ...files, "app/orders.py": orders },
+    '[tool.inwards.rules]\nextend-select = ["FAPI005"]',
+  );
+  return diagnostics.filter((d) => d.code === "FAPI005").length;
+}
+
 describe("routers built at run time (#358)", () => {
   test("a first-party `APIRouter = <call>` builds routers in the modules that import it", async () => {
     // The router module never names fastapi, as Polar's `customer_portal/endpoints/__init__.py`.
@@ -242,7 +292,7 @@ def make_twice(prefix: str):
     return make_router(prefix)
 `;
     const files = { "app/factories.py": factories };
-    const [router, named, twice] = await Promise.all(
+    const [router, named, twoHops] = await Promise.all(
       ["make_router", "make_named", "make_twice"].map((factory) =>
         found({ ...files, "app/orders.py": ordersFrom(factory) }),
       ),
@@ -250,7 +300,7 @@ def make_twice(prefix: str):
     expect(router).toEqual(["FAPI001 app/orders.py:7", "INW012 app/orders.py:8"]);
     expect(named).toEqual(["FAPI001 app/orders.py:7", "INW012 app/orders.py:8"]);
     // A factory that calls another factory is two hops: not followed.
-    expect(twice).toEqual([]);
+    expect(twoHops).toEqual([]);
   });
 
   test("routes declared inside a router factory report", async () => {
@@ -287,5 +337,61 @@ app.include_router(make_orders_router())
     // Without the annotation nothing says the wrapper's result is a router.
     const bare = orders.replace(" -> APIRouter:", ":");
     expect(await found({ ...files, "app/orders.py": bare })).toEqual([]);
+  });
+
+  test("an unfollowable inclusion makes a newly recognised router unknown to FAPI003", async () => {
+    // Polar: `add_versioned_routers(app, api_router)` and `include_router(get_oauth_login_router())`.
+    const orders = `from app.routing import APIRouter
+
+router = APIRouter(prefix="/orders")
+
+
+@router.get("/", summary="List")
+async def list_orders() -> list[int]: ...
+`;
+    const factory = `from app.routing import APIRouter
+
+
+def make_auth_router() -> APIRouter:
+    router = APIRouter(prefix="/auth")
+
+    @router.get("/login", summary="Log in")
+    async def login() -> int: ...
+
+    return router
+`;
+    const viaParameter = `from fastapi import FastAPI
+
+from app import orders
+
+
+def wire(app: FastAPI, api_router) -> None:
+    app.include_router(api_router)
+
+
+app = FastAPI()
+wire(app, orders.router)
+`;
+    const viaFactory = `from fastapi import FastAPI
+
+from app.auth import make_auth_router
+
+app = FastAPI()
+app.include_router(make_auth_router())
+`;
+    const base = { "app/kit.py": KIT, "app/routing.py": ROUTING, "app/auth.py": factory };
+    expect(await lines({ ...base, "app/orders.py": orders, "app/main.py": viaParameter })).toEqual(
+      [],
+    );
+    // Only the factory's own router could be the target: a router nothing includes still reports.
+    expect(await lines({ ...base, "app/orders.py": orders, "app/main.py": viaFactory })).toEqual([
+      "app/orders.py:3",
+    ]);
+  });
+
+  test("FAPI005 doesn't read route order on a router a first-party class builds", async () => {
+    // Polar's VersionedAPIRoute dispatches two routes with one method and path by API version.
+    expect(await shadowed(twice("from app.routing import APIRouter"))).toBe(0);
+    expect(await shadowed(twice("from fastapi import APIRouter"))).toBe(1);
   });
 });

@@ -26,6 +26,13 @@ export interface FastApiObject extends CallSyntax {
   readonly topLevel: boolean;
   /** True when a first-party factory built it (#358): its call's keywords are the factory's, so they are left out. */
   readonly factory: boolean;
+  /**
+   * True when a first-party router class or factory built it (#358), not
+   * FastAPI's own constructor. Such a class may set its own `route_class`
+   * and may be wired in ways the graph can't follow, so FAPI003 and FAPI005
+   * treat what they can't see about it as unknown.
+   */
+  readonly custom: boolean;
 }
 
 /** A path operation: `@router.get("/path", ...)` on a function, or `@app.api_route(...)`. */

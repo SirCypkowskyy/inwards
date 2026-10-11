@@ -103,6 +103,8 @@ export interface RouterBinding {
   readonly kind: RouterKind;
   /** True when a factory built it, so the call's keywords aren't the router's. */
   readonly factory: boolean;
+  /** True when a first-party class or factory built it, not FastAPI's own constructor. */
+  readonly custom: boolean;
 }
 
 /**
@@ -355,13 +357,13 @@ function bindingOf(
   const local = identifierName(left);
   const own = inner ? undefined : FASTAPI_CONSTRUCTORS.get(name);
   if (own !== undefined) {
-    return { assignment, local, call, kind: own, factory: false };
+    return { assignment, local, call, kind: own, factory: false, custom: false };
   }
   if (!(used.has(local) && kinds)) {
     return null;
   }
   const built = inner ? kinds.builtByClassOf(name) : kinds.builtBy(name);
-  return built ? { assignment, local, call, ...built } : null;
+  return built ? { assignment, local, call, ...built, custom: true } : null;
 }
 
 /**
@@ -417,6 +419,6 @@ function annotatedReturns(root: Node, qualify: Qualify, kinds: RouterKinds): Rou
     const names = returnedNames(fn);
     return ownCallBindings(fn)
       .filter(({ local }) => names.has(local))
-      .map(({ local, call, assignment }) => ({ assignment, local, call, kind, factory: true }));
+      .map((binding) => ({ ...binding, kind, factory: true, custom: true }));
   });
 }
