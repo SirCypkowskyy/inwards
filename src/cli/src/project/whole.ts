@@ -2,7 +2,7 @@
  * @file The checks only a whole-project run of `inwards check` makes, besides
  * the engine's own pass over the files: the config against the modules found
  * (INW006, INW007, rule options), nested projects and symlinks in layers
- * (INW006), the marked diagrams `diagrams` lists (INW017) and the required
+ * (INW006), the marked diagrams `diagrams` lists (INW017, INW018) and the required
  * members of every shaped package (INW008). All reading goes through the
  * injected `ProjectIo`; the engine decides every finding.
  */
@@ -25,7 +25,7 @@ import {
 } from "@inwards/core";
 import { posix } from "../paths/lexical.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { readDiagrams } from "./diagrams.ts";
+import type { ListedDiagrams } from "./diagrams.ts";
 import { layerLinks, linksUnder } from "./links.ts";
 
 /** What these checks need of a loaded project. */
@@ -42,8 +42,8 @@ interface WholeProject {
  * Runs the checks only a whole-project run makes, besides the engine's own:
  * the layer prefixes, shape selectors and rule options against the modules
  * found (INW006, INW007), nested projects and symlinks in layers (INW006),
- * the marked diagrams `diagrams` lists (INW017), and every shaped package's
- * required members (INW008).
+ * the marked diagrams `diagrams` lists (INW017, INW018), and every shaped
+ * package's required members (INW008).
  *
  * @param io - probes, walks and reads the project.
  * @param project - the loaded project.
@@ -52,11 +52,9 @@ interface WholeProject {
  * @param run.listing - the listing the index was built on.
  * @param run.base - directory that report paths are made relative to.
  * @param run.shownRoot - the config root as report paths show it.
- * @param run.texts - content to read instead of what is on disk, by absolute
- *   path: a listed diagram open in the editor is checked as it reads there.
+ * @param run.diagrams - the diagram files `readDiagrams` read, and the entries that matched none.
  * @returns the findings about the config and the diagrams (reported first),
  *   and the missing members (reported last).
- * @throws when a listed diagram can't be read.
  */
 export function wholeProjectFindings(
   io: ProjectIo,
@@ -66,20 +64,19 @@ export function wholeProjectFindings(
     listing,
     base,
     shownRoot,
-    texts,
+    diagrams,
   }: {
     files: readonly SourceFile[];
     listing: ProjectFiles;
     base: string;
     shownRoot: string;
-    texts: ReadonlyMap<string, string> | undefined;
+    diagrams: ListedDiagrams;
   },
 ): { config: Diagnostic[]; required: Diagnostic[] } {
   const modules = new Set(files.map((file) => file.module));
   const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
   const paths = files.map(rootPathOf);
   const packages = packagesOf(paths);
-  const diagrams = readDiagrams(io, project.configPath, project.config, { base, texts });
   return {
     config: [
       ...checkPrefixes(project.config, modules, pyproject),

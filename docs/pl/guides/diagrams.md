@@ -1,15 +1,15 @@
 ---
 source: docs/chapters/guides/diagrams.md
-source_hash: 24f137e462e83d226926f25b308e02b76b14da30420afcf9c2633120097c2b30
+source_hash: 8ddca8c31ebd01c7af29beae096fbc2d892bf29875a0bdd2a97c4b019c97651c
 ---
 
 # Diagramy architektury { #architecture-diagrams }
 
 Inwards trzyma rysunek architektury w Mermaid albo PlantUML w zgodzie z `[tool.inwards]`, w obie strony ([ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config)):
 
-- **Dokumentacja idzie za kodem.** [INW017](../rules/INW017.md) zgłasza nazwę w diagramie, której nie zna konfiguracja albo kod, a [INW018](../rules/INW018.md) strzałkę, która rysuje import zabroniony przez konfigurację.
-- **Dokumentacja steruje kodem.** `inwards import-diagram` zamienia diagram w pierwszą `[tool.inwards]`, jeden raz. Od tej chwili obie reguły trzymają je w zgodzie.
-- **Konfiguracja rysuje dokumentację.** `inwards diagram` wypisuje `[tool.inwards]` jako oznaczony diagram, który obie reguły akceptują, a `import-diagram` odczytuje z powrotem ([Narysuj konfigurację](#diagram)).
+- **Dokumentacja idzie za kodem.** [INW017](../rules/INW017.md) zgłasza nazwę w diagramie, której nie zna konfiguracja albo kod, [INW018](../rules/INW018.md) strzałkę, która rysuje import zabroniony przez konfigurację, a [INW019](../rules/INW019.md) import w kodzie, którego diagram nie rysuje.
+- **Dokumentacja steruje kodem.** `inwards import-diagram` zamienia diagram w pierwszą `[tool.inwards]`, jeden raz. Od tej chwili reguły trzymają je w zgodzie.
+- **Konfiguracja rysuje dokumentację.** `inwards diagram` wypisuje `[tool.inwards]` jako oznaczony diagram, który INW017 i INW018 akceptują, a `import-diagram` odczytuje z powrotem ([Narysuj konfigurację](#diagram)).
 
 `[tool.inwards]` pozostaje jedynym źródłem prawdy: diagram nigdy nie jest czytany jako konfiguracja w czasie sprawdzania.
 
@@ -71,10 +71,10 @@ Wymień pliki i włącz reguły:
 diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 
 [tool.inwards.rules]
-extend-select = ["INW017", "INW018"]
+extend-select = ["INW017", "INW018", "INW019"]
 ```
 
-Obie reguły dają ostrzeżenia, więc rysunek, który się rozjechał, nie blokuje Stop gate agenta; `severity = { INW017 = "error", INW018 = "error" }` sprawia, że blokują. Działają wszędzie tam, gdzie sprawdzany jest wymieniony diagram:
+Wszystkie trzy dają ostrzeżenia, więc rysunek, który się rozjechał, nie blokuje Stop gate agenta; `severity = { INW017 = "error", INW018 = "error" }` sprawia, że blokują. Działają wszędzie tam, gdzie sprawdzany jest wymieniony diagram:
 
 - **Sprawdzenie całego projektu**: `inwards check` bez ścieżek albo Stop gate z `stop-gate = "project"`. Tylko ono zgłasza wpis `diagrams`, do którego nie pasuje żaden plik.
 - **Plik podany z nazwy**: `inwards check docs/architecture.md`. Plik Markdown, Mermaid albo PlantUML, którego klucz nie wymienia, nie jest sprawdzany, a raport to mówi.
@@ -83,6 +83,8 @@ Obie reguły dają ostrzeżenia, więc rysunek, który się rozjechał, nie blok
 - **[MCP `check_files`](mcp.md#check_files)**, przez ścieżkę albo jako tekst w `contents`.
 
 Domyślny zakres Stop gate (`stop-gate = "changed"`) sprawdza pliki Pythona zmienione w sesji i żadnych diagramów. Ostrzeżenie nigdy nie blokuje, więc domyślnie nie ma czego pilnować; gdy reguły podniesiesz do błędów, diagram zepsuty przez agenta zablokował już własną edycję, a `stop-gate = "project"` sprawdza dodatkowo przy Stop każdy wymieniony diagram. Edycja kodu Pythona nie sprawdza diagramu ponownie: pakiet przemianowany w kodzie pojawi się na rysunku przy następnym sprawdzeniu całego projektu, w CI albo przy Stop z zakresem projektu.
+
+INW019 porównuje diagram z importami, które zbiera uruchomienie: w diagramie warstw import rysuje ścieżka strzałek, w diagramie kontekstów potrzebna jest bezpośrednia strzałka, a import pod `if TYPE_CHECKING:` się liczy. Działa tylko przy sprawdzaniu całego projektu, bo jeden edytowany albo podany plik nie pokazuje importów reszty projektu.
 
 ## Zacznij od diagramu { #import-diagram }
 
@@ -353,6 +355,7 @@ Czym Inwards się różni:
 - **Tylko flowcharty Mermaid i diagramy komponentów PlantUML.** Diagramy C4, `architecture-beta` i inne rodzaje diagramów PlantUML nie są czytane.
 - **PlantUML jest czytany linia po linii.** Instrukcja rozbita na kilka linii (opis komponentu, który przechodzi do następnej linii) nie jest śledzona, a połączenie z komponentem przez jego wyświetlaną nazwę zamiast aliasu nazywa inny węzeł.
 - **To, czego diagram nie wyrazi, zostaje poza tabelą.** Listy bibliotek, kształty, selektory inne niż etykieta węzła, opcje reguł i `ignore` dopisuje się ręcznie po imporcie.
-- **Importy, których diagram nie rysuje**, nie są jeszcze zgłaszane; to będzie INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
+- **Importy, których diagram nie rysuje**, zgłasza [INW019](../rules/INW019.md), tylko przy sprawdzaniu całego projektu, nigdy przy edycji.
+- **Importy między warstwami i kontekstami, nie modułami.** INW019 nie porównuje strzałki między dwoma węzłami modułów wewnątrz jednego kontekstu z importami między tymi modułami.
 - **Edycja kodu nie sprawdza diagramów.** Hook i edytor sprawdzają diagram, gdy jest edytowany; zmiana nazwy w kodzie Pythona dociera do rysunku przy następnym sprawdzeniu całego projektu.
 - **Ścieżki są porównywane tak, jak je zapisano.** Wpis `diagrams` jest porównywany ze ścieżką, którą podaje agent albo edytor, z wielkością liter włącznie, więc na systemie plików bez rozróżniania wielkości liter (macOS, Windows) `Docs/Architecture.md` nie pasuje w hooku ani w edytorze do `docs/architecture.md`. Sprawdzenie całego projektu przechodzi po dysku i tego problemu nie ma.

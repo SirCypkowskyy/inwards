@@ -2,9 +2,9 @@
 
 Inwards keeps a Mermaid or PlantUML drawing of your architecture in step with `[tool.inwards]`, in both directions ([ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config)):
 
-- **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, and [INW018](../rules/INW018.md) an arrow that draws an import the config forbids.
-- **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the two rules keep them in step.
-- **The config draws the docs.** `inwards diagram` prints `[tool.inwards]` as a marked diagram that the two rules accept and `import-diagram` reads back ([Draw the config](#diagram)).
+- **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, [INW018](../rules/INW018.md) an arrow that draws an import the config forbids, and [INW019](../rules/INW019.md) an import in the code that the diagram doesn't draw.
+- **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the rules keep them in step.
+- **The config draws the docs.** `inwards diagram` prints `[tool.inwards]` as a marked diagram that INW017 and INW018 accept and `import-diagram` reads back ([Draw the config](#diagram)).
 
 `[tool.inwards]` stays the only source of truth: a diagram is never read as config while checking.
 
@@ -66,10 +66,10 @@ List the files and turn the rules on:
 diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 
 [tool.inwards.rules]
-extend-select = ["INW017", "INW018"]
+extend-select = ["INW017", "INW018", "INW019"]
 ```
 
-Both are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. They run wherever a listed diagram is checked:
+All three are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. They run wherever a listed diagram is checked:
 
 - **A whole-project run**: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`. Only this run reports a `diagrams` entry that matches no file.
 - **A named file**: `inwards check docs/architecture.md`. A Markdown, Mermaid or PlantUML file the key doesn't list isn't checked, and the report says so.
@@ -78,6 +78,8 @@ Both are warnings, so a drawing that drifted doesn't block an agent's Stop gate;
 - **[MCP `check_files`](mcp.md#check_files)**, by path or as text in `contents`.
 
 The Stop gate's default scope (`stop-gate = "changed"`) checks the Python files the session changed, and no diagrams. A warning never blocks, so there is nothing to gate on by default; with the rules raised to errors, a diagram the agent broke has already blocked its own edit, and `stop-gate = "project"` checks every listed diagram at Stop as well. Editing Python code doesn't check a diagram again: a package renamed in the code shows up in the drawing on the next whole-project run, in CI or at a project-scope Stop.
+
+INW019 compares the diagram with the imports the run collects: in a layers diagram a path of arrows draws an import, in a contexts diagram it takes a direct arrow, and an import under `if TYPE_CHECKING:` counts. It runs on whole-project runs only, since one edited or named file doesn't show the imports of the rest of the project.
 
 ## Start from a diagram { #import-diagram }
 
@@ -348,6 +350,7 @@ Where Inwards differs:
 - **Mermaid flowcharts and PlantUML component diagrams only.** C4, `architecture-beta` and other PlantUML diagram types aren't read.
 - **PlantUML is read one line at a time.** A statement split over lines (a component description that runs onto the next line) isn't followed, and a link to a component by its display name, rather than its alias, names a different node.
 - **What a diagram can't say stays out.** Library lists, shapes, selectors other than a node's label, rule options and `ignore` are written by hand after the import.
-- **Imports the diagram doesn't draw** aren't reported yet; that is INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
+- **Imports the diagram doesn't draw** are reported by [INW019](../rules/INW019.md) on whole-project runs only, never at edit time.
+- **Imports between layers and contexts, not modules.** INW019 doesn't compare an arrow between two module nodes inside one context with the imports between those modules.
 - **A code edit doesn't check the diagrams.** The hook and the editor check a diagram when it is edited; a rename in the Python code reaches the drawing on the next whole-project run.
 - **Paths are matched as written.** A `diagrams` entry is compared with the path the agent or the editor gives, letter case included, so on a case-insensitive file system (macOS, Windows) `Docs/Architecture.md` doesn't match `docs/architecture.md` in the hook or the editor. The whole-project run walks the disk and isn't affected.

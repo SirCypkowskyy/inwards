@@ -147,6 +147,11 @@
         "name": "core-rule-diagram-forbidden-edge",
         "patterns": ["src/core/src/rules/diagram-forbidden-edge/**"]
       },
+      // INW019 diagram-missing-dependency (#347): imports a marked diagram doesn't draw.
+      {
+        "name": "core-rule-diagram-missing-dependency",
+        "patterns": ["src/core/src/rules/diagram-missing-dependency/**"]
+      },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -355,6 +360,10 @@
         "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
       },
       {
+        "from": "core-rule-diagram-missing-dependency",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
+      },
+      {
         "from": "core-rule-orm-naming",
         "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
       },
@@ -399,6 +408,7 @@
           "core-diagram",
           "core-rule-diagram-unknown-name",
           "core-rule-diagram-forbidden-edge",
+          "core-rule-diagram-missing-dependency",
           "core-baseline"
         ]
       },
@@ -460,6 +470,7 @@
           "core-diagram",
           "core-rule-diagram-unknown-name",
           "core-rule-diagram-forbidden-edge",
+          "core-rule-diagram-missing-dependency",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -950,6 +961,10 @@
         },
         {
           "from": "core-rule-diagram-forbidden-edge",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-diagram-missing-dependency",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

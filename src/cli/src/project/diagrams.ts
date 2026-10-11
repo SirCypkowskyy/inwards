@@ -1,6 +1,6 @@
 /**
- * @file Reading the files `[tool.inwards].diagrams` names, for INW017 and
- * INW018 (ADR-045): a plain entry is one file next to the config, a glob is
+ * @file Reading the files `[tool.inwards].diagrams` names, for INW017,
+ * INW018 and INW019 (ADR-045): a plain entry is one file next to the config, a glob is
  * walked from its directory before the first wildcard with the CLI's usual
  * skip rules. A check of named files (the PostToolUse hook, the language
  * server, MCP `check_files`, #348) asks `listsDiagram` whether one of them is
@@ -25,7 +25,7 @@ import type { PathProbe } from "../platform/contracts.ts";
 import type { ProjectIo } from "./contracts.ts";
 
 /** The rules that read diagrams. */
-const DIAGRAM_RULES = ["INW017", "INW018"];
+const DIAGRAM_RULES = ["INW017", "INW018", "INW019"];
 
 /**
  * The file names a diagram usually has: Markdown, Mermaid and PlantUML. The
@@ -38,7 +38,7 @@ export const DIAGRAM_FILE: RegExp = /\.(?:md|markdown|mmd|mermaid|puml|plantuml|
  * Tells whether a config turns on a rule that reads diagrams.
  *
  * @param config - the parsed config.
- * @returns true when it lists diagrams and INW017 or INW018 is on.
+ * @returns true when it lists diagrams and INW017, INW018 or INW019 is on.
  */
 function diagramsOn(config: InwardsConfig): boolean {
   return (
@@ -122,7 +122,7 @@ export interface ListedDiagrams {
 
 /**
  * Finds and reads the diagram files a config lists. Nothing is read when the
- * config lists none or INW017 and INW018 are both off.
+ * config lists none or INW017, INW018 and INW019 are all off.
  *
  * @param io - probes, walks and reads the project.
  * @param configPath - absolute path of the pyproject.toml; entries are relative to its directory.
