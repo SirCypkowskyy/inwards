@@ -136,7 +136,7 @@ No automatic fix (`autofix: false`). Merging handlers into a lifespan changes th
 
 ## Configuration
 
-Severity error, with the deprecated-only findings reported as warnings. Opt-in: turn it on with `extend-select`. It has no options of its own; `modules` works as for every rule ([options tables](index.md#opt-in-rules)).
+Severity error, with the deprecated-only findings reported as warnings. Opt-in: turn it on with `extend-select`. It has no options of its own; `modules` works as for every rule, and `check-tests` as for every content rule ([options tables](index.md#opt-in-rules)).
 
 Every finding can be suppressed inline with `# inwards: ignore[FAPI006] reason="..."` on the line of the registration.
 

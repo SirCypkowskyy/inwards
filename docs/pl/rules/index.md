@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: a30fc6f5421115bb24d1943b1d66aa11b0cc6391d1c50abae44bd6451dbb3874
+source_hash: b0daca9d66901060e931ec377abbcf9dff917954ad2095ee789c6b3cf660955d
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -11,7 +11,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 
 Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki automatycznej, posortuj według kodu, nazwy, kategorii albo statusu i przeglądaj je stronami. Pasek adresu zapamiętuje widok, więc link otwiera tę samą listę. Kategoria obejmuje swoje podkategorie: `imports` pokazuje też reguły z `imports › layers`.
 
-Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
+Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Każda kategoria ma też własną stronę, a nawigacja pokazuje pod nią jej reguły: [importy](imports/index.md), [układ](layout/index.md), [role](roles/index.md), [integralność](integrity/index.md), [diagramy](diagrams/index.md) i [FastAPI](fastapi/index.md). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>
 
@@ -86,6 +86,7 @@ Diagramy architektury w dokumentacji, sprawdzane względem `[tool.inwards]` ([AD
 |---|---|---|---|---|---|---|
 | [INW017](INW017.md) | `diagram-unknown-name` | Węzeł w oznaczonym diagramie architektury w Mermaid albo PlantUML, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie (moduł aliasu w PlantUML) nie pasuje do żadnego modułu (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
 | [INW018](INW018.md) | `diagram-forbidden-edge` | Ciągła strzałka w oznaczonym diagramie architektury w Mermaid albo PlantUML, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi, między kontekstami bez `depends-on` albo do modułu, który nie jest `public` (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
+| [INW019](INW019.md) | `diagram-missing-dependency` | Import w kodzie między dwiema warstwami albo kontekstami, które rysuje oznaczony diagram architektury w Mermaid albo PlantUML, bez strzałki (dla warstw: bez ścieżki strzałek), która by go rysowała (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
 
 </div>
 
@@ -134,7 +135,7 @@ Kody są dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (k
 
 ### Reguły opt-in i opcje reguł { #opt-in-rules }
 
-Reguła, która w kolumnie Włączona ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md) i [INW018](INW018.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, INW015 i INW016, reguły, które sprawdzają dokumentację względem konfiguracji, INW017 i INW018, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
+Reguła, która w kolumnie Włączona ma „opt-in”, nie zgłasza niczego, dopóki jej nie włączysz: wpisz jej kod do `extend-select`, co zostawia pozostałe reguły bez zmian, albo do `select`. Reguły INW są domyślnie włączone, poza [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md) i [INW019](INW019.md); opt-in są reguły, które oceniają kod według progów wybranych przez zespół, takie jak INW012, reguły, które oceniają zawartość modułów danej roli, takie jak INW013, INW015 i INW016, reguły, które sprawdzają dokumentację względem konfiguracji i kodu, INW017, INW018 i INW019, oraz rodziny reguł dla frameworków, takie jak [FastAPI](#fastapi). SARIF wymienia regułę opt-in z `defaultConfiguration.enabled` ustawionym na `false`.
 
 Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<rule-name>]`. Niektóre reguły mają też własne opcje, opisane na ich stronach ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Każda reguła przyjmuje `modules`, listę prefiksów modułów albo selektorów zapisanych jak w [`modules` warstwy](../guides/configuration.md#layers) (`shop.domain` obejmuje ten pakiet i wszystko pod nim, `shop.*.api` używa symboli wieloznacznych): reguła zgłasza wtedy tylko w modułach, które pasują. Nieznany klucz albo zły typ to błąd konfiguracji, który podaje nazwę klucza.
 
@@ -143,6 +144,15 @@ Opcje reguły trafiają do tabeli nazwanej jak reguła, `[tool.inwards.rules.<ru
 ```toml title="pyproject.toml"
 [tool.inwards.rules.pure-domain]
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
+```
+
+Reguły treści opt-in, INW012 do INW016 i reguły FAPI, pomijają moduły testowe: moduł, którego ostatni segment nazwy to `test_*` albo `*_test`, albo który ma segment `tests`, `test` lub `conftest`, na przykład `app/tests/test_orders.py`, `tests/conftest.py` czy `app/orders_test.py`. Test celowo buduje jednorazową aplikację albo importuje adapter, więc zgłoszenie w nim rzadko warto poprawiać ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` w tabeli reguły przywraca je dla tej reguły. Pozostałe reguły sprawdzają moduły testowe jak każde inne, a `ignore` najwyższego poziomu nie zawęża reguł treści.
+
+<!-- config: fragment -->
+
+```toml title="pyproject.toml"
+[tool.inwards.rules.async-blocking]
+check-tests = true  # INW013 also reports in tests/ and test_*.py
 ```
 
 [Szablon](../guides/configuration.md#template-rules) może włączyć regułę opt-in dla jednej ze swoich ról, na przykład `router = { async-blocking = true }`; rozwija się to do `extend-select` i tabeli opcji reguły, z modułami roli w `modules`.
@@ -159,4 +169,4 @@ W ten sposób można wyciszać reguły, które wskazują na linię kodu Pythona:
 
 ## Format strony { #page-format }
 
-Każda strona reguły zaczyna się od front matter w formacie [OKF](https://okf.md/spec/): `type: rule`, `title`, `description`, `resource` (plik źródłowy reguły), `tags` (kategoria, najpierw nadrzędna), `timestamp` (kiedy reguła trafiła do kodu), `status` oraz pola Inwards `code`, `name`, `severity`, `suppressible`, `autofix` i `related_issues`. Każda strona ma też sekcje Co robi, Dlaczego to źle, Przykład (zgłoszony i poprawiony blok kodu) i Bezpieczeństwo poprawki oraz wiersz w tabeli na tej stronie. `uv run scripts/check-rule-pages.py` sprawdza to wszystko w obu językach, także w CI, i zapisuje plik `rules.json`, z którego czyta lista powyżej; po zmianie strony reguły albo wiersza tutaj uruchom go z `--write`. Test sprawdza, że każda zarejestrowana reguła ma stronę, a każda strona wskazuje zarejestrowaną regułę. Przykłady zgłoszone i poprawione też działają jako testy, sprawdzane względem wyjścia pokazanego na stronie.
+Każda strona reguły zaczyna się od front matter w formacie [OKF](https://okf.md/spec/): `type: rule`, `title`, `description`, `resource` (plik źródłowy reguły), `tags` (kategoria, najpierw nadrzędna), `timestamp` (kiedy reguła trafiła do kodu), `status` oraz pola Inwards `code`, `name`, `severity`, `suppressible`, `autofix` i `related_issues`. Każda strona ma też sekcje Co robi, Dlaczego to źle, Przykład (zgłoszony i poprawiony blok kodu) i Bezpieczeństwo poprawki oraz wiersz w tabeli na tej stronie i na stronie swojej kategorii (`rules/<category>/`), a także wpis w grupie swojej kategorii w nawigacji, w `docs/zensical.toml` i `docs/zensical.pl.toml`. `uv run scripts/check-rule-pages.py` sprawdza to wszystko w obu językach, także w CI, i zapisuje plik `rules.json`, z którego czyta lista powyżej; po zmianie strony reguły albo wiersza tutaj uruchom go z `--write`. Test sprawdza, że każda zarejestrowana reguła ma stronę, a każda strona wskazuje zarejestrowaną regułę. Przykłady zgłoszone i poprawione też działają jako testy, sprawdzane względem wyjścia pokazanego na stronie.

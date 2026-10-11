@@ -17,19 +17,21 @@ import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import { type RouterKinds, routerBindings } from "../shared/fastapi-routers.ts";
 import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
 import { type ResolveBase, viewMethods } from "./classes.ts";
 import {
+  FLASK_ROUTERS,
   type Framework,
   frameworksIn,
   type Kind,
   OPERATIONS,
   REGISTER_CALLS,
   REGISTER_METHODS,
-  ROUTERS,
   standaloneDecorator,
   VIEW_METHODS,
 } from "./frameworks.ts";
+import { routeField, routeOf } from "./route-path.ts";
 import type { Recognise } from "./settings.ts";
 
 /** The frameworks whose apps and routers declare and register routes through methods. */
@@ -46,6 +48,8 @@ export interface Endpoint {
   readonly name: string;
   /** The framework that marked it, or `custom` for a configured decorator or base class. */
   readonly kind: Kind;
+  /** The route's path when the decorator or registration spells it as a literal, e.g. `/healthz`. */
+  readonly route?: string;
 }
 
 /** A route registered in this file whose handler lives in another module. */
@@ -58,6 +62,8 @@ export interface Registration {
   readonly how: string;
   /** The framework the registration belongs to. */
   readonly kind: Kind;
+  /** The route's path when the registration spells it as a literal. */
+  readonly route?: string;
 }
 
 /** The endpoints one file defines, and the routes it registers to other modules' functions. */
@@ -82,6 +88,8 @@ export interface EndpointContext {
   readonly functions: ReadonlyMap<string, Node>;
   /** Resolves a view base class from another first-party module; undefined reads none. */
   readonly resolveBase: ResolveBase | undefined;
+  /** Tells what first-party callees build, for FastAPI routers built at run time or by a factory (#358); undefined reads none. */
+  readonly routerKinds: RouterKinds | undefined;
 }
 
 /** The file's own apps and routers, by framework. */
@@ -126,7 +134,9 @@ export function mayHoldEndpoints(text: string, recognise: Recognise): boolean {
 /**
  * Lists the qualified names the file binds to an app or router of each
  * active framework, in any scope, as the FastAPI model does (an app
- * factory's app counts).
+ * factory's app counts). FastAPI's are found as the model finds them
+ * (`shared/fastapi-routers.ts`), so a first-party router class or factory
+ * counts too (#358).
  *
  * @param root - the module node.
  * @param context - the file's module and qualifier.
@@ -141,14 +151,18 @@ function routerNames(
   const names = new Map(
     ROUTER_FRAMEWORKS.filter((f) => active.has(f)).map((f) => [f, new Set<string>()]),
   );
-  for (const assignment of root.descendantsOfType("assignment")) {
+  for (const { local } of names.has("fastapi")
+    ? routerBindings(root, context.qualify, context.routerKinds)
+    : []) {
+    names.get("fastapi")?.add(`${context.module}.${local}`);
+  }
+  for (const assignment of names.has("flask") ? root.descendantsOfType("assignment") : []) {
     const left = assignment.childForFieldName("left");
     const right = assignment.childForFieldName("right");
     const callee = right?.type === "call" ? right.childForFieldName("function") : null;
     const made = callee ? context.qualify(callee) : null;
-    const framework = [...names.keys()].find((f) => made !== null && ROUTERS[f].has(made));
-    if (left?.type === "identifier" && framework) {
-      names.get(framework)?.add(`${context.module}.${identifierName(left)}`);
+    if (left?.type === "identifier" && made !== null && FLASK_ROUTERS.has(made)) {
+      names.get("flask")?.add(`${context.module}.${identifierName(left)}`);
     }
   }
   return names;
@@ -254,7 +268,7 @@ function registrationOf(
   const handler = how ? argumentAt(call, how.index, how.keyword) : null;
   const target = handler ? context.qualify(handler) : null;
   return how && handler && target !== null
-    ? { handler, target, how: how.how, kind: how.framework }
+    ? { handler, target, how: how.how, kind: how.framework, ...routeField(routeOf(call)) }
     : null;
 }
 
@@ -276,16 +290,21 @@ function decorated(
   for (const definition of root.descendantsOfType("decorated_definition")) {
     const fn = definition.childForFieldName("definition");
     const name = fn?.type === "function_definition" ? fn.childForFieldName("name") : null;
-    const kind = namedChildren(definition)
+    const marked = namedChildren(definition)
       .filter((child) => child.type === "decorator")
       .flatMap((decorator) => namedChildren(decorator).slice(0, 1))
-      .map((expression) => decoratorKind(expression, routers, custom, context))
-      .find((k) => k !== undefined);
-    if (fn && name && kind) {
+      .map((expression) => ({
+        expression,
+        marks: decoratorKind(expression, routers, custom, context),
+      }))
+      .find(({ marks }) => marks !== undefined);
+    const kind = marked?.marks;
+    if (fn && name && marked && kind) {
       const cls = fn.parent?.parent?.parent;
       const owner = cls?.type === "class_definition" ? cls.childForFieldName("name") : null;
       const own = identifierName(name);
-      found.push({ fn, name: owner ? `${identifierName(owner)}.${own}` : own, kind });
+      const full = owner ? `${identifierName(owner)}.${own}` : own;
+      found.push({ fn, name: full, kind, ...routeField(routeOf(marked.expression)) });
     }
   }
   return found;
@@ -378,7 +397,8 @@ export function findEndpoints(root: Node, context: EndpointContext): Found {
     if (registration && !local) {
       registrations.push(registration);
     } else if (fn && registration) {
-      registered.push({ fn, name: target.slice(prefix.length), kind: registration.kind });
+      const { kind, route } = registration;
+      registered.push({ fn, name: target.slice(prefix.length), kind, ...routeField(route) });
     }
   }
   const endpoints = unique([...ownEndpoints(root, routers, full), ...registered]);

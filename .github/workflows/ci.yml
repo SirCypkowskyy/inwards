@@ -75,8 +75,9 @@ jobs:
         # save Actions minutes (#126); revert this to test all four on PRs.
         # `os` names the check ("Test on ubuntu-26.04" is required by the
         # rulesets); `runner` is where it runs. ubuntu-26.04 runs on the
-        # self-hosted Ubuntu 26.04 containers on irysek (ops/runner). The other
-        # rows stay GitHub-hosted: ubuntu-24.04 on irysek would really be 26.04.
+        # self-hosted Ubuntu 26.04 runners (ops/runner), or GitHub-hosted for
+        # a fork's PR (#333). The other rows stay GitHub-hosted: ubuntu-24.04
+        # on the self-hosted runners would really be 26.04.
         include: >-
           ${{ fromJSON(
             github.event_name == 'workflow_dispatch'

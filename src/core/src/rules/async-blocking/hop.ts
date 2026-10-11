@@ -49,6 +49,12 @@ export interface FollowScope {
   readonly views: ParsedModules<Walk>;
   /** `follow-modules`: the modules followed into, or undefined for every first-party one. */
   readonly modules: readonly string[] | undefined;
+  /**
+   * The run's prefilter's helper names and aliases (`prefilter.ts`), when it
+   * has one: a call that passes no receiver is followed only when its
+   * qualified name ends in one of them.
+   */
+  readonly helpers?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -112,6 +118,44 @@ function runsInline(fn: Node): boolean {
 }
 
 /**
+ * Lists the blocking calls a helper's body runs, with the receivers its
+ * module, its annotations and its body give it, plus those the call passes.
+ *
+ * @param fn - the helper's `function_definition` node.
+ * @param walk - the helper's module.
+ * @param passed - the receivers the call passes, by parameter name.
+ * @returns the blocking calls, in source order; empty when it blocks nothing.
+ */
+function helperBlocking(
+  fn: Node,
+  walk: Walk,
+  passed: ReadonlyMap<string, Source>,
+): readonly Blocking[] {
+  const body = fn.childForFieldName("body");
+  const own = functionReceivers(fn, walk, passed);
+  return (body ? callsIn(body) : []).flatMap((inner) => {
+    const found = blockingCall(inner, own, walk);
+    return found ? [found] : [];
+  });
+}
+
+/**
+ * Lists the names of a module's helpers that block when a caller passes them
+ * no receiver: its top-level plain `def`s whose bodies make a blocking call
+ * with the receivers their module and annotations give them. A hop from a
+ * file that names no blocking type can only reach one of these
+ * (`prefilter.ts`).
+ *
+ * @param walk - the module.
+ * @returns the helpers' names in the module.
+ */
+export function blockingHelpers(walk: Walk): string[] {
+  return [...walk.functions]
+    .filter(([, fn]) => runsInline(fn) && helperBlocking(fn, walk, new Map()).length > 0)
+    .map(([name]) => name);
+}
+
+/**
  * The sync helpers the `async def`s of one checked file call, read on
  * demand. Build one per check of a file.
  */
@@ -148,19 +192,14 @@ export class Helpers {
     if (call.parent?.type === "await" || !callee) {
       return undefined;
     }
-    const target = this.helperOf(callee, shadowed);
+    const target = this.helperOf(callee, shadowed, receivers.size === 0);
     if (target === undefined || !runsInline(target.fn)) {
       return undefined;
     }
     const { fn, name, walk } = target;
-    const body = fn.childForFieldName("body");
     const params = [...parameterTypes(fn, walk.context).keys()];
     const passed = passedNames(call, params, (arg) => receivers.get(arg));
-    const own = functionReceivers(fn, walk, passed);
-    const blocking = (body ? callsIn(body) : []).flatMap((inner) => {
-      const found = blockingCall(inner, own, walk);
-      return found ? [found] : [];
-    });
+    const blocking = helperBlocking(fn, walk, passed);
     if (blocking.length === 0) {
       return undefined;
     }
@@ -172,13 +211,19 @@ export class Helpers {
    * Finds the function a callee names: a top-level function of the checked
    * module called by bare name, or one another first-party module defines.
    *
+   * A call from a function with no receivers passes none, so the helper's
+   * body blocks only through its own module's names: another module is then
+   * read only when the run's prefilter lists the name the call ends in.
+   *
    * @param callee - the call's `function` node.
    * @param shadowed - names that hide the checked module's functions.
+   * @param bare - true when the calling function has no receivers to pass.
    * @returns the function, its name and its module, or undefined.
    */
   private helperOf(
     callee: Node,
     shadowed: ReadonlySet<string>,
+    bare: boolean,
   ): { fn: Node; name: string; walk: Walk } | undefined {
     const own = this.walk;
     if (callee.type === "identifier") {
@@ -189,15 +234,17 @@ export class Helpers {
       }
     }
     const qualified = own.context.qualify(callee);
+    const { helpers, modules } = this.scope;
     if (
       qualified === null ||
       qualified.startsWith(`${own.src.module}.`) ||
-      this.scope.modules?.length === 0
+      modules?.length === 0 ||
+      (bare && helpers !== undefined && !helpers.has(qualified.split(".").at(-1) ?? qualified))
     ) {
       return undefined;
     }
     const found = this.scope.views.follow(qualified, (walk, rest) => walk.functions.get(rest));
-    return found && followed(found.view.src.module, this.scope.modules)
+    return found && followed(found.view.src.module, modules)
       ? { fn: found.node, name: found.rest, walk: found.view }
       : undefined;
   }

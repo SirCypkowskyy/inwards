@@ -9,6 +9,7 @@
  */
 import type {
   Checked,
+  DiagramSource,
   Engine,
   ExtractionBatch,
   ExtractionJob,
@@ -107,9 +108,10 @@ export function openPool(
  * @param run.files - the source files.
  * @param run.index - the project's module index.
  * @param run.accepted - accepted copies by baseline key, when a baseline applies.
- * @param run.options - `whole` and `edit`, as `Engine.check` takes them.
+ * @param run.options - `whole`, `edit` and `diagrams`, as `Engine.check` takes them.
  * @param run.options.whole - true for a whole-project run.
  * @param run.options.edit - true for a per-edit check.
+ * @param run.options.diagrams - the files `diagrams` lists, for INW019.
  * @returns the findings and the suppressed ones.
  */
 export function checkOnThreads(
@@ -124,7 +126,7 @@ export function checkOnThreads(
     files: SourceFile[];
     index: ProjectIndex;
     accepted: ReadonlyMap<string, number> | undefined;
-    options: { whole: boolean; edit: boolean };
+    options: { whole: boolean; edit: boolean; diagrams?: readonly DiagramSource[] };
   },
 ): Promise<Checked> {
   if (pool === undefined) {

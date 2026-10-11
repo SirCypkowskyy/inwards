@@ -19,6 +19,7 @@ import { checkCommand } from "./commands/check.ts";
 import { contextCommand } from "./commands/context.ts";
 import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
+import { diagramCommand } from "./commands/diagram.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
 import { importDiagramCommand } from "./commands/import-diagram.ts";
@@ -33,7 +34,7 @@ import { print } from "./platform/print.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const OPTIONS = {
-  format: { type: "string", default: "text" },
+  format: { type: "string" },
   config: { type: "string" },
   version: { type: "boolean" },
   help: { type: "boolean", short: "h" },
@@ -55,6 +56,8 @@ const OPTIONS = {
   idle: { type: "string" },
   json: { type: "boolean" },
   full: { type: "boolean" },
+  layers: { type: "boolean" },
+  contexts: { type: "boolean" },
   // LSP's conventional server arguments (#63): stdio is the only transport,
   // and vscode-languageserver reads --clientProcessId from argv itself.
   stdio: { type: "boolean" },
@@ -168,7 +171,7 @@ function argumentError(argv: string[], code: string, message: string): string {
 
 /**
  * Runs the commands besides `check`: the hook, `daemon`, `server`, `mcp`, `init`, `baseline`, `stats`,
- * and through `readCommand` `context`, `import-config`, `import-diagram`, `rules` and `rule`.
+ * and through `readCommand` `context`, `diagram`, `import-config`, `import-diagram`, `rules` and `rule`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -178,13 +181,15 @@ function argumentError(argv: string[], code: string, message: string): string {
  * @param values."dry-run" - `--dry-run`, for init.
  * @param values.config - `--config`, for baseline, context and rules (stats refuses it).
  * @param values."no-cache" - `--no-cache`, for baseline.
- * @param values.format - `--format`, for stats.
+ * @param values.format - `--format`, for stats and diagram.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
  * @param values.write - `--write`, for context, import-config and import-diagram.
  * @param values.idle - `--idle SECONDS`, for daemon.
  * @param values.json - `--json`, for rules and rule.
  * @param values.full - `--full`, for rule.
+ * @param values.layers - `--layers`, for diagram.
+ * @param values.contexts - `--contexts`, for diagram.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -201,6 +206,8 @@ async function setupCommand(
     idle?: string | undefined;
     json?: boolean | undefined;
     full?: boolean | undefined;
+    layers?: boolean | undefined;
+    contexts?: boolean | undefined;
   },
 ): Promise<number> {
   const { streams } = deps.io;
@@ -234,31 +241,41 @@ async function setupCommand(
 }
 
 /** The commands that read the project or the docs and print: `readCommand` runs them. */
-const READ_COMMANDS = ["context", "import-config", "import-diagram", "rules", "rule"] as const;
+const READ_COMMANDS = [
+  "context",
+  "diagram",
+  "import-config",
+  "import-diagram",
+  "rules",
+  "rule",
+] as const;
 
 /**
  * Tells whether a command is one `readCommand` runs.
  *
  * @param command - a command besides `check`.
- * @returns true for `context`, `import-config`, `import-diagram`, `rules` and `rule`.
+ * @returns true for `context`, `diagram`, `import-config`, `import-diagram`, `rules` and `rule`.
  */
 function isReadCommand(command: Command): command is (typeof READ_COMMANDS)[number] {
   return READ_COMMANDS.some((name) => name === command);
 }
 
 /**
- * Runs `context`, `import-config`, `import-diagram`, `rules` and `rule`: the
- * commands that read the config, import-linter's contracts, a diagram or the
- * rule pages and print.
+ * Runs `context`, `diagram`, `import-config`, `import-diagram`, `rules` and
+ * `rule`: the commands that read the config, import-linter's contracts, a
+ * diagram or the rule pages and print.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
  * @param paths - the positionals after it.
  * @param values - the parsed options.
- * @param values.config - `--config`, for context and rules.
+ * @param values.config - `--config`, for context, diagram and rules.
  * @param values.write - `--write`, for context, import-config and import-diagram.
  * @param values.json - `--json`, for rules and rule.
  * @param values.full - `--full`, for rule.
+ * @param values.format - `--format`, for diagram.
+ * @param values.layers - `--layers`, for diagram.
+ * @param values.contexts - `--contexts`, for diagram.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function readCommand(
@@ -270,9 +287,15 @@ async function readCommand(
     write?: boolean | undefined;
     json?: boolean | undefined;
     full?: boolean | undefined;
+    format?: string | undefined;
+    layers?: boolean | undefined;
+    contexts?: boolean | undefined;
   },
 ): Promise<number> {
   const usage = commandUsage(command);
+  if (command === "diagram") {
+    return diagramCommand(deps, paths, values, usage);
+  }
   if (command === "context") {
     return paths.length === 0
       ? contextCommand(deps, values.config, values.write === true)

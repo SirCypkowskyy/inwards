@@ -1,7 +1,7 @@
 /**
  * @file The run's first-party modules (#359): `ModuleTrees` reads and parses
- * each module at most once, whichever rule or checked file asks, and hands
- * a checked file its tree back only for the same path and text. A call to a
+ * each text at most once, whichever rule, hop or checked file asks, and a
+ * checked file shares the tree of the module with the same text. A call to a
  * method of a module-level object reads nothing, and a run of many files
  * gives INW013 the findings each file gets when it is checked alone, the
  * helper's own module included, which reuses the tree its callers parsed.
@@ -84,17 +84,18 @@ describe("ModuleTrees", () => {
     }
   });
 
-  test("hands a checked file its tree back only for the same path and text", () => {
+  test("parses each text once, for a module a hop reads and a checked file alike", () => {
     const { trees } = counted();
     try {
       const users = MODULES.get("shop.users");
-      expect(users && trees.parsedAs(users)).toBeUndefined(); // not parsed yet
-      const parsed = trees.moduleOf("shop.users");
-      expect(users && trees.parsedAs(users)).toBe(parsed?.tree);
-      expect(
-        users && trees.parsedAs({ ...users, text: `${users.text}\n# edited\n` }),
-      ).toBeUndefined();
-      expect(users && trees.parsedAs({ ...users, path: "shop/users.pyi" })).toBeUndefined();
+      const checked = users && trees.treeOf(users); // a content rule asks first
+      expect(trees.moduleOf("shop.users")?.tree).toBe(checked);
+      // The CLI names a checked file from the working directory, the index from the root:
+      // the tree depends on the text alone.
+      expect(users && trees.treeOf({ ...users, path: "server/shop/users.py" })).toBe(checked);
+      const edited = users && trees.treeOf({ ...users, text: `${users.text}\n# edited\n` });
+      expect(edited).toBeDefined();
+      expect(edited).not.toBe(checked);
     } finally {
       trees.dispose();
     }

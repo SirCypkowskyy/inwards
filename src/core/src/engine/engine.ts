@@ -157,12 +157,12 @@ export class Engine {
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
     const run = new ContentRun(this.parser, project, this.config);
     try {
+      const wired = fastApiFindings(run.trees, project, [src], { config: this.config, edit: true });
       const confirmed = withFound(
         withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
-        contentFindings(this.parser, src, this.config, run),
+        contentFindings(src, this.config, run),
       );
       const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
       return applyRules(kept, this.config.rules);
@@ -453,13 +453,15 @@ export class Engine {
    *   for a per-edit check, where FAPI003 reports one-file findings only.
    * @param options.whole - true for a whole-project run.
    * @param options.edit - true for a per-edit check.
+   * @param options.diagrams - the files `diagrams` lists, for INW019 on a
+   *   whole-project run (`engine/diagrams.ts`).
    * @returns the violations, as `checkFiles` returns them, and the suppressed findings.
    */
   check(
     files: Iterable<SourceFile>,
     project: ProjectIndex,
     accepted?: ReadonlyMap<string, number>,
-    options: { whole?: boolean; edit?: boolean } = {},
+    options: Omit<CheckOptions, "accepted"> = {},
   ): Checked {
     return checkAll(this.steps(), files, project, { accepted, ...options });
   }
@@ -478,6 +480,7 @@ export class Engine {
    * @param options.accepted - accepted copies by baseline key, when a baseline applies.
    * @param options.whole - true for a whole-project run.
    * @param options.edit - true for a per-edit check.
+   * @param options.diagrams - the files `diagrams` lists, for INW019.
    * @param extract - runs extraction jobs elsewhere, such as on worker threads.
    * @returns what `check` returns for the same arguments.
    */

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 6bb7295c2c30f6f8092341fe4c2fd6031a232bcad6236862ae230b17ec98d555
+source_hash: 9d5b0e2db9cd361db5cb20b4f321a9127f70c155a370c067a7fce8204174b232
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -158,7 +158,7 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 
 !!! info "Stan"
     Pre-alpha.
-    Reguły INW000–INW018 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
+    Reguły INW000–INW019 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
-    Najnowsze wydanie to 0.5.0 (2026-10-10). Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako pięć wheeli platformowych (`uv add --dev inwards`) oraz do GitHub Releases z plikami binarnymi dla sześciu platform, tymi samymi wheelami i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Szczegóły są w [Instalacji](guides/install.md).
+    Najnowsze wydanie to 0.6.0 (2026-10-11). Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako pięć wheeli platformowych (`uv add --dev inwards`) oraz do GitHub Releases z plikami binarnymi dla sześciu platform, tymi samymi wheelami i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Szczegóły są w [Instalacji](guides/install.md).
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.

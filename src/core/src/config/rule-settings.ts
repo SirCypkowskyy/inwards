@@ -17,7 +17,14 @@
 import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";
 import { diagnostic, RULES, ruleFor } from "../meta/registry.ts";
 import { matchEntry } from "./layer-selector.ts";
-import { type OptionValue, optionKeys, parseOptions, stringList } from "./rule-options.ts";
+import {
+  CHECK_TESTS,
+  type OptionValue,
+  optionKeys,
+  parseOptions,
+  skipsTests,
+  stringList,
+} from "./rule-options.ts";
 import { type ConfigFile, spanOfRuleTable } from "./source-span.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
 
@@ -233,7 +240,9 @@ function isSeverity(value: unknown): value is Severity {
  * Says what the config does to one rule's findings. A rule is on when `select`
  * lists it, or, without `select`, when it is on by default; `extend-select`
  * turns it on as well, and `ignore` turns it off whatever the rest says. An
- * options table's `modules` turns it off outside the modules it selects.
+ * options table's `modules` turns it off outside the modules it selects. An
+ * opt-in content rule (INW012 to INW016, the FAPI rules) is off in a test
+ * module (`isTestModule`) unless its table sets `check-tests = true` (#362).
  *
  * @param code - a code such as `INW001`.
  * @param rules - the project's `[tool.inwards.rules]`, if any.
@@ -253,15 +262,51 @@ export function ruleLevel(
   const { select, extendSelect = [], ignore = [], severity = {}, options = {} } = rules ?? {};
   const rule = ruleFor(code);
   const chosen = select === undefined ? rule?.default !== "off" : select.includes(code);
-  const scope = rule === undefined ? undefined : stringList(options[rule.name]?.["modules"]);
   const inScope =
-    scope === undefined ||
-    module === "" ||
-    scope.some((entry) => matchEntry(entry, module) !== undefined);
+    rule === undefined || module === "" || covers(rule.name, options[rule.name], module);
   if (!(chosen || extendSelect.includes(code)) || ignore.includes(code) || !inScope) {
     return "off";
   }
   return Object.hasOwn(severity, code) ? severity[code] : undefined;
+}
+
+/** Test-file names pytest collects: `test_*.py` and `*_test.py`. */
+const TEST_FILE = /^test_|_test$/u;
+/** Module name segments that hold tests: a `tests` or `test` package, or pytest's `conftest`. */
+const TEST_SEGMENTS: ReadonlySet<string> = new Set(["tests", "test", "conftest"]);
+
+/**
+ * Tells whether a module is test code by its name alone: a segment `tests`,
+ * `test` or `conftest`, or a last segment named like a pytest test file
+ * (`test_orders`, `orders_test`). A package such as `app.test_support` is not
+ * a test, and neither is a module outside the naming conventions that only
+ * tests import; `modules` scopes those out.
+ *
+ * @param module - a dotted module name.
+ * @returns true when the name says it is a test module.
+ */
+function isTestModule(module: string): boolean {
+  const segments = module.split(".");
+  const last = segments.at(-1) ?? "";
+  return TEST_FILE.test(last) || segments.some((segment) => TEST_SEGMENTS.has(segment));
+}
+
+/**
+ * Tells whether a rule's options table leaves a module in its scope: inside
+ * `modules` when that is set, and, for a content rule, not a test module
+ * unless `check-tests = true`.
+ *
+ * @param rule - the rule's kebab-case name.
+ * @param table - its options table, if any.
+ * @param module - a non-empty dotted module name.
+ * @returns true when the rule may report in the module.
+ */
+function covers(rule: string, table: RuleOptions | undefined, module: string): boolean {
+  const scope = stringList(table?.["modules"]);
+  if (scope !== undefined && !scope.some((entry) => matchEntry(entry, module) !== undefined)) {
+    return false;
+  }
+  return !(skipsTests(rule) && table?.[CHECK_TESTS] !== true && isTestModule(module));
 }
 
 /**

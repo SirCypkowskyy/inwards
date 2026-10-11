@@ -83,13 +83,14 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     The Stop gate reads the user, project and local settings files, so hooks in any one of them count.
 
-    `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote:
+    `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote, or the one diagram file the [`diagrams`](guides/configuration.md#diagrams) key lists:
 
     - **Violation:** compact JSON diagnostics on stderr, exit code 2.
     - **Warnings only** (INW006: the file belongs to no layer): exit 0, and the same JSON goes back to the model as `additionalContext`, so the edit stands but the agent hears about it.
     - **A violation the file already had at session start:** context, not a block (exit 0, a note that lists it as already there and tells the agent to leave it unless the task needs that code). A violation the edit adds still blocks, a second copy of an old import included. How the gate knows what was there is described under the stop gate below.
     - **Package shape** ([guide](guides/package-shape.md)): INW007 blocks when the file is new this session, and is context only for a file that existed at session start under the same path, with no symlink on that path (the start identity in [ADR-028](05-ADR.md#adr-028-inline-suppressions-need-a-reason-and-an-agent-cant-add-one-by-default)), so an alias the agent creates or a start file swapped for a link still blocks, here and at Stop. INW008 for the edited file's package (a required member still missing) is always context; the Stop gate enforces it.
-    - **Clean file, non-Python file, or any other hook event:** exit 0, no output.
+    - **Listed diagram** ([guide](guides/diagrams.md#check)), with INW017 or INW018 on: their findings, a warning as context and an error raised by `severity` as a block, like the findings in a Python file. Any other non-Python file costs the hook a look at the config, under a millisecond, and the Python check is unchanged ([#348](https://github.com/SirCypkowskyy/inwards/issues/348)). The Stop gate's default scope doesn't check diagrams; see the guide.
+    - **Clean file, a non-Python file the `diagrams` key doesn't list, or any other hook event:** exit 0, no output.
     - **Broken `[tool.inwards]`:** the message goes to stderr with exit code 2, so an agent that broke the config hears about it. With no `[tool.inwards]` at all the hook stays silent, because it may be installed for every project; the config guard stops an agent from deleting the table.
     - **Unreadable payload or an internal error:** exit 1. Claude Code shows that to the user, not the model.
     - **File outside the project** (`CLAUDE_PROJECT_DIR`, or the directory Claude Code runs the hook in; never the payload's own `cwd`): skipped, even when the path reaches it through `..` or a symlink. The payload comes from the agent, so Inwards doesn't trust it to pick what gets checked.

@@ -33,10 +33,10 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule: INW000 to INW018, and the FAPI family without FAPI004. */
+/** Codes of every registered rule: INW000 to INW019, and the FAPI family without FAPI004. */
 type RuleCode =
   | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
-  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
+  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
   | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
@@ -202,7 +202,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     docs: page("INW016"),
   },
   // Opt-in and a warning: docs drift shouldn't block the Stop gate by default
-  // (#332, ADR-045). INW019 is reserved for imports a diagram doesn't draw.
+  // (#332, ADR-045).
   INW017: {
     code: "INW017",
     name: "diagram-unknown-name",
@@ -220,6 +220,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
     docs: page("INW018"),
+  },
+  INW019: {
+    code: "INW019",
+    name: "diagram-missing-dependency",
+    severity: "warning",
+    default: "off",
+    summary:
+      "A marked architecture diagram draws every import the code makes between the layers or contexts it shows.",
+    docs: page("INW019"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. FAPI004 stays
   // unused: the #185 spike said no-go, and codes are never renumbered.

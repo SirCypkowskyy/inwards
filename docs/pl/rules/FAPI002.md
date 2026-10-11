@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI002.md
-source_hash: e1d786ef86170945bf0b328659cb74613d169a87c1804954930ad5ac3cb5f6e3
+source_hash: 94a67e4aff8667789fc6d037d5c69bd27b8947da701889739d812ff8f653139c
 type: rule
 title: FAPI002 undocumented-error-response
 description: Operacja ścieżki FastAPI może zwrócić kod błędu, bezpośrednio, przez funkcję pomocniczą albo zależność, albo przez handler wyjątków aplikacji, którego jej wpis OpenAPI nie deklaruje.
@@ -196,7 +196,7 @@ handled-counts-as-documented = false  # true: codes from app exception handlers 
 explicit-422 = "ignore"               # "report": a raised 422 must be declared too
 ```
 
-Nieznany klucz albo zła wartość to błąd konfiguracji, który podaje klucz. Jak każda reguła, przyjmuje też `modules` ([tabele opcji](index.md#opt-in-rules)). Diagnostykę można wyciszyć w linii dekoratora przez `# inwards: ignore[FAPI002] reason="..."`.
+Nieznany klucz albo zła wartość to błąd konfiguracji, który podaje klucz. Jak każda reguła, przyjmuje też `modules`, a jak każda reguła treści także `check-tests`, które sprawia, że zgłasza też w modułach testowych ([tabele opcji](index.md#opt-in-rules)). Diagnostykę można wyciszyć w linii dekoratora przez `# inwards: ignore[FAPI002] reason="..."`.
 
 `FAST004` Ruffa (w recenzji) obejmuje pierścień 0 z `responses=` w tym samym pliku. Gdy trafi do wydania, `report-direct-raises = false` sprawi, że obie reguły nie zgłoszą tego samego `raise`.
 
@@ -213,7 +213,8 @@ Nieznane znaczy ciche: FAPI002 woli przeoczyć diagnostykę niż zgłosić błę
 - Funkcja-generator wywołana po nazwie (treść `StreamingResponse`) nie jest czytana, bo wywołanie jej nie uruchamia.
 - Gdy do jednego routera prowadzi kilka dołączeń, liczy się kod zadeklarowany w którymkolwiek z nich.
 - Żeby ustalić, co jest nad routerem, FAPI002 czyta raz na sprawdzenie każdy plik projektu z FastAPI. W hooku po edycji robi to tylko dla trasy z kodem, którego nie deklarują jej dekorator ani router.
-- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 18 zgłoszeń przed regułą o `openapi_url`, 17 po niej; 8 obejrzanych, wszystkie trafne (każdy podany kod rzuca endpoint albo zależność). Usunięte było na back office Polara, aplikacji z `openapi_url=None`. Własna klasa routera Polara ukrywa większość jego endpointów ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **Które routery się liczą** ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)). Trasa liczy się na nazwie powiązanej z `FastAPI(...)` albo `APIRouter(...)` z FastAPI, a gdy plik wywołuje na tej nazwie dekorator trasy, `include_router` albo inną metodę routera, także z własną klasą albo fabryką routera, którą Inwards rozwiązuje przez importy projektu: podklasą klasy FastAPI; `NAZWA = fabryka(...)` na poziomie modułu, gdy własna fabryka klas mówi albo pokazuje, że zwraca klasę routera (`-> type[APIRouter]` albo podklasa, którą definiuje i zwraca, jak `get_api_router_class` w Polarze); dowolnym `APIRouter = <wywołanie>` albo `FastAPI = <wywołanie>` na poziomie modułu; własną funkcją, która zwraca router, jeden krok w głąb; oraz nazwą zwracaną przez funkcję z adnotacją `-> APIRouter` (fabryki `make_*_router()` w fastapi-clean-example). Samo wywołanie czegoś, co nazywa się `APIRouter`, się nie liczy: projekty OpenStack tak nazywają swoje routery WSGI. Argumenty fabryki nie są słowami kluczowymi routera, więc prefiks, tagi i `responses=` routera z fabryki są nieznane, a jego trasy liczą się jako widoczne w schemacie. Plik, który nie zawiera żadnego słowa z filtra tekstowego (`fastapi`, `APIRouter`, `include_router`...), nie jest czytany.
+- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 18 zgłoszeń przed regułą o `openapi_url`, 17 po niej; 8 obejrzanych, wszystkie trafne (każdy podany kod rzuca endpoint albo zależność). Usunięte było na back office Polara, aplikacji z `openapi_url=None`. Od [#358](https://github.com/SirCypkowskyy/inwards/issues/358) model widzi 526 operacji ścieżki Polara poza testami i 15 z fastapi-clean-example, ale FAPI002 nadal nic tam nie zgłasza: Polar dołącza swój router API przez parametr funkcji, a część routerów przez wywołania fabryk, fastapi-clean-example zaś dołącza każdy router przez wywołanie fabryki, więc dołączenia nad ich trasami są nieznane ([#391](https://github.com/SirCypkowskyy/inwards/issues/391)).
 
 ## Źródła { #references }
 

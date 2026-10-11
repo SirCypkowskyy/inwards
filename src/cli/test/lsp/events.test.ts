@@ -1,6 +1,6 @@
 /**
  * @file Which file events make `inwards server` check the workspace again: module
- * files, directories, the config and the baseline do; hidden directories,
+ * files, directories, the config, the baseline and diagram files (#348) do; hidden directories,
  * compiled caches, other files and paths outside the workspace don't. The
  * test feeds paths only; no file is touched.
  */
@@ -20,7 +20,7 @@ function passFor(rel: string): boolean {
   return needsPass([ROOT], [{ kind: "created", path: join(ROOT, rel) }]);
 }
 
-test("module files, directories, the config and the baseline need a pass", () => {
+test("module files, directories, the config, the baseline and diagrams need a pass", () => {
   for (const rel of [
     "shop/domain/order.py",
     "shop/domain/order.pyi",
@@ -29,6 +29,9 @@ test("module files, directories, the config and the baseline need a pass", () =>
     "pyproject.toml",
     "packages/api/pyproject.toml",
     "inwards-baseline.json",
+    "docs/architecture.md",
+    "docs/layers.mmd",
+    "docs/components.puml",
   ]) {
     expect(passFor(rel)).toBe(true);
   }
@@ -40,7 +43,8 @@ test("hidden directories, caches, other files and outside paths don't", () => {
     ".venv/lib/python3.13/site-packages/x.py",
     ".inwards/cache/abc",
     "shop/__pycache__/order.cpython-313.pyc",
-    "README.md",
+    "notes.txt",
+    "docs/.drafts/architecture.md",
     "../outside.py",
   ]) {
     expect(passFor(rel)).toBe(false);

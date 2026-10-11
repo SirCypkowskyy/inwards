@@ -19,16 +19,18 @@ can't lean on either runtime.
 | `config/` | parsing `[tool.inwards]`: layers, rule settings, shapes, `generated`, globs, source spans | read files (it gets the text) |
 | `python/` | tree-sitter parsing, import extraction, module names, the prescan, PEP 263 encodings, literals, stdlib names | know about layers or rules |
 | `lookup/` | the module index (`ProjectIndex`), module lookup, the directory-listing ports | decide what is a violation |
+| `diagram/` | the readers for marked architecture diagrams (ADR-045): finding the blocks (`blocks`, `plantuml-blocks`), the Mermaid and PlantUML readers (`mermaid` with `syntax`, `plantuml` with `plantuml-syntax` and `plantuml-skip`), the one model both read into (`model`, `read`), what a node names (`names`), the notation a fix hint uses (`notation`), the config `inwards import-diagram` reads out of a diagram (`draft`), and the writer that draws the config as a diagram for `inwards diagram` (`write`) | know about layers' imports or report a finding (INW017 to INW019 do) |
 | `rules/` | one module or folder per rule, named after the rule; `shared/` for what several rules need | import another rule |
 | `baseline/` | baseline keys and which modules a baseline accepts in full | render or write anything |
 | `engine/` | the facade: order of the checks, rule precedence, suppressions, the baseline shortcut | hold a rule's logic |
-| `report/` | text, concise, JSON and SARIF rendering | decide severities or filter findings |
+| `report/` | text, concise, JSON and SARIF rendering, and GitHub Actions workflow commands (`github.ts`) | decide severities or filter findings |
 
 ## Dependency rules
 
 Imports go downwards: `contracts`, then `meta`, then `config`; `python` (on
-`contracts`) and `lookup` (on `python`) beside it; then `rules/shared`, then
-each rule; then `baseline`, `engine` and `report`. `index.ts` may re-export
+`contracts`), `lookup` (on `python`) and `diagram` (on `contracts`) beside
+it; then `rules/shared`, then each rule (INW017 to INW019 also on
+`diagram`); then `baseline`, `engine` and `report`. `index.ts` may re-export
 any of them. Nothing in core imports the CLI, the extension, tests or
 scripts.
 

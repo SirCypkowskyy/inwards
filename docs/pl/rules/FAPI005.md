@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI005.md
-source_hash: 35a905e897e0b6ae0634ea5e50961bfa8c0ef7c04e2e8c52b7e2340f14ae326d
+source_hash: 55a247e430be7c6a28c0c1cbc2fcfdbb1eafca845c1cf67be3668010a016988b
 type: rule
 title: FAPI005 route-shadowing
 description: Żadna operacja ścieżki FastAPI nie jest przesłonięta przez wcześniejszą z tą samą metodą, więc każda trasa jest osiągalna.
@@ -145,7 +145,7 @@ Brak automatycznej poprawki (`autofix: false`). Która trasa jest zamierzona i c
 
 ## Konfiguracja { #configuration }
 
-Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule, a `check-tests` jak w każdej regule treści ([tabele opcji](index.md#opt-in-rules)).
 
 Każde zgłoszenie stoi na dekoratorze i można je wyciszyć w kodzie przez `# inwards: ignore[FAPI005] reason="..."` w tej linii.
 
@@ -156,7 +156,8 @@ Nieznane oznacza ciszę. Nic nie jest zgłaszane, gdy:
 - ścieżka, lista `methods=` albo `prefix=` nie jest literałem tekstowym (zmienna, f-string, wywołanie) albo `**kwargs` może któreś ukrywać;
 - router trzyma trasy w kilku plikach, bo ich kolejność jest nieznana;
 - segment używa konwertera, którego Inwards nie zna, innego niż identyczny;
-- inne dołączenie tego samego routera, pod prefiksem, którego Inwards nie czyta, albo w innej aplikacji, zostawia trasę osiągalną.
+- inne dołączenie tego samego routera, pod prefiksem, którego Inwards nie czyta, albo w innej aplikacji, zostawia trasę osiągalną;
+- router buduje własna klasa albo fabryka routera ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)), która może ustawić własne `route_class` i dopasowywać trasy po swojemu: `VersionedAPIRoute` Polara obsługuje dwie trasy z tą samą metodą i ścieżką według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
 
 Dalsze ograniczenia:
 

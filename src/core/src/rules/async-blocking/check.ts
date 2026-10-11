@@ -15,23 +15,29 @@
  * supplies the parser, the file, the options and the run's first-party
  * modules, each parsed and read once per run (#359).
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
-import { parsePython } from "../../python/parser.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import type { ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
-import { configuredFamily, FAMILIES, type Family, LIBRARIES } from "./catalog.ts";
+import { BUILT_IN_NAMES, configuredFamily, FAMILIES, type Family, LIBRARIES } from "./catalog.ts";
 import { followModules, Helpers } from "./hop.ts";
+import { BlockingReach, blockingSegments } from "./prefilter.ts";
 import { functionReceivers } from "./receivers.ts";
 import { blockingCall, callsIn, functionsIn, isAsync, type Walk, walkOf } from "./walk.ts";
 import { report, reportHop } from "./wording.ts";
 
 /** An `async def` anywhere in a file's text. */
 const ASYNC_DEF = /\basync\s+def\b/u;
+
+/** The fewest files with an `async def` a run needs for the prefilter to pay. */
+const PREFILTER_FILES = 200;
+
+/** The prefilter needs one file in this many to have an `async def`. */
+const PREFILTER_SHARE = 20;
 
 /** A wildcard in a pattern's first segment, which no text filter can rule out. */
 const WILDCARD = /[*?]/u;
@@ -85,6 +91,26 @@ function mayBlock(text: string, settings: Settings): boolean {
 }
 
 /**
+ * Tells whether INW013's prefilter (`prefilter.ts`) pays for a run: it reads
+ * every listed module once and parses those that name a blocking type, so it
+ * pays when the run would otherwise parse many files with an `async def`, and
+ * they are a fair share of the run (#369). Saleor, with 12 such files in
+ * 4,324, checks faster without it; Polar, with 865 in 1,831, five times
+ * faster with it. Findings are the same either way.
+ *
+ * @param files - the files the run checks.
+ * @returns true when at least `PREFILTER_FILES` of them, and one in
+ *   `PREFILTER_SHARE`, have an `async def`.
+ */
+function prefilterPays(files: readonly SourceFile[]): boolean {
+  if (files.length < PREFILTER_FILES) {
+    return false;
+  }
+  const asynchronous = files.filter((file) => ASYNC_DEF.test(file.text)).length;
+  return asynchronous >= PREFILTER_FILES && asynchronous * PREFILTER_SHARE >= files.length;
+}
+
+/**
  * Checks one `async def`: its own blocking calls, and the sync helpers it calls.
  *
  * @param fn - its `function_definition` node.
@@ -121,17 +147,68 @@ export class AsyncBlockingRun {
   readonly views: ParsedModules<Walk>;
   /** The run's trees, which may already hold the checked file. */
   readonly trees: ModuleTrees;
+  /** The files the run checks, which decide whether the prefilter pays (`prefilterPays`). */
+  private readonly files: readonly SourceFile[];
+  /** The prefilter once built; null when it can't apply to this run. */
+  private reach: BlockingReach | null | undefined;
 
   /**
    * Reads the options and wraps the run's trees. Nothing is parsed yet.
    *
    * @param options - `[tool.inwards.rules.async-blocking]`, if set.
    * @param trees - the run's first-party modules, which a hop reads.
+   * @param files - the files the run checks; none by default, which leaves the prefilter off.
    */
-  constructor(options: RuleOptions | undefined, trees: ModuleTrees) {
+  constructor(
+    options: RuleOptions | undefined,
+    trees: ModuleTrees,
+    files: readonly SourceFile[] = [],
+  ) {
     this.settings = settingsOf(options);
     this.trees = trees;
     this.views = followModules(trees, this.settings.families, this.settings.follow);
+    this.files = files;
+  }
+
+  /**
+   * Tells whether a checked file may hold a finding, by the run's prefilter
+   * (`prefilter.ts`), built on the first call. Without one, every file may.
+   *
+   * @param src - the checked file, with normalised text.
+   * @returns false only when parsing the file can't find anything.
+   */
+  mayFind(src: SourceFile): boolean {
+    const reach: BlockingReach | undefined = this.reachOf();
+    return reach === undefined || reach.mayFind(src);
+  }
+
+  /**
+   * The names a call that passes no receiver must end in to reach a helper
+   * that blocks, by the run's prefilter.
+   *
+   * @returns the helpers' names and aliases, or undefined without a prefilter.
+   */
+  helpers(): ReadonlySet<string> | undefined {
+    return this.reachOf()?.helpers;
+  }
+
+  /**
+   * Builds the run's prefilter on first use, when the run asked for one and
+   * hops may leave the file.
+   *
+   * @returns the prefilter, or undefined when it doesn't apply.
+   */
+  private reachOf(): BlockingReach | undefined {
+    if (this.reach === undefined) {
+      const { follow, patterns } = this.settings;
+      // With `follow-modules = []` no hop leaves the file, and `mayBlock` has already decided.
+      const segments =
+        follow?.length !== 0 && prefilterPays(this.files)
+          ? blockingSegments([...BUILT_IN_NAMES, ...patterns])
+          : undefined;
+      this.reach = (segments && BlockingReach.of(this.trees, this.views, segments)) ?? null;
+    }
+    return this.reach ?? undefined;
   }
 }
 
@@ -140,33 +217,21 @@ export class AsyncBlockingRun {
  * for the file; this parses only a file that may hold a finding, and reads
  * another module only when an `async def` calls a function there.
  *
- * @param parser - parser with the Python grammar loaded.
  * @param src - the file, with normalised text.
- * @param run - the options and the run's view of the modules a hop reads.
+ * @param run - the options, the run's trees and its view of the modules a hop reads.
  * @returns the findings in source order, before suppressions and severities apply.
  */
-export function checkAsyncBlocking(
-  parser: Parser,
-  src: SourceFile,
-  run: AsyncBlockingRun,
-): Diagnostic[] {
+export function checkAsyncBlocking(src: SourceFile, run: AsyncBlockingRun): Diagnostic[] {
   const { settings, views } = run;
-  if (!mayBlock(src.text, settings)) {
+  if (!(mayBlock(src.text, settings) && run.mayFind(src))) {
     return [];
   }
-  // A file an earlier file's hop led to is parsed already; the run frees that tree.
-  const shared = run.trees.parsedAs(src);
-  const tree = shared ?? parsePython(parser, src.text);
-  try {
-    const walk = walkOf(tree, src, settings.families);
-    const hops = new Helpers(walk, { views, modules: settings.follow });
-    return functionsIn(tree.rootNode)
-      .filter(isAsync)
-      .flatMap((fn) => checkFunction(fn, walk, hops))
-      .sort((a, b) => a.line - b.line || a.column - b.column);
-  } finally {
-    if (shared === undefined) {
-      tree.delete(); // WASM memory is not garbage collected
-    }
-  }
+  // The run's tree: another rule, or an earlier file's hop, may have parsed it already.
+  const tree = run.trees.treeOf(src);
+  const walk = walkOf(tree, src, settings.families);
+  const hops = new Helpers(walk, { views, modules: settings.follow, helpers: run.helpers() });
+  return functionsIn(tree.rootNode)
+    .filter(isAsync)
+    .flatMap((fn) => checkFunction(fn, walk, hops))
+    .sort((a, b) => a.line - b.line || a.column - b.column);
 }

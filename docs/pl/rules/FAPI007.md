@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI007.md
-source_hash: 469fc4c0e72cc1d21388efb96dce0156d155f616abf0a3bdd1c51d4f8381bc3e
+source_hash: 936df38a23cda5e2eb5ef21cc7df90fef24fce46fcc0250f7da8011f23e6e5e1
 type: rule
 title: FAPI007 yield-dependency-swallows
 description: Zależność z yield rzuca ponownie to, co łapią jej klauzule except, więc błąd w endpoincie nie jest ukryty przed serwerem.
@@ -146,7 +146,7 @@ Brak automatycznej poprawki (`autofix: false`). To, czy błąd ma dotrzeć do kl
 
 ## Konfiguracja { #configuration }
 
-Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule, a `check-tests` jak w każdej regule treści ([tabele opcji](index.md#opt-in-rules)).
 
 Każde zgłoszenie można wyciszyć w kodzie przez `# inwards: ignore[FAPI007] reason="..."` w linii `except`.
 

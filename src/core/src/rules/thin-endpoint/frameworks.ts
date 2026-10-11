@@ -20,21 +20,17 @@ const MENTIONS: Readonly<Record<Framework, RegExp>> = {
   django: /django|rest_framework/u,
 };
 
-/** The constructors whose result is an app or router that declares routes, by qualified name. */
-export const ROUTERS: Readonly<Record<"fastapi" | "flask", ReadonlySet<string>>> = {
-  fastapi: new Set([
-    "fastapi.FastAPI",
-    "fastapi.applications.FastAPI",
-    "fastapi.APIRouter",
-    "fastapi.routing.APIRouter",
-  ]),
-  flask: new Set([
-    "flask.Flask",
-    "flask.app.Flask",
-    "flask.Blueprint",
-    "flask.blueprints.Blueprint",
-  ]),
-};
+/**
+ * Flask's constructors of an app or blueprint, by qualified name. FastAPI's
+ * apps and routers are recognised as the FastAPI model recognises them
+ * (`shared/fastapi-routers.ts`).
+ */
+export const FLASK_ROUTERS: ReadonlySet<string> = new Set([
+  "flask.Flask",
+  "flask.app.Flask",
+  "flask.Blueprint",
+  "flask.blueprints.Blueprint",
+]);
 
 /** The route decorators of an app or router (FastAPI's path operations; Flask's `route` and its shortcuts). */
 export const OPERATIONS: Readonly<Record<"fastapi" | "flask", ReadonlySet<string>>> = {

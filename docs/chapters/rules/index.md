@@ -6,7 +6,7 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 
 Search the rules, filter them by category, status or autofix, sort them by code, name, category or status, and page through them. The address bar keeps the view, so a link opens the same list. A category includes its sub-categories: `imports` also lists the rules filed under `imports › layers`.
 
-The rules fall into six categories, described below in this order: [imports](#imports), [layout](#layout), [roles](#roles), [integrity](#integrity), [diagrams](#diagrams) and [FastAPI](#fastapi). A rule is either on by default or [opt-in](#opt-in-rules). The presets of [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) keep every rule that is on by default, except that django and fastapi turn INW002 off, and turn some opt-in rules on as warnings: INW014 and INW015 in clean and hexagonal, INW012, INW013, INW016 and the FAPI rules in fastapi.
+The rules fall into six categories, described below in this order: [imports](#imports), [layout](#layout), [roles](#roles), [integrity](#integrity), [diagrams](#diagrams) and [FastAPI](#fastapi). Each category also has a page of its own, and the navigation lists its rules under it: [imports](imports/index.md), [layout](layout/index.md), [roles](roles/index.md), [integrity](integrity/index.md), [diagrams](diagrams/index.md) and [FastAPI](fastapi/index.md). A rule is either on by default or [opt-in](#opt-in-rules). The presets of [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) keep every rule that is on by default, except that django and fastapi turn INW002 off, and turn some opt-in rules on as warnings: INW014 and INW015 in clean and hexagonal, INW012, INW013, INW016 and the FAPI rules in fastapi.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>
 
@@ -81,6 +81,7 @@ Architecture diagrams in the docs, checked against `[tool.inwards]` ([ADR-045](.
 |---|---|---|---|---|---|---|
 | [INW017](INW017.md) | `diagram-unknown-name` | A node in a marked Mermaid or PlantUML architecture diagram that names no declared layer or context, or whose quoted label (a PlantUML alias's module) matches no module (whole-project runs) | opt-in | warning | none | no |
 | [INW018](INW018.md) | `diagram-forbidden-edge` | A solid arrow in a marked Mermaid or PlantUML architecture diagram that draws an import the config forbids: outward or between sibling layers, between contexts without `depends-on`, or into a module that isn't `public` (whole-project runs) | opt-in | warning | none | no |
+| [INW019](INW019.md) | `diagram-missing-dependency` | An import in the code between two layers or contexts a marked Mermaid or PlantUML architecture diagram draws, with no arrow (for layers, no path of arrows) for it (whole-project runs) | opt-in | warning | none | no |
 
 </div>
 
@@ -129,7 +130,7 @@ Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `
 
 ### Opt-in rules and rule options { #opt-in-rules }
 
-A rule whose On column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md) and [INW018](INW018.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, the rules that judge the content of a role's modules, such as INW013, INW015 and INW016, the rules that check docs against the config, INW017 and INW018, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
+A rule whose On column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md), [INW018](INW018.md) and [INW019](INW019.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, the rules that judge the content of a role's modules, such as INW013, INW015 and INW016, the rules that check docs against the config and the code, INW017, INW018 and INW019, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
 
 A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
 
@@ -138,6 +139,15 @@ A rule's options live in a table named after the rule, `[tool.inwards.rules.<rul
 ```toml title="pyproject.toml"
 [tool.inwards.rules.pure-domain]
 modules = ["shop.domain"]  # INW005 reports only in shop.domain and below
+```
+
+The opt-in content rules, INW012 to INW016 and the FAPI rules, skip test modules: a module whose last name segment is `test_*` or `*_test`, or that has a `tests`, `test` or `conftest` segment, such as `app/tests/test_orders.py`, `tests/conftest.py` or `app/orders_test.py`. A test builds a throwaway app or imports an adapter on purpose, so a finding there is rarely worth fixing ([ADR-037](../05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)). `check-tests = true` in the rule's table brings them back for that rule. The other rules check test modules like any other module, and the top-level `ignore` doesn't scope the content rules.
+
+<!-- config: fragment -->
+
+```toml title="pyproject.toml"
+[tool.inwards.rules.async-blocking]
+check-tests = true  # INW013 also reports in tests/ and test_*.py
 ```
 
 A [template](../guides/configuration.md#template-rules) can turn an opt-in rule on for one of its roles, such as `router = { async-blocking = true }`; it expands into `extend-select` and the rule's options table, with the role's modules in `modules`.
@@ -154,4 +164,4 @@ Rules that point at a line of Python can be suppressed this way: INW001, INW002,
 
 ## Page format
 
-Each rule page starts with front matter in the [OKF](https://okf.md/spec/) format: `type: rule`, `title`, `description`, `resource` (the rule's source file), `tags` (the category, parent first), `timestamp` (when the rule shipped), `status`, and the Inwards fields `code`, `name`, `severity`, `suppressible`, `autofix` and `related_issues`. Every page also has the sections What it does, Why is this bad, Example (a flagged and a fixed code block) and Fix safety, and a row in a table on this page. `uv run scripts/check-rule-pages.py` checks all of that in both languages, in CI too, and writes the `rules.json` the list above reads; after changing a rule page or a row here, run it with `--write`. A test checks that every registered rule has a page and every page names a registered rule. The flagged and fixed examples run as tests too, against the output shown on the page.
+Each rule page starts with front matter in the [OKF](https://okf.md/spec/) format: `type: rule`, `title`, `description`, `resource` (the rule's source file), `tags` (the category, parent first), `timestamp` (when the rule shipped), `status`, and the Inwards fields `code`, `name`, `severity`, `suppressible`, `autofix` and `related_issues`. Every page also has the sections What it does, Why is this bad, Example (a flagged and a fixed code block) and Fix safety, plus a row in a table on this page and in its category's page (`rules/<category>/`), and an entry in its category's group of the navigation, in `docs/zensical.toml` and `docs/zensical.pl.toml`. `uv run scripts/check-rule-pages.py` checks all of that in both languages, in CI too, and writes the `rules.json` the list above reads; after changing a rule page or a row here, run it with `--write`. A test checks that every registered rule has a page and every page names a registered rule. The flagged and fixed examples run as tests too, against the output shown on the page.

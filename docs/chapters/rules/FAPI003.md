@@ -164,12 +164,13 @@ check-order = true
 - `unresolved-includes` (default `"warn"`): what an `include_router` call whose target Inwards can't resolve does. `"warn"` turns every unmounted router into a warning that names the call; `"silent"` drops them.
 - `check-order` (default `true`): `false` stops reporting an inclusion above the routes.
 - `modules`, as for every rule ([options tables](index.md#opt-in-rules)).
+- `check-tests`: `true` makes FAPI003 report in test modules too, which it skips by default ([options tables](index.md#opt-in-rules)).
 
 Every finding sits on a line of its own and can be suppressed inline with `# inwards: ignore[FAPI003] reason="..."` on that line. A suppression on an `APIRouter(...)` line counts as used in the hook too, which doesn't report the router.
 
 ## Known limitations
 
-- **Dynamic wiring:** `importlib.import_module(...)`, `getattr(m, "router")`, a loop over anything but a literal, a router a factory function returns, entry-point plugins. An `include_router` whose target Inwards can't resolve makes unmounted routers warnings (or nothing, with `"silent"`), never errors on a guess. A library's router (`from fastapi_users import ...`) isn't an unresolved call; it just isn't in the graph.
+- **Dynamic wiring:** `importlib.import_module(...)`, `getattr(m, "router")`, a loop over anything but a literal, a router a factory function returns, entry-point plugins. An `include_router` whose target Inwards can't resolve makes unmounted routers warnings (or nothing, with `"silent"`), never errors on a guess. A library's router (`from fastapi_users import ...`) isn't an unresolved call; it just isn't in the graph. A router a first-party class or factory builds ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)) isn't reported at all while such a call could include it or a router above it: `include_router(make_router())` could include only the routers `make_router` returns, any other unresolved target (a function parameter, `getattr`) any router. Polar wires its API router through a parameter of `add_versioned_routers(app, api_router)`, so none of its 72 routers is reported ([#391](https://github.com/SirCypkowskyy/inwards/issues/391) is about following those calls).
 - **Conditional wiring:** `if settings.DEBUG: app.include_router(debug.router)` counts as included.
 - **Routers meant to be unused** (a shared router other packages include, a test-only router, one kept for a later release): use `allow-unmounted` or a suppression with a reason.
 - **Apps outside the project** aren't seen: a router a library's app includes is unmounted as far as FAPI003 knows. Use `allow-unmounted` or `ignore` for such code.

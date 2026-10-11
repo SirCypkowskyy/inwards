@@ -178,6 +178,16 @@ Check it works:
 - A layer violation shows in the gutter and in the diagnostics picker (`Space` `d`) with its rule code.
 - `:lsp-restart` restarts the servers after a config change; `:log-open` shows why one didn't start.
 
+## Architecture diagrams { #diagrams }
+
+With [INW017 or INW018](diagrams.md#check) on, the server checks the Markdown, Mermaid and PlantUML files the [`diagrams`](configuration.md#diagrams) key lists too: a closed one with each whole-project pass, an open one on every change, from the unsaved text. Saving a diagram runs no pass, since nothing else depends on it. Any other Markdown file is left alone. The editor has to send the server those files, so add their file types where you added `python`, as the [VS Code extension](install.md#vs-code) does:
+
+- **Neovim:** `filetypes = { "python", "markdown", "mermaid", "plantuml" }`.
+- **Zed:** `languages = ["Python", "Markdown"]` in `extension.toml`.
+- **Helix:** add `inwards` to the `language-servers` of the `markdown` language too.
+
+These lines follow each editor's docs and haven't been tried by hand.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
@@ -186,4 +196,5 @@ Check it works:
 | The server exits at once, and the editor's log shows Inwards' usage text | The binary is older than 0.5.0 and has no `server` command. Install a newer release. |
 | A config error on `pyproject.toml` and nothing in the Python files | `[tool.inwards]` doesn't parse. The message names the key; the files are checked again once the fixed config is saved. |
 | Findings from other files (an import cycle, say) lag behind your typing | A keystroke checks the file you type in; findings that need the whole project update on the next save. |
+| A diagram shows nothing | The file isn't in `diagrams`, INW017 and INW018 are off, or the editor doesn't send Markdown to the server ([Architecture diagrams](#diagrams)). |
 | With uv: "Failed to spawn: `inwards`" | The server started outside the project, or Inwards isn't in the project's dev dependencies. Check the root the editor reports, and run `uv add --dev inwards`. |

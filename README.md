@@ -9,14 +9,14 @@ that probably wrote the import.
 $ inwards check --format json
 ```
 
-Status: pre-alpha. The rules INW000 to INW016 and the FastAPI rules FAPI001 to FAPI009
-work end to end in the CLI and the editor; the
+Status: pre-alpha. The rules INW000 to INW019 and the FastAPI rules FAPI001 to FAPI009
+(FAPI004 is unused) work end to end in the CLI and the editor; the
 [rules index](https://sircypkowskyy.github.io/inwards/rules/) says what each one checks.
 `inwards init --agent claude` wires them into Claude Code with a per-edit check, a Stop gate,
 a config guard and escalation to the user (`--agent opencode` does the same through an OpenCode
 plugin; `--agent aider` and `--agent agents-md` cover Aider and `AGENTS.md`). On a new project,
 `uvx inwards init --style hexagonal --scaffold` writes the layers (six other presets too) and an
-example package that passes the check. The latest release is 0.5.0 (2026-10-10):
+example package that passes the check. The latest release is 0.6.0 (2026-10-11):
 
 ```sh
 uv add --dev inwards

@@ -209,4 +209,4 @@ Other agents: [OpenCode](guides/opencode.md), [Aider](guides/aider.md), [`AGENTS
 
 </nav>
 
-<p class="inw-status" markdown>Pre-alpha. Latest release: [0.5.0 on PyPI](https://pypi.org/project/inwards/), 2026-10-10. Rules: [INW000 to INW016, FAPI001 to FAPI009](rules/index.md).</p>
+<p class="inw-status" markdown>Pre-alpha. Latest release: [0.6.0 on PyPI](https://pypi.org/project/inwards/), 2026-10-11. Rules: [INW000 to INW018, FAPI001 to FAPI003 and FAPI005 to FAPI009](rules/index.md).</p>

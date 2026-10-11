@@ -3,13 +3,15 @@
  * Every pass reads the config, the baseline, the listing and the files afresh
  * (ADR-041), so an event only decides when a pass runs, never what it may
  * keep. Anything that can change what `inwards check` says counts: a module
- * file or a directory created, changed or deleted, a pyproject.toml, or a
- * baseline. Hidden directories (`.git`, `.venv`, `.inwards`) and compiled
+ * file or a directory created, changed or deleted, a pyproject.toml, a
+ * baseline, or a file named like a diagram (`DIAGRAM_FILE`), which the
+ * `diagrams` key may list (#348). Hidden directories (`.git`, `.venv`, `.inwards`) and compiled
  * caches don't. Pure path text; nothing is read.
  */
 import { relative } from "node:path";
 import { isInside } from "../paths/lexical.ts";
 import { BASELINE_FILE } from "../project/baseline.ts";
+import { DIAGRAM_FILE } from "../project/diagrams.ts";
 import type { FileChange } from "./contracts.ts";
 
 /** Files Python can import a module from. */
@@ -20,8 +22,8 @@ const SEPARATOR = /[\\/]/u;
 /**
  * Tells whether one event under the workspace can change a finding: a
  * module file, a name without a dot (a directory, since a deleted path can't
- * be looked at), the config or the baseline, outside hidden directories and
- * `__pycache__`.
+ * be looked at), the config, the baseline or a diagram, outside hidden
+ * directories and `__pycache__`.
  *
  * @param folders - the workspace folders, absolute.
  * @param path - the event's absolute path.
@@ -41,7 +43,8 @@ function matters(folders: readonly string[], path: string): boolean {
     name === "pyproject.toml" ||
     name === BASELINE_FILE ||
     !name.includes(".") ||
-    MODULE_FILE.test(name)
+    MODULE_FILE.test(name) ||
+    DIAGRAM_FILE.test(name)
   );
 }
 

@@ -286,6 +286,21 @@
       "url": "INW018/"
     },
     {
+      "code": "INW019",
+      "name": "diagram-missing-dependency",
+      "title": "INW019 diagram-missing-dependency",
+      "summary": "An import in the code between two layers or contexts a marked Mermaid or PlantUML architecture diagram draws, with no arrow (for layers, no path of arrows) for it (whole-project runs)",
+      "description": "A marked architecture diagram draws every import the code makes between the layers or contexts it shows.",
+      "category": ["diagrams", "docs"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "warning",
+      "suppressible": false,
+      "default": "opt-in, warning",
+      "presets": "none",
+      "url": "INW019/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

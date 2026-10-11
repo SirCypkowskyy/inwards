@@ -3,7 +3,8 @@
 Shows [Inwards](https://sircypkowskyy.github.io/inwards/) architecture violations in Python files as
 you type: a domain module importing infrastructure, a module no layer owns, a package missing its
 `service.py`. The extension starts `inwards server`, which runs the same code as `inwards check`, so
-the editor and CI report the same findings.
+the editor and CI report the same findings. Architecture diagrams that `[tool.inwards].diagrams`
+lists (Markdown, Mermaid, PlantUML) are checked as you type too, when INW017 or INW018 is on.
 
 ## Requirements
 

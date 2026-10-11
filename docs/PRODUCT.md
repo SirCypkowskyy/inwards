@@ -48,7 +48,7 @@ and no fix steps. Chapter 2 names speed as the moat against import-linter.
 ## Operating Context
 
 - Install: `uv add --dev inwards` or `pip install inwards` (on PyPI since
-  0.2.0, 2026-09-26; the latest is 0.5.0, 2026-10-10), `uvx inwards` with
+  0.2.0, 2026-09-26; the latest is 0.6.0, 2026-10-11), `uvx inwards` with
   no project, or a binary from GitHub Releases. The repository is public.
 - Setup: `inwards init --agent claude|opencode|aider|agents-md`; on a new
   project `uvx inwards init --style <preset> --scaffold`
@@ -60,7 +60,7 @@ and no fix steps. Chapter 2 names speed as the moat against import-linter.
 
 ## Capabilities and Constraints
 
-- Rules INW000 to INW018 and FAPI001 to FAPI009 (FAPI004 is unused), each
+- Rules INW000 to INW019 and FAPI001 to FAPI009 (FAPI004 is unused), each
   with a page at `rules/<CODE>/`. Those URLs are printed by the CLI and are a contract.
 - The docs site is Zensical (0.0.65), extended only through `custom_dir`
   overrides, `extra_css` and `extra_javascript`; no JS framework, no build

@@ -12,6 +12,7 @@ import { moduleFunctions } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { moduleAliases, parameterTypes } from "../shared/annotations.ts";
+import type { RouterKinds } from "../shared/fastapi-routers.ts";
 import { moduleClasses, type ResolveBase } from "./classes.ts";
 import { type Found, findEndpoints } from "./endpoints.ts";
 import { isAbort } from "./frameworks.ts";
@@ -33,6 +34,14 @@ export interface FileView {
   readonly found: Found;
   /** Reads an endpoint's own body first, then the same-module helpers it runs, in source order. */
   readonly bodies: (fn: Node, name: string) => Body[];
+}
+
+/** What reading a file looks up in other first-party modules; undefined fields read none. */
+export interface Resolvers {
+  /** Resolves a view base class from another first-party module. */
+  readonly base: ResolveBase | undefined;
+  /** Tells what first-party callees build, so a FastAPI router class built at run time counts (#358). */
+  readonly routers: RouterKinds | undefined;
 }
 
 /**
@@ -66,14 +75,14 @@ function mapsToHttp(statement: Node, qualify: Qualify): boolean {
  * @param tree - the file's tree, which the caller frees.
  * @param src - the file, with normalised text.
  * @param recognise - the configured decorators, base classes and frameworks.
- * @param resolveBase - resolves a view base class from another first-party module; undefined reads none.
+ * @param resolvers - resolve view base classes and router classes from other first-party modules.
  * @returns the file's view; bodies are measured on first use and cached.
  */
 export function fileView(
   tree: Tree,
   src: SourceFile,
   recognise: Recognise,
-  resolveBase: ResolveBase | undefined,
+  resolvers: Resolvers,
 ): FileView {
   const root = tree.rootNode;
   const names = importedNames(tree, src);
@@ -85,7 +94,8 @@ export function fileView(
     text: src.text,
     recognise,
     functions,
-    resolveBase,
+    resolveBase: resolvers.base,
+    routerKinds: resolvers.routers,
   });
   const types = { qualify, aliases: moduleAliases(root) };
   const measured = new Map<number, ReturnType<typeof measure>>();

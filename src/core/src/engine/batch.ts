@@ -2,7 +2,8 @@
  * @file Checking many files at once: the order the engine's per-file steps run
  * in over a whole list, and what only the whole list decides (the baseline
  * shortcut, FastAPI's cross-file findings, one unassigned-package warning per
- * package, import cycles, INW016's naming convention). `checkAllWith` is the same run with the parsing
+ * package, import cycles, INW016's naming convention and the naming scheme a
+ * project follows instead of the configured one). `checkAllWith` is the same run with the parsing
  * handed to an `ExtractionBatch` first (#61), such as worker threads. The
  * rules and their precedence stay in `engine.ts`; this module only orders
  * the steps the engine hands it.
@@ -13,6 +14,7 @@ import type { InwardsConfig } from "../config/parse.ts";
 import { applyRules } from "../config/rule-settings.ts";
 import type {
   Diagnostic,
+  DiagramSource,
   ExtractionBatch,
   ImportRef,
   SourceFile,
@@ -21,9 +23,10 @@ import type {
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { ContentRun, contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
+import { projectDiagramImports } from "./diagrams.ts";
 import type { Extractor } from "./extraction.ts";
 import { fastApiFindings, withFastApi } from "./fastapi.ts";
-import { ormConventionFindings } from "./orm-naming.ts";
+import { type OrmProject, ormProjectFindings } from "./orm-naming.ts";
 import {
   type Checked,
   type Confirmed,
@@ -88,6 +91,11 @@ export interface CheckOptions {
   whole?: boolean | undefined;
   /** True for a per-edit check, where FAPI003 reports one-file findings only. */
   edit?: boolean | undefined;
+  /**
+   * The files `diagrams` lists, with report paths, for INW019 on a
+   * whole-project run; the adapter reads them only when the rule is on.
+   */
+  diagrams?: readonly DiagramSource[] | undefined;
 }
 
 /** One file and its scan. */
@@ -181,7 +189,8 @@ function hiddenBy(
 /**
  * Confirms the scanned files in order, applies their suppressions and the
  * FastAPI cross-file findings, keeps each unassigned-package warning once,
- * adds the import cycles of a whole-project run, and applies
+ * adds the import cycles and the imports diagrams leave out of a
+ * whole-project run, and applies
  * `[tool.inwards.rules]` last.
  *
  * @param steps - the engine's per-file steps.
@@ -191,6 +200,7 @@ function hiddenBy(
  *   baseline shortcut skips (`hiddenBy`).
  * @param options.whole - true for a whole-project run.
  * @param options.edit - true for a per-edit check.
+ * @param options.diagrams - the files `diagrams` lists, for INW019.
  * @param options.hidden - the modules whose confirmation the baseline shortcut skips.
  * @returns the violations and the suppressed findings.
  */
@@ -198,7 +208,12 @@ function finish(
   steps: FileSteps,
   scanned: readonly Scanned[],
   project: ProjectIndex,
-  { whole = false, edit = false, hidden }: CheckOptions & { hidden: ReadonlySet<string> },
+  {
+    whole = false,
+    edit = false,
+    diagrams = [],
+    hidden,
+  }: CheckOptions & { hidden: ReadonlySet<string> },
 ): Checked {
   const { config } = steps;
   const all: Diagnostic[] = [];
@@ -206,10 +221,11 @@ function finish(
   const warned = new Set<string>();
   const collected: Collected[] = [];
   const sources = scanned.map(({ src }) => src);
-  const wired = fastApiFindings(steps.parser, project, sources, { config, edit });
-  // One parse per first-party module the content rules follow into, for the whole run (#359).
-  const run = new ContentRun(steps.parser, project, config);
+  // One parse per text for the whole run, shared by the FastAPI and content rules (#359, #387).
+  const run = new ContentRun(steps.parser, project, config, sources);
+  let orm: OrmProject = { findings: [], replaced: () => false };
   try {
+    const wired = fastApiFindings(run.trees, project, sources, { config, edit });
     for (const { src, scan } of scanned) {
       const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));
       const imports = confirmed.imports ?? scan.imports;
@@ -218,30 +234,45 @@ function finish(
       }
       const extra = withFound(
         withFastApi(confirmed, src, wired),
-        contentFindings(steps.parser, src, config, run),
+        contentFindings(src, config, run),
       );
       const own = steps.suppressIn(src, extra);
       suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
       all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }
+    if (whole) {
+      orm = ormProjectFindings(run.trees, sources, config, run.ormModels);
+    }
   } finally {
     run.dispose();
   }
   if (whole) {
+    /**
+     * Reads a file's imports with the full parse, for INW004 and INW019.
+     *
+     * @param file - a checked file.
+     * @param lastLine - the line by which its imports have ended.
+     * @returns its static imports.
+     */
+    function fullImports(file: SourceFile, lastLine: number): readonly ImportRef[] {
+      return steps.extractor.importsUpTo(file, lastLine);
+    }
     all.push(
       ...projectCycles(collected, {
         modes: config.cycles,
         contexts: config.contexts ?? [],
-        fullImports: (file: SourceFile, lastLine: number): readonly ImportRef[] =>
-          steps.extractor.importsUpTo(file, lastLine),
+        fullImports,
       }),
-      ...ormConventionFindings(steps.parser, sources, config),
+      ...projectDiagramImports(collected, { config, sources: diagrams, fullImports }),
     );
   }
+  const kept = all.filter((d) => !orm.replaced(d));
   return {
-    diagnostics: applyRules(all, config.rules),
-    suppressed: suppressed.flatMap(({ diagnostic, reason }) =>
-      applyRules([diagnostic], config.rules).map((d) => ({ diagnostic: d, reason })),
-    ),
+    diagnostics: applyRules([...kept, ...orm.findings], config.rules),
+    suppressed: suppressed
+      .filter(({ diagnostic }) => !orm.replaced(diagnostic))
+      .flatMap(({ diagnostic, reason }) =>
+        applyRules([diagnostic], config.rules).map((d) => ({ diagnostic: d, reason })),
+      ),
   };
 }

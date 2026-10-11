@@ -29,8 +29,8 @@ same PR that first needs it.
   subgraph titles), `aria-label`s, and hand-written SVG text on the pages.
   A diagram marked `%% inwards: layers` or `%% inwards: contexts` (or
   `' inwards: layers` or `' inwards: contexts` in PlantUML) is a code
-  block that INW017 and INW018 read: its ids and quoted labels (module prefixes) stay
-  as written.
+  block that INW017, INW018 and INW019 read: its ids and quoted labels
+  (module prefixes) stay as written.
 - **Cross-links** inside `docs/pl/` point to Polish pages (same relative
   paths as in English). Images, CSS and scripts come from the English site:
   a Polish page references `../assets/...` one level further up than the
@@ -67,7 +67,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW018, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW019, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | Naming styles | lower_case_snake, snake case, camel case | INW016's table and column schemes |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
@@ -185,6 +185,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | on by default (the rules index's On column); turned on by preset | domyślnie (kolumna Włączona); włącza ją preset |
 | rule categories (the first tag: imports, layout, roles, integrity, diagrams, fastapi) | kategorie reguł: importy, układ, role, integralność, diagramy, FastAPI (tag i kotwica zostają po angielsku) |
 | options table (`[tool.inwards.rules.<rule-name>]`) | tabela opcji |
+| content rule (INW012 to INW016, FAPI) | reguła treści |
+| test module (`test_*.py`, `conftest.py`, a `tests` package) | moduł testowy |
 | owner (the repo's) | właściciel |
 | payload (hook input) | dane wejściowe (hooka) |
 | per-edit hook | hook edycji |
@@ -198,6 +200,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | path operation (FastAPI) | operacja ścieżki |
 | include a router (`include_router`) | dołączać router, dołączenie |
 | unmounted router (FAPI003) | niepodpięty router |
+| router factory, class factory (#358) | fabryka routera, fabryka klas |
+| route class (`route_class=`) | klasa tras |
 | shadowed route (FAPI005) | przesłonięta trasa |
 | lifespan (FastAPI, FAPI006) | lifespan (menedżer kontekstu cyklu życia aplikacji) |
 | event handler (`on_event`, FAPI006) | handler zdarzeń |
@@ -229,6 +233,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | node, edge, link (Mermaid) | węzeł, krawędź |
 | solid arrow, dotted link (Mermaid; INW018) | ciągła strzałka, przerywana krawędź |
 | forbidden edge (INW018) | zabroniona krawędź |
+| missing dependency, missing pair (INW019) | brakująca zależność, brakująca para |
 | head, tail (of an arrow) | grot, początek (strzałki) |
 | round trip (`import-diagram`, then `check`) | test w obie strony |
 | subgraph (Mermaid) | subgraph (subgraphu, subgraphy) |
@@ -265,6 +270,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
 | rule list, rule browser (the filterable list on `rules/`) | lista reguł |
 | category, sub-category (a rule page's `tags`) | kategoria, podkategoria |
+| category page (`rules/<category>/`) | strona kategorii |
+| navigation (the sidebar; a category's group in it) | nawigacja (grupa kategorii) |
 | autofix (the rule list's filter and column; the key stays `autofix`) | poprawka automatyczna |
 | rule status: stable, in review, in development, backlog | stabilna, w przeglądzie, w rozwoju, w planach |
 | rules per page, page (pagination) | reguł na stronie, strona |
