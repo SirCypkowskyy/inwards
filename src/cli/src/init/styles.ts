@@ -141,8 +141,9 @@ export const BOOTSTRAP: StyleLayer = {
 /**
  * Turns on the opt-in rules for the presets with ports and driven adapters
  * (clean, hexagonal). INW014 keeps `application/ports/` abstract with its
- * default scope, every module with a `ports` segment, so it needs no table.
- * INW015 lets only `bootstrap` import and build the driven adapters, so its
+ * default scope, every module with a `ports` segment; its table asks for
+ * Protocol ports that adapters implement by shape, never by subclassing
+ * (ADR-046). INW015 lets only `bootstrap` import and build the driven adapters, so its
  * table names that layer's package as `role` and `bootstrap` as `allowed-in`.
  *
  * @param adapters - the driven adapters' module below the package, e.g. `adapters.outbound`.
@@ -151,8 +152,13 @@ export const BOOTSTRAP: StyleLayer = {
 export function portsAndAdapters(adapters: string): StyleOptIn {
   return {
     codes: ["INW014", "INW015"],
-    why: "Port modules hold only ABCs and Protocols (INW014), and only bootstrap imports and builds the driven adapters (INW015), as warnings to start with: make them errors once the project is clean.",
+    why: "Port modules hold only Protocols, which adapters never subclass (INW014), and only bootstrap imports and builds the driven adapters (INW015), as warnings to start with: make them errors once the project is clean.",
     options: [
+      {
+        rule: "ports-abstract",
+        why: "Ports are typing.Protocol classes, never ABCs, and adapters implement them without subclassing them.",
+        lines: ['interface = "protocol"', "allow-subclassing = false"],
+      },
       {
         rule: "construct-only-in",
         why: "The driven adapters, and the composition root, the one module that may import and build them.",
