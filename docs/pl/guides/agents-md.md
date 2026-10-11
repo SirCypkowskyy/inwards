@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: a128cd6e877bb4392d956d55423c81b0f42089b9c3086b1baa24dfcf5bc868d3
+source_hash: 2bd4bd14938983c0fdc32cd75a1911ef7e5c9dd86c5b64ffc2f99dce3d9286a3
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -58,13 +58,13 @@ Sekcja powyżej każe agentowi sprawdzić pracę po fakcie. Opis architektury (b
 inwards context
 ```
 
-Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`), z dziewięcioma warstwami, trzema kontekstami i dwiema regułami opt-in, ma 1671 znaków, około 418 tokenów. Test pilnuje, żeby każdy preset mieścił się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540), presetem vertical-slices, który z pięcioma rolami wycinka i INW021 ma się zmieścić poniżej 350 (z `--scaffold` ma około 334), a przykład poniżej 450. Ze znacznikami, które dodaje `--write`, wygląda tak:
+Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`), z dziewięcioma warstwami, trzema kontekstami i dwiema regułami opt-in, ma 1662 znaków, około 416 tokenów. Test pilnuje, żeby każdy preset mieścił się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540), presetem vertical-slices, który z pięcioma rolami wycinka i INW021 ma się zmieścić poniżej 350 (z `--scaffold` ma około 334), a przykład poniżej 450. Ze znacznikami, które dodaje `--write`, wygląda tak:
 
 ```markdown
 <!-- inwards-brief:begin -->
 ## Architecture brief (Inwards)
 
-`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of your own layer (sibling groups: 4-6).
+`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of yours (sibling groups: 4-6).
 
 1. slice.models (`shop.*.models`): imports no other layer
 2. slice.ports (`shop.*.ports`): may import slice.models
