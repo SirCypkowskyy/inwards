@@ -217,6 +217,8 @@ Which rules report and how loudly:
 
 INW000 can't be ignored, re-levelled or given options. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
 
+`inwards rules` shows what the table resolves to: every rule with its code, name, whether it is on, its severity, and the key that decided each, as a key under `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), or `default`. A rule limited by `modules` says where (`only in src.*.router`). It reads the nearest config, or `--config FILE`, and without one lists the defaults. `--json` prints the same as `inwards/rules@1`: a `source` and a `severitySource` per rule, each a `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` or `severity`) and its `keys`. `inwards rule INW013` prints one rule's page ([MCP guide](mcp.md#explain_rule)).
+
 <!-- config: fragment -->
 
 ```toml

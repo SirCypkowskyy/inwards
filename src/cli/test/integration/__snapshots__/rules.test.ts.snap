@@ -1,0 +1,613 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`rules without a config lists every rule at its default 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"No pyproject.toml with [tool.inwards] found: every rule at its default.
+
+CODE     NAME                         STATE  SEVERITY  SOURCE
+INW000   unsupported-encoding         on     error     always on
+INW001   layer-dependency             on     error     default
+INW002   context-independence         on     error     default
+INW003   public-api-only              on     error     default
+INW004   import-cycles                on     error     default
+INW005   pure-domain                  on     error     default
+INW006   unassigned-module            on     error     default
+INW007   package-shape                on     error     default
+INW008   missing-member               on     error     default
+INW009   suppression-comment          on     error     default
+INW010   unknown-first-party          on     error     default
+INW011   dynamic-import               on     error     default
+INW012   thin-endpoint                off    warning   opt-in, off by default
+INW013   async-blocking               off    error     opt-in, off by default
+INW014   ports-abstract               off    error     opt-in, off by default
+INW015   construct-only-in            off    error     opt-in, off by default
+INW016   orm-naming                   off    error     opt-in, off by default
+FAPI001  endpoint-metadata            off    error     opt-in, off by default
+FAPI002  undocumented-error-response  off    error     opt-in, off by default
+FAPI003  router-wiring                off    error     opt-in, off by default
+FAPI005  route-shadowing              off    error     opt-in, off by default
+FAPI006  lifespan-events              off    error     opt-in, off by default
+FAPI007  yield-dependency-swallows    off    error     opt-in, off by default
+FAPI008  duplicate-operation-id       off    error     opt-in, off by default
+FAPI009  depends-called               off    error     opt-in, off by default
+"
+,
+}
+`;
+
+exports[`rules names the key behind each rule's state and severity 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": 
+"Rules for pyproject.toml; SOURCE names keys under [tool.inwards].
+
+CODE     NAME                         STATE  SEVERITY  SOURCE
+INW000   unsupported-encoding         on     error     always on
+INW001   layer-dependency             on     warning   default; severity: rules.severity
+INW002   context-independence         on     error     default
+INW003   public-api-only              on     error     default
+INW004   import-cycles                on     error     default
+INW005   pure-domain                  off    error     rules.ignore
+INW006   unassigned-module            on     error     default
+INW007   package-shape                on     error     default
+INW008   missing-member               on     error     default
+INW009   suppression-comment          on     error     default
+INW010   unknown-first-party          on     error     default
+INW011   dynamic-import               on     error     default
+INW012   thin-endpoint                off    warning   opt-in, off by default
+INW013   async-blocking               on     error     templates.domain.rules.router; only in src.*.router
+INW014   ports-abstract               off    error     opt-in, off by default
+INW015   construct-only-in            off    error     opt-in, off by default
+INW016   orm-naming                   on     warning   templates.domain.rules.models; severity: templates.domain.rules.models; only in src.*.models
+FAPI001  endpoint-metadata            off    error     opt-in, off by default
+FAPI002  undocumented-error-response  off    error     opt-in, off by default
+FAPI003  router-wiring                off    error     opt-in, off by default
+FAPI005  route-shadowing              off    error     opt-in, off by default
+FAPI006  lifespan-events              on     error     rules.extend-select
+FAPI007  yield-dependency-swallows    off    error     opt-in, off by default
+FAPI008  duplicate-operation-id       off    error     opt-in, off by default
+FAPI009  depends-called               off    error     opt-in, off by default
+"
+,
+}
+`;
+
+exports[`rules --json prints inwards/rules@1 1`] = `
+{
+  "config": "pyproject.toml",
+  "rules": [
+    {
+      "code": "INW000",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW000/",
+      "enabled": true,
+      "name": "unsupported-encoding",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "fixed",
+      },
+      "summary": "The file's declared encoding can hide imports.",
+    },
+    {
+      "code": "INW001",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW001/",
+      "enabled": true,
+      "name": "layer-dependency",
+      "severity": "warning",
+      "severitySource": {
+        "keys": [
+          "rules.severity",
+        ],
+        "kind": "severity",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "Dependencies must point toward inner layers.",
+    },
+    {
+      "code": "INW002",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW002/",
+      "enabled": true,
+      "name": "context-independence",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "A bounded context imports another context only when it declares it in depends-on.",
+    },
+    {
+      "code": "INW003",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW003/",
+      "enabled": true,
+      "name": "public-api-only",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "Code outside a bounded context imports only the context's public modules.",
+    },
+    {
+      "code": "INW004",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW004/",
+      "enabled": true,
+      "name": "import-cycles",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "Modules, or bounded contexts, don't import each other in a cycle.",
+    },
+    {
+      "code": "INW005",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW005/",
+      "enabled": false,
+      "name": "pure-domain",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [
+          "rules.ignore",
+        ],
+        "kind": "ignore",
+      },
+      "summary": "A layer imports only the third-party and standard-library modules its config allows.",
+    },
+    {
+      "code": "INW006",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW006/",
+      "enabled": true,
+      "name": "unassigned-module",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "First-party code must belong to a layer, and every layer prefix must match modules.",
+    },
+    {
+      "code": "INW007",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW007/",
+      "enabled": true,
+      "name": "package-shape",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "A package holds only the members its configured shape allows, and names stay where they belong.",
+    },
+    {
+      "code": "INW008",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW008/",
+      "enabled": true,
+      "name": "missing-member",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "A package holds every member its configured shape requires.",
+    },
+    {
+      "code": "INW009",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW009/",
+      "enabled": true,
+      "name": "suppression-comment",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "An inline suppression names rules that can be suppressed, gives a reason, and hides a finding.",
+    },
+    {
+      "code": "INW010",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW010/",
+      "enabled": true,
+      "name": "unknown-first-party",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "An imported first-party module must exist.",
+    },
+    {
+      "code": "INW011",
+      "default": "on",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW011/",
+      "enabled": true,
+      "name": "dynamic-import",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "default",
+      },
+      "summary": "Dynamic imports (importlib, __import__, runpy, exec) must point toward inner layers too.",
+    },
+    {
+      "code": "INW012",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW012/",
+      "enabled": false,
+      "name": "thin-endpoint",
+      "severity": "warning",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "An HTTP endpoint reads the request, calls one use case and shapes the response; the logic, queries and outgoing calls live in other layers.",
+    },
+    {
+      "code": "INW013",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW013/",
+      "enabled": true,
+      "modules": [
+        "src.*.router",
+      ],
+      "name": "async-blocking",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [
+          "templates.domain.rules.router",
+        ],
+        "kind": "template",
+      },
+      "summary": "An async def makes no synchronous database, cache or cloud call: a sync SQLAlchemy Session, redis.Redis, boto3 or a blocking driver stalls the event loop.",
+    },
+    {
+      "code": "INW014",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW014/",
+      "enabled": false,
+      "name": "ports-abstract",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A port module holds only ABCs and Protocols whose methods have no body; implementations live in adapters.",
+    },
+    {
+      "code": "INW015",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW015/",
+      "enabled": false,
+      "name": "construct-only-in",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "Only the composition root imports and builds the modules of a guarded role, such as the outbound adapters; everything else takes them through a port.",
+    },
+    {
+      "code": "INW016",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW016/",
+      "enabled": true,
+      "modules": [
+        "src.*.models",
+      ],
+      "name": "orm-naming",
+      "severity": "warning",
+      "severitySource": {
+        "keys": [
+          "templates.domain.rules.models",
+        ],
+        "kind": "template",
+      },
+      "source": {
+        "keys": [
+          "templates.domain.rules.models",
+        ],
+        "kind": "template",
+      },
+      "summary": "ORM table names and the names of datetime and date columns follow the project's scheme: lower_case_snake singular tables, _at for datetimes, _date for dates.",
+    },
+    {
+      "code": "FAPI001",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI001/",
+      "enabled": false,
+      "name": "endpoint-metadata",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A FastAPI path operation declares the OpenAPI metadata the project requires.",
+    },
+    {
+      "code": "FAPI002",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI002/",
+      "enabled": false,
+      "name": "undocumented-error-response",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A FastAPI path operation declares every error status code it can produce.",
+    },
+    {
+      "code": "FAPI003",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI003/",
+      "enabled": false,
+      "name": "router-wiring",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "Every APIRouter with routes is included in an app, and no routers include each other in a cycle.",
+    },
+    {
+      "code": "FAPI005",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI005/",
+      "enabled": false,
+      "name": "route-shadowing",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "No FastAPI path operation is shadowed by an earlier one with the same method, so every route can be reached.",
+    },
+    {
+      "code": "FAPI006",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI006/",
+      "enabled": true,
+      "name": "lifespan-events",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [
+          "rules.extend-select",
+        ],
+        "kind": "extend-select",
+      },
+      "summary": "FastAPI apps use a lifespan context manager, not the deprecated on_event handlers, and never both, so every startup and shutdown handler runs.",
+    },
+    {
+      "code": "FAPI007",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI007/",
+      "enabled": false,
+      "name": "yield-dependency-swallows",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A dependency with yield re-raises what its except clauses catch, so an error in the endpoint is not hidden from the server.",
+    },
+    {
+      "code": "FAPI008",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI008/",
+      "enabled": false,
+      "name": "duplicate-operation-id",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "No two path operations of one FastAPI app share an explicit operation_id, so generated clients get one method per operation.",
+    },
+    {
+      "code": "FAPI009",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/FAPI009/",
+      "enabled": false,
+      "name": "depends-called",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "Depends and Security get the dependency function, not the result of calling it at import time.",
+    },
+  ],
+  "schema": "inwards/rules@1",
+}
+`;
+
+exports[`rules with a --config that isn't a file is a usage error 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"--config nope.toml: no such file.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`rule "INW099" is a usage error, exit 2 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards rule: no rule "INW099". Did you mean INW009 (suppression-comment)? Run inwards rules for the list.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`rule "layer-dependecy" is a usage error, exit 2 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards rule: no rule "layer-dependecy". Did you mean INW001 (layer-dependency)? Run inwards rules for the list.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`rule "nothing-like-it" is a usage error, exit 2 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards rule: no rule "nothing-like-it". Run inwards rules for the list.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`rule "" is a usage error, exit 2 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"Usage: inwards rule CODE|NAME [--full] [--json]
+
+Prints a rule's docs page, built into the binary: what it reports, why, an
+example and how to fix it. The same text as the MCP tool explain_rule.
+
+CODE|NAME: a rule code (INW001) or name (layer-dependency), in any case.
+--full: every section of the page, configuration and known limitations included.
+--json: print the page's fields and sections as JSON.
+
+Exit codes: 0 printed, 2 usage error or unknown rule.
+"
+,
+  "stdout": "",
+}
+`;
+
+exports[`rule "INW001 INW002" is a usage error, exit 2 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"Usage: inwards rule CODE|NAME [--full] [--json]
+
+Prints a rule's docs page, built into the binary: what it reports, why, an
+example and how to fix it. The same text as the MCP tool explain_rule.
+
+CODE|NAME: a rule code (INW001) or name (layer-dependency), in any case.
+--full: every section of the page, configuration and known limitations included.
+--json: print the page's fields and sections as JSON.
+
+Exit codes: 0 printed, 2 usage error or unknown rule.
+"
+,
+  "stdout": "",
+}
+`;

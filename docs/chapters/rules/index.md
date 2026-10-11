@@ -2,6 +2,8 @@
 
 Every diagnostic Inwards prints links to its rule's page here: the `docs:` line of the text output, the `docs` field of the JSON output, `helpUri` in SARIF and the code link in the editor. Each page says what the rule flags, why it matters when an AI agent writes the code, a flagged and a fixed example, how to fix a finding, how to configure the rule, and what it doesn't catch yet.
 
+`inwards rule INW001` prints a rule's page in the terminal, offline, from the binary you run, and `inwards rules` lists which rules your config turns on, at what severity, and why ([configuration](../guides/configuration.md#rules)).
+
 Search the rules, filter them by category, status or autofix, sort them by code, name or status, and page through them. The address bar keeps the view, so a link opens the same list. A category includes its sub-categories: `imports` also lists the rules filed under `imports › layers`.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>

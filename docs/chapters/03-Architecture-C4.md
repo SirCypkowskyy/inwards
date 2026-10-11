@@ -223,7 +223,7 @@ The other commands reuse the same pieces:
 
 - `inwards hook claude-code` reads a Claude Code hook payload from stdin and dispatches on the event: SessionStart records the session state, PreToolUse runs the shape guard and the config guard, PostToolUse checks the edited file, and Stop runs the Stop gate over what the session changed. [Chapter 4](04-AI-Integration.md) describes each one.
 - `inwards daemon` keeps the engine warm for PostToolUse ([ADR-039](05-ADR.md#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)). The hook sends it the payload, the working directory and the environment over a local socket, one JSON line each way; the daemon runs the same `hook claude-code` code with a runtime built from them and streams that collect the output, and the hook writes that output and exits with its code. It keeps only what content identifies: extractions by text hash and git answers by commit id. Without an answer the hook runs one-shot.
-- `inwards mcp` serves three tools to an agent's MCP client over stdio ([ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)). `check_files` runs `inwards check`'s routing and check with the agent's unwritten Python source laid over the disk, `explain_rule` serves the rule pages built into the binary, and `where_should_this_go` checks a module holding only the planned imports in each layer. The SDK and the pages load from their own chunks, only for this command.
+- `inwards mcp` serves three tools to an agent's MCP client over stdio ([ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)). `check_files` runs `inwards check`'s routing and check with the agent's unwritten Python source laid over the disk, `explain_rule` serves the rule pages built into the binary, and `where_should_this_go` checks a module holding only the planned imports in each layer. The SDK and the pages load from their own chunks, only for this command; `inwards rule CODE` prints the same page from the same chunk, for agents without an MCP client.
 - `inwards init --agent claude|opencode|aider|agents-md` computes every file change first, so `--dry-run` can print it as a diff and a second run changes nothing.
 - `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi [--scaffold]` writes a preset's `[tool.inwards]` (and an example package with the package shapes that fit it) only where nothing exists yet, then runs the check in process and prints the package as an annotated tree. On a terminal with no flags, a picker built on `@clack/prompts` asks instead; it is loaded with a dynamic import that the build puts in its own chunk ([ADR-020](05-ADR.md#adr-020-the-init-picker-uses-clackprompts-loaded-from-a-split-chunk)).
 
@@ -467,7 +467,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook, daemon, server, mcp: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
