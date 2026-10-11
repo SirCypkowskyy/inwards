@@ -94,6 +94,8 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # Tests that run pinned Ruff and Ty through uv skip without it.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Compile the binary for this OS (catches WASM embedding regressions)
         run: bun run scripts/build-binaries.ts ${{ matrix.target }}
       - name: Unit and end-to-end tests against the compiled binary
