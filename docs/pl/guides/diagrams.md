@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/diagrams.md
-source_hash: 8ddca8c31ebd01c7af29beae096fbc2d892bf29875a0bdd2a97c4b019c97651c
+source_hash: eee5154ddff615ccf7cc13ee0c7c9538848fe86216770c46080fb8ceaac136c6
 ---
 
 # Diagramy architektury { #architecture-diagrams }
@@ -119,7 +119,7 @@ inwards diagram --config services/pyproject.toml
 - **Nazwy.** Nazwa, która może być id węzła, jest tym id. Każda inna, na przykład `slices.domain` z szablonu, dostaje id zrobione z niej (`slices_domain`) i jest wskazywana przez swój pierwszy moduł, który INW017 i INW018 rozpoznają ([Oznacz diagram](#mark-a-diagram)). W PlantUML nazwa z łącznikiem albo taka, którą czytnik wziąłby za słowo kluczowe (`interface`, `package`), trafia w nawiasy: `[interface] as "shop.api"`.
 - **W obie strony.** Względem tej samej konfiguracji INW017 i INW018 nie znajdują w wyniku niczego, o ile istnieje każdy moduł, który konfiguracja wymienia (inaczej INW017 powtarza na diagramie zgłoszenie INW006), a `inwards import-diagram` odczytuje go z powrotem do tych samych warstw, miejsc i kontekstów. Testy sprawdzają jedno i drugie dla przykładowego pakietu każdego presetu i obu przykładowych aplikacji, w obu notacjach.
 - **To, czego diagram nie pokaże**, trafia na stderr, po linii na sprawę; kod wyjścia zostaje 0:
-    - Warstwa albo kontekst z dwoma lub więcej modułami. W Mermaid każdy moduł dostaje własną linię węzła i `import-diagram` czyta je wszystkie, ale Mermaid rysuje węzeł z ostatnią etykietą. Alias PlantUML nazywa jeden komponent, więc diagram zostawia pierwszy moduł. Tak samo kontekst narysowany jako subgraph albo pakiet.
+    - Warstwa albo kontekst z dwoma lub więcej modułami. Notatkę dostaje tylko PlantUML: alias nazywa jeden komponent, więc diagram zostawia pierwszy moduł. W Mermaid każdy moduł dostaje własną linię węzła i nie ma notatki; `import-diagram` czyta je wszystkie, ale Mermaid rysuje węzeł z ostatnią etykietą. Kontekst narysowany jako subgraph albo pakiet też zostawia pierwszy moduł, z notatką w obu notacjach.
     - Warstwa albo kontekst nazwany jak słowo kluczowe Mermaid (`class`, `style`, `end`) nie może być węzłem Mermaid. `--format plantuml` go narysuje.
     - Listy bibliotek, kształty, opcje reguł i `ignore`, tak jak przy `import-diagram`, oraz szablony, rysowane jako warstwy, na które się rozwijają.
 - **Kod wyjścia 2** dla `--layers` razem z `--contexts`, `--format` innego niż `mermaid` albo `plantuml` oraz `--contexts`, gdy konfiguracja nie deklaruje kontekstów.

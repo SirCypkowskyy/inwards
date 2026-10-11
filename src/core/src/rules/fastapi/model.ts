@@ -12,15 +12,16 @@
  * nodes (a path operation's function, a keyword's value) for the rules to
  * walk. The model reports nothing; deciding what is wrong is the rules' job.
  */
-import type { Node } from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
 import type { SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
-import { identifierName, moduleFunctions } from "../../python/nodes.ts";
+import { moduleFunctions } from "../../python/nodes.ts";
 import { importedNames, normalizeSource } from "../../python/parser.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { type ModuleDefinitions, moduleDefinitions } from "../shared/definitions.ts";
 import { type FoundDefinition, RouterKinds } from "../shared/fastapi-routers.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
+import { type CallSite, CallSites } from "./call-sites.ts";
 import { extract } from "./extract.ts";
 import type { FastApiFile, FastApiObject } from "./records.ts";
 
@@ -44,20 +45,6 @@ export type Definition =
       readonly node: Node;
       readonly qualify: Qualify;
     };
-
-/** A call to a first-party function, as `callsTo` found it. */
-export interface CallSite {
-  readonly call: Node;
-  /** Qualifies a name in the calling file. */
-  readonly qualify: Qualify;
-}
-
-/** The statements a name may appear in without being a use of what it names. */
-const IMPORTS: ReadonlySet<string> = new Set([
-  "import_statement",
-  "import_from_statement",
-  "future_import_statement",
-]);
 
 /** One parsed file, kept until `dispose()`; the run's trees own its tree. */
 interface Parsed {
@@ -98,8 +85,14 @@ export class FastApiModel {
   private readonly kinds = new RouterKinds((qualified) => this.definitionOf(qualified));
   /** Paths whose text came from `fileModel`, the adapter's view, which a disk read must not replace. */
   private readonly pinned = new Set<string>();
-  /** Each function's calls `callsTo` found, by qualified name; null when they can't all be known. */
-  private readonly calls = new Map<string, readonly CallSite[] | null>();
+  /** Finds a function's calls across the project, for the graph's parameters (#391). */
+  private readonly callSites = new CallSites({
+    modules: (): Iterable<string> => this.project.modules,
+    sourceOf: (module: string): SourceFile | undefined => this.project.sourceOf(module),
+    parse: (src: SourceFile): Parsed => this.parse({ ...src, text: normalizeSource(src.text) }),
+    treeOf: (src: SourceFile): Tree => this.trees.treeOf(src),
+    resolve: (qualified: string): Definition | null => this.resolve(qualified),
+  });
 
   /**
    * Wraps the run's trees and a project index. Nothing is read or parsed yet.
@@ -215,7 +208,7 @@ export class FastApiModel {
       const src = owner === undefined ? undefined : this.project.sourceOf(owner);
       const [head = "", ...rest] =
         src === undefined ? [] : name.slice(src.module.length + 1).split(".");
-      if (src === undefined || head === "") {
+      if (src === undefined || head === "" || this.unbound(src, head, rest)) {
         return null;
       }
       // A file the check already handed in keeps its text (e.g. as it was at session start).
@@ -229,6 +222,27 @@ export class FastApiModel {
       name = [next, ...rest].join(".");
     }
     return null;
+  }
+
+  /**
+   * Tells, without parsing a module the model hasn't read, that none of its
+   * imports binds a name, so a dotted name through it (`service.list`, where
+   * `service` is defined in the module) leads nowhere: only an import would
+   * carry the walk on. FAPI002 asks this for nearly every call an endpoint
+   * makes, and parsing each service module it names was a quarter of the
+   * FastAPI rules' cost on Polar (#395).
+   *
+   * @param src - the module's file, as the project index reads it.
+   * @param head - the name's first segment in that module.
+   * @param rest - the segments after it; with none, the module's own definitions count and it must be read.
+   * @returns true when the name goes on past `head`, the module is unread and its imports don't bind `head`.
+   */
+  private unbound(src: SourceFile, head: string, rest: readonly string[]): boolean {
+    if (rest.length === 0 || this.parsed.has(src.path)) {
+      return false;
+    }
+    const names = this.trees.boundNames({ ...src, text: normalizeSource(src.text) });
+    return names !== undefined && !names.has(head);
   }
 
   /**
@@ -255,103 +269,13 @@ export class FastApiModel {
 
   /**
    * Finds every call to a first-party module-level function in the project
-   * (#391), so a parameter of it can be followed one hop to what the callers
-   * pass. Only files whose text spells the function's name are parsed, and a
-   * name counts as a use when it resolves to the function, re-exports and
-   * aliases included. A use that isn't a call (`hooks = [wire]`, a method
-   * reference, a decorator) means the function may be called from anywhere,
-   * so the answer is unknown. Answered once per function.
+   * (#391), so a parameter of it can be followed one hop (`call-sites.ts`).
    *
    * @param qualified - the function's qualified name, e.g. `app.wiring.wire`.
-   * @returns the calls with their files' qualifiers, or null when the name
-   *   isn't a first-party function, nothing calls it, or a use isn't a call.
+   * @returns the calls with their files' qualifiers, or null when they can't all be known.
    */
   callsTo(qualified: string): readonly CallSite[] | null {
-    const known = this.calls.get(qualified);
-    if (known !== undefined) {
-      return known;
-    }
-    this.calls.set(qualified, null);
-    const found = this.resolve(qualified);
-    const local = qualified.slice(qualified.lastIndexOf(".") + 1);
-    const sites = found?.kind === "function" ? this.findCalls(found, local) : null;
-    const answer = sites === null || sites.length === 0 ? null : sites;
-    this.calls.set(qualified, answer);
-    return answer;
-  }
-
-  /**
-   * Scans the project's files that spell a function's name for its uses.
-   *
-   * @param target - the function's definition.
-   * @param target.file - the file that defines it.
-   * @param target.node - its `function_definition`.
-   * @param local - the name it is defined under.
-   * @returns the calls, or null when a use isn't a call.
-   */
-  private findCalls(target: { file: SourceFile; node: Node }, local: string): CallSite[] | null {
-    const spelled = new RegExp(`\\b${local}\\b`, "u");
-    const sites: CallSite[] = [];
-    for (const module of this.project.modules) {
-      const src = this.project.sourceOf(module);
-      const text = src === undefined ? "" : normalizeSource(src.text);
-      const parsed = src !== undefined && spelled.test(text) ? this.parse({ ...src, text }) : null;
-      const found = parsed === null ? [] : this.callsIn(parsed, target, local);
-      if (found === null) {
-        return null;
-      }
-      sites.push(...found);
-    }
-    return sites;
-  }
-
-  /**
-   * Lists one file's calls to a function.
-   *
-   * @param parsed - the file's parse.
-   * @param target - the function's definition.
-   * @param target.file - the file that defines it.
-   * @param target.node - its `function_definition`.
-   * @param local - the name it is defined under.
-   * @returns the calls, or null when the file uses the function another way.
-   */
-  private callsIn(
-    parsed: Parsed,
-    target: { file: SourceFile; node: Node },
-    local: string,
-  ): CallSite[] | null {
-    const sites: CallSite[] = [];
-    for (const id of this.trees.treeOf(parsed.file).rootNode.descendantsOfType("identifier")) {
-      const ref = id && identifierName(id) === local ? referenceOf(id) : null;
-      const name = ref === null ? null : parsed.qualify(ref);
-      if (ref === null || name === null || !this.isFunction(name, target)) {
-        continue;
-      }
-      const { parent } = ref;
-      if (parent?.type !== "call" || parent.childForFieldName("function")?.id !== ref.id) {
-        return null;
-      }
-      sites.push({ call: parent, qualify: parsed.qualify });
-    }
-    return sites;
-  }
-
-  /**
-   * Tells whether a qualified name resolves to one function definition.
-   *
-   * @param name - a qualified name.
-   * @param target - the function's definition.
-   * @param target.file - the file that defines it.
-   * @param target.node - its `function_definition`.
-   * @returns true when it is that function.
-   */
-  private isFunction(name: string, target: { file: SourceFile; node: Node }): boolean {
-    const found = this.resolve(name);
-    return (
-      found?.kind === "function" &&
-      found.file.path === target.file.path &&
-      found.node.startIndex === target.node.startIndex
-    );
+    return this.callSites.callsTo(qualified);
   }
 
   /** Drops every file's records; the run's trees, not the model, free the syntax trees. */
@@ -359,7 +283,7 @@ export class FastApiModel {
     this.parsed.clear();
     this.models.clear();
     this.pinned.clear();
-    this.calls.clear();
+    this.callSites.clear();
   }
 
   /**
@@ -386,29 +310,6 @@ export class FastApiModel {
     this.parsed.set(file.path, parsed);
     return parsed;
   }
-}
-
-/**
- * Reads an identifier as a reference to what it names: itself, or the
- * `module.name` attribute it ends. A name that is being defined (a `def` or
- * `class` name, a keyword argument's name), the object of an attribute, or
- * part of an import statement isn't a reference.
- *
- * @param id - an identifier node.
- * @returns the node to qualify, or null when it isn't a reference.
- */
-function referenceOf(id: Node): Node | null {
-  const { parent } = id;
-  const attribute = parent?.type === "attribute";
-  const ref = attribute && parent.childForFieldName("attribute")?.id === id.id ? parent : id;
-  const holder = ref.parent;
-  const defined =
-    holder?.childForFieldName("name")?.id === id.id || (attribute && ref.id === id.id);
-  let statement: Node | null = ref;
-  while (statement !== null && !IMPORTS.has(statement.type) && statement.type !== "module") {
-    statement = statement.parent;
-  }
-  return defined || (statement !== null && IMPORTS.has(statement.type)) ? null : ref;
 }
 
 /**

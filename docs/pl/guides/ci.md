@@ -1,12 +1,12 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: 92f38778c6dece5addcdb6c2d96fc0bf0bab6955dafc1718c5b38b1d102dcbe0
+source_hash: ab8ab7a1fedc426929bc2c8e5a4e10c6c57b8080fa13f761a28e7173e05cd444
 ---
 
 # GitHub Actions { #github-actions }
 
 !!! info "Zweryfikowano 2026-10-11"
-    `inwards check --format github` jest przypięte snapshotem E2E, a jego escapowanie testami jednostkowymi zgodnymi z regułami, których używa `@actions/core`. Kroki sprawdzenia, adnotacji przez `--format github` i wysyłki z workflow dla code scanning działają przy każdym pull requeście w tym repozytorium ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), na `examples/broken-app`), z Inwards zbudowanym ze źródeł. Krok instalacji uruchomiono ręcznie poza GitHub Actions: `uv tool install inwards==0.6.0` z PyPI, a potem `inwards check --format github` na `examples/broken-app`. Hook pre-commit uruchomiono przez `uvx pre-commit run --all-files` (pre-commit 4.6.2) z `inwards==0.6.0` na projekcie testowym.
+    `inwards check --format github` jest przypięte snapshotem E2E, a jego escapowanie testami jednostkowymi zgodnymi z regułami, których używa `@actions/core`. Kroki sprawdzenia, adnotacji przez `--format github` i wysyłki z workflow dla code scanning działają przy każdym pull requeście w tym repozytorium ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), na `examples/broken-app`), z Inwards zbudowanym ze źródeł. Krok instalacji uruchomiono ręcznie poza GitHub Actions: `uv tool install inwards==0.7.0` z PyPI, a potem `inwards check --format github` na `examples/broken-app`. Hook pre-commit uruchomiono przez `uvx pre-commit run --all-files` (pre-commit 4.6.2) z `inwards==0.7.0` na projekcie testowym.
 
 Hooki agentów wyłapują naruszenie, gdy agent pracuje; CI wyłapuje te, które się przez nie prześlizgną, na przykład ręczną edycję albo pracę agenta bez hooków. Poniższy workflow oblewa pull request, gdy import łamie warstwę, i umieszcza naruszenie przy linii, która je spowodowała.
 
@@ -30,7 +30,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
       - name: Install Inwards
         run: |
-          uv tool install inwards==0.6.0 # pin the release; bump it on purpose
+          uv tool install inwards==0.7.0 # pin the release; bump it on purpose
           uv tool dir --bin >> "$GITHUB_PATH"
       - name: Check
         run: inwards check --format github
@@ -87,7 +87,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0
       - name: Install Inwards
         run: |
-          uv tool install inwards==0.6.0 # pin the release; bump it on purpose
+          uv tool install inwards==0.7.0 # pin the release; bump it on purpose
           uv tool dir --bin >> "$GITHUB_PATH"
       - name: Check
         id: check
@@ -127,7 +127,7 @@ repos:
         name: inwards
         entry: inwards check --format concise
         language: python
-        additional_dependencies: ["inwards==0.6.0"]
+        additional_dependencies: ["inwards==0.7.0"]
         pass_filenames: false
         files: (\.py|pyproject\.toml|inwards-baseline\.json)$
 ```
@@ -135,7 +135,7 @@ repos:
 - `pass_filenames: false` sprawdza cały projekt, więc działają też reguły całego projektu (martwe prefiksy warstw, cykle importów, dowiązania symboliczne w warstwach), a commit, który zmienia tylko `pyproject.toml`, jest sprawdzany względem nowej konfiguracji. Zimne sprawdzenie całego repozytorium benchmarku (496 000 linii) trwa 0,4 s na jednym rdzeniu ([rozdział 6](../06-Constraints-and-Quality.md)). Żeby sprawdzać tylko pliki w staging area, usuń tę linię; reguły całego projektu poczekają wtedy na CI.
 - `files` uruchamia hook, gdy zmienia się plik Pythona, `pyproject.toml` albo baseline, a w pozostałych przypadkach go pomija.
 - `--format concise` wypisuje jedną linię na wynik. Naruszenie oblewa hook kodem 1, co zatrzymuje commit; ostrzeżenie nie.
-- Podbijaj `inwards==0.6.0` świadomie, tak jak w CI. Lokalny hook nie ma `rev`, więc `pre-commit autoupdate` go nie zmienia.
+- Podbijaj `inwards==0.7.0` świadomie, tak jak w CI. Lokalny hook nie ma `rev`, więc `pre-commit autoupdate` go nie zmienia.
 - Gdy Inwards jest już zależnością deweloperską uv, `entry: uv run inwards check --format concise` z `language: system` użyje zablokowanej wersji, bez `additional_dependencies`.
 
 ## Moduły generowane { #generated-modules }

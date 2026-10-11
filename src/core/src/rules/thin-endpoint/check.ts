@@ -29,13 +29,36 @@ import { trip } from "./signals.ts";
 import { type FileView, fileView } from "./view.ts";
 import { fixFor, helperText, targetText } from "./wording.ts";
 
+/**
+ * INW012's state for one run: its settings, read once, and the other
+ * first-party modules its checked files' registrations and router classes
+ * lead to, each read into a view once per run instead of once per checked
+ * file (#395). Build one per run with the run's trees; it holds views of
+ * them, so it is invalid once they are freed.
+ */
+export class ThinEndpointRun {
+  readonly settings: ThinSettings;
+  readonly remote: RemoteModules;
+
+  /**
+   * Reads the settings. No module is read yet.
+   *
+   * @param options - `[tool.inwards.rules.thin-endpoint]`, if set.
+   * @param project - the run's trees: the checked files' own, and the modules a registration or a router class leads to.
+   */
+  constructor(options: RuleOptions | undefined, project: ModuleTrees) {
+    this.settings = thinSettings(options);
+    this.remote = new RemoteModules(project, this.settings.recognise);
+  }
+}
+
 /** What INW012 needs besides the file. */
 export interface ThinInputs {
-  /** `[tool.inwards.rules.thin-endpoint]`, if set. */
-  readonly options: RuleOptions | undefined;
+  /** The run's settings and other modules' views. */
+  readonly run: ThinEndpointRun;
   /** The configured layers, innermost first, for `delegate-to` and the fix steps. */
   readonly layers: readonly LayerSpec[];
-  /** The run's trees: the file's own, and the modules a registration of another module's handler reads. */
+  /** The run's trees, for the file's own. */
   readonly project: ModuleTrees;
 }
 
@@ -128,16 +151,15 @@ function report(
  * when a registration in it names a handler there.
  *
  * @param src - the file, with normalised text.
- * @param inputs - the rule's options, the layers and the project index.
+ * @param inputs - the run's settings and other modules' views, the layers and the run's trees.
  * @returns one finding per endpoint that trips a signal, before suppressions and severities apply.
  */
 export function checkThinEndpoints(src: SourceFile, inputs: ThinInputs): Diagnostic[] {
-  const settings = thinSettings(inputs.options);
+  const { settings, remote } = inputs.run;
   if (!mayHoldEndpoints(src.text, settings.recognise)) {
     return [];
   }
   const tree = inputs.project.treeOf(src);
-  const remote = new RemoteModules(inputs.project, settings.recognise);
   const view = fileView(tree, src, settings.recognise, {
     base: (q: string): ViewKind | undefined => remote.baseKind(q),
     routers: remote.routers,

@@ -16,8 +16,9 @@ import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { returnedNames } from "../shared/function-returns.ts";
+import type { CallSite } from "./call-sites.ts";
 import { argumentFor, enclosingParameter } from "./callers.ts";
-import type { CallSite, FastApiModel } from "./model.ts";
+import type { FastApiModel } from "./model.ts";
 import type { FastApiFile, FastApiObject, PathOperation, Wiring } from "./records.ts";
 
 /** An app or router, where it is declared, and the path operations declared on it. */

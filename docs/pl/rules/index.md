@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: b0daca9d66901060e931ec377abbcf9dff917954ad2095ee789c6b3cf660955d
+source_hash: c1177c7bb611c88d63090dccc37e141327981ba6372678178e8718019fc33088
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -84,8 +84,8 @@ Diagramy architektury w dokumentacji, sprawdzane względem `[tool.inwards]` ([AD
 
 | Kod | Nazwa | Co zgłasza | Włączona | Poziom | Włącza ją preset | Wyciszenie w linii |
 |---|---|---|---|---|---|---|
-| [INW017](INW017.md) | `diagram-unknown-name` | Węzeł w oznaczonym diagramie architektury w Mermaid albo PlantUML, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie (moduł aliasu w PlantUML) nie pasuje do żadnego modułu (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
-| [INW018](INW018.md) | `diagram-forbidden-edge` | Ciągła strzałka w oznaczonym diagramie architektury w Mermaid albo PlantUML, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi, między kontekstami bez `depends-on` albo do modułu, który nie jest `public` (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
+| [INW017](INW017.md) | `diagram-unknown-name` | Węzeł w oznaczonym diagramie architektury w Mermaid albo PlantUML, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie (moduł aliasu w PlantUML) nie pasuje do żadnego modułu | opt-in | ostrzeżenie | żaden | nie |
+| [INW018](INW018.md) | `diagram-forbidden-edge` | Ciągła strzałka w oznaczonym diagramie architektury w Mermaid albo PlantUML, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi, między kontekstami bez `depends-on` albo do modułu, który nie jest `public` | opt-in | ostrzeżenie | żaden | nie |
 | [INW019](INW019.md) | `diagram-missing-dependency` | Import w kodzie między dwiema warstwami albo kontekstami, które rysuje oznaczony diagram architektury w Mermaid albo PlantUML, bez strzałki (dla warstw: bez ścieżki strzałek), która by go rysowała (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
 
 </div>

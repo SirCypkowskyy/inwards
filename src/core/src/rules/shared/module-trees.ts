@@ -10,8 +10,8 @@
  */
 import type { Parser, Tree } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../../contracts/records.ts";
-import { normalizeSource, parsePython } from "../../python/parser.ts";
-import { skeletonImports } from "../../python/prescan.ts";
+import { importedNames, normalizeSource, parsePython } from "../../python/parser.ts";
+import { skeletonImports, skeletonNames } from "../../python/prescan.ts";
 
 /** What reading first-party modules needs from the project; `ProjectIndex` provides it. */
 export interface FirstPartySource {
@@ -27,6 +27,15 @@ export interface FirstPartySource {
 export interface FileTrees {
   /** Gives the tree of a file (normalised text), parsed at most once per run and valid until it ends. */
   readonly treeOf: (src: SourceFile) => Tree;
+  /**
+   * Gives the names a file's imports bind (`importedNames`), from the run's
+   * tree of its text when there is one and from its import skeleton
+   * otherwise, so a lookup that only needs the imports parses nothing. A
+   * name missing is bound by no import; one present may come from an
+   * import-shaped line in a string. Undefined when the prescan refuses the
+   * file and no tree exists.
+   */
+  readonly boundNames: (src: SourceFile) => ReadonlyMap<string, string> | undefined;
 }
 
 /** A first-party module as one run parsed it. */
@@ -51,6 +60,8 @@ export class ModuleTrees implements FileTrees {
   private readonly sources = new Map<string, SourceFile | undefined>();
   /** Every tree of the run by the text it was parsed from: the tree depends on the text alone. */
   private readonly trees = new Map<string, Tree>();
+  /** `boundNames` answers by module and text: relative imports resolve against the module. */
+  private readonly bound = new Map<string, ReadonlyMap<string, string> | undefined>();
 
   /**
    * Wraps the parser and the project. Nothing is read yet.
@@ -118,6 +129,27 @@ export class ModuleTrees implements FileTrees {
   }
 
   /**
+   * Gives the names a file's imports bind without a full parse when the run
+   * has none of its text (see `FileTrees.boundNames`), once per text and module.
+   *
+   * @param src - a file, with normalised text.
+   * @returns local name to dotted name, or undefined when the prescan refuses the file.
+   */
+  boundNames(src: SourceFile): ReadonlyMap<string, string> | undefined {
+    const key = `${src.module}\n${src.text}`;
+    if (this.bound.has(key)) {
+      return this.bound.get(key);
+    }
+    const tree = this.trees.get(src.text);
+    const names =
+      tree === undefined
+        ? (skeletonNames(this.parser, src) ?? undefined)
+        : importedNames(tree, src);
+    this.bound.set(key, names);
+    return names;
+  }
+
+  /**
    * Lists the project's first-party modules, for a rule that must read every
    * module a name could lead to before it skips a file.
    *
@@ -153,6 +185,7 @@ export class ModuleTrees implements FileTrees {
       tree.delete(); // WASM memory is not garbage collected
     }
     this.trees.clear();
+    this.bound.clear();
     this.parsed.clear();
     this.sources.clear();
   }

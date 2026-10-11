@@ -16,7 +16,7 @@
 import type { Node, Tree } from "web-tree-sitter";
 import type { SourceFile, Span } from "../../contracts/records.ts";
 import { argumentAt, literalString } from "../../python/literals.ts";
-import { identifierName, keywordOf, namedChildren } from "../../python/nodes.ts";
+import { identifierName, keywordOf, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
 import { qualifierFor } from "../../python/qualify.ts";
 import { moduleAliases, type TypeContext } from "../shared/annotations.ts";
@@ -330,12 +330,12 @@ export function readModels(tree: Tree, src: SourceFile): Models {
     handled: new Set(),
   };
   const root = tree.rootNode;
-  for (const cls of root.descendantsOfType("class_definition")) {
+  for (const cls of moduleNodes(root, "class_definition")) {
     if (cls) {
       readClass(cls, reading);
     }
   }
-  for (const call of root.descendantsOfType("call")) {
+  for (const call of moduleNodes(root, "call")) {
     if (call) {
       readCall(call, reading);
     }
@@ -356,13 +356,13 @@ export function readModels(tree: Tree, src: SourceFile): Models {
 export function setsNamingConvention(tree: Tree, src: SourceFile): boolean {
   const context = contextOf(tree, src);
   const root = tree.rootNode;
-  const viaCall = root.descendantsOfType("call").some((call) => {
+  const viaCall = moduleNodes(root, "call").some((call) => {
     const metadata = call && lastSegment(calleeOf(call, context), ORM_ROOTS) === "MetaData";
     return metadata === true && keywordValue(call, "naming_convention") !== null;
   });
   return (
     viaCall ||
-    root.descendantsOfType("assignment").some((assignment) => {
+    moduleNodes(root, "assignment").some((assignment) => {
       const left = assignment?.childForFieldName("left");
       const attribute = left?.type === "attribute" ? left.childForFieldName("attribute") : null;
       return attribute ? identifierName(attribute) === "naming_convention" : false;

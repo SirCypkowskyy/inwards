@@ -79,8 +79,8 @@ Architecture diagrams in the docs, checked against `[tool.inwards]` ([ADR-045](.
 
 | Code | Name | What it flags | On | Severity | Turned on by preset | Inline suppression |
 |---|---|---|---|---|---|---|
-| [INW017](INW017.md) | `diagram-unknown-name` | A node in a marked Mermaid or PlantUML architecture diagram that names no declared layer or context, or whose quoted label (a PlantUML alias's module) matches no module (whole-project runs) | opt-in | warning | none | no |
-| [INW018](INW018.md) | `diagram-forbidden-edge` | A solid arrow in a marked Mermaid or PlantUML architecture diagram that draws an import the config forbids: outward or between sibling layers, between contexts without `depends-on`, or into a module that isn't `public` (whole-project runs) | opt-in | warning | none | no |
+| [INW017](INW017.md) | `diagram-unknown-name` | A node in a marked Mermaid or PlantUML architecture diagram that names no declared layer or context, or whose quoted label (a PlantUML alias's module) matches no module | opt-in | warning | none | no |
+| [INW018](INW018.md) | `diagram-forbidden-edge` | A solid arrow in a marked Mermaid or PlantUML architecture diagram that draws an import the config forbids: outward or between sibling layers, between contexts without `depends-on`, or into a module that isn't `public` | opt-in | warning | none | no |
 | [INW019](INW019.md) | `diagram-missing-dependency` | An import in the code between two layers or contexts a marked Mermaid or PlantUML architecture diagram draws, with no arrow (for layers, no path of arrows) for it (whole-project runs) | opt-in | warning | none | no |
 
 </div>
