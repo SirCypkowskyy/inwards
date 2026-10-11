@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 4e8ad68ed87ed36a9a816c32bfb58a00c6c97a1f8f8a5e70c070d66a3d3a20ed
+source_hash: f32d82b6b8306762fd80cce5bcc3388abc1c7e59830fd44c8ed2bb2109442462
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -303,7 +303,7 @@ Reguły treści opt-in (od INW012 do INW016, od FAPI001 do FAPI009) weszły z te
 | INW013 | 1 → 1 | wszystkie | 1 z 1 | niepotrzebna |
 | INW014 | 0 → 0 | n/d | n/d | niepotrzebna |
 | INW015 | 48 → 17 | wszystkie | 31 % → 88 % | klasy wyjątków z roli nie są zgłaszane |
-| INW016 | 173 → 152 | każde zgłoszenie kolumny i nazwa tabeli | 88 % → 100 % względem domyślnego schematu | migracje Alembica nie są czytane |
+| INW016 | 173 → 152 (55 po [#361](https://github.com/SirCypkowskyy/inwards/issues/361)) | każde zgłoszenie kolumny i nazwa tabeli | 88 % → 100 % względem domyślnego schematu | migracje Alembica nie są czytane |
 | FAPI001 | 22 → 21 | wszystkie | 86 % → 90 % | aplikacja z `openapi_url=None` nie ma schematu |
 | FAPI002 | 18 → 17 | 8 | wszystkie trafne | ta sama |
 | FAPI007 | 4 → 0 | wszystkie | 0 % → brak zgłoszeń | generator z dwoma `yield` albo `yield` w pętli to strumień |
@@ -313,7 +313,7 @@ Czym były fałszywe alarmy i co zostało:
 
 - **INW012.** 8 z 14 fałszywych alarmów pierwszej próby to warunki ochronne, które rzucają błędy samego projektu (`raise ResourceNotFound()`, mapowane na 404 przez handler wyjątków całej aplikacji); liczenie ich jako warunków ochronnych kosztowało jedno trafne zgłoszenie, regułę biznesową zapisaną jako dwa warunki. 3 w obu próbach to pojedyncze `joinedload(...)` przekazane repozytorium. Zostały: HTML renderowany na serwerze w zagnieżdżonych blokach `with` (46 z 73 zgłoszeń leży w back office Polara), handlery formularzy HTMX, health checki i webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)). Domyślne progi się sprawdziły: tylko 3 z 73 zgłoszeń przekraczają jeden sygnał o najwyżej 2 instrukcje, 1 gałąź albo 1 poziom.
 - **INW015.** 31 z 48 zgłoszeń to import klasy wyjątku z adaptera, żeby zmapować go na status HTTP. Została stała importowana z adaptera. Drugim fałszywym zgłoszeniem był moduł testów; od [#362](https://github.com/SirCypkowskyy/inwards/issues/362) reguły treści pomijają moduły testowe, więc zostaje 16 zgłoszeń, z czego 15 trafnych.
-- **INW016.** 21 zgłoszeń powtarzało kolumnę modelu w migracji Alembica. Pozostałe 152 są poprawne względem domyślnego schematu, ale 101 z nich to konsekwentnie mnogie nazwy tabel Polara; lepiej posłużyłoby jedno zgłoszenie dla całego projektu ([#361](https://github.com/SirCypkowskyy/inwards/issues/361)).
+- **INW016.** 21 zgłoszeń powtarzało kolumnę modelu w migracji Alembica. Pozostałe 152 są poprawne względem domyślnego schematu, ale 98 z nich to mnogie nazwy tabel Polara, 94% z jego 104. [#361](https://github.com/SirCypkowskyy/inwards/issues/361) zgłasza taki schemat raz przy uruchomieniu dla całego projektu i podaje `table-name = "snake"`: Polar spadł ze 121 zgłoszeń do 24, a korpus ze 152 do 55. 26 zgłoszeń Saleora zostaje: 46 z jego 72 kolumn z datą i czasem kończy się na `_at`, więc jego `date_joined` i `start_date` to mieszanka, a nie schemat. 13 zgłoszeń kolumn nie podpowiada już nazwy złożonej tylko ze słów o czasie (`date_at`, `timestamp_at`), a `date_of_birth` dostaje teraz `birth_date`.
 - **FAPI001, FAPI002.** Back office Polara to aplikacja `FastAPI(openapi_url=None)`. Dwóch zgłoszeń FAPI001 na aplikacjach testowych w Polarze nie ma od [#362](https://github.com/SirCypkowskyy/inwards/issues/362), więc zostaje 19, wszystkie trafne. Obie reguły widzą w korpusie około 40 endpointów, bo routery Polara i fastapi-clean-example nie są rozpoznawane ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 - **FAPI007.** Wszystkie 4 zgłoszenia to strumienie (zdarzenia wysyłane przez serwer w Polarze, iterator rabatów w Saleorze), nie zależności.
 

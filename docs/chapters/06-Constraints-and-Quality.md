@@ -298,7 +298,7 @@ The opt-in content rules (INW012 to INW016, FAPI001 to FAPI009) shipped with tes
 | INW013 | 1 → 1 | all | 1 of 1 | none needed |
 | INW014 | 0 → 0 | n/a | n/a | none needed |
 | INW015 | 48 → 17 | all | 31 % → 88 % | exception classes of the role aren't reported |
-| INW016 | 173 → 152 | every column finding and table name | 88 % → 100 % against the default scheme | Alembic migrations aren't read |
+| INW016 | 173 → 152 (55 after [#361](https://github.com/SirCypkowskyy/inwards/issues/361)) | every column finding and table name | 88 % → 100 % against the default scheme | Alembic migrations aren't read |
 | FAPI001 | 22 → 21 | all | 86 % → 90 % | an app with `openapi_url=None` has no schema |
 | FAPI002 | 18 → 17 | 8 | all true | the same |
 | FAPI007 | 4 → 0 | all | 0 % → no findings | a generator that yields twice or in a loop is a stream |
@@ -308,7 +308,7 @@ What the false positives were, and what is left:
 
 - **INW012.** 8 of the first sample's 14 false positives were guards that raise the project's own errors (`raise ResourceNotFound()`, mapped to 404 by an app-wide exception handler); counting them as guards lost one true positive, a business rule written as two guards. 3 across both samples were a single `joinedload(...)` passed to a repository. Left: server-rendered HTML in nested `with` blocks (46 of the 73 findings are in Polar's back office), HTMX form handlers, health checks and a webhook ([#360](https://github.com/SirCypkowskyy/inwards/issues/360)). The default thresholds held: only 3 of the 73 findings trip a single signal by 2 statements, 1 branch or 1 level or less.
 - **INW015.** 31 of 48 findings imported an exception class from an adapter to map it to an HTTP status. Left: a constant imported from an adapter. A test module was the other false positive; since [#362](https://github.com/SirCypkowskyy/inwards/issues/362) the content rules skip test modules, which leaves 16 findings, 15 of them true.
-- **INW016.** 21 findings repeated a model's column in an Alembic migration. The 152 left are correct against the default scheme, but 101 are Polar's consistently plural table names; one project-wide finding would serve better ([#361](https://github.com/SirCypkowskyy/inwards/issues/361)).
+- **INW016.** 21 findings repeated a model's column in an Alembic migration. The 152 left are correct against the default scheme, but 98 are Polar's plural table names, 94% of its 104. [#361](https://github.com/SirCypkowskyy/inwards/issues/361) reports such a scheme once in a whole-project run, naming `table-name = "snake"`: Polar went from 121 findings to 24 and the corpus from 152 to 55. Saleor's 26 stay: 46 of its 72 datetime columns end with `_at`, so its `date_joined` and `start_date` are a mix, not a scheme. 13 column findings no longer suggest a name made of time words only (`date_at`, `timestamp_at`), and `date_of_birth` now gets `birth_date`.
 - **FAPI001, FAPI002.** Polar's back office is a `FastAPI(openapi_url=None)` app. The two FAPI001 findings on test apps in Polar are gone since [#362](https://github.com/SirCypkowskyy/inwards/issues/362), which leaves 19, all true. Both rules see about 40 endpoints in the corpus, because Polar's and fastapi-clean-example's routers aren't recognised ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 - **FAPI007.** All 4 findings were streams (Polar's server-sent events, Saleor's discount iterator), not dependencies.
 
