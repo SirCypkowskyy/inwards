@@ -106,6 +106,21 @@
       "url": "INW011/"
     },
     {
+      "code": "INW021",
+      "name": "private-module",
+      "title": "INW021 private-module",
+      "summary": "An import of a module whose name starts with `_` from outside the package that holds it",
+      "description": "A module whose name starts with an underscore is imported only from inside the package that holds it; other code imports what the package's __init__.py re-exports.",
+      "category": ["imports", "private-modules"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, error",
+      "presets": "vertical-slices",
+      "url": "INW021/"
+    },
+    {
       "code": "INW006",
       "name": "unassigned-module",
       "title": "INW006 unassigned-module",

@@ -86,6 +86,10 @@
         ]
       },
       {
+        "name": "core-rule-private-module",
+        "patterns": ["src/core/src/rules/private-module.ts", "src/core/src/rules/private-module/**"]
+      },
+      {
         "name": "core-rule-import-cycles",
         "patterns": ["src/core/src/rules/import-cycles.ts", "src/core/src/rules/import-cycles/**"]
       },
@@ -236,6 +240,10 @@
       {
         "from": "core-rule-public-api-only",
         "allow": ["core-contracts", "core-meta", "core-config", "core-lookup"]
+      },
+      {
+        "from": "core-rule-private-module",
+        "allow": ["core-contracts", "core-meta", "core-lookup", "core-python"]
       },
       {
         "from": "core-rule-import-cycles",
@@ -392,6 +400,7 @@
           "core-rule-layer-dependency",
           "core-rule-context-independence",
           "core-rule-public-api-only",
+          "core-rule-private-module",
           "core-rule-import-cycles",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
@@ -454,6 +463,7 @@
           "core-rule-layer-dependency",
           "core-rule-context-independence",
           "core-rule-public-api-only",
+          "core-rule-private-module",
           "core-rule-import-cycles",
           "core-rule-pure-domain",
           "core-rule-unassigned-module",
@@ -897,6 +907,10 @@
         },
         {
           "from": "core-rule-public-api-only",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-private-module",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {

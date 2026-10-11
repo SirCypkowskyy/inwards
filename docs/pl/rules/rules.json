@@ -106,6 +106,21 @@
       "url": "INW011/"
     },
     {
+      "code": "INW021",
+      "name": "private-module",
+      "title": "INW021 private-module",
+      "summary": "Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera",
+      "description": "Moduł, którego nazwa zaczyna się od podkreślenia, importuje się tylko z wnętrza pakietu, który go zawiera; reszta kodu importuje to, co reeksportuje __init__.py pakietu.",
+      "category": ["imports", "private-modules"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, błąd",
+      "presets": "vertical-slices",
+      "url": "INW021/"
+    },
+    {
       "code": "INW006",
       "name": "unassigned-module",
       "title": "INW006 unassigned-module",
