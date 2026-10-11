@@ -2,12 +2,14 @@
  * @file The rule documentation pages (docs/chapters/rules, docs/pl/rules) agree
  * with the rule registry. Every rule has a page in both languages with the full
  * front matter, every diagnostic's link points at its page, and the index
- * marks the opt-in rules.
+ * marks the opt-in rules and names the presets that turn each rule on.
  */
 import { expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { DOCS_BASE, RULES } from "@inwards/core";
+import { STYLES } from "../../src/init/presets.ts";
+import { STYLE_NAMES } from "../../src/init/styles.ts";
 
 // #49: every rule has a docs page, in English and in Polish, and every
 // diagnostic links to its own. The pages' front matter follows OKF
@@ -110,5 +112,53 @@ test.each(Object.entries(SITES))("the rule index marks opt-in rules (%s)", (_sit
       rule.code,
       rule.default === "off",
     ]);
+  }
+});
+
+/** What the index's presets cell says for "every preset", "every preset but" and "no preset", per site. */
+const PRESET_WORDS = {
+  en: { all: "all", allBut: "all but", none: "none" },
+  pl: { all: "wszystkie", allBut: "wszystkie oprócz", none: "żaden" },
+};
+
+/**
+ * Words the presets cell the rule index should show for a rule, from the
+ * `inwards init --style` presets themselves: a rule on by default is on in
+ * every preset that doesn't ignore it, and an opt-in rule in every preset
+ * that selects it or turns it on for a template's role.
+ *
+ * @param rule - the registered rule.
+ * @param words - the site's words for every preset, every preset but, and none.
+ * @returns the cell's text, such as "all but django, fastapi" or "clean, hexagonal".
+ */
+function presetCell(rule: (typeof registered)[number], words: typeof PRESET_WORDS.en): string {
+  const on = STYLE_NAMES.filter((name) => {
+    const style = STYLES[name];
+    if (rule.default === "on") {
+      return !style.ignoreRules?.codes.includes(rule.code);
+    }
+    const byTemplate = style.templates.some((template) =>
+      Object.values(template.rules?.roles ?? {}).some((rules) => rule.name in rules),
+    );
+    return byTemplate || (style.optIn?.codes.includes(rule.code) ?? false);
+  });
+  if (rule.default === "on" && on.length === STYLE_NAMES.length) {
+    return words.all;
+  }
+  if (rule.default === "on") {
+    const off = STYLE_NAMES.filter((name) => !on.includes(name));
+    return `${words.allBut} ${off.join(", ")}`;
+  }
+  return on.length > 0 ? on.join(", ") : words.none;
+}
+
+// #337: the index's "turned on by preset" column agrees with the presets.
+test.each(Object.entries(SITES))("the rule index names each rule's presets (%s)", (site, dir) => {
+  const index = readFileSync(join(dir, "index.md"), "utf8");
+  const words = site === "pl" ? PRESET_WORDS.pl : PRESET_WORDS.en;
+  for (const rule of registered) {
+    const row = index.split("\n").find((line) => line.startsWith(`| [${rule.code}]`));
+    const cells = row?.split("|").map((cell) => cell.trim()) ?? [];
+    expect([rule.code, cells[6]]).toEqual([rule.code, presetCell(rule, words)]);
   }
 });
