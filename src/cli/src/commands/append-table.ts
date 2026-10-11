@@ -6,7 +6,7 @@
  * writes through init's file writer.
  */
 import { ConfigError, declaresInwards, parseConfig } from "@inwards/core";
-import { separator } from "../init/style.ts";
+import { appendSeparator } from "../init/section.ts";
 import { shown } from "../init/target.ts";
 import type { AppDeps } from "./deps.ts";
 
@@ -43,7 +43,7 @@ export function appendTable(
     return `${where} already has [tool.inwards], and ${command} never overwrites it. Run without --write and merge the table by hand.`;
   }
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const after = `${text}${separator(text, eol)}${table.replaceAll("\n", eol)}`;
+  const after = `${text}${appendSeparator(text, eol)}${table.replaceAll("\n", eol)}`;
   if (JSON.stringify(parsedTable(after)) !== JSON.stringify(parsedTable(table))) {
     return `could not add [tool.inwards] to ${where} safely; add this table by hand:\n${table}`;
   }
