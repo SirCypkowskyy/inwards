@@ -3,17 +3,18 @@
  * by reading: a core module can't import a Node module or use the `process`
  * global (Biome rejects a probe file), every source folder and every rule has
  * a fallow zone, the rules share only `rules/shared`, and no core zone may
- * import anything outside core. These tests fail if a refactor lets the engine
- * do I/O or lets one rule reach into another.
+ * import anything outside core. A module named `_x.ts` is private to its
+ * folder, and a migrated slice keeps the names of ADR-047. These tests fail if
+ * a refactor lets the engine do I/O or lets one rule reach into another.
  */
 import { describe, expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { lintAs, misnamed } from "./support/architecture.ts";
 
 const REPO = resolve(import.meta.dir, "../../..");
 const SRC = join(REPO, "src/core/src");
-const BIOME = join(REPO, "node_modules/.bin/biome");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /**
  * Timeout for the tests that start Biome or `fallow guard` as a child
@@ -24,6 +25,11 @@ const FALLOW = join(REPO, "node_modules/.bin/fallow");
  * follows the runner, not the engine's code.
  */
 const CHILD_TOOL_TIMEOUT_MS = 30_000;
+/**
+ * Folders under src/core/src already moved to the slice layout of ADR-047.
+ * Each migration step adds its folders, so a moved slice can't drift back.
+ */
+const MIGRATED_SLICES: readonly string[] = [];
 /** The extension of a single-module rule. */
 const TS_SUFFIX = /\.ts$/u;
 
@@ -86,31 +92,6 @@ function expectedZone(path: string): string {
     return next === "shared" ? "core-rules-shared" : `core-rule-${next.replace(TS_SUFFIX, "")}`;
   }
   return `core-${top}`;
-}
-
-/**
- * Lints some source as if it were a file at a path, with the repo's Biome
- * config. Biome shows no rule findings for stdin, so the text goes into a
- * temporary tree next to a copy of biome.jsonc, removed afterwards.
- *
- * @param path - repo-relative path the text pretends to live at.
- * @param text - the source.
- * @returns Biome's exit code and output.
- */
-function lintAs(path: string, text: string): { code: number | null; out: string } {
-  const root = mkdtempSync(join(tmpdir(), "inwards-core-arch-"));
-  try {
-    copyFileSync(join(REPO, "biome.jsonc"), join(root, "biome.jsonc"));
-    mkdirSync(dirname(join(root, path)), { recursive: true });
-    writeFileSync(join(root, path), text);
-    const run = Bun.spawnSync(
-      [BIOME, "lint", "--vcs-enabled=false", `--config-path=${root}`, join(root, path)],
-      { cwd: root },
-    );
-    return { code: run.exitCode, out: `${run.stdout.toString()}${run.stderr.toString()}` };
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
 }
 
 describe("no I/O in the engine", () => {
@@ -216,4 +197,51 @@ describe("zones, as fallow applies them", () => {
     },
     CHILD_TOOL_TIMEOUT_MS,
   );
+});
+
+describe("slices (ADR-047)", () => {
+  test(
+    "a module may import its own folder's or its parent's _x.ts, never another slice's",
+    () => {
+      const from = "src/core/src/rules/probe/module.ts";
+      for (const specifier of ["../other/_check.ts", "./sub/_check.ts", "../../engine/_x.ts"]) {
+        const result = lintAs(from, `export { check } from "${specifier}";\n`);
+        expect(result.code).not.toBe(0);
+        expect(result.out).toContain("noRestrictedImports");
+      }
+      for (const specifier of ["./_check.ts", "../_check.ts"]) {
+        const result = lintAs(
+          from,
+          `import { check } from "${specifier}";\n\n/** Runs. */\nexport const run = check;\n`,
+        );
+        expect(result.out).not.toContain("noRestrictedImports");
+      }
+    },
+    CHILD_TOOL_TIMEOUT_MS,
+  );
+
+  test("every migrated slice keeps the slice names", () => {
+    expect(misnamed(SRC, MIGRATED_SLICES)).toEqual([]);
+  });
+
+  test("the naming check reports a stray module and a subfolder without index.ts", () => {
+    const root = mkdtempSync(join(tmpdir(), "inwards-core-slices-"));
+    try {
+      for (const path of [
+        "s/index.ts",
+        "s/_a.ts",
+        "s/stray.ts",
+        "s/mini/index.ts",
+        "s/mini/_b.ts",
+        "s/loose/c.ts",
+        "s/adapters/fs.ts",
+      ]) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        writeFileSync(join(root, path), "");
+      }
+      expect(misnamed(root, ["s"]).sort()).toEqual(["s/loose", "s/stray.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

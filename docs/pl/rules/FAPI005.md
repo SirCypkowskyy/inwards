@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI005.md
-source_hash: 55a247e430be7c6a28c0c1cbc2fcfdbb1eafca845c1cf67be3668010a016988b
+source_hash: d0b6be32fe0a610cd92e2d7b14ec658a126cabab44259aa3bee0fa24fcf110da
 type: rule
 title: FAPI005 route-shadowing
 description: Żadna operacja ścieżki FastAPI nie jest przesłonięta przez wcześniejszą z tą samą metodą, więc każda trasa jest osiągalna.
@@ -157,7 +157,7 @@ Nieznane oznacza ciszę. Nic nie jest zgłaszane, gdy:
 - router trzyma trasy w kilku plikach, bo ich kolejność jest nieznana;
 - segment używa konwertera, którego Inwards nie zna, innego niż identyczny;
 - inne dołączenie tego samego routera, pod prefiksem, którego Inwards nie czyta, albo w innej aplikacji, zostawia trasę osiągalną;
-- router buduje własna klasa albo fabryka routera ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)), która może ustawić własne `route_class` i dopasowywać trasy po swojemu: `VersionedAPIRoute` Polara obsługuje dwie trasy z tą samą metodą i ścieżką według wersji API ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
+- klasa tras routera może dopasowywać trasy po swojemu ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)): router Starlette uruchamia pierwszą trasę, której `matches` odpowiada pełnym dopasowaniem ([`routing.py`](https://github.com/Kludex/starlette/blob/96d5023c55b29224edb8d684868c49f681d079a9/starlette/routing.py), `Router.app`), więc własna klasa tras, która nadpisuje `matches`, `handle` albo `__call__`, może wybierać między trasami z tą samą metodą i ścieżką. `VersionedAPIRoute` Polara obsługuje dwie takie trasy według wersji API. Kolejność jest nieznana także wtedy, gdy klasy tras nie da się odczytać: router zwracany przez funkcję fabrykującą, `route_class=`, które nie jest nazwą, zewnętrzna klasa tras inna niż klasa FastAPI albo własna klasa routera, której klasy tras Inwards nie znajduje. Własna klasa routera z klasą tras FastAPI albo z klasą, która nie nadpisuje żadnej z tych metod (`TransactionalAPIRoute` w back office Polara), zachowuje odczytywaną kolejność.
 
 Dalsze ograniczenia:
 
