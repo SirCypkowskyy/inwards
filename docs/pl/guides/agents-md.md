@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: 9d84e9e1a21420c8fc990e1f9b92bf628196ce16c187807ec2fa5ad86140149c
+source_hash: 88a19230f5a63d75f421db17c5574673412f74959d524d2a7a742a6669b7f405
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -58,7 +58,7 @@ Sekcja powyżej każe agentowi sprawdzić pracę po fakcie. Opis architektury (b
 inwards context
 ```
 
-Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540). Ze znacznikami, które dodaje `--write`, wygląda tak:
+Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540), i presetem vertical-slices, który z pięcioma rolami wycinka i INW021 ma się zmieścić poniżej 350 (z `--scaffold` ma około 334). Ze znacznikami, które dodaje `--write`, wygląda tak:
 
 ```markdown
 <!-- inwards-brief:begin -->

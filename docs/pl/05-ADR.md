@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: b091294eed4ac59d4575118ceec73c28b4008b1fc63ebc1b374540042189c9da
+source_hash: 43568c130041784227f8c048b5cf4e7900380a63966dead8b89eaeb3136a2a8e
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -1450,6 +1450,7 @@ Pomiar na pięciu repozytoriach z `bench/corpus.json`, skryptem w Pythonie na `a
     - [#331](https://github.com/SirCypkowskyy/inwards/issues/331) (publiczne moduły kontekstów według konwencji podkreślenia) używa tej samej definicji prywatnego segmentu, więc obie zmiany się zgadzają, gdy działają razem.
     - Opis architektury: `` - INW021: import a `_private` module only from inside its package; elsewhere import what the package's `__init__.py` re-exports ``.
 - **Wycinki CQRS: szablon w presecie `vertical-slices`, bez nowej reguły.** Szablon `slice` presetu dostaje `roles = ["models", "services", "commands | queries", "api"]`, `public = ["api"]` jak dotąd i `require = ["__init__", "api"]`; wpis warstwy `features` go używa, więc każda rola jest warstwą, a `commands` i `queries` są sąsiadami. INW001 zgłasza wtedy import `commands` w `queries` i odwrotnie jako import „from sibling layer”, z komunikatem i linią opisu architektury, które INW001 już ma. Preset włącza INW021 jako ostrzeżenie, bo `services/__init__.py` reeksportuje moduły prywatne. Tego, czy zapytanie coś zapisuje albo czy komenda zwraca dane, nie da się wyczytać z importów ani nazw, więc żadna reguła tego nie sprawdza.
+- **Zmienione 2026-10-11 ([#435](https://github.com/SirCypkowskyy/inwards/issues/435)): wpis warstwy nazywa się `slice`, jak jego szablon, więc warstwy ról to `slice.models`, `slice.services`, `slice.commands`, `slice.queries` i `slice.api`, a nie `features.models` i tak dalej.** Krótsze nazwy utrzymują opis architektury presetu z `--scaffold` w budżecie tokenów, a wpis nadal obejmuje `app.features.*`. Ten opis może mieć 350 tokenów, a nie 300, bo zawiera też linię INW021.
 - **Presety dla portów i adapterów.** `clean` i `hexagonal` ustawiają w INW014 `interface = "protocol"` i `allow-subclassing = false` oraz włączają INW020 jako ostrzeżenie, z `modules` ustawionym na ich adaptery wyjściowe i `ports` na ich pakiet portów, tak jak dziś INW014 i INW015. Scaffoldy z [#406](https://github.com/SirCypkowskyy/inwards/issues/406) już stosują te konwencje, więc każdy scaffold dalej przechodzi sprawdzenie własnym presetem bez diagnostyk.
 - **Kody.** INW020 i INW021 to kolejne wolne kody (rejestr ma INW000 do INW019). Trafiają do rejestru razem z implementacją, nie wcześniej ([ADR-037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix)).
 
