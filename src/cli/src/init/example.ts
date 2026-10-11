@@ -1,8 +1,11 @@
 /**
- * @file The example package `inwards init --style --scaffold` writes: an entity,
- * a port, a use case, an adapter, a driving adapter, the composition root and
- * one test, placed where the preset says, with a public `api` module in front
- * of them for the context presets (the Django and FastAPI examples come from
+ * @file The example package `inwards init --style --scaffold` writes: an entity
+ * in `models`, a `typing.Protocol` port, a `commands` and a `queries` package
+ * whose `__init__.py` re-exports a use case from a private module, an adapter
+ * that matches the port without inheriting from it (checked under
+ * `TYPE_CHECKING`), a driving adapter, the composition root with its factory
+ * and one test, placed where the preset says, with a public `api` module in
+ * front of them for the context presets (the Django and FastAPI examples come from
  * `django.ts` and `fastapi.ts`). It only builds file texts; planning where
  * they land safely is `scaffold.ts`'s job, and writing them is `InitFiles`'s.
  */
@@ -140,17 +143,108 @@ from __future__ import annotations
 
 ${imports(
   `from ${pkg}.${m.adapter} import InMemoryOrderRepository`,
+  `from ${pkg}.${m.commands} import PlaceOrder`,
   `from ${pkg}.${m.driving} import run`,
-  `from ${pkg}.${m.useCase} import PlaceOrder`,
+  `from ${pkg}.${m.queries} import GetOrder`,
 )}
 
-__all__ = ["InMemoryOrderRepository", "PlaceOrder", "run"]
+__all__ = ["GetOrder", "InMemoryOrderRepository", "PlaceOrder", "run"]
 `;
 }
 
 /**
- * Writes the example's Python modules: an entity, a port, a use case, an
- * adapter implementing the port, a driving adapter and the composition root.
+ * Writes the `__init__.py` of a use case package: it re-exports the one class
+ * of a private module, so callers import the package and the module behind it
+ * can be split or renamed freely.
+ *
+ * @param doc - the package's docstring.
+ * @param from - the private module, in full.
+ * @param name - the class it re-exports.
+ * @returns the module text.
+ */
+function reexport(doc: string, from: string, name: string): string {
+  return `"""${doc}"""
+
+from ${from} import ${name}
+
+__all__ = ["${name}"]
+`;
+}
+
+/**
+ * Writes the example's use cases: the `PlaceOrder` command and the `GetOrder`
+ * query, each in a private module behind its package's `__init__.py`.
+ *
+ * @param m - where each part of the example lives.
+ * @param pkg - the package.
+ * @returns module text keyed by dotted module below the package.
+ */
+function commandQueryModules(m: ExampleModules, pkg: string): [string, string][] {
+  const future = "from __future__ import annotations\n";
+  return [
+    [
+      `${m.commands}.__init__`,
+      reexport(
+        "Commands: use cases that change state, one private module each, re-exported here.",
+        `${pkg}.${m.commands}._place_order`,
+        "PlaceOrder",
+      ),
+    ],
+    [
+      `${m.commands}._place_order`,
+      `"""PlaceOrder, a command: a use case that changes state, written against a port."""
+
+${future}
+from uuid import uuid4
+
+${imports(`from ${pkg}.${m.entity} import Order`, `from ${pkg}.${m.port} import OrderRepository`)}
+
+
+class PlaceOrder:
+    """Creates an order and stores it."""
+
+    def __init__(self, orders: OrderRepository) -> None:
+        self._orders = orders
+
+    def __call__(self, item: str, quantity: int) -> Order:
+        order = Order(id=uuid4().hex, item=item, quantity=quantity)
+        self._orders.add(order)
+        return order
+`,
+    ],
+    [
+      `${m.queries}.__init__`,
+      reexport(
+        "Queries: use cases that only read, one private module each, re-exported here.",
+        `${pkg}.${m.queries}._get_order`,
+        "GetOrder",
+      ),
+    ],
+    [
+      `${m.queries}._get_order`,
+      `"""GetOrder, a query: a use case that reads through a port and changes nothing."""
+
+${future}
+${imports(`from ${pkg}.${m.entity} import Order`, `from ${pkg}.${m.port} import OrderRepository`)}
+
+
+class GetOrder:
+    """Finds an order by its id."""
+
+    def __init__(self, orders: OrderRepository) -> None:
+        self._orders = orders
+
+    def __call__(self, order_id: str) -> Order | None:
+        return self._orders.get(order_id)
+`,
+    ],
+  ];
+}
+
+/**
+ * Writes the example's Python modules: an entity, a port, a command and a
+ * query each behind its package's `__init__.py`, an adapter that matches the
+ * port, a driving adapter and the composition root.
  *
  * @param m - where each part goes, below the package.
  * @param pkg - the package.
@@ -203,40 +297,22 @@ class OrderRepository(Protocol):
         ...
 `,
     ],
-    [
-      m.useCase,
-      `"""PlaceOrder, a use case: one thing the application does, written against a port."""
-
-${future}
-from uuid import uuid4
-
-${imports(`from ${pkg}.${m.entity} import Order`, `from ${pkg}.${m.port} import OrderRepository`)}
-
-
-class PlaceOrder:
-    """Creates an order and stores it."""
-
-    def __init__(self, orders: OrderRepository) -> None:
-        self._orders = orders
-
-    def __call__(self, item: str, quantity: int) -> Order:
-        order = Order(id=uuid4().hex, item=item, quantity=quantity)
-        self._orders.add(order)
-        return order
-`,
-    ],
+    ...commandQueryModules(m, pkg),
     [
       m.adapter,
       `"""InMemoryOrderRepository, an adapter: implements the OrderRepository port with a dict.
 
-Replace it with a database adapter and the use case doesn't change.
+Replace it with a database adapter and the use cases don't change. It doesn't inherit from
+the port; the assignment at the end lets Ty and other type checkers check that it fits.
 """
 
 ${future}
+from typing import TYPE_CHECKING
+
 ${imports(`from ${pkg}.${m.entity} import Order`, `from ${pkg}.${m.port} import OrderRepository`)}
 
 
-class InMemoryOrderRepository(OrderRepository):
+class InMemoryOrderRepository:
     """Keeps orders in memory, for tests and demos."""
 
     def __init__(self) -> None:
@@ -247,6 +323,10 @@ class InMemoryOrderRepository(OrderRepository):
 
     def get(self, order_id: str) -> Order | None:
         return self._orders.get(order_id)
+
+
+if TYPE_CHECKING:
+    _: OrderRepository = InMemoryOrderRepository()
 `,
     ],
     [
@@ -256,7 +336,7 @@ class InMemoryOrderRepository(OrderRepository):
 ${future}
 import argparse
 
-from ${pkg}.${m.useCase} import PlaceOrder
+from ${pkg}.${m.commands} import PlaceOrder
 
 
 def run(place_order: PlaceOrder, argv: list[str]) -> int:
@@ -283,13 +363,18 @@ import sys
 ${outsideImports(m, pkg, [
   [m.adapter, "InMemoryOrderRepository"],
   [m.driving, "run"],
-  [m.useCase, "PlaceOrder"],
+  [m.commands, "PlaceOrder"],
 ])}
 
 
+def create_place_order() -> PlaceOrder:
+    """Builds PlaceOrder with its adapter: the factory is the one place that picks the storage."""
+    return PlaceOrder(InMemoryOrderRepository())
+
+
 def main() -> int:
-    """Builds the use case with its adapter and hands it to the command line."""
-    return run(PlaceOrder(InMemoryOrderRepository()), sys.argv[1:])
+    """Hands the command the factory builds to the command line."""
+    return run(create_place_order(), sys.argv[1:])
 
 
 if __name__ == "__main__":
@@ -304,26 +389,27 @@ if __name__ == "__main__":
 }
 
 /**
- * Writes the example's one test: the use case against the in-memory adapter.
+ * Writes the example's one test: the command and the query against the in-memory adapter.
  *
  * @param m - where each part of the example lives.
  * @param pkg - the package.
  * @returns the test module's text.
  */
 function exampleTest(m: ExampleModules, pkg: string): string {
-  return `"""The use case runs against the in-memory adapter: no database needed."""
+  return `"""The use cases run against the in-memory adapter: no database needed."""
 
 from __future__ import annotations
 
 ${outsideImports(m, pkg, [
   [m.adapter, "InMemoryOrderRepository"],
-  [m.useCase, "PlaceOrder"],
+  [m.commands, "PlaceOrder"],
+  [m.queries, "GetOrder"],
 ])}
 
 
 def test_place_order_stores_the_order() -> None:
     orders = InMemoryOrderRepository()
     order = PlaceOrder(orders)("book", 2)
-    assert orders.get(order.id) == order
+    assert GetOrder(orders)(order.id) == order
 `;
 }
