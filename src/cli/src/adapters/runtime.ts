@@ -99,6 +99,7 @@ export function runtimeFrom(
     pid: process.pid,
     execPath: process.execPath,
     ci: Boolean(env["CI"]),
+    githubWorkspace: env["GITHUB_WORKSPACE"] || undefined,
     daemon: daemonSwitch(env["INWARDS_DAEMON"]),
     hookHost: env["INWARDS_HOOK_HOST"] === "opencode" ? "opencode" : "claude-code",
     pluginSha256: env["INWARDS_PLUGIN_SHA256"] || undefined,

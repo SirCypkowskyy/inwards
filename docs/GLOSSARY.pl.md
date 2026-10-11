@@ -100,6 +100,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
 | agent loop | pętla agenta |
+| annotation (GitHub Actions) | adnotacja |
 | architecture linter | linter architektury |
 | architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
@@ -296,6 +297,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | violation | naruszenie |
 | wall time | czas rzeczywisty |
 | warning | ostrzeżenie |
+| workflow command (GitHub Actions, `::error`) | polecenie workflow |
 | workspace (uv) | workspace (uv) |
 | workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |
