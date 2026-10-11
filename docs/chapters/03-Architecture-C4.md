@@ -217,7 +217,7 @@ flowchart LR
     cache["Content-hash cache<br/><small>.inwards/cache</small>"] --> eng
 ```
 
-Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usage or config error. Agents and CI scripts can branch on that without parsing output. In the JSON report, `summary.violations` counts errors and `summary.warnings` counts warnings. A whole-project run (no path arguments) also checks every layer prefix and shape selector against the modules it found (INW006, INW007) and the required members of every shaped package (INW008).
+Exit codes follow Ruff: `0` clean (warnings allowed), `1` errors found, `2` usage or config error. Agents and CI scripts can branch on that without parsing output. In the JSON report, `summary.violations` counts errors and `summary.warnings` counts warnings. `inwards --help` lists every command and `inwards COMMAND --help` prints one command's options, both on stdout with exit `0`; an unknown command or option, or an option missing its value, is one line on stderr with exit `2`. A whole-project run (no path arguments) also checks every layer prefix and shape selector against the modules it found (INW006, INW007) and the required members of every shaped package (INW008).
 
 The other commands reuse the same pieces:
 
