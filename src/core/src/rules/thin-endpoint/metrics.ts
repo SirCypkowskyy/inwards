@@ -2,10 +2,12 @@
  * @file Measures one endpoint's body for INW012 in one walk: statements,
  * branches, how deep blocks nest, its loops, and the calls it makes. Mapping
  * an error to HTTP is the endpoint's job, so a guard (`if <cond>: raise
- * ...`, or Flask's `abort(404)`) and an `except` that only raises count for
- * nothing, whatever they raise. A docstring doesn't count either. A nested function, class or
- * lambda counts as one statement and its body is its own business. It reads
- * syntax only; what is denied is `check.ts`'s question.
+ * ...`, Flask's `abort(404)`, or one call and a `return`, as an HTMX handler
+ * shows a toast) and an `except` that only raises or answers that way count
+ * for nothing, whatever they raise. A tree of markup `with` blocks counts as
+ * one statement (#360). A docstring doesn't count either. A nested function,
+ * class or lambda counts as one statement and its body is its own business.
+ * It reads syntax only; what is denied is `check.ts`'s question.
  */
 import type { Node } from "web-tree-sitter";
 import { namedChildren } from "../../python/nodes.ts";
@@ -37,6 +39,9 @@ const CLAUSES: ReadonlySet<string> = new Set([
   "finally_clause",
   "case_clause",
 ]);
+
+/** Statements a markup block may hold besides other markup blocks. */
+const PRESENTATION: ReadonlySet<string> = new Set(["pass_statement", "comment"]);
 
 /** Comprehensions: loops written as expressions. */
 const COMPREHENSIONS: ReadonlySet<string> = new Set([
@@ -90,7 +95,37 @@ interface Tally {
 function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp): boolean {
   const statements = block ? namedChildren(block) : [];
   const [only] = statements;
-  return statements.length === 1 && only !== undefined && raisesHttp(only);
+  return (
+    (statements.length === 1 && only !== undefined && raisesHttp(only)) || answersEarly(statements)
+  );
+}
+
+/**
+ * Tells whether a block answers the request early: at most one bare call
+ * (awaited or not) and then a `return`. That is how an HTMX form handler
+ * maps an error, `await add_toast(request, "Not found.", "error")` and
+ * `return None`, where a JSON API raises (#360). Two calls before the
+ * return, or an assignment, are work and count.
+ *
+ * @param statements - the block's statements.
+ * @returns true for a toast-and-return or a bare early return.
+ */
+function answersEarly(statements: readonly Node[]): boolean {
+  const last = statements.at(-1);
+  const before = statements.slice(0, -1);
+  return last?.type === "return_statement" && before.length <= 1 && before.every(bareCall);
+}
+
+/**
+ * Tells whether a statement is a call and nothing else: `f(...)` or `await f(...)`.
+ *
+ * @param statement - a statement node.
+ * @returns true for a bare call statement.
+ */
+function bareCall(statement: Node): boolean {
+  const [expression, ...more] = namedChildren(statement);
+  const [awaited] = expression?.type === "await" ? namedChildren(expression) : [expression];
+  return statement.type === "expression_statement" && more.length === 0 && awaited?.type === "call";
 }
 
 /**
@@ -169,6 +204,43 @@ function countCompound(statement: Node, depth: number, tally: Tally): void {
 }
 
 /**
+ * Tells whether a statement is a block of markup, as templating libraries
+ * that build HTML with context managers write it (tagflow, dominate):
+ * `with tag.div(classes="card"):` whose context expressions are calls bound
+ * to no name, and whose body holds only such blocks, bare calls such as
+ * `text(...)`, and `pass`. The whole tree is one statement and adds no
+ * nesting (#360): it is the response's shape, not the feature. An `as`
+ * target, an assignment, an `await`, a branch or a loop inside makes it an
+ * ordinary `with`.
+ *
+ * @param statement - a statement node.
+ * @returns true for a markup tree.
+ */
+function isMarkup(statement: Node): boolean {
+  if (statement.type !== "with_statement") {
+    return false;
+  }
+  const clause = namedChildren(statement).find((child) => child.type === "with_clause");
+  const items = clause ? namedChildren(clause) : [];
+  const unbound = items.every((item) => item.childForFieldName("value")?.type === "call");
+  const body = statement.childForFieldName("body");
+  return items.length > 0 && unbound && body !== null && namedChildren(body).every(presents);
+}
+
+/**
+ * Tells whether a statement inside a markup block only presents: `pass`, a
+ * comment, a bare call such as `text(...)`, or another markup block.
+ *
+ * @param statement - a statement node in a markup block's body.
+ * @returns true when it does no work of its own.
+ */
+function presents(statement: Node): boolean {
+  const [only, ...more] = namedChildren(statement);
+  const call = statement.type === "expression_statement" && only?.type === "call";
+  return PRESENTATION.has(statement.type) || (call && more.length === 0) || isMarkup(statement);
+}
+
+/**
  * Walks one block's statements, counting into the tally.
  *
  * @param block - a `block` node.
@@ -183,7 +255,7 @@ function walk(block: Node, depth: number, tally: Tally): void {
     tally.statements += 1;
     tally.first = tally.first === 0 ? statement.startPosition.row + 1 : tally.first;
     tally.last = Math.max(tally.last, statement.endPosition.row + 1);
-    if (COMPOUND.has(statement.type)) {
+    if (COMPOUND.has(statement.type) && !isMarkup(statement)) {
       countCompound(statement, depth, tally);
     }
   }

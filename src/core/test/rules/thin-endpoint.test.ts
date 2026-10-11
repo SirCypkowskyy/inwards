@@ -345,9 +345,9 @@ async def recent():
 
   test("delegate-to reports a handler that calls nothing from the target", async () => {
     const body = `
-@router.get("/health")
-async def health():
-    return {"ok": True}
+@router.get("/version")
+async def version():
+    return {"version": "1.0"}
 
 
 @router.post("/direct")
@@ -355,10 +355,10 @@ async def direct(body: OrderIn):
     return await place_order(body)
 `;
     expect(await inw012(body, 'delegate-to = ["application"]')).toEqual([
-      `15 warning \`health\` is an HTTP endpoint with no call into the \`application\` layer (\`shop.application\`). ${TAIL}`,
+      `15 warning \`version\` is an HTTP endpoint with no call into the \`application\` layer (\`shop.application\`). ${TAIL}`,
     ]);
     expect(await inw012(body, 'delegate-to = ["shop.*.orders"]')).toEqual([
-      `15 warning \`health\` is an HTTP endpoint with no call into a module matching \`shop.*.orders\`. ${TAIL}`,
+      `15 warning \`version\` is an HTTP endpoint with no call into a module matching \`shop.*.orders\`. ${TAIL}`,
     ]);
     expect(await inw012(body, 'delegate-to = ["infrastructure"]')).toHaveLength(2);
   });
