@@ -69,6 +69,20 @@ export interface Wiring extends CallSyntax {
   readonly loopTargets: readonly (string | null)[];
 }
 
+/**
+ * A route an app or router adds that serves an OpenAPI schema itself: a
+ * path operation or `add_api_route`/`add_route` call whose path ends in
+ * `openapi.json`, as Polar's `/{version}/openapi.json` routes do (#391).
+ * FastAPI's `openapi_url=None` only stops FastAPI serving the schema; such
+ * a route still builds one from the app's routes.
+ */
+export interface SchemaRoute {
+  /** The qualified name of the app or router the route is added to. */
+  readonly receiver: string;
+  /** The call that adds it. */
+  readonly node: Node;
+}
+
 /** An exception handler an app registers, and the status codes its responses set. */
 export interface ExceptionHandler {
   /** The qualified name of the app. */
@@ -113,6 +127,8 @@ export interface FastApiFile {
   readonly handlers: readonly ExceptionHandler[];
   readonly events: readonly EventHandlerUse[];
   readonly dependencies: readonly DependencyUse[];
+  /** The routes that serve a schema of their own (#391). */
+  readonly schemaRoutes: readonly SchemaRoute[];
 }
 
 /** What reading one file needs besides its tree. */

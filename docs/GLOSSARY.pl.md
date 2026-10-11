@@ -251,6 +251,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | abstract base class, ABC (`abc.ABC`) | abstrakcyjna klasa bazowa, ABC |
 | Protocol (`typing.Protocol`) | Protocol (protokół strukturalny) |
 | abstract method, method body (INW014) | metoda abstrakcyjna, ciało metody |
+| conformance line (`_: Port = Adapter(...)` under `if TYPE_CHECKING:`, INW020) | linia zgodności |
+| private module (`_user.py`, INW021) | moduł prywatny |
+| command, query (CQRS; the `commands` and `queries` packages stay in code) | komenda, zapytanie |
+| test stub, test double | atrapa (w testach) |
 | implementation (of a port) | implementacja (portu) |
 | command, query (CQRS use cases, `commands/`, `queries/`) | komenda, zapytanie |
 | private module (`_place_order.py`) | moduł prywatny |
@@ -287,6 +291,10 @@ baseline'u); multi-word names are left uninflected where possible.
 | severity | poziom (błąd, ostrzeżenie) |
 | shared kernel (the `shared` layer of `vertical-slices`) | wspólne jądro |
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
+| mini-domain (a folder inside a slice) | minidomena |
+| public face (a slice's `index.ts`) | publiczna fasada |
+| barrel (a module that only re-exports) | barrel |
+| zone (fallow's boundaries) | strefa |
 | snapshot | migawka |
 | spike | eksperyment |
 | resident process | stały proces |

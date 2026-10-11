@@ -18,7 +18,7 @@ import { namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { joined } from "../shared/words.ts";
 import { flag, list } from "./options.ts";
-import { hiddenBy, placementOf } from "./placement.ts";
+import { hiddenBy, objectHidden, placementOf } from "./placement.ts";
 import type { FastApiProject } from "./project.ts";
 import type { FastApiFile, FastApiObject, PathOperation } from "./records.ts";
 import { statusCode } from "./status.ts";
@@ -87,7 +87,10 @@ export function checkEndpointMetadata(
   const qualify = scope.model.qualifierOf(file);
   return file.operations.flatMap((op) => {
     const object = scope.objectOf(op.receiver);
-    if (op.splat || hiddenBy(op) || object === null || qualify === null || hiddenBy(object)) {
+    if (op.splat || hiddenBy(op) || object === null || qualify === null) {
+      return [];
+    }
+    if (objectHidden(object, scope)) {
       return [];
     }
     const gaps = gapsOf(op, { object, scope, qualify, options });
