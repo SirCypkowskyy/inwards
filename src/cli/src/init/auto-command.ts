@@ -292,7 +292,10 @@ function findPackage(
   if (only !== undefined && candidates.length === 1) {
     return only;
   }
-  const names = candidates.map((c) => c.pkg).join(", ");
+  const names = candidates
+    .map((c) => c.pkg)
+    .sort()
+    .join(", ");
   return candidates.length === 0
     ? `found no package (a directory with __init__.py) in ${shown(ctx.io.runtime.cwd, project) || "."} or its src/; name it with --package.`
     : `found several packages (${names}); name the one to map with --package.`;
