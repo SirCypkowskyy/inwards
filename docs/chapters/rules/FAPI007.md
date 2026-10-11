@@ -150,11 +150,12 @@ Every finding can be suppressed inline with `# inwards: ignore[FAPI007] reason="
 
 ## Known limitations
 
-- **Generators that aren't dependencies** are reported too: a plain `def lines(): try: yield ... except ...: log()` that nothing throws into never sees an endpoint's error. Suppress it inline, or decorate it if it is a context manager.
+- **Generators that aren't dependencies** are reported too when they yield once: a plain `def line(): try: yield ... except ...: log()` that nothing throws into never sees an endpoint's error. Suppress it inline, or decorate it if it is a context manager. A generator that yields more than once, or inside a `for` or `while`, is a stream and is skipped, since a dependency yields once; a dependency that yields on two branches (`if x: yield a` / `else: yield b`) is skipped with them.
 - **A handler that raises through a call** (`fail(exc)` where `fail` always raises) isn't a `raise` to Inwards, so it is reported.
 - **A `raise` that only some paths reach** (`if x: raise`) is reported; one on every branch of an `if` / `else` passes.
 - **A clause for a narrow exception** (`except KeyError:`) is checked like any other: errors of other types still go through, but this one is swallowed.
 - **`return` in the clause** before a `raise` ends the path without raising and is reported.
+- **Measured on the corpus** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [chapter 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 4 findings before streams were skipped, all false positives (Polar's server-sent events, Saleor's discount iterator), and none after.
 
 ## References
 

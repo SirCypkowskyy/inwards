@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI002.md
-source_hash: e36ae2882e6432bcd17edb3d881672b15d610d3883f539919943319ab3109167
+source_hash: e1d786ef86170945bf0b328659cb74613d169a87c1804954930ad5ac3cb5f6e3
 type: rule
 title: FAPI002 undocumented-error-response
 description: Operacja ścieżki FastAPI może zwrócić kod błędu, bezpośrednio, przez funkcję pomocniczą albo zależność, albo przez handler wyjątków aplikacji, którego jej wpis OpenAPI nie deklaruje.
@@ -213,6 +213,7 @@ Nieznane znaczy ciche: FAPI002 woli przeoczyć diagnostykę niż zgłosić błę
 - Funkcja-generator wywołana po nazwie (treść `StreamingResponse`) nie jest czytana, bo wywołanie jej nie uruchamia.
 - Gdy do jednego routera prowadzi kilka dołączeń, liczy się kod zadeklarowany w którymkolwiek z nich.
 - Żeby ustalić, co jest nad routerem, FAPI002 czyta raz na sprawdzenie każdy plik projektu z FastAPI. W hooku po edycji robi to tylko dla trasy z kodem, którego nie deklarują jej dekorator ani router.
+- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 18 zgłoszeń przed regułą o `openapi_url`, 17 po niej; 8 obejrzanych, wszystkie trafne (każdy podany kod rzuca endpoint albo zależność). Usunięte było na back office Polara, aplikacji z `openapi_url=None`. Własna klasa routera Polara ukrywa większość jego endpointów ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 
 ## Źródła { #references }
 

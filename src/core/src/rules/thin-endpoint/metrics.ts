@@ -2,8 +2,8 @@
  * @file Measures one endpoint's body for INW012 in one walk: statements,
  * branches, how deep blocks nest, its loops, and the calls it makes. Mapping
  * an error to HTTP is the endpoint's job, so a guard (`if <cond>: raise
- * HTTPException(...)`, or Flask's `abort(404)`) and an `except` that only
- * raises one count for nothing. A docstring doesn't count either. A nested function, class or
+ * ...`, or Flask's `abort(404)`) and an `except` that only raises count for
+ * nothing, whatever they raise. A docstring doesn't count either. A nested function, class or
  * lambda counts as one statement and its body is its own business. It reads
  * syntax only; what is denied is `check.ts`'s question.
  */
@@ -64,7 +64,7 @@ export interface Metrics {
   readonly lines: readonly [number, number];
 }
 
-/** Tells whether a statement maps an error to HTTP: it raises an HTTP error, or calls something that does. */
+/** Tells whether a statement ends the request with an error: a `raise`, or a call of `abort`. */
 export type RaisesHttp = (raise: Node) => boolean;
 
 /** The counts so far, and what the walk needs to tell guards and the docstring apart. */
@@ -81,10 +81,10 @@ interface Tally {
 }
 
 /**
- * Tells whether a block holds one statement and it raises an HTTP error.
+ * Tells whether a block holds one statement and it raises an error.
  *
  * @param block - a `block` node.
- * @param raisesHttp - tells whether a statement maps an error to HTTP.
+ * @param raisesHttp - tells whether a statement ends the request with an error.
  * @returns true for a guard's or a mapping handler's body.
  */
 function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp): boolean {
@@ -95,11 +95,11 @@ function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp):
 
 /**
  * Tells whether a statement is a guard: an `if` with no `elif` or `else`
- * whose body only raises an HTTP error.
+ * whose body only raises an error.
  *
  * @param statement - a statement node.
- * @param raisesHttp - tells whether a statement maps an error to HTTP.
- * @returns true for `if <cond>: raise HTTPException(...)`.
+ * @param raisesHttp - tells whether a statement ends the request with an error.
+ * @returns true for `if <cond>: raise HTTPException(...)` or `if <cond>: raise NotFound()`.
  */
 function isGuard(statement: Node, raisesHttp: RaisesHttp): boolean {
   return (
