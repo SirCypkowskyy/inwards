@@ -3,9 +3,11 @@
  * editor, as plain data: the diagnostics it publishes, the messages it shows,
  * and the events the editor reports, already turned into absolute paths and
  * text. The LSP connection over stdio implements `Editor` and drives
- * `LanguageServer` (`adapters/lsp-connection.ts`); this folder never sees the
- * protocol library or a stream. Types only.
+ * `LanguageServer` (`adapters/connection.ts`); the rest of the slice never sees the
+ * protocol library or a stream. `ServerCheck` is the check the root binds
+ * the I/O into. Types only.
  */
+import type { Report } from "@inwards/core";
 
 /** A position in a document, 0-based, as LSP counts it. */
 export interface LspPosition {
@@ -108,3 +110,22 @@ export interface LanguageServer {
    */
   stop: () => void;
 }
+
+/**
+ * Runs one config's check, as `project/check.ts`'s `runCheck` does with its
+ * I/O and the server's in-memory extraction cache bound. Never starts threads.
+ *
+ * @param configPath - the pyproject.toml.
+ * @param targets - absolute files; undefined for the whole project.
+ * @param base - the directory report paths are relative to.
+ * @param options - the open documents' text (`texts`), a per-edit check
+ *   (`edit`), and the directories another config checks (`exclude`).
+ * @returns the report.
+ * @throws {ConfigError} when the config or its baseline is invalid.
+ */
+export type ServerCheck = (
+  configPath: string,
+  targets: string[] | undefined,
+  base: string,
+  options: { texts: ReadonlyMap<string, string>; edit?: boolean; exclude: readonly string[] },
+) => Promise<Report>;

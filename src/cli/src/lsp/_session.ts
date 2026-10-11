@@ -12,11 +12,11 @@
  */
 import type { ConfigError, Diagnostic } from "@inwards/core";
 import { DIAGRAM_FILE } from "../project/diagrams.ts";
-import { checkAlone, checkWorkspace, type ServerDeps, without } from "./checks.ts";
+import { checkAlone, checkWorkspace, type ServerDeps, without } from "./_checks.ts";
+import { messageOf } from "./_convert.ts";
+import { needsPass } from "./_events.ts";
+import { type OpenDoc, publish } from "./_publish.ts";
 import type { FileChange, LanguageServer } from "./contracts.ts";
-import { messageOf } from "./convert.ts";
-import { needsPass } from "./events.ts";
-import { type OpenDoc, publish } from "./publish.ts";
 
 /** How long file events and saves are collected before a pass runs. */
 const DEBOUNCE_MS = 100;
