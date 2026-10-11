@@ -41,6 +41,7 @@ import type { Diagnostic } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { baselineHashes } from "../project/baseline.ts";
+import { fingerprint } from "../project/fingerprint.ts";
 import {
   projectConfigs,
   projectLinks,
@@ -49,7 +50,6 @@ import {
   projectTopLevel,
 } from "../project/snapshot.ts";
 import type { SessionStart } from "./contracts.ts";
-import { fingerprint } from "./fingerprint.ts";
 import { copiesName, startCopier } from "./start-copies.ts";
 import {
   readStart,

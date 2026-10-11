@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 26c25e0e68214bc56683fd1e46a840ee338fbf7c71244d44e90546338403e974
+source_hash: 626fa4c5a916236c6b75f088c256c746dd4dc939158b30ce3a20b918bede3a73
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -520,7 +520,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, mcp, import-config,
+│   │   ├── commands/      # check, baseline, rules, hook, daemon, mcp, import-config,
 │   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
@@ -529,8 +529,11 @@ src/
 │   │   │                  #   agent suppressions, layout changes against the session start
 │   │   ├── project/       # running a check, the baseline, config discovery, project snapshots,
 │   │   │                  #   texts laid over the disk (overlay.ts), the whole-project checks
-│   │   │                  #   (whole.ts), the diagram files `diagrams` lists (diagrams.ts)
-│   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
+│   │   │                  #   (whole.ts), the diagram files `diagrams` lists (diagrams.ts),
+│   │   │                  #   violation fingerprints (fingerprint.ts)
+│   │   ├── runlog/        # the opt-in run log, a slice (ADR-047): index.ts its face, cli.ts
+│   │   │                  #   inwards stats, commands/ writes the log, queries/ reads it back
+│   │   │                  #   (stats, --export), adapters/ the export key and file
 │   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
 │   │   │                  #   the in-memory caches
 │   │   ├── lsp/           # inwards server, a slice (ADR-047): index.ts re-exports the handler

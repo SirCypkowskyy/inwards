@@ -7,8 +7,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { nodeFileReader } from "../../src/adapters/filesystem.ts";
-import { readRunLogs } from "../../src/runlog/runs.ts";
-import { computeStats, type Stats } from "../../src/runlog/stats.ts";
+import { computeStats, readRunLogs, type Stats } from "../../src/runlog/index.ts";
 import { LAYERS, project } from "./run.ts";
 
 /**
