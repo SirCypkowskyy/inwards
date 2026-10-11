@@ -170,6 +170,9 @@
       { "name": "cli-claude-code", "patterns": ["src/cli/src/claude-code/**"] },
       { "name": "cli-session", "patterns": ["src/cli/src/session/**"] },
       { "name": "cli-project", "patterns": ["src/cli/src/project/**"] },
+      // The run log slice (ADR-047): its export storage before the rest, since the
+      // first matching zone wins.
+      { "name": "cli-runlog-adapters", "patterns": ["src/cli/src/runlog/adapters/**"] },
       { "name": "cli-runlog", "patterns": ["src/cli/src/runlog/**"] },
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
       // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
@@ -585,8 +588,28 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
-          "cli-session"
+          "cli-project"
+        ]
+      },
+      // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
+      {
+        "from": "cli-runlog-adapters",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-runlog"
         ]
       },
       {
@@ -848,7 +871,8 @@
           "cli-lsp",
           "cli-lsp-adapters",
           "cli-mcp",
-          "cli-mcp-adapters"
+          "cli-mcp-adapters",
+          "cli-runlog-adapters"
         ]
       },
       {

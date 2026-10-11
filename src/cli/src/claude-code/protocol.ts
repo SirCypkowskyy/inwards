@@ -7,7 +7,7 @@
  * filesystem on its own.
  */
 import type { Platform, Runtime } from "../platform/contracts.ts";
-import type { RunLog } from "../runlog/record.ts";
+import type { RunLog } from "../runlog/index.ts";
 import type { CheckRunner } from "../session/contracts.ts";
 
 /** Ends every denial. The agent eval (eval/evidence.ts) counts denials by it. */
