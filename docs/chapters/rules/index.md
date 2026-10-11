@@ -80,6 +80,7 @@ Architecture diagrams in the docs, checked against `[tool.inwards]` ([ADR-045](.
 | Code | Name | What it flags | On | Severity | Turned on by preset | Inline suppression |
 |---|---|---|---|---|---|---|
 | [INW017](INW017.md) | `diagram-unknown-name` | A node in a marked Mermaid architecture diagram that names no declared layer or context, or whose quoted label matches no module (whole-project runs) | opt-in | warning | none | no |
+| [INW018](INW018.md) | `diagram-forbidden-edge` | A solid arrow in a marked Mermaid architecture diagram that draws an import the config forbids: outward or between sibling layers, between contexts without `depends-on`, or into a module that isn't `public` (whole-project runs) | opt-in | warning | none | no |
 
 </div>
 
@@ -128,7 +129,7 @@ Codes are exact, not prefixes, and an unknown code is a config error (exit 2). `
 
 ### Opt-in rules and rule options { #opt-in-rules }
 
-A rule whose On column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md) and [INW017](INW017.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, the rules that judge the content of a role's modules, such as INW013, INW015 and INW016, the rules that check docs against the config, such as INW017, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
+A rule whose On column says "opt-in" doesn't report until you turn it on: list its code in `extend-select`, which keeps every other rule as it is, or in `select`. The INW rules are on by default, apart from [INW012](INW012.md), [INW013](INW013.md), [INW014](INW014.md), [INW015](INW015.md), [INW016](INW016.md), [INW017](INW017.md) and [INW018](INW018.md); the opt-in ones are the rules that judge code against thresholds a team picks, such as INW012, the rules that judge the content of a role's modules, such as INW013, INW015 and INW016, the rules that check docs against the config, INW017 and INW018, and framework families such as [FastAPI](#fastapi). SARIF lists an opt-in rule with `defaultConfiguration.enabled` set to `false`.
 
 A rule's options live in a table named after the rule, `[tool.inwards.rules.<rule-name>]`. Some rules take options of their own, listed on their pages ([INW012](INW012.md#configuration), [INW013](INW013.md#configuration), [INW014](INW014.md#configuration), [INW015](INW015.md#configuration), [INW016](INW016.md#configuration), [FAPI001](FAPI001.md#configuration), [FAPI002](FAPI002.md#configuration)). Every rule takes `modules`, a list of module prefixes or selectors written as in a [layer's `modules`](../guides/configuration.md#layers) (`shop.domain` covers that package and everything below it, `shop.*.api` uses wildcards): the rule then reports only in the modules they match. An unknown key or a wrong type is a config error that names the key.
 

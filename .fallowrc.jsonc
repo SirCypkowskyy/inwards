@@ -142,6 +142,11 @@
         "name": "core-rule-diagram-unknown-name",
         "patterns": ["src/core/src/rules/diagram-unknown-name/**"]
       },
+      // INW018 diagram-forbidden-edge (#345): arrows in marked diagrams.
+      {
+        "name": "core-rule-diagram-forbidden-edge",
+        "patterns": ["src/core/src/rules/diagram-forbidden-edge/**"]
+      },
       { "name": "core-baseline", "patterns": ["src/core/src/baseline/**"] },
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
@@ -346,6 +351,10 @@
         "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
       },
       {
+        "from": "core-rule-diagram-forbidden-edge",
+        "allow": ["core-contracts", "core-meta", "core-config", "core-diagram", "core-rules-shared"]
+      },
+      {
         "from": "core-rule-orm-naming",
         "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
       },
@@ -389,6 +398,7 @@
           "core-rule-orm-naming",
           "core-diagram",
           "core-rule-diagram-unknown-name",
+          "core-rule-diagram-forbidden-edge",
           "core-baseline"
         ]
       },
@@ -448,6 +458,7 @@
           "core-rule-orm-naming",
           "core-diagram",
           "core-rule-diagram-unknown-name",
+          "core-rule-diagram-forbidden-edge",
           "core-baseline",
           "core-engine",
           "core-report"
@@ -921,6 +932,10 @@
         },
         {
           "from": "core-rule-diagram-unknown-name",
+          "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
+        },
+        {
+          "from": "core-rule-diagram-forbidden-edge",
           "callee": ["Bun.*", "Deno.*", "process.*", "console.*", "fs.*", "child_process.*"]
         },
         {
