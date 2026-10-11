@@ -3,7 +3,8 @@
  * begin and an end marker that init and `inwards context --write` own and
  * replace in place, leaving everything outside the markers alone. The
  * splicing is pure; reading the current file goes through the platform's probe
- * and reader, and writing is left to the caller.
+ * and reader, and writing is left to the caller. It also says what goes
+ * between a pyproject.toml and a `[tool.inwards]` table appended to it.
  */
 import type { FileReader, PathProbe } from "../platform/contracts.ts";
 
@@ -65,4 +66,18 @@ export function readIfThere(
   path: string,
 ): string | undefined {
   return io.probe.exists(path) ? io.read.text(path) : undefined;
+}
+
+/**
+ * Picks what goes between the end of pyproject.toml and the new table: one blank line.
+ *
+ * @param text - the file's text.
+ * @param eol - its line ending.
+ * @returns "", one line ending or two.
+ */
+export function appendSeparator(text: string, eol: string): string {
+  if (text === "" || text.endsWith(`${eol}${eol}`)) {
+    return "";
+  }
+  return text.endsWith(eol) ? eol : `${eol}${eol}`;
 }
