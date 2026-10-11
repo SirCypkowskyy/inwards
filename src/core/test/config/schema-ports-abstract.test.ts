@@ -3,7 +3,8 @@
  * `[tool.inwards]` JSON Schema, kept beside `schema-negatives.test.ts`. Each
  * structural mistake fails both the schema and the parser, and a valid table
  * passes both, so the two can't drift on `allow-bases`,
- * `extend-allow-bases` or `allow-decorators`.
+ * `extend-allow-bases`, `allow-decorators`, `interface` or
+ * `allow-subclassing`.
  */
 import { describe, expect, test } from "bun:test";
 import { MINIMAL, parserError, schemaErrors } from "../support/config-schema.ts";
@@ -28,6 +29,9 @@ describe("INW014's options", () => {
     ["a decorator pattern with a hyphen", ports('allow-decorators = ["my-lib.record"]')],
     ["an unknown key", ports('allow-classes = ["Exception"]')],
     ["an empty modules", ports("modules = []")],
+    ["an unknown interface", ports('interface = "abc"')],
+    ["interface as a boolean", ports("interface = true")],
+    ["allow-subclassing as a string", ports('allow-subclassing = "no"')],
   ])("%s fails both", (_what, text) => {
     expect(parserError(text)).toBeDefined();
     expect(schemaErrors(text)).not.toEqual([]);
@@ -37,7 +41,9 @@ describe("INW014's options", () => {
     const text = ports(`modules = ["shop.application.ports", "shop.*.ports"]
 allow-bases = ["Exception", "*Error", "pydantic.BaseModel"]
 extend-allow-bases = ["shop.domain.ValueObject"]
-allow-decorators = ["dataclasses.dataclass", "attrs.*"]`);
+allow-decorators = ["dataclasses.dataclass", "attrs.*"]
+interface = "protocol"
+allow-subclassing = false`);
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 
