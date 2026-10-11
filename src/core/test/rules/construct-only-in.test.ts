@@ -194,6 +194,27 @@ def build():
     expect(await inw015(INBOUND, text)).toEqual([]);
   });
 
+  test("an exception class of the role passes, imported or raised", async () => {
+    // fastapi-clean-example (#182 corpus run) maps its adapters' errors to
+    // HTTP statuses: 31 of 48 findings were imports like these.
+    const extra = {
+      "app/adapters/outbound/errors.py":
+        "class StorageError(Exception):\n    pass\n\n\nclass BusyException(Exception):\n    pass\n",
+      "app/adapters/__init__.py": "from .outbound.errors import BusyException\n",
+    };
+    const text = `from app.adapters import BusyException
+from app.adapters.outbound.errors import StorageError
+from app.adapters.outbound.sql import SqlRepo
+
+
+def build():
+    raise BusyException()
+`;
+    expect((await inw015(INBOUND, text, ROLE, extra)).map((f) => f.split(" ")[0])).toEqual([
+      "3:39",
+    ]);
+  });
+
   test("a class reached through a re-export is reported on the call", async () => {
     const extra = { "app/adapters/__init__.py": "from .outbound.sql import SqlRepo, make_repo\n" };
     const text = `from app.adapters import SqlRepo, make_repo

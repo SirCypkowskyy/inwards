@@ -196,6 +196,41 @@ async def read(id: int, place_order: Annotated[PlaceOrder, Depends(get_place_ord
     ]);
   });
 
+  test("doesn't count guards or handlers that raise the project's own errors", async () => {
+    // Polar's endpoints (#182 corpus run) raise `ResourceNotFound` and
+    // `NotPermitted`, which an app-wide exception handler maps to HTTP.
+    const guards = `
+@router.get("/orders/{id}")
+async def read(id: int, place_order: Annotated[PlaceOrder, Depends(get_place_order)]):
+    if id < 0:
+        raise RequestValidationError("negative id")
+    if id == 0:
+        raise ResourceNotFound
+    try:
+        order = await place_order(id)
+    except OutOfStock as e:
+        raise NotPermitted("out of stock") from e
+    return order
+`;
+    expect(await inw012(guards, "max-statements = 3\nmax-branches = 0\nmax-nesting = 1")).toEqual(
+      [],
+    );
+  });
+
+  test("counts a branch that does more than raise", async () => {
+    const branch = `
+@router.get("/orders/{id}")
+async def read(id: int):
+    if id < 0:
+        log.warning("negative id")
+        raise ResourceNotFound
+    return id
+`;
+    expect(await inw012(branch, "max-branches = 0")).toEqual([
+      `15 warning \`read\` is an HTTP endpoint with 1 branch (max 0). ${TAIL}`,
+    ]);
+  });
+
   test("counts branches, nesting and loops, each against its own limit", async () => {
     const body = `
 @router.get("/")
@@ -285,6 +320,27 @@ async def pay():
       `18 warning \`pay\` is an HTTP endpoint with direct calls (\`stripe.charge\`, \`httpx.post\`). ${TAIL}`,
     ]);
     expect(await inw012(body, "deny-calls = []")).toEqual([]);
+  });
+
+  test("SQLAlchemy loader options passed to a service aren't denied calls", async () => {
+    // Polar's endpoints (#182 corpus run) ask a repository for eager loads:
+    // `get_by_id(id, options=(joinedload(Payout.account),))`.
+    const body = `
+from sqlalchemy.orm import joinedload, load_only, selectinload
+
+
+@router.get("/orders/{id}")
+async def read(id: int, place_order: Annotated[PlaceOrder, Depends(get_place_order)]):
+    return await place_order.get(id, options=(joinedload(Order.lines), selectinload(Order.customer), load_only(Order.id)))
+
+
+@router.get("/orders")
+async def recent():
+    return select(Order).limit(10)
+`;
+    expect(await inw012(body)).toEqual([
+      `23 warning \`recent\` is an HTTP endpoint with a direct call to \`select\`. ${TAIL}`,
+    ]);
   });
 
   test("delegate-to reports a handler that calls nothing from the target", async () => {

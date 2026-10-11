@@ -6,7 +6,8 @@
  * on the name, with the name to use instead. A whole-project run also
  * reports, once, a project whose SQLAlchemy tables have no `MetaData`
  * naming convention (`conventionFinding`); the caller decides which runs
- * get it. A file that names no ORM construct is never parsed. I/O-free: the
+ * get it. A file that names no ORM construct is never parsed, and neither
+ * is an Alembic migration. I/O-free: the
  * caller supplies the parser, the files and the options.
  */
 import type { Node, Parser } from "web-tree-sitter";
@@ -27,6 +28,14 @@ import { isSnake, singularOf, toSnake, withSuffix } from "./names.ts";
 /** Text that may declare a table or a datetime or date column. */
 const MAY_DECLARE =
   /__tablename__|db_table|\bTable\s*\(|\btable\s*=\s*True|\bMapped\b|\bColumn\s*\(|mapped_column|DateTimeField|DateField/u;
+
+/**
+ * An Alembic migration script: it imports `alembic` (`from alembic import
+ * op`). Its tables and columns record the schema's history, so a rename
+ * belongs in the model and a new migration, which the model's own finding
+ * asks for. The #182 corpus run found 20 such repeats in Polar's migrations.
+ */
+const ALEMBIC_MIGRATION = /^(?:from\s+alembic(?:\.\w+)*\s+import|import\s+alembic)\b/mu;
 
 /** Text that may declare a SQLAlchemy or SQLModel table, which a naming convention covers. */
 const MAY_DECLARE_TABLE = /__tablename__|\bTable\s*\(|\btable\s*=\s*True/u;
@@ -208,7 +217,7 @@ export function checkOrmNaming(
   src: SourceFile,
   options: RuleOptions | undefined,
 ): Diagnostic[] {
-  if (!MAY_DECLARE.test(src.text)) {
+  if (!MAY_DECLARE.test(src.text) || ALEMBIC_MIGRATION.test(src.text)) {
     return [];
   }
   const settings = settingsOf(options);

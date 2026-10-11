@@ -219,6 +219,27 @@ log = Table("log", Base.metadata, Column("logged", DateTime), Column("logged_at"
     ]);
   });
 
+  test("an Alembic migration isn't read: it records history, the model holds the name", async () => {
+    // Polar's migrations (#182 corpus run) gave 20 findings that repeat its
+    // models' and can't be fixed in place.
+    const migration = `import sqlalchemy as sa
+from alembic import op
+
+revision = "abc123"
+
+
+def upgrade() -> None:
+    op.add_column("subscription", sa.Column("trial_end", sa.TIMESTAMP(timezone=True)))
+    op.create_table("payouts", sa.Column("paid", sa.DateTime()))
+`;
+    expect(await inw016({ "app/migrations/versions/abc123_trial.py": migration })).toEqual([]);
+    expect(
+      await models('\nlog = Table("log", Base.metadata, Column("logged", DateTime))\n'),
+    ).toEqual([
+      `${FIRST + 1}:42 Datetime column \`logged\` doesn't end with \`_at\`: name it \`logged_at\`.`,
+    ]);
+  });
+
   test("configured suffixes, and false to turn one off", async () => {
     const body = `class Event(Base):
     __tablename__ = "event"
