@@ -31,10 +31,10 @@ export interface RuleMeta {
   docs: string;
 }
 
-/** Codes of every registered rule: INW000 to INW017, and the FAPI family without FAPI004. */
+/** Codes of every registered rule: INW000 to INW018, and the FAPI family without FAPI004. */
 type RuleCode =
   | `INW00${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`
-  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}`
+  | `INW01${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
   | `FAPI00${1 | 2 | 3 | 5 | 6 | 7 | 8 | 9}`;
 
 /**
@@ -200,7 +200,7 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     docs: page("INW016"),
   },
   // Opt-in and a warning: docs drift shouldn't block the Stop gate by default
-  // (#332, ADR-045). INW018 and INW019 are reserved for the diagram's edges (#345).
+  // (#332, ADR-045). INW019 is reserved for imports a diagram doesn't draw.
   INW017: {
     code: "INW017",
     name: "diagram-unknown-name",
@@ -209,6 +209,15 @@ export const RULES: { readonly [Code in RuleCode]: RuleMeta & { readonly code: C
     summary:
       "A node in a marked architecture diagram names a layer or context [tool.inwards] declares, and its quoted label a module that exists.",
     docs: page("INW017"),
+  },
+  INW018: {
+    code: "INW018",
+    name: "diagram-forbidden-edge",
+    severity: "warning",
+    default: "off",
+    summary:
+      "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
+    docs: page("INW018"),
   },
   // The FastAPI family (#186): opt-in, with its own prefix. The checks land in
   // #183 and #184; FAPI004 is reserved until the #185 spike says go.

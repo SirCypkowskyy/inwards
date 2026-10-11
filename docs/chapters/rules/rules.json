@@ -253,6 +253,20 @@
       "url": "INW017/"
     },
     {
+      "code": "INW018",
+      "name": "diagram-forbidden-edge",
+      "title": "INW018 diagram-forbidden-edge",
+      "summary": "A solid arrow in a marked Mermaid architecture diagram that draws an import the config forbids: outward or between sibling layers, between contexts without `depends-on`, or into a module that isn't `public` (whole-project runs)",
+      "description": "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
+      "category": ["diagrams", "docs"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "warning",
+      "suppressible": false,
+      "default": "opt-in, warning",
+      "url": "INW018/"
+    },
+    {
       "code": "FAPI001",
       "name": "endpoint-metadata",
       "title": "FAPI001 endpoint-metadata",

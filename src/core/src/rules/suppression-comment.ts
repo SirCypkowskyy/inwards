@@ -44,8 +44,9 @@ const EXAMPLE = '# inwards: ignore[INW001] reason="why this import is allowed"';
  * all, INW004 is about the whole project (a one-file check can't tell whether
  * a suppressed cycle still exists; the baseline accepts one), INW007 and
  * INW008 are about the package tree (configure the shape instead),
- * INW009 is about the suppressions themselves, and INW017 is about diagrams,
- * which hold no Python comment (mark the node `:::external` instead).
+ * INW009 is about the suppressions themselves, and INW017 and INW018 are about
+ * diagrams, which hold no Python comment (mark the node `:::external` or draw
+ * the link dotted instead).
  */
 const FIXED: ReadonlySet<string> = new Set([
   "INW000",
@@ -54,6 +55,7 @@ const FIXED: ReadonlySet<string> = new Set([
   "INW008",
   "INW009",
   "INW017",
+  "INW018",
 ]);
 
 /**
