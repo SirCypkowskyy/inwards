@@ -6,7 +6,7 @@
  */
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { needsPass } from "../../src/lsp/events.ts";
+import { needsPass } from "../../src/lsp/_events.ts";
 
 const ROOT = join("/", "work", "project");
 

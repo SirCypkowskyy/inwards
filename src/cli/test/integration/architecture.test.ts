@@ -46,7 +46,7 @@ const POLICY = [
  * Folders under src/cli/src already moved to the slice layout of ADR-047.
  * Each migration step adds its folders, so a moved slice can't drift back.
  */
-const MIGRATED_SLICES: readonly string[] = [];
+const MIGRATED_SLICES: readonly string[] = ["lsp"];
 /** The run-log fields these tests read. */
 interface LogLine {
   files: string[];
@@ -284,6 +284,13 @@ describe("boundaries", () => {
     for (const rule of config.boundaries.rules.filter((r) => policyZones.has(r.from))) {
       expect(rule.allow).not.toContain("cli-adapters");
       expect(rule.allow).not.toContain("cli-main");
+    }
+    // A slice's adapters/ has its own zone, and only the root (cli-main) imports it.
+    for (const slice of MIGRATED_SLICES.filter((s) => existsSync(join(SRC, s, "adapters")))) {
+      expect(patterns).toContain(`src/cli/src/${slice}/adapters/**`);
+      const zone = `cli-${slice}-adapters`;
+      const importers = config.boundaries.rules.filter((r) => r.allow.includes(zone));
+      expect(importers.map((r) => r.from)).toEqual(["cli-main"]);
     }
   });
 });
