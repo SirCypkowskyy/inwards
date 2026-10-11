@@ -18,6 +18,7 @@ import { WiringGraph } from "./graph.ts";
 import { returnedStatusCodes } from "./handlers.ts";
 import type { Definition, FastApiModel } from "./model.ts";
 import type { ExceptionHandler, FastApiFile, FastApiObject, Wiring } from "./records.ts";
+import { RouteClasses } from "./route-class.ts";
 import type { Value } from "./values.ts";
 import { valueFrom } from "./values.ts";
 
@@ -69,6 +70,8 @@ export interface Edge {
  */
 export class FastApiProject {
   readonly model: FastApiModel;
+  /** What each router's route class does (#392): route order and schema rule, read once per router. */
+  readonly routeClasses: RouteClasses = new RouteClasses(this);
   /** True in a per-edit check: rules read the rest of the project only when they must. */
   readonly lazy: boolean;
   private readonly project: ProjectIndex;
