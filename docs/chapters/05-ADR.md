@@ -870,6 +870,7 @@ The issue asked for the shape selectors of #95, but there `shop.domain` matches 
 
 - :material-plus-circle-outline: On the synthetic repo (2,100 files), where the generator's random imports put most modules of each layer in one cyclic group, the search with its confirmation made a cold whole-project check 1.51 s against 1.35 s without it (medians of 8 alternating runs with `INWARDS_NO_CACHE=1`, load average about 1.1). A full parse of every file in a group took about 7 s instead. The search found four cycles. The cold check is over the 1 s budget on this machine with or without it.
 - :material-plus-circle-outline: A cycle between contexts is caught even when `depends-on` allows both directions.
+- :material-plus-circle-outline: A project `inwards init --style` sets up has no cycles to fail on, so every preset writes `cycles = ["modules", "contexts"]` ([#340](https://github.com/SirCypkowskyy/inwards/issues/340)).
 - :material-minus-circle-outline: The editor and the per-edit hook don't show cycles; the Stop gate does only in project mode.
 - :material-minus-circle-outline: Importing a submodule also runs its package's `__init__`; that implicit step is no edge, so a cycle that only closes through an `__init__` is missed.
 - :material-minus-circle-outline: Without contexts, files outside every layer aren't parsed, so cycles through them aren't seen.

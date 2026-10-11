@@ -160,11 +160,15 @@ describe("django", () => {
     expect(findings(root)).toEqual({ code: 0, findings: [] });
   });
 
-  test("models importing the views fails with INW001", () => {
+  test("models importing the views fails with INW001, and closes a module cycle (INW004)", () => {
     const { root, result } = scaffolded("django");
     expect(result).toEqual(PASSING);
     write(root, { "src/my_app/orders/models.py": "from my_app.orders.views import place\n" });
-    expect(findings(root)).toEqual({ code: 1, findings: ["INW001 src/my_app/orders/models.py"] });
+    // The views already reach the models through the services.
+    expect(findings(root)).toEqual({
+      code: 1,
+      findings: ["INW001 src/my_app/orders/models.py", "INW004 src/my_app/orders/models.py"],
+    });
   });
 });
 
