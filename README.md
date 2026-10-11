@@ -16,7 +16,7 @@ Status: pre-alpha. The rules INW000 to INW019 and the FastAPI rules FAPI001 to F
 a config guard and escalation to the user (`--agent opencode` does the same through an OpenCode
 plugin; `--agent aider` and `--agent agents-md` cover Aider and `AGENTS.md`). On a new project,
 `uvx inwards init --style hexagonal --scaffold` writes the layers (six other presets too) and an
-example package that passes the check. The latest release is 0.6.0 (2026-10-11):
+example package that passes the check. The latest release is 0.7.0 (2026-10-11):
 
 ```sh
 uv add --dev inwards

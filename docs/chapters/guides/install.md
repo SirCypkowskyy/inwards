@@ -1,7 +1,7 @@
 # Install Inwards
 
 !!! info "Verified 2026-10-11"
-    With 0.6.0 on macOS (arm64): `uvx inwards@0.6.0 --version`; `uv add --dev inwards`, then `uv run inwards init --style layered` and `uv run inwards check`; `uvx inwards init --style hexagonal --scaffold` in a new `uv init --package` project; `uvx inwards init --style auto` on a scratch project and on the backend of full-stack-fastapi-template; and the `curl` download with its checksum and `gh attestation verify`. The from-source build by hand on Linux x64 on 2026-09-25. On Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The VS Code extension on 2026-10-10: a platform VSIX installed in VS Code 1.141 on macOS (arm64) showed INW007, checked with `src/vscode-extension/scripts/try-in-vscode.ts`; Linux and Windows are still open.
+    With 0.7.0 on macOS (arm64): `uvx inwards@0.7.0 --version`; `uv add --dev inwards`, then `uv run inwards init --style layered` and `uv run inwards check`; `uvx inwards init --style hexagonal --scaffold` in a new `uv init --package` project; `uvx inwards init --style auto` on a scratch project and on the backend of full-stack-fastapi-template; and the `curl` download with its checksum and `gh attestation verify`. The from-source build by hand on Linux x64 on 2026-09-25. On Windows, CI runs `init`, `check` and the hook with the compiled binary before each release; a by-hand check there is still open. The VS Code extension on 2026-10-10: a platform VSIX installed in VS Code 1.141 on macOS (arm64) showed INW007, checked with `src/vscode-extension/scripts/try-in-vscode.ts`; Linux and Windows are still open.
 
 Inwards is one executable with no runtime to install. Every release goes to [PyPI](https://pypi.org/project/inwards/) as platform wheels and to [GitHub Releases](https://github.com/SirCypkowskyy/inwards/releases) as binaries; the [changelog](https://github.com/SirCypkowskyy/inwards/blob/main/CHANGELOG.md) lists what each one changed. In a Python project, uv is the shortest way in. You can also build from source.
 
@@ -15,14 +15,14 @@ uv run inwards init --style layered   # write the layers: see "Configure the lay
 uv run inwards check
 ```
 
-`uv add` writes a lower bound such as `inwards>=0.6.0` to `pyproject.toml` and the exact version to `uv.lock`, so everyone on the project runs the same release until someone runs `uv lock --upgrade-package inwards`. `pip install inwards` works too.
+`uv add` writes a lower bound such as `inwards>=0.7.0` to `pyproject.toml` and the exact version to `uv.lock`, so everyone on the project runs the same release until someone runs `uv lock --upgrade-package inwards`. `pip install inwards` works too.
 
 To try Inwards without adding it to a project, or to set up a new one, run it with `uvx`. It keeps a copy in uv's cache and adds nothing to the project:
 
 ```sh
 uvx inwards --version
 uvx inwards init --style hexagonal --scaffold
-uvx inwards@0.6.0 check   # one exact release
+uvx inwards@0.7.0 check   # one exact release
 ```
 
 To wire an agent in such a project, pass `--launcher "uv run"` to `init` (`uv run inwards init --agent claude --launcher "uv run"`): the hooks and the `AGENTS.md` section then say `uv run inwards` and hold no path. Without it, `init` records the path of the binary it runs as, which in a project is inside `.venv` and differs per worktree, and under `uvx` is in uv's cache, which `init` warns about.
@@ -43,7 +43,7 @@ Each release on [GitHub Releases](https://github.com/SirCypkowskyy/inwards/relea
 | macOS Intel | `inwards-darwin-x64` |
 | Windows x64 | `inwards-windows-x64.exe` |
 
-The `latest/download` URLs below always point at the newest release; to pin one, use `releases/download/v0.6.0` instead.
+The `latest/download` URLs below always point at the newest release; to pin one, use `releases/download/v0.7.0` instead.
 
 === "Linux / macOS"
 
@@ -240,7 +240,7 @@ The closest preset orders the layers: `hexagonal` when there is an `adapters` pa
 
 ```toml title="pyproject.toml"
 [tool.inwards]
-# Mapped from app's modules by inwards init --style auto (Inwards 0.6.0); closest preset: layered.
+# Mapped from app's modules by inwards init --style auto (Inwards 0.7.0); closest preset: layered.
 # Layers are listed innermost first: each may import itself and the layers above it.
 # A module the name table put in the wrong layer can move to another one.
 root = "."
