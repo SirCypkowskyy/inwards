@@ -15,7 +15,7 @@ import { ConfigError, declaresInwards, parseConfig } from "@inwards/core";
 import { convert } from "../init/import-linter/convert.ts";
 import { type LinterConfig, readIni, readToml } from "../init/import-linter/read.ts";
 import { renderReport, renderToml } from "../init/import-linter/render.ts";
-import { separator } from "../init/style.ts";
+import { appendSeparator } from "../init/section.ts";
 import { shown, sourceRoot } from "../init/target.ts";
 import { print } from "../platform/print.ts";
 import type { AppDeps } from "./deps.ts";
@@ -126,7 +126,7 @@ function writeTable(deps: AppDeps, result: Converted): string | undefined {
     return `${where} already has [tool.inwards], and import-config never overwrites it. Run without --write and merge the table by hand.`;
   }
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const after = `${text}${separator(text, eol)}${result.table.replaceAll("\n", eol)}`;
+  const after = `${text}${appendSeparator(text, eol)}${result.table.replaceAll("\n", eol)}`;
   if (JSON.stringify(parsed(after)) !== JSON.stringify(parsed(result.table))) {
     return `could not add [tool.inwards] to ${where} safely; add this table by hand:\n${result.table}`;
   }

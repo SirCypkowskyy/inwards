@@ -218,6 +218,44 @@ inwards check
 
 ### On an existing codebase
 
+The presets name packages a new project doesn't have yet, so on existing code every layer they write matches no module. `inwards init --style auto` writes layers from the packages you already have. It lists the modules at the top of the project's package (from `[project].name` or `--package`, else the only package in the project or in `src/`), gives each a layer by its name, and prints the table:
+
+```sh
+uvx inwards init --style auto          # prints the table and exits 2, writes nothing
+uvx inwards init --style auto --write  # appends it to pyproject.toml, then runs the check
+```
+
+| Module name | Layer |
+|---|---|
+| `core`, `db`, `database`, `config`, `settings`, `kernel`, `shared`, `common`, `utils`, `helpers` | `kernel`, the innermost, with `deny-libraries = []` since settings and the database need libraries |
+| `models`, `entities`, `domain`, `schemas` | `domain` |
+| `crud`, `services`, `service`, `use_cases`, `usecases`, `application` | `services` (`application` in clean and hexagonal) |
+| `adapters`, `infrastructure`, `infra`, `repositories`, `repository`, `persistence` | `persistence` (`infrastructure` in clean, `adapters` in hexagonal) |
+| `api`, `routes`, `routers`, `router`, `views`, `endpoints`, `presentation`, `web` | `presentation` |
+| `main`, `bootstrap`, `__main__`, `asgi`, `wsgi` | `bootstrap`, the outermost |
+
+The closest preset orders the layers: `hexagonal` when there is an `adapters` package, `clean` when a name only clean architecture uses is there (`domain`, `entities`, `application`, `use_cases`, `infrastructure`), and `layered` otherwise, where persistence sits below the services. Only layers that got a module are written, so the first check has no "matches no module" finding. A module the table doesn't know goes in no layer and is listed in a comment under `layers` for you to place; INW006 warns about it until you do. An `alembic` package goes to `ignore`. On the backend of [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) it writes this, shown here without its `required-version` line:
+
+```toml title="pyproject.toml"
+[tool.inwards]
+# Mapped from app's modules by inwards init --style auto (Inwards 0.5.0); closest preset: layered.
+# Layers are listed innermost first: each may import itself and the layers above it.
+# A module the name table put in the wrong layer can move to another one.
+root = "."
+ignore = ["tests", "scripts", "migrations", "conftest", "alembic"]
+layers = [
+  { name = "kernel", modules = ["app.core", "app.utils"], deny-libraries = [] },  # settings, the database and helpers every layer may use; any library
+  { name = "domain", modules = ["app.models"] },                                  # entities, models and schemas
+  { name = "services", modules = ["app.crud"] },                                  # business operations: CRUD functions, services, use cases
+  { name = "presentation", modules = ["app.api"] },                               # endpoints and views that take requests
+  { name = "bootstrap", modules = ["app.main"] },                                 # the composition root: builds the app and wires the layers
+]
+# In no layer, so no layer rule checks them; add each to the layer it belongs in:
+#   "app.initial_data"
+```
+
+The first check then finds 3 violations, the imports of `app.crud` and `app.models` in `app/core/db.py`, and warns once about `app.initial_data`. Without `--write` and without a terminal, init prints the table on stdout and the mapping on stderr and exits 2, so a script or an agent can't take the proposal for a written config; on a terminal it asks before writing. `--dry-run`, `--agent` and `--brief` work as with the other styles, and `--scaffold` doesn't apply. Like every style, it never rewrites an existing `[tool.inwards]`.
+
 A codebase that already breaks its layers fails the first check. To adopt Inwards anyway, accept what is there today and block only new violations:
 
 <!-- e2e -->

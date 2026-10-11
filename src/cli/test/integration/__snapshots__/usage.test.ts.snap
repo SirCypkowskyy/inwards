@@ -14,6 +14,7 @@ Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagno
        inwards baseline [--config pyproject.toml] [--no-cache]    (accept today's violations)
        inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi
                     [--scaffold] [--package NAME] [--agent ...] [--dry-run]
+       inwards init --style auto [--package NAME] [--write] [--agent ...] [--dry-run]
        inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
        inwards init --brief [--dry-run]
        inwards init --list-styles [--package NAME]
@@ -84,6 +85,7 @@ exports[`init --help prints that command's usage, exit 0 1`] = `
   "stdout": 
 "Usage: inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi
                     [--scaffold] [--package NAME] [--agent ...] [--dry-run]
+       inwards init --style auto [--package NAME] [--write] [--agent ...] [--dry-run]
        inwards init --agent claude|opencode|aider|agents-md [--launcher "uv run"] [--dry-run]
        inwards init --brief [--dry-run]
        inwards init --list-styles [--package NAME]
@@ -92,6 +94,8 @@ Sets Inwards up: a preset's [tool.inwards], an example scaffold and an agent's w
 On a terminal with no flags it asks; elsewhere it needs --style, --agent or --brief.
 
 --style: write that preset's [tool.inwards] (--list-styles describes each one).
+--style auto: map the project's existing modules to layers by name and print the
+table; --write (or a yes on a terminal) adds it to pyproject.toml.
 --scaffold: also write the preset's example package; --package NAME names it.
 --agent: wire the hook (claude), the plugin (opencode), the lint command (aider)
 or the instructions (agents-md); --launcher sets the command that runs inwards.

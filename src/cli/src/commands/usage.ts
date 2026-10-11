@@ -75,6 +75,7 @@ ${CONFIG_OPTION}
     synopsis: [
       `init --style ${STYLE_NAMES.join("|")}`,
       "     [--scaffold] [--package NAME] [--agent ...] [--dry-run]",
+      "init --style auto [--package NAME] [--write] [--agent ...] [--dry-run]",
       `init --agent ${AGENTS.join("|")} [--launcher "uv run"] [--dry-run]`,
       "init --brief [--dry-run]",
       "init --list-styles [--package NAME]",
@@ -84,6 +85,8 @@ ${CONFIG_OPTION}
 On a terminal with no flags it asks; elsewhere it needs --style, --agent or --brief.
 
 --style: write that preset's [tool.inwards] (--list-styles describes each one).
+--style auto: map the project's existing modules to layers by name and print the
+table; --write (or a yes on a terminal) adds it to pyproject.toml.
 --scaffold: also write the preset's example package; --package NAME names it.
 --agent: wire the hook (claude), the plugin (opencode), the lint command (aider)
 or the instructions (agents-md); --launcher sets the command that runs inwards.

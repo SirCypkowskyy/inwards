@@ -1,0 +1,38 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`inwards init --style auto full-stack-fastapi-template's backend: the table, then a check with no dead prefix 1`] = `
+{
+  "stdout": 
+"inwards init: wrote 5 layers to pyproject.toml.
+inwards init: --style auto mapped app/ to the layered preset's layers:
+  kernel        app.core, app.utils
+  domain        app.models
+  services      app.crud
+  presentation  app.api
+  bootstrap     app.main
+  (no layer)    app.initial_data
+
+inwards check: 2 violations, 1 warning. Run \`inwards check\` to see them. One module is in no layer yet; the comment under layers lists them.
+"
+,
+  "table": 
+"[tool.inwards]
+# Mapped from app's modules by inwards init --style auto (Inwards <VERSION>); closest preset: layered.
+# Layers are listed innermost first: each may import itself and the layers above it.
+# A module the name table put in the wrong layer can move to another one.
+root = "."
+required-version = "<VERSION>"
+ignore = ["tests", "scripts", "migrations", "conftest", "alembic"]
+layers = [
+  { name = "kernel", modules = ["app.core", "app.utils"], deny-libraries = [] },  # settings, the database and helpers every layer may use; any library
+  { name = "domain", modules = ["app.models"] },                                  # entities, models and schemas
+  { name = "services", modules = ["app.crud"] },                                  # business operations: CRUD functions, services, use cases
+  { name = "presentation", modules = ["app.api"] },                               # endpoints and views that take requests
+  { name = "bootstrap", modules = ["app.main"] },                                 # the composition root: builds the app and wires the layers
+]
+# In no layer, so no layer rule checks them; add each to the layer it belongs in:
+#   "app.initial_data"
+"
+,
+}
+`;
