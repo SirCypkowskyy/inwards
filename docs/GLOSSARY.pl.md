@@ -256,6 +256,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | command, query (CQRS; the `commands` and `queries` packages stay in code) | komenda, zapytanie |
 | test stub, test double | atrapa (w testach) |
 | implementation (of a port) | implementacja (portu) |
+| command, query (CQRS use cases, `commands/`, `queries/`) | komenda, zapytanie |
+| private module (`_place_order.py`) | moduł prywatny |
 | DTO, value object | DTO, obiekt wartości |
 | test double (in-memory repository) | dubel testowy (repozytorium w pamięci) |
 | inbound adapter, outbound adapter | adapter wejściowy, adapter wyjściowy |

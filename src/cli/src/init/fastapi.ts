@@ -2,9 +2,9 @@
  * @file The FastAPI example `inwards init --style fastapi --scaffold` writes,
  * in the fastapi-best-practices layout: a `posts` domain with a module for
  * every role of the fastapi-domain template, on a kernel of shared modules,
- * and `main.py`, which builds the app. Every endpoint documents its metadata
- * and errors, so the FastAPI rules find nothing. It only builds module
- * texts; `example.ts` places them and `scaffold.ts` plans where they land.
+ * and `main.py`, whose `create_app()` factory builds the app. Every endpoint
+ * documents its metadata and errors, so the FastAPI rules find nothing. It
+ * only builds module texts; `example.ts` places them and `scaffold.ts` plans where they land.
  */
 
 /**
@@ -65,9 +65,9 @@ class NotFound(Exception):
     ],
     [
       "main",
-      `"""The app: includes each domain's router and answers the global exceptions.
+      `"""The app: create_app() includes each domain's router and answers the global exceptions.
 
-Run it with \`uvicorn ${pkg}.main:app\`.
+Run it with \`uvicorn ${pkg}.main:app\`; a test builds its own app with create_app().
 """
 
 from fastapi import FastAPI, Request
@@ -77,14 +77,21 @@ from ${pkg}.config import settings
 from ${pkg}.exceptions import NotFound
 from ${pkg}.posts.router import router as posts_router
 
-app = FastAPI(title=settings.APP_NAME)
-app.include_router(posts_router)
 
-
-@app.exception_handler(NotFound)
-async def not_found(request: Request, exc: NotFound) -> JSONResponse:
+async def not_found(request: Request, exc: Exception) -> JSONResponse:
     """Answers a NotFound from any domain with 404."""
     return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+def create_app() -> FastAPI:
+    """Builds the app: the factory is the one place that wires the domains in."""
+    app = FastAPI(title=settings.APP_NAME)
+    app.include_router(posts_router)
+    app.add_exception_handler(NotFound, not_found)
+    return app
+
+
+app = create_app()
 `,
     ],
   ]);
