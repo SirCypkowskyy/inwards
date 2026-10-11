@@ -31,11 +31,11 @@ jobs:
       - name: Skip without the ANTHROPIC_API_KEY secret
         if: env.HAS_KEY != 'true'
         run: echo "::notice::ANTHROPIC_API_KEY is not set; hook payloads were not re-recorded."
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: env.HAS_KEY == 'true'
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: env.HAS_KEY == 'true'
         with:
           bun-version-file: .bun-version
@@ -55,7 +55,7 @@ jobs:
           tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/drift.md"
           { echo "code=$code"; echo "report<<REPORT_EOF"; cat "$RUNNER_TEMP/drift.md"; echo "REPORT_EOF"; } >> "$GITHUB_OUTPUT"
           exit "$code"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && env.HAS_KEY == 'true'
         with:
           name: claude-code-payloads
