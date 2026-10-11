@@ -47,6 +47,8 @@ export interface InitFlags {
   brief?: boolean | undefined;
   "list-styles"?: boolean | undefined;
   "dry-run"?: boolean | undefined;
+  /** `--write`: write the table `--style auto` proposes instead of only printing it (#343). */
+  write?: boolean | undefined;
 }
 
 /** What to do, once flags or the picker have decided. */
@@ -97,6 +99,13 @@ export interface Picker {
    * @returns the plan, or undefined when the user cancels.
    */
   pick: (target: Target, flags: InitFlags) => Promise<InitPlan | undefined>;
+  /**
+   * Asks a yes-or-no question, such as whether to write what `--style auto` proposes.
+   *
+   * @param message - the question.
+   * @returns true for yes; false for no or when the user cancels.
+   */
+  confirm: (message: string) => Promise<boolean>;
 }
 
 /** What `inwards init` needs besides the platform. */

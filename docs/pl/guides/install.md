@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: a14f97ee572a6bffd32c6f4f9883b5380b91c968b060594df2684451d33ca8f7
+source_hash: 1f6d900a30d4bd4ea7d6d669e1838b96fc296a70ff53e7b333f0c8cbe3360e35
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -224,6 +224,46 @@ inwards check
 `inwards import-config` zamienia kontrakty z `.importlinter`, `setup.cfg` albo `[tool.importlinter]` na `[tool.inwards]`, a `--write` dopisuje tabelę do `pyproject.toml`. Każdy kontrakt, którego nie dało się przenieść, trafia do raportu razem z powodem. Mapowanie opisuje [Migracja z import-linter](import-linter.md).
 
 ### Istniejący kod { #on-an-existing-codebase }
+
+Presety nazywają pakiety, których nowy projekt jeszcze nie ma, więc w istniejącym kodzie każda zapisana przez nie warstwa nie pasuje do żadnego modułu. `inwards init --style auto` zapisuje warstwy z pakietów, które już masz. Wypisuje moduły na najwyższym poziomie pakietu projektu (z `[project].name` albo `--package`, a w przeciwnym razie jedyny pakiet w projekcie lub w `src/`), każdemu przydziela warstwę według nazwy i wypisuje tabelę:
+
+```sh
+uvx inwards init --style auto          # prints the table and exits 2, writes nothing
+uvx inwards init --style auto --write  # appends it to pyproject.toml, then runs the check
+```
+
+| Nazwa modułu | Warstwa |
+|---|---|
+| `core`, `db`, `database`, `config`, `settings`, `kernel`, `shared`, `common`, `utils`, `helpers` | `kernel`, najbardziej wewnętrzna, z `deny-libraries = []`, bo ustawienia i baza danych potrzebują bibliotek |
+| `models`, `entities`, `domain`, `schemas` | `domain` |
+| `crud`, `services`, `service`, `use_cases`, `usecases`, `application` | `services` (`application` w clean i hexagonal) |
+| `adapters`, `infrastructure`, `infra`, `repositories`, `repository`, `persistence` | `persistence` (`infrastructure` w clean, `adapters` w hexagonal) |
+| `api`, `routes`, `routers`, `router`, `views`, `endpoints`, `presentation`, `web` | `presentation` |
+| `main`, `bootstrap`, `__main__`, `asgi`, `wsgi` | `bootstrap`, najbardziej zewnętrzna |
+
+Kolejność warstw wyznacza najbliższy preset: `hexagonal`, gdy jest pakiet `adapters`, `clean`, gdy jest nazwa używana tylko w czystej architekturze (`domain`, `entities`, `application`, `use_cases`, `infrastructure`), a w pozostałych przypadkach `layered`, w którym persistence leży pod services. Zapisywane są tylko warstwy, które dostały moduł, więc pierwsze sprawdzenie nie ma żadnego wyniku „matches no module”. Moduł, którego tabela nie zna, nie trafia do żadnej warstwy i jest wymieniony w komentarzu pod `layers`, żebyś go przydzielił; do tego czasu INW006 ostrzega o nim. Pakiet `alembic` trafia do `ignore`, a cykle modułów i kontekstów są włączone ([INW004](../rules/INW004.md)), jak w każdym presecie. Dla backendu [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) zapisuje to (tu bez linii `required-version`):
+
+```toml title="pyproject.toml"
+[tool.inwards]
+# Mapped from app's modules by inwards init --style auto (Inwards 0.5.0); closest preset: layered.
+# Layers are listed innermost first: each may import itself and the layers above it.
+# A module the name table put in the wrong layer can move to another one.
+root = "."
+ignore = ["tests", "scripts", "migrations", "conftest", "alembic"]
+# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
+cycles = ["modules", "contexts"]
+layers = [
+  { name = "kernel", modules = ["app.core", "app.utils"], deny-libraries = [] },  # settings, the database and helpers every layer may use; any library
+  { name = "domain", modules = ["app.models"] },                                  # entities, models and schemas
+  { name = "services", modules = ["app.crud"] },                                  # business operations: CRUD functions, services, use cases
+  { name = "presentation", modules = ["app.api"] },                               # endpoints and views that take requests
+  { name = "bootstrap", modules = ["app.main"] },                                 # the composition root: builds the app and wires the layers
+]
+# In no layer, so no layer rule checks them; add each to the layer it belongs in:
+#   "app.initial_data"
+```
+
+Pierwsze sprawdzenie znajduje potem 3 naruszenia, czyli importy `app.crud` i `app.models` w `app/core/db.py`, i raz ostrzega o `app.initial_data`; cykli importów nie ma. Bez `--write` i bez terminala init wypisuje tabelę na stdout, a mapowanie na stderr, i kończy się kodem 2, więc skrypt ani agent nie weźmie propozycji za zapisaną konfigurację; w terminalu pyta przed zapisem. `--dry-run`, `--agent` i `--brief` działają jak przy innych stylach, a `--scaffold` tu nie ma zastosowania. Jak każdy styl, nigdy nie nadpisuje istniejącego `[tool.inwards]`.
 
 Kod, który już łamie swoje warstwy, nie przechodzi pierwszego sprawdzenia. Żeby mimo to wdrożyć Inwards, zaakceptuj to, co jest dziś, i blokuj tylko nowe naruszenia:
 

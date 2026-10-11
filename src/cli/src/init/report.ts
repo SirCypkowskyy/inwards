@@ -36,18 +36,10 @@ export async function report(ctx: InitContext, setup: Setup, plan: InitPlan): Pr
   const { streams } = ctx.io;
   const tree = annotatedTree(ctx.io.probe, setup);
   print(streams, `\n${tree}`, 0);
-  const result = await ctx.check(configPath, undefined, ctx.io.runtime.cwd, { baseline: false });
-  const errors = result.diagnostics.filter((d) => d.severity === "error").length;
-  const warnings = result.diagnostics.length - errors;
   const missing = tree.includes(MISSING)
     ? " Each layer marked (missing) fails the check until it has a module; `--scaffold` on a fresh project adds them."
     : "";
-  const more = errors + warnings > 0 ? ` Run \`inwards check\` to see them.${missing}` : "";
-  print(
-    streams,
-    `\ninwards check: ${plural(errors, "violation")}, ${plural(warnings, "warning")}.${more}`,
-    0,
-  );
+  await printCheck(ctx, configPath, missing);
   if (style.companion !== undefined) {
     print(streams, `\n${style.companion(packagePath(setup))}`, 0);
   }
@@ -59,6 +51,31 @@ export async function report(ctx: InitContext, setup: Setup, plan: InitPlan): Pr
     print(streams, `\n${next.join("\n")}`, 0);
   }
   return 0;
+}
+
+/**
+ * Runs a check on the config just written, baseline off, and prints how many
+ * violations and warnings it found.
+ *
+ * @param ctx - prints and runs the check.
+ * @param configPath - the pyproject.toml just written.
+ * @param hint - a sentence added after "Run `inwards check` to see them." when there are findings, or "".
+ * @throws {ConfigError} when the check can't run on the new config.
+ */
+export async function printCheck(
+  ctx: InitContext,
+  configPath: string,
+  hint: string,
+): Promise<void> {
+  const result = await ctx.check(configPath, undefined, ctx.io.runtime.cwd, { baseline: false });
+  const errors = result.diagnostics.filter((d) => d.severity === "error").length;
+  const warnings = result.diagnostics.length - errors;
+  const more = errors + warnings > 0 ? ` Run \`inwards check\` to see them.${hint}` : "";
+  print(
+    ctx.io.streams,
+    `\ninwards check: ${plural(errors, "violation")}, ${plural(warnings, "warning")}.${more}`,
+    0,
+  );
 }
 
 /**
