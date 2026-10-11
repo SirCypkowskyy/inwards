@@ -12,15 +12,17 @@
  * helper (the decorator may move it off the loop), and a function handed to
  * a worker thread (`run_in_threadpool(f, x)` calls nothing). Another module
  * is read only when `follow-modules` matches it, or when it is a package
- * `__init__.py` a re-export passes through, and each once per check of the
- * file. It owns the trees it parses and frees them in `dispose()`.
+ * `__init__.py` a re-export passes through. Each module is parsed and read
+ * as INW013's view once per run, whichever file reaches it first (#359): the
+ * view depends only on the options. The run owns the trees.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Node } from "web-tree-sitter";
 import { entryReach, matchEntry } from "../../config/layer-selector.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import { passedNames } from "../shared/arguments.ts";
-import { type FirstPartySource, ParsedModules } from "../shared/first-party.ts";
+import { ParsedModules } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/module-trees.ts";
 import type { Family } from "./catalog.ts";
 import { functionReceivers, type Source } from "./receivers.ts";
 import { type Blocking, blockingCall, callsIn, isAsync, type Walk, walkOf } from "./walk.ts";
@@ -41,12 +43,33 @@ export interface Hop {
   readonly blocking: readonly Blocking[];
 }
 
-/** Which modules one hop may read. */
+/** Which modules one hop may read, and INW013's view of them for the whole run. */
 export interface FollowScope {
-  /** The project, which finds and reads first-party modules. */
-  readonly project: FirstPartySource;
+  /** The run's first-party modules as INW013 reads them (`followModules`). */
+  readonly views: ParsedModules<Walk>;
   /** `follow-modules`: the modules followed into, or undefined for every first-party one. */
   readonly modules: readonly string[] | undefined;
+}
+
+/**
+ * Makes INW013's view of the run's first-party modules, shared by every
+ * checked file of the run: a module's walk depends only on the families.
+ *
+ * @param trees - the run's first-party modules, parsed once each.
+ * @param families - the blocking families to look for.
+ * @param follow - `follow-modules`, or undefined for every first-party module.
+ * @returns the views, read on demand.
+ */
+export function followModules(
+  trees: ModuleTrees,
+  families: readonly Family[],
+  follow: readonly string[] | undefined,
+): ParsedModules<Walk> {
+  return new ParsedModules(
+    trees,
+    (tree, src): Walk => walkOf(tree, src, families),
+    (module: string): boolean => onTheWay(module, follow),
+  );
 }
 
 /**
@@ -90,30 +113,21 @@ function runsInline(fn: Node): boolean {
 
 /**
  * The sync helpers the `async def`s of one checked file call, read on
- * demand. Build one per check of a file and call `dispose()` when done.
+ * demand. Build one per check of a file.
  */
 export class Helpers {
   private readonly walk: Walk;
   private readonly scope: FollowScope;
-  private readonly modules: ParsedModules<Walk>;
 
   /**
    * Wraps the checked file's walk and what following may read. Nothing is read yet.
    *
-   * @param parser - parser with the Python grammar loaded.
    * @param walk - the checked file.
-   * @param scope - the project and `follow-modules`.
+   * @param scope - the run's views and `follow-modules`.
    */
-  constructor(parser: Parser, walk: Walk, scope: FollowScope) {
+  constructor(walk: Walk, scope: FollowScope) {
     this.walk = walk;
     this.scope = scope;
-    const families: readonly Family[] = walk.families;
-    this.modules = new ParsedModules(
-      parser,
-      scope.project,
-      (tree, src): Walk => walkOf(tree, src, families),
-      (module: string): boolean => onTheWay(module, scope.modules),
-    );
   }
 
   /**
@@ -182,14 +196,9 @@ export class Helpers {
     ) {
       return undefined;
     }
-    const found = this.modules.follow(qualified, (walk, rest) => walk.functions.get(rest));
+    const found = this.scope.views.follow(qualified, (walk, rest) => walk.functions.get(rest));
     return found && followed(found.view.src.module, this.scope.modules)
       ? { fn: found.node, name: found.rest, walk: found.view }
       : undefined;
-  }
-
-  /** Frees every tree read so far; the hops handed out are invalid afterwards. */
-  dispose(): void {
-    this.modules.dispose();
   }
 }
