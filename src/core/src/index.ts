@@ -22,6 +22,7 @@ export { ConfigError } from "./config/toml.ts";
 export type {
   CachedExtraction,
   Diagnostic,
+  DiagramDraft,
   DiagramSource,
   ExtractionAnswer,
   ExtractionBatch,
@@ -36,7 +37,7 @@ export type {
   Suppressed,
   SuppressionComment,
 } from "./contracts/records.ts";
-export { checkDiagrams, type DiagramInput } from "./engine/diagrams.ts";
+export { checkDiagrams, type DiagramInput, draftDiagrams } from "./engine/diagrams.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export { createExtractionWorker } from "./engine/extraction.ts";
 export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";

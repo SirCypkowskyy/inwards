@@ -21,6 +21,7 @@ import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
+import { importDiagramCommand } from "./commands/import-diagram.ts";
 import { mcpCommand } from "./commands/mcp.ts";
 import { ruleCommand, rulesCommand } from "./commands/rules.ts";
 import { serverCommand } from "./commands/server.ts";
@@ -167,7 +168,7 @@ function argumentError(argv: string[], code: string, message: string): string {
 
 /**
  * Runs the commands besides `check`: the hook, `daemon`, `server`, `mcp`, `init`, `baseline`, `stats`,
- * and through `readCommand` `context`, `import-config`, `rules` and `rule`.
+ * and through `readCommand` `context`, `import-config`, `import-diagram`, `rules` and `rule`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -180,7 +181,7 @@ function argumentError(argv: string[], code: string, message: string): string {
  * @param values.format - `--format`, for stats.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
- * @param values.write - `--write`, for context and import-config.
+ * @param values.write - `--write`, for context, import-config and import-diagram.
  * @param values.idle - `--idle SECONDS`, for daemon.
  * @param values.json - `--json`, for rules and rule.
  * @param values.full - `--full`, for rule.
@@ -233,28 +234,29 @@ async function setupCommand(
 }
 
 /** The commands that read the project or the docs and print: `readCommand` runs them. */
-const READ_COMMANDS = ["context", "import-config", "rules", "rule"] as const;
+const READ_COMMANDS = ["context", "import-config", "import-diagram", "rules", "rule"] as const;
 
 /**
  * Tells whether a command is one `readCommand` runs.
  *
  * @param command - a command besides `check`.
- * @returns true for `context`, `import-config`, `rules` and `rule`.
+ * @returns true for `context`, `import-config`, `import-diagram`, `rules` and `rule`.
  */
 function isReadCommand(command: Command): command is (typeof READ_COMMANDS)[number] {
   return READ_COMMANDS.some((name) => name === command);
 }
 
 /**
- * Runs `context`, `import-config`, `rules` and `rule`: the commands that
- * read the config, import-linter's contracts or the rule pages and print.
+ * Runs `context`, `import-config`, `import-diagram`, `rules` and `rule`: the
+ * commands that read the config, import-linter's contracts, a diagram or the
+ * rule pages and print.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
  * @param paths - the positionals after it.
  * @param values - the parsed options.
  * @param values.config - `--config`, for context and rules.
- * @param values.write - `--write`, for context and import-config.
+ * @param values.write - `--write`, for context, import-config and import-diagram.
  * @param values.json - `--json`, for rules and rule.
  * @param values.full - `--full`, for rule.
  * @returns the exit code; 2 for unexpected arguments.
@@ -281,6 +283,9 @@ async function readCommand(
   }
   if (command === "rule") {
     return await ruleCommand(deps, paths, values, usage);
+  }
+  if (command === "import-diagram") {
+    return importDiagramCommand(deps, paths, values, usage);
   }
   return importConfigCommand(deps, paths, values, usage);
 }

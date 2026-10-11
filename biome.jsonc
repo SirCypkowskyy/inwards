@@ -186,6 +186,20 @@
       }
     },
     {
+      // The rule registry is one table with an eight-line entry per rule, and
+      // every reporter, the docs check and SARIF read it whole. Splitting it
+      // by rule family would only move entries to a second table to keep in
+      // step; it reached the 300-line limit with INW018 (#345).
+      "includes": ["src/core/src/meta/registry.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": { "level": "error", "options": { "maxLines": 400 } }
+          }
+        }
+      }
+    },
+    {
       // The npm name placeholder is a plain CommonJS bin (its package.json has no
       // "type": "module"), so it cannot `import process from "node:process"`, and
       // `require` would trip noCommonJs. It must stay dependency-free and run

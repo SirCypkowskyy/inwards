@@ -77,7 +77,15 @@ test("report paths are relative to the base, not the config", () => {
   expect(listed.sources.map((s) => s.path)).toEqual(["architecture.md"]);
 });
 
-test("nothing is read while INW017 is off", () => {
+test("INW018 alone reads the diagrams too", () => {
+  const { dir, configPath, config } = setUp(
+    '["README.md"]',
+    '\n[tool.inwards.rules]\nextend-select = ["INW018"]\n',
+  );
+  expect(readDiagrams(recording([]), configPath, config, dir).sources).toHaveLength(1);
+});
+
+test("nothing is read while INW017 and INW018 are off", () => {
   const { dir, configPath, config } = setUp('["README.md"]', "");
   const reads: string[] = [];
   expect(readDiagrams(recording(reads), configPath, config, dir)).toEqual({

@@ -1,11 +1,11 @@
 /**
- * @file Reading the files `[tool.inwards].diagrams` names, for INW017
- * (ADR-045): a plain entry is one file next to the config, a glob is walked
- * from its directory before the first wildcard with the CLI's usual skip
- * rules. The engine decides what the diagrams say (`checkDiagrams`); this
- * module only finds and reads them, through the injected `ProjectIo`, and
- * only when the rule is on, so a project that doesn't use diagrams pays
- * nothing.
+ * @file Reading the files `[tool.inwards].diagrams` names, for INW017 and
+ * INW018 (ADR-045): a plain entry is one file next to the config, a glob is
+ * walked from its directory before the first wildcard with the CLI's usual
+ * skip rules. The engine decides what the diagrams say (`checkDiagrams`);
+ * this module only finds and reads them, through the injected `ProjectIo`,
+ * and only when one of the rules is on, so a project that doesn't use
+ * diagrams pays nothing.
  */
 import { dirname, join, relative } from "node:path";
 import {
@@ -18,6 +18,9 @@ import {
 import { posix } from "../paths/lexical.ts";
 import type { ProjectIo } from "./contracts.ts";
 
+/** The rules that read diagrams. */
+const DIAGRAM_RULES = ["INW017", "INW018"];
+
 /** The diagram files a config names, and the entries that named none. */
 export interface ListedDiagrams {
   sources: DiagramSource[];
@@ -26,7 +29,7 @@ export interface ListedDiagrams {
 
 /**
  * Finds and reads the diagram files a config lists. Nothing is read when the
- * config lists none or INW017 is off.
+ * config lists none or INW017 and INW018 are both off.
  *
  * @param io - probes, walks and reads the project.
  * @param configPath - absolute path of the pyproject.toml; entries are relative to its directory.
@@ -43,7 +46,8 @@ export function readDiagrams(
   base: string,
 ): ListedDiagrams {
   const entries = config.diagrams ?? [];
-  if (entries.length === 0 || ruleLevel("INW017", config.rules) === "off") {
+  const on = DIAGRAM_RULES.some((code) => ruleLevel(code, config.rules) !== "off");
+  if (entries.length === 0 || !on) {
     return { sources: [], unmatched: [] };
   }
   const dir = dirname(configPath);

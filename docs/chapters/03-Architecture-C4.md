@@ -84,7 +84,7 @@ flowchart TB
 
 | Container | Tech | Lives in | Status |
 |---|---|---|---|
-| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017 |
+| **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -116,7 +116,7 @@ flowchart LR
         pre["<b>Import skeleton prescan</b><br/><small>python/prescan.ts<br/>blanks non-import lines</small>"]
         parser["<b>Parser adapter</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Import extractor + resolver</b><br/><small>python/parser.ts<br/>relative → absolute</small>"]
-        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Rules</b><br/><small>meta/registry.ts: registry<br/>rules/: one per rule<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Fix composer</b><br/><small>per-violation steps</small>"]
         report["<b>Reporters</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Engine facade</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -388,6 +388,7 @@ Each shipped rule has its own page under [Rules](rules/index.md), with examples,
 | INW015 | `construct-only-in` | Opt-in, an error when on. In a module a layer owns, outside `role` and `allowed-in`: an import of a `role` module that runs (`if TYPE_CHECKING:` bodies left out), on the imported name, and a call that builds a class defined in the role reached through a module outside it (a re-export or a module attribute), on the call. An import INW001 reports as outward gets INW001 alone. One parse per such file with an import, plus the role modules, `allowed-in` and the packages above the role when a capitalised callee leads there | :material-check-circle: |
 | INW016 | `orm-naming` | Opt-in, an error when on. Table names (`__tablename__`, `Table("name", ...)`, the name SQLModel derives for a `table=True` class, Django's `Meta.db_table`) that aren't lower_case_snake or, with `table-name = "snake_singular"` (the default), read as an English plural; and datetime or date columns (`Mapped[datetime]`, `mapped_column`/`Column` with `DateTime`, `TIMESTAMP` or `Date`, SQLModel fields, Django's `DateTimeField`/`DateField`) whose database name doesn't end with `datetime-suffix` (`_at`) or `date-suffix` (`_date`). One finding per name, with the name to use. A whole-project run adds one finding when the project has SQLAlchemy tables and no `MetaData(naming_convention=...)`. One parse per file whose text names an ORM construct, whatever layer it is in | :material-check-circle: |
 | INW017 | `diagram-unknown-name` | Opt-in, a warning when on. In the Markdown and `.mmd` files `diagrams` lists, a Mermaid `flowchart` or `graph` marked `%% inwards: layers` or `%% inwards: contexts`: a node id that names no declared layer (or, in a contexts diagram, a top-level node or subgraph that names no context), and a quoted label that matches no module. `:::external` nodes are skipped. Whole-project runs only; the CLI reads the files and `engine/diagrams.ts` hands them to a hand-written line parser in `diagram/`. A `diagrams` entry that matches no file is reported in pyproject.toml. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | :material-check-circle: |
+| INW018 | `diagram-forbidden-edge` | Opt-in, a warning when on. In the same marked diagrams, a one-way solid or thick arrow that draws an import the config forbids: outward or between sibling layers in a layers diagram; in a contexts diagram, from one context into another its `depends-on` doesn't list, or into a node whose quoted label isn't one of the other context's `public` modules. Dotted links and `:::external` nodes are skipped; each forbidden pair is reported once per diagram. `inwards import-diagram` writes the config a diagram stands for. See [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | :material-check-circle: |
 | FAPI001 | `endpoint-metadata` | Opt-in. A FastAPI path operation in the schema without the OpenAPI metadata the project requires: a summary or docstring, a response model, an explicit status code on `POST` and `DELETE`, a `description` in each `responses=` entry, and optionally tags and `operation_id`. One finding per endpoint, on the decorator | :material-check-circle: |
 | FAPI002 | `undocumented-error-response` | Opt-in. A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare: raised or returned in the endpoint, in same-file or imported helpers and dependencies up to `max-depth` calls, or from a first-party exception an app handler maps to a code. Declarations on the decorator, the router, the inclusions above it and the app count; anything Inwards can't read keeps it quiet | :material-check-circle: |
 | FAPI003 | `router-wiring` | Opt-in. An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | :material-check-circle: |
@@ -417,7 +418,8 @@ src/
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
 │   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
-│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), model.ts
+│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), model.ts,
+│   │   │                  #   names.ts (what a node names), draft.ts (import-diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
@@ -452,6 +454,7 @@ src/
 │   │   │   ├── ports-abstract/          # INW014: classes.ts (class kinds, method bodies),
 │   │   │   │                            #   wording.ts, check.ts
 │   │   │   ├── diagram-unknown-name/    # INW017: check.ts (names in marked diagrams)
+│   │   │   ├── diagram-forbidden-edge/  # INW018: check.ts (arrows in marked diagrams)
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
 │   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
@@ -467,14 +470,15 @@ src/
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
-│   │   │                  #   diagrams.ts INW017
+│   │   │                  #   diagrams.ts INW017 and INW018
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
+│   │   │                  #   import-diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings

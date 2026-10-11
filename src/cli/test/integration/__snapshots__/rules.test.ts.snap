@@ -26,6 +26,7 @@ INW014   ports-abstract               off    error     opt-in, off by default
 INW015   construct-only-in            off    error     opt-in, off by default
 INW016   orm-naming                   off    error     opt-in, off by default
 INW017   diagram-unknown-name         off    warning   opt-in, off by default
+INW018   diagram-forbidden-edge       off    warning   opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -65,6 +66,7 @@ INW014   ports-abstract               off    error     opt-in, off by default
 INW015   construct-only-in            off    error     opt-in, off by default
 INW016   orm-naming                   on     warning   templates.domain.rules.models; severity: templates.domain.rules.models; only in src.*.models
 INW017   diagram-unknown-name         off    warning   opt-in, off by default
+INW018   diagram-forbidden-edge       off    warning   opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -403,6 +405,23 @@ exports[`rules --json prints inwards/rules@1 1`] = `
         "kind": "opt-in",
       },
       "summary": "A node in a marked architecture diagram names a layer or context [tool.inwards] declares, and its quoted label a module that exists.",
+    },
+    {
+      "code": "INW018",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW018/",
+      "enabled": false,
+      "name": "diagram-forbidden-edge",
+      "severity": "warning",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
     },
     {
       "code": "FAPI001",

@@ -19,15 +19,23 @@ import type { InwardsConfig } from "../../config/parse.ts";
 import { applyRules } from "../../config/rule-settings.ts";
 import { type ConfigFile, spanOf } from "../../config/source-span.ts";
 import { isDottedName } from "../../config/toml.ts";
-import type { Diagnostic, Fix, SourceFile, Span } from "../../contracts/records.ts";
+import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
 import type { Diagram, NodeMention, SubgraphMention } from "../../diagram/model.ts";
+import {
+  type Declared,
+  diagramFile,
+  EXTERNAL,
+  idsWithClass,
+  mentionSpan,
+  quotedLabel,
+  resolveName,
+  topLevel,
+} from "../../diagram/names.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { distance } from "../shared/edit-distance.ts";
 import { matchesAny } from "../shared/entry-matches.ts";
 import { joined } from "../shared/words.ts";
 
-/** The class that keeps a node out of the check: something outside `[tool.inwards]`. */
-const EXTERNAL = "external";
 /** A name this many times longer than its distance to a declared one is a typo of it. */
 const TYPO_SHARE = 3;
 /** The step every fix ends with: the config is the user's. */
@@ -97,7 +105,7 @@ export function checkDiagramEntries(
 
 /** The names a diagram's nodes may use, and what they are called in messages. */
 interface Names {
-  declared: readonly string[];
+  declared: readonly Declared[];
   /** "layer" or "context". */
   noun: string;
 }
@@ -112,8 +120,8 @@ interface Names {
  */
 function declaredNames(config: InwardsConfig, diagram: Diagram): Names {
   return diagram.kind === "layers"
-    ? { declared: config.layers.map((layer) => layer.name), noun: "layer" }
-    : { declared: (config.contexts ?? []).map((context) => context.name), noun: "context" };
+    ? { declared: config.layers, noun: "layer" }
+    : { declared: config.contexts ?? [], noun: "context" };
 }
 
 /**
@@ -126,7 +134,7 @@ function declaredNames(config: InwardsConfig, diagram: Diagram): Names {
  */
 function unknownNodes(diagram: Diagram, names: Names): Diagnostic[] {
   const subgraphs = new Set(diagram.subgraphs.map((s) => s.id));
-  const external = externalIds(diagram);
+  const external = idsWithClass(diagram, EXTERNAL);
   const first = new Map<string, NodeMention>();
   for (const node of diagram.nodes) {
     if (!first.has(node.id)) {
@@ -136,8 +144,8 @@ function unknownNodes(diagram: Diagram, names: Names): Diagnostic[] {
   return [...first.values()]
     .filter(
       (node) =>
-        !(subgraphs.has(node.id) || external.has(node.id) || names.declared.includes(node.id)) &&
-        (diagram.kind === "layers" || node.subgraph === undefined),
+        !(subgraphs.has(node.id) || external.has(node.id) || isDeclared(diagram, node.id, names)) &&
+        (diagram.kind === "layers" || topLevel(diagram, node.id) === node.id),
     )
     .map((node) => nameFinding(diagram, node, names, "node"));
 }
@@ -153,10 +161,25 @@ function unknownSubgraphs(diagram: Diagram, names: Names): Diagnostic[] {
   if (diagram.kind !== "contexts") {
     return [];
   }
-  const external = externalIds(diagram);
+  const external = idsWithClass(diagram, EXTERNAL);
   return diagram.subgraphs
-    .filter((s) => s.parent === undefined && !external.has(s.id) && !names.declared.includes(s.id))
+    .filter(
+      (s) => s.parent === undefined && !external.has(s.id) && !isDeclared(diagram, s.id, names),
+    )
     .map((s) => nameFinding(diagram, s, names, "subgraph"));
+}
+
+/**
+ * Tells whether a node or subgraph names a declared layer or context, by its
+ * id or, for a name that can't be an id, by its quoted label.
+ *
+ * @param diagram - a marked diagram, read.
+ * @param id - the node or subgraph id.
+ * @param names - the layers or contexts.
+ * @returns true when it names one.
+ */
+function isDeclared(diagram: Diagram, id: string, names: Names): boolean {
+  return resolveName(id, quotedLabel(diagram, id), names.declared) !== undefined;
 }
 
 /**
@@ -169,7 +192,7 @@ function unknownSubgraphs(diagram: Diagram, names: Names): Diagnostic[] {
  * @returns one finding per node and label, at its first mention.
  */
 function unknownLabels(diagram: Diagram, modules: ReadonlySet<string>): Diagnostic[] {
-  const external = externalIds(diagram);
+  const external = idsWithClass(diagram, EXTERNAL);
   const seen = new Set<string>();
   const found: Diagnostic[] = [];
   for (const node of [...diagram.nodes, ...diagram.subgraphs]) {
@@ -181,8 +204,8 @@ function unknownLabels(diagram: Diagram, modules: ReadonlySet<string>): Diagnost
     seen.add(key);
     if (!matchesAny(label, modules)) {
       found.push(
-        diagnostic(RULES.INW017, fileOf(diagram), {
-          span: spanAt(node),
+        diagnostic(RULES.INW017, diagramFile(diagram), {
+          span: mentionSpan(node),
           message: `"${node.id}" is labelled "${label}" in this ${diagram.kind} diagram, and no module matches "${label}".`,
           fix: labelFix(label, modules),
         }),
@@ -211,14 +234,17 @@ function nameFinding(
   const listed =
     declared.length === 0
       ? `[tool.inwards] declares no ${noun}s`
-      : `the ${noun}s are ${joined(declared.map((name) => `"${name}"`))}`;
-  const near = nearest(named.id, declared);
+      : `the ${noun}s are ${joined(declared.map(({ name }) => `"${name}"`))}`;
+  const near = nearest(
+    named.id,
+    declared.map(({ name }) => name),
+  );
   const rename =
     near === undefined
       ? `Rename the ${what} to the ${noun} it shows.`
       : `Rename the ${what} to "${near}", the ${noun} it most likely means.`;
-  return diagnostic(RULES.INW017, fileOf(diagram), {
-    span: spanAt(named),
+  return diagnostic(RULES.INW017, diagramFile(diagram), {
+    span: mentionSpan(named),
     message: `${what === "node" ? "Node" : "Subgraph"} "${named.id}" in this ${diagram.kind} diagram names no ${noun}: ${listed}.`,
     fix: {
       summary:
@@ -263,27 +289,6 @@ function labelFix(label: string, modules: ReadonlySet<string>): Fix {
 }
 
 /**
- * Collects the ids marked external, by `:::external` or a `class` statement.
- *
- * @param diagram - a marked diagram, read.
- * @returns the ids INW017 leaves alone.
- */
-function externalIds(diagram: Diagram): Set<string> {
-  const ids = new Set<string>();
-  for (const node of diagram.nodes) {
-    if (node.classes.includes(EXTERNAL)) {
-      ids.add(node.id);
-    }
-  }
-  for (const [id, classes] of diagram.classes) {
-    if (classes.includes(EXTERNAL)) {
-      ids.add(id);
-    }
-  }
-  return ids;
-}
-
-/**
  * Tells whether a label is written like a module prefix or a layer selector.
  *
  * @param label - the quoted label.
@@ -311,29 +316,4 @@ function nearest(name: string, candidates: readonly string[]): string | undefine
     }
   }
   return best?.name;
-}
-
-/**
- * Makes the diagram's file into the source a diagnostic names.
- *
- * @param diagram - a marked diagram, read.
- * @returns a source with no module, as for pyproject.toml findings.
- */
-function fileOf(diagram: Diagram): SourceFile {
-  return { path: diagram.path, module: "", isPackage: false, text: "" };
-}
-
-/**
- * Turns a mention into a span on its line.
- *
- * @param named - a node or subgraph mention.
- * @returns the span of its id.
- */
-function spanAt(named: NodeMention | SubgraphMention): Span {
-  return {
-    line: named.line,
-    column: named.column,
-    endLine: named.line,
-    endColumn: named.endColumn,
-  };
 }
