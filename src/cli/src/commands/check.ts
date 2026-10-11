@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import { type Format, render } from "@inwards/core";
 import { print } from "../platform/print.ts";
 import { diskCacheWanted } from "../project/check.ts";
-import { commandConfig } from "../project/config-discovery.ts";
+import { commandConfig, NO_CONFIG } from "../project/config-discovery.ts";
 import { type CheckPlan, planCheck } from "../project/routing.ts";
 import { runPlan } from "./check-runs.ts";
 import type { AppDeps } from "./deps.ts";
@@ -59,7 +59,7 @@ function planOf(deps: AppDeps, paths: string[], config: string | undefined): Che
     ? { units: [{ config: flagged.path, targets, exclude: [] }], skipped: [], unrouted: [] }
     : planCheck({ ...io, toml: deps.toml }, cwd, missing === undefined ? targets : undefined);
   if (plan.units.length === 0 && plan.unrouted.length === 0) {
-    return "No pyproject.toml with [tool.inwards] found.";
+    return NO_CONFIG;
   }
   return missing === undefined ? plan : `${missing} is not a file or directory.`;
 }
