@@ -14,7 +14,7 @@
  * owns no tree and decides nothing: `check.ts` holds the names to the scheme.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
+import type { SourceFile, Span } from "../../contracts/records.ts";
 import { argumentAt, literalString } from "../../python/literals.ts";
 import { identifierName, keywordOf, namedChildren } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";
@@ -34,8 +34,8 @@ import {
 
 /** One table name a module declares. */
 export interface TableName {
-  /** The node the finding points at: the string, or the class name SQLModel derives from. */
-  readonly node: Node;
+  /** Where the finding points: the string, or the class name SQLModel derives from. */
+  readonly span: Span;
   readonly name: string;
   /** The class name, when SQLModel derives the table name from it. */
   readonly derivedFrom?: string;
@@ -45,8 +45,8 @@ export interface TableName {
 
 /** One datetime or date column a module declares. */
 export interface TimeColumn {
-  /** The node the finding points at: the name string, or the attribute. */
-  readonly node: Node;
+  /** Where the finding points: the name string, or the attribute. */
+  readonly span: Span;
   readonly name: string;
   readonly kind: TimeKind;
 }
@@ -55,6 +55,23 @@ export interface TimeColumn {
 export interface Models {
   readonly tables: readonly TableName[];
   readonly columns: readonly TimeColumn[];
+}
+
+/**
+ * Spans a node, copying its positions out of the tree. The caller frees the
+ * tree once the module is read, and a freed node's `endPosition` reads
+ * whatever the WASM heap holds by then (#370), so no `Node` outlives a reading.
+ *
+ * @param node - the name's node.
+ * @returns the 1-based span.
+ */
+function spanOf(node: Node): Span {
+  return {
+    line: node.startPosition.row + 1,
+    column: node.startPosition.column + 1,
+    endLine: node.endPosition.row + 1,
+    endColumn: node.endPosition.column + 1,
+  };
 }
 
 /** One module, read for INW016. */
@@ -132,7 +149,7 @@ function readMeta(body: Node, reading: Reading): void {
       const right = assignment.childForFieldName("right");
       const value = literalString(right);
       if (left?.type === "identifier" && identifierName(left) === "db_table" && right && value) {
-        reading.tables.push({ node: right, name: value, sqlalchemy: false });
+        reading.tables.push({ span: spanOf(right), name: value, sqlalchemy: false });
       }
     }
   }
@@ -164,7 +181,7 @@ function readColumnCall(
       read.kind ?? (orm === "mapped_column" ? mappedKind(annotation, context) : undefined);
     if (kind) {
       const { node, value } = read.name ?? { node: attribute, value: identifierName(attribute) };
-      reading.columns.push({ node, name: value, kind });
+      reading.columns.push({ span: spanOf(node), name: value, kind });
     }
     return true;
   }
@@ -174,7 +191,7 @@ function readColumnCall(
     const value = literalString(column);
     const named = value !== null && column ? { node: column, value } : undefined;
     const { node, value: name } = named ?? { node: attribute, value: identifierName(attribute) };
-    reading.columns.push({ node, name, kind: django });
+    reading.columns.push({ span: spanOf(node), name, kind: django });
     return true;
   }
   return false;
@@ -217,7 +234,7 @@ function readAssignment(assignment: Node, table: boolean, reading: Reading): boo
   if (identifierName(left) === "__tablename__") {
     const value = literalString(right);
     if (right && value !== null) {
-      reading.tables.push({ node: right, name: value, sqlalchemy: true });
+      reading.tables.push({ span: spanOf(right), name: value, sqlalchemy: true });
     }
     return true;
   }
@@ -230,7 +247,7 @@ function readAssignment(assignment: Node, table: boolean, reading: Reading): boo
     mappedKind(annotation, context) ??
     (field && annotation ? pythonKind(annotation, context) : undefined);
   if (kind) {
-    reading.columns.push({ node: left, name: identifierName(left), kind });
+    reading.columns.push({ span: spanOf(left), name: identifierName(left), kind });
   }
   return false;
 }
@@ -256,7 +273,7 @@ function readClass(cls: Node, reading: Reading): void {
   if (table && !named) {
     const derivedFrom = identifierName(className);
     const name = derivedFrom.toLowerCase();
-    reading.tables.push({ node: className, name, derivedFrom, sqlalchemy: true });
+    reading.tables.push({ span: spanOf(className), name, derivedFrom, sqlalchemy: true });
   }
 }
 
@@ -276,12 +293,12 @@ function readCall(call: Node, reading: Reading): void {
     const first = argumentAt(call, 0, "");
     const value = literalString(first);
     if (first && value !== null) {
-      reading.tables.push({ node: first, name: value, sqlalchemy: true });
+      reading.tables.push({ span: spanOf(first), name: value, sqlalchemy: true });
     }
   } else if (last === "Column" || last === "mapped_column") {
     const { name, kind } = columnCall(call, reading.context);
     if (name && kind) {
-      reading.columns.push({ node: name.node, name: name.value, kind });
+      reading.columns.push({ span: spanOf(name.node), name: name.value, kind });
     }
   }
 }
