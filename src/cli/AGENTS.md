@@ -74,6 +74,33 @@ A relative path from the command line (`--config`, check targets,
 bare `resolve(p)`, which would read the process's working directory behind
 the contract's back.
 
+## Slice names (ADR-047)
+
+The CLI is moving to vertical slices one step at a time (ADR-047 in chapter
+5 has the target map and the 15 steps). Until a folder's step lands, it
+keeps the layout above. A migrated slice holds only these names:
+
+- `index.ts`: the slice's public face, re-exports only; it never re-exports
+  an adapter.
+- `_name.ts`: private to the folder it sits in.
+- `contracts.ts`: the ports and records the slice owns.
+- `cli.ts`: the slice's `inwards <command>` handlers, which replace
+  `commands/`.
+- `adapters/`: the slice's I/O; only the root (`main.ts`, later `compose.ts`)
+  imports it.
+- `*.d.ts` typings, and subfolders (mini-domains) with their own `index.ts`.
+
+Biome enforces two of these already. The policy override covers
+`src/cli/src/**` except the root's own `*.ts` and every `adapters/` folder,
+so a new folder gets the I/O ban without being listed. In the same override
+`noRestrictedImports` refuses another folder's `_x.ts`: `./_x.ts` and
+`../_x.ts` pass, `../check/_x.ts` and `./session/_x.ts` fail. Biome doesn't
+merge one rule's options across overrides, so a new override that sets
+`noRestrictedImports` on policy files repeats the pattern. `noBarrelFile`
+is off for every `index.ts`. `test/integration/architecture.test.ts` probes
+both, and its `MIGRATED_SLICES` list holds the folders the naming check
+walks: a move PR adds its folder there.
+
 ## State lifetimes
 
 The CLI runs one command per process, but tests and future callers may run

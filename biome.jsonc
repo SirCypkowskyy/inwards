@@ -221,21 +221,12 @@
       // denied outright, since pattern matching on their uses leaked (a clock
       // read nested in Date.parse, globalThis["Date"]); platform/time.ts parses
       // recorded timestamps behind the one exception. node:path and node:crypto
-      // stay allowed: path text and hashing are pure.
-      "includes": [
-        "src/cli/src/claude-code/**",
-        "src/cli/src/commands/**",
-        "src/cli/src/daemon/**",
-        "src/cli/src/init/**",
-        "src/cli/src/json/**",
-        "src/cli/src/lsp/**",
-        "src/cli/src/mcp/**",
-        "src/cli/src/paths/**",
-        "src/cli/src/platform/**",
-        "src/cli/src/project/**",
-        "src/cli/src/runlog/**",
-        "src/cli/src/session/**"
-      ],
+      // stay allowed: path text and hashing are pure. The last pattern keeps a
+      // module named _x.ts private to its folder; it repeats in the engine's
+      // override, since Biome doesn't merge one rule's options across overrides.
+      // Every folder but the root's own modules and adapters (ADR-047), so a
+      // new folder gets the ban without being listed here.
+      "includes": ["src/cli/src/**", "!src/cli/src/*.ts", "!src/cli/src/**/adapters/**"],
       "linter": {
         "rules": {
           "nursery": { "noBunModules": "error" },
@@ -274,6 +265,10 @@
                   "cluster": "Policy code talks to nothing outside the process; add a contract and an adapter if it must."
                 },
                 "patterns": [
+                  {
+                    "group": ["**/_*", "!./_*", "!../_*", "!../../_*"],
+                    "message": "A module named _x.ts is private to its folder; import the slice's index.ts."
+                  },
                   {
                     "group": ["node:fs/*", "fs/*"],
                     "message": "Read and write through the platform contracts, not node:fs."
@@ -326,14 +321,17 @@
       }
     },
     {
-      // The engine's public API: adapters import `@inwards/core` and nothing deeper.
-      "includes": ["src/core/src/index.ts"],
+      // The engine's public API (adapters import `@inwards/core` and nothing
+      // deeper) and each slice's face (ADR-047) are barrels on purpose.
+      // noReExportAll stays on, so an index.ts names what it exports.
+      "includes": ["src/*/src/**/index.ts"],
       "linter": { "rules": { "performance": { "noBarrelFile": "off" } } }
     },
     {
       // The engine is pure: no runtime globals, no Node or Bun modules, no env,
       // no network and no clock (Date, performance and the global object are
-      // denied; durations and times come from the adapter).
+      // denied; durations and times come from the adapter). A module named
+      // _x.ts is private to its folder (ADR-047), the same pattern as the CLI's.
       "includes": ["src/core/src/**"],
       "linter": {
         "rules": {
@@ -341,6 +339,17 @@
           "nursery": { "noBunModules": "error" },
           "style": {
             "noProcessEnv": "error",
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/_*", "!./_*", "!../_*", "!../../_*"],
+                    "message": "A module named _x.ts is private to its folder; import the slice's index.ts."
+                  }
+                ]
+              }
+            },
             "noRestrictedGlobals": {
               "level": "error",
               "options": {
