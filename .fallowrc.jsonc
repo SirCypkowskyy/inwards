@@ -161,7 +161,12 @@
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
       // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
-      { "name": "cli-main", "patterns": ["src/cli/src/main.ts"] },
+      // The root (ADR-047): main.ts, and compose.ts until step 14 moves it up
+      // from adapters/. Only the root may import a slice's adapters zone.
+      {
+        "name": "cli-main",
+        "patterns": ["src/cli/src/main.ts", "src/cli/src/adapters/compose.ts"]
+      },
       { "name": "cli-adapters", "patterns": ["src/cli/src/adapters/**"] },
       { "name": "cli-commands", "patterns": ["src/cli/src/commands/**"] },
       // Before the rest of claude-code/: the eval may import this module alone.
@@ -173,7 +178,9 @@
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
       // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
       { "name": "cli-daemon", "patterns": ["src/cli/src/daemon/**"] },
-      // The language server's policy (`inwards server`, ADR-041): when to check what.
+      // The language server slice (`inwards server`, ADR-041, ADR-047): its LSP
+      // connection before the rest, since the first matching zone wins.
+      { "name": "cli-lsp-adapters", "patterns": ["src/cli/src/lsp/adapters/**"] },
       { "name": "cli-lsp", "patterns": ["src/cli/src/lsp/**"] },
       // The MCP server's policy (`inwards mcp`, ADR-043): the three tools.
       { "name": "cli-mcp", "patterns": ["src/cli/src/mcp/**"] },
@@ -666,8 +673,9 @@
           "cli-json"
         ]
       },
+      // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
       {
-        "from": "cli-lsp",
+        "from": "cli-lsp-adapters",
         "allow": [
           "core-api",
           "core-contracts",
@@ -686,7 +694,32 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project"
+          "cli-lsp"
+        ]
+      },
+      {
+        "from": "cli-lsp",
+        // cli.ts takes AppDeps from commands/deps.ts until step 14 moves it to the root.
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-commands"
         ]
       },
       {
@@ -768,7 +801,6 @@
           "cli-init",
           "cli-commands",
           "cli-daemon",
-          "cli-lsp",
           "cli-mcp"
         ]
       },
@@ -792,12 +824,19 @@
           "cli-adapters",
           "cli-commands",
           "cli-init",
-          "cli-platform"
+          "cli-platform",
+          "cli-project",
+          "cli-session",
+          "cli-runlog",
+          "cli-daemon",
+          "cli-lsp",
+          "cli-lsp-adapters",
+          "cli-mcp"
         ]
       },
       {
         "from": "cli-test",
-        // core-dev: the slice naming check (src/core/test/support/slices.ts) both packages share.
+        // core-dev: the slice naming check (src/core/test/support/architecture.ts) both packages share.
         "allow": [
           "core-dev",
           "core-api",

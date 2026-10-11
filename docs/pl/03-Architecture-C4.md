@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 00175f6e407d81342dcdd53f14c85253e4a639ba75c7f59c9809035c8a93f638
+source_hash: 26c25e0e68214bc56683fd1e46a840ee338fbf7c71244d44e90546338403e974
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -91,7 +91,7 @@ flowchart TB
 |---|---|---|---|
 | **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019, INW021 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
-| **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
+| **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
 | **Rozszerzenie VS Code** | `vscode-languageclient` 10, cienki klient | `src/vscode-extension/src/client/` | :material-check-circle: uruchamia `inwards server` z pliku binarnego w swoim VSIX dla platformy, z `inwards.path` albo z `PATH` ([ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)); VSIX dla każdej platformy w każdym wydaniu; :material-progress-clock: Marketplace i Open VSX, gdy właściciel opublikuje ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Zestaw dla agentów** | Generowana konfiguracja hooków i Markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` dla `claude`, `aider` i `agents-md` |
@@ -520,7 +520,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, server, mcp, import-config,
+│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, mcp, import-config,
 │   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
@@ -533,8 +533,10 @@ src/
 │   │   ├── runlog/        # the opt-in run log, reading it back, stats, --export
 │   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
 │   │   │                  #   the in-memory caches
-│   │   ├── lsp/           # inwards server: when to check what (session.ts), the whole pass
-│   │   │                  #   and the one-document check (checks.ts), what each file shows
+│   │   ├── lsp/           # inwards server, a slice (ADR-047): index.ts re-exports the handler
+│   │   │                  #   (cli.ts); when to check what (_session.ts), the whole pass and
+│   │   │                  #   the one-document check (_checks.ts), what each file shows;
+│   │   │                  #   adapters/connection.ts is the LSP connection over stdio
 │   │   ├── mcp/           # inwards mcp: the three tools (check-files.ts, explain-rule.ts,
 │   │   │                  #   where.ts), queued one at a time (tools.ts)
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
@@ -543,8 +545,8 @@ src/
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
 │   │                      #   the grammars, the picker, the daemon's socket and files,
-│   │                      #   the LSP connection over stdio (lsp-connection.ts), the MCP one
-│   │                      #   (mcp-connection.ts) and the embedded rule pages (rule-pages.ts);
+│   │                      #   the MCP connection over stdio (mcp-connection.ts) and the
+│   │                      #   embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/

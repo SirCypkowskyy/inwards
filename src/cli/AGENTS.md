@@ -12,7 +12,7 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
-| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `diagram`, `import-config`, `import-diagram`, `rules` for `inwards rules` and `inwards rule`, `daemon`, `server`, `mcp`), `rule-sources` for which config key turns each rule on, `append-table` for appending an imported `[tool.inwards]` table, `usage` for the help text, `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
+| `commands/` | one module per command (`check`, `baseline`, `stats`, `hook`, `context`, `diagram`, `import-config`, `import-diagram`, `rules` for `inwards rules` and `inwards rule`, `daemon`, `mcp`), `rule-sources` for which config key turns each rule on, `append-table` for appending an imported `[tool.inwards]` table, `usage` for the help text, `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
 | `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings` and `hook-host` (whether the agent still has Inwards wired in), and `protocol` (shared by all of them) | read the environment or the filesystem itself |
 | `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), violation fingerprints, old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
 | `project/` | running a check, which files it reads and under which module names, then reading them (`sources`: one batch from 1,000 files, #281), the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), how many threads parse a full check (`threads`, ADR-040), texts laid over the disk for one check, files not yet written included (`overlay`, for `inwards mcp`), the files `diagrams` names (`diagrams`), and the checks only a whole-project run makes (`whole`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
@@ -20,11 +20,11 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | `init/` | `inwards init`: agent wiring (`claude` with its `.mcp.json` in `mcp-json`, `opencode`, `agents`), `--style`, `--style auto`'s name table and command (`auto`, `auto-command`), the scaffold plan, the report, presets and the text their templates add (`template-text`), the architecture brief (`--brief`, `inwards context`) with its opt-in rules part (`brief-rules`), marked sections in Markdown files (`section`), import-linter contracts as `[tool.inwards]` (`import-linter/`, for `inwards import-config`), and a read diagram as `[tool.inwards]` (`diagram-table`, for `inwards import-diagram`) | write files itself (`InitFiles` does) |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
 | `daemon/` | the hook daemon's side of ADR-039: the `inwards-daemon/1` wire format and the daemon's file names (`protocol`), the hook's side (`viaDaemon` and `askDaemon` in `client`), the request handler (`server`), the caches kept between requests (`memory`), and the `DaemonLink` and `DaemonHost` contracts | do I/O (the socket, the record and the lock are `adapters/daemon-*.ts`) |
-| `lsp/` | the language server's policy (`inwards server`, ADR-041): when to run a whole pass or a one-document check (`session`), the two checks through `planCheck` and `runCheck` (`checks`), what each file shows (`publish`), which file events matter (`events`), and the `Editor` and `LanguageServer` contracts | import the protocol library or touch a stream (that is `adapters/lsp-connection.ts`) |
+| `lsp/` | the language server slice (`inwards server`, ADR-041), the first one in the ADR-047 layout: the `server` handler (`cli`, re-exported by `index`), when to run a whole pass or a one-document check (`_session`), the two checks through `planCheck` and `runCheck` (`_checks`), what each file shows (`_publish`), which file events matter (`_events`), the `Editor`, `LanguageServer` and `ServerCheck` contracts, and the LSP connection over stdio (`adapters/connection`) | import the protocol library or touch a stream outside `lsp/adapters/` |
 | `mcp/` | the MCP server's policy (`inwards mcp`, ADR-042): the three tools (`check-files`, `explain-rule` with `rule-page`, `where` with `where-answer` and `hints`), their arguments and answers (`contracts`), and running them one at a time (`tools`) | import the SDK or Zod, or touch a stream (that is `adapters/mcp-connection.ts`) |
 | `platform/` | the contracts for everything outside the process, `print()`, and `time.ts`, the one place that may name `Date` to parse a recorded timestamp | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
-| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), the LSP connection over stdio (`lsp-connection`), the MCP connection over stdio (`mcp-connection`) and the rule pages it serves (`rule-pages`, embedded as text); `compose.ts` wires them into `AppDeps` | hold policy |
+| `adapters/` | `node:fs`, git, the environment, stdio, state/baseline/export/init files, the grammars, the picker, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), the MCP connection over stdio (`mcp-connection`) and the rule pages it serves (`rule-pages`, embedded as text); `compose.ts` wires them into `AppDeps` | hold policy |
 
 ## Dependency rules
 
@@ -39,9 +39,11 @@ Imports go downwards only: `platform`, `json` and `paths` are leaves, then
 then `commands`. `daemon/` sits beside them, below `commands/`, and imports
 only `platform` and `json` (and the engine's API); `commands/` and the
 `daemon-*` adapters use it. `lsp/` sits beside it too and imports `platform`,
-`json`, `paths` and `project` (for `planCheck`); `commands/` and
-`adapters/lsp-connection.ts` use it. `mcp/` sits beside them with the same
-imports as `lsp/`; `commands/` and `adapters/mcp-connection.ts` use it. Only `main.ts` imports `adapters/`. `eval/` may
+`json`, `paths` and `project` (for `planCheck`), and `commands/deps.ts` for
+`AppDeps` until step 14 moves it to the root; `main.ts` imports its
+`index.ts`, `commands/deps.ts` and `adapters/compose.ts` its `contracts.ts`. `mcp/` sits beside them with the same
+imports as `lsp/`; `commands/` and `adapters/mcp-connection.ts` use it. Only the root (`main.ts`, and `adapters/compose.ts` until it moves up)
+imports `adapters/` or a slice's `adapters/`. `eval/` may
 import `claude-code/protocol.ts` and nothing else.
 
 Enforced by:
@@ -101,6 +103,26 @@ is off for every `index.ts`. `test/integration/architecture.test.ts` probes
 both, and its `MIGRATED_SLICES` list holds the folders the naming check
 walks: a move PR adds its folder there.
 
+`lsp/` moved first (#418), and later steps copy it:
+
+1. Move the files and rewrite the imports with
+   `bun run scripts/move-slice.ts OLD=NEW...` (repo-relative paths). It runs
+   `git mv`, so history follows, and it only rewrites a specifier that no
+   longer resolves, so it can run again. After a rebase, take the base's
+   version of a conflicting file and rerun the same command from the PR
+   description. Paths in comments, docs and test probes are fixed by hand.
+2. Give the slice an `index.ts` that re-exports its `cli.ts` handlers;
+   `main.ts` imports that. A type the root wires (`ServerCheck`) goes in
+   `contracts.ts`, which `commands/deps.ts` and `adapters/compose.ts` import
+   directly: through `index.ts` the type import would close a cycle
+   (`index.ts`, `cli.ts`, `deps.ts`, `index.ts`) that `check:cycles` refuses.
+3. In `.fallowrc.jsonc`, add `cli-<slice>-adapters` before `cli-<slice>`,
+   allowing the engine, `platform`, `json`, `paths` and its own slice, and
+   add it to `cli-main`'s list only. `cli-main` is the root zone and holds
+   `adapters/compose.ts` until step 14. The architecture test checks that
+   only `cli-main` allows an adapters zone.
+4. Add the folder to `MIGRATED_SLICES`.
+
 ## State lifetimes
 
 The CLI runs one command per process, but tests and future callers may run
@@ -118,7 +140,7 @@ it serves gets its own runtime, clock, streams and run log, as a one-shot
 hook would.
 
 The language server (`inwards server`, ADR-041) is the other one: its
-`Session` (`lsp/session.ts`) holds the folders, the open documents and the
+`Session` (`lsp/_session.ts`) holds the folders, the open documents and the
 last pass for as long as the editor keeps it, and `nodeLsp` in
 `adapters/compose.ts` makes its extraction cache once. Every check still reads
 the config, the baseline and the listing again; don't keep any of them.
@@ -143,7 +165,7 @@ A module-level `Map` or array that grows at run time is a bug.
 - **A new CLI command.** Add a module to `commands/` that takes `AppDeps`,
   route to it in `main.ts`, and add its usage line to `USAGE`.
 - **Something an editor shows.** The policy goes in `lsp/` (which check runs
-  when, what a document shows), the protocol in `adapters/lsp-connection.ts`.
+  when, what a document shows), the protocol in `lsp/adapters/connection.ts`.
   Test it over stdio with `test/support/lsp-client.ts`, which drives the
   compiled binary in CI. The VS Code extension starts this server and has
   none of its own (ADR-043).

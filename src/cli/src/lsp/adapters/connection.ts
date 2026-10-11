@@ -2,7 +2,7 @@
  * @file The language server's LSP connection over stdio, with
  * `vscode-languageserver`: it reads JSON-RPC from stdin, writes it to stdout,
  * turns the editor's notifications into calls on the policy
- * (`lsp/session.ts`) and its publishes into `textDocument/publishDiagnostics`.
+ * (`lsp/_session.ts`) and its publishes into `textDocument/publishDiagnostics`.
  * It asks the editor to watch files when the editor can, and follows
  * workspace folder changes. Stdout is the protocol's channel: nothing else
  * may write there (`main.ts` hands the server streams that write to stderr).
@@ -23,7 +23,7 @@ import {
   TextDocumentSyncKind,
   WatchKind,
 } from "vscode-languageserver/node";
-import type { Editor, FileChange, LanguageServer, LspDiagnostic } from "../lsp/contracts.ts";
+import type { Editor, FileChange, LanguageServer, LspDiagnostic } from "../contracts.ts";
 
 /**
  * What the server asks the editor to report: any path created or deleted
