@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 2a1c680dfd4cb0f402aacbca43fc2881e44ea4c41279dd1a9baf804bb0743088
+source_hash: 02fa21afbb10be937b7079b3eb7edea7ba6af7a6a32d7c25a3c3afda3977a099
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -222,7 +222,7 @@ Które reguły zgłaszają i jak głośno:
 
 INW000 nie da się wyłączyć, zmienić jego poziomu ani nadać mu opcji. Szczegóły są w [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table).
 
-`inwards rules` pokazuje, co z tej tabeli wynika: każdą regułę z kodem, nazwą, informacją, czy jest włączona, poziomem i kluczem, który o każdym z nich zdecydował, zapisanym jako klucz pod `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), albo `default`. Reguła ograniczona przez `modules` mówi gdzie (`only in src.*.router`). Czyta najbliższą konfigurację albo `--config FILE`, a bez konfiguracji wypisuje ustawienia domyślne. `--json` wypisuje to samo jako `inwards/rules@1`: każda reguła ma `source` i `severitySource`, każde z polem `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` albo `severity`) i swoimi `keys`. `inwards rule INW013` wypisuje stronę jednej reguły ([poradnik MCP](mcp.md#explain_rule)).
+`inwards rules` pokazuje, co z tej tabeli wynika: każdą regułę z kodem, nazwą, informacją, czy jest włączona, poziomem i kluczem, który o każdym z nich zdecydował, zapisanym jako klucz pod `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), albo `default`. Reguła ograniczona przez `modules` mówi gdzie (`only in src.*.router`). Czyta najbliższą konfigurację albo `--config FILE`, a bez konfiguracji wypisuje ustawienia domyślne. `--json` wypisuje to samo jako `inwards/rules@1`: każda reguła ma `source` i `severitySource`, każde z polem `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` albo `severity`) i swoimi `keys`. Tak jak `inwards/diagnostics@1` jest to kontrakt: pola są tylko dodawane, a zmiana nazwy albo usunięcie pola wymaga nowej wersji schematu ([ADR-007](../05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)). `inwards rule INW013` wypisuje stronę jednej reguły ([poradnik MCP](mcp.md#explain_rule)).
 
 <!-- config: fragment -->
 
