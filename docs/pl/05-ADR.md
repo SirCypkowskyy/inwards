@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3bce519537ea4a621b0e8635463a53d793384f34640d16bb6aa8781ad7e7ccdd
+source_hash: 65e38c0d1ece6c0517460c05782277f7f319d25ad839460bec5e244d4e226692
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -54,6 +54,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
 | [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja | :material-check-circle: Przyjęty, INW017 od [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 i `import-diagram` od [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
+| [046](#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template) | Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon | :material-help-circle-outline: Proponowany, [#407](https://github.com/SirCypkowskyy/inwards/issues/407) |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1398,3 +1399,75 @@ W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, al
 - *Sprawdzać każdy blok Mermaid w repozytorium:* diagramy procesów i sekwencji dawałyby fałszywe zgłoszenia, a projekt nie mógłby trzymać diagramu poglądowego.
 - *Użyć parsera samego Mermaida:* potrzebuje DOM i środowiska jison, czyli więcej niż wszystkie zależności silnika razem.
 - *Domyślnie błędy:* literówka w dokumentacji blokowałaby Stop gate agenta przy kodzie, który jest w porządku.
+
+## ADR-046: Porty strukturalne, linie zgodności i moduły prywatne to reguły opt-in, a wycinki CQRS to szablon { #adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template }
+
+**Stan:** Proponowany · 2026-10-11 · [#407](https://github.com/SirCypkowskyy/inwards/issues/407) · scaffoldy [#406](https://github.com/SirCypkowskyy/inwards/issues/406)
+
+**Kontekst.** Konwencje właściciela (2026-10-11) dla projektu w Pythonie: pionowe wycinki podzielone według domen, z pakietem `shared/`; te same nazwy modułów w każdym wycinku (`models.py`, `api.py`, `services/`, którego `__init__.py` reeksportuje z modułów prywatnych, takich jak `_user.py`, oraz `commands/` i `queries/` dla CQRS); porty to klasy `typing.Protocol`, nigdy ABC i nigdy dziedziczone; każdy moduł adaptera kończy się blokiem `if TYPE_CHECKING:` z linią `_: Port = Adapter(...)`, żeby type checker sprawdził adapter względem jego portu. [#406](https://github.com/SirCypkowskyy/inwards/issues/406) wprowadza je do scaffoldów. Spike miał ustalić, których z nich inwards może pilnować i jak.
+
+Co mówią Python i narzędzia (stan na 2026-10-11):
+
+- **Protokoły są strukturalne.** Klasa implementuje protokół, gdy ma jego składowe; dziedziczenie po nim jest dozwolone, ale niepotrzebne do sprawdzania typów, a jawna podklasa dziedziczy domyślne ciała metod protokołu ([specyfikacja typowania, Protocols](https://typing.python.org/en/latest/spec/protocol.html#explicitly-declaring-implementation)). Podklasa protokołu jest protokołem tylko wtedy, gdy sama wymienia `Protocol` wśród swoich baz; inaczej zostaje „zdegradowana” do zwykłej klasy ([Merging and extending protocols](https://typing.python.org/en/latest/spec/protocol.html#merging-and-extending-protocols)).
+- **`TYPE_CHECKING` ma w czasie działania wartość `False`**, a statyczne type checkery przyjmują `True` ([`typing.TYPE_CHECKING`](https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING)), więc `_: Port = Adapter(...)` pod nim niczego nie buduje, a mimo to jest sprawdzane.
+- **Zgodność sprawdza type checker, nie Ruff.** ty zgłasza wartość, której nie da się przypisać do zadeklarowanego typu, jako [`invalid-assignment`](https://docs.astral.sh/ty/reference/rules/#invalid-assignment); mypy i pyright mają to samo sprawdzenie. Zmienna z adnotacją `type[Proto]` przyjmuje konkretną klasę, której instancje implementują protokół ([type[] and class objects vs protocols](https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols)). Ruff nie sprawdza typów; w tej linii zgłasza tylko niezdefiniowaną nazwę (`F821`).
+- **Reguła Ruffa o prywatnych importach pomija własne moduły projektu.** [PLC2701 `import-private-name`](https://docs.astral.sh/ruff/rules/import-private-name/) jest w trybie preview, pomija importy względne i importy używane tylko w adnotacjach, a także każdy import, którego pakiet najwyższego poziomu jest pakietem importującego pliku ([źródło](https://github.com/astral-sh/ruff/blob/main/crates/ruff_linter/src/rules/pylint/rules/import_private_name.rs)). W obrębie jednego projektu `from app.users.services._user import X` w `app.orders` nigdy nie jest zgłaszane.
+- **INW014** już sprawdza, że moduł portu zawiera tylko ABC i Protocol z metodami bez ciała, a warstwy sąsiednie INW001 ([ADR-036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand)) już zabraniają importów między rolami `a | b` szablonu.
+
+Pomiar na pięciu repozytoriach z `bench/corpus.json`, skryptem w Pythonie na `ast` (2026-10-11):
+
+| Sprawdzenie | fastapi-clean-example | polar | full-stack-fastapi-template, python-ddd, saleor |
+|---|---|---|---|
+| ABC w modułach `ports` | 0 (każdy port to Protocol) | brak modułów `ports` | brak |
+| Klasy poza modułami portów dziedziczące po porcie | 9 baz w 8 klasach adapterów i 1 atrapa w testach | 57 podklas Protocol, żadna z modułu portu | 0 |
+| Linie `_: Port = Adapter(...)` pod `TYPE_CHECKING` | 0 | 0 | 0 |
+| Publiczne, niewyłączone klasy w modułach `adapters` | 8, wszystkie to adaptery | 4: 1 adapter, 2 dataclassy, 1 model Pydantic na własnej bazie projektu | 0 |
+| Importy modułu `_private` spoza jego pakietu | 0 | 42: 32 w testach, 2 w skryptach, 8 w `polar` | 0 (brak modułów prywatnych) |
+| Moduły `queries` importujące `commands` | 0 | 0 | 0 |
+
+Żaden projekt z korpusu nie stosuje konwencji linii zgodności, a moduły prywatne ma tylko polar; te konwencje to wybór zespołu, więc każde sprawdzenie poniżej jest opt-in.
+
+**Decyzja.**
+
+- **Porty: dwie opcje INW014, bez nowego kodu.** `interface = "any"` (domyślnie, tak jak dziś) albo `"protocol"` w `[tool.inwards.rules.ports-abstract]` mówi, czym musi być klasa portu. Przy `"protocol"` ABC w module portu jest zgłaszana na swojej nazwie, podobnie jak klasa, która rozszerza port, ale sama nie wymienia `Protocol`, bo type checker traktuje ją jak zwykłą klasę. `allow-subclassing = false` (domyślnie `true`) zgłasza klasę w dowolnym miejscu poza modułami portów, która wśród swoich baz ma klasę z modułu portu; diagnostyka stoi na tej bazie. Bazy są rozwiązywane przez importy samego pliku, jak dziś w INW014, więc sprawdzenie dalej działa na jednym pliku naraz, a plik jest parsowany tylko wtedy, gdy jego szkielet importów importuje moduł portu. Moduły testów są pomijane, jak w każdej regule treści ([ADR-037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix)), więc atrapa w testach dziedzicząca po porcie przechodzi.
+    - Komunikaty: ``` `OrderRepository` in port module `shop.application.ports.orders` is an ABC; ports here are `typing.Protocol` classes (`interface = "protocol"`), which adapters implement by their shape. ``` oraz ``` `SqlOrderRepository` in `shop.infrastructure.orders` subclasses the port `OrderRepository` from `shop.application.ports.orders`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built. ```
+    - Poprawka: dla ABC zamienić `ABC` na `Protocol` wśród baz i usunąć `@abstractmethod`, które ma znaczenie tylko dla podklas; dla podklasy usunąć port z baz i dodać `_: OrderRepository = SqlOrderRepository(...)` pod `if TYPE_CHECKING:` na końcu modułu.
+    - Opis architektury (brief): linia INW014 mówi `` `ports` modules hold only `typing.Protocol` classes whose methods have no body ``, a przy `allow-subclassing = false` dodaje `; adapters never subclass them`.
+- **Zgodność: nowa reguła INW020 `adapter-conformance`.** Kategoria roles, opt-in, błąd po włączeniu. Każda publiczna klasa najwyższego poziomu (jej nazwa nie zaczyna się od `_`) w module adaptera potrzebuje co najmniej jednej linii zgodności w bloku `if TYPE_CHECKING:` (albo `if typing.TYPE_CHECKING:`) na poziomie modułu: przypisania z adnotacją, którego wartością jest wywołanie klasy (`Adapter(...)` z dowolnymi argumentami, także `Adapter[T](...)`) albo sama klasa przy adnotacji `type[Port]`. Nazwa celu jest dowolna; konwencją jest `_`. Trzy diagnostyki:
+    - **Brak linii zgodności**, na nazwie klasy: ``` `SqlOrderRepository` in adapter module `shop.infrastructure.orders` declares no port it implements. Add `_: OrderRepository = SqlOrderRepository(...)` under `if TYPE_CHECKING:` at the end of the module, so the type checker checks the class against its port. ``` Port w komunikacie to jedyna klasa, którą moduł importuje z modułu portu, jeśli jest dokładnie jedna; w przeciwnym razie `<Port>`. Kroki poprawki: zaimportować port pod `if TYPE_CHECKING:`; dodać linię; jeśli klasa jest pomocnicza, a nie adapterem, zmienić jej nazwę na `_Name` albo przenieść ją poza moduł adaptera.
+    - **Linia zgodności, która się wykonuje**, na tej linii: to samo przypisanie z adnotacją na poziomie modułu poza `if TYPE_CHECKING:` buduje adapter przy imporcie.
+    - **Adnotacja, która nie wskazuje portu**, na adnotacji, tylko gdy ustawiono `ports`: adnotacja nie rozwiązuje się przez importy pliku do klasy w jednym z tych modułów. Bez `ports` liczy się każda adnotacja oprócz `Any` i `object`.
+    - Opcje w `[tool.inwards.rules.adapter-conformance]`: `modules`, moduły adapterów (domyślnie moduły z segmentem `adapters`, tak jak INW014 domyślnie bierze segment `ports`); `ports`, selektory modułów portów; `allow-bases`, `extend-allow-bases` i `allow-decorators` z domyślnymi wartościami INW014, więc wyjątki, enumy, modele Pydantic, typed dicty, named tuple i dataclassy nie potrzebują linii; `check-tests`.
+    - Czego nie sprawdza: czy klasa pasuje do portu. To zadanie type checkera i powód, dla którego linia istnieje. Klasa może implementować kilka portów, po jednej linii na każdy; INW020 wymaga co najmniej jednej.
+    - Koszt: jedno parsowanie na plik adaptera, którego tekst zawiera `class`; żaden inny plik nie jest czytany, więc działa w hooku po każdej edycji i w edytorze.
+    - Opis architektury: `` - INW020 in `shop.infrastructure`: every adapter class ends its module with `_: Port = Adapter(...)` under `if TYPE_CHECKING:` ``.
+- **Moduły prywatne: nowa reguła INW021 `private-module`.** Kategoria imports, opt-in (pierwsza reguła opt-in w tej kategorii, więc zdanie „domyślnie włączone” w jej opisie dostaje wyjątek), błąd po włączeniu. Własna ścieżka modułu, której segment poniżej pakietu najwyższego poziomu zaczyna się od jednego podkreślenia (`app.users.services._user` albo cokolwiek pod `app.users._internal`), jest prywatna dla pakietu, który ten segment zawiera (`app.users.services`, `app.users`). INW021 zgłasza jej import z każdego modułu spoza tego pakietu; `__init__.py` pakietu, moduły sąsiednie i podpakiety mogą ją importować. Nazwy dunder (`__init__`, `__main__`) nie są prywatne. Zbiór importów jest taki jak w INW003: zwykłe, `from`, względne i z gwiazdką, importy w funkcjach i pod `TYPE_CHECKING` (taki import też wiąże importującego z prywatną ścieżką) oraz `from pkg import _x`, gdy `pkg._x` jest modułem. Import, który INW003 już zgłasza w tej samej linii, nie jest zgłaszany drugi raz.
+    - Komunikat: ``` `app.orders.api` imports `app.users.services._user`, a private module of `app.users.services`. A module whose name starts with `_` is for its own package; other code imports what the package's `__init__.py` re-exports. ```
+    - Poprawka: zaimportować nazwę z `app.users.services` i reeksportować ją w `app/users/services/__init__.py`, jeśli jeszcze jej tam nie ma; jeśli moduł ma służyć innym pakietom, zmienić jego nazwę na taką bez podkreślenia.
+    - Opcje: `modules` (gdzie reguła zgłasza) i `check-tests`. Testy są domyślnie pomijane: 32 z 42 diagnostyk w polar to testy sięgające do prywatnych modułów workera.
+    - Poza zakresem: prywatne *nazwy* (`from app.users.services import _helper`, gdy `_helper` jest funkcją) zostają Ruffowi. PLC2701 pomija je w obrębie jednego pakietu najwyższego poziomu, a inwards nie czyta nazw modułu docelowego. Prywatne moduły bibliotek zewnętrznych też należą do Ruffa.
+    - [#331](https://github.com/SirCypkowskyy/inwards/issues/331) (publiczne moduły kontekstów według konwencji podkreślenia) używa tej samej definicji prywatnego segmentu, więc obie zmiany się zgadzają, gdy działają razem.
+    - Opis architektury: `` - INW021: import a `_private` module only from inside its package; elsewhere import what the package's `__init__.py` re-exports ``.
+- **Wycinki CQRS: szablon w presecie `vertical-slices`, bez nowej reguły.** Szablon `slice` presetu dostaje `roles = ["models", "services", "commands | queries", "api"]`, `public = ["api"]` jak dotąd i `require = ["__init__", "api"]`; wpis warstwy `features` go używa, więc każda rola jest warstwą, a `commands` i `queries` są sąsiadami. INW001 zgłasza wtedy import `commands` w `queries` i odwrotnie jako import „from sibling layer”, z komunikatem i linią opisu architektury, które INW001 już ma. Preset włącza INW021 jako ostrzeżenie, bo `services/__init__.py` reeksportuje moduły prywatne. Tego, czy zapytanie coś zapisuje albo czy komenda zwraca dane, nie da się wyczytać z importów ani nazw, więc żadna reguła tego nie sprawdza.
+- **Presety dla portów i adapterów.** `clean` i `hexagonal` ustawiają w INW014 `interface = "protocol"` i `allow-subclassing = false` oraz włączają INW020 jako ostrzeżenie, z `modules` ustawionym na ich adaptery wyjściowe i `ports` na ich pakiet portów, tak jak dziś INW014 i INW015. Scaffoldy z [#406](https://github.com/SirCypkowskyy/inwards/issues/406) już stosują te konwencje, więc każdy scaffold dalej przechodzi sprawdzenie własnym presetem bez diagnostyk.
+- **Kody.** INW020 i INW021 to kolejne wolne kody (rejestr ma INW000 do INW019). Trafiają do rejestru razem z implementacją, nie wcześniej ([ADR-037](#adr-037-framework-rule-families-opt-in-with-their-own-prefix)).
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Każdą konwencję da się włączyć osobno, a każda diagnostyka mówi, z której pochodzi: nazwą opcji w INW014, kodem reguły w pozostałych przypadkach.
+- :material-plus-circle-outline: Inwards sprawdza, że linia zgodności istnieje, a type checker sprawdza to, co ona mówi, więc żadne z narzędzi nie powtarza drugiego.
+- :material-plus-circle-outline: Każde nowe sprawdzenie działa na jednym pliku naraz, więc hook po edycji, edytor i MCP zgłaszają problem przy edycji, która go wprowadziła.
+- :material-minus-circle-outline: INW020 nie odróżni adaptera od klasy pomocniczej w module adaptera; klasa pomocnicza potrzebuje podkreślenia, dozwolonej bazy albo węższego `modules`. W korpusie to 1 z 10 klas, które reguła by zgłosiła (model kursora w polar na własnej bazie Pydantic).
+- :material-minus-circle-outline: Projekt, który celowo dziedziczy po portach, jak fastapi-clean-example we wszystkich 8 adapterach, dostaje 9 diagnostyk INW014 po ustawieniu `allow-subclassing = false` i 8 diagnostyk INW020 po włączeniu INW020; specyfikacja typowania dopuszcza ten styl, więc oba sprawdzenia są domyślnie wyłączone.
+- :material-minus-circle-outline: INW021 jest surowsza niż praktyka samego polar: 8 importów w jego kodzie i 2 w skryptach sięga do prywatnego modułu innego pakietu.
+- :material-minus-circle-outline: Gdy role wycinka stają się warstwami, komunikaty i opis architektury nazywają je `features.models` i tak dalej, a rola, której nie ma żaden wycinek, jest pustą warstwą (INW006), jak mówi [ADR-036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) dla każdego szablonu.
+
+**Alternatywy.**
+
+- *Nowa reguła dla portów tylko z Protocol:* sprawdzenie portów, które inaczej niż INW014 rozumie, czym jest port, byłoby mylące; opcja zostawia jedną regułę i jeden zakres.
+- *Rozpoznawać adaptery przez dopasowanie strukturalne do portów:* wymaga typów składowych z innych plików, czyli pracy type checkera; linia przekazuje tę pracę type checkerowi.
+- *Rozpoznawać adaptery po imporcie portu:* w tej konwencji port jest importowany tylko dla linii zgodności, więc brak linii zwykle oznacza też brak importu, a reguła przeoczyłaby dokładnie ten przypadek, dla którego istnieje.
+- *Liczyć jawne dziedziczenie jako deklarację zgodności:* specyfikacja mówi tylko, że type checker *może* ostrzec o składowej, której jawna podklasa nie ma, a konwencja właściciela i tak zabrania dziedziczenia.
+- *Moduły prywatne jako opcja INW003:* INW003 wymaga kontekstów; prywatność pakietu obowiązuje w każdym projekcie, z kontekstami albo bez.
+- *Zostawić moduły prywatne Ruffowi:* PLC2701 jest w preview i pomija każdy własny import z tego samego pakietu najwyższego poziomu, a to jest właśnie ten przypadek.
+- *Reguła dla `commands`/`queries`:* role sąsiednie już zabraniają tych importów, a reszty CQRS nie widać w importach.
