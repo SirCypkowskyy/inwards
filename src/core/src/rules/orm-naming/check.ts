@@ -10,10 +10,10 @@
  * is an Alembic migration. I/O-free: the
  * caller supplies the parser, the files and the options.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Parser } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
-import type { Diagnostic, Fix, SourceFile, Span } from "../../contracts/records.ts";
+import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { parsePython } from "../../python/parser.ts";
 import {
@@ -76,21 +76,6 @@ function settingsOf(options: RuleOptions | undefined): Settings {
 }
 
 /**
- * Spans a node.
- *
- * @param node - the name's node.
- * @returns the 1-based span.
- */
-function spanOf(node: Node): Span {
-  return {
-    line: node.startPosition.row + 1,
-    column: node.startPosition.column + 1,
-    endLine: node.endPosition.row + 1,
-    endColumn: node.endPosition.column + 1,
-  };
-}
-
-/**
  * Writes the fix for a table name.
  *
  * @param table - the table whose name breaks the scheme.
@@ -137,7 +122,7 @@ function checkTable(table: TableName, settings: Settings, src: SourceFile): Diag
     const wanted = toSnake(table.name);
     return [
       diagnostic(RULES.INW016, src, {
-        span: spanOf(table.node),
+        span: table.span,
         message: `${label} isn't lower_case_snake: "${wanted}".`,
         fix: tableFix(table, wanted, false),
       }),
@@ -149,7 +134,7 @@ function checkTable(table: TableName, settings: Settings, src: SourceFile): Diag
   }
   return [
     diagnostic(RULES.INW016, src, {
-      span: spanOf(table.node),
+      span: table.span,
       message: `${label} is plural; this project names tables in the singular: "${singular}".`,
       fix: tableFix(table, singular, true),
     }),
@@ -173,7 +158,7 @@ function checkColumn(column: TimeColumn, settings: Settings, src: SourceFile): D
   const wanted = withSuffix(column.name, suffix);
   return [
     diagnostic(RULES.INW016, src, {
-      span: spanOf(column.node),
+      span: column.span,
       message: `${kind} column \`${column.name}\` doesn't end with \`${suffix}\`: name it \`${wanted}\`.`,
       fix: {
         summary: `Rename the column \`${column.name}\` to \`${wanted}\`.`,
@@ -280,7 +265,7 @@ export function conventionFinding(
     if (table) {
       return [
         diagnostic(RULES.INW016, src, {
-          span: spanOf(table.node),
+          span: table.span,
           message:
             "No `MetaData(naming_convention=...)` in the project, so SQLAlchemy leaves unique, check, foreign key and primary key constraints unnamed and the database picks their names.",
           fix: {
