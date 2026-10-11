@@ -121,7 +121,7 @@ A suppression with no reason, an unknown code or a malformed comment hides nothi
 
     ---
 
-    A single executable compiled with Bun. Drop it in CI, a pre-commit hook or an agent hook, or add it with `uv add --dev` as a platform wheel with the binary inside.
+    A single executable compiled with Bun. Drop it in [CI](guides/ci.md), a [pre-commit hook](guides/ci.md#pre-commit) or an agent hook, or add it with `uv add --dev` as a platform wheel with the binary inside.
 
 -   :material-microsoft-visual-studio-code:{ .lg .middle } __Same rules in the editor__
 

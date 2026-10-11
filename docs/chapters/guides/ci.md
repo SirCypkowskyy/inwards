@@ -1,13 +1,66 @@
 # GitHub Actions
 
 !!! info "Verified 2026-10-11"
-    The check, annotation and upload steps run on every pull request in this repository ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), on `examples/broken-app`), with Inwards built from source. The install step's `uv tool install` was run by hand with 0.5.0 from PyPI, outside GitHub Actions.
+    `inwards check --format github` is pinned by an E2E snapshot, its escaping by unit tests against the rules `@actions/core` uses; it hasn't yet run inside a GitHub Actions job. The code scanning workflow's check, annotation and upload steps run on every pull request in this repository ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), on `examples/broken-app`), with Inwards built from source. The install step's `uv tool install` was run by hand with 0.5.0 from PyPI, outside GitHub Actions. The pre-commit hook was run with `uvx pre-commit run --all-files` (pre-commit 4.6.2) and `inwards==0.5.0` on a scratch project.
 
 Agent hooks catch a violation while the agent works; CI catches the ones that get past them, such as a hand edit or an agent without hooks. The workflow below fails the pull request when an import breaks a layer and puts the violation on the line that caused it.
 
 ## The workflow
 
+!!! warning "Needs the release after 0.5.0"
+    `--format github` is new: Inwards 0.5.0 exits 2 with `Unknown --format github`. Until the next release is on PyPI, use the [code scanning workflow](#code-scanning), which works with 0.5.0 and annotates the pull request without code scanning too.
+
 Save it as `.github/workflows/inwards.yml`:
+
+```yaml title=".github/workflows/inwards.yml"
+name: Inwards
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  inwards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Install Inwards
+        run: |
+          uv tool install 'inwards>0.5.0' # then pin the release you tested: inwards==X.Y.Z
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Check
+        run: inwards check --format github
+```
+
+- **Install Inwards** takes the wheel from [PyPI](https://pypi.org/project/inwards/). Pin the version so a new release, which may add a rule, never fails a pull request that changed nothing; bump it in its own pull request. If the project already takes Inwards as a uv dev dependency, `uv sync` and `uv run inwards check --format github` use the version in `uv.lock`. Without uv, download the binary as in [Install](install.md#from-a-release) instead.
+- **Check** prints one [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) per finding, `::error` for a violation and `::warning` for a warning, then the usual summary line. The runner turns each command into an annotation: the violation shows on its line under "Files changed" and in the run summary, with the fix steps and the rule's docs link as the message. It needs no code scanning and no `jq`. The exit code is the same as in every other format: 0 clean or warnings only, 1 with violations, 2 for a usage or config error, so the step fails the job by itself. The check reads `inwards-baseline.json` if you committed one, so on a legacy codebase only new violations fail.
+- GitHub shows at most 10 error annotations per step and 50 per job. The rest are still in the step's log. `--max-diagnostics N` caps the commands too, errors first.
+
+A line looks like this:
+
+```text
+::error file=shop/domain/order.py,line=1,endLine=1,col=8,endColumn=30,title=INW001::Layer "domain" imports "shop.infrastructure.db" from outer layer "infrastructure". ...%0AFix: ...
+```
+
+The message and the property values are escaped as GitHub's own toolkit escapes them (`escapeData` and `escapeProperty` in [`@actions/core`](https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts)): `%`, carriage return and line feed become `%25`, `%0D` and `%0A` everywhere, and in `file` and `title` a `:` becomes `%3A` and a `,` becomes `%2C`. A path with a comma or a colon in it still lands on its line. For a finding that spans several lines the command gives `line` and `endLine` without columns, since the runner drops columns when the two lines differ.
+
+### Monorepos { #monorepos }
+
+GitHub matches an annotation's `file` against paths from the repository root. When the check runs in a package folder, set the step's `working-directory`; Inwards reads `GITHUB_WORKSPACE`, the checkout's root on the runner, and writes each path from there:
+
+```yaml
+      - name: Check the API package
+        working-directory: packages/api
+        run: inwards check --format github
+```
+
+Run from `packages/api`, a violation in `shop/domain/order.py` is annotated as `packages/api/shop/domain/order.py`. At a uv workspace root, a plain `inwards check --format github` checks every member against its own config, and the paths are already relative to the root. Two cases still miss the line: an `actions/checkout` with `path:`, which puts the repository in a subfolder of `GITHUB_WORKSPACE`, so every path starts with that folder; and a run from outside `GITHUB_WORKSPACE`, where the paths stay relative to the working directory. The annotation then shows in the run summary only.
+
+## Code scanning { #code-scanning }
+
+[GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github) gives each alert a history, a dismiss button and the rule's help link. It reads SARIF, so this workflow writes `--format sarif` and annotates the pull request from that file with `jq`, which works with Inwards 0.5.0 as well:
 
 ```yaml title=".github/workflows/inwards.yml"
 name: Inwards
@@ -55,13 +108,35 @@ jobs:
         run: exit 1
 ```
 
-- **Install Inwards** takes the wheel from [PyPI](https://pypi.org/project/inwards/). Pin the version so a new release, which may add a rule, never fails a pull request that changed nothing; bump it in its own pull request. If the project already takes Inwards as a uv dev dependency, `uv sync` and `uv run inwards check` use the version in `uv.lock`. Without uv, download the binary as in [Install](install.md#from-a-release) instead.
-- **Check** writes SARIF 2.1.0 and records the exit code instead of failing, so the next steps still run. Exit code 2 (no config, bad config) fails at once. The check reads `inwards-baseline.json` if you committed one, so on a legacy codebase only new violations fail.
-- **Annotate the pull request** turns each result into a [workflow command](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands). The violation shows on its line under "Files changed" and in the run summary, with the fix steps as the message. It needs no code scanning. GitHub shows at most 10 error annotations per step and 50 per job. Paths come from the SARIF, where they are URI-encoded, so a file whose name has a space or a non-ASCII character is annotated in the run summary rather than on its line.
-- **Upload to code scanning** sends the same file to [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github). Alerts get a history, a dismiss button and the rule's help link. Code scanning shows new alerts on a pull request by comparing it with the base branch, hence the `push` trigger.
+- **Check** writes SARIF 2.1.0 and records the exit code instead of failing, so the next steps still run. Exit code 2 (no config, bad config) fails at once.
+- **Annotate the pull request** does what `--format github` does, from the SARIF. Paths come from the SARIF, where they are URI-encoded and relative to the working directory, so a file whose name has a space or a non-ASCII character is annotated in the run summary rather than on its line. With a release after 0.5.0, replace this step with `inwards check --format github || true` to get exact paths.
+- **Upload to code scanning** sends the same file to code scanning. Code scanning shows new alerts on a pull request by comparing it with the base branch, hence the `push` trigger.
 - **Fail on violations** fails the job last, after the findings are out.
 
 Keep one of the two annotation steps once code scanning works, or each violation shows twice.
+
+## pre-commit { #pre-commit }
+
+To check before each commit with [pre-commit](https://pre-commit.com/), add a local hook to `.pre-commit-config.yaml`. pre-commit installs the pinned wheel from PyPI into its own environment, so the project needs no other setup:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: local
+    hooks:
+      - id: inwards
+        name: inwards
+        entry: inwards check --format concise
+        language: python
+        additional_dependencies: ["inwards==0.5.0"]
+        pass_filenames: false
+        files: (\.py|pyproject\.toml|inwards-baseline\.json)$
+```
+
+- `pass_filenames: false` checks the whole project, so the whole-project rules (dead layer prefixes, import cycles, symlinks in layers) run too, and a commit that only touches `pyproject.toml` is checked against the new config. A cold whole check of the 496,000-line benchmark repo takes 0.4 s on one core ([chapter 6](../06-Constraints-and-Quality.md)). To check only the staged files, drop the line; the whole-project rules then wait for CI.
+- `files` runs the hook when a Python file, a `pyproject.toml` or the baseline changes, and skips it otherwise.
+- `--format concise` prints one line per finding. A violation fails the hook with exit 1, which stops the commit; a warning doesn't.
+- Bump `inwards==0.5.0` on purpose, as in CI. A local hook has no `rev`, so `pre-commit autoupdate` leaves it alone.
+- When Inwards is already a uv dev dependency, `entry: uv run inwards check --format concise` with `language: system` uses the locked version instead, and no `additional_dependencies`.
 
 ## Generated modules
 
@@ -106,4 +181,4 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 
 ## Code scanning availability
 
-Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either delete the upload step and rely on the annotation step, or add `continue-on-error: true` to it.
+Code scanning is free on public repositories. On a private repository it needs GitHub Code Security (part of GitHub Advanced Security), which only organizations on GitHub Team or Enterprise can buy. Without it, the upload step fails with "Code scanning is not enabled for this repository". Then either use [the workflow](#the-workflow) without code scanning, or add `continue-on-error: true` to the upload step.
