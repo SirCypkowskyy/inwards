@@ -3,7 +3,8 @@
  * string work: whether a name is lower_case_snake, whether its last word
  * reads as an English plural, and the name to suggest instead (`UserAccount`
  * becomes `user_account`, `categories` becomes `category`, `created`
- * becomes `created_at`). The plural test is a heuristic on the last word,
+ * becomes `created_at`, `date_of_birth` becomes `birth_date`, and `date`
+ * gets no suggestion). The plural test is a heuristic on the last word,
  * with the usual singular endings (`-ss`, `-us`, `-is`) and a few irregular
  * and invariant words; `allow-tables` covers the rest. It knows nothing
  * about syntax or ORMs.
@@ -62,7 +63,7 @@ const IE_PLURALS: ReadonlySet<string> = new Set([
 const ES_PLURAL = /(?:ss|x|ch|sh|zz|[^aeiou]us)es$/u;
 
 /** The suffixes a datetime or date column often carries instead of the configured one. */
-const TIME_SUFFIXES: readonly string[] = [
+export const TIME_SUFFIXES: readonly string[] = [
   "_timestamp",
   "_datetime",
   "_date",
@@ -137,16 +138,46 @@ export function singularOf(name: string): string | undefined {
   return singular === undefined ? undefined : `${name.slice(0, cut)}${singular}`;
 }
 
+/** Words that name a time but not what happened at it: a column called only these says nothing else. */
+const TIME_WORDS: ReadonlySet<string> = new Set([
+  "date",
+  "time",
+  "datetime",
+  "timestamp",
+  "ts",
+  "dt",
+]);
+
+/** A leading time word Django code often puts first: `date_joined`, `date_of_birth`, `time_of_last_login`. */
+const TIME_PREFIX = /^(?:date|time|datetime|timestamp)_(?:of_|on_)?/u;
+
 /**
  * Suggests a column name with the configured suffix: another time suffix
- * the name ends with is swapped for it (`due_date` becomes `due_at`),
- * otherwise the suffix is added (`created` becomes `created_at`).
+ * the name ends with is swapped for it (`due_date` becomes `due_at`), a
+ * leading time word moves to the end as the suffix (`date_joined` becomes
+ * `joined_at`, `date_of_birth` becomes `birth_date`), and otherwise the
+ * suffix is added (`created` becomes `created_at`).
+ *
+ * No suggestion when the rest of the name is only time words (`date`,
+ * `timestamp`, `date_time`): `date_at` says nothing about what the time
+ * records. Nor when the rest still holds a word of the suffix
+ * (`start_date_utc` with `_date`), since adding it would repeat the word.
  *
  * @param name - the column name as written.
  * @param suffix - the suffix the scheme requires.
- * @returns the suggested name.
+ * @returns the suggested name, or undefined when no name built from this one reads well.
  */
-export function withSuffix(name: string, suffix: string): string {
+export function withSuffix(name: string, suffix: string): string | undefined {
   const other = TIME_SUFFIXES.find((s) => name.endsWith(s) && name.length > s.length);
-  return `${other === undefined ? name : name.slice(0, -other.length)}${suffix}`;
+  const trimmed = other === undefined ? name : name.slice(0, -other.length);
+  const stem = trimmed.replace(TIME_PREFIX, "");
+  const words = stem.split("_").filter((word) => word !== "");
+  const repeated = suffix.split("_").filter((word) => word !== "");
+  if (
+    words.every((word) => TIME_WORDS.has(word)) ||
+    words.some((word) => repeated.includes(word))
+  ) {
+    return undefined;
+  }
+  return `${stem}${suffix}`;
 }

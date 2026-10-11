@@ -7,8 +7,10 @@
  * finding; their findings join the file's others before the suppression
  * comments apply. INW012, INW013 and INW015 may read another first-party
  * module through the run's `ContentRun`, which parses each one once per
- * run, and INW013 reads each once per run too (#359). It also decides that an outward import
- * INW001 reports gets INW001 alone, not INW015 as well. No I/O: the caller
+ * run, and INW013 reads each once per run too (#359). INW016 leaves the
+ * tables and columns it read in the run, for the whole-project findings. It
+ * also decides that an outward import INW001 reports gets INW001 alone, not
+ * INW015 as well. No I/O: the caller
  * supplies the file and the run's first-party modules.
  */
 import type { Parser } from "web-tree-sitter";
@@ -18,6 +20,7 @@ import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts"
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { AsyncBlockingRun, checkAsyncBlocking } from "../rules/async-blocking/check.ts";
 import { checkConstructOnlyIn } from "../rules/construct-only-in/check.ts";
+import type { Models } from "../rules/orm-naming/models.ts";
 import { checkPortsAbstract } from "../rules/ports-abstract/check.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { ModuleTrees } from "../rules/shared/module-trees.ts";
@@ -37,6 +40,12 @@ export class ContentRun {
   /** The files the run checks, from which INW013 decides whether its prefilter pays. */
   private readonly files: readonly SourceFile[];
   private asyncBlocking: AsyncBlockingRun | undefined;
+  /**
+   * The tables and columns INW016 read from each file it parsed, which a
+   * whole-project run's scheme finding reuses (#361). Plain data: it
+   * outlives `dispose()`.
+   */
+  readonly ormModels: Map<SourceFile, Models> = new Map();
 
   /**
    * Wraps the parser, the project and the config. Nothing is read yet.
@@ -181,6 +190,6 @@ export function contentFindings(
     ...asyncBlockingFindings(parser, src, config, run),
     ...portsAbstractFindings(parser, src, config),
     ...constructOnlyInFindings(parser, src, config, run.trees),
-    ...ormNamingFindings(parser, src, config),
+    ...ormNamingFindings(parser, src, config, run.ormModels),
   ];
 }
