@@ -156,7 +156,7 @@ export function portsAndAdapters(adapters: string): StyleOptIn {
     options: [
       {
         rule: "ports-abstract",
-        why: "Ports are typing.Protocol classes, and adapters match them by shape: no ABCs, no subclassing a port.",
+        why: "Ports are typing.Protocol classes, never ABCs, and adapters implement them without subclassing them.",
         lines: ['interface = "protocol"', "allow-subclassing = false"],
       },
       {
