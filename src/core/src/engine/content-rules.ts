@@ -24,6 +24,7 @@ import type { Models } from "../rules/orm-naming/models.ts";
 import { checkPortsAbstract } from "../rules/ports-abstract/check.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { ModuleTrees } from "../rules/shared/module-trees.ts";
+import { ThinEndpointRun } from "../rules/thin-endpoint/check.ts";
 import { checkEncoding } from "../rules/unsupported-encoding.ts";
 import { ormNamingFindings } from "./orm-naming.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
@@ -41,6 +42,7 @@ export class ContentRun {
   /** The files the run checks, from which INW013 decides whether its prefilter pays. */
   private readonly files: readonly SourceFile[];
   private asyncBlocking: AsyncBlockingRun | undefined;
+  private thinEndpoint: ThinEndpointRun | undefined;
   /**
    * The tables and columns INW016 read from each file it parsed, which a
    * whole-project run's scheme finding reuses (#361). Plain data: it
@@ -79,6 +81,16 @@ export class ContentRun {
       this.files,
     );
     return this.asyncBlocking;
+  }
+
+  /**
+   * INW012's settings and its views of other modules, built when a file first needs them.
+   *
+   * @returns the same object for the whole run.
+   */
+  thinEndpointRun(): ThinEndpointRun {
+    this.thinEndpoint ??= new ThinEndpointRun(this.options?.options?.["thin-endpoint"], this.trees);
+    return this.thinEndpoint;
   }
 
   /** Frees every tree the run parsed; the views handed out are invalid afterwards. */
@@ -181,7 +193,7 @@ export function contentFindings(
   run: ContentRun,
 ): Diagnostic[] {
   return [
-    ...thinEndpointFindings(src, config, run.trees),
+    ...thinEndpointFindings(src, config, run.trees, () => run.thinEndpointRun()),
     ...asyncBlockingFindings(src, config, run),
     ...portsAbstractFindings(src, config, run.trees),
     ...constructOnlyInFindings(src, config, run.trees),

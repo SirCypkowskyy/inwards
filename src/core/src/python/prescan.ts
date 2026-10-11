@@ -10,9 +10,9 @@
  * parses the full file. False positives are fine because the engine confirms
  * every violation against a full parse.
  */
-import type { Parser } from "web-tree-sitter";
+import type { Parser, Tree } from "web-tree-sitter";
 import type { ImportRef, SourceFile } from "../contracts/records.ts";
-import { extractImports, parsePython } from "./parser.ts";
+import { extractImports, importedNames, parsePython } from "./parser.ts";
 
 interface Skeleton {
   text: string;
@@ -183,7 +183,7 @@ const SKELETON_NODES = new Set([
  * the skeleton does not parse into imports and comments only.
  *
  * A skeleton with a parse error, or with any node other than an import or a
- * comment, is not trusted (the comment in the body shows how that happens).
+ * comment, is not trusted (`readSkeleton` says how that happens).
  * `src/core/scripts/prescan-diff.ts` checks that this never misses an import.
  *
  * @param parser - parser with the Python grammar loaded.
@@ -192,23 +192,54 @@ const SKELETON_NODES = new Set([
  */
 export function skeletonImports(parser: Parser, file: SourceFile): ImportRef[] | null {
   const skeleton = importSkeleton(file.text);
-  if (!skeleton) {
-    return null;
-  }
+  return skeleton === null
+    ? null
+    : readSkeleton(parser, skeleton, (tree) =>
+        extractImports(tree, file).map((ref) => ({
+          ...ref,
+          column: ref.column + (skeleton.indent[ref.line - 1] ?? 0),
+          endColumn: ref.endColumn + (skeleton.indent[ref.endLine - 1] ?? 0),
+        })),
+      );
+}
+
+/**
+ * Reads the names a file's imports bind (`importedNames`) from its import
+ * skeleton, without parsing the whole file. The prescan never misses an
+ * import, so a name missing here is bound by no import of the file; an
+ * import-shaped line in a string can add one the file doesn't bind.
+ *
+ * @param parser - parser with the Python grammar loaded.
+ * @param file - the source file, with normalised text.
+ * @returns local name to dotted name, or null when the prescan refuses the file.
+ */
+export function skeletonNames(parser: Parser, file: SourceFile): Map<string, string> | null {
+  const skeleton = importSkeleton(file.text);
+  return skeleton === null
+    ? null
+    : readSkeleton(parser, skeleton, (tree) => importedNames(tree, file));
+}
+
+/**
+ * Parses a skeleton and reads it, when it can be trusted: it parses cleanly
+ * and holds nothing but imports and comments.
+ *
+ * Import-shaped lines inside strings can glue real code onto a bogus import
+ * (`from a import (`) or open a string of their own (`import a; t = '''`).
+ *
+ * @param parser - parser with the Python grammar loaded.
+ * @param skeleton - the file's import skeleton.
+ * @param read - reads the skeleton's tree, which is freed afterwards.
+ * @returns what `read` returned, or null when the skeleton isn't trusted.
+ */
+function readSkeleton<T>(parser: Parser, skeleton: Skeleton, read: (tree: Tree) => T): T | null {
   const tree = parsePython(parser, skeleton.text);
   try {
-    // Import-shaped lines inside strings can glue real code onto a bogus import
-    // (`from a import (`) or open a string of their own (`import a; t = '''`).
-    // A skeleton we can trust parses cleanly and holds nothing but imports.
     const root = tree.rootNode;
     if (root.hasError || !root.namedChildren.every((n) => n && SKELETON_NODES.has(n.type))) {
       return null;
     }
-    return extractImports(tree, file).map((ref) => ({
-      ...ref,
-      column: ref.column + (skeleton.indent[ref.line - 1] ?? 0),
-      endColumn: ref.endColumn + (skeleton.indent[ref.endLine - 1] ?? 0),
-    }));
+    return read(tree);
   } finally {
     tree.delete(); // WASM memory is not garbage collected
   }

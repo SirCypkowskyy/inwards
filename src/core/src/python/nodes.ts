@@ -4,7 +4,26 @@
  * argument names, integer literals and a module's top-level functions. They
  * read one node each and hold no state.
  */
-import type { Node } from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
+
+/** The node types `moduleNodes` collects for a whole module, in one walk. */
+export type ModuleWide =
+  | "call"
+  | "assignment"
+  | "function_definition"
+  | "class_definition"
+  | "decorated_definition";
+
+const MODULE_WIDE: readonly ModuleWide[] = [
+  "call",
+  "assignment",
+  "function_definition",
+  "class_definition",
+  "decorated_definition",
+];
+
+/** Each tree's `moduleNodes` walks, by the walked node's id, then by type. */
+const walked = new WeakMap<Tree, Map<number, ReadonlyMap<string, readonly Node[]>>>();
 
 /**
  * Lists a node's named children, without comments.
@@ -14,6 +33,41 @@ import type { Node } from "web-tree-sitter";
  */
 export function namedChildren(node: Node): Node[] {
   return node.namedChildren.flatMap((c) => (c && c.type !== "comment" ? [c] : []));
+}
+
+/**
+ * Lists a module's descendants of one type, in pre-order, as
+ * `descendantsOfType` does, from one walk per tree that collects every
+ * `ModuleWide` type at once and is kept while the tree lives.
+ *
+ * The FastAPI model, INW012, INW016 and FAPI007 each walk the same shared
+ * tree for calls, assignments and definitions, and each walk visits every
+ * node inside WASM and copies the hits out; on Polar those walks cost about
+ * as much as the rules' own work (#395). The lists are shared, so callers
+ * must not change them.
+ *
+ * @param root - the node to walk, usually a tree's `rootNode`.
+ * @param type - the node type to list.
+ * @returns the nodes of that type below `root`, outermost first.
+ */
+export function moduleNodes(root: Node, type: ModuleWide): readonly Node[] {
+  let byNode = walked.get(root.tree);
+  if (byNode === undefined) {
+    byNode = new Map();
+    walked.set(root.tree, byNode);
+  }
+  let byType = byNode.get(root.id);
+  if (byType === undefined) {
+    const lists = new Map<string, Node[]>(MODULE_WIDE.map((t) => [t, []]));
+    for (const hit of root.descendantsOfType([...MODULE_WIDE])) {
+      if (hit) {
+        lists.get(hit.type)?.push(hit);
+      }
+    }
+    byType = lists;
+    byNode.set(root.id, byType);
+  }
+  return byType.get(type) ?? [];
 }
 
 /**

@@ -11,7 +11,7 @@
  */
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { type RouterBinding, routerBindings } from "../shared/fastapi-routers.ts";
 import { enclosingParameter } from "./callers.ts";
@@ -93,7 +93,7 @@ export function extract(root: Node, context: Context): FastApiFile {
     dependencies: [],
     schemaRoutes: [],
   };
-  for (const call of root.descendantsOfType("call")) {
+  for (const call of moduleNodes(root, "call")) {
     const dependency = dependencyOf(call, context.qualify);
     if (dependency === null) {
       record(call, context, found);

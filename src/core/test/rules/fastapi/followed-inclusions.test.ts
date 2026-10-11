@@ -166,6 +166,11 @@ wire(app, api.router)
       main("wire(app, api.build())"),
       // Passed as a value: it may be called anywhere.
       main("hooks = [wire]"),
+      // Imported under another name, whose calls don't spell `wire`.
+      main("wire(app, api.router)").replace(
+        "from app.wiring import wire",
+        "from app.wiring import wire\nfrom app.wiring import wire as hook",
+      ),
     ];
     for (const text of unknown) {
       const graph = graphOf({ ...BASE, "app/main.py": text });

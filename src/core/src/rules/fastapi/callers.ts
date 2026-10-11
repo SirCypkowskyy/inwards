@@ -13,6 +13,7 @@ import {
   descendantsOutside,
   identifierName,
   keywordOf,
+  moduleNodes,
   namedChildren,
 } from "../../python/nodes.ts";
 
@@ -44,7 +45,7 @@ export function parameterValues(fn: Node, parameter: Node, name: string): Node[]
     return null;
   }
   const own = identifierName(fnName);
-  const calls = root.descendantsOfType("call").filter((call) => {
+  const calls = moduleNodes(root, "call").filter((call) => {
     const callee = call?.childForFieldName("function");
     return callee?.type === "identifier" && identifierName(callee) === own;
   });
