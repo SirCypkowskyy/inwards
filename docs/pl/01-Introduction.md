@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: ebe75570bc5cc548020ed63f6dbfafaf34a3ecdf287854f85b8119d02b1041e7
+source_hash: 512a7a4ae3936fe9b04a038cd750f10491974db3e1e49fa58aeb070eb9b91fcc
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -157,7 +157,7 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 
 !!! info "Stan"
     Pre-alpha.
-    Osiem reguł działa od początku do końca w CLI, w silniku i w edytorze (`inwards server`): INW001 (kierunek warstw), INW011 (importy dynamiczne), INW005 ([biblioteki w warstwach](guides/libraries.md): domyślnie żadnych frameworków ani operacji wejścia-wyjścia w domenie), INW006 (kod poza wszystkimi warstwami, martwe prefiksy), INW010 (importy własnych modułów, które nie istnieją), INW007 i INW008 ([kształt pakietu](guides/package-shape.md): elementy dozwolone, zabronione i wymagane) oraz INW000 (zadeklarowane kodowanie źródła, które mogłoby ukryć importy).
+    Reguły INW000–INW016 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) mówi, co sprawdza każda z nich.
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
-    Każde wydanie to GitHub Release z plikami binarnymi dla sześciu platform, pięcioma wheelami platformowymi i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Jak dotąd jedynym wydaniem jest wersja przedpremierowa v0.1.0-rc.1.
+    Najnowsze wydanie to 0.5.0 (2026-10-10). Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako pięć wheeli platformowych (`uv add --dev inwards`) oraz do GitHub Releases z plikami binarnymi dla sześciu platform, tymi samymi wheelami i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Szczegóły są w [Instalacji](guides/install.md).
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.
