@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 57690b3707a621c279eb6d7b7edebe81173f4ecca7aad723bc5b9178d8af2389
+source_hash: bceedb133cc14181617dc9a69f4c6cb41a594cac2eccdda9d5e0f63d6ebe34c1
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -523,8 +523,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, rules, hook, daemon, import-config,
-│   │   │                  #   import-diagram, diagram: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, rules, hook, daemon, mcp: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
@@ -547,12 +546,16 @@ src/
 │   │   │                  #   (cli.ts); the three tools (_check-files.ts, _explain-rule.ts,
 │   │   │                  #   _where.ts), queued one at a time (_tools.ts);
 │   │   │                  #   adapters/connection.ts is the MCP connection over stdio
-│   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
+│   │   ├── init/          # inwards init, a slice (ADR-047): index.ts its face, cli.ts the init
+│   │   │                  #   handler; agents, --style, the scaffold plan, the report, presets
+│   │   │                  #   (_*.ts); brief/ (inwards context), diagram/ (inwards diagram and
+│   │   │                  #   import-diagram), import-linter/ (inwards import-config);
+│   │   │                  #   adapters/ the init file writer and the style picker
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
-│   │                      #   the grammars, the picker, the daemon's socket and files,
+│   │                      #   the grammars, the daemon's socket and files,
 │   │                      #   the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/

@@ -183,6 +183,9 @@
       // first matching zone wins.
       { "name": "cli-runlog-adapters", "patterns": ["src/cli/src/runlog/adapters/**"] },
       { "name": "cli-runlog", "patterns": ["src/cli/src/runlog/**"] },
+      // The init slice (ADR-047): its file writer and picker before the rest,
+      // since the first matching zone wins.
+      { "name": "cli-init-adapters", "patterns": ["src/cli/src/init/adapters/**"] },
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
       // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
       { "name": "cli-daemon", "patterns": ["src/cli/src/daemon/**"] },
@@ -665,6 +668,7 @@
       },
       {
         "from": "cli-init",
+        // The handlers take AppDeps from commands/deps.ts until step 14 moves it to the root.
         "allow": [
           "core-api",
           "core-contracts",
@@ -685,7 +689,8 @@
           "cli-paths",
           "cli-project",
           "cli-session",
-          "cli-claude-code"
+          "cli-claude-code",
+          "cli-commands"
         ]
       },
       {
@@ -710,6 +715,29 @@
         ]
       },
       // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
+      {
+        "from": "cli-init-adapters",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-init"
+        ]
+      },
       {
         "from": "cli-lsp-adapters",
         "allow": [
@@ -859,7 +887,6 @@
           "cli-project",
           "cli-session",
           "cli-runlog",
-          "cli-init",
           "cli-commands",
           "cli-daemon"
         ]
@@ -893,7 +920,8 @@
           "cli-lsp-adapters",
           "cli-mcp",
           "cli-mcp-adapters",
-          "cli-runlog-adapters"
+          "cli-runlog-adapters",
+          "cli-init-adapters"
         ]
       },
       {

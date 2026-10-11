@@ -9,9 +9,9 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseConfig, VERSION } from "@inwards/core";
 import Ajv from "ajv";
-import { STYLES } from "../../src/init/presets.ts";
-import { configTable } from "../../src/init/style-text.ts";
-import { STYLE_NAMES } from "../../src/init/styles.ts";
+import { STYLES } from "../../src/init/_presets.ts";
+import { configTable } from "../../src/init/_style-text.ts";
+import { STYLE_NAMES } from "../../src/init/_styles.ts";
 
 const REPO = resolve(import.meta.dir, "../../../..");
 const ajv = new Ajv({ allErrors: true, strict: true });

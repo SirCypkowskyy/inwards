@@ -89,7 +89,7 @@ export function nodeDaemonLink(entry: string): DaemonLink {
 
 /**
  * Gives the command that starts this Inwards: the binary alone, or Bun and
- * `main.ts` when running from source (as `init/launcher.ts` decides).
+ * `main.ts` when running from source (as `init/_launcher.ts` decides).
  *
  * @param entry - the CLI's `main.ts`.
  * @returns the executable and its leading arguments.

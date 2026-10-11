@@ -19,6 +19,8 @@ import {
 import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
+import { nodeInitFiles } from "../init/adapters/files.ts";
+import { terminalPicker } from "../init/adapters/picker.ts";
 import type { ServerCheck } from "../lsp/contracts.ts";
 import type { RulePages } from "../mcp/contracts.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
@@ -37,8 +39,6 @@ import { nodeFileWalker } from "./file-walk.ts";
 import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { budgetedGit, nodeGit } from "./git.ts";
 import { loadGrammars } from "./grammars.ts";
-import { nodeInitFiles } from "./init-files.ts";
-import { terminalPicker } from "./picker.ts";
 import { readRuntime, runtimeFrom, systemClock } from "./runtime.ts";
 import { nodeStateFiles } from "./state-files.ts";
 import { processStreams } from "./stdio.ts";
