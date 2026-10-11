@@ -14,12 +14,11 @@
  * adapters on purpose. I/O-free: the caller supplies the parser, the file,
  * the options and the project index.
  */
-import type { Node, Parser } from "web-tree-sitter";
+import type { Parser } from "web-tree-sitter";
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import { identifierName } from "../../python/nodes.ts";
-import { extractImports, importStatements, parsePython } from "../../python/parser.ts";
+import { extractImports, parsePython } from "../../python/parser.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { constructions, inEntries, isExceptionName } from "./calls.ts";
 import { reportConstruction, reportImport, type Scope } from "./wording.ts";
@@ -35,12 +34,6 @@ export interface ConstructInputs {
   readonly deferred: (ref: ImportRef) => boolean;
 }
 
-/** Where a block of code starts and ends, as 0-based rows and columns. */
-interface Range {
-  readonly start: { readonly row: number; readonly column: number };
-  readonly end: { readonly row: number; readonly column: number };
-}
-
 /**
  * Reads INW015's role and `allowed-in`.
  *
@@ -52,67 +45,6 @@ function scopeOf(options: RuleOptions | undefined): Scope {
     role: stringList(options?.["role"]) ?? [],
     allowed: stringList(options?.["allowed-in"]) ?? [],
   };
-}
-
-/**
- * Tells whether a condition is `TYPE_CHECKING` or an attribute that ends in
- * it (`typing.TYPE_CHECKING`, `t.TYPE_CHECKING`).
- *
- * @param node - an `if` or `elif` condition.
- * @returns true for such a name.
- */
-function isTypeChecking(node: Node | null): boolean {
-  const name = node?.type === "attribute" ? node.childForFieldName("attribute") : node;
-  return name?.type === "identifier" && identifierName(name) === "TYPE_CHECKING";
-}
-
-/**
- * Finds the `if TYPE_CHECKING:` (and `elif TYPE_CHECKING:`) bodies that hold
- * an import. Their `else` runs, so it isn't one.
- *
- * @param statements - the file's import statements.
- * @returns each such body's range, once per import inside it.
- */
-function typeCheckingBlocks(statements: readonly Node[]): Range[] {
-  const blocks: Range[] = [];
-  for (const stmt of statements) {
-    for (let node: Node | null = stmt; node !== null; node = node.parent) {
-      const branch = node.parent;
-      const guarded =
-        node.type === "block" &&
-        (branch?.type === "if_statement" || branch?.type === "elif_clause") &&
-        branch.childForFieldName("consequence")?.equals(node) === true &&
-        isTypeChecking(branch.childForFieldName("condition"));
-      if (guarded) {
-        blocks.push({ start: node.startPosition, end: node.endPosition });
-        break;
-      }
-    }
-  }
-  return blocks;
-}
-
-/**
- * Orders two 0-based positions.
- *
- * @param a - one position.
- * @param b - the other.
- * @returns negative when `a` comes first, 0 when they are equal, positive otherwise.
- */
-function compare(a: Range["start"], b: Range["start"]): number {
-  return a.row - b.row || a.column - b.column;
-}
-
-/**
- * Tells whether an import sits inside one of some blocks.
- *
- * @param ref - the import, with its 1-based position.
- * @param blocks - the blocks, with 0-based positions.
- * @returns true when its start falls inside one.
- */
-function inside(ref: ImportRef, blocks: readonly Range[]): boolean {
-  const at = { row: ref.line - 1, column: ref.column - 1 };
-  return blocks.some((block) => compare(at, block.start) >= 0 && compare(at, block.end) < 0);
 }
 
 /**
@@ -140,12 +72,11 @@ export function checkConstructOnlyIn(
   const { project, deferred } = inputs;
   const tree = parsePython(parser, src.text);
   try {
-    const blocks = typeCheckingBlocks(importStatements(tree));
     const found: Diagnostic[] = [];
     const covered: string[] = [];
     for (const ref of extractImports(tree, src)) {
       const owner = ref.target === "" ? undefined : project.ownerOf(ref.target);
-      if (owner === undefined || !inEntries(scope.role, owner) || inside(ref, blocks)) {
+      if (owner === undefined || !inEntries(scope.role, owner) || ref.typeChecking === true) {
         continue;
       }
       covered.push(ref.target);

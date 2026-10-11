@@ -5,7 +5,9 @@
  * lands in) and, with contexts, a context graph (imports between two
  * different contexts), finds the cycles, and words one diagnostic per
  * strongly connected component: the shortest cycle through its first node,
- * anchored at the import that makes the first step. Whole-project runs only,
+ * anchored at the import that makes the first step. An import in the body of
+ * `if TYPE_CHECKING:` makes no edge: it never runs, and it is how Python code
+ * breaks a runtime cycle for type hints (#375). Whole-project runs only,
  * since one file can't show a cycle (ADR-032).
  */
 import { type ContextSpec, contextOf } from "../../config/contexts.ts";
@@ -140,7 +142,9 @@ function linkHash(links: readonly string[]): string {
  * modules they land in: the longest checked module a target starts with.
  * Only checked modules are nodes, so an import of anything else (the
  * standard library, a package outside every layer) can't close a cycle and
- * makes no edge; neither does an import of the module itself.
+ * makes no edge; neither does an import of the module itself, or one under
+ * `if TYPE_CHECKING:` (only the full parse marks those, so a skeleton's edge
+ * may be one, until the confirmation in `engine/cycles.ts` reads the file).
  *
  * @param entry - one checked file and its imports.
  * @param entry.file - the file, whose module the edges start from.
@@ -150,7 +154,7 @@ function linkHash(links: readonly string[]): string {
  */
 export function fileEdges({ file, imports }: FileImports, nodes: ReadonlySet<string>): Edge[] {
   return imports.flatMap((ref): Edge[] => {
-    const to = landsIn(ref.target, nodes);
+    const to = ref.typeChecking === true ? undefined : landsIn(ref.target, nodes);
     return to === undefined || to === file.module ? [] : [{ from: file.module, to, file, ref }];
   });
 }
@@ -246,7 +250,7 @@ function moduleFix(cycle: Cycle): Diagnostic["fix"] {
       `The imports that make the cycle: ${imports}.`,
       "Pick the import that points the wrong way, usually from the lower-level module back up, and remove it.",
       "Move what both modules need into a third module they can both import, or define a Protocol in the lower-level module and pass the implementation in.",
-      "Don't move the import into a function or behind TYPE_CHECKING to hide the cycle; Inwards counts those imports too.",
+      "If a module needs the other only for type annotations, move that import under `if TYPE_CHECKING:` (before Python 3.14, also quote those annotations or add `from __future__ import annotations`); Inwards doesn't count it, since it never runs. Don't do that for a name the code uses at runtime, and don't move the import into a function: Inwards counts that one.",
     ],
   };
 }

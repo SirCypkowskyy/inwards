@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: ebab82c1ce13a2852ce17cbc769daca03836009de80175ce42cb0ba5edb7a58a
+source_hash: 0c5b031a2d63d0a4a49c70c7d7246031741af6d1f669e1061292a761a027a58b
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -889,6 +889,12 @@ Zgłoszenie prosiło o selektory kształtów z #95, ale tam `shop.domain` pasuje
 - *Pełne parsowanie każdego pliku w cyklicznej grupie:* poprawne, ale na zimno około 7 s na syntetycznym repozytorium.
 - *Zgłaszanie każdego cyklu elementarnego:* ich liczba eksploduje wraz z rozmiarem grupy; jeden najkrótszy cykl na grupę wystarcza do działania, a następne uruchomienie pokaże kolejny.
 - *Cykle modułów domyślnie włączone:* ustawienie bardziej rygorystyczne, ale aktualizacja, która wywraca większość kodu, uczy ludzi wyłączać regułę.
+
+**Poprawka · 2026-10-11 · [#375](https://github.com/SirCypkowskyy/inwards/issues/375).** Import w treści `if TYPE_CHECKING:` albo `elif TYPE_CHECKING:` (`typing.TYPE_CHECKING` albo dowolny atrybut, który się na nim kończy) nie daje już krawędzi, ani dla cykli modułów, ani kontekstów. [`TYPE_CHECKING`](https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING) ma w czasie działania wartość `False`, więc taki import nigdy się nie wykonuje, a to standardowy sposób na zachowanie podpowiedzi typu bez cyklu w czasie działania. `examples/clean-app` pokazał koszt liczenia go: `shop.domain.ports` importuje z powrotem `shop.domain.order` dla podpowiedzi, a każdy preset `inwards init` włącza cykle modułów ([#340](https://github.com/SirCypkowskyy/inwards/issues/340)), więc rada brzmiała: usuń poprawną adnotację. INW015 już zwalniał takie importy ([#313](https://github.com/SirCypkowskyy/inwards/pull/313)), a teraz obie reguły czytają jeden znacznik: pełne parsowanie ustawia `typeChecking` na takim imporcie (`python/parser.ts`), a `EXTRACTION_REVISION` zmienił się, żeby żadna pamięć podręczna nie podała importów bez niego. Gałąź `else` się wykonuje, więc jej importy się liczą, podobnie jak importy pod `if not TYPE_CHECKING:` albo pod warunkiem złożonym. Szkielet nie widzi linii z `if`, więc jego importy nie mają znacznika; krawędź ze szkieletu spod `TYPE_CHECKING`, która trafia do cyklicznej grupy, znika, gdy opisane wyżej potwierdzanie sparsuje plik, a plik, który zaczyna się od samych importów najwyższego poziomu, takiej krawędzi mieć nie może. INW001, INW002, INW003 i INW005 nadal liczą importy tylko dla typów: podpowiedź przez granicę warstwy albo kontekstu to nadal zależność w projekcie.
+
+- :material-plus-circle-outline: `examples/clean-app` przechodzi sprawdzenie z `cycles = ["modules", "contexts"]`.
+- :material-minus-circle-outline: Inwards patrzy na nazwę w warunku: `if TC:` po `from typing import TYPE_CHECKING as TC` się liczy, a projekt, który sam ustawia `TYPE_CHECKING = True`, ukryłby prawdziwy cykl.
+- *Odrzucone: ustawienie, które przywraca importy tylko dla typów.* Cykl, za którym idzie tylko narzędzie do sprawdzania typów, nigdy nie wywraca się przy imporcie, i nikt o nie nie prosił; można je dodać później, nikomu niczego nie psując.
 
 ## ADR-033: OpenCode przez plugin, który uruchamia hook Claude Code { #adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook }
 
