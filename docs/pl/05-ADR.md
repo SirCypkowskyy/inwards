@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 3bce519537ea4a621b0e8635463a53d793384f34640d16bb6aa8781ad7e7ccdd
+source_hash: aa9ce1871d2e713c82e93b10257a9d08a1c55239da4441760d86a627aa657091
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -54,6 +54,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
 | [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja | :material-check-circle: Przyjęty, INW017 od [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 i `import-diagram` od [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
+| [046](#adr-046-typescript-in-vertical-slices-moved-one-small-pr-at-a-time) | TypeScript w pionowych wycinkach, przenoszony małymi PR-ami | :material-help-circle-outline: Proponowany |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1398,3 +1399,113 @@ W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, al
 - *Sprawdzać każdy blok Mermaid w repozytorium:* diagramy procesów i sekwencji dawałyby fałszywe zgłoszenia, a projekt nie mógłby trzymać diagramu poglądowego.
 - *Użyć parsera samego Mermaida:* potrzebuje DOM i środowiska jison, czyli więcej niż wszystkie zależności silnika razem.
 - *Domyślnie błędy:* literówka w dokumentacji blokowałaby Stop gate agenta przy kodzie, który jest w porządku.
+
+## ADR-046: TypeScript w pionowych wycinkach, przenoszony małymi PR-ami { #adr-046-typescript-in-vertical-slices-moved-one-small-pr-at-a-time }
+
+**Stan:** Proponowany · 2026-10-11 · [#408](https://github.com/SirCypkowskyy/inwards/issues/408)
+
+**Kontekst.** Właściciel ustalił konwencje dla projektów w Pythonie w [#405](https://github.com/SirCypkowskyy/inwards/issues/405)–[#407](https://github.com/SirCypkowskyy/inwards/issues/407): pionowe wycinki według domen, pakiet `shared/` na to, co wycinki dzielą, minidomeny wewnątrz wycinka, te same nazwy modułów w każdym wycinku, moduły prywatne za publiczną fasadą, komendy i zapytania tam, gdzie wycinek ma jedno i drugie, oraz fabryki do składania zależności. Własny TypeScript Inwards powinien się ich trzymać. Inwards nie sprawdza TypeScriptu, więc kształtu muszą pilnować strefy fallow, Biome i testy architektury. Część kodu jest już pocięta na wycinki, reszta na poziome warstwy:
+
+| Pakiet | Już wycinek | Poziomo |
+|---|---|---|
+| `src/core` | każda reguła w `rules/` (13 folderów, 7 pojedynczych plików), `diagram/`, `baseline/`, `report/` | `contracts/`, `meta/`, `python/`, `lookup/` (używane wszędzie), `config/` (opcje każdej reguły), `engine/` (fasada i runner dla każdej rodziny reguł) |
+| `src/cli` | `claude-code/`, `session/`, `daemon/`, `lsp/`, `mcp/`, `runlog/`, `init/`, `project/` | `commands/` (17 modułów, po jednym na komendę, z każdej domeny), `adapters/` (27 modułów, I/O każdej domeny), `platform/`, `json/`, `paths/` |
+| `src/vscode-extension` | `src/client/` (3 pliki) | brak |
+
+Jedna funkcja CLI leży więc w trzech folderach: `inwards server` to `commands/server.ts`, `lsp/` i `adapters/lsp-connection.ts`. Żaden folder nie ma też publicznej fasady: moduł może zaimportować dowolny moduł folderu, na który pozwala mu strefa. W CLI granicę folderu przekracza około 260 linii importów, w silniku około 390. Wiele PR-ów zmienia `src/` naraz (reguły FastAPI w #401, scaffoldy w #406), więc przeniesienie wszystkiego w jednym PR kłóciłoby się z każdym z nich.
+
+**Decyzja.**
+
+- **Docelowa mapa silnika.** `index.ts` zostaje publicznym API. `contracts/`, `meta/`, `python/` i `lookup/` przechodzą do `shared/`, wspólnego jądra, którego może używać każdy wycinek. `config/`, `diagram/`, `baseline/` i `report/` są wycinkami. Każda reguła jest folderem w `rules/` (7 reguł z jednego pliku staje się folderami), a `rules/shared/` zostaje zestawem narzędzi rodziny reguł. `engine/` zostaje fasadą, razem z runnerami rodzin: kolejność reguł należy do silnika (`src/core/AGENTS.md`), a runnery używają `engine/stages.ts` oraz modułów INW000 i INW009, których reguła importować nie może.
+- **Docelowa mapa CLI.**
+
+    | Folder | Zawiera |
+    |---|---|
+    | `main.ts`, `compose.ts`, `deps.ts`, `usage.ts` | korzeń: argv i cykl życia procesu, składanie zależności (`compose.ts` przechodzi wyżej z `adapters/`), `AppDeps` i tekst pomocy (z `commands/`) |
+    | `shared/` | `platform/`, `json/`, `paths/` oraz `adapters/` z I/O używanym przez kilka wycinków (system plików, git, runtime, stdio, TOML, gramatyki, przechodzenie po plikach, typy `.d.ts`) |
+    | `check/` | dzisiejszy `project/`, komendy `check`, `check-runs` i `baseline`, adaptery `baseline-files` i `extraction-*`, `fingerprint` (z `session/`) i `CheckRunner` (z `session/contracts.ts`) |
+    | `hook/` | trzy minidomeny, `claude-code/`, `session/` i `daemon/`, do tego komendy `hook` i `daemon` oraz adaptery `daemon-*` i `state-files`; `claude-code/protocol.ts` staje się `hook/contracts.ts`, który importuje `eval/` |
+    | `runlog/` | dzisiejszy `runlog/`, komenda `stats`, adapter `export-files` |
+    | `init/` | dzisiejszy `init/`, komendy `context`, `import-config`, `import-diagram`, `diagram` i `append-table`, adaptery `init-files` i `picker` |
+    | `rules/` | komenda `rules`, `rule-sources`, `mcp/rule-page.ts`, adapter `rule-pages` |
+    | `lsp/` | dzisiejszy `lsp/`, komenda `server`, adapter `lsp-connection` |
+    | `mcp/` | dzisiejszy `mcp/`, komenda `mcp`, adapter `mcp-connection` |
+
+    Wycinki zależą od siebie w jedną stronę: `shared` pod wszystkim; `check` od `shared`; `runlog`, `rules` i `lsp` od `check`; `mcp` od `check` i `rules`; `hook` od `check` i `runlog`; `init` od `check` i `hook`. `commands/` i `adapters/` znikają.
+- **Rozszerzenie zostaje bez zmian.** `src/client/` to już jeden wycinek z trzema plikami.
+- **Nazwy powtarzane w każdym wycinku.**
+
+    | Nazwa | Znaczy | Pilnuje |
+    |---|---|---|
+    | `index.ts` | publiczna fasada wycinka lub minidomeny; tylko reeksporty | wzorzec modułów prywatnych niżej; „tylko reeksporty” sprawdza review |
+    | `_name.ts` | prywatny dla folderu, w którym leży | `noRestrictedImports` w Biome |
+    | `contracts.ts` | porty i rekordy, które wycinek posiada, publiczne (ta nazwa jest już w 6 folderach CLI) | test nazw |
+    | `cli.ts` | obsługa `inwards <komenda>` w wycinku CLI, zamiast `commands/` | test nazw |
+    | `adapters/` | I/O wycinka CLI; importuje je tylko korzeń, a `index.ts` wycinka nigdy ich nie reeksportuje | strefy fallow; resztę obejmuje zakaz I/O w Biome |
+    | `<minidomena>/` | podfolder z własnym `index.ts` i tymi samymi zasadami poziom niżej | test nazw |
+    | `commands/`, `queries/` | zapisy i odczyty tego samego stanu, tylko tam, gdzie wycinek ma jedno i drugie i rozchodzą się: `runlog/` (`record` wobec `runs`, `stats`, `export`) i `hook/session/` (rekord startu, kopie i świadek wobec starych błędów, wyciszeń i zmian układu); nigdzie indziej | Biome: `../commands/**` jest odrzucane, więc `queries/` nie zaimportuje `commands/` |
+    | `create*` | fabryka stanu na jedno wywołanie, eksportowana z `index.ts` wycinka (istnieją `createRunLog`, `createStartLookups` i `createTools`) | testy stanu w `architecture.test.ts` |
+    | `compose.ts` | jedyne miejsce, gdzie adaptery powstają i są składane (`nodePlatform`, `nodeDaemon`, `nodeLsp`, `nodeMcp`) | fallow: strefę `adapters` może importować tylko strefa korzenia |
+    | `shared/` | to, czego używa kilka wycinków; nie importuje żadnego wycinka | krawędzie stref fallow |
+
+    W silniku `index.ts` reguły eksportuje to, co wywołuje `engine/`, a jej moduły prywatne zachowują dzisiejsze powtarzane nazwy (`_check.ts`, `_wording.ts`, już w 8 folderach reguł).
+- **Jak pilnują tego narzędzia.**
+    - *Biome, moduły prywatne.* Każde nadpisanie, które ustawia `noRestrictedImports` dla `src/core/src/**` albo plików polityki CLI, dostaje ten wzorzec:
+
+        ```jsonc
+        "patterns": [
+          { "group": ["**/_*", "!./_*", "!../_*", "!../../_*"],
+            "message": "A module named _x.ts is private to its folder; import the slice's index.ts." }
+        ]
+        ```
+
+        `./_x.ts` (ten sam folder) i `../_x.ts` (z minidomeny do jej wycinka) przechodzą; `../check/_x.ts`, `./session/_x.ts` i `../../hook/_x.ts` nie. Ten eksperyment uruchomił go na Biome 2.5.15. Biome nie łączy opcji jednej reguły z kilku nadpisań: późniejsze nadpisanie, które ustawia `noRestrictedImports`, zastępuje wcześniejsze opcje dla plików, które obejmuje, więc wzorzec powtarza się w każdym takim nadpisaniu (w dwóch: silnika, które dziś nie ustawia `noRestrictedImports`, i polityki CLI). Testy leżą poza tymi nadpisaniami, więc test jednostkowy może importować moduły prywatne wycinka, któremu odpowiada.
+    - *Biome, barrele.* Grupa `performance` jest na poziomie błędu, więc `noBarrelFile` odrzuca każdy `index.ts`, który reeksportuje. Dziś jedno nadpisanie wyłącza tę regułę dla `src/core/src/index.ts`; jego `includes` rozszerza się do `src/*/src/**/index.ts`, z uzasadnieniem, że fasada wycinka jest barrelem celowo. `noReExportAll` zostaje włączone, więc `index.ts` wymienia to, co eksportuje.
+    - *Biome, I/O.* Nadpisanie polityki CLI zmienia się z listy folderów na `src/cli/src/**` bez `src/cli/src/*.ts` (korzeń) i `src/cli/src/**/adapters/**`, więc nowy folder dostaje zakaz I/O bez dopisywania go do listy. Nadpisanie silnika pod tym względem się nie zmienia.
+    - *Biome, komendy i zapytania.* Wzorzec `../commands/**` dołącza do listy, gdy zniknie własny folder `commands/` CLI (ostatni import korzenia z niego przenosi się w tym samym kroku).
+    - *fallow.* Jedna strefa na wycinek (`src/cli/src/check/**`) i, wpisana przed nią, bo wygrywa pierwsza pasująca strefa, jedna na adaptery wycinka (`src/cli/src/check/adapters/**`). Strefa wycinka pozwala na strefy `shared`, wycinki pod nim i strefy silnika; strefa adapterów pozwala na własny wycinek, `shared` i silnik; strefę adapterów może importować tylko strefa korzenia (`src/cli/src/*.ts`). fallow nie upilnuje modułów prywatnych: od wersji 3.31 ocenia import przez barrel według strefy modułu, który deklaruje symbol ([#262](https://github.com/SirCypkowskyy/inwards/issues/262)), więc strefa dla plików `_*.ts` odrzucałaby każdy import przez `index.ts`. Strefy zostają na poziomie wycinków, a specyfikator importu sprawdza Biome. `requireAllFiles` dalej odrzuca plik w folderze bez strefy. W silniku znikają wzorce reguł z jednego pliku (`rules/x.ts`), a przeniesienie jądra zmienia jego wzorce stref i listę dla `eval/` w `.fallow-core-api.jsonc`.
+    - *Testy architektury.* Sonda Biome: plik importujący `_x.ts` innego wycinka nie przechodzi, własny `_x.ts` przechodzi. Test nazw: w każdym przeniesionym wycinku każdy plik to `index.ts`, `contracts.ts`, `cli.ts`, `_*.ts` albo `*.d.ts`, a każdy podfolder ma `index.ts` albo jest `adapters/`. Lista przeniesionych wycinków w teście rośnie z każdym krokiem, więc folder jeszcze nieprzeniesiony nie zawodzi, a przeniesiony nie wróci do starego kształtu. Istniejące sondy stref i I/O dostają nowe ścieżki.
+    - *`check:cycles`* łapie moduł prywatny, który importuje `index.ts` własnego wycinka.
+- **Co się nie zmienia.** Eksporty `@inwards/core` (`test/api.test.ts` przechodzi bez zmian w każdym kroku); `inwards/diagnostics@1`, `inwards-daemon/1`, kody wyjścia, flagi CLI i treść snapshotów E2E; typy kontraktów (zmieniają się tylko ich pliki); osobne chunki dla `@clack/prompts`, SDK MCP i stron reguł, bo `compose.ts` zachowuje ich dynamiczny `import()`, a żaden `index.ts` nie reeksportuje adaptera; rozszerzenie; adresy stron reguł (zmienia się tylko `resource:` w ich front matter). Zakaz I/O w silniku oraz podział CLI na politykę i adaptery zostają tak samo ścisłe.
+- **Migracja.** Piętnaście małych PR-ów, każdy zielony sam w sobie, zgłoszonych jako pod-zadania [#7](https://github.com/SirCypkowskyy/inwards/issues/7) i zablokowanych do przyjęcia tego ADR. Najpierw egzekwowanie, które niczego nie zmienia; potem wycinki, których inne PR-y dotykają najmniej; najbardziej ruchliwe foldery (`project/`, hook, jądro CLI, jądro silnika) na końcu, każdy w spokojnym momencie, gdy kolejka PR-ów jest prawie pusta. PR z przeniesieniem to `git mv` plus przepisanie importów skryptem, więc rebase uruchamia skrypt ponownie zamiast ręcznie łączyć importy.
+
+    | Krok | Co się przenosi | Ryzyko | Rozmiar | Zadanie |
+    |---|---|---|---|---|
+    | 1 | Nic: wzorce Biome, wyjątek dla barreli, nowe `includes` nadpisania I/O, sonda i test nazw z pustą listą | niskie: tylko konfiguracja i testy | S | [#417](https://github.com/SirCypkowskyy/inwards/issues/417) |
+    | 2 | `lsp/` w CLI z `server` i `lsp-connection`, pierwszy `cli.ts` i `adapters/` wycinka | niskie | S | [#418](https://github.com/SirCypkowskyy/inwards/issues/418) |
+    | 3 | `mcp/` w CLI z `mcp` i `mcp-connection` | niskie | S | [#419](https://github.com/SirCypkowskyy/inwards/issues/419) |
+    | 4 | `rules/` w CLI: `rules`, `rule-sources`, `rule-page`, `rule-pages` | niskie; po kroku 3 | S | [#420](https://github.com/SirCypkowskyy/inwards/issues/420) |
+    | 5 | `runlog/` w CLI ze `stats` i `export-files`, podzielony na `commands/` i `queries/`; najpierw `fingerprint` przechodzi do `project/` | niskie | S | [#421](https://github.com/SirCypkowskyy/inwards/issues/421) |
+    | 6 | Silnik: 7 reguł z jednego pliku staje się folderami; `resource:` ich stron (EN i PL) | niskie | S | [#422](https://github.com/SirCypkowskyy/inwards/issues/422) |
+    | 7 | Silnik: każdy folder reguły poza `fastapi/` dostaje `index.ts` i nazwy z `_`; `engine/` importuje fasady | średnie: każdy otwarty PR z regułą | M | [#423](https://github.com/SirCypkowskyy/inwards/issues/423) |
+    | 8 | Silnik: `config/`, `diagram/`, `baseline/`, `report/` dostają `index.ts` i nazwy z `_` | średnie: około 100 linii importów | M | [#424](https://github.com/SirCypkowskyy/inwards/issues/424) |
+    | 9 | `init/` w CLI z pięcioma komendami i dwoma adapterami; nazwy z `_` w 34 modułach | średnie; po scaleniu #406 | M | [#425](https://github.com/SirCypkowskyy/inwards/issues/425) |
+    | 10 | Silnik: `rules/fastapi/` jako wycinek z minidomeną `model/` | średnie; po scaleniu #401 | M | [#426](https://github.com/SirCypkowskyy/inwards/issues/426) |
+    | 11 | `project/` w CLI staje się `check/` z komendami, adapterami i `CheckRunner` | wysokie: około 50 linii importów, wejście wątku roboczego w `main.ts` i budowanie binarki | M | [#427](https://github.com/SirCypkowskyy/inwards/issues/427) |
+    | 12 | `hook/` w CLI z `claude-code/` i `session/` (podzielonym na `commands/` i `queries/`); `protocol.ts` staje się `hook/contracts.ts` | wysokie: snapshoty E2E hooka i `eval/` | M | [#428](https://github.com/SirCypkowskyy/inwards/issues/428) |
+    | 13 | `hook/daemon/` w CLI z komendą `daemon` i adapterami `daemon-*` | średnie | S | [#429](https://github.com/SirCypkowskyy/inwards/issues/429) |
+    | 14 | `shared/` i korzeń CLI; znikają `commands/` i `adapters/`; wzorzec `../commands/**` | wysokie: około 120 linii importów | M | [#430](https://github.com/SirCypkowskyy/inwards/issues/430) |
+    | 15 | Jądro silnika do `shared/` | wysokie: około 240 linii importów; można go pominąć osobno | M | [#431](https://github.com/SirCypkowskyy/inwards/issues/431) |
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Funkcja CLI leży w jednym folderze: `inwards server` to `lsp/` (polityka, obsługa komendy i adapter), a jego testy to `test/lsp/`.
+- :material-plus-circle-outline: Powierzchnią wycinka jest jego `index.ts`, więc moduł prywatny można zmienić bez przeszukiwania innych folderów.
+- :material-plus-circle-outline: Repozytorium używa tych samych nazw, których uczą scaffoldy ([#406](https://github.com/SirCypkowskyy/inwards/issues/406)).
+- :material-plus-circle-outline: Nowy folder CLI dostaje zakaz I/O od razu, a nie dopiero gdy ktoś go dopisze.
+- :material-minus-circle-outline: Około 650 linii importów zostaje przepisanych w 15 PR-ach, a otwarty PR, który zmienia przeniesiony plik, robi rebase przez zmianę nazwy. `git log --follow` śledzi przeniesienia; blame przez mocno zmieniony plik może się zgubić.
+- :material-minus-circle-outline: `.fallowrc.jsonc` dostaje około 8 stref adapterów, a każda lista dozwolonych stref adaptera dalej powtarza strefy silnika.
+- :material-minus-circle-outline: Wzorzec modułów prywatnych powtarza się w każdym nadpisaniu Biome, które ustawia `noRestrictedImports`; nowe nadpisanie bez niego wyłącza sprawdzanie dla swoich plików, a sonda obejmuje tylko foldery, które sprawdza.
+- :material-minus-circle-outline: `noBarrelFile` jest wyłączone dla każdego `index.ts`, więc fasada wycinka kosztuje Buna tyle co barrel: import jednej nazwy ładuje cały wycinek. CLI to jeden bundle, więc liczy się tylko praca przy starcie wewnątrz wycinka, a osobne chunki zostają osobne.
+- :material-minus-circle-outline: Zasadę „`index.ts` tylko reeksportuje” sprawdza review; żadne narzędzie jej nie pilnuje.
+- :material-minus-circle-outline: Każdy krok zmienia też mapę kodu w rozdziale 3, przewodnik pakietu (pliki `AGENTS.md` mają jednego właściciela naraz) i, przy regułach, `resource:` na maksymalnie 28 stronach reguł w obu językach.
+
+**Alternatywy.**
+
+- *Przenieść wszystko w jednym PR:* kłóci się z każdym otwartym PR-em w `src/` i wymaga jednego review około 400 plików.
+- *Zostawić `commands/` i `adapters/` i tylko dodać pliki `index.ts`:* taniej, ale funkcja dalej leży w trzech folderach.
+- *Pilnować modułów prywatnych strefami fallow:* fallow rozwiązuje import przez barrel do strefy modułu, który deklaruje symbol, więc nie odróżni barrela od bezpośredniego importu.
+- *„Importuj tylko `index.ts`” zamiast nazw z `_`:* bez zmian nazw, ale wzorzec Biome musiałby wymieniać jako wyjątki każdy folder jądra i `contracts.ts`, i różniłby się od konwencji dla Pythona.
+- *Przenieść runnery rodzin z silnika do wycinków reguł:* potrzebują `engine/stages.ts` i modułów dwóch innych reguł, których reguła importować nie może.
+- *Podzielić `meta/registry.ts` na wpis w każdym wycinku reguły:* rejestr jest jedną tabelą celowo (`biome.jsonc` mówi dlaczego), a reportery, SARIF i sprawdzanie dokumentacji czytają go w całości.
+- *Zostawić jądro silnika na najwyższym poziomie:* oszczędza około 240 linii importów, ale zostawia drugą nazwę dla tej samej idei; to ostatni krok, więc właściciel może go pominąć osobno.

@@ -285,6 +285,12 @@ baseline'u); multi-word names are left uninflected where possible.
 | severity | poziom (błąd, ostrzeżenie) |
 | shared kernel (the `shared` layer of `vertical-slices`) | wspólne jądro |
 | slice, vertical slice | wycinek, pionowy wycinek (vertical slice) |
+| mini-domain (a folder inside a slice) | minidomena |
+| private module (`_name.ts`, `_name.py`) | moduł prywatny |
+| public face (a slice's `index.ts`) | publiczna fasada |
+| commands and queries (CQRS) | komendy i zapytania (CQRS) |
+| barrel (a module that only re-exports) | barrel |
+| zone (fallow's boundaries) | strefa |
 | snapshot | migawka |
 | spike | eksperyment |
 | resident process | stały proces |
