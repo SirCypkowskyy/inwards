@@ -87,6 +87,20 @@ async function models(body: string, options = ""): Promise<string[]> {
   return found.map((line) => line.slice(MODELS.length + 1));
 }
 
+/**
+ * Checks files in a whole-project run with INW016 on and keeps each finding's full span.
+ *
+ * @param files - file text by path.
+ * @returns `path:line:column-endLine:endColumn` for each INW016 finding, sorted.
+ */
+async function spans(files: Readonly<Record<string, string>>): Promise<string[]> {
+  const found = await check(files, '[tool.inwards.rules]\nextend-select = ["INW016"]', true);
+  return found
+    .filter((d) => d.code === "INW016")
+    .map((d) => `${d.file}:${d.line}:${d.column}-${d.endLine}:${d.endColumn}`)
+    .sort();
+}
+
 /** The line in `HEAD` + body where a body's first line lands. */
 const FIRST: number = HEAD.split("\n").length;
 
@@ -359,6 +373,23 @@ class Post(Base):
       "shop/domain/models.py": `from django.db import models\n\n\nclass A(models.Model):\n    class Meta:\n        db_table = "a"\n`,
     };
     expect(await inw016(django, "", true)).toEqual([]);
+  });
+
+  test("every finding spans its whole name, the same on every run (#370)", async () => {
+    const files = {
+      [MODELS]: `${HEAD}${FASTAPI_BAD}`,
+      "shop/infrastructure/tags.py": `${HEAD}tags = Table("Tags", MetaData())\n`,
+      "shop/domain/noise.py": "def f(x):\n    return [y for y in x if y]\n".repeat(50),
+    };
+    const expected = [
+      `${MODELS}:${FIRST + 5}:21-${FIRST + 5}:28`,
+      `${MODELS}:${FIRST + 5}:21-${FIRST + 5}:28`,
+      `${MODELS}:${FIRST + 8}:5-${FIRST + 8}:12`,
+      `shop/infrastructure/tags.py:${FIRST}:14-${FIRST}:20`,
+    ];
+    // A second run parses the same files again over a heap the first run churned.
+    expect(await spans(files)).toEqual(expected);
+    expect(await spans(files)).toEqual(expected);
   });
 });
 
