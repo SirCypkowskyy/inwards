@@ -27,6 +27,9 @@ same PR that first needs it.
 - **Translate**: prose, headings, table text, admonition titles, image alt
   text and captions, Mermaid labels that are prose (node and edge labels,
   subgraph titles), `aria-label`s, and hand-written SVG text on the pages.
+  A diagram marked `%% inwards: layers` or `%% inwards: contexts` is a code
+  block that INW017 reads: its ids and quoted labels (module prefixes) stay
+  as written.
 - **Cross-links** inside `docs/pl/` point to Polish pages (same relative
   paths as in English). Images, CSS and scripts come from the English site:
   a Polish page references `../assets/...` one level further up than the
@@ -63,7 +66,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW016, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW017, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | Naming styles | lower_case_snake, snake case, camel case | INW016's table and column schemes |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
@@ -214,6 +217,12 @@ baseline'u); multi-word names are left uninflected where possible.
 | singular, plural | liczba pojedyncza, liczba mnoga |
 | mass noun | rzeczownik niepoliczalny |
 | migration (Alembic) | migracja |
+| architecture diagram, marked diagram (INW017) | diagram architektury, oznaczony diagram |
+| marker comment (`%% inwards: layers`) | komentarz-znacznik, znacznik |
+| node, edge, link (Mermaid) | węzeł, krawędź |
+| subgraph (Mermaid) | subgraph (subgraphu, subgraphy) |
+| label, caption (of a node) | etykieta, podpis |
+| docs drift (a diagram that no longer matches the config) | rozjazd dokumentacji |
 | repository (the pattern) | repozytorium |
 | port | port |
 | ports and adapters, hexagonal architecture | porty i adaptery, architektura heksagonalna |

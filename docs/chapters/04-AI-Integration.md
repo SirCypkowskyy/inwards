@@ -47,7 +47,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     Claude Code runs [hooks](https://code.claude.com/docs/en/hooks) around tool calls. For `PostToolUse`, exit code 2 doesn't undo the edit (it already happened), but Claude sees the hook's stderr and reacts to it. For `Stop`, exit code 2 keeps Claude working instead of ending the turn. The hook input includes `stop_hook_active`, and Claude Code ends the turn anyway after several consecutive blocks, so a broken stop hook can't trap the session.
 
-    To share the setup through the committed `.claude/settings.json` instead, write it by hand. This version relies on `inwards` being on `PATH`:
+    To share the setup through the committed `.claude/settings.json` instead, run `inwards init --agent claude --shared --launcher "uv run"` ([guide](guides/claude-code.md#share-it-with-the-team)). The hooks and deny rules then go into `.claude/settings.json`, an `inwards` server running `uv run inwards mcp` goes into `.mcp.json`, and `.gitignore` gets only `.inwards/`. Committed files can't hold a machine's path, so `--shared` takes a launcher, or writes the bare `inwards` when it is on `PATH` and refuses otherwise. It takes Inwards' own hooks out of `.claude/settings.local.json`, because Claude Code merges hook lists across settings files and they would run twice, and it never replaces a team's own hooks or an `inwards` MCP server that runs something else. Without a launcher, the result is:
 
     ```json title=".claude/settings.json"
     {
@@ -64,20 +64,24 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
-            "hooks": [
-              {
-                "type": "command",
-                "command": "inwards hook claude-code"
-              }
-            ]
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
           }
         ],
         "Stop": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
+      },
+      "permissions": {
+        "deny": [
+          "Edit(/.claude/settings*.json)",
+          "Edit(/.inwards/**)",
+          "Edit(/**/inwards-baseline.json)"
+        ]
       }
     }
     ```
+
+    The Stop gate reads the user, project and local settings files, so hooks in any one of them count.
 
     `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote:
 
@@ -244,7 +248,7 @@ Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy
 Fixing a violation costs a retry. Avoiding it costs nothing. Two features move Inwards earlier in the loop:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) prints a map of the layers, what each one may import, where ports live, and the library and context rules, in under 300 tokens. `inwards context --write` or `inwards init --brief` keeps it in a marked section of `AGENTS.md`. It is opt-in, so design partners can compare runs with and without it ([the brief](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page.
+- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page. An agent without MCP gets the same page from `inwards rule CODE`, and `inwards rules` lists the rules the project turns on.
 
 ```mermaid
 flowchart LR

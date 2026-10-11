@@ -217,6 +217,8 @@ Which rules report and how loudly:
 
 INW000 can't be ignored, re-levelled or given options. [ADR-027](../05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) has the details.
 
+`inwards rules` shows what the table resolves to: every rule with its code, name, whether it is on, its severity, and the key that decided each, as a key under `[tool.inwards]` (`rules.extend-select`, `rules.severity`, `templates.domain.rules.router`), or `default`. A rule limited by `modules` says where (`only in src.*.router`). It reads the nearest config, or `--config FILE`, and without one lists the defaults. `--json` prints the same as `inwards/rules@1`: a `source` and a `severitySource` per rule, each a `kind` (`fixed`, `default`, `opt-in`, `select`, `extend-select`, `template`, `ignore`, `not-selected` or `severity`) and its `keys`. `inwards/rules@1` is a contract, like `inwards/diagnostics@1`: within `@1` fields are only added, and removing or renaming one bumps the version ([ADR-007](../05-ADR.md#adr-007-a-versioned-output-contract-with-fix-steps-as-data)). `inwards rule INW013` prints one rule's page ([MCP guide](mcp.md#explain_rule)).
+
 <!-- config: fragment -->
 
 ```toml
@@ -396,6 +398,20 @@ Which import cycles [INW004](../rules/INW004.md) reports on whole-project runs: 
 ```toml
 [tool.inwards]
 cycles = ["modules", "contexts"]
+```
+
+### `diagrams` { #diagrams }
+
+Type: list of paths. Default: none.
+
+Markdown and Mermaid files whose architecture diagrams [INW017](../rules/INW017.md) checks against `[tool.inwards]` and the code on whole-project runs. Each entry is a path relative to the pyproject.toml; a segment may use `*`, `?` and `[seq]`, and `**` stands for any number of directories. An entry can't be absolute or climb out with `..`. In a listed file, only a Mermaid `flowchart` or `graph` that opens with `%% inwards: layers` or `%% inwards: contexts` is read: a fenced `mermaid` block in a Markdown file, or the whole of a `.mmd` or `.mermaid` file. The diagram is checked, never read as config. INW017 is opt-in, so turn it on with `extend-select`. [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) has the details.
+
+<!-- config: fragment -->
+
+```toml
+[tool.inwards]
+diagrams = ["docs/architecture.md", "docs/**/*.mmd"]
+rules = { extend-select = ["INW017"] }
 ```
 
 ## Monorepos and uv workspaces { #monorepos }

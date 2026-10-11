@@ -22,6 +22,7 @@ import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
 import { mcpCommand } from "./commands/mcp.ts";
+import { ruleCommand, rulesCommand } from "./commands/rules.ts";
 import { serverCommand } from "./commands/server.ts";
 import { statsCommand } from "./commands/stats.ts";
 import { type Command, commandUsage, isCommand, overview } from "./commands/usage.ts";
@@ -47,9 +48,12 @@ const OPTIONS = {
   package: { type: "string" },
   "list-styles": { type: "boolean" },
   launcher: { type: "string" },
+  shared: { type: "boolean" },
   brief: { type: "boolean" },
   write: { type: "boolean" },
   idle: { type: "string" },
+  json: { type: "boolean" },
+  full: { type: "boolean" },
   // LSP's conventional server arguments (#63): stdio is the only transport,
   // and vscode-languageserver reads --clientProcessId from argv itself.
   stdio: { type: "boolean" },
@@ -163,7 +167,7 @@ function argumentError(argv: string[], code: string, message: string): string {
 
 /**
  * Runs the commands besides `check`: the hook, `daemon`, `server`, `mcp`, `init`, `baseline`, `stats`,
- * `context` and `import-config`.
+ * and through `readCommand` `context`, `import-config`, `rules` and `rule`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -171,13 +175,15 @@ function argumentError(argv: string[], code: string, message: string): string {
  * @param values - the parsed options.
  * @param values.agent - `--agent`, for init (so are the other InitFlags).
  * @param values."dry-run" - `--dry-run`, for init.
- * @param values.config - `--config`, for baseline and context (stats refuses it).
+ * @param values.config - `--config`, for baseline, context and rules (stats refuses it).
  * @param values."no-cache" - `--no-cache`, for baseline.
  * @param values.format - `--format`, for stats.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
  * @param values.write - `--write`, for context and import-config.
  * @param values.idle - `--idle SECONDS`, for daemon.
+ * @param values.json - `--json`, for rules and rule.
+ * @param values.full - `--full`, for rule.
  * @returns the exit code; 2 for unexpected arguments.
  */
 async function setupCommand(
@@ -192,6 +198,8 @@ async function setupCommand(
     redact?: boolean | undefined;
     write?: boolean | undefined;
     idle?: string | undefined;
+    json?: boolean | undefined;
+    full?: boolean | undefined;
   },
 ): Promise<number> {
   const { streams } = deps.io;
@@ -213,13 +221,8 @@ async function setupCommand(
   if (command === "mcp") {
     return await mcpCommand(deps, paths, usage);
   }
-  if (command === "context") {
-    return paths.length === 0
-      ? contextCommand(deps, values.config, values.write === true)
-      : print(streams, usage, 2);
-  }
-  if (command === "import-config") {
-    return importConfigCommand(deps, paths, values, usage);
+  if (isReadCommand(command)) {
+    return await readCommand(deps, command, paths, values);
   }
   if (command === "init") {
     return await initMain(deps, paths, values, usage);
@@ -227,6 +230,59 @@ async function setupCommand(
   return paths.length === 0
     ? await baselineCommand(deps, values.config, values["no-cache"] === true)
     : print(streams, usage, 2);
+}
+
+/** The commands that read the project or the docs and print: `readCommand` runs them. */
+const READ_COMMANDS = ["context", "import-config", "rules", "rule"] as const;
+
+/**
+ * Tells whether a command is one `readCommand` runs.
+ *
+ * @param command - a command besides `check`.
+ * @returns true for `context`, `import-config`, `rules` and `rule`.
+ */
+function isReadCommand(command: Command): command is (typeof READ_COMMANDS)[number] {
+  return READ_COMMANDS.some((name) => name === command);
+}
+
+/**
+ * Runs `context`, `import-config`, `rules` and `rule`: the commands that
+ * read the config, import-linter's contracts or the rule pages and print.
+ *
+ * @param deps - this invocation's dependencies.
+ * @param command - which one.
+ * @param paths - the positionals after it.
+ * @param values - the parsed options.
+ * @param values.config - `--config`, for context and rules.
+ * @param values.write - `--write`, for context and import-config.
+ * @param values.json - `--json`, for rules and rule.
+ * @param values.full - `--full`, for rule.
+ * @returns the exit code; 2 for unexpected arguments.
+ */
+async function readCommand(
+  deps: AppDeps,
+  command: (typeof READ_COMMANDS)[number],
+  paths: string[],
+  values: {
+    config?: string | undefined;
+    write?: boolean | undefined;
+    json?: boolean | undefined;
+    full?: boolean | undefined;
+  },
+): Promise<number> {
+  const usage = commandUsage(command);
+  if (command === "context") {
+    return paths.length === 0
+      ? contextCommand(deps, values.config, values.write === true)
+      : print(deps.io.streams, usage, 2);
+  }
+  if (command === "rules") {
+    return rulesCommand(deps, paths, values, usage);
+  }
+  if (command === "rule") {
+    return await ruleCommand(deps, paths, values, usage);
+  }
+  return importConfigCommand(deps, paths, values, usage);
 }
 
 /**
