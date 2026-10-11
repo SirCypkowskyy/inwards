@@ -117,7 +117,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
-      "presets": "vertical-slices",
+      "presets": "żaden",
       "url": "INW021/"
     },
     {

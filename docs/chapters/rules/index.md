@@ -6,7 +6,7 @@ Every diagnostic Inwards prints links to its rule's page here: the `docs:` line 
 
 Search the rules, filter them by category, status or autofix, sort them by code, name, category or status, and page through them. The address bar keeps the view, so a link opens the same list. A category includes its sub-categories: `imports` also lists the rules filed under `imports › layers`.
 
-The rules fall into six categories, described below in this order: [imports](#imports), [layout](#layout), [roles](#roles), [integrity](#integrity), [diagrams](#diagrams) and [FastAPI](#fastapi). Each category also has a page of its own, and the navigation lists its rules under it: [imports](imports/index.md), [layout](layout/index.md), [roles](roles/index.md), [integrity](integrity/index.md), [diagrams](diagrams/index.md) and [FastAPI](fastapi/index.md). A rule is either on by default or [opt-in](#opt-in-rules). The presets of [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) keep every rule that is on by default, except that django and fastapi turn INW002 off, and turn some opt-in rules on as warnings: INW014 and INW015 in clean and hexagonal, INW021 in vertical-slices, INW012, INW013, INW016 and the FAPI rules in fastapi.
+The rules fall into six categories, described below in this order: [imports](#imports), [layout](#layout), [roles](#roles), [integrity](#integrity), [diagrams](#diagrams) and [FastAPI](#fastapi). Each category also has a page of its own, and the navigation lists its rules under it: [imports](imports/index.md), [layout](layout/index.md), [roles](roles/index.md), [integrity](integrity/index.md), [diagrams](diagrams/index.md) and [FastAPI](fastapi/index.md). A rule is either on by default or [opt-in](#opt-in-rules). The presets of [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) keep every rule that is on by default, except that django and fastapi turn INW002 off, and turn some opt-in rules on as warnings: INW014 and INW015 in clean and hexagonal, INW012, INW013, INW016 and the FAPI rules in fastapi.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>
 
@@ -25,7 +25,7 @@ What a module may import: layers point inward, contexts import each other only a
 | [INW005](INW005.md) | `pure-domain` | A library import a layer's config doesn't allow, such as SQLAlchemy in the domain | by default | error | all | yes |
 | [INW010](INW010.md) | `unknown-first-party` | An import of a first-party module that doesn't exist | by default | error | all | yes |
 | [INW011](INW011.md) | `dynamic-import` | A dynamic import that reaches an outer layer, or whose target Inwards can't read | by default | error | all | yes |
-| [INW021](INW021.md) | `private-module` | An import of a module whose name starts with `_` from outside the package that holds it | opt-in | error | vertical-slices | yes |
+| [INW021](INW021.md) | `private-module` | An import of a module whose name starts with `_` from outside the package that holds it | opt-in | error | none | yes |
 
 </div>
 

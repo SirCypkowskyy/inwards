@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: a345555106613e5a32705363f19c2a5cac6f7a7bb549d0e69be6abaafd701ac5
+source_hash: 2866bc853983e8fcb7848fdf0313aba12407638e1a2bd92c0ab7bcda45db00b9
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -11,7 +11,7 @@ Każda diagnostyka Inwards linkuje do strony swojej reguły w tej sekcji: linia 
 
 Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki automatycznej, posortuj według kodu, nazwy, kategorii albo statusu i przeglądaj je stronami. Pasek adresu zapamiętuje widok, więc link otwiera tę samą listę. Kategoria obejmuje swoje podkategorie: `imports` pokazuje też reguły z `imports › layers`.
 
-Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Każda kategoria ma też własną stronę, a nawigacja pokazuje pod nią jej reguły: [importy](imports/index.md), [układ](layout/index.md), [role](roles/index.md), [integralność](integrity/index.md), [diagramy](diagrams/index.md) i [FastAPI](fastapi/index.md). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW021 w vertical-slices, INW012, INW013, INW016 i reguły FAPI w fastapi.
+Reguły dzielą się na sześć kategorii, opisanych niżej w tej kolejności: [importy](#imports), [układ](#layout), [role](#roles), [integralność](#integrity), [diagramy](#diagrams) i [FastAPI](#fastapi). Każda kategoria ma też własną stronę, a nawigacja pokazuje pod nią jej reguły: [importy](imports/index.md), [układ](layout/index.md), [role](roles/index.md), [integralność](integrity/index.md), [diagramy](diagrams/index.md) i [FastAPI](fastapi/index.md). Reguła jest albo domyślnie włączona, albo [opt-in](#opt-in-rules). Presety [`inwards init --style`](../guides/install.md#a-new-project-start-from-a-preset) zostawiają każdą domyślnie włączoną regułę, tylko django i fastapi wyłączają INW002, i włączają niektóre reguły opt-in jako ostrzeżenia: INW014 i INW015 w clean i hexagonal, INW012, INW013, INW016 i reguły FAPI w fastapi.
 
 <div class="inw-rules" data-inwards-rules="rules.json"></div>
 
@@ -30,7 +30,7 @@ Co moduł może importować: warstwy wskazują do środka, konteksty importują 
 | [INW005](INW005.md) | `pure-domain` | Import biblioteki, na który konfiguracja warstwy nie pozwala, np. SQLAlchemy w domenie | domyślnie | błąd | wszystkie | tak |
 | [INW010](INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | domyślnie | błąd | wszystkie | tak |
 | [INW011](INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | domyślnie | błąd | wszystkie | tak |
-| [INW021](INW021.md) | `private-module` | Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera | opt-in | błąd | vertical-slices | tak |
+| [INW021](INW021.md) | `private-module` | Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera | opt-in | błąd | żaden | tak |
 
 </div>
 

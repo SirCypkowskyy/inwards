@@ -1,8 +1,8 @@
 /**
  * @file The seven architecture presets behind `inwards init --style`: layered,
  * clean and hexagonal, which are layers only (clean and hexagonal turn on
- * INW014 and INW015 for their ports and driven adapters), and vertical-slices
- * (which also turns on INW021), bounded-contexts, django and fastapi, which add templates and contexts
+ * INW014 and INW015 for their ports and driven adapters), and vertical-slices,
+ * bounded-contexts, django and fastapi, which add templates and contexts
  * (fastapi, which also turns on the FastAPI rules, is `fastapi-preset.ts`'s).
  * Each names the one import its config can't forbid (its `gap`). Pure data;
  * what a preset is lives in `styles.ts`.
@@ -135,11 +135,7 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
       names: ["orders"],
     },
     ignoreRules: undefined,
-    optIn: {
-      codes: ["INW021"],
-      why: "A module named _x is imported only inside its package (INW021); others import what the package's __init__.py re-exports. A warning to start with: make it an error once the project is clean.",
-      options: [],
-    },
+    optIn: undefined,
     companion: undefined,
     example: {
       entity: "features.orders.models",
