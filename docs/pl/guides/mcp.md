@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/mcp.md
-source_hash: 51b72f04a61951a03cc34ab2c00fd67a7e12a4f887b28053251c4f4872546acd
+source_hash: cf0a492498f4f3870ddfc328706f08687f208a3d42920616baf8c72f0df04d7f
 ---
 
 # Serwer MCP { #mcp-server }
@@ -120,6 +120,8 @@ Baseline działa jak w `inwards check`. Zepsuta konfiguracja albo ścieżka w `c
 | `full` | wartość logiczna | Zwraca też sekcje Configuration, Fix safety, Known limitations i, jeśli strona ją ma, How it works |
 
 Zwraca [stronę dokumentacji](../rules/index.md) reguły jako Markdown: kod, nazwę, poziom, informację, czy reguła jest domyślnie włączona, oraz sekcje What it does, Why is this bad, Example i How to fix. Strony są wbudowane w plik binarny, więc odpowiedź to strona wersji, której używasz, i działa bez sieci. Linki prowadzą do opublikowanej strony. Treść strukturalna zawiera te same pola: `code`, `name`, `summary`, `description`, `severity`, `default`, `status`, `suppressible`, `autofix`, `docs` i `sections`. Strony są po angielsku.
+
+Bez klienta MCP `inwards rule INW001` (albo `inwards rule layer-dependency`) wypisuje ten sam tekst, `--full` dodaje pozostałe sekcje, a `--json` wypisuje treść strukturalną. Nieznana reguła kończy się kodem wyjścia 2 i podpowiada najbliższą. `inwards rules` wypisuje wszystkie reguły z informacją, czy projekt je włącza ([konfiguracja](configuration.md#rules)).
 
 ## `where_should_this_go` { #where_should_this_go }
 

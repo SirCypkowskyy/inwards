@@ -247,7 +247,7 @@ Agents invent plausible modules: `from shop.domain.pricing import DiscountPolicy
 Fixing a violation costs a retry. Avoiding it costs nothing. Two features move Inwards earlier in the loop:
 
 - **`inwards context`** ([#58](https://github.com/SirCypkowskyy/inwards/issues/58)) prints a map of the layers, what each one may import, where ports live, and the library and context rules, in under 300 tokens. `inwards context --write` or `inwards init --brief` keeps it in a marked section of `AGENTS.md`. It is opt-in, so design partners can compare runs with and without it ([the brief](guides/agents-md.md#the-architecture-brief-opt-in)).
-- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page.
+- **`inwards mcp`** ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) is an MCP server with three tools. `where_should_this_go` takes a description ("SQL repository for orders") and the imports the code will need, and answers with a layer and a module path, after checking those imports in each layer. `check_files` checks code before it is written, and `explain_rule` returns a rule's docs page. An agent without MCP gets the same page from `inwards rule CODE`, and `inwards rules` lists the rules the project turns on.
 
 ```mermaid
 flowchart LR

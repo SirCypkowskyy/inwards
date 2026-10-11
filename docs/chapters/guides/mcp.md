@@ -116,6 +116,8 @@ The baseline applies as in `inwards check`. A broken config, or a `contents` pat
 
 It returns the rule's [docs page](../rules/index.md) as Markdown: the code, name, severity, whether it is on by default, and the sections What it does, Why is this bad, Example and How to fix. The pages are built into the binary, so the answer is the page of the version you run, and it works offline. Links point at the published site. The structured content holds the same fields: `code`, `name`, `summary`, `description`, `severity`, `default`, `status`, `suppressible`, `autofix`, `docs` and `sections`.
 
+Without an MCP client, `inwards rule INW001` (or `inwards rule layer-dependency`) prints the same text, `--full` adds the other sections, and `--json` prints the structured content. An unknown rule exits with code 2 and names the closest one. `inwards rules` lists every rule with whether the project turns it on ([configuration](configuration.md#rules)).
+
 ## `where_should_this_go`
 
 | Argument | Type | Meaning |

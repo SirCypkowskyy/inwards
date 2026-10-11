@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: f58ad851743db5a4a45c6891f472c86d86eeb5a3a9cd6af42cb3fc8362ef4962
+source_hash: 6605eedc743dab75ddf2d25f4ff907d1f22ab4b5806e347ab207e0bf6b8e3dd2
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -159,7 +159,7 @@ Istnieje siedem presetów, każdy z warstwami wymienionymi od najbardziej wewnę
 | Styl | Warstwy | Czego nie potrafi zabronić |
 |---|---|---|
 | `layered` | domain, persistence, services, presentation, bootstrap | presentation wywołującej persistence bezpośrednio (otwarte warstwy) |
-| `clean` | domain, application, infrastructure, presentation, bootstrap | presentation importującej infrastructure |
+| `clean` | domain, application, infrastructure, presentation, bootstrap | presentation wywołującej port zamiast przypadku użycia |
 | `hexagonal` | domain, application, outbound (`adapters.outbound`) i inbound (`adapters.inbound`) jako [warstwy sąsiednie](configuration.md#sibling-layers), bootstrap | adaptera inbound wywołującego port zamiast przypadku użycia |
 | `vertical-slices` | shared, features, bootstrap; każdy wycinek w `features` jest kontekstem, którego modułem publicznym jest `api` | kodu używanego przez jeden wycinek, przeniesionego do `shared` |
 | `bounded-contexts` | `app.*` z szablonem `context`: domain, application, infrastructure, api w każdym kontekście; bootstrap | `api` kontekstu reeksportującego jego encje domenowe |
@@ -168,7 +168,9 @@ Istnieje siedem presetów, każdy z warstwami wymienionymi od najbardziej wewnę
 
 Każda warstwa może importować samą siebie i warstwy przed nią, więc konfiguracja złożona z samych warstw nie wyrazi luk z ostatniej kolumny; komentarz w tabeli `[tool.inwards]` nazywa tę lukę. `bootstrap.py` to korzeń kompozycji (composition root), jedyny moduł, który widzi każdą warstwę. W `hexagonal` adaptery inbound i outbound zajmują jedno miejsce w kolejności, więc żaden nie może importować drugiego.
 
-`clean` i `hexagonal` włączają też [INW014](../rules/INW014.md) przez `extend-select`, jako ostrzeżenie przez linię w `[tool.inwards.rules.severity]`: moduł w `application/ports/` może zawierać tylko klasy ABC i Protocol, a metoda w nim tylko docstring, `...`, `pass` albo `raise NotImplementedError`. Domyślny zakres reguły, czyli każdy moduł z segmentem `ports`, obejmuje już ten pakiet, więc preset nie ustawia żadnych opcji. `OrderRepository` z przykładowego pakietu jest klasą Protocol i przechodzi. Klasa konkretna albo metoda, która wykonuje pracę, w `application/ports/orders.py` dostaje ostrzeżenie, którego poprawka wskazuje warstwę adapterów: `infrastructure` w `clean` i `outbound` w `hexagonal`.
+`clean` i `hexagonal` włączają też [INW014](../rules/INW014.md) przez `extend-select`, jako ostrzeżenie przez linię w `[tool.inwards.rules.severity]`: moduł w `application/ports/` może zawierać tylko klasy ABC i Protocol, a metoda w nim tylko docstring, `...`, `pass` albo `raise NotImplementedError`. Domyślny zakres reguły, czyli każdy moduł z segmentem `ports`, obejmuje już ten pakiet, więc preset nie ustawia dla niej żadnych opcji. `OrderRepository` z przykładowego pakietu jest klasą Protocol i przechodzi. Klasa konkretna albo metoda, która wykonuje pracę, w `application/ports/orders.py` dostaje ostrzeżenie, którego poprawka wskazuje warstwę adapterów: `infrastructure` w `clean` i `outbound` w `hexagonal`.
+
+Oba presety włączają też [INW015](../rules/INW015.md), również jako ostrzeżenie: tylko `bootstrap.py` może importować i budować adaptery wyjściowe (driven). Jej tabela `[tool.inwards.rules.construct-only-in]` ustawia `role` na pakiet warstwy adapterów (`app.infrastructure` w `clean`, `app.adapters.outbound` w `hexagonal`), a `allowed-in` na `app.bootstrap`. Przykładowy pakiet buduje `InMemoryOrderRepository` tylko w `bootstrap.py`, więc przechodzi. W `clean` moduł presentation, który importuje repozytorium, dostaje ostrzeżenie; to zamyka lukę, którą ten preset wcześniej nazywał. W `hexagonal` adaptery inbound i outbound są warstwami sąsiednimi, więc INW001 zgłasza już ten import jako błąd, a INW015 go nie powtarza; INW015 nadal zgłasza adapter zbudowany przez reeksport, na przykład z `__init__.py` pakietu.
 
 Ostatnie cztery presety rozdzielają pakiety [kontekstami](configuration.md#contexts) i opisują pakiety [szablonem](configuration.md#templates):
 
