@@ -5,15 +5,15 @@
  * config), and a check of one document alone with the config `inwards check`
  * would route it to, as the PostToolUse hook checks an edit. Both read the
  * open documents' text instead of the disk's. When to run them, and what a
- * document shows, is `session.ts`'s; the I/O is bound into `ServerCheck`.
+ * document shows, is `_session.ts`'s; the I/O is bound into `ServerCheck` (`contracts.ts`).
  */
 import { dirname, resolve } from "node:path";
-import type { ConfigError, Diagnostic, Report } from "@inwards/core";
+import type { ConfigError, Diagnostic } from "@inwards/core";
 import type { ProjectIo } from "../project/contracts.ts";
 import { configListsDiagram, DIAGRAM_FILE } from "../project/diagrams.ts";
 import { type CheckUnit, planCheck } from "../project/routing.ts";
-import type { Editor } from "./contracts.ts";
-import { isConfigError, messageOf } from "./convert.ts";
+import { isConfigError, messageOf } from "./_convert.ts";
+import type { Editor, ServerCheck } from "./contracts.ts";
 
 /** The documents a check reads, as `inwards check` does: Python sources and stubs. */
 const PYTHON: RegExp = /\.pyi?$/u;
@@ -29,25 +29,6 @@ const PYTHON: RegExp = /\.pyi?$/u;
 export function checkedAlone(path: string): boolean {
   return PYTHON.test(path) || DIAGRAM_FILE.test(path);
 }
-
-/**
- * Runs one config's check, as `project/check.ts`'s `runCheck` does with its
- * I/O and the server's in-memory extraction cache bound. Never starts threads.
- *
- * @param configPath - the pyproject.toml.
- * @param targets - absolute files; undefined for the whole project.
- * @param base - the directory report paths are relative to.
- * @param options - the open documents' text (`texts`), a per-edit check
- *   (`edit`), and the directories another config checks (`exclude`).
- * @returns the report.
- * @throws {ConfigError} when the config or its baseline is invalid.
- */
-export type ServerCheck = (
-  configPath: string,
-  targets: string[] | undefined,
-  base: string,
-  options: { texts: ReadonlyMap<string, string>; edit?: boolean; exclude: readonly string[] },
-) => Promise<Report>;
 
 /** What the server needs: the editor, a check, and what planning reads. */
 export interface ServerDeps {
