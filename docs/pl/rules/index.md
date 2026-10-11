@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: 2866bc853983e8fcb7848fdf0313aba12407638e1a2bd92c0ab7bcda45db00b9
+source_hash: 7525ceac4d82712fb6532b931728a7459a7d422cf1c78b3cbfca8305cd07e30e
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -30,7 +30,7 @@ Co moduł może importować: warstwy wskazują do środka, konteksty importują 
 | [INW005](INW005.md) | `pure-domain` | Import biblioteki, na który konfiguracja warstwy nie pozwala, np. SQLAlchemy w domenie | domyślnie | błąd | wszystkie | tak |
 | [INW010](INW010.md) | `unknown-first-party` | Import własnego modułu, który nie istnieje | domyślnie | błąd | wszystkie | tak |
 | [INW011](INW011.md) | `dynamic-import` | Import dynamiczny, który sięga do warstwy zewnętrznej albo którego celu Inwards nie umie odczytać | domyślnie | błąd | wszystkie | tak |
-| [INW021](INW021.md) | `private-module` | Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera | opt-in | błąd | żaden | tak |
+| [INW021](INW021.md) | `private-module` | Import modułu, którego nazwa zaczyna się od `_`, spoza pakietu, który go zawiera | opt-in | błąd | vertical-slices | tak |
 
 </div>
 

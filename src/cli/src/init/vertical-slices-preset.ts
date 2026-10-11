@@ -2,8 +2,9 @@
  * @file The `vertical-slices` preset of `inwards init --style`: one package
  * per feature under `features`, on a shared kernel, each slice a context
  * layered by the `slice` template as models, services, commands and queries
- * (siblings, so neither imports the other; ADR-046) and api. Pure data; the
- * example's modules come from `example.ts`.
+ * (siblings, so neither imports the other; ADR-046) and api, with INW021
+ * (private modules) on as a warning. Pure data; the example's modules come
+ * from `example.ts`.
  */
 import { topShape } from "./shapes.ts";
 import { BOOTSTRAP, contextsWhy, runBootstrap, type Style } from "./styles.ts";
@@ -45,7 +46,11 @@ export const VERTICAL_SLICES: Style = {
     names: ["orders"],
   },
   ignoreRules: undefined,
-  optIn: undefined,
+  optIn: {
+    codes: ["INW021"],
+    why: "A module whose name starts with _ is imported only from inside its package (INW021), as a warning to start with: commands/ and queries/ re-export their private modules from __init__.py.",
+    options: [],
+  },
   companion: undefined,
   example: {
     entity: "features.orders.models",
