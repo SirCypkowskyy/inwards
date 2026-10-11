@@ -7,7 +7,7 @@ exports[`--help prints the overview with every style 1`] = `
   "stdout": 
 "inwards <version>
 
-Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
+Usage: inwards check [PATHS...] [--format text|concise|json|sarif|github] [--max-diagnostics N]
                      [--config pyproject.toml] [--log] [--no-cache]
                      (PATHS: those files only; whole-project checks such as dead layer
                      prefixes, import cycles and symlinks in layers run without PATHS)
@@ -44,14 +44,15 @@ exports[`check --help prints that command's usage, exit 0 1`] = `
   "code": 0,
   "stderr": "",
   "stdout": 
-"Usage: inwards check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]
+"Usage: inwards check [PATHS...] [--format text|concise|json|sarif|github] [--max-diagnostics N]
                      [--config pyproject.toml] [--log] [--no-cache]
 
 Checks Python imports against the layers declared in [tool.inwards].
 
 PATHS: check those files or directories only; whole-project checks such as
 dead layer prefixes, import cycles and symlinks in layers run without PATHS.
---format: text (default), concise, json (inwards/diagnostics@1) or sarif.
+--format: text (default), concise, json (inwards/diagnostics@1), sarif, or github
+(GitHub Actions annotations, paths from the repository root).
 --max-diagnostics N: print at most N findings (not with sarif).
 --config FILE: the pyproject.toml to read, instead of the nearest one with [tool.inwards].
 --log: append this run to .inwards/runs.jsonl even when the run log is off.

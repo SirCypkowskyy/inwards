@@ -1,11 +1,13 @@
 /**
- * @file Renders a check's report as text, concise, JSON or SARIF. Pure string
- * building: the adapter writes the result, and colour is added only when the
- * caller asks for it.
+ * @file Renders a check's report as text, concise, JSON, SARIF or GitHub
+ * Actions workflow commands. Pure string building: the adapter writes the
+ * result, picks the paths (relative to the working directory, or to the
+ * repository root for `github`), and asks for colour.
  */
 import type { Diagnostic, Suppressed } from "../contracts/records.ts";
 import { DOCS_BASE, VERSION } from "../meta/product.ts";
 import { RULES } from "../meta/registry.ts";
+import { renderGithub } from "./github.ts";
 
 /** A line break with the spaces around it; Unicode line and paragraph separators count too. */
 const LINE_BREAKS = /\s*[\r\n\u2028\u2029]+\s*/gu;
@@ -27,7 +29,7 @@ export interface Report {
   notChecked?: { path: string; message: string }[];
 }
 
-export type Format = "text" | "concise" | "json" | "sarif";
+export type Format = "text" | "concise" | "json" | "sarif" | "github";
 
 export interface RenderOptions {
   /** Indent JSON and SARIF. Adapters turn this off when a program, not a person, reads stdout. */
@@ -48,13 +50,14 @@ interface View extends Report {
 }
 
 /**
- * Formats a report as text, concise text, JSON or SARIF.
+ * Formats a report as text, concise text, JSON, SARIF or GitHub workflow commands.
  * The engine only builds strings; the adapter decides where they go and
  * whether to indent or colour them.
  *
  * @param report - the diagnostics plus file count and timing.
  * @param format - `text` for people, `concise` (one line each) for agents on
- *   a token budget, `json` (`inwards/diagnostics@1`) or `sarif` for tools.
+ *   a token budget, `json` (`inwards/diagnostics@1`) or `sarif` for tools,
+ *   `github` for annotations in a GitHub Actions log.
  * @param options - how to lay the output out.
  * @param options.pretty - indent JSON and SARIF (default true).
  * @param options.color - add ANSI colour codes to text (default false).
@@ -74,6 +77,9 @@ export function render(
   }
   if (format === "sarif") {
     return renderSarif(view, indent);
+  }
+  if (format === "github") {
+    return renderGithub(view.shown, view.notChecked, footer(view, PLAIN).map(oneLine));
   }
   return format === "concise" ? renderConcise(view) : renderText(view, color ? ANSI : PLAIN);
 }

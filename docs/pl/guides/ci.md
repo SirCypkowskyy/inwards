@@ -1,18 +1,71 @@
 ---
 source: docs/chapters/guides/ci.md
-source_hash: 09445c4a6804a0763ffa91e1fac8fac19649a0e3167ae42484e429735d4cc793
+source_hash: a0b68f7228ce4ac110f640c4696401dc5fd2b28b3a619a9c90f064ccd33e4907
 ---
 
 # GitHub Actions { #github-actions }
 
 !!! info "Zweryfikowano 2026-10-11"
-    Kroki sprawdzenia, adnotacji i wysyłki działają przy każdym pull requeście w tym repozytorium ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), na `examples/broken-app`), z Inwards zbudowanym ze źródeł. `uv tool install` z kroku instalacji uruchomiono ręcznie z wersją 0.5.0 z PyPI, poza GitHub Actions.
+    `inwards check --format github` jest przypięte snapshotem E2E, a jego escapowanie testami jednostkowymi zgodnymi z regułami, których używa `@actions/core`; nie uruchomiono go jeszcze w zadaniu GitHub Actions. Kroki sprawdzenia, adnotacji i wysyłki z workflow dla code scanning działają przy każdym pull requeście w tym repozytorium ([`sarif.yml`](https://github.com/SirCypkowskyy/inwards/blob/develop/.github/workflows/sarif.yml), na `examples/broken-app`), z Inwards zbudowanym ze źródeł. `uv tool install` z kroku instalacji uruchomiono ręcznie z wersją 0.5.0 z PyPI, poza GitHub Actions. Hook pre-commit uruchomiono przez `uvx pre-commit run --all-files` (pre-commit 4.6.2) z `inwards==0.5.0` na projekcie testowym.
 
 Hooki agentów wyłapują naruszenie, gdy agent pracuje; CI wyłapuje te, które się przez nie prześlizgną, na przykład ręczną edycję albo pracę agenta bez hooków. Poniższy workflow oblewa pull request, gdy import łamie warstwę, i umieszcza naruszenie przy linii, która je spowodowała.
 
 ## Workflow { #the-workflow }
 
+!!! warning "Wymaga wydania po 0.5.0"
+    `--format github` jest nowe: Inwards 0.5.0 kończy się kodem 2 i komunikatem `Unknown --format github`. Dopóki następne wydanie nie trafi na PyPI, użyj [workflow dla code scanning](#code-scanning), który działa z 0.5.0 i dodaje adnotacje do pull requesta także bez code scanning.
+
 Zapisz go jako `.github/workflows/inwards.yml`:
+
+```yaml title=".github/workflows/inwards.yml"
+name: Inwards
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  inwards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Install Inwards
+        run: |
+          uv tool install 'inwards>0.5.0' # then pin the release you tested: inwards==X.Y.Z
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Check
+        run: inwards check --format github
+```
+
+- **Install Inwards** bierze wheel z [PyPI](https://pypi.org/project/inwards/). Przypnij wersję, żeby nowe wydanie, które może dodać regułę, nigdy nie oblało pull requesta, który niczego nie zmienił; podbijaj ją w osobnym pull requeście. Jeśli projekt ma już Inwards jako zależność deweloperską uv, `uv sync` i `uv run inwards check --format github` użyją wersji z `uv.lock`. Bez uv pobierz zamiast tego plik binarny tak, jak opisuje [Instalacja](install.md#from-a-release).
+- **Check** wypisuje jedno [polecenie workflow](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) na każdy wynik, `::error` dla naruszenia i `::warning` dla ostrzeżenia, a potem zwykłą linię podsumowania. Runner zamienia każde polecenie w adnotację: naruszenie pojawia się przy swojej linii w zakładce „Files changed” i w podsumowaniu uruchomienia, z krokami naprawy i linkiem do dokumentacji reguły jako treścią. Nie potrzeba do tego ani code scanning, ani `jq`. Kod wyjścia jest taki sam jak w każdym innym formacie: 0 bez naruszeń albo tylko z ostrzeżeniami, 1 z naruszeniami, 2 przy błędzie użycia albo konfiguracji, więc krok sam oblewa zadanie. Sprawdzenie czyta `inwards-baseline.json`, jeśli go zacommitowano, więc w istniejącym kodzie błędem kończą się tylko nowe naruszenia.
+- GitHub pokazuje najwyżej 10 adnotacji błędów na krok i 50 na zadanie. Pozostałe wyniki wciąż są w logu kroku. `--max-diagnostics N` ogranicza też liczbę poleceń, błędy najpierw.
+
+Linia wygląda tak:
+
+```text
+::error file=shop/domain/order.py,line=1,endLine=1,col=8,endColumn=30,title=INW001::Layer "domain" imports "shop.infrastructure.db" from outer layer "infrastructure". ...%0AFix: ...
+```
+
+Treść i wartości właściwości są escapowane tak, jak robi to zestaw narzędzi GitHuba (`escapeData` i `escapeProperty` w [`@actions/core`](https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts)): `%`, powrót karetki i znak nowej linii wszędzie stają się `%25`, `%0D` i `%0A`, a w `file` i `title` dodatkowo `:` staje się `%3A`, a `,` staje się `%2C`. Ścieżka z przecinkiem albo dwukropkiem nadal trafia na swoją linię. Dla wyniku obejmującego kilka linii polecenie podaje `line` i `endLine` bez kolumn, bo runner odrzuca kolumny, gdy obie linie się różnią.
+
+### Monorepo { #monorepos }
+
+GitHub dopasowuje `file` z adnotacji do ścieżek liczonych od korzenia repozytorium. Gdy sprawdzenie działa w folderze pakietu, ustaw w kroku `working-directory`; Inwards czyta `GITHUB_WORKSPACE`, czyli korzeń checkoutu na runnerze, i zapisuje każdą ścieżkę względem niego:
+
+```yaml
+      - name: Check the API package
+        working-directory: packages/api
+        run: inwards check --format github
+```
+
+Uruchomione z `packages/api` naruszenie w `shop/domain/order.py` dostaje adnotację jako `packages/api/shop/domain/order.py`. W korzeniu workspace'u uv zwykłe `inwards check --format github` sprawdza każdy pakiet członkowski względem jego własnej konfiguracji, a ścieżki są już liczone od korzenia. Dwa przypadki nadal nie trafiają na linię: `actions/checkout` z `path:`, który umieszcza repozytorium w podfolderze `GITHUB_WORKSPACE`, więc każda ścieżka zaczyna się od tego folderu; oraz uruchomienie spoza `GITHUB_WORKSPACE`, gdzie ścieżki zostają względne wobec katalogu roboczego. Adnotacja pojawia się wtedy tylko w podsumowaniu uruchomienia.
+
+## Code scanning { #code-scanning }
+
+[GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github) daje każdemu alertowi historię, przycisk odrzucenia i link do pomocy reguły. Czyta SARIF, więc ten workflow zapisuje `--format sarif` i dodaje adnotacje do pull requesta z tego pliku przez `jq`, co działa także z Inwards 0.5.0:
 
 ```yaml title=".github/workflows/inwards.yml"
 name: Inwards
@@ -60,13 +113,35 @@ jobs:
         run: exit 1
 ```
 
-- **Install Inwards** bierze wheel z [PyPI](https://pypi.org/project/inwards/). Przypnij wersję, żeby nowe wydanie, które może dodać regułę, nigdy nie oblało pull requesta, który niczego nie zmienił; podbijaj ją w osobnym pull requeście. Jeśli projekt ma już Inwards jako zależność deweloperską uv, `uv sync` i `uv run inwards check` użyją wersji z `uv.lock`. Bez uv pobierz zamiast tego plik binarny tak, jak opisuje [Instalacja](install.md#from-a-release).
-- **Check** zapisuje SARIF 2.1.0 i zapamiętuje kod wyjścia, zamiast od razu oblewać zadanie, więc kolejne kroki nadal się wykonują. Kod wyjścia 2 (brak konfiguracji, błędna konfiguracja) oblewa zadanie od razu. Sprawdzenie czyta `inwards-baseline.json`, jeśli go zacommitowano, więc w istniejącym kodzie błędem kończą się tylko nowe naruszenia.
-- **Annotate the pull request** zamienia każdy wynik w [polecenie workflow](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands). Naruszenie pojawia się przy swojej linii w zakładce „Files changed” i w podsumowaniu uruchomienia, z krokami naprawy jako treścią. Nie potrzebuje do tego code scanning. GitHub pokazuje najwyżej 10 adnotacji błędów na krok i 50 na zadanie. Ścieżki pochodzą z SARIF-u, gdzie są zakodowane jako URI, więc plik, którego nazwa zawiera spację albo znak spoza ASCII, dostaje adnotację w podsumowaniu uruchomienia, a nie przy swojej linii.
-- **Upload to code scanning** wysyła ten sam plik do [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github). Alerty mają historię, przycisk odrzucenia i link do pomocy reguły. Code scanning pokazuje nowe alerty w pull requeście, porównując go z gałęzią bazową, stąd wyzwalacz `push`.
+- **Check** zapisuje SARIF 2.1.0 i zapamiętuje kod wyjścia, zamiast od razu oblewać zadanie, więc kolejne kroki nadal się wykonują. Kod wyjścia 2 (brak konfiguracji, błędna konfiguracja) oblewa zadanie od razu.
+- **Annotate the pull request** robi to samo co `--format github`, ale z SARIF-u. Ścieżki pochodzą z SARIF-u, gdzie są zakodowane jako URI i względne wobec katalogu roboczego, więc plik, którego nazwa zawiera spację albo znak spoza ASCII, dostaje adnotację w podsumowaniu uruchomienia, a nie przy swojej linii. Z wydaniem po 0.5.0 zastąp ten krok przez `inwards check --format github || true`, żeby dostać dokładne ścieżki.
+- **Upload to code scanning** wysyła ten sam plik do code scanning. Code scanning pokazuje nowe alerty w pull requeście, porównując go z gałęzią bazową, stąd wyzwalacz `push`.
 - **Fail on violations** oblewa zadanie na końcu, gdy wyniki są już opublikowane.
 
 Gdy code scanning zacznie działać, zostaw tylko jeden z dwóch kroków z adnotacjami, bo inaczej każde naruszenie pojawi się dwa razy.
+
+## pre-commit { #pre-commit }
+
+Żeby sprawdzać kod przed każdym commitem przez [pre-commit](https://pre-commit.com/), dodaj lokalny hook do `.pre-commit-config.yaml`. pre-commit instaluje przypięty wheel z PyPI we własnym środowisku, więc projekt nie potrzebuje innej konfiguracji:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: local
+    hooks:
+      - id: inwards
+        name: inwards
+        entry: inwards check --format concise
+        language: python
+        additional_dependencies: ["inwards==0.5.0"]
+        pass_filenames: false
+        files: (\.py|pyproject\.toml|inwards-baseline\.json)$
+```
+
+- `pass_filenames: false` sprawdza cały projekt, więc działają też reguły całego projektu (martwe prefiksy warstw, cykle importów, dowiązania symboliczne w warstwach), a commit, który zmienia tylko `pyproject.toml`, jest sprawdzany względem nowej konfiguracji. Zimne sprawdzenie całego repozytorium benchmarku (496 000 linii) trwa 0,4 s na jednym rdzeniu ([rozdział 6](../06-Constraints-and-Quality.md)). Żeby sprawdzać tylko pliki w staging area, usuń tę linię; reguły całego projektu poczekają wtedy na CI.
+- `files` uruchamia hook, gdy zmienia się plik Pythona, `pyproject.toml` albo baseline, a w pozostałych przypadkach go pomija.
+- `--format concise` wypisuje jedną linię na wynik. Naruszenie oblewa hook kodem 1, co zatrzymuje commit; ostrzeżenie nie.
+- Podbijaj `inwards==0.5.0` świadomie, tak jak w CI. Lokalny hook nie ma `rev`, więc `pre-commit autoupdate` go nie zmienia.
+- Gdy Inwards jest już zależnością deweloperską uv, `entry: uv run inwards check --format concise` z `language: system` użyje zablokowanej wersji, bez `additional_dependencies`.
 
 ## Moduły generowane { #generated-modules }
 
@@ -111,4 +186,4 @@ generated = ["*_pb2", "*_pb2_grpc", "_version", "shop.api.gen"]
 
 ## Dostępność code scanning { #code-scanning-availability }
 
-Code scanning jest darmowe w publicznych repozytoriach. W prywatnym repozytorium wymaga GitHub Code Security (części GitHub Advanced Security), które mogą kupić tylko organizacje na planie GitHub Team albo Enterprise. Bez tego krok wysyłki kończy się błędem „Code scanning is not enabled for this repository”. Wtedy albo usuń krok wysyłki i polegaj na kroku z adnotacjami, albo dodaj do niego `continue-on-error: true`.
+Code scanning jest darmowe w publicznych repozytoriach. W prywatnym repozytorium wymaga GitHub Code Security (części GitHub Advanced Security), które mogą kupić tylko organizacje na planie GitHub Team albo Enterprise. Bez tego krok wysyłki kończy się błędem „Code scanning is not enabled for this repository”. Wtedy albo użyj [workflow](#the-workflow) bez code scanning, albo dodaj do kroku wysyłki `continue-on-error: true`.
