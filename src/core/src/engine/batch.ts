@@ -221,10 +221,11 @@ function finish(
   const warned = new Set<string>();
   const collected: Collected[] = [];
   const sources = scanned.map(({ src }) => src);
-  const wired = fastApiFindings(steps.parser, project, sources, { config, edit });
-  // One parse per first-party module the content rules follow into, for the whole run (#359).
+  // One parse per text for the whole run, shared by the FastAPI and content rules (#359, #387).
   const run = new ContentRun(steps.parser, project, config, sources);
+  let orm: OrmProject = { findings: [], replaced: () => false };
   try {
+    const wired = fastApiFindings(run.trees, project, sources, { config, edit });
     for (const { src, scan } of scanned) {
       const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));
       const imports = confirmed.imports ?? scan.imports;
@@ -233,18 +234,19 @@ function finish(
       }
       const extra = withFound(
         withFastApi(confirmed, src, wired),
-        contentFindings(steps.parser, src, config, run),
+        contentFindings(src, config, run),
       );
       const own = steps.suppressIn(src, extra);
       suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
       all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }
+    if (whole) {
+      orm = ormProjectFindings(run.trees, sources, config, run.ormModels);
+    }
   } finally {
     run.dispose();
   }
-  let orm: OrmProject = { findings: [], replaced: () => false };
   if (whole) {
-    orm = ormProjectFindings(steps.parser, sources, config, run.ormModels);
     /**
      * Reads a file's imports with the full parse, for INW004 and INW019.
      *

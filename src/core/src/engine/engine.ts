@@ -157,12 +157,12 @@ export class Engine {
    */
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
-    const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
     const run = new ContentRun(this.parser, project, this.config);
     try {
+      const wired = fastApiFindings(run.trees, project, [src], { config: this.config, edit: true });
       const confirmed = withFound(
         withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
-        contentFindings(this.parser, src, this.config, run),
+        contentFindings(src, this.config, run),
       );
       const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
       return applyRules(kept, this.config.rules);
