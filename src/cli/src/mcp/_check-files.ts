@@ -11,7 +11,7 @@
 import { ConfigError, render } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
 import { DIAGRAM_FILE } from "../project/diagrams.ts";
-import { absoluteFrom, failure } from "./answers.ts";
+import { absoluteFrom, failure } from "./_answers.ts";
 import type { CheckFilesInput, McpCheck, ToolAnswer } from "./contracts.ts";
 
 /** Python sources and stubs, whose text may be given. */

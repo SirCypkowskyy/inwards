@@ -3,7 +3,7 @@
  * layers with what each may import, the contexts, the choice among the
  * candidates (the named module, the innermost layer whose imports pass, or
  * the layer the description points to), and the Markdown the model reads.
- * Pure: the verdicts come in from `where.ts`, which runs the checks.
+ * Pure: the verdicts come in from `_where.ts`, which runs the checks.
  */
 import type { ContextSpec, LayerSpec } from "@inwards/core";
 

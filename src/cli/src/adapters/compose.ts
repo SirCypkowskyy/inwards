@@ -20,7 +20,7 @@ import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts"
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
 import type { ServerCheck } from "../lsp/contracts.ts";
-import type { RulePages } from "../mcp/explain-rule.ts";
+import type { RulePages } from "../mcp/contracts.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
 import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
@@ -194,7 +194,7 @@ function nodeMcp(io: Platform): McpDeps {
   return {
     io: platform,
     serve: async (tools: Parameters<McpDeps["serve"]>[0]): Promise<number> => {
-      const { serveMcp } = await import("./mcp-connection.ts");
+      const { serveMcp } = await import("../mcp/adapters/connection.ts");
       return await serveMcp(tools);
     },
     pages: async (): Promise<RulePages> => (await import("./rule-pages.ts")).RULE_PAGES,

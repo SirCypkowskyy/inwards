@@ -1,20 +1,20 @@
 /**
  * @file `inwards mcp`: the MCP server over stdio (ADR-042), for agents with an
- * MCP client. It binds the tools' policy (`mcp/tools.ts`) to a check that is
+ * MCP client. It binds the tools' policy (`_tools.ts`) to a check that is
  * `inwards check`'s own (`planCheck` routes from the working directory,
  * `runPlan` runs and merges, the warm check `main.ts` wires in reads), with an
  * agent's unsaved texts laid over the disk, and serves the tools until the
  * client closes stdin. Nothing is noted in the run log.
  */
 import type { Report } from "@inwards/core";
+import { runPlan } from "../commands/check-runs.ts";
+import type { AppDeps } from "../commands/deps.ts";
 import type { McpCheck, McpTools } from "../mcp/contracts.ts";
-import { createTools } from "../mcp/tools.ts";
 import type { Streams } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { overlayTexts } from "../project/overlay.ts";
 import { planCheck } from "../project/routing.ts";
-import { runPlan } from "./check-runs.ts";
-import type { AppDeps } from "./deps.ts";
+import { createTools } from "./_tools.ts";
 
 /**
  * Makes the check the tools run: `inwards check` from the working directory

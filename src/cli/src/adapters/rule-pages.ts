@@ -5,7 +5,7 @@
  * makes `bun build --compile` put the text in the binary; from source the
  * same imports read the files. Only `compose.ts` loads this module, lazily,
  * so no other command pays for the text. It doesn't parse the pages; that is
- * `mcp/rule-page.ts`'s job.
+ * `mcp/_rule-page.ts`'s job.
  */
 import fapi001 from "../../../../docs/chapters/rules/FAPI001.md" with { type: "text" };
 import fapi002 from "../../../../docs/chapters/rules/FAPI002.md" with { type: "text" };

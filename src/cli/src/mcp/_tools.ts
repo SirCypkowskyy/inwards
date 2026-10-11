@@ -3,20 +3,21 @@
  * bound to one invocation's check, working directory, config reads and rule
  * pages, and run one at a time, as the language server runs its checks, so
  * two calls never share the kept parse at once. What each tool does is its
- * own module's; the protocol is `adapters/mcp-connection.ts`'s.
+ * own module's; the protocol is `adapters/connection.ts`'s.
  */
 import type { ProjectIo } from "../project/contracts.ts";
-import { checkFiles } from "./check-files.ts";
+import { checkFiles } from "./_check-files.ts";
+import { explainRule } from "./_explain-rule.ts";
+import { whereShouldThisGo } from "./_where.ts";
 import type {
   CheckFilesInput,
   ExplainRuleInput,
   McpCheck,
   McpTools,
+  RulePages,
   ToolAnswer,
   WhereInput,
 } from "./contracts.ts";
-import { explainRule, type RulePages } from "./explain-rule.ts";
-import { whereShouldThisGo } from "./where.ts";
 
 /** What the tools need. */
 export interface ToolsDeps {

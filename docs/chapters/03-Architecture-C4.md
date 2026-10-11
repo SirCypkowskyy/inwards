@@ -87,7 +87,7 @@ flowchart TB
 | **Engine** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019 |
 | **CLI** | Bun 1.4 single-file executable, 6 targets, also wrapped in 5 platform wheels | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agents, style presets, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 on Bun, in the CLI binary | `src/cli/src/lsp/` | :material-check-circle: what `inwards check` reports in each workspace folder, with unsaved text, on start, save, folder changes and file events; a keystroke checks its document alone ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
-| **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
+| **`inwards mcp`** | MCP TypeScript SDK 2 on Bun, in the CLI binary | `src/cli/src/mcp/` | :material-check-circle: `check_files`, `explain_rule` and `where_should_this_go` for agents with an MCP client ([guide](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
 | **VS Code extension** | `vscode-languageclient` 10, a thin client | `src/vscode-extension/src/client/` | :material-check-circle: starts `inwards server` from the binary in its platform VSIX, `inwards.path` or `PATH` ([ADR-043](05-ADR.md#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform)); a VSIX per platform on each release; :material-progress-clock: Marketplace and Open VSX once the owner publishes ([#64](https://github.com/SirCypkowskyy/inwards/issues/64)) |
 | **Agent kit** | Generated hook config and markdown | `src/cli/src/init/` | :material-check-circle: `init --agent` for `claude`, `aider` and `agents-md` |
 | **Session state and run log** | JSON and JSON Lines files, local only | `.inwards/state/`, `.inwards/runs.jsonl` | :material-check-circle: (run log opt-in, [chapter 8](08-Run-Log.md)) |
@@ -511,7 +511,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, mcp, import-config,
+│   │   ├── commands/      # check, baseline, stats, rules, hook, daemon, import-config,
 │   │   │                  #   import-diagram, diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
@@ -528,16 +528,17 @@ src/
 │   │   │                  #   (cli.ts); when to check what (_session.ts), the whole pass and
 │   │   │                  #   the one-document check (_checks.ts), what each file shows;
 │   │   │                  #   adapters/connection.ts is the LSP connection over stdio
-│   │   ├── mcp/           # inwards mcp: the three tools (check-files.ts, explain-rule.ts,
-│   │   │                  #   where.ts), queued one at a time (tools.ts)
+│   │   ├── mcp/           # inwards mcp, a slice (ADR-047): index.ts re-exports the handler
+│   │   │                  #   (cli.ts); the three tools (_check-files.ts, _explain-rule.ts,
+│   │   │                  #   _where.ts), queued one at a time (_tools.ts);
+│   │   │                  #   adapters/connection.ts is the MCP connection over stdio
 │   │   ├── init/          # inwards init: agents, --style, the scaffold plan, the report, presets
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
 │   │                      #   the grammars, the picker, the daemon's socket and files,
-│   │                      #   the MCP connection over stdio (mcp-connection.ts) and the
-│   │                      #   embedded rule pages (rule-pages.ts);
+│   │                      #   the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/
