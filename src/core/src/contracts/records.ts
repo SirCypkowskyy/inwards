@@ -72,6 +72,13 @@ export interface ImportRef extends Span {
    * target is a module (`import X`, `from X import *`, dynamic imports).
    */
   from?: string;
+  /**
+   * Set when the import sits in the body of an `if TYPE_CHECKING:` or
+   * `elif TYPE_CHECKING:` (also `typing.TYPE_CHECKING`), which never runs
+   * (#375). Only the full parse sets it: the prescan's skeleton keeps import
+   * lines alone, so it can't tell, and its references never carry it.
+   */
+  typeChecking?: true;
 }
 
 /** Machine-actionable repair advice. Written for an LLM first, a human second. */

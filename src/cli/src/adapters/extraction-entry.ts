@@ -66,14 +66,16 @@ function isImportList(value: unknown): value is ImportRef[] {
  * Tells whether a value is an import reference.
  *
  * @param value - any parsed value.
- * @returns true for a span with a target, a statement and an optional `from`.
+ * @returns true for a span with a target, a statement, an optional `from`
+ *   and an optional `typeChecking` that is `true` when present.
  */
 function isImportRef(value: unknown): value is ImportRef {
   return (
     isSpan(value) &&
     typeof value["target"] === "string" &&
     typeof value["statement"] === "string" &&
-    (value["from"] === undefined || typeof value["from"] === "string")
+    (value["from"] === undefined || typeof value["from"] === "string") &&
+    (value["typeChecking"] === undefined || value["typeChecking"] === true)
   );
 }
 

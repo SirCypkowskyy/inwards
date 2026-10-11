@@ -92,3 +92,53 @@ describe("parsePython on long comment runs", () => {
     expect(took).toBeLessThan(1500);
   });
 });
+
+describe("extractImports and TYPE_CHECKING", () => {
+  test("marks an import in an if or elif TYPE_CHECKING body, at any depth, and nothing else", () => {
+    const text = [
+      "import typing",
+      "from typing import TYPE_CHECKING",
+      "if TYPE_CHECKING:",
+      "    import a",
+      "    try:",
+      "        from b import c",
+      "    except ImportError:",
+      "        pass",
+      "elif x:",
+      "    import d",
+      "if typing.TYPE_CHECKING:",
+      "    import e",
+      "else:",
+      "    import f",
+      "if y:",
+      "    pass",
+      "elif TYPE_CHECKING:",
+      "    import g",
+      "if not TYPE_CHECKING:",
+      "    import h",
+      "if TYPE_CHECKING and y:",
+      "    import i",
+      "",
+    ].join("\n");
+    const tree = parsePython(parser, text);
+    try {
+      const found = extractImports(tree, file("pkg/mod.py", text));
+      expect(found.filter((r) => r.typeChecking === true).map((r) => r.target)).toEqual([
+        "a",
+        "b.c",
+        "e",
+        "g",
+      ]);
+      expect(found.filter((r) => r.typeChecking === undefined).map((r) => r.target)).toEqual([
+        "typing",
+        "typing.TYPE_CHECKING",
+        "d",
+        "f",
+        "h",
+        "i",
+      ]);
+    } finally {
+      tree.delete();
+    }
+  });
+});
