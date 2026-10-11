@@ -2,8 +2,8 @@
 
 Inwards keeps a Mermaid or PlantUML drawing of your architecture in step with `[tool.inwards]`, in both directions ([ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config)):
 
-- **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, and [INW018](../rules/INW018.md) an arrow that draws an import the config forbids.
-- **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the two rules keep them in step.
+- **The docs follow the code.** [INW017](../rules/INW017.md) reports a name in the diagram that the config or the code doesn't know, [INW018](../rules/INW018.md) an arrow that draws an import the config forbids, and [INW019](../rules/INW019.md) an import in the code that the diagram doesn't draw.
+- **The docs drive the code.** `inwards import-diagram` turns a diagram into a first `[tool.inwards]`, once. From then on the rules keep them in step.
 
 `[tool.inwards]` stays the only source of truth: a diagram is never read as config while checking.
 
@@ -65,10 +65,10 @@ List the files and turn the rules on:
 diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 
 [tool.inwards.rules]
-extend-select = ["INW017", "INW018"]
+extend-select = ["INW017", "INW018", "INW019"]
 ```
 
-Both are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. They run on whole-project runs: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`.
+All three are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. INW019 compares the diagram with the imports the run collects: in a layers diagram a path of arrows draws an import, in a contexts diagram it takes a direct arrow, and an import under `if TYPE_CHECKING:` counts. They run on whole-project runs: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`.
 
 ## Start from a diagram { #import-diagram }
 
@@ -293,5 +293,5 @@ Where Inwards differs:
 - **Mermaid flowcharts and PlantUML component diagrams only.** C4, `architecture-beta` and other PlantUML diagram types aren't read.
 - **PlantUML is read one line at a time.** A statement split over lines (a component description that runs onto the next line) isn't followed, and a link to a component by its display name, rather than its alias, names a different node.
 - **What a diagram can't say stays out.** Library lists, shapes, selectors other than a node's label, rule options and `ignore` are written by hand after the import.
-- **Imports the diagram doesn't draw** aren't reported yet; that is INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
+- **Imports between layers and contexts, not modules.** INW019 doesn't compare an arrow between two module nodes inside one context with the imports between those modules.
 - **Whole-project runs only.** The per-edit hook and the editor don't show diagram findings.

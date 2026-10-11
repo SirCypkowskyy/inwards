@@ -26,6 +26,12 @@ const UNCHECKED =
 const WORKSPACE_PACKAGE =
   /^(?<head>(?:Layer|Module) "[^"]*" imports "[^"]*" from )workspace package "/u;
 
+/**
+ * INW019 names the import behind a missing arrow as `path:line imports target`;
+ * the line goes, so a moved import keeps the finding accepted.
+ */
+const IMPORT_LINE = /(?<head> in the code \([^\n]*?):\d+(?= imports )/u;
+
 /** The rules whose messages end with the layer order. */
 const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
 
@@ -39,7 +45,7 @@ const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
  * @param d - a diagnostic or baseline entry: its rule code and message.
  * @param d.code - which rule wrote it, which decides what is dropped.
  * @param d.message - the text to normalise.
- * @returns the message without INW001's and INW011's "Allowed direction" sentence or INW006's closing clause, and with INW005's "workspace package" read as "library".
+ * @returns the message without INW001's and INW011's "Allowed direction" sentence, INW006's closing clause or the line of INW019's import, and with INW005's "workspace package" read as "library".
  */
 export function stableMessage({ code, message }: Pick<Diagnostic, "code" | "message">): string {
   if (WITH_DIRECTION.has(code)) {
@@ -47,6 +53,9 @@ export function stableMessage({ code, message }: Pick<Diagnostic, "code" | "mess
   }
   if (code === "INW005") {
     return message.replace(WORKSPACE_PACKAGE, '$<head>library "');
+  }
+  if (code === "INW019") {
+    return message.replace(IMPORT_LINE, "$<head>");
   }
   return code === "INW006" ? message.replace(UNCHECKED, ".") : message;
 }

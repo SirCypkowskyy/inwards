@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 7c81277ff4c5560d8839febc96ccaab07bf99ab2a52be47a4334a62e0378080c
+source_hash: c089c4b88ae1219f4dabf30546af2d53e9d1d697d9c8b3398445cb19f53cf29c
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -89,7 +89,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -121,7 +121,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -418,6 +418,7 @@ Reguły są pogrupowane według kategorii, w kolejności, której używa [indeks
 |---|---|---|---|---|---|---|
 | INW017 | `diagram-unknown-name` | W plikach Markdown i `.mmd`, które wymienia `diagrams`, `flowchart` albo `graph` w Mermaid oznaczony `%% inwards: layers` lub `%% inwards: contexts`: identyfikator węzła, który nie nazywa żadnej zadeklarowanej warstwy (albo, w diagramie kontekstów, węzeł lub subgraph na najwyższym poziomie, który nie nazywa żadnego kontekstu), i etykieta w cudzysłowie, do której nie pasuje żaden moduł. Węzły `:::external` są pomijane. Tylko przy sprawdzaniu całego projektu; CLI czyta pliki, a `engine/diagrams.ts` przekazuje je do ręcznie napisanego parsera linii w `diagram/`. Wpis `diagrams`, do którego nie pasuje żaden plik, jest zgłaszany w pyproject.toml. Zobacz [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 | INW018 | `diagram-forbidden-edge` | W tych samych oznaczonych diagramach ciągła albo pogrubiona strzałka w jedną stronę, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi w diagramie warstw; w diagramie kontekstów z jednego kontekstu do innego, którego nie wymienia jego `depends-on`, albo do węzła, którego etykieta w cudzysłowie nie jest jednym z modułów `public` tamtego kontekstu. Przerywane krawędzie i węzły `:::external` są pomijane; każda zabroniona para jest zgłaszana raz na diagram. `inwards import-diagram` zapisuje konfigurację, którą przedstawia diagram. Zob. [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
+| INW019 | `diagram-missing-dependency` | W tych samych oznaczonych diagramach import w kodzie z jednej narysowanej warstwy albo jednego kontekstu do innego, dla którego nie ma strzałki: w diagramie warstw brak ścieżki strzałek, w diagramie kontekstów brak bezpośredniej strzałki. Importy pod `if TYPE_CHECKING:` się liczą. Uruchamia ją silnik na importach, które uruchomienie dla całego projektu zbiera dla INW004 (`engine/diagrams.ts`), i potwierdza plik zgłoszenia pełnym parsowaniem; każda brakująca para jest zgłaszana raz na diagram, przy węźle, który importuje. Zob. [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 
 ### FastAPI { #catalogue-fastapi }
 
@@ -491,6 +492,7 @@ src/
 │   │   │   │                            #   wording.ts, check.ts
 │   │   │   ├── diagram-unknown-name/    # INW017: check.ts (names in marked diagrams)
 │   │   │   ├── diagram-forbidden-edge/  # INW018: check.ts (arrows in marked diagrams)
+│   │   │   ├── diagram-missing-dependency/  # INW019: check.ts (imports a diagram leaves out)
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
 │   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
@@ -506,7 +508,7 @@ src/
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
-│   │   │                  #   diagrams.ts INW017 and INW018
+│   │   │                  #   diagrams.ts INW017 to INW019
 │   │   └── report/        # render.ts: text / concise / json / sarif; github.ts
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts

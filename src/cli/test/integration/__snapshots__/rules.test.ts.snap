@@ -27,6 +27,7 @@ INW015   construct-only-in            off    error     opt-in, off by default
 INW016   orm-naming                   off    error     opt-in, off by default
 INW017   diagram-unknown-name         off    warning   opt-in, off by default
 INW018   diagram-forbidden-edge       off    warning   opt-in, off by default
+INW019   diagram-missing-dependency   off    warning   opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -67,6 +68,7 @@ INW015   construct-only-in            off    error     opt-in, off by default
 INW016   orm-naming                   on     warning   templates.domain.rules.models; severity: templates.domain.rules.models; only in src.*.models
 INW017   diagram-unknown-name         off    warning   opt-in, off by default
 INW018   diagram-forbidden-edge       off    warning   opt-in, off by default
+INW019   diagram-missing-dependency   off    warning   opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -422,6 +424,23 @@ exports[`rules --json prints inwards/rules@1 1`] = `
         "kind": "opt-in",
       },
       "summary": "A solid arrow in a marked architecture diagram draws only imports [tool.inwards] allows.",
+    },
+    {
+      "code": "INW019",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW019/",
+      "enabled": false,
+      "name": "diagram-missing-dependency",
+      "severity": "warning",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "A marked architecture diagram draws every import the code makes between the layers or contexts it shows.",
     },
     {
       "code": "FAPI001",

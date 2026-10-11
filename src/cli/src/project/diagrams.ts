@@ -1,6 +1,6 @@
 /**
- * @file Reading the files `[tool.inwards].diagrams` names, for INW017 and
- * INW018 (ADR-045): a plain entry is one file next to the config, a glob is
+ * @file Reading the files `[tool.inwards].diagrams` names, for INW017,
+ * INW018 and INW019 (ADR-045): a plain entry is one file next to the config, a glob is
  * walked from its directory before the first wildcard with the CLI's usual
  * skip rules. The engine decides what the diagrams say (`checkDiagrams`);
  * this module only finds and reads them, through the injected `ProjectIo`,
@@ -19,7 +19,7 @@ import { posix } from "../paths/lexical.ts";
 import type { ProjectIo } from "./contracts.ts";
 
 /** The rules that read diagrams. */
-const DIAGRAM_RULES = ["INW017", "INW018"];
+const DIAGRAM_RULES = ["INW017", "INW018", "INW019"];
 
 /** The diagram files a config names, and the entries that named none. */
 export interface ListedDiagrams {
@@ -29,7 +29,7 @@ export interface ListedDiagrams {
 
 /**
  * Finds and reads the diagram files a config lists. Nothing is read when the
- * config lists none or INW017 and INW018 are both off.
+ * config lists none or INW017, INW018 and INW019 are all off.
  *
  * @param io - probes, walks and reads the project.
  * @param configPath - absolute path of the pyproject.toml; entries are relative to its directory.

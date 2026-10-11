@@ -2,7 +2,7 @@
  * @file How a whole-project check finds the files `diagrams` lists (#344):
  * plain paths and globs relative to the config file, each file once, report
  * paths relative to the base, the entries that match nothing, and no read at
- * all while INW017 is off. The findings themselves are the engine's and are
+ * all while the diagram rules are off. The findings themselves are the engine's and are
  * tested in core.
  */
 import { expect, test } from "bun:test";
@@ -77,15 +77,18 @@ test("report paths are relative to the base, not the config", () => {
   expect(listed.sources.map((s) => s.path)).toEqual(["architecture.md"]);
 });
 
-test("INW018 alone reads the diagrams too", () => {
-  const { dir, configPath, config } = setUp(
-    '["README.md"]',
-    '\n[tool.inwards.rules]\nextend-select = ["INW018"]\n',
-  );
-  expect(readDiagrams(recording([]), configPath, config, dir).sources).toHaveLength(1);
+test("INW018 or INW019 alone reads the diagrams too", () => {
+  for (const code of ["INW018", "INW019"]) {
+    const { dir, configPath, config } = setUp(
+      '["README.md"]',
+      `\n[tool.inwards.rules]\nextend-select = ["${code}"]\n`,
+    );
+    const read = readDiagrams(recording([]), configPath, config, dir).sources;
+    expect([code, read.length]).toEqual([code, 1]);
+  }
 });
 
-test("nothing is read while INW017 and INW018 are off", () => {
+test("nothing is read while INW017, INW018 and INW019 are off", () => {
   const { dir, configPath, config } = setUp('["README.md"]', "");
   const reads: string[] = [];
   expect(readDiagrams(recording(reads), configPath, config, dir)).toEqual({

@@ -3,7 +3,8 @@
  * project whose docs draw its layers and contexts gets its `[tool.inwards]`
  * from the diagram with `--write`, and `inwards check` then finds no INW017
  * or INW018 in that same diagram, while a drawn edge the config forbids is
- * still caught after an edit, for a Mermaid and a PlantUML diagram (#346).
+ * still caught after an edit, for a Mermaid and a PlantUML diagram (#346),
+ * and an import the code adds later without an arrow is INW019 (#347).
  * Also: printing, the notes, the src root, a file outside the project, and
  * the refusals.
  */
@@ -104,6 +105,26 @@ describe("inwards import-diagram", () => {
       readFileSync(path, "utf8").replace("invoicing --> place", "place --> invoices"),
     );
     expect(findings(dir)).toEqual(["INW018 docs/architecture.md:21"]);
+  });
+
+  test("docs drive the code, then follow it: an import the imported diagram doesn't draw is INW019", () => {
+    const dir = project(FILES);
+    expect(inwards(["import-diagram", "docs/architecture.md", "--write"], { cwd: dir }).code).toBe(
+      0,
+    );
+    const config = join(dir, "pyproject.toml");
+    writeFileSync(config, readFileSync(config, "utf8").replace('"INW018"]', '"INW018", "INW019"]'));
+    expect(findings(dir)).toEqual([]);
+
+    // The ordering slice reaches into billing, which neither diagram draws.
+    writeFileSync(
+      join(dir, "shop/orders/place.py"),
+      "from shop.domain.order import Order\nfrom shop.billing.invoices import Order as O\n",
+    );
+    expect(findings(dir).filter((f) => f.startsWith("INW019"))).toEqual([
+      "INW019 docs/architecture.md:15",
+      "INW019 docs/architecture.md:6",
+    ]);
   });
 
   // ArchUnitPython has no public modules: a slice may import any module of a

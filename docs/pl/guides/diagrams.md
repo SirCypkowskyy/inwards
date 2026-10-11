@@ -1,14 +1,14 @@
 ---
 source: docs/chapters/guides/diagrams.md
-source_hash: fbebd33d634347b4395edf42e173ced565f626a5811b6777cdf77a2d95de5f6e
+source_hash: 91fb40b7226bab02c9c73802364b9b8c4fb01ff3b8bdac7954be033fb67b38af
 ---
 
 # Diagramy architektury { #architecture-diagrams }
 
 Inwards trzyma rysunek architektury w Mermaid albo PlantUML w zgodzie z `[tool.inwards]`, w obie strony ([ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config)):
 
-- **Dokumentacja idzie za kodem.** [INW017](../rules/INW017.md) zgłasza nazwę w diagramie, której nie zna konfiguracja albo kod, a [INW018](../rules/INW018.md) strzałkę, która rysuje import zabroniony przez konfigurację.
-- **Dokumentacja steruje kodem.** `inwards import-diagram` zamienia diagram w pierwszą `[tool.inwards]`, jeden raz. Od tej chwili obie reguły trzymają je w zgodzie.
+- **Dokumentacja idzie za kodem.** [INW017](../rules/INW017.md) zgłasza nazwę w diagramie, której nie zna konfiguracja albo kod, [INW018](../rules/INW018.md) strzałkę, która rysuje import zabroniony przez konfigurację, a [INW019](../rules/INW019.md) import w kodzie, którego diagram nie rysuje.
+- **Dokumentacja steruje kodem.** `inwards import-diagram` zamienia diagram w pierwszą `[tool.inwards]`, jeden raz. Od tej chwili reguły trzymają je w zgodzie.
 
 `[tool.inwards]` pozostaje jedynym źródłem prawdy: diagram nigdy nie jest czytany jako konfiguracja w czasie sprawdzania.
 
@@ -70,10 +70,10 @@ Wymień pliki i włącz reguły:
 diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 
 [tool.inwards.rules]
-extend-select = ["INW017", "INW018"]
+extend-select = ["INW017", "INW018", "INW019"]
 ```
 
-Obie reguły dają ostrzeżenia, więc rysunek, który się rozjechał, nie blokuje Stop gate agenta; `severity = { INW017 = "error", INW018 = "error" }` sprawia, że blokują. Działają przy sprawdzaniu całego projektu: `inwards check` bez ścieżek albo Stop gate z `stop-gate = "project"`.
+Wszystkie trzy dają ostrzeżenia, więc rysunek, który się rozjechał, nie blokuje Stop gate agenta; `severity = { INW017 = "error", INW018 = "error" }` sprawia, że blokują. INW019 porównuje diagram z importami, które zbiera uruchomienie: w diagramie warstw import rysuje ścieżka strzałek, w diagramie kontekstów potrzebna jest bezpośrednia strzałka, a import pod `if TYPE_CHECKING:` się liczy. Działają przy sprawdzaniu całego projektu: `inwards check` bez ścieżek albo Stop gate z `stop-gate = "project"`.
 
 ## Zacznij od diagramu { #import-diagram }
 
@@ -298,5 +298,5 @@ Czym Inwards się różni:
 - **Tylko flowcharty Mermaid i diagramy komponentów PlantUML.** Diagramy C4, `architecture-beta` i inne rodzaje diagramów PlantUML nie są czytane.
 - **PlantUML jest czytany linia po linii.** Instrukcja rozbita na kilka linii (opis komponentu, który przechodzi do następnej linii) nie jest śledzona, a połączenie z komponentem przez jego wyświetlaną nazwę zamiast aliasu nazywa inny węzeł.
 - **To, czego diagram nie wyrazi, zostaje poza tabelą.** Listy bibliotek, kształty, selektory inne niż etykieta węzła, opcje reguł i `ignore` dopisuje się ręcznie po imporcie.
-- **Importy, których diagram nie rysuje**, nie są jeszcze zgłaszane; to będzie INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
+- **Importy między warstwami i kontekstami, nie modułami.** INW019 nie porównuje strzałki między dwoma węzłami modułów wewnątrz jednego kontekstu z importami między tymi modułami.
 - **Tylko uruchomienia dla całego projektu.** Hook po edycji i edytor nie pokazują zgłoszeń z diagramów.

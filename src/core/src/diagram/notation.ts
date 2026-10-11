@@ -1,9 +1,9 @@
 /**
  * @file How a fix hint writes a piece of diagram in the notation the diagram
- * uses (#346): a node marked external, a dotted arrow, a node or group that
- * names its module, and what a group is called. INW017, INW018 and
- * `import-diagram` take their examples from here, so a PlantUML user is
- * never told to write Mermaid. Pure strings; no reading.
+ * uses (#346): a node marked external, a solid and a dotted arrow, a node or
+ * group that names its module, and what a group is called. INW017, INW018,
+ * INW019 and `import-diagram` take their examples from here, so a PlantUML
+ * user is never told to write Mermaid. Pure strings; no reading.
  */
 import type { DiagramNotation } from "./model.ts";
 
@@ -15,6 +15,14 @@ export interface Notation {
   externalClass: string;
   /** A dotted arrow, which means no import. */
   dotted: string;
+  /**
+   * Writes a solid arrow between two nodes, which means "may import".
+   *
+   * @param from - the importing node's id.
+   * @param to - the imported node's id.
+   * @returns such as `api --> domain`.
+   */
+  arrow: (from: string, to: string) => string;
   /** How a node gets its module, in words: "a quoted label". */
   moduleLabel: string;
   /** How a label becomes a caption that isn't checked. */
@@ -49,6 +57,7 @@ const MERMAID: Notation = {
   group: "subgraph",
   externalClass: ":::external",
   dotted: "-.->",
+  arrow: (from: string, to: string): string => `${from} --> ${to}`,
   moduleLabel: "a quoted label",
   caption: "drop the quotes to make the label a caption",
   external: (id: string): string => `${id}:::external`,
@@ -61,6 +70,7 @@ const PLANTUML: Notation = {
   group: "package",
   externalClass: "<<external>>",
   dotted: "..>",
+  arrow: (from: string, to: string): string => `[${from}] --> [${to}]`,
   moduleLabel: "a module and an alias",
   caption: "write a caption with a space in it instead",
   external: (id: string): string => `[${id}] <<external>>`,

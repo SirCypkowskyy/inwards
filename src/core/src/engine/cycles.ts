@@ -68,27 +68,51 @@ export function projectCycles(collected: Collected[], inputs: CycleInputs): Diag
   for (;;) {
     const cycles = findCycles([...edges.values()].flat(), modes, inputs.contexts);
     const inside = new Set(cycles.flatMap((cycle) => cycle.inside.map((edge) => edge.file.path)));
-    const unconfirmed = sorted.filter((entry) => {
-      if (entry.exact || !inside.has(entry.file.path)) {
-        return false;
-      }
-      // A file that opens with its imports needs no parse: its skeleton is its text.
-      const lastName = Math.max(0, ...entry.imports.map((ref) => ref.endLine));
-      entry.exact = onlyImportsUpTo(entry.file.text, lastName);
-      return !entry.exact;
-    });
-    if (unconfirmed.length === 0) {
+    const reread = confirmImports(
+      sorted.filter((entry) => inside.has(entry.file.path)),
+      inputs.fullImports,
+    );
+    if (reread.length === 0) {
       return cycles.flatMap((cycle) => {
         const found = cycleDiagnostic(cycle);
         return found === undefined ? [] : [found];
       });
     }
-    for (const entry of unconfirmed) {
-      entry.imports = inputs.fullImports(entry.file, lastLineOf(entry));
-      entry.exact = true;
+    for (const entry of reread) {
       edges.set(entry, fileEdges(entry, nodes));
     }
   }
+}
+
+/**
+ * Makes the imports of some files stand on the full parse: a file that
+ * opens with its imports keeps its skeleton, which is its text there, and
+ * any other file the skeleton alone read is read again. INW004 and INW019
+ * both confirm the files behind a finding this way, and an entry confirmed
+ * once stays confirmed for the other.
+ *
+ * @param entries - the files behind some findings, updated in place.
+ * @param fullImports - reads a file's imports with the full parse, up to a line.
+ * @returns the entries read again, whose imports may have changed.
+ */
+export function confirmImports(
+  entries: readonly Collected[],
+  fullImports: CycleInputs["fullImports"],
+): Collected[] {
+  const reread = entries.filter((entry) => {
+    if (entry.exact) {
+      return false;
+    }
+    // A file that opens with its imports needs no parse: its skeleton is its text.
+    const lastName = Math.max(0, ...entry.imports.map((ref) => ref.endLine));
+    entry.exact = onlyImportsUpTo(entry.file.text, lastName);
+    return !entry.exact;
+  });
+  for (const entry of reread) {
+    entry.imports = fullImports(entry.file, lastLineOf(entry));
+    entry.exact = true;
+  }
+  return reread;
 }
 
 /**

@@ -147,6 +147,26 @@ function cycle(hash: string): string {
   return `Contexts import each other in a cycle: anchor -> billing Allowed direction: EU -> anchor. The group holds 2 contexts and 2 links between them (link hash ${hash}).`;
 }
 
+/**
+ * Writes an INW019 message naming an import.
+ *
+ * @param at - the import's file and line.
+ * @returns the message.
+ */
+function missing(at: string): string {
+  return `Layer "api" imports layer "domain" in the code (${at} imports shop.domain.order), and the diagram draws no arrow or path of arrows from "api" to "domain".`;
+}
+
+/**
+ * Keys an INW019 finding naming an import.
+ *
+ * @param at - the import's file and line.
+ * @returns its baseline key.
+ */
+function missingKey(at: string): string {
+  return baselineKey({ code: "INW019", module: "", message: missing(at) });
+}
+
 describe("what a key drops", () => {
   test("only INW001 and INW011 lose the layer order, and only INW006 its closing clause", () => {
     const module = "shop.domain.order";
@@ -162,6 +182,14 @@ describe("what a key drops", () => {
     const unchecked = '"shop.common" belongs to no layer, so its imports are not checked.';
     expect(baselineKey({ code: "INW010", module, message: unchecked })).toContain(
       "are not checked",
+    );
+  });
+
+  test("INW019 loses the line of the import it names, and nothing else", () => {
+    expect(missingKey("shop/api/app.py:3")).toBe(missingKey("shop/api/app.py:12"));
+    expect(missingKey("shop/api/app.py:3")).not.toBe(missingKey("shop/api/other.py:3"));
+    expect(missingKey("shop/api/app.py:3")).toContain(
+      "(shop/api/app.py imports shop.domain.order)",
     );
   });
 });
