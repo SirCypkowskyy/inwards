@@ -100,12 +100,16 @@ export function declaredBy(call: CallSyntax, scope: FastApiProject): ReadonlySet
  * @returns true unless `include_in_schema=` is absent or a literal `True`;
  *   true for an app built with `openapi_url=None`, which serves no schema at
  *   all (Polar's server-rendered backoffice, #182 corpus run); also true when
- *   a `**kwargs` may set either, since that is unknown.
+ *   a `**kwargs` may set either, since that is unknown. A router a factory
+ *   builds (#358) counts as shown: its keywords are unknown, but a factory
+ *   that hides its router is rare, and treating it as hidden would hide every
+ *   route of a project that builds routers that way (fastapi-clean-example).
  */
-export function hiddenBy(call: CallSyntax): boolean {
+export function hiddenBy(call: CallSyntax & { readonly factory?: boolean }): boolean {
   const value = call.keywords.get("include_in_schema")?.value;
   const noSchema = call.keywords.get("openapi_url")?.value.kind === "none";
-  return call.splat || noSchema || (value !== undefined && !(value.kind === "bool" && value.value));
+  const unknown = call.splat && call.factory !== true;
+  return unknown || noSchema || (value !== undefined && !(value.kind === "bool" && value.value));
 }
 
 /**
@@ -126,7 +130,8 @@ export function placementOf(
   const own = ownPlacement(object, scope);
   const edges = object.kind === "router" ? scope.edgesTo(object.name) : [];
   if (edges === null) {
-    return { ...own, responses: null, tagged: own.tagged === true ? true : null };
+    const hidden = own.hidden || hiddenByKnown(object, scope, seen);
+    return { ...own, responses: null, tagged: own.tagged === true ? true : null, hidden };
   }
   if (edges.length === 0 || seen.has(object.name)) {
     return own;
@@ -153,6 +158,36 @@ export function placementOf(
     hidden: own.hidden || paths.every((p) => p.hidden),
     dependencies: [...own.dependencies, ...paths.flatMap((p) => p.dependencies)],
   };
+}
+
+/**
+ * Tells whether every inclusion of a router the graph can follow leaves it
+ * out of the schema, for when some other inclusion in the project can't be
+ * followed (#358). That inclusion could add a path to any router, but a
+ * router only a schema-less app includes is rarely included anywhere else:
+ * Polar's back office routers sit under `FastAPI(openapi_url=None)`, while
+ * router factories and a function parameter elsewhere keep its graph open.
+ *
+ * @param object - the router.
+ * @param scope - the project lookups.
+ * @param seen - the routers already on this path, which ends an inclusion cycle.
+ * @returns true when it has known inclusions and each one hides it.
+ */
+function hiddenByKnown(
+  object: FastApiObject,
+  scope: FastApiProject,
+  seen: ReadonlySet<string>,
+): boolean {
+  const into = seen.has(object.name) ? [] : scope.graph().into(object.name);
+  const known = into.filter((edge) => edge.kind === "include");
+  return (
+    known.length > 0 &&
+    known.every(({ wiring, from }) => {
+      const above = from === null ? null : scope.objectOf(from);
+      const next = new Set([...seen, object.name]);
+      return hiddenBy(wiring) || (above !== null && placementOf(above, scope, next).hidden);
+    })
+  );
 }
 
 /**

@@ -200,6 +200,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | path operation (FastAPI) | operacja ścieżki |
 | include a router (`include_router`) | dołączać router, dołączenie |
 | unmounted router (FAPI003) | niepodpięty router |
+| router factory, class factory (#358) | fabryka routera, fabryka klas |
+| route class (`route_class=`) | klasa tras |
 | shadowed route (FAPI005) | przesłonięta trasa |
 | lifespan (FastAPI, FAPI006) | lifespan (menedżer kontekstu cyklu życia aplikacji) |
 | event handler (`on_event`, FAPI006) | handler zdarzeń |

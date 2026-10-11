@@ -21,7 +21,7 @@ import { diagnostic, RULES } from "../../meta/registry.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
-import type { Kind } from "./frameworks.ts";
+import type { Kind, ViewKind } from "./frameworks.ts";
 import { isHealthCheck } from "./health.ts";
 import { RemoteModules } from "./remote.ts";
 import { type ThinSettings, thinSettings } from "./settings.ts";
@@ -138,7 +138,10 @@ export function checkThinEndpoints(src: SourceFile, inputs: ThinInputs): Diagnos
   }
   const tree = inputs.project.treeOf(src);
   const remote = new RemoteModules(inputs.project, settings.recognise);
-  const view = fileView(tree, src, settings.recognise, (q) => remote.baseKind(q));
+  const view = fileView(tree, src, settings.recognise, {
+    base: (q: string): ViewKind | undefined => remote.baseKind(q),
+    routers: remote.routers,
+  });
   const context = {
     src,
     settings,

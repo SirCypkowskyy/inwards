@@ -1,16 +1,19 @@
 /**
  * @file Reads one file's FastAPI records out of its syntax tree: the names
- * bound to `FastAPI(...)` or `APIRouter(...)`, the path operations declared
- * on them, the `include_router` and `mount` calls, and the exception
- * handlers an app registers, with the status codes their responses set.
- * Function and class scopes are ignored, as INW011 ignores them, so an app
- * built inside a factory function is found too. It reads one tree and
- * resolves nothing across files; `model.ts` owns the parse and the lookups.
+ * bound to an app or router (FastAPI's constructors, or a first-party router
+ * class or factory, which `shared/fastapi-routers.ts` recognises), the path
+ * operations declared on them, the `include_router` and `mount` calls, and
+ * the exception handlers an app registers, with the status codes their
+ * responses set. Function and class scopes are ignored, as INW011 ignores
+ * them, so an app built inside a factory function is found too. It reads one
+ * tree; other files are read only through the context's `kinds`, and
+ * `model.ts` owns the parse and the lookups.
  */
 import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import { type RouterBinding, routerBindings } from "../shared/fastapi-routers.ts";
 import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./handlers.ts";
 import type {
   Context,
@@ -24,14 +27,6 @@ import type {
   Wiring,
 } from "./records.ts";
 import { type Argument, callSyntax, valueFrom } from "./values.ts";
-
-/** The constructors the model looks for, by qualified name. */
-const CONSTRUCTORS: ReadonlyMap<string, "app" | "router"> = new Map([
-  ["fastapi.FastAPI", "app"],
-  ["fastapi.applications.FastAPI", "app"],
-  ["fastapi.APIRouter", "router"],
-  ["fastapi.routing.APIRouter", "router"],
-]);
 
 /** The names `Depends` and `Security` are imported under. */
 export const DEPENDS: ReadonlySet<string> = new Set([
@@ -74,7 +69,9 @@ interface Found {
  */
 export function extract(root: Node, context: Context): FastApiFile {
   const { file } = context;
-  const objects = root.descendantsOfType("assignment").flatMap((a) => objectOf(a, context));
+  const objects = routerBindings(root, context.qualify, context.kinds).map((binding) =>
+    objectOf(binding, context),
+  );
   const found: Found = {
     own: new Set(objects.map((o) => o.name)),
     operations: [],
@@ -159,27 +156,23 @@ function counts(app: string, method: string, context: Context, found: Found): bo
 }
 
 /**
- * Reads an assignment of `FastAPI(...)` or `APIRouter(...)` to a name.
+ * Reads a name bound to an app or router. A factory's arguments aren't the
+ * router's keywords, so they are left out, and what the router sets is
+ * unknown, as behind a `**kwargs` splat.
  *
- * @param assignment - an `assignment` node.
+ * @param binding - the name's assignment, its call, the kind and whether a factory built it.
  * @param context - the file and its name qualifier.
- * @returns the object, or nothing for any other assignment.
+ * @returns the app or router record, its keywords read from the call.
  */
-function objectOf(assignment: Node, context: Context): FastApiObject[] {
-  const { file, qualify } = context;
-  const left = assignment.childForFieldName("left");
-  const right = assignment.childForFieldName("right");
-  const callee = right?.type === "call" ? right.childForFieldName("function") : null;
-  const kind = callee ? CONSTRUCTORS.get(qualify(callee) ?? "") : undefined;
-  if (left?.type !== "identifier" || !right || kind === undefined) {
-    return [];
-  }
-  const local = identifierName(left);
+function objectOf(binding: RouterBinding, context: Context): FastApiObject {
+  const { assignment, local, call, kind, factory, custom } = binding;
   const topLevel = assignment.parent?.parent?.type === "module";
-  const syntax = callSyntax(right, qualify);
+  const syntax = callSyntax(call, context.qualify);
   // An app's `**kwargs` that only carries `exception_handlers` hides no other keyword (#242).
-  const splat = syntax.splat && !(kind === "app" && splatsOnlyHandlers(right));
-  return [{ kind, name: `${file.module}.${local}`, local, topLevel, ...syntax, splat }];
+  const splat = factory || (syntax.splat && !(kind === "app" && splatsOnlyHandlers(call)));
+  const keywords = factory ? new Map() : syntax.keywords;
+  const name = `${context.file.module}.${local}`;
+  return { kind, name, local, topLevel, node: call, keywords, splat, factory, custom };
 }
 
 /**

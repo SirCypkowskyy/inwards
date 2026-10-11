@@ -120,6 +120,7 @@ function unmounted(
       object.topLevel &&
       node.operations.length > 0 &&
       !reached.has(object.name) &&
+      !(object.custom && mayBeIncluded(graph, object.name, new Set())) &&
       !allowed.some((entry) => matchEntry(entry, object.name) !== undefined);
     if (src === undefined || !lonely) {
       return [];
@@ -141,6 +142,36 @@ function unmounted(
       }),
     ];
   });
+}
+
+/**
+ * Tells whether an inclusion the graph can't follow could include a router,
+ * directly or through the routers above it. Only asked for a router a
+ * first-party class or factory builds (#358): such a project often wires
+ * its routers through its own functions too (Polar passes its API router to
+ * `add_versioned_routers(app, api_router)`), so a router the graph doesn't
+ * reach is unknown, not unmounted. A router FastAPI's own constructor
+ * builds keeps the older answer, a warning that names the call.
+ *
+ * @param graph - the project's graph.
+ * @param name - the router's qualified name.
+ * @param seen - the routers already on this path, which ends an inclusion cycle.
+ * @returns true when some unfollowed inclusion could include it or a router above it.
+ */
+function mayBeIncluded(graph: WiringGraph, name: string, seen: ReadonlySet<string>): boolean {
+  if (seen.has(name)) {
+    return false;
+  }
+  if (graph.unresolved.some(({ targets }) => targets === "any" || targets.has(name))) {
+    return true;
+  }
+  const next = new Set([...seen, name]);
+  return graph
+    .into(name)
+    .some(
+      (edge) =>
+        edge.kind === "include" && edge.from !== null && mayBeIncluded(graph, edge.from, next),
+    );
 }
 
 /**

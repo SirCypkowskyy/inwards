@@ -17,16 +17,17 @@ import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
+import { type RouterKinds, routerBindings } from "../shared/fastapi-routers.ts";
 import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
 import { type ResolveBase, viewMethods } from "./classes.ts";
 import {
+  FLASK_ROUTERS,
   type Framework,
   frameworksIn,
   type Kind,
   OPERATIONS,
   REGISTER_CALLS,
   REGISTER_METHODS,
-  ROUTERS,
   standaloneDecorator,
   VIEW_METHODS,
 } from "./frameworks.ts";
@@ -87,6 +88,8 @@ export interface EndpointContext {
   readonly functions: ReadonlyMap<string, Node>;
   /** Resolves a view base class from another first-party module; undefined reads none. */
   readonly resolveBase: ResolveBase | undefined;
+  /** Tells what first-party callees build, for FastAPI routers built at run time or by a factory (#358); undefined reads none. */
+  readonly routerKinds: RouterKinds | undefined;
 }
 
 /** The file's own apps and routers, by framework. */
@@ -131,7 +134,9 @@ export function mayHoldEndpoints(text: string, recognise: Recognise): boolean {
 /**
  * Lists the qualified names the file binds to an app or router of each
  * active framework, in any scope, as the FastAPI model does (an app
- * factory's app counts).
+ * factory's app counts). FastAPI's are found as the model finds them
+ * (`shared/fastapi-routers.ts`), so a first-party router class or factory
+ * counts too (#358).
  *
  * @param root - the module node.
  * @param context - the file's module and qualifier.
@@ -146,14 +151,18 @@ function routerNames(
   const names = new Map(
     ROUTER_FRAMEWORKS.filter((f) => active.has(f)).map((f) => [f, new Set<string>()]),
   );
-  for (const assignment of root.descendantsOfType("assignment")) {
+  for (const { local } of names.has("fastapi")
+    ? routerBindings(root, context.qualify, context.routerKinds)
+    : []) {
+    names.get("fastapi")?.add(`${context.module}.${local}`);
+  }
+  for (const assignment of names.has("flask") ? root.descendantsOfType("assignment") : []) {
     const left = assignment.childForFieldName("left");
     const right = assignment.childForFieldName("right");
     const callee = right?.type === "call" ? right.childForFieldName("function") : null;
     const made = callee ? context.qualify(callee) : null;
-    const framework = [...names.keys()].find((f) => made !== null && ROUTERS[f].has(made));
-    if (left?.type === "identifier" && framework) {
-      names.get(framework)?.add(`${context.module}.${identifierName(left)}`);
+    if (left?.type === "identifier" && made !== null && FLASK_ROUTERS.has(made)) {
+      names.get("flask")?.add(`${context.module}.${identifierName(left)}`);
     }
   }
   return names;

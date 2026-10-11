@@ -154,7 +154,8 @@ Unknown means silent. Nothing is reported when:
 - a path, a `methods=` list or a `prefix=` isn't a string literal (a variable, an f-string, a call), or a `**kwargs` may hide one;
 - a router keeps its routes in several files, since their order isn't known;
 - a segment uses a converter Inwards doesn't know, other than an identical one;
-- another inclusion of the same router, under a prefix Inwards can't read or in another app, leaves the route reachable.
+- another inclusion of the same router, under a prefix Inwards can't read or in another app, leaves the route reachable;
+- the router is built by a first-party router class or factory ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)), which may set its own `route_class` and match routes its own way: Polar's `VersionedAPIRoute` serves two routes with one method and path by API version ([#392](https://github.com/SirCypkowskyy/inwards/issues/392)).
 
 More limits:
 

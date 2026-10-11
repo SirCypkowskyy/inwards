@@ -12,6 +12,8 @@
  * counts as a problem are the rules' decisions.
  */
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
+import { argumentAt } from "../../python/literals.ts";
+import { returnedNames } from "../shared/function-returns.ts";
 import type { FastApiModel } from "./model.ts";
 import type { FastApiFile, FastApiObject, PathOperation, Wiring } from "./records.ts";
 
@@ -49,6 +51,12 @@ export interface GraphEdge {
 export interface UnresolvedInclude {
   readonly wiring: Wiring;
   readonly file: FastApiFile;
+  /**
+   * The routers the call could include (#358): those a first-party factory
+   * returns for `include_router(make_router())`, or `any` for every other
+   * target (a function parameter, `getattr`, a name the model can't bind).
+   */
+  readonly targets: ReadonlySet<string> | "any";
 }
 
 /** The graph while it is built: what was found and resolved so far, and how to resolve. */
@@ -224,9 +232,46 @@ function addWiring(building: Building, wiring: Wiring, file: FastApiFile): void 
     if (to !== null) {
       building.edges.push({ kind: wiring.kind, from, to, wiring, file });
     } else if (wiring.kind === "include" && (target === null || building.ownerOf(target))) {
-      building.unresolved.push({ wiring, file });
+      building.unresolved.push({ wiring, file, targets: possibleTargets(building, wiring, file) });
     }
   }
+}
+
+/**
+ * Lists the routers an inclusion the graph can't follow could include. A
+ * call to a first-party function, `include_router(make_router())`, can only
+ * include a router that function returns (`return router` after
+ * `router = APIRouter(...)` in its own body); any other target could be any
+ * router.
+ *
+ * @param building - the graph so far, with the model.
+ * @param wiring - the inclusion.
+ * @param file - the file that makes it.
+ * @returns the qualified names of the routers it could include, or `any`.
+ */
+function possibleTargets(
+  building: Building,
+  wiring: Wiring,
+  file: FastApiFile,
+): ReadonlySet<string> | "any" {
+  const arg = wiring.loopTargets.length > 0 ? null : argumentAt(wiring.node, 0, "router");
+  const callee = arg?.type === "call" ? arg.childForFieldName("function") : null;
+  const qualify = building.model.qualifierOf(file);
+  const name = callee && qualify ? qualify(callee) : null;
+  const found = name === null ? null : building.model.resolve(name);
+  if (found?.kind !== "function") {
+    return "any";
+  }
+  const { node } = found;
+  const returned = returnedNames(node);
+  const objects = building.model.moduleModel(found.file.module)?.objects ?? [];
+  const inside = objects.filter(
+    (o) =>
+      returned.has(o.local) &&
+      o.node.startIndex >= node.startIndex &&
+      o.node.endIndex <= node.endIndex,
+  );
+  return new Set(inside.map((o) => o.name));
 }
 
 /**
