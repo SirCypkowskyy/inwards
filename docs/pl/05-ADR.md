@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 8a5c0538e4178f054dd1303c046211e19bf7bcf5465920ec5b05f6dcfd2c2267
+source_hash: d6680059162c5617423a2b9a0453b78cca7f7d2475c075866b90000fd538583d
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -52,6 +52,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [041](#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches) | `inwards server` używa kodu `inwards check`; serwer Node rozszerzenia zostaje do jego przełączenia | :material-check-circle: Przyjęty, rozszerzenie przełączone w [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) |
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` odpowiada sprawdzeniem `inwards check`, na tekstach nałożonych na dysk | :material-check-circle: Przyjęty |
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
+| [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1287,3 +1288,56 @@ Eksperyment ([rozdział 6](06-Constraints-and-Quality.md#spike-a-resident-proces
 - *Jeden VSIX ze wszystkimi sześcioma plikami binarnymi:* każdy użytkownik pobiera około 160 MB, żeby używać jednego z nich.
 - *Tylko `inwards` z `PATH` albo ze środowiska wirtualnego projektu:* po instalacji rozszerzenie nie robiłoby nic, dopóki użytkownik nie zainstaluje też pliku binarnego. Zostaje jako ścieżka zapasowa.
 - *Zachowanie serwera Node jako zapasu:* dwa serwery, które się nie zgadzają, czyli dokładnie to, co ADR-041 miał zakończyć.
+
+## ADR-044: Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków { #adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file }
+
+**Stan:** Przyjęty · 2026-10-11 · [#316](https://github.com/SirCypkowskyy/inwards/issues/316) · prace zaczynają się od danych wejściowych, które nagra [#320](https://github.com/SirCypkowskyy/inwards/issues/320)
+
+**Kontekst.** [Przewodnik po Copilocie](guides/copilot.md) łączy Copilota z Inwards przez `AGENTS.md`, rozszerzenie edytora, `inwards mcp` i CI, więc Copilot nie dostaje ani config guarda, ani Stop gate. Copilot uruchamia teraz hooki agenta w czterech miejscach. Poniższe pochodzi z dokumentacji czytanej 2026-10-11: z [opisu hooków](https://docs.github.com/en/copilot/reference/hooks-reference) GitHuba, [About hooks](https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-hooks), [Using hooks with the Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-hooks) i [Customize the cloud agent with hooks](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/use-hooks) (żadna z czterech stron nie podaje daty) oraz z [przewodnika po hookach](https://code.visualstudio.com/docs/agent-customization/hooks) i [opisu hooków](https://code.visualstudio.com/docs/agents/reference/hooks-reference) VS Code (obie z datą 2026-10-07). Nie uruchomiono żadnej sesji Copilota: na maszynie, na której przeprowadzono eksperyment, nie ma ani Copilot CLI, ani VS Code, i nigdzie się nie logowano.
+
+| | Copilot CLI | Agent w chmurze (cloud agent) | VS Code, harness Copilota | VS Code, harness Local (preview) |
+|---|---|---|---|---|
+| Pliki hooków | `.github/hooks/*.json`, `.github/copilot/settings*.json`, `.claude/settings*.json`, `~/.copilot/hooks/`, katalogi polityk, pluginy; uruchamia się każdy wpis | tylko `.github/hooks/*.json` z gałęzi domyślnej; uruchamia się tylko polecenie `bash` | własna implementacja Copilota (Copilot SDK), format Copilota | `.github/hooks/*.json` (pliki Copilota są mapowane), `~/.copilot/hooks/`, `.claude/settings*.json` z `chat.useClaudeHooks` (matchery ignorowane), front matter agentów własnych; obowiązuje zaufanie do obszaru roboczego |
+| Dane wejściowe | camelCase (`sessionId`, `toolName`, `toolArgs`) z nazwami narzędzi Copilota (`edit`, `create`, `bash`, `apply_patch`); nazwa zdarzenia w PascalCase przełącza na snake_case z nazwami narzędzi Claude'a | jak w CLI | jak w CLI | snake_case z `hook_event_name`, `tool_name`, `tool_input`; nazwy narzędzi harnessu Local nie są udokumentowane |
+| Odmowa edycji | `permissionDecision: "deny"` albo kod wyjścia 2; inny niezerowy kod też odmawia (fail-closed); przekroczenie czasu przepuszcza (fail-open, domyślnie 30 s) | jak w CLI; `ask` staje się `deny` | jak w CLI | `hookSpecificOutput.permissionDecision` albo kod wyjścia 2 z powodem na stderr |
+| Po edycji | `additionalContext` dopisany do wyniku narzędzia, najwyżej 10 KB; bez blokady | jak w CLI | jak w CLI | `additionalContext` albo `decision: "block"` |
+| Koniec tury | `agentStop`: `decision: "block"` i `reason` zaczynają kolejną turę; ustawione jest `stop_hook_active`; CLI kończy turę po 8 blokadach z rzędu | jak w CLI; blokada zużywa limit czasu zadania | jak w CLI | `Stop`: `decision: "block"` i `reason` albo kod wyjścia 2 |
+| Start sesji | `sessionStart`, tylko `additionalContext`, `source` to `startup`, `resume` albo `new` | raz na zadanie | jak w CLI | `SessionStart`, `source` zawsze `new` |
+
+Każda z tych powierzchni potrafi więc odmówić wywołania narzędzia i przedłużyć turę, a tego potrzebują config guard i Stop gate. O szczegółach decydują dwie rzeczy, których dokumentacja nie podaje: nazwy argumentów `edit`, `create` i `apply_patch` (oraz to, czy `toolArgs` przychodzi jako obiekt, czy jako napis z JSON-em; poradnik CLI pokazuje napis) i nazwy narzędzi harnessu Local.
+
+`inwards hook claude-code` w obecnej postaci nie obsłuży tych powierzchni, nawet tam, gdzie Copilot czyta pliki Claude Code. Copilot CLI czyta `.claude/settings.local.json`, który zapisuje `inwards init --agent claude-code`, więc w projekcie podłączonym do Claude Code już teraz uruchamia ten hook. Hook działa tam źle na trzy sposoby:
+
+- Stop gate i sprawdzenie po edycji odpowiadają kodem wyjścia 2 i tekstem na stderr, a Copilot traktuje to jako ostrzeżenie dla użytkownika, więc tura się kończy, a model nigdy nie widzi diagnostyki;
+- opis hooków dokumentuje tylko płaskie odpowiedzi, więc odmowa opakowana w `hookSpecificOutput` może zostać zignorowana;
+- config guard czyta `tool_input.file_path` i przepuszcza wywołanie, gdy go nie ma (`config-config guard.ts`), więc jeśli `edit` Copilota nazywa swój plik `path`, edycja `[tool.inwards]` przechodzi niesprawdzona.
+
+W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, ale nazwy narzędzi są inne, więc config guard widzi wywołania, których nie rozpoznaje, i je przepuszcza.
+
+**Decyzja.**
+
+- **Najpierw nagranie.** Hook zapisujący dane wejściowe na każdej z czterech powierzchni nagrywa `sessionStart`, `preToolUse` i `postToolUse` dla `edit`, `create`, `bash` i `apply_patch` oraz `agentStop`, a nagrania stają się fixture'ami testów ([#320](https://github.com/SirCypkowskyy/inwards/issues/320)). Adapter Claude Code powstał tak samo, na nagranych danych wejściowych.
+- **Jeden punkt wejścia dla dialektów Copilota, w CLI.** `inwards hook copilot` ([#321](https://github.com/SirCypkowskyy/inwards/issues/321)) czyta dane wejściowe w camelCase, w PascalCase i te z harnessu Local, rozróżniając je po samych danych: tylko te w snake_case mają `hook_event_name`. Wariant PascalCase Copilota i dane z harnessu Local wyglądają tak samo; co je odróżnia, ustali #320. Do tego czasu plik hooków używa nazw zdarzeń w camelCase, więc Copilot wysyła camelCase, a snake_case przychodzi tylko z harnessu Local. Każde zamienia na wywołanie, które handlery przyjmują dziś (nazwy narzędzi i argumentów Claude'a), i odpowiada w dialekcie wywołującego: odmowa to kod wyjścia 2 z `permissionDecision` na stdout i powodem na stderr, co i Copilot, i harness Local czytają jako odmowę; diagnostyka po edycji to `additionalContext`; blokada Stop gate to `decision: "block"` z powodami bramki albo, dla harnessu Local, kod wyjścia 2 i stderr. Handlery zachowują swoją politykę i zwracają odpowiedź zamiast ją drukować, a drukuje ją punkt wejścia danego hosta.
+- **Zacommitowany plik hooków.** `inwards init --agent copilot` ([#322](https://github.com/SirCypkowskyy/inwards/issues/322)) zapisuje `.github/hooks/inwards.json` w formacie camelCase Copilota, z poleceniami `bash` i `powershell`, `timeoutSec: 60` i `INWARDS_HOOK_HOST=copilot` w `env`. Agent w chmurze czyta tylko zacommitowane pliki z gałęzi domyślnej, więc plik nie zawiera ścieżki z żadnej maszyny: uruchamia `inwards` z `PATH` albo przez launcher wskazany w `--launcher` (`uv run`). Agent w chmurze dostaje Inwards z `copilot-setup-steps.yml`, jak pokazuje przewodnik. Narzędzie, którego adapter nie rozpoznaje, przechodzi, tak jak w Claude Code.
+- **Stop gate sprawdza plik hooków**, gdy `INWARDS_HOOK_HOST=copilot`: bramka blokuje, gdy `.github/hooks/inwards.json` zniknął albo nie uruchamia już `inwards hook copilot` dla czterech zdarzeń, tak jak robi to dla pluginu OpenCode.
+- **Czego config guard nie umie odczytać, tego adapter odmawia.** Wywołanie `apply_patch`, które dotyka `pyproject.toml`, `.github/hooks/`, `.inwards/` albo baseline'u, dostaje odmowę, tak jak w pluginie OpenCode, bo config guard ocenia edycję po jej starym i nowym tekście.
+- **`inwards hook claude-code` przestaje udawać pod Copilotem** ([#323](https://github.com/SirCypkowskyy/inwards/issues/323)): gdy nagrane dane wejściowe Copilota pokażą, że wywołującym nie jest Claude Code, hook przepuszcza i raz, na starcie sesji, mówi, żeby uruchomić `inwards init --agent copilot`. Dzięki temu projekt podłączony do obu nie uruchamia dwóch hooków, z których jeden działa połowicznie.
+
+**Konsekwencje.**
+
+- :material-plus-circle-outline: Sprawdzenie po edycji, config guard i Stop gate docierają do Copilot CLI i agenta w chmurze w tej samej jednej implementacji, której używają hooki Claude Code i OpenCode. W przeciwieństwie do OpenCode Copilot potrafi odmówić zakończenia tury, więc Stop gate zatrzymuje agenta przy pracy tak jak w Claude Code, także w uruchomieniu nieinteraktywnym.
+- :material-plus-circle-outline: Jeden zacommitowany plik obsługuje agenta w chmurze, Copilot CLI każdej osoby w projekcie i oba harnessy VS Code.
+- :material-minus-circle-outline: Plik uruchamia się na maszynie każdej osoby w projekcie. Tam, gdzie `inwards` nie jest zainstalowany, powłoka kończy się kodem 127, a Copilot odmawia każdego wywołania narzędzia (fail-closed). Polecenie najpierw sprawdza, czy plik binarny jest, i przepuszcza, gdy go nie ma, więc na takiej maszynie config guarda nie ma, a bramką zostaje CI.
+- :material-minus-circle-outline: Przekroczenie czasu przepuszcza wywołanie. Domyślnie to 30 s; plik ustawia 60 s, tak jak w OpenCode, a daemon hooków ([ADR-039](#adr-039-a-hook-daemon-per-project-separate-from-the-language-server)) trzyma ciepłe sprawdzenie po edycji wyraźnie poniżej tego.
+- :material-minus-circle-outline: Copilot nie może blokować po edycji. Naruszenie wraca jako kontekst do wyniku narzędzia, najwyżej 10 KB, więc długi raport jest przycinany do pierwszych diagnostyk i wskazówki, żeby uruchomić `inwards check`.
+- :material-minus-circle-outline: W agencie w chmurze blokada Stop gate zużywa czas zadania, a `sessionStart` przychodzi raz na zadanie, więc zapis sesji obejmuje całe zadanie. Limit CLI, 8 blokad z rzędu, kończy turę, której wcześniej nie zakończyło `escalate-after`.
+- :material-minus-circle-outline: Hooki VS Code są w wersji preview, a nazwy narzędzi harnessu Local nie są udokumentowane. Dopóki #320 ich nie nagra, harness Local dostaje sprawdzenie po edycji tylko dla nazw, które nagranie obejmie, a bramką zostaje CI.
+- :material-minus-circle-outline: Drugi kontrakt danych wejściowych do utrzymania, w trzech dialektach, dla API, które zmieniło się między [ogólną dostępnością](https://github.blog/changelog/2026-02-25-github-copilot-cli-is-now-generally-available/) Copilot CLI (2026-02-25, tylko `preToolUse` i `postToolUse`) a opisem hooków z października 2026.
+
+**Alternatywy.**
+
+- *Zostać przy `AGENTS.md`, `inwards mcp` i CI:* nic do budowania, ale bez config guarda i bez bramki tam, gdzie oba są już możliwe. Zostaje to konfiguracją dla powierzchni Copilota bez hooków.
+- *Polegać na tym, że Copilot czyta ustawienia Claude Code:* bez nowego kodu, ale kody wyjścia znaczą co innego, odpowiedzi mogą zostać zignorowane, agent w chmurze nie czyta `.claude/`, a config guard przepuszczałby edycje bez śladu.
+- *Skrypt powłoki, który tłumaczy dane wejściowe Copilota na dane Claude Code i uruchamia `inwards hook claude-code`, tak jak plugin OpenCode ([ADR-033](#adr-033-opencode-through-a-plugin-that-runs-the-claude-code-hook)):* tłumaczenie wymagałoby `jq` albo PowerShella na każdej maszynie, a odpowiedzi i tak trzeba by tłumaczyć z powrotem. OpenCode miał do tego środowisko JavaScriptu; hook Copilota to zwykłe polecenie.
+- *Hooki z nazwami zdarzeń w PascalCase, żeby Copilot wysyłał nazwy narzędzi Claude'a:* bliżej tego, co czytają handlery, ale dokumentacja nie mówi, że zmieniane są też nazwy argumentów, a dokumentacja agenta w chmurze pokazuje tylko camelCase. Czy to prostsze, rozstrzygnie #320.
+- *Hooki HTTP do daemona hooków:* bez procesu na każde zdarzenie, ale `preToolUse` wymaga `https`, lokalny adres `http` wymaga `COPILOT_HOOK_ALLOW_LOCALHOST=1` na każdej maszynie, a agent w chmurze nie ma daemona, z którym mógłby rozmawiać.

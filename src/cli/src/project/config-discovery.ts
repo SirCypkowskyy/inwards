@@ -11,6 +11,10 @@ import { declaresInwards } from "@inwards/core";
 import { isInside } from "../paths/lexical.ts";
 import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
 
+/** What a command says when no config is found: the problem, then the next step. */
+export const NO_CONFIG =
+  "No pyproject.toml with [tool.inwards] found. Run inwards init to set one up, or pass --config FILE.";
+
 /**
  * Picks the config a command works on: `--config`, resolved against the
  * cwd, or else the nearest one above the cwd. A `--config` that isn't a file
@@ -39,7 +43,7 @@ export function commandConfig(
       : { problem: `--config ${flag}: no such file.` };
   }
   const path = findConfig(io, io.runtime.cwd);
-  return path ? { path } : { problem: "No pyproject.toml with [tool.inwards] found." };
+  return path ? { path } : { problem: NO_CONFIG };
 }
 
 /**
