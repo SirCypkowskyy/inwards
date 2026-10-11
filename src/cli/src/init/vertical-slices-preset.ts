@@ -14,7 +14,7 @@ export const VERTICAL_SLICES: Style = {
   layers: [
     { name: "shared", module: "shared", role: "the shared kernel: code every slice may use" },
     {
-      name: "features",
+      name: "slice",
       module: "features.*",
       role: "every slice, layered by the slice template",
       template: "slice",
