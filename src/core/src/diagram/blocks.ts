@@ -23,8 +23,10 @@ export interface MarkedBlock {
 const NEWLINE = /\r?\n/u;
 /** A whole-file Mermaid diagram, by extension. */
 const MERMAID_FILE = /\.(?:mmd|mermaid)$/iu;
-/** The opening fence of a `mermaid` block: up to three spaces, three or more backticks or tildes. */
-const OPEN_FENCE = /^ {0,3}(?<fence>`{3,}|~{3,})[ \t]*mermaid(?:[ \t].*)?$/u;
+/** The opening fence of a block: up to three spaces, three or more backticks or tildes, then the info string. */
+const OPEN_FENCE = /^ {0,3}(?<fence>`{3,}|~{3,})[ \t]*(?<info>[^ \t`]*)(?:[ \t].*)?$/u;
+/** The info string of a Mermaid block. */
+const MERMAID_INFO = new Set(["mermaid"]);
 /** A closing fence, checked against the opening one's character and length. */
 const CLOSE_FENCE = /^ {0,3}(?<fence>`{3,}|~{3,})[ \t]*$/u;
 /** The marker comment. */
@@ -47,7 +49,7 @@ export function markedBlocks(source: DiagramSource): MarkedBlock[] {
   const lines = source.text.split(NEWLINE);
   const bodies = MERMAID_FILE.test(source.path)
     ? [{ start: 0, end: lines.length }]
-    : fencedBodies(lines);
+    : fencedBodies(lines, MERMAID_INFO);
   return bodies.flatMap(({ start, end }) => {
     const block = marked(lines, start, end);
     return block === undefined ? [] : [block];
@@ -55,17 +57,22 @@ export function markedBlocks(source: DiagramSource): MarkedBlock[] {
 }
 
 /**
- * Finds the bodies of the fenced `mermaid` blocks in Markdown lines. A block
- * left open runs to the end of the file, as CommonMark reads it.
+ * Finds the bodies of the fenced blocks of one language in Markdown lines. A
+ * block left open runs to the end of the file, as CommonMark reads it.
  *
  * @param lines - the file's lines.
+ * @param languages - the info strings that count, such as `mermaid`.
  * @returns each body as a half-open range of 0-based line indexes.
  */
-function fencedBodies(lines: readonly string[]): { start: number; end: number }[] {
+export function fencedBodies(
+  lines: readonly string[],
+  languages: ReadonlySet<string>,
+): { start: number; end: number }[] {
   const bodies: { start: number; end: number }[] = [];
   let i = 0;
   while (i < lines.length) {
-    const fence = OPEN_FENCE.exec(lines[i] ?? "")?.groups?.["fence"];
+    const open = OPEN_FENCE.exec(lines[i] ?? "")?.groups;
+    const fence = open?.["fence"];
     i += 1;
     if (fence === undefined) {
       continue;
@@ -74,7 +81,9 @@ function fencedBodies(lines: readonly string[]): { start: number; end: number }[
     while (i < lines.length && !closes(lines[i] ?? "", fence)) {
       i += 1;
     }
-    bodies.push({ start, end: i });
+    if (languages.has(open?.["info"] ?? "")) {
+      bodies.push({ start, end: i });
+    }
     i += 1;
   }
   return bodies;
