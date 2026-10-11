@@ -22,7 +22,9 @@ Each fixture in `fixtures/<RULE>/<case>/` is a `task.md` prompt (a
 `task.<agent>.md` next to it replaces it for that agent, when the prompt names
 the agent's hook file), a `check.py` that exercises the result (it imports the
 code and calls it; exit 0 means the task was done), and an optional `files/`
-overlay on `examples/clean-app`. For every Claude Code run the harness:
+overlay on `eval/app`, a small layered shop (domain, application,
+infrastructure, api) that `eval/pyproject.toml` describes. For every Claude
+Code run the harness:
 
 1. compiles `inwards` from this checkout (`scripts/build-binaries.ts`) and
    gives the run a private copy of the binary;

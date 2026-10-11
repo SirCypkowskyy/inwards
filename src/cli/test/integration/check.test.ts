@@ -6,8 +6,8 @@
  * and a uv workspace checked from its root warns about each member instead of
  * passing silently (#201). Layer selectors check every slice, including code
  * in a `node_modules` directory inside one (#191). A path-scoped check skips
- * the whole-project checks, as `--help` says (#86). `examples/clean-app`,
- * whose ports module imports the order module back only under
+ * the whole-project checks, as `--help` says (#86). The eval harness's app
+ * (`eval/app`), whose ports module imports the order module back only under
  * `if TYPE_CHECKING:`, has no module or context cycle (#375).
  */
 import { expect, test } from "bun:test";
@@ -277,7 +277,7 @@ layers = [
   );
 });
 
-test("examples/clean-app checks clean with module and context cycles on (#375)", () => {
+test("eval/app checks clean with module and context cycles on (#375)", () => {
   const repo = resolve(import.meta.dir, "../../../..");
   const layers = readFileSync(join(repo, "eval/pyproject.toml"), "utf8");
   // shop.domain.ports imports shop.domain.order back only under TYPE_CHECKING.
@@ -297,7 +297,7 @@ depends-on = ["orders"]
 public = ["shop.domain.ports"]
 `,
   });
-  cpSync(join(repo, "examples/clean-app/shop"), join(root, "shop"), { recursive: true });
+  cpSync(join(repo, "eval/app/shop"), join(root, "shop"), { recursive: true });
   const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
   expect(JSON.parse(stdout).diagnostics).toEqual([]);
   expect(code).toBe(0);

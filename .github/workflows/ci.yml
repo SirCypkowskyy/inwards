@@ -94,6 +94,8 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # Tests that run pinned Ruff and Ty through uv skip without it.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Compile the binary for this OS (catches WASM embedding regressions)
         run: bun run scripts/build-binaries.ts ${{ matrix.target }}
       - name: Unit and end-to-end tests against the compiled binary
@@ -114,6 +116,32 @@ jobs:
           grep -q '"uri":"shop/domain/deep/order.py"' out.json
           curl -sSfL https://json.schemastore.org/sarif-2.1.0.json -o schema.json
           npx -y -p ajv-cli@5 -p ajv-formats@3 ajv validate --spec=draft7 -c ajv-formats --strict=false -s schema.json -d out.json
+
+  dogfood:
+    name: Examples with the released tools
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-24.04-arm' || fromJSON('["self-hosted","linux","ARM64","inwards"]') }} # forks: GitHub-hosted (#333)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # What users get from PyPI, not this checkout: bump it after each release.
+      - name: The latest release checks examples/clean-app with the reference config
+        run: uvx inwards@0.7.0 check
+      - name: The latest release still reports broken-app's planted INW001
+        run: |
+          status=0
+          uvx inwards@0.7.0 check --config examples/broken-app/pyproject.toml --format concise > broken.txt || status=$?
+          cat broken.txt
+          test "$status" -eq 1
+          grep -q '^examples/broken-app/shop/orders/models.py:3:[0-9]*: INW001 ' broken.txt
+      - name: Ruff (examples/ruff.toml)
+        run: |
+          uvx ruff@0.17.0 check examples
+          uvx ruff@0.17.0 format --check examples
+      - name: Ty, so each adapter's TYPE_CHECKING line checks it against its port
+        run: |
+          for app in clean-app broken-app; do
+            uvx ty@0.0.86 check --error-on-warning --python-version 3.11 --extra-search-path "examples/$app" "examples/$app"
+          done
 
   docs:
     name: Docs build

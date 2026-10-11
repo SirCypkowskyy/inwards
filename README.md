@@ -34,9 +34,9 @@ per platform; see the [install guide](https://sircypkowskyy.github.io/inwards/gu
 | `src/cli/` | `inwards` command, compiled to one binary with `bun build --compile`; `inwards server` is its language server, `inwards mcp` its MCP server. |
 | `src/vscode-extension/` | Thin LSP client that starts `inwards server`, packaged as one VSIX per platform with the binary inside. |
 | `docs/` | Architecture docs (C4, ADRs), built with Zensical, published to GitHub Pages. |
-| `examples/clean-app/` | Tiny layered app the CLI checks in CI. |
-| `examples/broken-app/` | One deliberate INW001 violation; `sarif.yml` expects it and annotates PRs with it. |
-| `eval/` | Agent eval harness: does an agent fix what the hook reports? |
+| `examples/clean-app/` | A small shop in vertical slices (`catalog`, `orders`, `shared`) that `[tool.inwards]` in `pyproject.toml` describes. CI checks it with the latest Inwards release, Ruff and Ty. |
+| `examples/broken-app/` | The same shape with one deliberate INW001 violation; `sarif.yml` expects it and annotates PRs with it. |
+| `eval/` | Agent eval harness: does an agent fix what the hook reports? Its fixtures build on the layered shop in `eval/app/`. |
 | `bench/` | The synthetic benchmark repo generator and the PR regression gate (`compare.ts`). |
 | `packaging/` | README for the platform wheels, and the PyPI/npm name placeholders (the PyPI one was 0.0.0, before the first release). |
 | `scripts/` | Build binaries and wheels, version and docs-nav checks, screenshots. |

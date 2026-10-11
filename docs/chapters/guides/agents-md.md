@@ -53,27 +53,41 @@ The section above tells the agent to check its work after the fact. The brief te
 inwards context
 ```
 
-It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005), the contexts with their public modules and dependencies (INW002, INW003), and the opt-in rules the config turns on. Rules turned off in `[tool.inwards.rules]` are left out. A layer with more than three layers inside it names them by their numbers in the list (`may import layers 1-9`); a brief that does so names the sibling groups once in its first sentence (`sibling groups: 2-4; 5-6`) instead of on every line. A context's public modules inside its one module share that prefix (`` `app.posts.{router,service}` ``), and so do the modules of a `deny` entry with one parent (`` `app.*.{models,service}` ``). With INW002 off, the contexts leave out their dependencies. For the repository's example config (`examples/clean-app`) it is 678 characters, about 170 tokens; a test keeps the example and every preset under 300 tokens (at four characters per token), except the fastapi preset, with eleven layers, a `deny` entry and eleven opt-in rules, under 550 (about 540). With the markers `--write` adds, it reads:
+It lists the layers innermost first with what each may import, where ports live, and, when configured, the library rules (INW005), the contexts with their public modules and dependencies (INW002, INW003), and the opt-in rules the config turns on. Rules turned off in `[tool.inwards.rules]` are left out. A layer with more than three layers inside it names them by their numbers in the list (`may import layers 1-9`); a brief that does so names the sibling groups once in its first sentence (`sibling groups: 2-4; 5-6`) instead of on every line. A context's public modules inside its one module share that prefix (`` `app.posts.{router,service}` ``), and so do the modules of a `deny` entry with one parent (`` `app.*.{models,service}` ``). With INW002 off, the contexts leave out their dependencies. For the repository's example config (`examples/clean-app`), with nine layers, three contexts and two opt-in rules, it is 1,671 characters, about 418 tokens. A test keeps every preset under 300 tokens (at four characters per token), except the fastapi preset, with eleven layers, a `deny` entry and eleven opt-in rules, under 550 (about 540), and the example under 450. With the markers `--write` adds, it reads:
 
 ```markdown
 <!-- inwards-brief:begin -->
 ## Architecture brief (Inwards)
 
-`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own.
+`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of your own layer (sibling groups: 4-6).
 
-1. domain (`shop.domain`): imports no other layer
-2. application (`shop.application`): may import domain
-3. infrastructure (`shop.infrastructure`): may import domain, application
-4. interface (`shop.api`, `shop.cli`): may import every other layer
+1. slice.models (`shop.*.models`): imports no other layer
+2. slice.ports (`shop.*.ports`): may import slice.models
+3. slice.services (`shop.*.services`): may import slice.models, slice.ports
+4. slice.commands (`shop.*.commands`): may import slice.models, slice.ports, slice.services
+5. slice.queries (`shop.*.queries`): may import slice.models, slice.ports, slice.services
+6. slice.adapters (`shop.*.adapters`): may import slice.models, slice.ports, slice.services
+7. slice.api (`shop.*.api`): may import layers 1-6
+8. slice.factory (`shop.*.factory`): may import layers 1-7
+9. bootstrap (`shop.main`): may import every other layer
 
-Ports: when an inner layer needs something from an outer one, declare a `typing.Protocol` in `shop.domain.ports` and implement it in the outer layer.
+Ports: when an inner layer needs something from an outer one, declare a `typing.Protocol` in the inner layer and implement it in the outer layer.
 
 Libraries (INW005):
-- domain: no web frameworks, database or network clients, `subprocess` or `socket`
+- slice.models: no web frameworks, database or network clients, `subprocess` or `socket`
+
+Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.
+- catalog (`shop.catalog`): public `shop.catalog.{api,factory}`; depends on shared
+- orders (`shop.orders`): public `shop.orders.{api,factory}`; depends on shared
+- shared (`shop.shared`): public `shop.shared`; no dependencies
+
+Opt-in rules:
+- INW014: `shop.*.ports` hold only ABCs and Protocols whose methods have no body
+- INW015: only `shop.*.factory`, `shop.main` may import or build `shop.*.adapters`; elsewhere take it through a port
 <!-- inwards-brief:end -->
 ```
 
-Ports are the `ports` package or module directly inside a layer's module on disk (`shop/domain/ports.py` here). For a config `inwards init --style` wrote, the brief also names the preset and its ports module (`app.application.ports` for clean and hexagonal) before `--scaffold` creates it; it finds the preset by the comment init put in the table, so deleting that comment drops the name.
+Ports are the `ports` package or module directly inside a layer's module on disk, such as `shop/domain/ports.py` for a `shop.domain` layer. A layer written as a selector (`shop.*.models`) has no single such module, so the brief says "the inner layer" instead, as it does here; INW014's line names the port modules. For a config `inwards init --style` wrote, the brief also names the preset and its ports module (`app.application.ports` for clean and hexagonal) before `--scaffold` creates it; it finds the preset by the comment init put in the table, so deleting that comment drops the name.
 
 Each opt-in rule the config turns on (INW012 to INW016 and the FAPI rules, through `extend-select`, `select` or a [template role](configuration.md#template-rules)) adds one line under "Opt-in rules:". The line says what to do while writing code, with the rule's key setting: INW012's `delegate-to`, INW014's port modules (its `modules`, or else every `ports` module), INW015's `role` and `allowed-in`, INW016's naming scheme, FAPI001's required metadata, FAPI002's `codes` and FAPI003's `entrypoints`. A rule scoped by `modules` names them (`INW013 in app.*.router`). INW015 checks nothing without a `role`, so it gets no line then. Under `inwards init --style fastapi` they read:
 

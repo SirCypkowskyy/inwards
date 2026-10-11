@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: f53b96d53940eff3add3f3209463dd4dfec40e2551087d4d9fb03a4d10669a96
+source_hash: 68ded61269528eccb76757070f2ebc1af81706f801d1c220c3cb4acc0638eab9
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -52,7 +52,7 @@ Każdy klucz opisuje [dokumentacja konfiguracji](guides/configuration.md), któr
 
 <figure markdown="span">
   ![inwards check na czystym kodzie](../assets/screens/check-clean.svg){ loading=lazy }
-  <figcaption>Przykładowa aplikacja w wersji z repozytorium: każdy import wskazuje do środka.</figcaption>
+  <figcaption>Warstwowy przykładowy sklep (`eval/app`) w wersji z repozytorium: każdy import wskazuje do środka.</figcaption>
 </figure>
 
 Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować własną warstwę i wszystko, co jest na liście przed nią. `required-version` sprawia, że starszy plik binarny (albo nakładka, która nie jest Inwards) kończy się kodem wyjścia 2, zamiast sprawdzać projekt regułami, których może nie znać. Kod poza wszystkimi warstwami nie jest sprawdzany, więc INW006 uwidacznia tę lukę: import własnego kodu, który nie należy do żadnej warstwy, z wnętrza warstwy jest błędem (podobnie jak import z pakietu nad warstwami, którego `__init__.py` nie należy do żadnej warstwy), pakiet poza wszystkimi warstwami (chyba że wymienia go `ignore`) dostaje ostrzeżenie, a prefiks, który nie pasuje do żadnego modułu, jest zgłaszany w `pyproject.toml`. Wpisy `ignore` dopasowują całe segmenty nazwy w dowolnym miejscu, więc `migrations` obejmuje `shop.orders.migrations`. Nieznane klucze i prefiks wymieniony w dwóch warstwach to błędy konfiguracji (kod wyjścia 2). Ostrzeżenia nie zmieniają kodu wyjścia. Gdy domena importuje infrastrukturę, dostajesz to (w skrócie, jedna diagnostyka z tablicy `diagnostics`):
@@ -75,7 +75,7 @@ Warstwy wymienia się od najbardziej wewnętrznej. Moduł może importować wła
 }
 ```
 
-Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii `examples/clean-app` z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
+Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomionego na kopii warstwowego sklepu, który leży teraz w `eval/app`, z jednym dodanym błędnym importem. Długie napisy są tu ucięte przez `...`. Prawdziwe wyjście zawiera je w całości.
 
 Żeby wprowadzać reguły stopniowo, tabela `[tool.inwards.rules]` ustala, które reguły zgłaszają naruszenia i na jakim poziomie:
 

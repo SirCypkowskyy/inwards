@@ -98,8 +98,8 @@ afterAll(async () => {
 
 test("inwards server publishes what inwards check reports on examples/", async () => {
   const expected = checked();
-  // broken-app's INW001, and the repository config's INW006 about shop.cli.
-  expect(expected.map((row) => row.code).sort()).toEqual(["INW001", "INW006"]);
+  // broken-app's INW001; clean-app checks clean under the repository config.
+  expect(expected.map((row) => row.code).sort()).toEqual(["INW001"]);
   client = await startServer(FOLDERS);
   const server = client;
   await server.until(() => JSON.stringify(shown(server)) === JSON.stringify(expected));

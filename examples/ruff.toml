@@ -1,0 +1,10 @@
+# Ruff for the example apps (ci.yml, job "dogfood"). Each app's `shop` is its own
+# first-party package, so imports sort the same in both.
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "TC", "RUF"]
+
+[lint.isort]
+known-first-party = ["shop"]

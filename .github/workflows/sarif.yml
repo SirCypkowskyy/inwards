@@ -48,7 +48,7 @@ jobs:
           bun run src/cli/src/main.ts check --config examples/broken-app/pyproject.toml --format github > annotations.txt || status=$?
           cat annotations.txt
           test "$status" -eq 1
-          grep -q '^::error file=examples/broken-app/shop/domain/order.py,line=3,.*title=INW001::' annotations.txt
+          grep -q '^::error file=examples/broken-app/shop/orders/models.py,line=3,.*title=INW001::' annotations.txt
       - name: Upload to code scanning
         uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         continue-on-error: ${{ github.event.repository.private }}

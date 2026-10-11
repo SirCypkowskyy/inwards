@@ -1,7 +1,7 @@
 /**
  * @file #134: a violation a file already had at session start is context, not a
  * block, in both the PostToolUse hook and the Stop gate. The projects mirror
- * the eval's seeded-* cases: the example app, the eval config, the fixture's
+ * the eval's seeded-* cases: the eval app, the eval config, the fixture's
  * files, committed, then the edit the task asks for.
  */
 import { describe, expect, test } from "bun:test";
@@ -23,14 +23,14 @@ const PLACE = "shop/application/place_order.py";
 const NO_LAZY_FETCH = Bun.spawnSync(["git", "--no-lazy-fetch", "version"]).exitCode === 0;
 
 /**
- * Starts a session on the example app with one eval fixture's files committed.
+ * Starts a session on the eval app with one eval fixture's files committed.
  *
  * @param fixture - the fixture's directory name under eval/fixtures/INW001.
  * @returns the project directory.
  */
 function seeded(fixture: string): string {
   return session({}, (root) => {
-    cpSync(join(REPO, "examples/clean-app/shop"), join(root, "shop"), { recursive: true });
+    cpSync(join(REPO, "eval/app/shop"), join(root, "shop"), { recursive: true });
     cpSync(join(REPO, "eval/pyproject.toml"), join(root, "pyproject.toml"));
     cpSync(join(FIXTURES, fixture, "files"), root, { recursive: true });
   });
