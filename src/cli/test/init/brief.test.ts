@@ -56,8 +56,8 @@ const PRESET_PORTS: Readonly<Record<(typeof STYLE_NAMES)[number], string>> = {
   layered: "`app.persistence`",
   clean: "`app.application.ports`",
   hexagonal: "`app.application.ports`",
-  "vertical-slices": "`app.features.orders`",
   // Their layers are selectors, which name no one module.
+  "vertical-slices": "the inner layer",
   "bounded-contexts": "the inner layer",
   django: "the inner layer",
   fastapi: "the inner layer",

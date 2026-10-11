@@ -3,7 +3,8 @@
  * clean and hexagonal, which are layers only (clean and hexagonal turn on
  * INW014 and INW015 for their ports and driven adapters), and vertical-slices,
  * bounded-contexts, django and fastapi, which add templates and contexts
- * (fastapi, which also turns on the FastAPI rules, is `fastapi-preset.ts`'s).
+ * (fastapi, which also turns on the FastAPI rules, is `fastapi-preset.ts`'s,
+ * and vertical-slices is `vertical-slices-preset.ts`'s).
  * Each names the one import its config can't forbid (its `gap`). Pure data;
  * what a preset is lives in `styles.ts`.
  */
@@ -18,6 +19,7 @@ import {
   type Style,
   type StyleName,
 } from "./styles.ts";
+import { VERTICAL_SLICES } from "./vertical-slices-preset.ts";
 
 /** The fields the linear presets share: no templates, contexts or rules turned off. */
 const LINEAR: Pick<
@@ -109,64 +111,7 @@ export const STYLES: Readonly<Record<StyleName, Style>> = {
     shapes: [topShape(["domain/", "application/", "adapters/"]), USE_CASES, ADAPTERS],
     gap: "an inbound adapter may call a port directly instead of a use case",
   },
-  "vertical-slices": {
-    name: "vertical-slices",
-    summary: "one package per feature, independent of each other, on a shared kernel",
-    layers: [
-      { name: "shared", module: "shared", role: "the shared kernel: code every slice may use" },
-      { name: "features", module: "features", role: "one package per slice, each a context" },
-      BOOTSTRAP,
-    ],
-    templates: [
-      {
-        name: "slice",
-        why: "What every slice has in common: other code may import only its api module.",
-        roles: [],
-        public: ["api"],
-      },
-    ],
-    contexts: {
-      template: "slice",
-      parent: "features",
-      why: contextsWhy(
-        "slice",
-        "Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.",
-      ),
-      names: ["orders"],
-    },
-    ignoreRules: undefined,
-    optIn: undefined,
-    companion: undefined,
-    example: {
-      entity: "features.orders.models",
-      port: "features.orders.ports",
-      commands: "features.orders.commands",
-      queries: "features.orders.queries",
-      adapter: "features.orders.in_memory_orders",
-      driving: "features.orders.cli",
-      bootstrap: "bootstrap",
-      api: "features.orders.api",
-    },
-    tryIt: runBootstrap,
-    shapes: [
-      topShape(["shared/", "features/"]),
-      {
-        package: "features",
-        require: [],
-        allow: ["*/"],
-        extra: "error",
-        why: "slice packages only; a module here would belong to no slice",
-      },
-      {
-        package: "features.*",
-        require: ["api"],
-        allow: undefined,
-        extra: "error",
-        why: "every slice has its public api module",
-      },
-    ],
-    gap: "code only one slice uses may still move into shared, where every slice can reach it",
-  },
+  "vertical-slices": VERTICAL_SLICES,
   "bounded-contexts": {
     name: "bounded-contexts",
     summary: "one package per bounded context, each layered inside, crossing only through its api",
