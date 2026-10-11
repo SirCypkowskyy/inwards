@@ -1,13 +1,14 @@
 /**
  * @file `inwards server`: the language server over stdio (ADR-041), for any
- * editor with an LSP client. It builds the server's policy (`lsp/session.ts`)
+ * editor with an LSP client. It builds the server's policy (`_session.ts`)
  * around the connection and the warm check `main.ts` wires in, and returns
  * when the editor ends the session. `--stdio` is accepted and changes
  * nothing, since editors pass it by convention; stdio is the only transport.
  */
-import { createLanguageServer } from "../lsp/session.ts";
+
+import type { AppDeps } from "../commands/deps.ts";
 import { print } from "../platform/print.ts";
-import type { AppDeps } from "./deps.ts";
+import { createLanguageServer } from "./_session.ts";
 
 /**
  * Runs `inwards server`.

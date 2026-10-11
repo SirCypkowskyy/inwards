@@ -19,7 +19,7 @@ import {
 import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
-import type { ServerCheck } from "../lsp/checks.ts";
+import type { ServerCheck } from "../lsp/contracts.ts";
 import type { RulePages } from "../mcp/explain-rule.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
@@ -166,7 +166,7 @@ function nodeLsp(io: Platform): LspDeps {
   return {
     serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
       // A split chunk in the binary, loaded on use (as the init picker is, ADR-020).
-      const { serveLsp } = await import("./lsp-connection.ts");
+      const { serveLsp } = await import("../lsp/adapters/connection.ts");
       return await serveLsp(build);
     },
     check: (
