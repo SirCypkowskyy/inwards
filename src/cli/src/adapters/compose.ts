@@ -19,18 +19,18 @@ import {
 import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
-import type { ServerCheck } from "../lsp/checks.ts";
+import type { ServerCheck } from "../lsp/contracts.ts";
 import type { RulePages } from "../mcp/explain-rule.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
 import { runCheck } from "../project/check.ts";
 import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
 import { overlayTexts } from "../project/overlay.ts";
-import { createRunLog } from "../runlog/record.ts";
+import { nodeExportFiles } from "../runlog/adapters/export-files.ts";
+import { createRunLog } from "../runlog/index.ts";
 import type { CheckRunner } from "../session/contracts.ts";
 import { nodeBaselineWriter } from "./baseline-files.ts";
 import { nodeDaemonHost } from "./daemon-host.ts";
 import { nodeDaemonLink } from "./daemon-link.ts";
-import { nodeExportFiles } from "./export-files.ts";
 import { fileExtractionCache } from "./extraction-cache.ts";
 import { startExtractionPool } from "./extraction-pool.ts";
 import { nodeFileWalker } from "./file-walk.ts";
@@ -166,7 +166,7 @@ function nodeLsp(io: Platform): LspDeps {
   return {
     serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
       // A split chunk in the binary, loaded on use (as the init picker is, ADR-020).
-      const { serveLsp } = await import("./lsp-connection.ts");
+      const { serveLsp } = await import("../lsp/adapters/connection.ts");
       return await serveLsp(build);
     },
     check: (

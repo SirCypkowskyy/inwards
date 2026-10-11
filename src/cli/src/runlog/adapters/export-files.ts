@@ -3,14 +3,14 @@
  * per-project HMAC key in `.inwards/export-key` (made once, never leaving
  * the machine, read with O_NOFOLLOW so a planted symlink isn't followed), and
  * the export file, written for the owner only.
- * Hashing and choosing what to export are policy, in `runlog/export.ts`; only
+ * Hashing and choosing what to export are policy, in `runlog/queries/_export.ts`; only
  * the key and the file live here.
  */
 import { randomBytes } from "node:crypto";
 import { closeSync, constants, lstatSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ConfigError } from "@inwards/core";
-import type { ExportFiles } from "../runlog/contracts.ts";
+import type { ExportFiles } from "../contracts.ts";
 
 const KEY_BYTES = 32;
 const KEY_FORMAT = /^[0-9a-f]{64}$/u;

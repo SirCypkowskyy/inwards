@@ -1,8 +1,9 @@
 /**
- * @file What `inwards stats --export` needs from outside: the project's export key,
- * kept and read without following symlinks, and a file written for the
- * owner only. Types only.
+ * @file What `inwards stats` needs from outside: the platform, and for `--export`
+ * the project's export key, kept and read without following symlinks, and a
+ * file written for the owner only. Types only.
  */
+import type { Platform } from "../platform/contracts.ts";
 
 /** Storage for `--export`. */
 export interface ExportFiles {
@@ -23,4 +24,12 @@ export interface ExportFiles {
    * @throws when it can't be written.
    */
   writeOwnerOnly: (path: string, text: string) => void;
+}
+
+/** What `inwards stats` is given: the part of `AppDeps` it reads. */
+export interface StatsDeps {
+  /** Everything outside the process. */
+  io: Platform;
+  /** Keeps the export key and writes the export. */
+  exports: ExportFiles;
 }

@@ -19,8 +19,7 @@ import { compose, nodePlatform } from "../../src/adapters/compose.ts";
 import { baselineCommand } from "../../src/commands/baseline.ts";
 import { checkCommand } from "../../src/commands/check.ts";
 import type { AppDeps } from "../../src/commands/deps.ts";
-import { statsCommand } from "../../src/commands/stats.ts";
-import { createRunLog } from "../../src/runlog/record.ts";
+import { createRunLog, statsCommand } from "../../src/runlog/index.ts";
 import { createStartIdentity } from "../../src/session/start-identity.ts";
 import { project } from "../support/run.ts";
 
@@ -46,7 +45,7 @@ const POLICY = [
  * Folders under src/cli/src already moved to the slice layout of ADR-047.
  * Each migration step adds its folders, so a moved slice can't drift back.
  */
-const MIGRATED_SLICES: readonly string[] = [];
+const MIGRATED_SLICES: readonly string[] = ["lsp", "runlog"];
 /** The run-log fields these tests read. */
 interface LogLine {
   files: string[];
@@ -282,8 +281,16 @@ describe("boundaries", () => {
     }
     const policyZones = new Set(POLICY.map((folder) => `cli-${folder}`));
     for (const rule of config.boundaries.rules.filter((r) => policyZones.has(r.from))) {
-      expect(rule.allow).not.toContain("cli-adapters");
+      // A slice's own adapters zone (cli-runlog-adapters) counts too (ADR-047).
+      expect(rule.allow.filter((zone) => zone.endsWith("adapters"))).toEqual([]);
       expect(rule.allow).not.toContain("cli-main");
+    }
+    // A slice's adapters/ has its own zone, and only the root (cli-main) imports it.
+    for (const slice of MIGRATED_SLICES.filter((s) => existsSync(join(SRC, s, "adapters")))) {
+      expect(patterns).toContain(`src/cli/src/${slice}/adapters/**`);
+      const zone = `cli-${slice}-adapters`;
+      const importers = config.boundaries.rules.filter((r) => r.allow.includes(zone));
+      expect(importers.map((r) => r.from)).toEqual(["cli-main"]);
     }
   });
 });

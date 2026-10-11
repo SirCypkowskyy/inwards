@@ -1,8 +1,8 @@
 /**
- * @file The opt-in content rules skip test modules (#362): INW012 to INW016
- * and FAPI001 to FAPI009 don't report in a module whose name says it is a
+ * @file The opt-in content rules skip test modules (#362): INW012 to INW016,
+ * INW021 and FAPI001 to FAPI009 don't report in a module whose name says it is a
  * test (`test_*`, `*_test`, `conftest`, or a `tests` or `test` segment) unless
- * the rule's options table sets `check-tests = true`. The import rules still
+ * the rule's options table sets `check-tests = true`. The other import rules still
  * check those modules, a suppression there isn't reported as unused, and
  * `check-tests` is a config error on a rule that doesn't take it, in the
  * parser and the JSON Schema alike (paired cases, as in `schema-negatives`).
@@ -100,6 +100,7 @@ describe("check-tests in the schema and the parser", () => {
   test.each([
     ["a string", "depends-called", 'check-tests = "yes"'],
     ["a number", "orm-naming", "check-tests = 1"],
+    ["a string in INW021's table", "private-module", 'check-tests = "no"'],
     ["an import rule's table", "layer-dependency", "check-tests = true"],
     ["a diagram rule's table", "diagram-unknown-name", "check-tests = true"],
   ])("fails both for %s", (_what, rule, body) => {
@@ -108,14 +109,17 @@ describe("check-tests in the schema and the parser", () => {
     expect(schemaErrors(text)).not.toEqual([]);
   });
 
-  test.each(["thin-endpoint", "construct-only-in", "router-wiring", "duplicate-operation-id"])(
-    "passes both in %s's table",
-    (rule) => {
-      const role = rule === "construct-only-in" ? 'role = ["shop.adapters"]\n' : "";
-      const text = `${MINIMAL}[tool.inwards.rules.${rule}]\n${role}check-tests = true\n`;
-      expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
-    },
-  );
+  test.each([
+    "thin-endpoint",
+    "construct-only-in",
+    "router-wiring",
+    "duplicate-operation-id",
+    "private-module",
+  ])("passes both in %s's table", (rule) => {
+    const role = rule === "construct-only-in" ? 'role = ["shop.adapters"]\n' : "";
+    const text = `${MINIMAL}[tool.inwards.rules.${rule}]\n${role}check-tests = true\n`;
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
 });
 
 const ROUTER = `from fastapi import APIRouter
