@@ -100,9 +100,10 @@ describe("INW020 adapter-conformance", () => {
       "_: type[OrderRepository] = SqlOrderRepository",
       "_check: OrderRepository = SqlOrderRepository(...)",
     ];
-    for (const line of forms) {
-      expect(await inw020(`${HEAD}\n\nif TYPE_CHECKING:\n    ${line}\n`)).toEqual([]);
-    }
+    const found = await Promise.all(
+      forms.map((line) => inw020(`${HEAD}\n\nif TYPE_CHECKING:\n    ${line}\n`)),
+    );
+    expect(found).toEqual(forms.map(() => []));
     const qualified = HEAD.replace("from typing import TYPE_CHECKING", "import typing");
     const text = `${qualified}\n\nif typing.TYPE_CHECKING:\n    _: OrderRepository = SqlOrderRepository(...)\n`;
     expect(await inw020(text)).toEqual([]);

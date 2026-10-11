@@ -16,15 +16,8 @@ import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { importedNames } from "../../python/parser.ts";
-import {
-  classNames,
-  classQualifier,
-  DEFAULT_ALLOW_BASES,
-  DEFAULT_ALLOW_DECORATORS,
-  moduleScope,
-} from "../shared/classes.ts";
+import { classNames, classQualifier, exemptMatchers, moduleScope } from "../shared/classes.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
-import { nameMatcher } from "../shared/name-patterns.ts";
 import { type ClassContext, concreteMethods, portClasses } from "./classes.ts";
 import { adapterTarget, reportClass, reportImplementation, reportMethod } from "./wording.ts";
 
@@ -61,16 +54,12 @@ export function checkPortsAbstract(
   if (!(inScope(src.module) && CLASS.test(src.text))) {
     return [];
   }
-  const bases = stringList(options?.["allow-bases"]) ?? DEFAULT_ALLOW_BASES;
-  const extra = stringList(options?.["extend-allow-bases"]) ?? [];
-  const decorators = stringList(options?.["allow-decorators"]) ?? DEFAULT_ALLOW_DECORATORS;
   const tree = trees.treeOf(src);
   const root = tree.rootNode;
   const context: ClassContext = {
     qualify: classQualifier(importedNames(tree, src), src.module, classNames(root)),
     inScope,
-    allowBase: nameMatcher([...bases, ...extra]),
-    allowDecorator: nameMatcher(decorators),
+    ...exemptMatchers(options),
   };
   const target = adapterTarget(layers);
   return portClasses(root, src.module, context).flatMap((cls) => {

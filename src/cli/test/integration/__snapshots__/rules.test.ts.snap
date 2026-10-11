@@ -28,6 +28,7 @@ INW016   orm-naming                   off    error     opt-in, off by default
 INW017   diagram-unknown-name         off    warning   opt-in, off by default
 INW018   diagram-forbidden-edge       off    warning   opt-in, off by default
 INW019   diagram-missing-dependency   off    warning   opt-in, off by default
+INW020   adapter-conformance          off    error     opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -69,6 +70,7 @@ INW016   orm-naming                   on     warning   templates.domain.rules.mo
 INW017   diagram-unknown-name         off    warning   opt-in, off by default
 INW018   diagram-forbidden-edge       off    warning   opt-in, off by default
 INW019   diagram-missing-dependency   off    warning   opt-in, off by default
+INW020   adapter-conformance          off    error     opt-in, off by default
 FAPI001  endpoint-metadata            off    error     opt-in, off by default
 FAPI002  undocumented-error-response  off    error     opt-in, off by default
 FAPI003  router-wiring                off    error     opt-in, off by default
@@ -441,6 +443,23 @@ exports[`rules --json prints inwards/rules@1 1`] = `
         "kind": "opt-in",
       },
       "summary": "A marked architecture diagram draws every import the code makes between the layers or contexts it shows.",
+    },
+    {
+      "code": "INW020",
+      "default": "off",
+      "docs": "https://sircypkowskyy.github.io/inwards/rules/INW020/",
+      "enabled": false,
+      "name": "adapter-conformance",
+      "severity": "error",
+      "severitySource": {
+        "keys": [],
+        "kind": "default",
+      },
+      "source": {
+        "keys": [],
+        "kind": "opt-in",
+      },
+      "summary": "Every adapter class declares the port it implements with \`_: Port = Adapter(...)\` under \`if TYPE_CHECKING:\`, so the type checker checks it against the port.",
     },
     {
       "code": "FAPI001",

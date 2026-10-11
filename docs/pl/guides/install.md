@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 9472f8b2bd0647cbe58d9bdc1bde85eb6511f2091bb991e03cb473409e442314
+source_hash: abf7701573bfd2d5247e8cf9bf46202f8a7eb405bf66e547f4b7844ea54f6ebf
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -173,6 +173,8 @@ Każdy preset ustawia [`cycles`](configuration.md#cycles) na `["modules", "conte
 `clean` i `hexagonal` włączają też [INW014](../rules/INW014.md) przez `extend-select`, jako ostrzeżenie przez linię w `[tool.inwards.rules.severity]`: moduł w `application/ports/` może zawierać tylko klasy ABC i Protocol, a metoda w nim tylko docstring, `...`, `pass` albo `raise NotImplementedError`. Domyślny zakres reguły, czyli każdy moduł z segmentem `ports`, obejmuje już ten pakiet, więc preset nie ustawia dla niej żadnych opcji. `OrderRepository` z przykładowego pakietu jest klasą Protocol i przechodzi. `InMemoryOrderRepository` po niej nie dziedziczy: jej moduł kończy się blokiem `if TYPE_CHECKING:` z `_: OrderRepository = InMemoryOrderRepository()`, więc ty, mypy albo Pyright zgłosi adapter, który przestał pasować do portu. Klasa konkretna albo metoda, która wykonuje pracę, w `application/ports/orders.py` dostaje ostrzeżenie, którego poprawka wskazuje warstwę adapterów: `infrastructure` w `clean` i `outbound` w `hexagonal`.
 
 Oba presety włączają też [INW015](../rules/INW015.md), również jako ostrzeżenie: tylko `bootstrap.py` może importować i budować adaptery wyjściowe (driven). Jej tabela `[tool.inwards.rules.construct-only-in]` ustawia `role` na pakiet warstwy adapterów (`app.infrastructure` w `clean`, `app.adapters.outbound` w `hexagonal`), a `allowed-in` na `app.bootstrap`. Przykładowy pakiet buduje `InMemoryOrderRepository` tylko w fabryce `create_place_order()` w `bootstrap.py`, więc przechodzi. W `clean` moduł presentation, który importuje repozytorium, dostaje ostrzeżenie; to zamyka lukę, którą ten preset wcześniej nazywał. W `hexagonal` adaptery inbound i outbound są warstwami sąsiednimi, więc INW001 zgłasza już ten import jako błąd, a INW015 go nie powtarza; INW015 nadal zgłasza adapter zbudowany przez reeksport, na przykład z `__init__.py` pakietu.
+
+Włączają też [INW020](../rules/INW020.md), również jako ostrzeżenie: każda klasa w warstwie adapterów wyjściowych (driven) potrzebuje takiej linii `_: OrderRepository = InMemoryOrderRepository()` pod `if TYPE_CHECKING:`. Tabela `[tool.inwards.rules.adapter-conformance]` ustawia `modules` na pakiet warstwy adapterów, a `ports` na `app.application.ports`. Usuń tę linię z adaptera w przykładowym pakiecie, a sprawdzenie zgłosi ostrzeżenie na klasie; nadaj jej adnotację klasą spoza pakietu portów, a zgłosi ostrzeżenie na adnotacji.
 
 Ostatnie cztery presety rozdzielają pakiety [kontekstami](configuration.md#contexts) i opisują pakiety [szablonem](configuration.md#templates):
 

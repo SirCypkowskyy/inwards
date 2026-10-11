@@ -7,10 +7,10 @@
  * else an adapter module in general. Plain text from the records
  * `classes.ts` builds; it decides nothing about what is reported.
  */
-import type { Node } from "web-tree-sitter";
 import type { LayerSpec } from "../../config/layers.ts";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
+import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
+import { firstLine, nodeSpan } from "../shared/node-span.ts";
 import type { ConcreteMethod, PortClass } from "./classes.ts";
 
 /**
@@ -25,9 +25,6 @@ const ADAPTER_LAYERS: readonly RegExp[] = [
 
 /** The longest statement a message quotes before it is cut. */
 const MAX_QUOTE = 60;
-
-/** What a cut quote ends with. */
-const CUT = "...";
 
 /** Where an implementation should move: an adapter layer's first module entry. */
 export interface AdapterTarget {
@@ -65,32 +62,6 @@ function destination(target: AdapterTarget | undefined): string {
 }
 
 /**
- * Spans a name node.
- *
- * @param node - an `identifier`.
- * @returns the 1-based span.
- */
-function spanOf(node: Node): Span {
-  return {
-    line: node.startPosition.row + 1,
-    column: node.startPosition.column + 1,
-    endLine: node.endPosition.row + 1,
-    endColumn: node.endPosition.column + 1,
-  };
-}
-
-/**
- * Quotes a statement's first line, cut to `MAX_QUOTE` characters.
- *
- * @param statement - a statement node.
- * @returns its text for a message.
- */
-function quote(statement: Node): string {
-  const [first = ""] = statement.text.split("\n");
-  return first.length > MAX_QUOTE ? `${first.slice(0, MAX_QUOTE - CUT.length)}${CUT}` : first;
-}
-
-/**
  * Turns a class that is neither an ABC nor a Protocol into a finding.
  *
  * @param cls - the concrete class, with its node and name.
@@ -105,7 +76,7 @@ export function reportClass(
 ): Diagnostic {
   const name = cls.node.childForFieldName("name") ?? cls.node;
   return diagnostic(RULES.INW014, src, {
-    span: spanOf(name),
+    span: nodeSpan(name),
     message: `\`${cls.name}\` in port module \`${src.module}\` is neither an ABC nor a Protocol, and extends no class from a port module. A port module holds only the interfaces adapters implement.`,
     fix: {
       summary: `Move \`${cls.name}\` to ${destination(target)}, and leave an ABC or Protocol here.`,
@@ -165,8 +136,8 @@ export function reportMethod(
   const name = method.fn.childForFieldName("name") ?? method.fn;
   const line = method.statement.startPosition.row + 1;
   return diagnostic(RULES.INW014, src, {
-    span: spanOf(name),
-    message: `\`${qualified}\` in port module \`${src.module}\` has a body that does work: line ${line} runs \`${quote(method.statement)}\`. A port declares what adapters implement; its methods hold only a docstring, \`...\`, \`pass\` or \`raise NotImplementedError\`.`,
+    span: nodeSpan(name),
+    message: `\`${qualified}\` in port module \`${src.module}\` has a body that does work: line ${line} runs \`${firstLine(method.statement, MAX_QUOTE)}\`. A port declares what adapters implement; its methods hold only a docstring, \`...\`, \`pass\` or \`raise NotImplementedError\`.`,
     fix: {
       summary: `Move the body of \`${qualified}\` to an implementation in ${destination(target)}, and leave \`...\` here.`,
       steps: methodSteps(cls, method.name, destination(target)),
@@ -197,7 +168,7 @@ export function reportImplementation(
   const which = listed.length === 0 ? last : `${listed.join(", ")} and ${last}`;
   const verb = methods.length === 1 ? "does" : "do";
   return diagnostic(RULES.INW014, src, {
-    span: spanOf(name),
+    span: nodeSpan(name),
     message: `\`${cls.name}\` in port module \`${src.module}\` extends the port \`${base}\` and implements it: ${which} ${verb} work. An implementation is an adapter; a port module holds only the interfaces adapters implement.`,
     fix: {
       summary: `Move \`${cls.name}\` to ${destination(target)}.`,

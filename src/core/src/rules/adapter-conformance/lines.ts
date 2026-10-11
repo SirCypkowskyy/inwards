@@ -58,6 +58,17 @@ export interface ConformanceLine {
 }
 
 /**
+ * Qualifies the heads of base or decorator expressions, dropping what can't be named.
+ *
+ * @param nodes - base or decorator expressions.
+ * @param qualify - the file's qualifier.
+ * @returns the dotted names, in order.
+ */
+function heads(nodes: readonly Node[], qualify: Qualify): string[] {
+  return nodes.flatMap((n) => qualifiedHead(n, qualify) ?? []);
+}
+
+/**
  * Tells whether a class's bases or decorators keep it out of the check.
  *
  * @param node - the `class_definition`.
@@ -72,12 +83,16 @@ function exemption(
   context: LineContext,
   exempt: ReadonlySet<string>,
 ): "record" | "port" | undefined {
-  const heads = (nodes: readonly Node[]): string[] =>
-    nodes.flatMap((n) => qualifiedHead(n, context.qualify) ?? []);
-  const decorated = heads(decorators.flatMap((d) => namedChildren(d).slice(0, 1)));
+  const decorated = heads(
+    decorators.flatMap((d) => namedChildren(d).slice(0, 1)),
+    context.qualify,
+  );
   const list = node.childForFieldName("superclasses");
   const args = list ? namedChildren(list) : [];
-  const bases = heads(args.filter((a) => a.type !== "keyword_argument"));
+  const bases = heads(
+    args.filter((a) => a.type !== "keyword_argument"),
+    context.qualify,
+  );
   if (
     decorated.some(context.allowDecorator) ||
     bases.some((b) => context.allowBase(b) || exempt.has(b))

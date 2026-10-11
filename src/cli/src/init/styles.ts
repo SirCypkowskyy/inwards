@@ -144,14 +144,16 @@ export const BOOTSTRAP: StyleLayer = {
  * default scope, every module with a `ports` segment, so it needs no table.
  * INW015 lets only `bootstrap` import and build the driven adapters, so its
  * table names that layer's package as `role` and `bootstrap` as `allowed-in`.
+ * INW020 asks every driven adapter for a conformance line, so its table names
+ * that package as `modules` and `application.ports` as `ports`.
  *
  * @param adapters - the driven adapters' module below the package, e.g. `adapters.outbound`.
- * @returns the opt-in, both rules as warnings.
+ * @returns the opt-in, the three rules as warnings.
  */
 export function portsAndAdapters(adapters: string): StyleOptIn {
   return {
-    codes: ["INW014", "INW015"],
-    why: "Port modules hold only ABCs and Protocols (INW014), and only bootstrap imports and builds the driven adapters (INW015), as warnings to start with: make them errors once the project is clean.",
+    codes: ["INW014", "INW015", "INW020"],
+    why: "Port modules hold only ABCs and Protocols (INW014), only bootstrap imports and builds the driven adapters (INW015), and each driven adapter declares its port under TYPE_CHECKING (INW020), as warnings to start with: make them errors once the project is clean.",
     options: [
       {
         rule: "construct-only-in",
@@ -159,6 +161,14 @@ export function portsAndAdapters(adapters: string): StyleOptIn {
         lines: (pkg: string): string[] => [
           `role = ["${pkg}.${adapters}"]`,
           `allowed-in = ["${pkg}.${BOOTSTRAP.module}"]`,
+        ],
+      },
+      {
+        rule: "adapter-conformance",
+        why: "The driven adapters, each of which ends with `_: Port = Adapter(...)` under `if TYPE_CHECKING:`, and the ports they implement.",
+        lines: (pkg: string): string[] => [
+          `modules = ["${pkg}.${adapters}"]`,
+          `ports = ["${pkg}.application.ports"]`,
         ],
       },
     ],

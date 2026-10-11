@@ -347,13 +347,7 @@
       },
       {
         "from": "core-rule-adapter-conformance",
-        "allow": [
-          "core-contracts",
-          "core-meta",
-          "core-config",
-          "core-python",
-          "core-rules-shared"
-        ]
+        "allow": ["core-contracts", "core-meta", "core-config", "core-python", "core-rules-shared"]
       },
       {
         "from": "core-rule-construct-only-in",

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: cb13e21eb518a4a456488fc1a2dc23107f5f2095c29ed86f124c5d650392d784
+source_hash: fcc5d18f1099891405e7ac3771cacfb8c74c92c1d687e7dc434d20463691fdfa
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -89,7 +89,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018, INW019, INW020 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif/github), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -121,7 +121,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>adapter-conformance: INW020<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -404,6 +404,7 @@ Reguły są pogrupowane według kategorii, w kolejności, której używa [indeks
 | INW014 | `ports-abstract` | W module portu (takim, który ma segment `ports`, albo w modułach wybranych przez `modules`) klasa najwyższego poziomu, która nie jest ani ABC (`abc.ABC`, `metaclass=ABCMeta`), ani `typing.Protocol`, i nie rozszerza klasy z modułu portu; metoda ABC albo Protocol, której ciało zawiera coś więcej niż docstring, `...`, `pass` albo `raise NotImplementedError`; oraz podklasa portu, która go implementuje. Wyjątki, modele Pydantic, named tuple, typed dict, enumy i dataclassy są zwolnione (`allow-bases`, `extend-allow-bases`, `allow-decorators`). Poprawka wskazuje warstwę adapterów. Jedno parsowanie na moduł portu, który zawiera `class` | opt-in | błąd | clean, hexagonal | :material-check-circle: |
 | INW015 | `construct-only-in` | W module, który należy do warstwy, a nie do `role` ani `allowed-in`: import modułu z `role`, który się wykonuje (bez ciał `if TYPE_CHECKING:`), na importowanej nazwie, oraz wywołanie budujące klasę zdefiniowaną w roli, osiągniętą przez moduł spoza niej (reeksport albo atrybut modułu), na wywołaniu. Import, który INW001 zgłasza jako skierowany na zewnątrz, dostaje tylko INW001. Jedno parsowanie na taki plik z importem, plus moduły roli, `allowed-in` i pakiety nad rolą, gdy prowadzi tam wywołanie nazwy pisanej wielką literą | opt-in | błąd | clean, hexagonal | :material-check-circle: |
 | INW016 | `orm-naming` | Nazwy tabel (`__tablename__`, `Table("name", ...)`, nazwa, którą SQLModel wyprowadza dla klasy `table=True`, `Meta.db_table` w Django), które nie są w lower_case_snake albo, przy `table-name = "snake_singular"` (domyślnie), wyglądają na angielską liczbę mnogą; oraz kolumny daty i czasu (`Mapped[datetime]`, `mapped_column`/`Column` z `DateTime`, `TIMESTAMP` albo `Date`, pola SQLModel, `DateTimeField`/`DateField` z Django), których nazwa w bazie nie kończy się na `datetime-suffix` (`_at`) albo `date-suffix` (`_date`). Jedno zgłoszenie na nazwę, z nazwą do użycia. Uruchomienie dla całego projektu dodaje jedno zgłoszenie, gdy projekt ma tabele SQLAlchemy i nigdzie nie ma `MetaData(naming_convention=...)`. Jedno parsowanie na plik, którego tekst wymienia konstrukcję ORM, niezależnie od warstwy (poza modułami testowymi) | opt-in | błąd | fastapi | :material-check-circle: |
+| INW020 | `adapter-conformance` | W module adaptera (z segmentem `adapters` albo wybranym przez `modules`) publiczna klasa najwyższego poziomu bez linii zgodności, czyli przypisania z adnotacją `_: Port = Adapter(...)` albo `_: type[Port] = Adapter` w bloku `if TYPE_CHECKING:` na poziomie modułu, zgłaszana na nazwie klasy; taka linia poza tym blokiem, zgłaszana na linii; oraz, gdy ustawiono `ports`, adnotacja, która nie jest klasą z tych modułów (`Any` i `object` zawsze), zgłaszana na adnotacji. Klasy Protocol, ABC, klasy prywatne i rekordy zwolnione jak w INW014 nie potrzebują linii. Jedno parsowanie na moduł adaptera, w którym jest `class` | opt-in | błąd | clean, hexagonal | :material-check-circle: |
 
 ### Integralność { #catalogue-integrity }
 
@@ -463,7 +464,7 @@ src/
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
 │   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
-│   │   │   │              #   annotations.ts
+│   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)
 │   │   │   │              #   (parameter types), name-patterns.ts (fnmatch-style names)
 │   │   │   ├── unsupported-encoding.ts  # INW000
 │   │   │   ├── layer-dependency.ts      # INW001 + fix composer
@@ -483,6 +484,8 @@ src/
 │   │   │   │                            #   helpers.ts (same-module helpers), remote.ts (handlers
 │   │   │   │                            #   and view bases in other modules), metrics.ts,
 │   │   │   │                            #   signals.ts, wording.ts, check.ts
+│   │   │   ├── adapter-conformance/     # INW020: lines.ts (adapter classes, conformance lines),
+│   │   │   │                            #   wording.ts, check.ts
 │   │   │   ├── async-blocking/          # INW013: catalog.ts (blocking families), receivers.ts,
 │   │   │   │                            #   check.ts
 │   │   │   ├── construct-only-in/       # INW015: check.ts (imports), calls.ts (constructions
@@ -508,7 +511,7 @@ src/
 │   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
-│   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
+│   │   │                  #   content-rules.ts INW013 to INW015 and INW020, orm-naming.ts INW016,
 │   │   │                  #   diagrams.ts INW017 to INW019
 │   │   └── report/        # render.ts: text / concise / json / sarif; github.ts
 │   ├── scripts/           # prescan-diff.ts: the differential test

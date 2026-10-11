@@ -226,6 +226,21 @@
       "url": "INW016/"
     },
     {
+      "code": "INW020",
+      "name": "adapter-conformance",
+      "title": "INW020 adapter-conformance",
+      "summary": "A public class in an adapter module with no `_: Port = Adapter(...)` line under `if TYPE_CHECKING:`, such a line that runs at import, or one whose annotation names no port",
+      "description": "Every adapter class declares the port it implements with `_: Port = Adapter(...)` under `if TYPE_CHECKING:`, so the type checker checks it against the port.",
+      "category": ["roles", "ports"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "opt-in, error",
+      "presets": "clean, hexagonal",
+      "url": "INW020/"
+    },
+    {
       "code": "INW000",
       "name": "unsupported-encoding",
       "title": "INW000 unsupported-encoding",

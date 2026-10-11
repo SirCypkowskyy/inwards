@@ -7,19 +7,23 @@
  * exempt by default: exceptions, enums, Pydantic models, typed dicts, named
  * tuples and dataclasses. It reads one parsed tree and decides nothing about
  * findings; the caller parses and frees the tree. It also makes the test
- * for a role's modules from an option or a default segment.
+ * for a role's modules from an option or a default segment, and the
+ * exemption matchers from a rule's options.
  */
 import type { Node } from "web-tree-sitter";
 import { matchEntry } from "../../config/layer-selector.ts";
+import { stringList } from "../../config/rule-options.ts";
+import type { RuleOptions } from "../../config/rule-settings.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import { type NameMatch, nameMatcher } from "./name-patterns.ts";
 
 /**
  * The bases a class may extend and stay out of a role rule's check:
  * exceptions (builtin ones are spelled bare), Pydantic models, named tuples,
  * typed dicts and enums.
  */
-export const DEFAULT_ALLOW_BASES: readonly string[] = [
+const DEFAULT_ALLOW_BASES: readonly string[] = [
   "BaseException",
   "Exception",
   "*Error",
@@ -34,7 +38,7 @@ export const DEFAULT_ALLOW_BASES: readonly string[] = [
 ];
 
 /** The decorators that make a class a data record and keep it out of a role rule's check. */
-export const DEFAULT_ALLOW_DECORATORS: readonly string[] = [
+const DEFAULT_ALLOW_DECORATORS: readonly string[] = [
   "dataclasses.dataclass",
   "pydantic.dataclasses.dataclass",
   "attrs.define",
@@ -155,4 +159,22 @@ export function moduleScope(
   }
   return (module: string): boolean =>
     entries.some((entry) => matchEntry(entry, module) !== undefined);
+}
+
+/**
+ * Builds the exemption matchers from a role rule's options: `allow-bases`
+ * (or its default) plus `extend-allow-bases`, and `allow-decorators` (or its
+ * default).
+ *
+ * @param options - the rule's options table, if set.
+ * @returns the matchers for an exempt base and an exempt decorator.
+ */
+export function exemptMatchers(options: RuleOptions | undefined): {
+  allowBase: NameMatch;
+  allowDecorator: NameMatch;
+} {
+  const bases = stringList(options?.["allow-bases"]) ?? DEFAULT_ALLOW_BASES;
+  const extra = stringList(options?.["extend-allow-bases"]) ?? [];
+  const decorators = stringList(options?.["allow-decorators"]) ?? DEFAULT_ALLOW_DECORATORS;
+  return { allowBase: nameMatcher([...bases, ...extra]), allowDecorator: nameMatcher(decorators) };
 }

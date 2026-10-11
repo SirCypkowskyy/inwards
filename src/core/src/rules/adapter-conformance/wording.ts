@@ -5,45 +5,16 @@
  * port (on the annotation). Plain text from the records `lines.ts` builds;
  * it decides nothing about what is reported.
  */
-import type { Node } from "web-tree-sitter";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
+import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
+import { firstLine, nodeSpan } from "../shared/node-span.ts";
 import type { AdapterClass, ConformanceLine } from "./lines.ts";
 
 /** The longest line a message quotes before it is cut. */
 const MAX_QUOTE = 80;
 
-/** What a cut quote ends with. */
-const CUT = "...";
-
 /** The option a user adds a record's base to. */
 const TABLE = "[tool.inwards.rules.adapter-conformance]";
-
-/**
- * Spans a node.
- *
- * @param node - any node.
- * @returns the 1-based span.
- */
-function spanOf(node: Node): Span {
-  return {
-    line: node.startPosition.row + 1,
-    column: node.startPosition.column + 1,
-    endLine: node.endPosition.row + 1,
-    endColumn: node.endPosition.column + 1,
-  };
-}
-
-/**
- * Quotes a statement's first line, cut to `MAX_QUOTE` characters.
- *
- * @param statement - a statement node.
- * @returns its text for a message.
- */
-function quote(statement: Node): string {
-  const [first = ""] = statement.text.split("\n");
-  return first.length > MAX_QUOTE ? `${first.slice(0, MAX_QUOTE - CUT.length)}${CUT}` : first;
-}
 
 /**
  * Turns a class with no conformance line into a finding.
@@ -56,7 +27,7 @@ function quote(statement: Node): string {
 export function reportMissing(cls: AdapterClass, src: SourceFile, port: string): Diagnostic {
   const line = `_: ${port} = ${cls.name}(...)`;
   return diagnostic(RULES.INW020, src, {
-    span: spanOf(cls.nameNode),
+    span: nodeSpan(cls.nameNode),
     message: `\`${cls.name}\` in adapter module \`${src.module}\` declares no port it implements. Add \`${line}\` under \`if TYPE_CHECKING:\` at the end of the module, so the type checker checks the class against its port.`,
     fix: {
       summary: `Add \`${line}\` under \`if TYPE_CHECKING:\` at the end of the module.`,
@@ -72,7 +43,7 @@ export function reportMissing(cls: AdapterClass, src: SourceFile, port: string):
 /**
  * Turns a conformance line outside `if TYPE_CHECKING:` into a finding.
  *
- * @param line - the line.
+ * @param line - the conformance line that runs at import.
  * @param src - the checked file.
  * @returns the finding, on the line.
  */
@@ -80,8 +51,8 @@ export function reportRuns(line: ConformanceLine, src: SourceFile): Diagnostic {
   const effect =
     line.form === "call" ? `builds a \`${line.cls}\`` : "needs the port imported at runtime";
   return diagnostic(RULES.INW020, src, {
-    span: spanOf(line.statement),
-    message: `\`${quote(line.statement)}\` in adapter module \`${src.module}\` is outside \`if TYPE_CHECKING:\`, so it runs when the module is imported and ${effect}. A conformance line is only for the type checker.`,
+    span: nodeSpan(line.statement),
+    message: `\`${firstLine(line.statement, MAX_QUOTE)}\` in adapter module \`${src.module}\` is outside \`if TYPE_CHECKING:\`, so it runs when the module is imported and ${effect}. A conformance line is only for the type checker.`,
     fix: {
       summary: "Move the line into an `if TYPE_CHECKING:` block at the end of the module.",
       steps: [
@@ -95,7 +66,7 @@ export function reportRuns(line: ConformanceLine, src: SourceFile): Diagnostic {
 /**
  * Turns a conformance line whose annotation names no port into a finding.
  *
- * @param line - the line.
+ * @param line - the conformance line, whose `port` node the finding spans.
  * @param src - the checked file.
  * @param named - the annotation's qualified name.
  * @param anything - true for `Any` or `object`, which accept any value; false for a class outside the port modules.
@@ -111,7 +82,7 @@ export function reportAnnotation(
     ? "which accepts any value"
     : "which isn't a class from a port module (`ports`)";
   return diagnostic(RULES.INW020, src, {
-    span: spanOf(line.port),
+    span: nodeSpan(line.port),
     message: `The conformance line for \`${line.cls}\` in adapter module \`${src.module}\` is annotated \`${named}\`, ${why}, so the type checker doesn't check the class against a port.`,
     fix: {
       summary: `Annotate the line with the port \`${line.cls}\` implements.`,

@@ -15,15 +15,8 @@ import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { importedNames } from "../../python/parser.ts";
-import {
-  classNames,
-  classQualifier,
-  DEFAULT_ALLOW_BASES,
-  DEFAULT_ALLOW_DECORATORS,
-  moduleScope,
-} from "../shared/classes.ts";
+import { classNames, classQualifier, exemptMatchers, moduleScope } from "../shared/classes.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
-import { nameMatcher } from "../shared/name-patterns.ts";
 import { adapterClasses, conformanceLines, type LineContext, portName } from "./lines.ts";
 import { reportAnnotation, reportMissing, reportRuns } from "./wording.ts";
 
@@ -95,16 +88,12 @@ export function checkAdapterConformance(
   }
   const ports = stringList(options?.["ports"]);
   const isPort = moduleScope(ports, PORTS_SEGMENT);
-  const bases = stringList(options?.["allow-bases"]) ?? DEFAULT_ALLOW_BASES;
-  const extra = stringList(options?.["extend-allow-bases"]) ?? [];
-  const decorators = stringList(options?.["allow-decorators"]) ?? DEFAULT_ALLOW_DECORATORS;
   const tree = trees.treeOf(src);
   const root = tree.rootNode;
   const names = importedNames(tree, src);
   const context: LineContext = {
     qualify: classQualifier(names, src.module, classNames(root)),
-    allowBase: nameMatcher([...bases, ...extra]),
-    allowDecorator: nameMatcher(decorators),
+    ...exemptMatchers(options),
   };
   const classes = adapterClasses(root, src.module, context);
   if (classes.length === 0) {
