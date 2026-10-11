@@ -153,6 +153,19 @@ components:
   nav-item-active:
     backgroundColor: "rgb(11 103 132 / 10%)"
     textColor: "{colors.hunk}"
+  nav-tree-root:
+    textColor: "{colors.ink}"
+    typography: "{typography.label}"
+  nav-tree-group:
+    textColor: "{colors.ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+  nav-tree-toggle:
+    textColor: "{colors.graphite}"
+  nav-tree-toggle-hover:
+    textColor: "{colors.ink}"
+  nav-tree-guide:
+    backgroundColor: "{colors.rule}"
   nav-tab:
     backgroundColor: "{colors.paper}"
     textColor: "{colors.graphite}"
@@ -323,7 +336,7 @@ Headings are all weight 700, tracked -0.01em and balanced; they are Ink in both 
 
 ## Layout
 
-Read pages keep Zensical's own grid: a left sidebar, the content column and a right table of contents, with `navigation.tabs` adding a top tab bar at wide screens and `navigation.sections` grouping the sidebar. The tabs are **Guides**, **Rules**, **How it works** (chapters 4, 3 and 6) and **Project** (chapters 1, 2, 5, 7, 8 and Design partners). Page URLs never change with the grouping: `rules/INWxxx/` is printed by the CLI and is a contract.
+Read pages keep Zensical's own grid: a left sidebar, the content column and a right table of contents, with `navigation.tabs` adding a top tab bar at wide screens and `navigation.indexes` giving a section a page of its own (an `index.md` listed first in it). The sidebar shows the current tab's pages; `navigation.sections` is off, so a sub-section is a group that opens and closes instead of a fixed heading. The Rules tab is the one tab with sub-sections: one per rule category, in the index's order, drawn as a tree (see Navigation). The tabs are **Guides**, **Rules**, **How it works** (chapters 4, 3 and 6) and **Project** (chapters 1, 2, 5, 7, 8 and Design partners). Page URLs never change with the grouping: `rules/INWxxx/` is printed by the CLI and is a contract.
 
 Prose sits at 34em inside the column while tables, code and diagrams take the full column width; a page therefore has a ragged right edge by design.
 
@@ -396,7 +409,8 @@ Ink on Paper 2 in Atkinson Hyperlegible Mono, 1px Rule border, 6px corners, line
 
 - **Header:** Paper with a 1px Rule bottom edge; the mark at 1.1rem high and the site name at 0.8rem, 700, as the wordmark; the repository link without star or fork counts.
 - **Top tabs:** 0.75rem at 600 on Paper, Graphite at rest, Ink on hover, Hunk for the current section.
-- **Sidebar:** 0.75rem. The current page is Hunk at 700 on a 10% Hunk tint, the only colour in the sidebar. Section headings are Ink at 700.
+- **Sidebar:** 0.75rem, items with 6px corners. The current page is Hunk at 700 on a 10% Hunk tint, the only colour in the sidebar. Section headings are Ink at 700. The theme's page `status` icon is hidden: every rule page has `status: stable` for the rule browser, so the icon said nothing.
+- **Rules tree** (issue #381), at 76.25em and wider where the sidebar is a column: the Rules tab's own page is the root, Ink at 700 (Hunk on its tint when it is the current page). Each rule category is a group: a Graphite chevron (Ink on hover) before the name, which is Ink at 600 and links to the category page (`rules/<category>/`); the chevron opens and closes the group and turns 90° in 150ms. A group's rule pages hang off a 1px Rule guide under the chevron, their text aligned with the category name, like `tree` draws a folder. The group holding the current page is open on load and the others are closed. The chevron is a `<label>` for the theme's hidden checkbox; `javascripts/nav-tree.mjs` names it after its category, gives it `role="button"` and `aria-expanded`, and makes Space toggle it as Enter already does. It sits before the name visually but after the link in tab order. In the drawer below 76.25em the theme's own nested list stays, chevrons on the right. `scripts/check-docs-nav.py` and `scripts/check-rule-pages.py` fail when a rule page is outside its category's group.
 - **Language menu:** a Paper panel with a Rule border, 6px corners and the floating-panel shadow; items turn Hunk on hover. It keeps the current page when switching language.
 - **Footer:** Paper with a 1px Rule top, the meta row on Paper 2, copyright in Graphite.
 
@@ -420,6 +434,10 @@ The filterable list of every rule at the top of `rules/` (issue #145), drawn by 
 - **Phone (below 45em):** each rule becomes a block of labelled lines (label in Graphite, 9em wide) and the header keeps only the four sort buttons, in one row.
 - **State:** every filter, the sort, the page and the page size are in the query string, defaults left out, and restored on load; `history.replaceState` keeps one history entry. Without JS, or when `rules.json` fails to load, the static tables below stay visible; once the browser draws, it hides them.
 
+### Rule category pages
+
+`rules/<category>/` (issue #381), one per category, the page a group of the rules tree opens: the category's paragraph from the index, then its rules in the docs table with four columns (code, name, what it flags, on), wrapped in `.inw-rule-category`. The name stays on one line. Below 45em each rule is a block: code and name on the first line, what it flags under them, the on cell in Graphite, rules divided by 1px Rule lines. The rows repeat the index's, which `scripts/check-rule-pages.py` checks.
+
 ### Diagrams and charts
 
 **Hand-built SVG** (the model: `#homepage-loop` and `#quadrant-chart` in `stylesheets/extra.css`). Give the SVG an id, classes on its parts and colour them in CSS only with `var(--md-*)` or `var(--inw-*)`, never literal colours in the markup, so both schemes work. Nodes are Paper 2 with a 1px Graphite stroke and Ink labels (14.70 / 12.91), the one subject node is a Hunk fill with On Hunk text at 700 (6.39 / 8.66), edges and edge labels are Graphite at a 2px stroke, a pass is outlined in Added and a violation edge turns Removed. Set text in `var(--md-text-font-family)` at 14 to 15px and draw at the size it will be shown (the loop is 380 units wide and never scaled up). Focusable nodes get `tabindex="0"`, a visible focus state (2.5px Ink stroke) and the SVG an `aria-label` or `role="img"` with a description. Put diagram styles in `@layer inwards-diagrams`: the theme never styles SVG internals, so a layer loses nothing, and only a size the theme's unlayered `svg` rules would override goes in `home.css`.
@@ -441,10 +459,11 @@ Checked against Zensical 0.0.65. After an upgrade, diff each template's upstream
 | `overrides/partials/source.html` | The theme's repository link without `data-md-component="source"`, which would fetch star and fork counts from api.github.com: a third-party request, and one that fails while the repository is private. |
 | `overrides/partials/alternate.html` | Language selector that links to the same page in the other language (issue #149), paired with `javascripts/language-switch.mjs`. |
 | `theme.font = false`, `palette primary/accent = "custom"` | No Google Fonts request; no stock palette. |
-| `stylesheets/theme.css` (unlayered) | Tokens, the `--md-*` mapping and restyles of theme classes: `.md-typeset` type and its code, admonition, tab, table, button, `kbd` and `mark` styles, `.md-header`, `.md-tabs`, `.md-nav`, `.md-select`, `.md-tooltip`/`.md-tooltip2`, `.md-footer`, `.md-source__repository`, `.md-copyright`, and the modern variant's `--color-*` triplets. |
+| `stylesheets/theme.css` (unlayered) | Tokens, the `--md-*` mapping and restyles of theme classes: `.md-typeset` type and its code, admonition, tab, table (including the category pages' tables), button, `kbd` and `mark` styles, `.md-header`, `.md-tabs`, `.md-nav` (with the rules tree and the hidden `.md-status`), `.md-select`, `.md-tooltip`/`.md-tooltip2`, `.md-footer`, `.md-source__repository`, `.md-copyright`, and the modern variant's `--color-*` triplets. |
 | `stylesheets/home.css` (unlayered) | Home page only, scoped to `.inw-home`, plus `.inw-actions`, which the 404 page reuses. |
 | `stylesheets/extra.css` (`@layer inwards-diagrams`) | The two hand-built SVGs. |
 | `stylesheets/rules.css` (`@layer inwards-rules`) | The rule browser. Its classes are its own, so a layer loses nothing, except the input border the theme resets (drawn on a wrapper instead). |
+| `javascripts/nav-tree.mjs` | Names each sidebar group's chevron after its section, as a button with `aria-expanded`, and lets Space toggle it; the theme's label has only an icon. |
 | `javascripts/rule-index*.mjs` | The rule browser: the view logic (`-state`), labels in both languages (`-text`), DOM helpers (`-dom`) and the drawing. |
 
 `theme.css` and `home.css` are unlayered on purpose: Zensical's CSS is unlayered, and unlayered rules beat every cascade layer whatever their specificity, so a layered token or restyle would lose. `biome.jsonc` scopes that exception. The diagrams stay layered because the theme never styles SVG internals.
