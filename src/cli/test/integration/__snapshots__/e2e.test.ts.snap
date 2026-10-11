@@ -110,6 +110,18 @@ Found 1 violation in 2 files (0 ms).
 }
 `;
 
+exports[`check --format github 1`] = `
+{
+  "code": 1,
+  "stderr": "",
+  "stdout": 
+"::error file=shop/domain/order.py,line=1,endLine=1,col=8,endColumn=30,title=INW001::Layer "domain" imports "shop.infrastructure.db" from outer layer "infrastructure". Allowed direction: domain <- infrastructure.%0AFix: Depend on an abstraction owned by "domain" instead of "shop.infrastructure.db".%0A1. Delete \`import shop.infrastructure.db\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.%0A2. Declare a typing.Protocol in \`shop.domain\` (for example \`shop.domain.ports\`) that describes only what this module needs from \`db\`.%0A3. Type this module against that Protocol and receive the implementation through a constructor or function parameter.%0A4. Make the class in "infrastructure" satisfy the Protocol, and wire it in the outermost layer (the composition root).%0ADocs: https://sircypkowskyy.github.io/inwards/rules/INW001/
+Found 1 violation in 2 files (0 ms).
+"
+,
+}
+`;
+
 exports[`check --format json --max-diagnostics 0 1`] = `
 {
   "code": 1,
@@ -144,6 +156,18 @@ exports[`check --format sarif --max-diagnostics 1 1`] = `
 }
 `;
 
+exports[`check --format github --max-diagnostics 0 1`] = `
+{
+  "code": 1,
+  "stderr": "",
+  "stdout": 
+"Found 1 violation in 2 files (0 ms).
+Not shown: 1 violation.
+"
+,
+}
+`;
+
 exports[`check --format text --max-diagnostics some 1`] = `
 {
   "code": 2,
@@ -152,6 +176,17 @@ exports[`check --format text --max-diagnostics some 1`] = `
 "
 ,
   "stdout": "",
+}
+`;
+
+exports[`check --format github names files from GITHUB_WORKSPACE 1`] = `
+{
+  "code": 1,
+  "stdout": 
+"::error file=packages/api/shop/domain/order.py,line=1,endLine=1,col=8,endColumn=30,title=INW001::Layer "domain" imports "shop.infrastructure.db" from outer layer "infrastructure". Allowed direction: domain <- infrastructure.%0AFix: Depend on an abstraction owned by "domain" instead of "shop.infrastructure.db".%0A1. Delete \`import shop.infrastructure.db\`. Do not move the import into a function or behind TYPE_CHECKING; Inwards checks those too.%0A2. Declare a typing.Protocol in \`shop.domain\` (for example \`shop.domain.ports\`) that describes only what this module needs from \`db\`.%0A3. Type this module against that Protocol and receive the implementation through a constructor or function parameter.%0A4. Make the class in "infrastructure" satisfy the Protocol, and wire it in the outermost layer (the composition root).%0ADocs: https://sircypkowskyy.github.io/inwards/rules/INW001/
+Found 1 violation in 2 files (0 ms).
+"
+,
 }
 `;
 

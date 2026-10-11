@@ -221,6 +221,11 @@ export interface Runtime {
   /** `CI` is set to a non-empty value. */
   ci: boolean;
   /**
+   * `GITHUB_WORKSPACE`, when set and non-empty: the checkout on a GitHub
+   * Actions runner, which `check --format github` makes its paths relative to.
+   */
+  githubWorkspace: string | undefined;
+  /**
    * `INWARDS_DAEMON`: "off" (`0`) makes every hook run in its own process,
    * "on" (`1`) lets PostToolUse use the daemon even when `CI` is set, and
    * "auto" (unset) uses it unless `CI` is set (ADR-039).

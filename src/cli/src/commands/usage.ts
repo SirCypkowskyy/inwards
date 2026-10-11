@@ -46,7 +46,8 @@ const CONFIG_OPTION =
 const HELP: Readonly<Record<Command, CommandHelp>> = {
   check: {
     synopsis: [
-      "check [PATHS...] [--format text|concise|json|sarif] [--max-diagnostics N]",
+      // biome-ignore lint/security/noSecrets: a usage synopsis, not a credential
+      "check [PATHS...] [--format text|concise|json|sarif|github] [--max-diagnostics N]",
       "      [--config pyproject.toml] [--log] [--no-cache]",
     ],
     note: "(PATHS: those files only; whole-project checks such as dead layer\nprefixes, import cycles and symlinks in layers run without PATHS)",
@@ -54,7 +55,8 @@ const HELP: Readonly<Record<Command, CommandHelp>> = {
 
 PATHS: check those files or directories only; whole-project checks such as
 dead layer prefixes, import cycles and symlinks in layers run without PATHS.
---format: text (default), concise, json (inwards/diagnostics@1) or sarif.
+--format: text (default), concise, json (inwards/diagnostics@1), sarif, or github
+(GitHub Actions annotations, paths from the repository root).
 --max-diagnostics N: print at most N findings (not with sarif).
 ${CONFIG_OPTION}
 --log: append this run to .inwards/runs.jsonl even when the run log is off.
