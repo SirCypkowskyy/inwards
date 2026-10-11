@@ -55,7 +55,7 @@
       { "name": "core-python", "patterns": ["src/core/src/python/**"] },
       { "name": "core-lookup", "patterns": ["src/core/src/lookup/**"] },
       { "name": "core-rules-shared", "patterns": ["src/core/src/rules/shared/**"] },
-      // The Mermaid reader for marked architecture diagrams (#344, ADR-045).
+      // The Mermaid and PlantUML readers for marked architecture diagrams (#344, #346, ADR-045).
       { "name": "core-diagram", "patterns": ["src/core/src/diagram/**"] },
       {
         "name": "core-rule-unsupported-encoding",
