@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: e7f3b414030768529fc94af53ff32d40c645c4381a721ba525065ad69f81ee39
+source_hash: a30fc6f5421115bb24d1943b1d66aa11b0cc6391d1c50abae44bd6451dbb3874
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -84,8 +84,8 @@ Diagramy architektury w dokumentacji, sprawdzane względem `[tool.inwards]` ([AD
 
 | Kod | Nazwa | Co zgłasza | Włączona | Poziom | Włącza ją preset | Wyciszenie w linii |
 |---|---|---|---|---|---|---|
-| [INW017](INW017.md) | `diagram-unknown-name` | Węzeł w oznaczonym diagramie architektury w Mermaid, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie nie pasuje do żadnego modułu (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
-| [INW018](INW018.md) | `diagram-forbidden-edge` | Ciągła strzałka w oznaczonym diagramie architektury w Mermaid, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi, między kontekstami bez `depends-on` albo do modułu, który nie jest `public` (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
+| [INW017](INW017.md) | `diagram-unknown-name` | Węzeł w oznaczonym diagramie architektury w Mermaid albo PlantUML, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie (moduł aliasu w PlantUML) nie pasuje do żadnego modułu (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
+| [INW018](INW018.md) | `diagram-forbidden-edge` | Ciągła strzałka w oznaczonym diagramie architektury w Mermaid albo PlantUML, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi, między kontekstami bez `depends-on` albo do modułu, który nie jest `public` (sprawdzenie całego projektu) | opt-in | ostrzeżenie | żaden | nie |
 
 </div>
 

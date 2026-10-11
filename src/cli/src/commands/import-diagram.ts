@@ -1,6 +1,6 @@
 /**
- * @file `inwards import-diagram FILE [--write]`: turns the marked Mermaid
- * diagrams of one file into a `[tool.inwards]` table (ADR-045), so the docs
+ * @file `inwards import-diagram FILE [--write]`: turns the marked Mermaid and
+ * PlantUML diagrams of one file into a `[tool.inwards]` table (ADR-045), so the docs
  * can drive the config once and INW017 and INW018 keep the two in step after
  * that. It prints the table on stdout and what to finish by hand on stderr,
  * or with `--write` appends the table to the pyproject.toml in the working

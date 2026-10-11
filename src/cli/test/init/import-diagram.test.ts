@@ -3,8 +3,9 @@
  * project whose docs draw its layers and contexts gets its `[tool.inwards]`
  * from the diagram with `--write`, and `inwards check` then finds no INW017
  * or INW018 in that same diagram, while a drawn edge the config forbids is
- * still caught after an edit. Also: printing, the notes, the src root, a
- * file outside the project, and the refusals.
+ * still caught after an edit, for a Mermaid and a PlantUML diagram (#346).
+ * Also: printing, the notes, the src root, a file outside the project, and
+ * the refusals.
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -103,6 +104,51 @@ describe("inwards import-diagram", () => {
       readFileSync(path, "utf8").replace("invoicing --> place", "place --> invoices"),
     );
     expect(findings(dir)).toEqual(["INW018 docs/architecture.md:21"]);
+  });
+
+  // ArchUnitPython has no public modules: a slice may import any module of a
+  // slice it depends on, so each component is <<public>> as a whole.
+  test("round trip from ArchUnitPython's PlantUML diagram, with module aliases", () => {
+    const dir = project({
+      "pyproject.toml": '[project]\nname = "sample"\n',
+      "architecture.puml": [
+        "@startuml",
+        "' inwards: contexts",
+        "  component [sample.controllers] as controllers <<public>>",
+        "  component [sample.services] as services <<public>>",
+        "  component [sample.models] as models <<public>>",
+        "  component [sample.utils] as utils <<public>>",
+        "  [controllers] --> [services]",
+        "  [services] --> [models]",
+        "@enduml",
+        "",
+      ].join("\n"),
+      "sample/__init__.py": "",
+      "sample/controllers/__init__.py": "from sample.services import run\n",
+      "sample/services/__init__.py": "from sample.models import Model\n\ndef run():\n    pass\n",
+      "sample/models/__init__.py": "class Model:\n    pass\n",
+      "sample/utils/__init__.py": "",
+    });
+    const run = inwards(["import-diagram", "architecture.puml", "--write"], { cwd: dir });
+    expect([run.code, run.stderr]).toEqual([
+      0,
+      expect.stringContaining("read 1 layer and 4 contexts"),
+    ]);
+    const config = parseConfig(readFileSync(join(dir, "pyproject.toml"), "utf8"));
+    expect(config.contexts?.map((c) => [c.name, c.public, c.dependsOn])).toEqual([
+      ["controllers", ["sample.controllers"], ["services"]],
+      ["services", ["sample.services"], ["models"]],
+      ["models", ["sample.models"], []],
+      ["utils", ["sample.utils"], []],
+    ]);
+    expect(findings(dir)).toEqual([]);
+
+    const path = join(dir, "architecture.puml");
+    writeFileSync(
+      path,
+      readFileSync(path, "utf8").replace("@enduml", "  [models] -> [utils]\n@enduml"),
+    );
+    expect(findings(dir)).toEqual(["INW018 architecture.puml:9"]);
   });
 
   test("prints the table on stdout and the notes on stderr", () => {

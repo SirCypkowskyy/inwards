@@ -447,8 +447,10 @@ src/
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
 │   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
-│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), model.ts,
-│   │   │                  #   names.ts (what a node names), draft.ts (import-diagram)
+│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
+│   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
+│   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
+│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/

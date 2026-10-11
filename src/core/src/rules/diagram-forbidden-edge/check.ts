@@ -27,15 +27,13 @@ import {
   resolveName,
   topLevel,
 } from "../../diagram/names.ts";
+import { notationOf } from "../../diagram/notation.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { joined } from "../shared/words.ts";
 
 /** The step every fix ends with: the config is the user's. */
 const ASK_USER =
   "If the code really needs this import, ask the user whether [tool.inwards] should allow it; don't edit [tool.inwards] yourself.";
-/** The step for an arrow that stands for something other than an import. */
-const DOTTED =
-  "If the arrow shows a call at run time or a flow of data rather than an import, draw it dotted (-.->), which INW018 doesn't read.";
 
 /** Why an arrow is forbidden, before it becomes a diagnostic. */
 interface Breach {
@@ -126,7 +124,7 @@ function layerBreach(
         summary: "Remove the arrow: sibling layers don't import each other.",
         steps: [
           "If the code imports this way, the import is the problem; INW001 reports it in the code.",
-          DOTTED,
+          dotted(diagram),
           ASK_USER,
         ],
       },
@@ -139,7 +137,7 @@ function layerBreach(
       summary: `Turn the arrow around or remove it: "${edge.to} ${edge.link} ${edge.from}" is the direction [tool.inwards] allows.`,
       steps: [
         "Arrows point from the importing layer to the imported one, so they point inward.",
-        DOTTED,
+        dotted(diagram),
         ASK_USER,
       ],
     },
@@ -176,7 +174,7 @@ function contextBreach(
         summary: `Remove the arrow, or ask the user to add "${to.name}" to the depends-on of "${from.name}".`,
         steps: [
           "If the code imports this way, the import is the problem; INW002 reports it in the code.",
-          DOTTED,
+          dotted(diagram),
           ASK_USER,
         ],
       },
@@ -189,17 +187,18 @@ function contextBreach(
   return {
     key: `${from.name}\0${to.name}\0${target}`,
     reason: `"${target}" isn't one of the public modules of context "${to.name}".`,
-    fix: publicFix(to),
+    fix: publicFix(diagram, to),
   };
 }
 
 /**
  * Writes the fix for an arrow into a module that isn't public.
  *
+ * @param diagram - the diagram, for the notation of its hints.
  * @param context - the context the arrow points into.
  * @returns the summary and steps, naming its public modules.
  */
-function publicFix(context: ContextSpec): Fix {
+function publicFix(diagram: Diagram, context: ContextSpec): Fix {
   const listed = joined(context.public.map((entry) => `"${publicModule(entry)}"`));
   return {
     summary:
@@ -208,15 +207,27 @@ function publicFix(context: ContextSpec): Fix {
         : `Point the arrow at a public module of "${context.name}": ${listed}.`,
     steps: [
       "Code in another context imports only the public modules (INW003 reports it in the code).",
-      DOTTED,
+      dotted(diagram),
       ASK_USER,
     ],
   };
 }
 
 /**
+ * Writes the step for an arrow that stands for something other than an
+ * import, with the dotted arrow of the diagram's notation.
+ *
+ * @param diagram - the diagram the arrow is in.
+ * @returns the step.
+ */
+function dotted(diagram: Diagram): string {
+  return `If the arrow shows a call at run time or a flow of data rather than an import, draw it dotted (${notationOf(diagram.notation).dotted}), which INW018 doesn't read.`;
+}
+
+/**
  * Finds where an arrow is written: from its first node's id to its last
- * node's id on the arrow's line.
+ * node's id on the arrow's line, left to right, so a PlantUML arrow written
+ * the other way round (`b <-- a`) still covers both ids.
  *
  * @param diagram - the diagram the arrow is in.
  * @param edge - the arrow.
@@ -226,11 +237,13 @@ function edgeSpan(diagram: Diagram, edge: DiagramEdge): Span {
   const onLine = diagram.nodes.filter((n) => n.line === edge.line);
   const from = onLine.find((n) => n.id === edge.from);
   const to = onLine.findLast((n) => n.id === edge.to);
-  const column = from?.column ?? 1;
+  const [first, last] =
+    from !== undefined && to !== undefined && to.column < from.column ? [to, from] : [from, to];
+  const column = first?.column ?? 1;
   return {
     line: edge.line,
     column,
     endLine: edge.line,
-    endColumn: Math.max(to?.endColumn ?? column + 1, column + 1),
+    endColumn: Math.max(last?.endColumn ?? column + 1, column + 1),
   };
 }

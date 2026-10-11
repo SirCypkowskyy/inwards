@@ -126,7 +126,7 @@ describe("draftDiagrams: contexts", () => {
 
   test("a file without a marked diagram is refused", () => {
     expect(draftDiagrams({ path: "docs/architecture.md", text: "# Architecture\n" })).toBe(
-      "docs/architecture.md: no marked diagram; a diagram counts when it opens with %% inwards: layers or %% inwards: contexts.",
+      "docs/architecture.md: no marked diagram; a diagram counts when it opens with %% inwards: layers or %% inwards: contexts (Mermaid), or ' inwards: layers or ' inwards: contexts (PlantUML).",
     );
   });
 
