@@ -265,6 +265,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | rule page (`docs/chapters/rules/INWxxx.md`) | strona reguły |
 | rule list, rule browser (the filterable list on `rules/`) | lista reguł |
 | category, sub-category (a rule page's `tags`) | kategoria, podkategoria |
+| category page (`rules/<category>/`) | strona kategorii |
+| navigation (the sidebar; a category's group in it) | nawigacja (grupa kategorii) |
 | autofix (the rule list's filter and column; the key stays `autofix`) | poprawka automatyczna |
 | rule status: stable, in review, in development, backlog | stabilna, w przeglądzie, w rozwoju, w planach |
 | rules per page, page (pagination) | reguł na stronie, strona |
