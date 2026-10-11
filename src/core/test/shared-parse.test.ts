@@ -1,8 +1,8 @@
 /**
  * @file One parse per text per run across the content rules (#387): INW012,
- * INW013, INW014, INW016, FAPI007 and the FastAPI model all read a checked
- * file's tree from the run's `ModuleTrees`, so a file every one of them
- * reads is parsed once, and a module a hop or a name resolution reads
+ * INW013, INW014, INW016 (per file and project-wide), FAPI007 and the
+ * FastAPI model all read a checked file's tree from the run's
+ * `ModuleTrees`, so a file every one of them reads is parsed once, and a module a hop or a name resolution reads
  * shares the tree of the checked file with the same text. The parser is
  * wrapped to count its parses; the findings are compared with a check of
  * each file alone, so sharing changes nothing a rule reports.
@@ -13,7 +13,7 @@ import { parseConfig } from "../src/config/parse.ts";
 import type { Diagnostic, SourceFile } from "../src/contracts/records.ts";
 import { ContentRun, contentFindings } from "../src/engine/content-rules.ts";
 import { fastApiFindings } from "../src/engine/fastapi.ts";
-import { ormConventionFindings } from "../src/engine/orm-naming.ts";
+import { ormProjectFindings } from "../src/engine/orm-naming.ts";
 import { Engine } from "../src/index.ts";
 import { file, grammars, indexOn, parser } from "./support/helpers.ts";
 
@@ -139,7 +139,7 @@ describe("one parse per text across the content rules", () => {
       found = [
         ...[...wired.found.values()].flat(),
         ...files.flatMap((src) => contentFindings(src, CONFIG, run)),
-        ...ormConventionFindings(run.trees, files, CONFIG),
+        ...ormProjectFindings(run.trees, files, CONFIG, run.ormModels).findings,
       ];
     } finally {
       run.dispose();

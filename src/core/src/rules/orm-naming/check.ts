@@ -5,10 +5,11 @@
  * for datetimes and `_date` for dates. One finding per name that breaks it,
  * on the name, with the name to use instead. A whole-project run also
  * reports, once, a project whose SQLAlchemy tables have no `MetaData`
- * naming convention (`conventionFinding`); the caller decides which runs
- * get it. A file that names no ORM construct is never parsed, and neither
- * is an Alembic migration. I/O-free: the
- * caller supplies the run's trees, the files and the options.
+ * naming convention, and a project that follows another scheme
+ * consistently (`projectFindings`, with `schemes.ts`); the caller decides
+ * which runs get them. A file that names no ORM construct is never parsed,
+ * and neither is an Alembic migration. I/O-free: the caller supplies the
+ * run's trees, the files and the options.
  */
 import { stringList } from "../../config/rule-options.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
@@ -23,6 +24,7 @@ import {
   type TimeColumn,
 } from "./models.ts";
 import { isSnake, singularOf, toSnake, withSuffix } from "./names.ts";
+import { type Placed, type SchemeSettings, type Schemes, schemeFindings } from "./schemes.ts";
 
 /** Text that may declare a table or a datetime or date column. */
 const MAY_DECLARE =
@@ -36,16 +38,19 @@ const MAY_DECLARE =
  */
 const ALEMBIC_MIGRATION = /^(?:from\s+alembic(?:\.\w+)*\s+import|import\s+alembic)\b/mu;
 
-/** Text that may declare a SQLAlchemy or SQLModel table, which a naming convention covers. */
-const MAY_DECLARE_TABLE = /__tablename__|\bTable\s*\(|\btable\s*=\s*True/u;
+/**
+ * Tells whether INW016 reads a file at all: it names a table or column
+ * construct and isn't an Alembic migration.
+ *
+ * @param src - the file, with normalised text.
+ * @returns true when the file is worth a parse.
+ */
+function mayDeclare(src: SourceFile): boolean {
+  return MAY_DECLARE.test(src.text) && !ALEMBIC_MIGRATION.test(src.text);
+}
 
 /** What INW016 reads from its options, with their defaults. */
-interface Settings {
-  readonly tableName: "snake" | "snake_singular" | false;
-  readonly datetimeSuffix: string | false;
-  readonly dateSuffix: string | false;
-  readonly allowTables: ReadonlySet<string>;
-}
+type Settings = SchemeSettings;
 
 /**
  * Reads one suffix option.
@@ -94,7 +99,7 @@ function tableFix(table: TableName, wanted: string, plural: boolean): Fix {
       `If the table already exists, add a migration that renames it, such as Alembic's \`op.rename_table("${table.name}", "${wanted}")\`, and update raw SQL that names it.`,
       ...(plural
         ? [
-            `If "${table.name}" is singular in fact (a mass noun such as "news"), ask the user to add it to \`allow-tables\` in [tool.inwards.rules.orm-naming]. Don't edit [tool.inwards] yourself.`,
+            `If "${table.name}" is singular in fact (a mass noun such as "news"), ask the user to add it to \`allow-tables\` in [tool.inwards.rules.orm-naming]; if the project names all its tables in the plural, ask for \`table-name = "snake"\` there instead. Don't edit [tool.inwards] yourself.`,
           ]
         : []),
     ],
@@ -155,15 +160,22 @@ function checkColumn(column: TimeColumn, settings: Settings, src: SourceFile): D
   }
   const kind = column.kind === "datetime" ? "Datetime" : "Date";
   const wanted = withSuffix(column.name, suffix);
+  const head = `${kind} column \`${column.name}\` doesn't end with \`${suffix}\``;
   return [
     diagnostic(RULES.INW016, src, {
       span: column.span,
-      message: `${kind} column \`${column.name}\` doesn't end with \`${suffix}\`: name it \`${wanted}\`.`,
+      message:
+        wanted === undefined
+          ? `${head}: name it for what it records, ending with \`${suffix}\`.`
+          : `${head}: name it \`${wanted}\`.`,
       fix: {
-        summary: `Rename the column \`${column.name}\` to \`${wanted}\`.`,
+        summary:
+          wanted === undefined
+            ? `Rename the column \`${column.name}\` after what it records, ending with \`${suffix}\`, such as \`created${suffix}\`.`
+            : `Rename the column \`${column.name}\` to \`${wanted}\`.`,
         steps: [
           "Rename it where it is declared, and every attribute access, query and serializer that uses it.",
-          `If the column already exists, add a migration that renames it, such as Alembic's \`op.alter_column(<table>, "${column.name}", new_column_name="${wanted}")\`.`,
+          `If the column already exists, add a migration that renames it, such as Alembic's \`op.alter_column(<table>, "${column.name}", new_column_name="${wanted ?? `<name>${suffix}`}")\`.`,
         ],
       },
     }),
@@ -171,7 +183,7 @@ function checkColumn(column: TimeColumn, settings: Settings, src: SourceFile): D
 }
 
 /**
- * Reads a file's models from the run's tree of it.
+ * Parses a file and reads its models.
  *
  * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
@@ -189,18 +201,22 @@ function modelsOf(trees: FileTrees, src: SourceFile): Models {
  * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
  * @param options - `[tool.inwards.rules.orm-naming]`, if set.
+ * @param read - where the file's models are kept for the project-wide findings, when given.
  * @returns the findings in source order, before suppressions and severities apply.
  */
 export function checkOrmNaming(
   trees: FileTrees,
   src: SourceFile,
   options: RuleOptions | undefined,
+  read?: Map<SourceFile, Models>,
 ): Diagnostic[] {
-  if (!MAY_DECLARE.test(src.text) || ALEMBIC_MIGRATION.test(src.text)) {
+  if (!mayDeclare(src)) {
     return [];
   }
   const settings = settingsOf(options);
-  const { tables, columns } = modelsOf(trees, src);
+  const models = modelsOf(trees, src);
+  read?.set(src, models);
+  const { tables, columns } = models;
   return [
     ...tables.flatMap((table) => checkTable(table, settings, src)),
     ...columns.flatMap((column) => checkColumn(column, settings, src)),
@@ -223,51 +239,73 @@ function hasConvention(trees: FileTrees, src: SourceFile): boolean {
 }
 
 /**
- * Finds the one project-wide INW016 finding: SQLAlchemy or SQLModel tables
- * and no `MetaData(naming_convention=...)` anywhere among the files. It sits
- * on the first such table of the files `checked` accepts, in the order given.
- * A convention in any file counts, whether the rule covers that file or not.
+ * Builds the project-wide finding for a missing naming convention, on a table.
+ *
+ * @param src - the file the table is declared in.
+ * @param table - the first SQLAlchemy or SQLModel table the rule covers.
+ * @returns the finding, with the convention to add.
+ */
+function conventionFinding(src: SourceFile, table: TableName): Diagnostic {
+  return diagnostic(RULES.INW016, src, {
+    span: table.span,
+    message:
+      "No `MetaData(naming_convention=...)` in the project, so SQLAlchemy leaves unique, check, foreign key and primary key constraints unnamed and the database picks their names.",
+    fix: {
+      summary: "Give the declarative base's MetaData a naming convention.",
+      steps: [
+        'Define the convention once, such as `{"ix": "%(column_0_label)s_idx", "uq": "%(table_name)s_%(column_0_name)s_key", "ck": "%(table_name)s_%(constraint_name)s_check", "fk": "%(table_name)s_%(column_0_name)s_fkey", "pk": "%(table_name)s_pkey"}`.',
+        "Pass it to the MetaData every model shares: `metadata = MetaData(naming_convention=...)` on the `DeclarativeBase` subclass, or `SQLModel.metadata.naming_convention = ...` before the first model.",
+        "Generate a migration: constraints that exist already keep the names the database gave them until the migration renames them.",
+      ],
+    },
+  });
+}
+
+/**
+ * Finds INW016's project-wide findings over a whole-project run's files:
+ *
+ * - SQLAlchemy or SQLModel tables and no `MetaData(naming_convention=...)`
+ *   anywhere among the files, on the first such table of the files
+ *   `checked` accepts, in the order given. A convention in any file counts,
+ *   whether the rule covers that file or not.
+ * - A project that follows another naming scheme consistently (`schemes.ts`),
+ *   on its first name, with the keys of the per-name findings it replaces.
+ *
+ * The models come from `read`, which the per-file checks of the same run
+ * filled; a file the rule covers and `read` lacks is parsed here.
  *
  * @param trees - the run's trees, which parse each text once per run.
  * @param files - every file of the run, with normalised text.
  * @param options - `[tool.inwards.rules.orm-naming]`, if set.
- * @param checked - tells whether the rule covers a file.
- * @returns the finding, or none.
+ * @param scope - which files count, and what was read of them.
+ * @param scope.checked - tells whether the rule covers a file.
+ * @param scope.read - the models the per-file checks read, by file.
+ * @returns the findings, and the per-name findings they replace.
  */
-export function conventionFinding(
+export function projectFindings(
   trees: FileTrees,
   files: readonly SourceFile[],
   options: RuleOptions | undefined,
-  checked: (src: SourceFile) => boolean,
-): Diagnostic[] {
-  if (options?.["require-naming-convention"] === false) {
-    return [];
-  }
-  if (files.some((src) => hasConvention(trees, src))) {
-    return [];
-  }
+  scope: { checked: (src: SourceFile) => boolean; read: ReadonlyMap<SourceFile, Models> },
+): Schemes {
+  const settings = settingsOf(options);
+  const tables: Placed<TableName>[] = [];
+  const columns: Placed<TimeColumn>[] = [];
   for (const src of files) {
-    const table =
-      checked(src) && MAY_DECLARE_TABLE.test(src.text)
-        ? modelsOf(trees, src).tables.find((t) => t.sqlalchemy)
-        : undefined;
-    if (table) {
-      return [
-        diagnostic(RULES.INW016, src, {
-          span: table.span,
-          message:
-            "No `MetaData(naming_convention=...)` in the project, so SQLAlchemy leaves unique, check, foreign key and primary key constraints unnamed and the database picks their names.",
-          fix: {
-            summary: "Give the declarative base's MetaData a naming convention.",
-            steps: [
-              'Define the convention once, such as `{"ix": "%(column_0_label)s_idx", "uq": "%(table_name)s_%(column_0_name)s_key", "ck": "%(table_name)s_%(constraint_name)s_check", "fk": "%(table_name)s_%(column_0_name)s_fkey", "pk": "%(table_name)s_pkey"}`.',
-              "Pass it to the MetaData every model shares: `metadata = MetaData(naming_convention=...)` on the `DeclarativeBase` subclass, or `SQLModel.metadata.naming_convention = ...` before the first model.",
-              "Generate a migration: constraints that exist already keep the names the database gave them until the migration renames them.",
-            ],
-          },
-        }),
-      ];
+    if (scope.checked(src) && mayDeclare(src)) {
+      const models = scope.read.get(src) ?? modelsOf(trees, src);
+      tables.push(...models.tables.map((item) => ({ src, item })));
+      columns.push(...models.columns.map((item) => ({ src, item })));
     }
   }
-  return [];
+  const schemes = schemeFindings(tables, columns, settings);
+  const first = tables.find(({ item }) => item.sqlalchemy);
+  const wanted =
+    first !== undefined &&
+    options?.["require-naming-convention"] !== false &&
+    !files.some((src) => hasConvention(trees, src));
+  return {
+    findings: [...(wanted ? [conventionFinding(first.src, first.item)] : []), ...schemes.findings],
+    folded: schemes.folded,
+  };
 }
