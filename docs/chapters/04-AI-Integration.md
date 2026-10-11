@@ -47,7 +47,7 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
 
     Claude Code runs [hooks](https://code.claude.com/docs/en/hooks) around tool calls. For `PostToolUse`, exit code 2 doesn't undo the edit (it already happened), but Claude sees the hook's stderr and reacts to it. For `Stop`, exit code 2 keeps Claude working instead of ending the turn. The hook input includes `stop_hook_active`, and Claude Code ends the turn anyway after several consecutive blocks, so a broken stop hook can't trap the session.
 
-    To share the setup through the committed `.claude/settings.json` instead, write it by hand. This version relies on `inwards` being on `PATH`:
+    To share the setup through the committed `.claude/settings.json` instead, run `inwards init --agent claude --shared --launcher "uv run"` ([guide](guides/claude-code.md#share-it-with-the-team)). The hooks and deny rules then go into `.claude/settings.json`, an `inwards` server running `uv run inwards mcp` goes into `.mcp.json`, and `.gitignore` gets only `.inwards/`. Committed files can't hold a machine's path, so `--shared` takes a launcher, or writes the bare `inwards` when it is on `PATH` and refuses otherwise. It takes Inwards' own hooks out of `.claude/settings.local.json`, because Claude Code merges hook lists across settings files and they would run twice, and it never replaces a team's own hooks or an `inwards` MCP server that runs something else. Without a launcher, the result is:
 
     ```json title=".claude/settings.json"
     {
@@ -64,20 +64,24 @@ Two hooks do the checking. A **per-edit hook** gives fast feedback on the file t
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
-            "hooks": [
-              {
-                "type": "command",
-                "command": "inwards hook claude-code"
-              }
-            ]
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
           }
         ],
         "Stop": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
+      },
+      "permissions": {
+        "deny": [
+          "Edit(/.claude/settings*.json)",
+          "Edit(/.inwards/**)",
+          "Edit(/**/inwards-baseline.json)"
+        ]
       }
     }
     ```
+
+    The Stop gate reads the user, project and local settings files, so hooks in any one of them count.
 
     `inwards hook claude-code` reads the hook JSON from stdin, so it needs no `jq` and no POSIX shell and runs the same on Windows. After a `PostToolUse`, it checks the one Python file the agent just wrote:
 

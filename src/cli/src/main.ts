@@ -47,6 +47,7 @@ const OPTIONS = {
   package: { type: "string" },
   "list-styles": { type: "boolean" },
   launcher: { type: "string" },
+  shared: { type: "boolean" },
   brief: { type: "boolean" },
   write: { type: "boolean" },
   idle: { type: "string" },

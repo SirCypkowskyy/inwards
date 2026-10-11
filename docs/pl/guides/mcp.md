@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/mcp.md
-source_hash: 8e346631fc42f15062ba0e271eda8a2a66ef455f524a6cd1a2d664fd99f1fa18
+source_hash: 51b72f04a61951a03cc34ab2c00fd67a7e12a4f887b28053251c4f4872546acd
 ---
 
 # Serwer MCP { #mcp-server }
@@ -36,6 +36,8 @@ Ma trzy narzędzia:
     ```sh
     claude mcp add --scope project inwards -- uv run inwards mcp
     ```
+
+    `inwards init --agent claude --shared --launcher "uv run"` zapisuje ten sam wpis w `.mcp.json`, razem z hookami w `.claude/settings.json` ([przewodnik po Claude Code](claude-code.md#share-it-with-the-team)).
 
     Claude Code za pierwszym razem prosi każdego użytkownika o zatwierdzenie serwerów projektu. Potem `claude mcp list` pokazuje `inwards` jako połączony, a `/mcp` w sesji wymienia jego trzy narzędzia.
 

@@ -32,6 +32,8 @@ It has three tools:
     claude mcp add --scope project inwards -- uv run inwards mcp
     ```
 
+    `inwards init --agent claude --shared --launcher "uv run"` writes the same entry into `.mcp.json`, together with the hooks in `.claude/settings.json` ([Claude Code guide](claude-code.md#share-it-with-the-team)).
+
     Claude Code asks each user to approve a project's servers the first time. `claude mcp list` then shows `inwards` as connected, and `/mcp` inside a session lists its three tools.
 
 === "Codex CLI"

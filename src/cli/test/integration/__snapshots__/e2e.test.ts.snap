@@ -192,3 +192,31 @@ exports[`hook with garbage on stdin 1`] = `
   "stdout": "",
 }
 `;
+
+exports[`Stop gate with the hooks only in the committed .claude/settings.json: session start 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": "",
+}
+`;
+
+exports[`Stop gate with the hooks only in the committed .claude/settings.json: project-scope hooks pass 1`] = `
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": "",
+}
+`;
+
+exports[`Stop gate with the hooks only in the committed .claude/settings.json: hooks missing everywhere 1`] = `
+{
+  "code": 2,
+  "stderr": 
+"inwards: The Inwards SessionStart, PreToolUse, and PostToolUse hooks are missing from every Claude Code settings file. Restore them (\`inwards init --agent claude\`) or ask the user.
+
+"
+,
+  "stdout": "",
+}
+`;
