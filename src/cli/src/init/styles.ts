@@ -51,6 +51,13 @@ export interface StyleTemplate {
   roles: readonly StyleRole[];
   /** Module names inside each context that other code may import (INW003). */
   public: readonly string[];
+  /** Opt-in rules per role, written as `[tool.inwards.templates.<name>.rules]`: role, then rule name and its value. */
+  rules?: {
+    why: string;
+    roles: Readonly<Record<string, Readonly<Record<string, "warning" | "error" | true>>>>;
+  };
+  /** Libraries some roles may not import, written as INW005's `deny` with one selector per role for each entry that uses the template. */
+  deny?: { why: string; roles: readonly string[]; libraries: readonly string[] };
 }
 
 /** The preset's contexts (INW002, INW003): one per package that repeats the template. */
@@ -82,8 +89,12 @@ export interface StyleOptIn {
   codes: readonly string[];
   /** The comment above `extend-select`. */
   why: string;
-  /** `[tool.inwards.rules.<rule>]` tables, each with a comment and its `key = value` lines. */
-  options: readonly { rule: string; why: string; lines: readonly string[] }[];
+  /** `[tool.inwards.rules.<rule>]` tables, each with a comment and its `key = value` lines, or a function writing them for the package. */
+  options: readonly {
+    rule: string;
+    why: string;
+    lines: readonly string[] | ((pkg: string) => readonly string[]);
+  }[];
 }
 
 /** A preset: a one-line summary, its config, the example's modules, its shapes, and the import it can't forbid. */
@@ -125,15 +136,31 @@ export const BOOTSTRAP: StyleLayer = {
 };
 
 /**
- * INW014 for the presets with an `application/ports/` package (clean,
- * hexagonal): its default scope, every module with a `ports` segment, already
- * covers that package, so it needs no options table.
+ * Turns on the opt-in rules for the presets with ports and driven adapters
+ * (clean, hexagonal). INW014 keeps `application/ports/` abstract with its
+ * default scope, every module with a `ports` segment, so it needs no table.
+ * INW015 lets only `bootstrap` import and build the driven adapters, so its
+ * table names that layer's package as `role` and `bootstrap` as `allowed-in`.
+ *
+ * @param adapters - the driven adapters' module below the package, e.g. `adapters.outbound`.
+ * @returns the opt-in, both rules as warnings.
  */
-export const PORTS_ABSTRACT: StyleOptIn = {
-  codes: ["INW014"],
-  why: "Port modules hold only ABCs and Protocols (INW014), as a warning to start with: make it an error once the project is clean.",
-  options: [],
-};
+export function portsAndAdapters(adapters: string): StyleOptIn {
+  return {
+    codes: ["INW014", "INW015"],
+    why: "Port modules hold only ABCs and Protocols (INW014), and only bootstrap imports and builds the driven adapters (INW015), as warnings to start with: make them errors once the project is clean.",
+    options: [
+      {
+        rule: "construct-only-in",
+        why: "The driven adapters, and the composition root, the one module that may import and build them.",
+        lines: (pkg: string): string[] => [
+          `role = ["${pkg}.${adapters}"]`,
+          `allowed-in = ["${pkg}.${BOOTSTRAP.module}"]`,
+        ],
+      },
+    ],
+  };
+}
 
 /**
  * Words the next step for the order example: run its composition root.

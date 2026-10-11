@@ -57,7 +57,9 @@ export function architectureBrief(input: BriefInput): string {
   const preset = style === undefined ? "" : ` (the ${style.name} preset)`;
   const where = ports.length === 0 ? "the inner layer" : ports.map(code).join(" or ");
   const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
-  const siblings = hasSiblings ? ", nor a sibling of your own layer" : "";
+  const numbered = numbersLayers(config.layers);
+  const groups = numbered ? ` (sibling groups: ${siblingGroups(config.layers).join("; ")})` : "";
+  const siblings = hasSiblings ? `, nor a sibling of your own layer${groups}` : "";
   const lines = [
     "## Architecture brief (Inwards)",
     "",
@@ -65,7 +67,7 @@ export function architectureBrief(input: BriefInput): string {
     "",
     ...config.layers.map(
       (layer, i) =>
-        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${layerImports(config.layers, i)}`,
+        `${i + 1}. ${layer.name} (${layer.modules.map(code).join(", ")}): ${layerImports(config.layers, i, numbered)}`,
     ),
     "",
     `Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in ${where} and implement it in the outer layer.`,
@@ -93,7 +95,7 @@ function librarySection(config: InwardsConfig): string[] {
     return rule === undefined ? [] : [`- ${layer.name}: ${rule}`];
   });
   for (const { modules, libraries } of libraryDenies(config.rules?.options?.["pure-domain"])) {
-    rules.push(`- ${list(modules)}: not ${list(libraries)}`);
+    rules.push(`- ${siblingModules(modules)}: not ${list(libraries)}`);
   }
   return rules.length === 0 ? [] : ["", "Libraries (INW005):", ...rules];
 }
@@ -133,10 +135,10 @@ function contextSection(config: InwardsConfig): string[] {
   if (config.contexts === undefined || off) {
     return [];
   }
-  const header =
-    ruleLevel("INW002", config.rules) === "off"
-      ? "Contexts (INW003): import only another context's public modules."
-      : "Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.";
+  const independent = ruleLevel("INW002", config.rules) !== "off";
+  const header = independent
+    ? "Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules."
+    : "Contexts (INW003): import only another context's public modules.";
   return [
     "",
     header,
@@ -144,7 +146,7 @@ function contextSection(config: InwardsConfig): string[] {
       const pub = ctx.public.length === 0 ? "nothing public" : `public ${publicList(ctx)}`;
       const deps =
         ctx.dependsOn.length === 0 ? "no dependencies" : `depends on ${ctx.dependsOn.join(", ")}`;
-      return `- ${ctx.name} (${list(ctx.modules)}): ${pub}; ${deps}`;
+      return `- ${ctx.name} (${list(ctx.modules)}): ${independent ? `${pub}; ${deps}` : pub}`;
     }),
   ];
 }
@@ -161,44 +163,120 @@ function contextSection(config: InwardsConfig): string[] {
  */
 function publicList(ctx: { modules: readonly string[]; public: readonly string[] }): string {
   const [only, ...more] = ctx.modules;
-  const prefix = `${only}.`;
-  if (only === undefined || more.length > 0 || ctx.public.length < 2) {
+  if (only === undefined || more.length > 0) {
     return list(ctx.public);
   }
-  const inside = ctx.public.filter((m) => m.startsWith(prefix)).map((m) => m.slice(prefix.length));
-  return inside.length === ctx.public.length
-    ? code(`${prefix}{${inside.join(",")}}`)
-    : list(ctx.public);
+  return braced(`${only}.`, ctx.public) ?? list(ctx.public);
+}
+
+/**
+ * Formats modules that share one parent, such as a deny entry's template
+ * roles, the way {@link publicList} does: `` `app.*.{models,service}` ``.
+ *
+ * @param modules - module names or selectors.
+ * @returns the modules as inline code, braced when two or more share their parent.
+ */
+function siblingModules(modules: readonly string[]): string {
+  /**
+   * Cuts a module's last segment off.
+   *
+   * @param m - a dotted module name.
+   * @returns its parent with the trailing dot, or "" for a top-level name.
+   */
+  function parent(m: string): string {
+    return m.slice(0, m.lastIndexOf(".") + 1);
+  }
+  const prefix = parent(modules[0] ?? "");
+  const shared = modules.every((m) => parent(m) === prefix);
+  return (shared ? braced(prefix, modules) : undefined) ?? list(modules);
+}
+
+/**
+ * Writes two or more modules under one prefix in braces.
+ *
+ * @param prefix - the shared prefix, ending in a dot.
+ * @param modules - dotted module names, each expected to start with the prefix.
+ * @returns e.g. `` `app.posts.{router,service}` ``, or undefined when fewer than two modules or one lies outside the prefix.
+ */
+function braced(prefix: string, modules: readonly string[]): string | undefined {
+  const inside = modules.filter((m) => prefix !== "" && m.startsWith(prefix));
+  if (modules.length < 2 || inside.length !== modules.length) {
+    return undefined;
+  }
+  return code(`${prefix}{${inside.map((m) => m.slice(prefix.length)).join(",")}}`);
+}
+
+/**
+ * Finds a layer's place in the order.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @param k - the layer's index.
+ * @returns its rank, or its index when the layers have no ranks.
+ */
+function rankOf(layers: readonly LayerSpec[], k: number): number {
+  return layers[k]?.rank ?? k;
+}
+
+/**
+ * Numbers the layers below one layer's rank, as the brief's list does.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @param k - the layer's index.
+ * @returns their 1-based numbers, ascending.
+ */
+function innerOf(layers: readonly LayerSpec[], k: number): number[] {
+  return layers.flatMap((_, j) => (rankOf(layers, j) < rankOf(layers, k) ? [j + 1] : []));
+}
+
+/**
+ * Tells whether the brief refers to layers by number: once a layer has more
+ * than `NAMED_IMPORTS` inner layers, as a template's deep roles do.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @returns true when some line gives numbers instead of names.
+ */
+function numbersLayers(layers: readonly LayerSpec[]): boolean {
+  return layers.some((_, k) => innerOf(layers, k).length > NAMED_IMPORTS);
+}
+
+/**
+ * Lists each group of sibling layers by number, for the brief's opening
+ * sentence when it refers to layers by number.
+ *
+ * @param layers - the configured layers, in the brief's order.
+ * @returns e.g. `2-4` and `5-6`, one per rank that two or more layers share.
+ */
+function siblingGroups(layers: readonly LayerSpec[]): string[] {
+  const byRank = new Map<number, number[]>();
+  layers.forEach((_, k) => {
+    const rank = rankOf(layers, k);
+    byRank.set(rank, [...(byRank.get(rank) ?? []), k + 1]);
+  });
+  return [...byRank.values()].filter((group) => group.length > 1).map(ranges);
 }
 
 /**
  * Says what one layer may import. Up to `NAMED_IMPORTS` inner layers are named;
  * more are given by their numbers in the brief's list (`layers 1-9`), which
- * keeps a template's deep roles to one short line each.
+ * keeps a template's deep roles to one short line each. When the brief gives
+ * numbers, its opening sentence lists the sibling groups once, so a line
+ * leaves its siblings out instead of repeating their long names.
  *
  * @param layers - the configured layers, in the brief's order.
  * @param i - the layer's index.
- * @returns e.g. `may import layers 1-4; not its sibling domain.schemas`.
+ * @param numbered - whether the brief refers to layers by number ({@link numbersLayers}).
+ * @returns e.g. `may import layers 1-4`, or `may import domain; not its sibling inbound` in a short brief.
  */
-function layerImports(layers: readonly LayerSpec[], i: number): string {
+function layerImports(layers: readonly LayerSpec[], i: number, numbered: boolean): string {
   const named = allowedImports(layers, i);
-  /**
-   * Finds a layer's place in the order.
-   *
-   * @param k - the layer's index.
-   * @returns its rank, or its index when the layers have no ranks.
-   */
-  function rankOf(k: number): number {
-    return layers[k]?.rank ?? k;
-  }
-  const inner = layers.flatMap((_, k) => (rankOf(k) < rankOf(i) ? [k + 1] : []));
-  if (inner.length <= NAMED_IMPORTS || named.startsWith("may import every")) {
+  if (!numbered || named.startsWith("may import every")) {
     return named;
   }
-  const siblings = layers.filter((_, k) => k !== i && rankOf(k) === rankOf(i)).map((l) => l.name);
-  const base = `may import layers ${ranges(inner)}`;
-  const plural = siblings.length > 1 ? "siblings" : "sibling";
-  return siblings.length === 0 ? base : `${base}; not its ${plural} ${siblings.join(", ")}`;
+  const inner = innerOf(layers, i);
+  if (inner.length <= NAMED_IMPORTS) {
+    return named.split("; ")[0] ?? named;
+  }
+  return `may import layers ${ranges(inner)}`;
 }
 
 /**
