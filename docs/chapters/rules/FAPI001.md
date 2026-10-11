@@ -140,7 +140,7 @@ require-tags = false                      # tags= on the route, its router, or a
 require-operation-id = false              # an explicit operation_id=, for generated clients
 ```
 
-`false`, or `[]` for a list, turns a check off. An unknown key or a wrong value is a config error that names the key. Like every rule, it also takes `modules` ([options tables](index.md#opt-in-rules)). A finding can be suppressed on the decorator's line with `# inwards: ignore[FAPI001] reason="..."`.
+`false`, or `[]` for a list, turns a check off. An unknown key or a wrong value is a config error that names the key. Like every rule, it also takes `modules`, and like every content rule `check-tests`, which makes it report in test modules too ([options tables](index.md#opt-in-rules)). A finding can be suppressed on the decorator's line with `# inwards: ignore[FAPI001] reason="..."`.
 
 ## Known limitations
 
@@ -150,7 +150,7 @@ require-operation-id = false              # an explicit operation_id=, for gener
 - A router's `include_in_schema=False` on an `include_router(...)` elsewhere is followed only through inclusions Inwards can resolve.
 - Routes added at runtime (`add_api_route`, loops over config) aren't seen.
 - **An app that serves no schema** (`FastAPI(openapi_url=None)`) is skipped with every route it declares, like `include_in_schema=False`.
-- **Measured on the corpus** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [chapter 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 findings before the `openapi_url` rule, 21 after, all looked at: 19 true positives (a `POST` or `DELETE` with no explicit status code, a route with no summary) and 2 on the tiny apps Polar's tests build ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Polar's 450 endpoints and fastapi-clean-example's 15 aren't seen at all ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **Measured on the corpus** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [chapter 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 findings before the `openapi_url` rule, 21 after, all looked at: 19 true positives (a `POST` or `DELETE` with no explicit status code, a route with no summary) and 2 on the tiny apps Polar's tests build, which aren't reported since test modules are skipped ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). Polar's 450 endpoints and fastapi-clean-example's 15 aren't seen at all ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 
 ## References
 

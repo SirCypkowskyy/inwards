@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI001.md
-source_hash: 248c41b2d725d6588cb4bd178878c55aa4aedb1b705f630b1630dd988fb508b5
+source_hash: 14552f1b0979299d0707044cdab1dc5e209a4b5a8355b6868dca24261d3ad29c
 type: rule
 title: FAPI001 endpoint-metadata
 description: Operacja ścieżki FastAPI w schemacie OpenAPI nie ma metadanych, których wymaga projekt, na przykład podsumowania, modelu odpowiedzi albo jawnego kodu statusu.
@@ -142,7 +142,7 @@ require-tags = false                      # tags= on the route, its router, or a
 require-operation-id = false              # an explicit operation_id=, for generated clients
 ```
 
-`false`, a dla listy `[]`, wyłącza sprawdzenie. Nieznany klucz albo zła wartość to błąd konfiguracji, który podaje klucz. Jak każda reguła, przyjmuje też `modules` ([tabele opcji](index.md#opt-in-rules)). Diagnostykę można wyciszyć w linii dekoratora przez `# inwards: ignore[FAPI001] reason="..."`.
+`false`, a dla listy `[]`, wyłącza sprawdzenie. Nieznany klucz albo zła wartość to błąd konfiguracji, który podaje klucz. Jak każda reguła, przyjmuje też `modules`, a jak każda reguła treści także `check-tests`, które sprawia, że zgłasza też w modułach testowych ([tabele opcji](index.md#opt-in-rules)). Diagnostykę można wyciszyć w linii dekoratora przez `# inwards: ignore[FAPI001] reason="..."`.
 
 ## Znane ograniczenia { #known-limitations }
 
@@ -152,7 +152,7 @@ require-operation-id = false              # an explicit operation_id=, for gener
 - `include_in_schema=False` na `include_router(...)` gdzie indziej jest brane pod uwagę tylko przez dołączenia, które Inwards umie rozwiązać.
 - Trasy dodawane w czasie działania (`add_api_route`, pętle po konfiguracji) nie są widoczne.
 - **Aplikacja, która nie serwuje schematu** (`FastAPI(openapi_url=None)`), jest pomijana razem ze wszystkimi swoimi trasami, jak przy `include_in_schema=False`.
-- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 zgłoszenia przed regułą o `openapi_url`, 21 po niej, wszystkie obejrzane: 19 trafnych (`POST` albo `DELETE` bez jawnego kodu statusu, trasa bez podsumowania) i 2 na małych aplikacjach, które budują testy Polara ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). 450 endpointów Polara i 15 z fastapi-clean-example nie jest w ogóle widocznych ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
+- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 zgłoszenia przed regułą o `openapi_url`, 21 po niej, wszystkie obejrzane: 19 trafnych (`POST` albo `DELETE` bez jawnego kodu statusu, trasa bez podsumowania) i 2 na małych aplikacjach, które budują testy Polara; tych nie zgłasza, odkąd moduły testowe są pomijane ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). 450 endpointów Polara i 15 z fastapi-clean-example nie jest w ogóle widocznych ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 
 ## Źródła { #references }
 

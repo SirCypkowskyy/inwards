@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI005.md
-source_hash: 35a905e897e0b6ae0634ea5e50961bfa8c0ef7c04e2e8c52b7e2340f14ae326d
+source_hash: 1752f2a29cbd10592de4e30565578e25fe96d153f4aea3be2949c36ce796e157
 type: rule
 title: FAPI005 route-shadowing
 description: Żadna operacja ścieżki FastAPI nie jest przesłonięta przez wcześniejszą z tą samą metodą, więc każda trasa jest osiągalna.
@@ -145,7 +145,7 @@ Brak automatycznej poprawki (`autofix: false`). Która trasa jest zamierzona i c
 
 ## Konfiguracja { #configuration }
 
-Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule ([tabele opcji](index.md#opt-in-rules)).
+Waga: błąd. Opt-in: włącz przez `extend-select`. Nie ma własnych opcji; `modules` działa jak w każdej regule, a `check-tests` jak w każdej regule treści ([tabele opcji](index.md#opt-in-rules)).
 
 Każde zgłoszenie stoi na dekoratorze i można je wyciszyć w kodzie przez `# inwards: ignore[FAPI005] reason="..."` w tej linii.
 

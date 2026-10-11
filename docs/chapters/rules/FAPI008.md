@@ -137,7 +137,7 @@ No automatic fix (`autofix: false`). Which of the two keeps the name, and whethe
 
 ## Configuration
 
-Severity error. Opt-in: turn it on with `extend-select`. It has no options of its own; `modules` works as for every rule ([options tables](index.md#opt-in-rules)).
+Severity error. Opt-in: turn it on with `extend-select`. It has no options of its own; `modules` works as for every rule, and `check-tests` as for every content rule ([options tables](index.md#opt-in-rules)).
 
 Every finding sits on the decorator and can be suppressed inline with `# inwards: ignore[FAPI008] reason="..."` on that line.
 

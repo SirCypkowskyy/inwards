@@ -6,7 +6,9 @@
  * by the rules and read the rest of the project only when a rule asks. Every
  * tree comes from the run's shared trees, so a file the content rules parse
  * too is parsed once. With every FAPI rule off, nothing is read or parsed; a file that doesn't mention
- * FastAPI is never parsed for them, and neither is one INW000 refuses. FAPI007
+ * FastAPI is never parsed for them, and neither is one INW000 refuses or one
+ * no FAPI rule covers, such as a test module (#362); the graph still reads
+ * every FastAPI file of the project, tests included, when a rule needs it. FAPI007
  * is the exception: it reads any file that spells both `yield` and `except`,
  * since a dependency module needn't import FastAPI.
  *
@@ -50,6 +52,18 @@ export interface FastApiFound {
 
 const NONE: FastApiFound = { found: new Map(), hidden: new Set() };
 
+/** The FAPI codes; a checked file none of them covers, such as a test module, is never read for them. */
+const FAPI: readonly string[] = [
+  "FAPI001",
+  "FAPI002",
+  "FAPI003",
+  "FAPI005",
+  "FAPI006",
+  "FAPI007",
+  "FAPI008",
+  "FAPI009",
+];
+
 /**
  * Finds the FAPI rules' findings in the checked files.
  *
@@ -84,8 +98,11 @@ export function fastApiFindings(
     return NONE;
   }
   const model = new FastApiModel(trees, project);
+  const scoped = files.filter((src) =>
+    FAPI.some((code) => ruleLevel(code, rules, src.module) !== "off"),
+  );
   try {
-    const own = files.flatMap((src) => {
+    const own = scoped.flatMap((src) => {
       const m = checkEncoding(src) ? null : model.fileModel(src);
       return m === null ? [] : [{ src, m }];
     });
@@ -100,7 +117,7 @@ export function fastApiFindings(
     for (const { src, m } of own) {
       found.set(src.path, fileFindings({ src, m, scope }, { on, edit, rules, settings }));
     }
-    for (const src of on.yields ? files.filter((file) => !checkEncoding(file)) : []) {
+    for (const src of on.yields ? scoped.filter((file) => !checkEncoding(file)) : []) {
       const swallows = checkYieldSwallows(trees, src);
       found.set(src.path, [...(found.get(src.path) ?? []), ...swallows]);
     }
