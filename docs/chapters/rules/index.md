@@ -28,6 +28,7 @@ Search the rules, filter them by category, status or autofix, sort them by code,
 | [INW015](INW015.md) | `construct-only-in` | A module outside the composition root that imports an outbound adapter, or another guarded role, at runtime, or builds one of its classes | opt-in, error | yes |
 | [INW016](INW016.md) | `orm-naming` | A table name that isn't lower_case_snake and singular, or a datetime or date column without `_at` or `_date`; a whole-project run also wants a `MetaData` naming convention | opt-in, error | yes |
 | [INW017](INW017.md) | `diagram-unknown-name` | A node in a marked Mermaid architecture diagram that names no declared layer or context, or whose quoted label matches no module (whole-project runs) | opt-in, warning | no |
+| [INW018](INW018.md) | `diagram-forbidden-edge` | A solid arrow in a marked Mermaid architecture diagram that draws an import the config forbids: outward or between sibling layers, between contexts without `depends-on`, or into a module that isn't `public` (whole-project runs) | opt-in, warning | no |
 
 </div>
 

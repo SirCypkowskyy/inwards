@@ -402,14 +402,14 @@ cycles = ["modules", "contexts"]
 
 Type: list of paths. Default: none.
 
-Markdown and Mermaid files whose architecture diagrams [INW017](../rules/INW017.md) checks against `[tool.inwards]` and the code on whole-project runs. Each entry is a path relative to the pyproject.toml; a segment may use `*`, `?` and `[seq]`, and `**` stands for any number of directories. An entry can't be absolute or climb out with `..`. In a listed file, only a Mermaid `flowchart` or `graph` that opens with `%% inwards: layers` or `%% inwards: contexts` is read: a fenced `mermaid` block in a Markdown file, or the whole of a `.mmd` or `.mermaid` file. The diagram is checked, never read as config. INW017 is opt-in, so turn it on with `extend-select`. [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) has the details.
+Markdown and Mermaid files whose architecture diagrams [INW017](../rules/INW017.md) (names) and [INW018](../rules/INW018.md) (arrows) check against `[tool.inwards]` and the code on whole-project runs. Each entry is a path relative to the pyproject.toml; a segment may use `*`, `?` and `[seq]`, and `**` stands for any number of directories. An entry can't be absolute or climb out with `..`. In a listed file, only a Mermaid `flowchart` or `graph` that opens with `%% inwards: layers` or `%% inwards: contexts` is read: a fenced `mermaid` block in a Markdown file, or the whole of a `.mmd` or `.mermaid` file. The diagram is checked, never read as config. Both rules are opt-in, so turn them on with `extend-select`; [`inwards import-diagram`](diagrams.md#import-diagram) writes a first `[tool.inwards]` from a diagram. [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) has the details.
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
 diagrams = ["docs/architecture.md", "docs/**/*.mmd"]
-rules = { extend-select = ["INW017"] }
+rules = { extend-select = ["INW017", "INW018"] }
 ```
 
 ## Monorepos and uv workspaces { #monorepos }

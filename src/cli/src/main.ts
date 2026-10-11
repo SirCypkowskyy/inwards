@@ -21,6 +21,7 @@ import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
+import { importDiagramCommand } from "./commands/import-diagram.ts";
 import { mcpCommand } from "./commands/mcp.ts";
 import { serverCommand } from "./commands/server.ts";
 import { statsCommand } from "./commands/stats.ts";
@@ -163,7 +164,7 @@ function argumentError(argv: string[], code: string, message: string): string {
 
 /**
  * Runs the commands besides `check`: the hook, `daemon`, `server`, `mcp`, `init`, `baseline`, `stats`,
- * `context` and `import-config`.
+ * `context`, `import-config` and `import-diagram`.
  *
  * @param deps - this invocation's dependencies.
  * @param command - which one.
@@ -176,7 +177,7 @@ function argumentError(argv: string[], code: string, message: string): string {
  * @param values.format - `--format`, for stats.
  * @param values.export - `--export FILE`, for stats.
  * @param values.redact - `--redact`, for stats.
- * @param values.write - `--write`, for context and import-config.
+ * @param values.write - `--write`, for context, import-config and import-diagram.
  * @param values.idle - `--idle SECONDS`, for daemon.
  * @returns the exit code; 2 for unexpected arguments.
  */
@@ -220,6 +221,9 @@ async function setupCommand(
   }
   if (command === "import-config") {
     return importConfigCommand(deps, paths, values, usage);
+  }
+  if (command === "import-diagram") {
+    return importDiagramCommand(deps, paths, values, usage);
   }
   if (command === "init") {
     return await initMain(deps, paths, values, usage);

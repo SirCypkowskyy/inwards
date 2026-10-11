@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/05-ADR.md
-source_hash: 27d92a2f9fd5e1e8a2ad024395293ecc1e4d7896a71b596b4555552ffd469925
+source_hash: dbd04e4c1ed36ed6f2c934df57565a21a6e568c18a8a91dcf9022b7817b25406
 ---
 
 # :material-scale-balance: Decyzje architektoniczne (ADR) { #architecture-decisions-adr }
@@ -53,7 +53,7 @@ Każdy zapis podaje decyzję, kontekst, w którym ją podjęto, to, ile nas kosz
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` odpowiada sprawdzeniem `inwards check`, na tekstach nałożonych na dysk | :material-check-circle: Przyjęty |
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | Rozszerzenie VS Code zawiera plik binarny, jeden VSIX na platformę | :material-check-circle: Przyjęty |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot przez punkt wejścia `inwards hook copilot` i zacommitowany plik hooków | :material-check-circle: Przyjęty, budowany po nagraniu danych wejściowych w [#320](https://github.com/SirCypkowskyy/inwards/issues/320) |
-| [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja | :material-check-circle: Przyjęty, INW017 od [#344](https://github.com/SirCypkowskyy/inwards/issues/344) |
+| [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja | :material-check-circle: Przyjęty, INW017 od [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 i `import-diagram` od [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
 
 ## ADR-001: TypeScript dla silnika { #adr-001-typescript-for-the-engine }
 
@@ -1345,18 +1345,19 @@ W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, al
 
 ## ADR-045: Diagramy architektury są sprawdzane względem `[tool.inwards]`, a nigdy nie są czytane jako konfiguracja { #adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config }
 
-**Stan:** Przyjęty · 2026-10-11 · [#332](https://github.com/SirCypkowskyy/inwards/issues/332) · pierwszy etap [#344](https://github.com/SirCypkowskyy/inwards/issues/344)
+**Stan:** Przyjęty · 2026-10-11 · [#332](https://github.com/SirCypkowskyy/inwards/issues/332) · pierwszy etap [#344](https://github.com/SirCypkowskyy/inwards/issues/344) · drugi etap [#345](https://github.com/SirCypkowskyy/inwards/issues/345)
 
 **Kontekst.** Zespoły już rysują swoją architekturę: bloki Mermaid w Markdownie, które renderują GitHub, Zensical i większość edytorów, oraz diagramy komponentów w PlantUML. Rysunek rozjeżdża się z kodem i z `[tool.inwards]`, i nikt tego nie zauważa; agenci, którzy czytają dokumentację przed pisaniem kodu, idą wtedy za błędną mapą. [ArchUnitPython](https://github.com/LukasNiessen/ArchUnitPython) pokazuje, że jest zapotrzebowanie na sprawdzanie kodu względem diagramu PlantUML. Spike [#332](https://github.com/SirCypkowskyy/inwards/issues/332) pytał, czy diagram ma sterować sprawdzeniami, iść za nimi, czy jedno i drugie. Zdecydowały dwa niezależne spike'i i koordynator, przy zgodzie co najmniej dwóch z trzech.
 
 **Decyzja.**
 
 - **`[tool.inwards]` pozostaje jedynym źródłem prawdy.** Diagram nigdy nie jest czytany jako konfiguracja w czasie sprawdzania: reguły, baseline, opis architektury (brief), edytor i MCP potrzebowałyby drugiego wejścia, a Mermaid nie wyrazi list bibliotek, selektorów, kształtów ani opcji reguł. [ADR-036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) ustalił ten sam wzorzec dla szablonów.
-- **Oba kierunki.** Dokumentacja idzie za kodem: inwards sprawdza oznaczone diagramy względem konfiguracji i kodu (INW017, potem INW018 i INW019). Dokumentacja steruje kodem: późniejsze `inwards import-diagram FILE [--write]` zamienia diagram w `[tool.inwards]` jeden raz, tak jak `import-config`, a potem sprawdzanie trzyma oba w zgodzie.
+- **Oba kierunki.** Dokumentacja idzie za kodem: inwards sprawdza oznaczone diagramy względem konfiguracji i kodu (INW017, potem INW018 i INW019). Dokumentacja steruje kodem: `inwards import-diagram FILE [--write]` zamienia diagram w `[tool.inwards]` jeden raz, tak jak `import-config`, a potem sprawdzanie trzyma oba w zgodzie.
 - **Liczą się tylko wymienione i oznaczone diagramy.** Nowy klucz `diagrams` wymienia pliki (ścieżki względem pliku konfiguracji, z globami). W nich `flowchart` albo `graph` w Mermaid liczy się tylko wtedy, gdy zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`, więc nieoznaczony diagram procesu w zwykłej dokumentacji nie daje zgłoszeń (2 z 3).
 - **Co znaczy diagram.** Identyfikator węzła to nazwa warstwy albo kontekstu; etykieta w cudzysłowie to prefiks modułu; węzeł z klasą `external` jest pomijany; ciągła strzałka (`-->`) znaczy „może importować”; `&` i łańcuchy się rozwijają. W diagramie kontekstów subgraph to kontekst, krawędź między subgraphami to `depends-on`, a węzeł `:::public` to wpis `public`. Miejsce warstwy w kolejności to najdłuższa ścieżka do ujścia, warstwy na tym samym miejscu bez krawędzi to warstwy sąsiednie, a cykl to błąd.
 - **Reguły.** INW017 `diagram-unknown-name` (nazwa, której nie zna konfiguracja albo kod), INW018 `diagram-forbidden-edge` i INW019 `diagram-missing-dependency` (sprawdzenie całego projektu). Wszystkie są opt-in, a po włączeniu dają ostrzeżenie, więc rozjazd dokumentacji nie blokuje Stop gate, chyba że projekt podniesie poziom (2 z 3).
 - **Miejsce w silniku.** Bez nowego portu: CLI czyta pliki, które wymienia klucz `diagrams`, i przekazuje `{path, text}` do czystego sprawdzenia, tak jak sprawdzenie prefiksów w INW006 dostaje listę modułów. Czytnik to ręcznie napisany parser linii w `src/core/src/diagram/`; parser samego Mermaida potrzebuje DOM i jison. Uruchomienie, które nie włącza tych reguł, nie czyta żadnego diagramu.
+- **Drugi etap ([#345](https://github.com/SirCypkowskyy/inwards/issues/345)).** INW018 ocenia tylko ciągłe albo pogrubione strzałki w jedną stronę, raz na zabronioną parę i diagram. Węzeł w diagramie kontekstów należy do subgraphu najwyższego poziomu, w którym został zapisany po raz pierwszy. Warstwę albo kontekst, którego nazwa nie może być identyfikatorem Mermaid (`slices.domain` z szablonu, nazwa ze spacją), nazywa węzeł, którego etykieta w cudzysłowie jest jednym z jej wpisów `modules`; nazwa, która może być identyfikatorem, musi nim być, więc INW017 dalej wyłapuje w niej literówkę. `import-diagram` czyta najwyżej jeden diagram warstw i jeden diagram kontekstów na plik. Węzeł warstwy bez etykiety w cudzysłowie dostaje `modules = []` i uwagę; kontekst albo węzeł `:::public` bez niej jest odrzucany, bo `[[tool.inwards.contexts]]` wymaga modułów. Plik tylko z diagramem kontekstów dostaje jedną warstwę, `app`, która obejmuje każdy kontekst. Tabela wymienia plik w `diagrams` i włącza INW017 oraz INW018, więc test w obie strony (import, potem sprawdzenie) przechodzi z założenia i diagram dalej jest sprawdzany.
 - **ArchUnitPython.** „Zgodność” znaczy, że inwards czyta te same diagramy komponentów PlantUML (`component [x]`, `[a] --> [b]`, `..>`, aliasy, `package`) przez ten sam model, więc przyjmą je i `import-diagram`, i sprawdzanie. Bez eksportu do testów ArchUnitPython i bez metryk (3 z 3). Jego znaczenie krawędzi (bezpośrednie, nie przechodnie) zgadza się z `depends-on`.
 
 **Konsekwencje.**
@@ -1365,8 +1366,8 @@ W harnessie Local w VS Code kody wyjścia znaczą to samo co dla Claude Code, al
 - :material-plus-circle-outline: W projekcie, który nie wymienia diagramów, sprawdzenia nie zmieniają się wcale, a projekt, który je wymienia, płaci tylko za czytanie tych plików przy sprawdzaniu całego projektu.
 - :material-plus-circle-outline: Czytnik jest mały i czysty, więc silnik dalej działa na Bunie i na Node bez przeglądarki i generatora parserów.
 - :material-minus-circle-outline: Czytnik obejmuje podzbiór flowchartów, linia po linii; instrukcja, której nie umie śledzić, jest pomijana, więc nietypowy diagram może przejść niesprawdzony, zamiast się wywrócić.
-- :material-minus-circle-outline: Warstwy ani kontekstu, którego nazwa nie jest poprawnym identyfikatorem Mermaid (`src.*.utils` z szablonu), żaden węzeł nie nazwie.
-- :material-minus-circle-outline: Na razie INW017 działa tylko przy sprawdzaniu całego projektu; hook po edycji i edytor jeszcze nie pokazują zgłoszeń z diagramów.
+- :material-minus-circle-outline: Warstwę albo kontekst, którego nazwa nie jest poprawnym identyfikatorem Mermaid (`slices.domain` z szablonu), węzeł nazywa tylko przez etykietę w cudzysłowie równą jednemu z jej wpisów `modules`.
+- :material-minus-circle-outline: Na razie INW017 i INW018 działają tylko przy sprawdzaniu całego projektu; hook po edycji i edytor jeszcze nie pokazują zgłoszeń z diagramów.
 
 **Alternatywy.**
 

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 9f914f697a09b55ec6e95bf03dc2cab1c834e6f3a302448cfce01032adcc2a39
+source_hash: d469807f939d2d8238be813e0a8e8fb75f9243d2eefc5276a95b5ae3f7b7e0f9
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -407,14 +407,14 @@ cycles = ["modules", "contexts"]
 
 Typ: lista ścieżek. Domyślnie: brak.
 
-Pliki Markdown i Mermaid, których diagramy architektury [INW017](../rules/INW017.md) sprawdza względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`: blok kodu `mermaid` w pliku Markdown albo cały plik `.mmd` lub `.mermaid`. Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. INW017 to reguła opt-in, więc włącz ją przez `extend-select`. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
+Pliki Markdown i Mermaid, których diagramy architektury [INW017](../rules/INW017.md) (nazwy) i [INW018](../rules/INW018.md) (strzałki) sprawdzają względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`: blok kodu `mermaid` w pliku Markdown albo cały plik `.mmd` lub `.mermaid`. Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. Obie reguły są opt-in, więc włącz je przez `extend-select`; [`inwards import-diagram`](diagrams.md#import-diagram) zapisuje pierwszą `[tool.inwards]` na podstawie diagramu. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
 diagrams = ["docs/architecture.md", "docs/**/*.mmd"]
-rules = { extend-select = ["INW017"] }
+rules = { extend-select = ["INW017", "INW018"] }
 ```
 
 ## Monorepo i workspace'y uv { #monorepos }

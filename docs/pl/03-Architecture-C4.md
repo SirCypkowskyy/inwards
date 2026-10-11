@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c26c7519996a8e08746fbc8190affbc0c984ff2f551cbaa9b6f4a87865e1f3d1
+source_hash: 7caa2cbe93da23cca60f2a94e6621cf67d80d412928a916fe9a0f6f5a72285a3
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -89,7 +89,7 @@ flowchart TB
 
 | Kontener | Technologia | Gdzie leży | Stan |
 |---|---|---|---|
-| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017 |
+| **Silnik** | TypeScript, `web-tree-sitter` 0.27 + `tree-sitter-python` 0.25 (WASM) | `src/core` | :material-check-circle: INW000, INW001, INW002, INW003, INW004, INW005, INW006, INW007, INW008, INW010, INW011, INW012, INW013, INW014, INW015, INW016, INW017, INW018 |
 | **CLI** | Jednoplikowy program wykonywalny Bun 1.4, 6 platform docelowych, opakowany też w 5 wheeli platformowych | `src/cli` | :material-check-circle: `check` (text/concise/json/sarif), `init` (agenci, presety stylów, scaffold), `hook claude-code`, `daemon`, `server`, `mcp` |
 | **`inwards server`** | `vscode-languageserver` 10 na Bunie, w pliku binarnym CLI | `src/cli/src/lsp/`, `src/cli/src/adapters/lsp-connection.ts` | :material-check-circle: to, co `inwards check` zgłasza w każdym folderze obszaru roboczego, z niezapisanym tekstem, na starcie, po zapisie, przy zmianie folderów i zdarzeniach plików; naciśnięcie klawisza sprawdza tylko swój dokument ([ADR-041](05-ADR.md#adr-041-inwards-server-runs-inwards-checks-own-code-the-extensions-node-server-stays-until-it-switches)) |
 | **`inwards mcp`** | MCP TypeScript SDK 2 na Bunie, w pliku binarnym CLI | `src/cli/src/mcp/`, `src/cli/src/adapters/mcp-connection.ts` | :material-check-circle: `check_files`, `explain_rule` i `where_should_this_go` dla agentów z klientem MCP ([poradnik](guides/mcp.md), [ADR-042](05-ADR.md#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk)) |
@@ -121,7 +121,7 @@ flowchart LR
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>unsupported-encoding: INW000</small>"]
+        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
@@ -393,6 +393,7 @@ Każda wdrożona reguła ma własną stronę w sekcji [Reguły](rules/index.md),
 | INW015 | `construct-only-in` | Opt-in, błąd, gdy jest włączona. W module, który należy do warstwy, a nie do `role` ani `allowed-in`: import modułu z `role`, który się wykonuje (bez ciał `if TYPE_CHECKING:`), na importowanej nazwie, oraz wywołanie budujące klasę zdefiniowaną w roli, osiągniętą przez moduł spoza niej (reeksport albo atrybut modułu), na wywołaniu. Import, który INW001 zgłasza jako skierowany na zewnątrz, dostaje tylko INW001. Jedno parsowanie na taki plik z importem, plus moduły roli, `allowed-in` i pakiety nad rolą, gdy prowadzi tam wywołanie nazwy pisanej wielką literą | :material-check-circle: |
 | INW016 | `orm-naming` | Opt-in, błąd, gdy jest włączona. Nazwy tabel (`__tablename__`, `Table("name", ...)`, nazwa, którą SQLModel wyprowadza dla klasy `table=True`, `Meta.db_table` w Django), które nie są w lower_case_snake albo, przy `table-name = "snake_singular"` (domyślnie), wyglądają na angielską liczbę mnogą; oraz kolumny daty i czasu (`Mapped[datetime]`, `mapped_column`/`Column` z `DateTime`, `TIMESTAMP` albo `Date`, pola SQLModel, `DateTimeField`/`DateField` z Django), których nazwa w bazie nie kończy się na `datetime-suffix` (`_at`) albo `date-suffix` (`_date`). Jedno zgłoszenie na nazwę, z nazwą do użycia. Uruchomienie dla całego projektu dodaje jedno zgłoszenie, gdy projekt ma tabele SQLAlchemy i nigdzie nie ma `MetaData(naming_convention=...)`. Jedno parsowanie na plik, którego tekst wymienia konstrukcję ORM, niezależnie od warstwy | :material-check-circle: |
 | INW017 | `diagram-unknown-name` | Opt-in, ostrzeżenie, gdy jest włączona. W plikach Markdown i `.mmd`, które wymienia `diagrams`, `flowchart` albo `graph` w Mermaid oznaczony `%% inwards: layers` lub `%% inwards: contexts`: identyfikator węzła, który nie nazywa żadnej zadeklarowanej warstwy (albo, w diagramie kontekstów, węzeł lub subgraph na najwyższym poziomie, który nie nazywa żadnego kontekstu), i etykieta w cudzysłowie, do której nie pasuje żaden moduł. Węzły `:::external` są pomijane. Tylko przy sprawdzaniu całego projektu; CLI czyta pliki, a `engine/diagrams.ts` przekazuje je do ręcznie napisanego parsera linii w `diagram/`. Wpis `diagrams`, do którego nie pasuje żaden plik, jest zgłaszany w pyproject.toml. Zobacz [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | :material-check-circle: |
+| INW018 | `diagram-forbidden-edge` | Opt-in, ostrzeżenie, gdy jest włączona. W tych samych oznaczonych diagramach ciągła albo pogrubiona strzałka w jedną stronę, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi w diagramie warstw; w diagramie kontekstów z jednego kontekstu do innego, którego nie wymienia jego `depends-on`, albo do węzła, którego etykieta w cudzysłowie nie jest jednym z modułów `public` tamtego kontekstu. Przerywane krawędzie i węzły `:::external` są pomijane; każda zabroniona para jest zgłaszana raz na diagram. `inwards import-diagram` zapisuje konfigurację, którą przedstawia diagram. Zob. [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | :material-check-circle: |
 | FAPI001 | `endpoint-metadata` | Opt-in. Operacja ścieżki FastAPI w schemacie bez metadanych OpenAPI, których wymaga projekt: podsumowania albo docstringu, modelu odpowiedzi, jawnego kodu statusu dla `POST` i `DELETE`, pola `description` w każdym wpisie `responses=`, a opcjonalnie tagów i `operation_id`. Jedna diagnostyka na endpoint, na dekoratorze | :material-check-circle: |
 | FAPI002 | `undocumented-error-response` | Opt-in. Operacja ścieżki FastAPI, która może zwrócić kod błędu niezadeklarowany w jej wpisie OpenAPI: rzucony albo zwrócony w endpoincie, w funkcjach pomocniczych i zależnościach z tego samego pliku albo importowanych, do `max-depth` wywołań, albo z własnego wyjątku, który handler aplikacji zamienia na kod. Liczą się deklaracje na dekoratorze, routerze, dołączeniach nad nim i aplikacji; wszystko, czego Inwards nie umie odczytać, ucisza regułę | :material-check-circle: |
 | FAPI003 | `router-wiring` | Opt-in. `APIRouter` z trasami, do którego żadna aplikacja nie dochodzi przez `include_router` ani `mount` (ostrzeżenie, gdy któregoś `include_router` nie da się rozwiązać), routery dołączające się nawzajem w cyklu oraz `include_router` nad trasami dołączanego routera w jednym pliku. Nazwy są rozwiązywane między plikami przez model; graf aplikacji i routerów (`rules/fastapi/graph.ts`) powstaje tylko wtedy, gdy sprawdzany plik zawiera router albo dołączenie. Hook edycji zgłasza tylko przypadki z jednego pliku; Stop gate zgłasza niepodpięte routery, które sesja utworzyła lub zmieniła | :material-check-circle: |
@@ -422,7 +423,8 @@ src/
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
 │   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
-│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), model.ts
+│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), model.ts,
+│   │   │                  #   names.ts (what a node names), draft.ts (import-diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
@@ -457,6 +459,7 @@ src/
 │   │   │   ├── ports-abstract/          # INW014: classes.ts (class kinds, method bodies),
 │   │   │   │                            #   wording.ts, check.ts
 │   │   │   ├── diagram-unknown-name/    # INW017: check.ts (names in marked diagrams)
+│   │   │   ├── diagram-forbidden-edge/  # INW018: check.ts (arrows in marked diagrams)
 │   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
 │   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
@@ -472,14 +475,15 @@ src/
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015, orm-naming.ts INW016,
-│   │   │                  #   diagrams.ts INW017
+│   │   │                  #   diagrams.ts INW017 and INW018
 │   │   └── report/        # render.ts: text / concise / json / sarif
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, stats, hook, daemon, server, mcp: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, stats, hook, daemon, server, mcp, import-config,
+│   │   │                  #   import-diagram: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings

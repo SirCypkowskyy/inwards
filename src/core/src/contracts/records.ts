@@ -34,6 +34,30 @@ export interface DiagramSource {
   text: string;
 }
 
+/** A layer `inwards import-diagram` read from a layers diagram. */
+export interface DraftDiagramLayer {
+  name: string;
+  /** The node's quoted label; empty when the node has none. */
+  modules: string[];
+}
+
+/** A context `inwards import-diagram` read from a contexts diagram. */
+export interface DraftDiagramContext {
+  name: string;
+  modules: string[];
+  public: string[];
+  dependsOn: string[];
+}
+
+/** The `[tool.inwards]` a marked diagram stands for (`inwards import-diagram`, ADR-045). */
+export interface DiagramDraft {
+  /** The places in the layer order, innermost first; a place of two or more layers is a sibling group. */
+  layers: DraftDiagramLayer[][];
+  contexts: DraftDiagramContext[];
+  /** What the user should finish by hand, one sentence each. */
+  notes: string[];
+}
+
 export interface ImportRef extends Span {
   /**
    * Fully resolved dotted target, e.g. `shop.infrastructure.db.OrderTable`.

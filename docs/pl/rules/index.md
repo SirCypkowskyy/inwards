@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/index.md
-source_hash: af8802835a0be692db3ab6c771bf11eceef9e803f92b9efb690adc482803937a
+source_hash: 0555e7a9c67739dfd1653be4596e475a3a98c63a1df0239b6db04e8e921f0d7d
 ---
 
 # :material-format-list-checks: Reguły { #rules }
@@ -33,6 +33,7 @@ Przeszukaj reguły, przefiltruj je według kategorii, statusu albo poprawki auto
 | [INW015](INW015.md) | `construct-only-in` | Moduł spoza korzenia kompozycji, który w czasie działania importuje adapter wyjściowy albo inną chronioną rolę lub buduje jedną z jej klas | opt-in, błąd | tak |
 | [INW016](INW016.md) | `orm-naming` | Nazwa tabeli, która nie jest w lower_case_snake i w liczbie pojedynczej, albo kolumna daty i czasu bez `_at` lub `_date`; uruchomienie dla całego projektu wymaga też konwencji nazw w `MetaData` | opt-in, błąd | tak |
 | [INW017](INW017.md) | `diagram-unknown-name` | Węzeł w oznaczonym diagramie architektury w Mermaid, który nie nazywa żadnej zadeklarowanej warstwy ani kontekstu, albo którego etykieta w cudzysłowie nie pasuje do żadnego modułu (sprawdzenie całego projektu) | opt-in, ostrzeżenie | nie |
+| [INW018](INW018.md) | `diagram-forbidden-edge` | Ciągła strzałka w oznaczonym diagramie architektury w Mermaid, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi, między kontekstami bez `depends-on` albo do modułu, który nie jest `public` (sprawdzenie całego projektu) | opt-in, ostrzeżenie | nie |
 
 </div>
 

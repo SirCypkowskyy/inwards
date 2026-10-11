@@ -48,7 +48,7 @@ Each record states the decision, the context it was made in, what it costs us, a
 | [042](#adr-042-inwards-mcp-answers-with-inwards-checks-own-check-on-texts-laid-over-the-disk) | `inwards mcp` answers with `inwards check`'s own check, on texts laid over the disk | :material-check-circle: Accepted |
 | [043](#adr-043-the-vs-code-extension-bundles-the-binary-one-vsix-per-platform) | The VS Code extension bundles the binary, one VSIX per platform | :material-check-circle: Accepted |
 | [044](#adr-044-copilot-through-an-inwards-hook-copilot-entry-point-and-a-committed-hooks-file) | Copilot through an `inwards hook copilot` entry point and a committed hooks file | :material-check-circle: Accepted, built after the payloads [#320](https://github.com/SirCypkowskyy/inwards/issues/320) records |
-| [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Architecture diagrams are checked against `[tool.inwards]`, never read as config | :material-check-circle: Accepted, INW017 since [#344](https://github.com/SirCypkowskyy/inwards/issues/344) |
+| [045](#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | Architecture diagrams are checked against `[tool.inwards]`, never read as config | :material-check-circle: Accepted, INW017 since [#344](https://github.com/SirCypkowskyy/inwards/issues/344), INW018 and `import-diagram` since [#345](https://github.com/SirCypkowskyy/inwards/issues/345) |
 
 ## ADR-001: TypeScript for the engine
 
@@ -1340,18 +1340,19 @@ In VS Code's Local harness the exit codes mean what they mean to Claude Code, bu
 
 ## ADR-045: Architecture diagrams are checked against `[tool.inwards]`, never read as config
 
-**Status:** Accepted · 2026-10-11 · [#332](https://github.com/SirCypkowskyy/inwards/issues/332) · first slice [#344](https://github.com/SirCypkowskyy/inwards/issues/344)
+**Status:** Accepted · 2026-10-11 · [#332](https://github.com/SirCypkowskyy/inwards/issues/332) · first slice [#344](https://github.com/SirCypkowskyy/inwards/issues/344) · second slice [#345](https://github.com/SirCypkowskyy/inwards/issues/345)
 
 **Context.** Teams already draw their architecture: Mermaid blocks in Markdown, which GitHub, Zensical and most editors render, and PlantUML component diagrams. The drawing drifts from the code and from `[tool.inwards]`, and nothing notices; agents that read the docs before writing code then follow a wrong map. [ArchUnitPython](https://github.com/LukasNiessen/ArchUnitPython) shows there is demand for checking code against a PlantUML diagram. The [#332](https://github.com/SirCypkowskyy/inwards/issues/332) spike asked whether a diagram should drive the checks, follow them, or both. Two independent spikes and the coordinator decided, by agreement of at least two of three.
 
 **Decision.**
 
 - **`[tool.inwards]` stays the only source of truth.** A diagram is never read as live config at check time: the rules, the baseline, the brief, the editor and MCP would all need a second input, and Mermaid can't express library lists, selectors, shapes or rule options. [ADR-036](#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) set the same pattern for templates.
-- **Both directions.** Docs follow the code: inwards lints marked diagrams against the config and the code (INW017, then INW018 and INW019). Docs drive the code: a later `inwards import-diagram FILE [--write]` turns a diagram into `[tool.inwards]` once, like `import-config`, and the linting keeps the two in step after that.
+- **Both directions.** Docs follow the code: inwards lints marked diagrams against the config and the code (INW017, then INW018 and INW019). Docs drive the code: `inwards import-diagram FILE [--write]` turns a diagram into `[tool.inwards]` once, like `import-config`, and the linting keeps the two in step after that.
 - **Only listed, marked diagrams count.** A new `diagrams` key lists files (paths relative to the config file, with globs). In them, a Mermaid `flowchart` or `graph` counts only when it opens with `%% inwards: layers` or `%% inwards: contexts`, so an unmarked process diagram in ordinary docs gives no finding (2 of 3).
 - **What a diagram means.** A node id is a layer or context name; a quoted label is a module prefix; a node with the class `external` is skipped; a solid arrow (`-->`) means "may import"; `&` and chains expand. In a contexts diagram a subgraph is a context, a link between subgraphs is `depends-on`, and a `:::public` node is a `public` entry. Layer rank is the longest path to a sink, same-rank layers without a link are siblings, and a cycle is an error.
 - **Rules.** INW017 `diagram-unknown-name` (a name the config or the code doesn't know), INW018 `diagram-forbidden-edge` and INW019 `diagram-missing-dependency` (whole-project runs). All are opt-in, and a warning when on, so docs drift doesn't block the Stop gate unless a project raises it (2 of 3).
 - **Engine fit.** No new port: the CLI reads the files the `diagrams` key names and passes `{path, text}` to a pure checker, as INW006's prefix check gets the module list. The reader is a hand-written line parser in `src/core/src/diagram/`; Mermaid's own parser needs a DOM and jison. A run that doesn't turn the rules on reads no diagram.
+- **Second slice ([#345](https://github.com/SirCypkowskyy/inwards/issues/345)).** INW018 judges only one-way solid or thick arrows, once per forbidden pair and diagram. A node in a contexts diagram belongs to the top-level subgraph it is first written in. A layer or context whose name can't be a Mermaid id (a template's `slices.domain`, a name with a space) is named by a node whose quoted label is one of its `modules` entries; a name that can be an id must be the id, so INW017 still catches a typo in it. `import-diagram` reads at most one layers and one contexts diagram per file. A layer node without a quoted label gets `modules = []` and a note; a context, or a `:::public` node, without one is refused, since `[[tool.inwards.contexts]]` needs modules. A file with only a contexts diagram gets one layer, `app`, holding every context. The table lists the file in `diagrams` and turns INW017 and INW018 on, so the round trip (import, then check) is clean by construction and stays checked.
 - **ArchUnitPython.** "Compatible" means inwards reads the same PlantUML component diagrams (`component [x]`, `[a] --> [b]`, `..>`, aliases, `package`) through the same model, so `import-diagram` and the linting accept them. No export to ArchUnitPython tests and no metrics (3 of 3). Its edge semantics (direct, not transitive) match `depends-on`.
 
 **Consequences.**
@@ -1360,8 +1361,8 @@ In VS Code's Local harness the exit codes mean what they mean to Claude Code, bu
 - :material-plus-circle-outline: Nothing about the checks changes for a project that doesn't list diagrams, and a project that does pays only for reading those files on whole-project runs.
 - :material-plus-circle-outline: The reader is small and pure, so the engine still runs on Bun and on Node with no browser or parser generator.
 - :material-minus-circle-outline: The reader covers the flowchart subset, one line at a time; a statement it can't follow is skipped, so an unusual diagram can pass unchecked rather than fail.
-- :material-minus-circle-outline: A layer or context whose name isn't a valid Mermaid id (a template's `src.*.utils`) can't be named by a node.
-- :material-minus-circle-outline: INW017 runs on whole-project runs only for now; the per-edit hook and the editor don't show diagram findings yet.
+- :material-minus-circle-outline: A layer or context whose name isn't a valid Mermaid id (a template's `slices.domain`) is named only through a quoted label equal to one of its `modules` entries.
+- :material-minus-circle-outline: INW017 and INW018 run on whole-project runs only for now; the per-edit hook and the editor don't show diagram findings yet.
 
 **Alternatives.**
 

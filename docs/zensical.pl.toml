@@ -51,6 +51,7 @@ nav = [
     { "Kształt pakietu" = "guides/package-shape.md" },
     { "Biblioteki w warstwach" = "guides/libraries.md" },
     { "Migracja z import-linter" = "guides/import-linter.md" },
+    { "Diagramy architektury" = "guides/diagrams.md" },
   ] },
   { "Reguły" = [
     { "Przegląd" = "rules/index.md" },
@@ -72,6 +73,7 @@ nav = [
     { "INW015 construct-only-in" = "rules/INW015.md" },
     { "INW016 orm-naming" = "rules/INW016.md" },
     { "INW017 diagram-unknown-name" = "rules/INW017.md" },
+    { "INW018 diagram-forbidden-edge" = "rules/INW018.md" },
     { "FAPI001 endpoint-metadata" = "rules/FAPI001.md" },
     { "FAPI002 undocumented-error-response" = "rules/FAPI002.md" },
     { "FAPI003 router-wiring" = "rules/FAPI003.md" },

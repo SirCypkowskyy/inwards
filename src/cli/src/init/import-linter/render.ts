@@ -1,7 +1,9 @@
 /**
  * @file Renders what `inwards import-config` arrived at: the draft as a
  * `[tool.inwards]` table in TOML, and the per-contract report for the
- * terminal. Pure text: the command decides where each one goes.
+ * terminal. Its TOML pieces (`quoted`, `array`, `placeLines`) also render
+ * `inwards import-diagram`'s table. Pure text: the command decides where
+ * each one goes.
  */
 import type { Draft, DraftLayer, Outcome } from "./model.ts";
 
@@ -14,7 +16,7 @@ const STATUS_WIDTH: number = "partial".length;
  * @param text - the raw string.
  * @returns the quoted string.
  */
-function quoted(text: string): string {
+export function quoted(text: string): string {
   return JSON.stringify(text);
 }
 
@@ -24,7 +26,7 @@ function quoted(text: string): string {
  * @param items - the strings.
  * @returns such as `["a", "b"]`.
  */
-function array(items: readonly string[]): string {
+export function array(items: readonly string[]): string {
   return `[${items.map(quoted).join(", ")}]`;
 }
 
@@ -35,7 +37,7 @@ function array(items: readonly string[]): string {
  * @param place - the layers sharing the place, innermost place first in the list.
  * @returns the lines of the `layers` array that stand for it.
  */
-function placeLines(place: readonly DraftLayer[]): string[] {
+export function placeLines(place: readonly DraftLayer[]): string[] {
   const siblings = place.length > 1;
   const indent = siblings ? "    " : "  ";
   const rows = place.map((layer) => {
