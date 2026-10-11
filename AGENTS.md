@@ -249,20 +249,26 @@ act push -W .github/workflows/cd.yml -n                                       # 
   yourself; the owner (or the coordinator, when asked) runs it once before
   a release with `gh workflow run ci.yml --ref develop`, and `cd.yml`
   verifies each binary on its own OS at the tag.
-- **Linux jobs run on self-hosted runners** on the owner's server `irysek`
-  (`runs-on: [self-hosted, linux, x64, inwards]`), so they cost no Actions
-  minutes. They are two Ubuntu 26.04 containers, one fresh container per
-  job, on a network that reaches only the internet; `ops/runner/README.md`
-  says how to recreate them. A new Linux job gets the self-hosted labels,
-  **except** a job that needs Docker, publishes, or holds a write token,
-  OIDC or a secret: it stays on `ubuntu-26.04`, as `cd.yml`, `pypi.yml`,
-  `release-please.yml`, `docs.yml`'s deploy, `docs-cloudflare.yml` and
-  `nightly-e2e.yml` do. `pr-title.yml` stays hosted too (a required check
-  from the base branch), and so do the manual macOS, Windows and
-  ubuntu-24.04 test rows. If PR jobs sit in "Queued" forever, the runners
-  are down: check `gh api repos/SirCypkowskyy/inwards/actions/runners` and
-  tell the owner. Never attach them to a public repository or allow fork PR
-  workflows: they run PR code.
+- **Linux jobs run on self-hosted runners** owned by the owner
+  (`runs-on: [self-hosted, linux, ARM64, inwards]`), so they cost no Actions
+  minutes; `ops/runner/README.md` says how they are set up. A new Linux job
+  gets the self-hosted labels, **except** a job that needs Docker, publishes,
+  or holds a write token, OIDC or a secret: it stays on `ubuntu-26.04`, as
+  `cd.yml`, `pypi.yml`, `release-please.yml`, `docs.yml`'s deploy,
+  `docs-cloudflare.yml` and `nightly-e2e.yml` do. `pr-title.yml` stays hosted
+  too (a required check from the base branch), and so do the manual macOS,
+  Windows and ubuntu-24.04 test rows. If PR jobs sit in "Queued" forever, the
+  runners are down: check `gh api repos/SirCypkowskyy/inwards/actions/runners`
+  and tell the owner.
+- **The repository is public, so fork pull requests never reach the
+  self-hosted runners** (#333). Every job that a `pull_request` event can
+  start and that would run self-hosted picks its runner with the fork check
+  instead of the bare labels:
+  `runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-24.04-arm' || fromJSON('["self-hosted","linux","ARM64","inwards"]') }}`.
+  A fork's run still needs a maintainer's approval first. Every `uses:` is
+  pinned to a full commit SHA with the tag in a comment
+  (`actions/checkout@<sha> # v7`); the repository's Actions settings require
+  it. Never use `pull_request_target` to check out or run PR code.
 - **Parallel agents:** run `act` in your own worktree only. Each run gets
   its own container. The first run pulls a 2.3 GB image.
 - **`setup-bun` fails with "Unable to locate executable file"**: act's local
