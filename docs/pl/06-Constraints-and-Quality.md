@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/06-Constraints-and-Quality.md
-source_hash: 24cddabc438510f3ac1d23e5de98ce218151b82ce65018b94912fb2d17c92d3b
+source_hash: 1d012b2b9b4991a1132f8c80459aeec3d72cfed21d5a56432be98605a3ecdba9
 ---
 
 # :material-speedometer: Ograniczenia i jakość { #constraints-and-quality }
@@ -350,7 +350,7 @@ Koszt, ze źródeł na laptopie opisanym wyżej, mediana 3 zimnych uruchomień n
 - **FAPI001.** Śledzenie `add_versioned_routers(app, api_router)` umieszcza trasy API Polara pod `FastAPI(openapi_url=None)` z `create_app()`, co ukryło wszystkie 131 zgłoszeń. `openapi_url=None` wyłącza tylko serwowanie schematu przez FastAPI; Polar sam serwuje `/{version}/openapi.json` z tych samych tras. Aplikacja, która dodaje własną trasę kończącą się na `openapi.json`, liczy się teraz jako serwująca schemat, co przywraca tych samych 131 zgłoszeń, a back office Polara (bez takiej trasy) pozostaje ukryte.
 - **FAPI002.** Jedyne zgłoszenie w Polarze jest trafne: OAuth2 `authorize` rzuca 401 i nie deklaruje żadnych odpowiedzi. Większość pozostałych jego tras rzuca podklasy `PolarError`, obsługiwane przez handlery rejestrowane w `add_exception_handlers(app)`, na parametrze, którego FAPI002 nie śledzi, i odpowiadające `exc.status_code` ([#400](https://github.com/SirCypkowskyy/inwards/issues/400)). Routery fastapi-clean-example buduje fabryka wokół zewnętrznego `ErrorAwareRouter`, którego argumenty kluczowe są nieznane, a więc i deklarowane odpowiedzi.
 
-Koszt: mediana 5 zimnych uruchomień na Polarze ze wszystkimi regułami FAPI, 1711 ms przed i 1728 ms po, w granicach szumu. Szukanie wywołań funkcji w projekcie parsuje tylko pliki, które zawierają jej nazwę.
+Koszt: 9 zimnych uruchomień na Polarze ze wszystkimi regułami FAPI, na przemian z `develop` w 9ac26f7 (po [#402](https://github.com/SirCypkowskyy/inwards/pull/402)): mediana 1565 ms przed i 1619 ms po, najszybsze uruchomienie 1466 i 1487 ms, w granicach szumu tego laptopa. Szukanie wywołań funkcji w projekcie parsuje tylko pliki, które zawierają jej nazwę.
 
 **Koszt.** Każda reguła osobno, oprócz warstw z manifestu, zimne (`--no-cache`) i ciepłe uruchomienie, mediana z 5 uruchomień (3 dla polara i saleora), plik binarny darwin-arm64 na opisanym wyżej laptopie, przy pracujących równolegle innych agentach (load average 5 do 11). Milisekundy, zimne / ciepłe:
 
