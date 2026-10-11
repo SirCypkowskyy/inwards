@@ -116,20 +116,75 @@ const DRIVER_CONNECTS: readonly string[] = [
   "mysql.connector.connect",
 ];
 
+/** The SQLAlchemy and SQLModel session types. */
+const SESSION_TYPES: readonly string[] = [
+  "sqlalchemy.orm.Session",
+  "sqlalchemy.orm.session.Session",
+  "sqlalchemy.orm.scoped_session",
+  "sqlalchemy.orm.scoping.scoped_session",
+  "sqlmodel.Session",
+  "sqlmodel.orm.session.Session",
+];
+
+/** The SQLAlchemy engine and connection types, and the factories that make one. */
+const ENGINE_TYPES: readonly string[] = [
+  "sqlalchemy.create_engine",
+  "sqlalchemy.engine.create_engine",
+  "sqlmodel.create_engine",
+  "sqlalchemy.Engine",
+  "sqlalchemy.engine.Engine",
+  "sqlalchemy.engine.base.Engine",
+  "sqlalchemy.Connection",
+  "sqlalchemy.engine.Connection",
+  "sqlalchemy.engine.base.Connection",
+];
+
+/** The redis-py client types and the factories that make one. */
+const REDIS_TYPES: readonly string[] = [
+  "redis.Redis",
+  "redis.StrictRedis",
+  "redis.client.Redis",
+  "redis.client.StrictRedis",
+  "redis.from_url",
+  "redis.Redis.from_url",
+  "redis.StrictRedis.from_url",
+  "redis.client.Redis.from_url",
+  "redis.RedisCluster",
+  "redis.cluster.RedisCluster",
+];
+
+/** The boto3 factories. */
+const BOTO3_TYPES: readonly string[] = ["boto3.client", "boto3.resource"];
+
+/** The DB-API drivers' connection types, and the connect functions that make one. */
+const DRIVER_TYPES: readonly string[] = [
+  ...DRIVER_CONNECTS,
+  "sqlite3.Connection",
+  "psycopg.Connection",
+  "psycopg2.extensions.connection",
+  "pymysql.connections.Connection",
+  "MySQLdb.connections.Connection",
+];
+
+/**
+ * Every qualified name a built-in family matches, as a type or as a call:
+ * the text prefilter (`prefilter.ts`) looks for their segments.
+ */
+export const BUILT_IN_NAMES: readonly string[] = [
+  ...SESSION_TYPES,
+  ...ENGINE_TYPES,
+  ...REDIS_TYPES,
+  ...BOTO3_TYPES,
+  ...DRIVER_TYPES,
+];
+
 /** The words every database family shares. */
 const DATABASE = "the database answers";
 
 /** The built-in families. */
 export const FAMILIES: readonly Family[] = [
   {
-    isType: exact([
-      "sqlalchemy.orm.Session",
-      "sqlalchemy.orm.session.Session",
-      "sqlalchemy.orm.scoped_session",
-      "sqlalchemy.orm.scoping.scoped_session",
-      "sqlmodel.Session",
-      "sqlmodel.orm.session.Session",
-    ]),
+    isType: exact(SESSION_TYPES),
     isCall: never,
     blocks: (method: string): boolean => SESSION_IO.has(method),
     method: (): string => "talks to the database through a synchronous SQLAlchemy `Session`",
@@ -138,17 +193,7 @@ export const FAMILIES: readonly Family[] = [
     instead: (): string => "`AsyncSession` from `sqlalchemy.ext.asyncio`",
   },
   {
-    isType: exact([
-      "sqlalchemy.create_engine",
-      "sqlalchemy.engine.create_engine",
-      "sqlmodel.create_engine",
-      "sqlalchemy.Engine",
-      "sqlalchemy.engine.Engine",
-      "sqlalchemy.engine.base.Engine",
-      "sqlalchemy.Connection",
-      "sqlalchemy.engine.Connection",
-      "sqlalchemy.engine.base.Connection",
-    ]),
+    isType: exact(ENGINE_TYPES),
     isCall: never,
     blocks: (method: string): boolean => !ENGINE_QUIET.has(method),
     method: (): string =>
@@ -158,18 +203,7 @@ export const FAMILIES: readonly Family[] = [
     instead: (): string => "`create_async_engine` from `sqlalchemy.ext.asyncio`",
   },
   {
-    isType: exact([
-      "redis.Redis",
-      "redis.StrictRedis",
-      "redis.client.Redis",
-      "redis.client.StrictRedis",
-      "redis.from_url",
-      "redis.Redis.from_url",
-      "redis.StrictRedis.from_url",
-      "redis.client.Redis.from_url",
-      "redis.RedisCluster",
-      "redis.cluster.RedisCluster",
-    ]),
+    isType: exact(REDIS_TYPES),
     isCall: never,
     blocks: (method: string): boolean => !REDIS_QUIET.has(method),
     method: (): string => "sends a command through a synchronous Redis client",
@@ -178,7 +212,7 @@ export const FAMILIES: readonly Family[] = [
     instead: (): string => "`redis.asyncio.Redis`",
   },
   {
-    isType: exact(["boto3.client", "boto3.resource"]),
+    isType: exact(BOTO3_TYPES),
     isCall: never,
     // A capitalised method of a resource (`s3.Bucket("b")`) builds a sub-resource locally.
     blocks: (method: string): boolean => !(BOTO3_QUIET.has(method) || SUB_RESOURCE.test(method)),
@@ -188,14 +222,7 @@ export const FAMILIES: readonly Family[] = [
     instead: (): string => "an async AWS client (`aioboto3` or `aiobotocore`)",
   },
   {
-    isType: exact([
-      ...DRIVER_CONNECTS,
-      "sqlite3.Connection",
-      "psycopg.Connection",
-      "psycopg2.extensions.connection",
-      "pymysql.connections.Connection",
-      "MySQLdb.connections.Connection",
-    ]),
+    isType: exact(DRIVER_TYPES),
     isCall: exact(DRIVER_CONNECTS),
     blocks: (): boolean => true,
     method: (type: string): string => `uses a synchronous database connection (\`${type}\`)`,
