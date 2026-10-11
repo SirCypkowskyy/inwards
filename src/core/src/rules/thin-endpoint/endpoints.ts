@@ -14,7 +14,7 @@
  * their job.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt, literalString } from "../../python/literals.ts";
+import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
@@ -30,6 +30,7 @@ import {
   standaloneDecorator,
   VIEW_METHODS,
 } from "./frameworks.ts";
+import { routeField, routeOf } from "./route-path.ts";
 import type { Recognise } from "./settings.ts";
 
 /** The frameworks whose apps and routers declare and register routes through methods. */
@@ -257,21 +258,9 @@ function registrationOf(
         };
   const handler = how ? argumentAt(call, how.index, how.keyword) : null;
   const target = handler ? context.qualify(handler) : null;
-  const route = routeOf(call);
   return how && handler && target !== null
-    ? { handler, target, how: how.how, kind: how.framework, ...(route === null ? {} : { route }) }
+    ? { handler, target, how: how.how, kind: how.framework, ...routeField(routeOf(call)) }
     : null;
-}
-
-/**
- * Reads the path a route decorator or registration spells as a literal:
- * its first positional argument, or `path=`.
- *
- * @param expression - the decorator's expression or the registration call.
- * @returns the path, e.g. `/healthz`, or null when it isn't a literal string.
- */
-function routeOf(expression: Node): string | null {
-  return expression.type === "call" ? literalString(argumentAt(expression, 0, "path")) : null;
 }
 
 /**
@@ -297,21 +286,16 @@ function decorated(
       .flatMap((decorator) => namedChildren(decorator).slice(0, 1))
       .map((expression) => ({
         expression,
-        kind: decoratorKind(expression, routers, custom, context),
+        marks: decoratorKind(expression, routers, custom, context),
       }))
-      .find(({ kind }) => kind !== undefined);
-    const kind = marked?.kind;
+      .find(({ marks }) => marks !== undefined);
+    const kind = marked?.marks;
     if (fn && name && marked && kind) {
       const cls = fn.parent?.parent?.parent;
       const owner = cls?.type === "class_definition" ? cls.childForFieldName("name") : null;
       const own = identifierName(name);
-      const route = routeOf(marked.expression);
-      found.push({
-        fn,
-        name: owner ? `${identifierName(owner)}.${own}` : own,
-        kind,
-        ...(route === null ? {} : { route }),
-      });
+      const full = owner ? `${identifierName(owner)}.${own}` : own;
+      found.push({ fn, name: full, kind, ...routeField(routeOf(marked.expression)) });
     }
   }
   return found;
@@ -405,8 +389,7 @@ export function findEndpoints(root: Node, context: EndpointContext): Found {
       registrations.push(registration);
     } else if (fn && registration) {
       const { kind, route } = registration;
-      const name = target.slice(prefix.length);
-      registered.push({ fn, name, kind, ...(route === undefined ? {} : { route }) });
+      registered.push({ fn, name: target.slice(prefix.length), kind, ...routeField(route) });
     }
   }
   const endpoints = unique([...ownEndpoints(root, routers, full), ...registered]);

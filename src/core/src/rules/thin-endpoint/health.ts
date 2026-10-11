@@ -19,6 +19,9 @@ const HEALTH: ReadonlySet<string> = new Set([
   "readiness",
 ]);
 
+/** What separates the words of a name or a path. */
+const SEPARATORS = /[/\-_.]+/u;
+
 /**
  * Splits a name or a path into its words: on `/`, `-`, `_` and `.`, lower-cased.
  *
@@ -28,7 +31,7 @@ const HEALTH: ReadonlySet<string> = new Set([
 function words(text: string): string[] {
   return text
     .toLowerCase()
-    .split(/[/\-_.]+/u)
+    .split(SEPARATORS)
     .filter((word) => word !== "");
 }
 

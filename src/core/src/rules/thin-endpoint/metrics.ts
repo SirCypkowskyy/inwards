@@ -101,11 +101,14 @@ function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp):
 }
 
 /**
- * Tells whether a block answers the request early: at most one bare call
- * (awaited or not) and then a `return`. That is how an HTMX form handler
- * maps an error, `await add_toast(request, "Not found.", "error")` and
- * `return None`, where a JSON API raises (#360). Two calls before the
- * return, or an assignment, are work and count.
+ * Tells whether a block answers the request early: one bare call (awaited
+ * or not) and then a `return`. That is how an HTMX form handler maps an
+ * error, `await add_toast(request, "Not found.", "error")` and `return
+ * None`, where a JSON API raises (#360). A bare `return` with no call stays
+ * counted: Saleor's Django views return `HttpResponseNotFound(...)` from
+ * branches that hold the view's logic, and counting those as guards lost a
+ * true positive. Two calls before the return, or an assignment, are work
+ * and count too.
  *
  * @param statements - the block's statements.
  * @returns true for a toast-and-return or a bare early return.
@@ -113,7 +116,7 @@ function onlyRaisesHttp(block: Node | null | undefined, raisesHttp: RaisesHttp):
 function answersEarly(statements: readonly Node[]): boolean {
   const last = statements.at(-1);
   const before = statements.slice(0, -1);
-  return last?.type === "return_statement" && before.length <= 1 && before.every(bareCall);
+  return last?.type === "return_statement" && before.length === 1 && before.every(bareCall);
 }
 
 /**

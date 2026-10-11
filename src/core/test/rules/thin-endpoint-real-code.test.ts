@@ -29,6 +29,9 @@ from shop.ui import layout
 router = APIRouter()
 `;
 
+/** INW012's closing sentence, which every finding repeats. */
+const TAIL = / Endpoints parse.*$/u;
+
 /**
  * Checks `shop/views.py` with INW012 on and keeps its findings.
  *
@@ -46,7 +49,7 @@ async function inw012(body: string): Promise<string[]> {
   return engine
     .checkFiles([file(path, text)], indexOn(disk, new Map([[path, text]])))
     .filter((d) => d.code === "INW012")
-    .map((d) => `${d.line} ${d.message.replace(/ Endpoints parse.*$/u, "")}`);
+    .map((d) => `${d.line} ${d.message.replace(TAIL, "")}`);
 }
 
 /** A back-office page in the shape of Polar's `email_logs` detail view: a lookup, then markup. */
@@ -138,6 +141,27 @@ async def uninvite(request: Request, id: int) -> Response | None:
     const work = Form.replaceAll('"error")\n', '"error")\n        await audit(id)\n');
     expect(await inw012(work)).toEqual([
       "13 `uninvite` is an HTTP endpoint with 17 statements (max 10) and 3 branches (max 2).",
+    ]);
+  });
+});
+
+describe("INW012 on early returns with no call (#360)", () => {
+  test("a branch that only returns a response still counts", async () => {
+    // Saleor's `handle_original_image`: its error responses sit in the branches that hold the view's work.
+    const view = `
+
+@router.get("/images/{id}")
+async def original(id: str):
+    if not id:
+        return not_found("No id.")
+    if id.startswith("x"):
+        return not_found("Bad id.")
+    if id.endswith("y"):
+        return not_found("Gone.")
+    return redirect(id)
+`;
+    expect(await inw012(view)).toEqual([
+      "13 `original` is an HTTP endpoint with 3 branches (max 2).",
     ]);
   });
 });
