@@ -77,7 +77,7 @@ ${CONFIG_OPTION}
     synopsis: [
       `init --style ${STYLE_NAMES.join("|")}`,
       "     [--scaffold] [--package NAME] [--agent ...] [--dry-run]",
-      `init --agent ${AGENTS.join("|")} [--launcher "uv run"] [--dry-run]`,
+      `init --agent ${AGENTS.join("|")} [--launcher "uv run"] [--shared] [--dry-run]`,
       "init --brief [--dry-run]",
       "init --list-styles [--package NAME]",
     ],
@@ -89,6 +89,8 @@ On a terminal with no flags it asks; elsewhere it needs --style, --agent or --br
 --scaffold: also write the preset's example package; --package NAME names it.
 --agent: wire the hook (claude), the plugin (opencode), the lint command (aider)
 or the instructions (agents-md); --launcher sets the command that runs inwards.
+--shared: with --agent claude, write the hooks into the committed .claude/settings.json
+and the MCP server into .mcp.json; needs --launcher or inwards on PATH.
 --brief: also write the architecture brief into AGENTS.md.
 --dry-run: print the changes instead of writing them.`,
   },

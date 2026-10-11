@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/04-AI-Integration.md
-source_hash: ada7c3eeb98c4e5a16525e04df085c709b4fe7aa8acf2b7253dc5808a2685f44
+source_hash: 5755a7667e14c11f8061fd38fed8b21bdbeb642588cf7f5b3c5f6a75ada76aa1
 ---
 
 # :material-robot-happy-outline: Integracja z AI { #ai-integration }
@@ -52,7 +52,7 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
 
     Claude Code uruchamia [hooki](https://code.claude.com/docs/en/hooks) wokół wywołań narzędzi. Dla `PostToolUse` kod wyjścia 2 nie cofa edycji (ona już się wydarzyła), ale Claude widzi stderr hooka i na nie reaguje. Dla `Stop` kod wyjścia 2 każe Claude'owi dalej pracować zamiast kończyć turę. Dane wejściowe hooka zawierają `stop_hook_active`, a Claude Code i tak kończy turę po kilku kolejnych blokadach, więc zepsuty hook Stop nie może uwięzić sesji.
 
-    Żeby zamiast tego udostępnić konfigurację przez commitowany `.claude/settings.json`, napisz go ręcznie. Ta wersja zakłada, że `inwards` jest w `PATH`:
+    Żeby zamiast tego udostępnić konfigurację przez commitowany `.claude/settings.json`, uruchom `inwards init --agent claude --shared --launcher "uv run"` ([przewodnik](guides/claude-code.md#share-it-with-the-team)). Hooki i reguły deny trafiają wtedy do `.claude/settings.json`, serwer `inwards` uruchamiający `uv run inwards mcp` do `.mcp.json`, a do `.gitignore` tylko `.inwards/`. Commitowane pliki nie mogą zawierać ścieżki z konkretnej maszyny, więc `--shared` przyjmuje launcher albo zapisuje samo `inwards`, gdy jest w `PATH`, a w przeciwnym razie odmawia. Usuwa własne hooki Inwards z `.claude/settings.local.json`, bo Claude Code łączy listy hooków z plików ustawień i uruchamiałyby się dwa razy, i nigdy nie zastępuje własnych hooków zespołu ani serwera MCP `inwards`, który uruchamia coś innego. Bez launchera wynik wygląda tak:
 
     ```json title=".claude/settings.json"
     {
@@ -69,20 +69,24 @@ Sprawdzaniem zajmują się dwa hooki. **Hook dla każdej edycji** daje szybką i
         "PostToolUse": [
           {
             "matcher": "Edit|Write|MultiEdit",
-            "hooks": [
-              {
-                "type": "command",
-                "command": "inwards hook claude-code"
-              }
-            ]
+            "hooks": [{ "type": "command", "command": "inwards hook claude-code" }]
           }
         ],
         "Stop": [
           { "hooks": [{ "type": "command", "command": "inwards hook claude-code" }] }
         ]
+      },
+      "permissions": {
+        "deny": [
+          "Edit(/.claude/settings*.json)",
+          "Edit(/.inwards/**)",
+          "Edit(/**/inwards-baseline.json)"
+        ]
       }
     }
     ```
+
+    Stop gate czyta pliki ustawień użytkownika, projektu i lokalny, więc liczą się hooki w dowolnym z nich.
 
     `inwards hook claude-code` czyta JSON hooka ze stdin, więc nie potrzebuje `jq` ani powłoki POSIX i działa tak samo na Windows. Po `PostToolUse` sprawdza ten jeden plik Pythona, który agent właśnie zapisał:
 
