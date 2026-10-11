@@ -7,7 +7,8 @@
  * from a role import, so those are skipped. Only a callee whose last name
  * starts with a capital letter is followed, as Python names classes; the
  * class must be a top-level `class` of a role module, found through the
- * project index and up to a few re-exports. Another module is read only
+ * project index and up to a few re-exports. An exception class is skipped:
+ * raising one builds no adapter. Another module is read only
  * when it is in the role, in `allowed-in`, or a package above the role
  * whose `__init__.py` may re-export it, once per check of the file. No I/O:
  * the project port reads the modules.
@@ -23,6 +24,36 @@ import type { Construction, Scope } from "./wording.ts";
 
 /** A name Python code gives a class: it starts with a capital letter. */
 const CLASS_NAME = /^\p{Lu}/u;
+
+/**
+ * A name Python code gives an exception class: `StorageError`,
+ * `BusyException`, `DeprecatedWarning`. Code outside the role catches,
+ * raises or maps an adapter's exception to an HTTP status; that builds no
+ * adapter, so neither form reports one. In the #182 corpus run such imports
+ * were 31 of fastapi-clean-example's 48 findings.
+ */
+const EXCEPTION_NAME = /^\p{Lu}\w*(?:Error|Exception|Warning)$/u;
+
+/**
+ * Tells whether the last part of a dotted name looks like an exception class.
+ *
+ * @param dotted - a qualified or written name, e.g. `app.adapters.errors.StorageError`.
+ * @returns true when its last part ends in `Error`, `Exception` or `Warning`.
+ */
+export function isExceptionName(dotted: string): boolean {
+  return EXCEPTION_NAME.test(dotted.split(".").at(-1) ?? "");
+}
+
+/**
+ * Tells whether a callee's last name may build an adapter: a class name
+ * that isn't an exception's.
+ *
+ * @param name - the last name of the callee, e.g. `SqlRepo`.
+ * @returns true for `SqlRepo`, false for `make_repo` and `StorageError`.
+ */
+function buildsAdapter(name: string): boolean {
+  return CLASS_NAME.test(name) && !isExceptionName(name);
+}
 
 /** What the call form keeps of another module: its imports and its top-level classes. */
 interface ClassView extends ModuleNames {
@@ -141,7 +172,7 @@ export function constructions(tree: Tree, src: SourceFile, inputs: CallInputs): 
       const callee = call.childForFieldName("function");
       const last = callee?.type === "attribute" ? callee.childForFieldName("attribute") : callee;
       const qualified = callee ? qualify(callee) : null;
-      if (!(callee && last && qualified && CLASS_NAME.test(identifierName(last)))) {
+      if (!(callee && last && qualified && buildsAdapter(identifierName(last)))) {
         return [];
       }
       if (coveredBy(qualified, covered) || project.ownerOf(qualified) === src.module) {

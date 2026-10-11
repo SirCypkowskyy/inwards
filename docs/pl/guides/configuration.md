@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 7e0c4f79bcad19696e4c1bfc78a3fa75a16750ff5f2ff622e00c0ffea861490f
+source_hash: 435794c93fa5f9b914b271eb0ae4690db4792bbe805b5a46d1e03047d507e38b
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -396,7 +396,7 @@ Szablon, z którego nikt nie korzysta, jest dozwolony. Cztery presety zapisują 
 
 Typ: lista wartości `"modules"` i `"contexts"`. Domyślnie: `["contexts"]`.
 
-Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu całego projektu: między kontekstami, między modułami, jedne i drugie albo żadne (`[]`). Wartość domyślna ma znaczenie dopiero wtedy, gdy zadeklarowano `contexts`, więc aktualizacja nie psuje projektu, który żyje z cyklami modułów; dodaj `"modules"`, żeby wyłapywać także je.
+Które cykle importów zgłasza [INW004](../rules/INW004.md) przy sprawdzaniu całego projektu: między kontekstami, między modułami, jedne i drugie albo żadne (`[]`). Wartość domyślna ma znaczenie dopiero wtedy, gdy zadeklarowano `contexts`, więc aktualizacja nie psuje projektu, który żyje z cyklami modułów; dodaj `"modules"`, żeby wyłapywać także je. Każdy preset `inwards init --style` zapisuje `["modules", "contexts"]` ([Instalacja](install.md#a-new-project-start-from-a-preset)).
 
 <!-- config: fragment -->
 
@@ -409,14 +409,14 @@ cycles = ["modules", "contexts"]
 
 Typ: lista ścieżek. Domyślnie: brak.
 
-Pliki Markdown i Mermaid, których diagramy architektury [INW017](../rules/INW017.md) sprawdza względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`: blok kodu `mermaid` w pliku Markdown albo cały plik `.mmd` lub `.mermaid`. Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. INW017 to reguła opt-in, więc włącz ją przez `extend-select`. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
+Pliki Markdown i Mermaid, których diagramy architektury [INW017](../rules/INW017.md) (nazwy) i [INW018](../rules/INW018.md) (strzałki) sprawdzają względem `[tool.inwards]` i kodu przy sprawdzaniu całego projektu. Każdy wpis to ścieżka względem pliku pyproject.toml; segment może używać `*`, `?` i `[seq]`, a `**` oznacza dowolną liczbę katalogów. Wpis nie może być ścieżką bezwzględną ani wychodzić wyżej przez `..`. W wymienionym pliku czytany jest tylko `flowchart` albo `graph` w Mermaid, który zaczyna się od `%% inwards: layers` albo `%% inwards: contexts`: blok kodu `mermaid` w pliku Markdown albo cały plik `.mmd` lub `.mermaid`. Diagram jest sprawdzany, a nigdy nie jest czytany jako konfiguracja. Obie reguły są opt-in, więc włącz je przez `extend-select`; [`inwards import-diagram`](diagrams.md#import-diagram) zapisuje pierwszą `[tool.inwards]` na podstawie diagramu. Szczegóły w [ADR-045](../05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config).
 
 <!-- config: fragment -->
 
 ```toml
 [tool.inwards]
 diagrams = ["docs/architecture.md", "docs/**/*.mmd"]
-rules = { extend-select = ["INW017"] }
+rules = { extend-select = ["INW017", "INW018"] }
 ```
 
 ## Monorepo i workspace'y uv { #monorepos }

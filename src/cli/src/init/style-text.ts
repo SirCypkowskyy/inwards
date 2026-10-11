@@ -1,7 +1,7 @@
 /**
  * @file The text a preset turns into: the `[tool.inwards]` table
  * `inwards init --style` writes (layers with sibling groups and templates,
- * the templates, the rules it turns off or on, its contexts and, with `--scaffold`,
+ * module and context cycles turned on, the templates, the rules it turns off or on, its contexts and, with `--scaffold`,
  * its shapes), the `--list-styles` listing, and the annotated tree init and
  * the picker draw. Pure: what is on disk comes in through a callback.
  */
@@ -19,6 +19,18 @@ import {
 import { roleDenies, templateNotes, templateRulesLines } from "./template-text.ts";
 
 export const MISSING = "(missing)";
+
+/**
+ * Every preset turns on INW004 for module cycles as well as context cycles
+ * (#340). ADR-032 keeps modules off by default so an upgrade doesn't fail a
+ * project that lives with cycles; a project init sets up has no such history.
+ * The linear presets keep `"contexts"` too, so contexts added later are
+ * covered without editing the list.
+ */
+const CYCLES: readonly string[] = [
+  "# INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.",
+  `cycles = ${array(["modules", "contexts"])}`,
+];
 
 /**
  * What a module below the package is: on disk as a file or a directory,
@@ -348,6 +360,7 @@ export function configTable(
     `root = ${JSON.stringify(opts.root)}`,
     `required-version = ${JSON.stringify(opts.version)}`,
     `ignore = ${array(opts.ignore)}`,
+    ...CYCLES,
     "layers = [",
     ...layerLines(style, opts.pkg),
     "]",

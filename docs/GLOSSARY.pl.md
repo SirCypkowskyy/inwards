@@ -28,7 +28,7 @@ same PR that first needs it.
   text and captions, Mermaid labels that are prose (node and edge labels,
   subgraph titles), `aria-label`s, and hand-written SVG text on the pages.
   A diagram marked `%% inwards: layers` or `%% inwards: contexts` is a code
-  block that INW017 reads: its ids and quoted labels (module prefixes) stay
+  block that INW017 and INW018 read: its ids and quoted labels (module prefixes) stay
   as written.
 - **Cross-links** inside `docs/pl/` point to Polish pages (same relative
   paths as in English). Images, CSS and scripts come from the English site:
@@ -66,7 +66,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | wildcard (`*`, `**` in a module name) | wildcard (wildcardu, wildcardy) | import-linter's module patterns |
 | preset | preset | `--style` presets |
 | Layer names | `domain`, `application`, `infrastructure`, `interface`, `bootstrap`, ... | when they name a configured layer; the generic concept is translated, see below |
-| Rule codes | INW000, INW001, ... INW017, FAPI001, ... | |
+| Rule codes | INW000, INW001, ... INW018, FAPI001, ... | |
 | Rule names | `package-shape`, `missing-member` | |
 | Naming styles | lower_case_snake, snake case, camel case | INW016's table and column schemes |
 | front matter, OKF | front matter, OKF | the rule pages' metadata block and its format; its keys (`autofix`, `suppressible`...) stay as written |
@@ -100,6 +100,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | allowlist, deny list (`allow-libraries`, `deny-libraries`, `extend-deny-libraries`) | lista dozwolonych, lista zakazów |
 | agent, coding agent, AI agent | agent, agent kodujący, agent AI |
 | agent loop | pętla agenta |
+| annotation (GitHub Actions) | adnotacja |
 | architecture linter | linter architektury |
 | architecture brief (`inwards context`, `init --brief`) | opis architektury (brief) |
 | binary (the executable) | plik binarny |
@@ -118,6 +119,8 @@ baseline'u); multi-word names are left uninflected where possible.
 | thread, worker thread (ADR-040) | wątek, wątek roboczy (worker); the main thread: wątek główny |
 | extraction job | zadanie ekstrakcji |
 | corpus | korpus |
+| precision (of a rule), true positive, false positive | precyzja, trafne zgłoszenie, fałszywy alarm |
+| sample, sampled precision | próba, precyzja w próbie |
 | compiled extension (`.so`, `.pyd`) | skompilowany moduł rozszerzenia (not "rozszerzenie", which is the VS Code extension) |
 | config, configuration | konfiguracja |
 | contract (import-linter) | kontrakt |
@@ -216,9 +219,15 @@ baseline'u); multi-word names are left uninflected where possible.
 | singular, plural | liczba pojedyncza, liczba mnoga |
 | mass noun | rzeczownik niepoliczalny |
 | migration (Alembic) | migracja |
+| loader option (SQLAlchemy `joinedload`, `selectinload`) | opcja ładowania (loader option) |
+| server-rendered HTML | HTML renderowany na serwerze |
 | architecture diagram, marked diagram (INW017) | diagram architektury, oznaczony diagram |
 | marker comment (`%% inwards: layers`) | komentarz-znacznik, znacznik |
 | node, edge, link (Mermaid) | węzeł, krawędź |
+| solid arrow, dotted link (Mermaid; INW018) | ciągła strzałka, przerywana krawędź |
+| forbidden edge (INW018) | zabroniona krawędź |
+| head, tail (of an arrow) | grot, początek (strzałki) |
+| round trip (`import-diagram`, then `check`) | test w obie strony |
 | subgraph (Mermaid) | subgraph (subgraphu, subgraphy) |
 | label, caption (of a node) | etykieta, podpis |
 | docs drift (a diagram that no longer matches the config) | rozjazd dokumentacji |
@@ -292,6 +301,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | violation | naruszenie |
 | wall time | czas rzeczywisty |
 | warning | ostrzeżenie |
+| workflow command (GitHub Actions, `::error`) | polecenie workflow |
 | workspace (uv) | workspace (uv) |
 | workspace package (a uv workspace member, INW005) | pakiet workspace'u |
 | workspace (editor, VS Code) | obszar roboczy |

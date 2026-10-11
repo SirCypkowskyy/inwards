@@ -11,13 +11,13 @@
  * `init/import-linter/`; this module only reads, picks the root and writes.
  */
 import { basename, dirname, join, resolve } from "node:path";
-import { ConfigError, declaresInwards, parseConfig } from "@inwards/core";
+import { ConfigError } from "@inwards/core";
 import { convert } from "../init/import-linter/convert.ts";
 import { type LinterConfig, readIni, readToml } from "../init/import-linter/read.ts";
 import { renderReport, renderToml } from "../init/import-linter/render.ts";
-import { separator } from "../init/style.ts";
 import { shown, sourceRoot } from "../init/target.ts";
 import { print } from "../platform/print.ts";
+import { appendTable, type Pyproject, parsedTable } from "./append-table.ts";
 import type { AppDeps } from "./deps.ts";
 
 /** Where `lint-imports` looks, in its order: the INI files first. */
@@ -30,7 +30,7 @@ interface Converted {
   /** The per-contract report. */
   report: string;
   /** The pyproject.toml beside the import-linter config, and its text if it exists. */
-  pyproject: { path: string; text: string | undefined };
+  pyproject: Pyproject;
 }
 
 /**
@@ -65,7 +65,7 @@ export function importConfigCommand(
     io.streams.err(`${result.report}\n`);
     return 0;
   }
-  const problem = writeTable(deps, result);
+  const problem = appendTable(deps, result.pyproject, result.table, "import-config");
   if (problem !== undefined) {
     return print(io.streams, `inwards import-config: ${problem}`, 2);
   }
@@ -98,40 +98,12 @@ function converted(deps: AppDeps, file: string | undefined): Converted | string 
   const first = found.config.rootPackages[0] ?? conversion.draft.layers[0]?.[0]?.modules[0] ?? "";
   const root = sourceRoot({ ...io, toml: deps.init.toml }, project, first, text ?? "");
   const table = renderToml(conversion.draft, { source: basename(found.path), root });
-  const check = parsed(table);
+  const check = parsedTable(table);
   if (check instanceof ConfigError) {
     return `the converted table doesn't parse (${check.message}); please report this with your import-linter config.`;
   }
   const report = renderReport(conversion.outcomes, shown(io.runtime.cwd, found.path));
   return { table, report, pyproject: { path, text } };
-}
-
-/**
- * Appends the table to pyproject.toml, one blank line after the rest, in the
- * file's own line endings. Refuses when there is no pyproject.toml, when it
- * already configures Inwards, or when the result wouldn't read back as the table.
- *
- * @param deps - the platform and init's file writer.
- * @param result - the table and the pyproject.toml to add it to.
- * @returns undefined once written, or why it wasn't.
- * @throws when the file can't be written.
- */
-function writeTable(deps: AppDeps, result: Converted): string | undefined {
-  const { path, text } = result.pyproject;
-  const where = shown(deps.io.runtime.cwd, path);
-  if (text === undefined) {
-    return `there is no ${where} to write to; run without --write and save the table yourself.`;
-  }
-  if (declaresInwards(text)) {
-    return `${where} already has [tool.inwards], and import-config never overwrites it. Run without --write and merge the table by hand.`;
-  }
-  const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const after = `${text}${separator(text, eol)}${result.table.replaceAll("\n", eol)}`;
-  if (JSON.stringify(parsed(after)) !== JSON.stringify(parsed(result.table))) {
-    return `could not add [tool.inwards] to ${where} safely; add this table by hand:\n${result.table}`;
-  }
-  deps.init.files.write(path, after);
-  return undefined;
 }
 
 /**
@@ -167,23 +139,4 @@ function findLinterConfig(
   return file === undefined
     ? `no import-linter config in ${CANDIDATES.join(", ")} here.`
     : `${file}: no such file, or no [importlinter] or [tool.importlinter] section in it.`;
-}
-
-/**
- * Parses a config, keeping the parts the conversion writes, so two texts can be compared.
- *
- * @param text - TOML holding `[tool.inwards]`.
- * @returns the parsed root, layers, contexts and ignores, or the config error.
- * @throws when parsing fails with anything but a ConfigError.
- */
-function parsed(text: string): object | ConfigError {
-  try {
-    const { layers, contexts, ignore, root } = parseConfig(text);
-    return { layers, contexts, ignore, root };
-  } catch (err) {
-    if (err instanceof ConfigError) {
-      return err;
-    }
-    throw err;
-  }
 }

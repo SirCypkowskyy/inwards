@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 512a7a4ae3936fe9b04a038cd750f10491974db3e1e49fa58aeb070eb9b91fcc
+source_hash: 87901a1f553feb268654cd9ec26d4e7b150ae1f0bd73bc9084151fba6d3cfdfb
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -126,7 +126,7 @@ Wyciszenie bez powodu, z nieznanym kodem albo w złej postaci niczego nie ukrywa
 
     ---
 
-    Jeden plik wykonywalny skompilowany Bunem. Wrzuć go do CI, do hooka pre-commit albo do hooka agenta, albo dodaj go przez `uv add --dev` jako wheel platformowy z plikiem binarnym w środku.
+    Jeden plik wykonywalny skompilowany Bunem. Wrzuć go do [CI](guides/ci.md), do [hooka pre-commit](guides/ci.md#pre-commit) albo do hooka agenta, albo dodaj go przez `uv add --dev` jako wheel platformowy z plikiem binarnym w środku.
 
 -   :material-microsoft-visual-studio-code:{ .lg .middle } __Te same reguły w edytorze__
 

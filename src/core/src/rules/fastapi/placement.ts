@@ -98,11 +98,14 @@ export function declaredBy(call: CallSyntax, scope: FastApiProject): ReadonlySet
  *
  * @param call - a decorator, constructor or `include_router` call.
  * @returns true unless `include_in_schema=` is absent or a literal `True`;
- *   also true when a `**kwargs` may set it, since that is unknown.
+ *   true for an app built with `openapi_url=None`, which serves no schema at
+ *   all (Polar's server-rendered backoffice, #182 corpus run); also true when
+ *   a `**kwargs` may set either, since that is unknown.
  */
 export function hiddenBy(call: CallSyntax): boolean {
   const value = call.keywords.get("include_in_schema")?.value;
-  return call.splat || (value !== undefined && !(value.kind === "bool" && value.value));
+  const noSchema = call.keywords.get("openapi_url")?.value.kind === "none";
+  return call.splat || noSchema || (value !== undefined && !(value.kind === "bool" && value.value));
 }
 
 /**
