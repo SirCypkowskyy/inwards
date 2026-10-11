@@ -23,6 +23,7 @@ import { checkLayers } from "../rules/layer-dependency.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
 import { checkPublicApi } from "../rules/public-api-only.ts";
 import { checkLibraries, coversModule, type LibraryInputs } from "../rules/pure-domain.ts";
+import { ModuleTrees } from "../rules/shared/first-party.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
 import {
@@ -158,12 +159,17 @@ export class Engine {
   checkFile(file: SourceFile, project: ProjectIndex): Diagnostic[] {
     const src = { ...file, text: normalizeSource(file.text) };
     const wired = fastApiFindings(this.parser, project, [src], { config: this.config, edit: true });
-    const confirmed = withFound(
-      withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
-      contentFindings(this.parser, src, this.config, project),
-    );
-    const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
-    return applyRules(kept, this.config.rules);
+    const trees = new ModuleTrees(this.parser, project);
+    try {
+      const confirmed = withFound(
+        withFastApi(this.confirm(src, this.scan(src, project), project), src, wired),
+        contentFindings(this.parser, src, this.config, trees),
+      );
+      const kept = this.suppressIn(src, confirmed).kept.filter((d) => !wired.hidden.has(d));
+      return applyRules(kept, this.config.rules);
+    } finally {
+      trees.dispose();
+    }
   }
 
   /**

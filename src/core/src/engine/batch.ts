@@ -19,6 +19,7 @@ import type {
   Suppressed,
 } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
+import { ModuleTrees } from "../rules/shared/first-party.ts";
 import { contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import type { Extractor } from "./extraction.ts";
@@ -207,19 +208,25 @@ function finish(
   const collected: Collected[] = [];
   const sources = scanned.map(({ src }) => src);
   const wired = fastApiFindings(steps.parser, project, sources, { config, edit });
-  for (const { src, scan } of scanned) {
-    const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));
-    const imports = confirmed.imports ?? scan.imports;
-    if (imports !== undefined) {
-      collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
+  // One parse per first-party module the content rules follow into, for the whole run (#359).
+  const trees = new ModuleTrees(steps.parser, project);
+  try {
+    for (const { src, scan } of scanned) {
+      const confirmed = steps.confirm(src, scan, project, hidden.has(src.module));
+      const imports = confirmed.imports ?? scan.imports;
+      if (imports !== undefined) {
+        collected.push({ file: src, imports, exact: confirmed.imports !== undefined });
+      }
+      const extra = withFound(
+        withFastApi(confirmed, src, wired),
+        contentFindings(steps.parser, src, config, trees),
+      );
+      const own = steps.suppressIn(src, extra);
+      suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
+      all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
     }
-    const extra = withFound(
-      withFastApi(confirmed, src, wired),
-      contentFindings(steps.parser, src, config, project),
-    );
-    const own = steps.suppressIn(src, extra);
-    suppressed.push(...own.suppressed.filter(({ diagnostic }) => !wired.hidden.has(diagnostic)));
-    all.push(...keptOnce(own.kept, warned).filter((d) => !wired.hidden.has(d)));
+  } finally {
+    trees.dispose();
   }
   if (whole) {
     all.push(

@@ -3,17 +3,16 @@
  * module, for INW012 (#271): `router.add_api_route("/x", views.create_order)`
  * leads through `ProjectIndex` to `create_order` in `shop/api/views.py`,
  * following re-exports (`from .views import create_order` in an
- * `__init__.py`). Reading and parsing those modules, once per check of the
- * registering file, is `rules/shared/first-party.ts`'s job; this reads them
+ * `__init__.py`). Reading and parsing those modules, once per run, is
+ * `rules/shared/first-party.ts`'s job; this reads them
  * as INW012's file views. A handler that isn't first-party, isn't a
  * module-level function, or is an endpoint in its own module (where its own
  * check reports it) is not returned. It also tells what kind of view a base
  * class from another first-party module is (#270), through that module's own
  * bases.
  */
-import type { Node, Parser } from "web-tree-sitter";
-import type { ProjectIndex } from "../../lookup/project-index.ts";
-import { ParsedModules } from "../shared/first-party.ts";
+import type { Node } from "web-tree-sitter";
+import { type ModuleTrees, ParsedModules } from "../shared/first-party.ts";
 import { nameMatcher } from "../shared/name-patterns.ts";
 import { viewKind } from "./classes.ts";
 import { frameworksIn, type ViewKind } from "./frameworks.ts";
@@ -30,8 +29,8 @@ export interface RemoteHandler {
 }
 
 /**
- * The other modules one file's registrations name, parsed on demand. Build
- * one per check of a file and call `dispose()` when done.
+ * The other modules one file's registrations name, read on demand. Build
+ * one per check of a file.
  */
 export class RemoteModules {
   private readonly modules: ParsedModules<FileView>;
@@ -40,16 +39,14 @@ export class RemoteModules {
   private readonly resolving = new Set<string>();
 
   /**
-   * Wraps the parser and the project index. Nothing is read yet.
+   * Wraps the run's first-party modules. Nothing is read yet.
    *
-   * @param parser - parser with the Python grammar loaded.
-   * @param project - the project's module index, which reads files on demand.
+   * @param project - the run's first-party modules, parsed once each.
    * @param recognise - the configured decorators, base classes and frameworks, so a handler module's own endpoints are known.
    */
-  constructor(parser: Parser, project: ProjectIndex, recognise: Recognise) {
+  constructor(project: ModuleTrees, recognise: Recognise) {
     this.recognise = recognise;
     this.modules = new ParsedModules(
-      parser,
       project,
       (tree, src): FileView =>
         fileView(tree, src, recognise, (q: string): ViewKind | undefined => this.baseKind(q)),
@@ -102,10 +99,5 @@ export class RemoteModules {
     } finally {
       this.resolving.delete(target);
     }
-  }
-
-  /** Frees every tree read so far; the views and nodes handed out are invalid afterwards. */
-  dispose(): void {
-    this.modules.dispose();
   }
 }

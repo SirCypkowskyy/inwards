@@ -21,7 +21,7 @@ import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { parsePython } from "../../python/parser.ts";
 import { parameterTypes } from "../shared/annotations.ts";
-import type { FirstPartySource } from "../shared/first-party.ts";
+import type { ModuleTrees } from "../shared/first-party.ts";
 import { configuredFamily, FAMILIES, type Family, LIBRARIES } from "./catalog.ts";
 import { Helpers } from "./hop.ts";
 import { functionReceivers } from "./receivers.ts";
@@ -117,31 +117,28 @@ function checkFunction(fn: Node, walk: Walk, helpers: Helpers): Diagnostic[] {
  * @param parser - parser with the Python grammar loaded.
  * @param src - the file, with normalised text.
  * @param options - `[tool.inwards.rules.async-blocking]`, if set.
- * @param project - finds and reads the first-party modules a hop leads to.
+ * @param project - the run's first-party modules, which a hop reads.
  * @returns the findings in source order, before suppressions and severities apply.
  */
 export function checkAsyncBlocking(
   parser: Parser,
   src: SourceFile,
   options: RuleOptions | undefined,
-  project: FirstPartySource,
+  project: ModuleTrees,
 ): Diagnostic[] {
   const settings = settingsOf(options);
   if (!mayBlock(src.text, settings)) {
     return [];
   }
   const tree = parsePython(parser, src.text);
-  let helpers: Helpers | undefined;
   try {
     const walk = walkOf(tree, src, settings.families);
-    const hops = new Helpers(parser, walk, { project, modules: settings.follow });
-    helpers = hops;
+    const hops = new Helpers(walk, { project, modules: settings.follow });
     return functionsIn(tree.rootNode)
       .filter(isAsync)
       .flatMap((fn) => checkFunction(fn, walk, hops))
       .sort((a, b) => a.line - b.line || a.column - b.column);
   } finally {
-    helpers?.dispose();
     tree.delete(); // WASM memory is not garbage collected
   }
 }

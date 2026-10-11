@@ -9,16 +9,16 @@
  * reported on its `def` line; a handler another first-party module defines
  * is reported on the registration that names it. A file that mentions no
  * framework and no configured decorator is never parsed. I/O-free: the
- * caller supplies the parser, the file, the config and the project index,
- * which reads a handler's module only when a registration names it.
+ * caller supplies the parser, the file, the config and the run's
+ * first-party modules, read only when a registration names one.
  */
 import type { Node, Parser } from "web-tree-sitter";
 import type { LayerSpec } from "../../config/layers.ts";
 import type { RuleOptions } from "../../config/rule-settings.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
-import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { parsePython } from "../../python/parser.ts";
+import type { ModuleTrees } from "../shared/first-party.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./endpoints.ts";
 import type { Kind } from "./frameworks.ts";
@@ -34,8 +34,8 @@ export interface ThinInputs {
   readonly options: RuleOptions | undefined;
   /** The configured layers, innermost first, for `delegate-to` and the fix steps. */
   readonly layers: readonly LayerSpec[];
-  /** The project's module index, which a registration of another module's handler reads. */
-  readonly project: ProjectIndex;
+  /** The run's first-party modules, which a registration of another module's handler reads. */
+  readonly project: ModuleTrees;
 }
 
 /** Where a finding for a handler in another module goes, and how it was registered. */
@@ -140,7 +140,7 @@ export function checkThinEndpoints(
     return [];
   }
   const tree = parsePython(parser, src.text);
-  const remote = new RemoteModules(parser, inputs.project, settings.recognise);
+  const remote = new RemoteModules(inputs.project, settings.recognise);
   try {
     const view = fileView(tree, src, settings.recognise, (q) => remote.baseKind(q));
     const context = {
@@ -157,7 +157,6 @@ export function checkThinEndpoints(
     });
     return [...own, ...registered].sort((a, b) => a.line - b.line || a.column - b.column);
   } finally {
-    remote.dispose();
     tree.delete(); // WASM memory is not garbage collected
   }
 }
