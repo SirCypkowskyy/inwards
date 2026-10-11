@@ -14,7 +14,9 @@ import {
   STYLE_NAMES,
   type Style,
   type StyleLayer,
+  type StyleOptIn,
 } from "./styles.ts";
+import { roleDenies, templateNotes, templateRulesLines } from "./template-text.ts";
 
 export const MISSING = "(missing)";
 
@@ -134,6 +136,7 @@ export function describeStyles(pkg: string): string {
         : [
             `  Turns on ${style.optIn.codes.join(", ")} as ${style.optIn.codes.length === 1 ? "a warning" : "warnings"}.`,
           ]),
+      ...templateNotes(style, pkg),
       `  Gap: ${style.gap}.`,
       "  Shapes, with --scaffold:",
       ...describeShapes(style.shapes, pkg),
@@ -201,6 +204,7 @@ function extraLines(style: Style, pkg: string, scaffold: boolean): string[] {
       lines.push(`roles = ${array(roleRanks(template.roles))}`);
     }
     lines.push(`public = ${array(template.public)}`);
+    lines.push(...templateRulesLines(template));
   }
   lines.push(...rulesLines(style, pkg));
   const { contexts } = style;
@@ -242,8 +246,8 @@ function roleRanks(roles: readonly { name: string; sibling?: true }[]): string[]
 /**
  * Writes `[tool.inwards.rules]`: the rules the preset turns off, the opt-in
  * rules it turns on, a severity table that makes each of them a warning (one
- * line per rule, so a user deletes a line to report the rule at its own severity again), and their
- * options tables.
+ * line per rule, so a user deletes a line to report the rule at its own severity again), their
+ * options tables, and the libraries its templates deny to some roles (INW005's `deny`).
  *
  * @param style - the preset.
  * @param pkg - the project's import package, for options that name modules.
@@ -251,24 +255,49 @@ function roleRanks(roles: readonly { name: string; sibling?: true }[]): string[]
  */
 function rulesLines(style: Style, pkg: string): string[] {
   const { ignoreRules: off, optIn: on } = style;
-  if (off === undefined && on === undefined) {
+  const denies = roleDenies(style, pkg);
+  if (off === undefined && on === undefined && denies.length === 0) {
     return [];
   }
   const lines = ["", "[tool.inwards.rules]"];
   if (off !== undefined) {
     lines.push(`# ${off.why}`, `ignore = ${array(off.codes)}`);
   }
-  if (on === undefined) {
-    return lines;
+  if (on !== undefined) {
+    lines.push(...optInLines(on, pkg));
   }
-  lines.push(
+  if (denies.length > 0) {
+    lines.push(
+      "",
+      ...denies.map((deny) => `# ${deny.why}`),
+      "[tool.inwards.rules.pure-domain]",
+      "deny = [",
+      ...denies.map(
+        (deny) => `  { modules = ${array(deny.modules)}, libraries = ${array(deny.libraries)} },`,
+      ),
+      "]",
+    );
+  }
+  return lines;
+}
+
+/**
+ * Writes the opt-in rules a preset turns on: `extend-select`, a severity
+ * table making each a warning, and their options tables.
+ *
+ * @param on - the preset's opt-in rules.
+ * @param pkg - the project's import package, for options that name modules.
+ * @returns the lines, to follow the `[tool.inwards.rules]` header.
+ */
+function optInLines(on: StyleOptIn, pkg: string): string[] {
+  const lines = [
     `# ${on.why}`,
     `extend-select = ${array(on.codes)}`,
     "",
     "# Delete a line to report that rule at its own severity, an error for most findings.",
     "[tool.inwards.rules.severity]",
     ...on.codes.map((code) => `${code} = "warning"`),
-  );
+  ];
   for (const table of on.options) {
     const options = typeof table.lines === "function" ? table.lines(pkg) : table.lines;
     lines.push("", `# ${table.why}`, `[tool.inwards.rules.${table.rule}]`, ...options);
