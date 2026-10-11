@@ -16,10 +16,10 @@ concurrency:
 jobs:
   bench:
     name: Performance against the base branch
-    runs-on: [self-hosted, linux, ARM64, inwards] # dellpromaxgb10, ops/runner
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-24.04-arm' || fromJSON('["self-hosted","linux","ARM64","inwards"]') }} # forks: GitHub-hosted (#333)
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       # Each side is built with its own Bun, so a PR that bumps .bun-version is
@@ -31,7 +31,7 @@ jobs:
         run: |
           git worktree prune
           git worktree add "$RUNNER_TEMP/base" "$BASE"
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: ${{ runner.temp }}/base/.bun-version
       - name: Build the base branch's binary
@@ -40,7 +40,7 @@ jobs:
           bun install --frozen-lockfile
           bun run scripts/build-binaries.ts bun-linux-arm64
           cp dist/inwards-linux-arm64 "$RUNNER_TEMP/base-inwards"
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: .bun-version
       - name: Build the PR's binary
@@ -55,7 +55,7 @@ jobs:
         run: |
           bun run bench/compare.ts --base "$RUNNER_TEMP/base-inwards" --head "$RUNNER_TEMP/head-inwards" \
             --repo "$RUNNER_TEMP/inwards-bench" --out bench-result.json | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: bench-result
