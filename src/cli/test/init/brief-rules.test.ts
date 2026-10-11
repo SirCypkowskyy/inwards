@@ -132,6 +132,17 @@ router = { async-blocking = true }
     );
   });
 
+  test("says Protocol ports, and no subclassing, when INW014's options say so", () => {
+    const on =
+      '[tool.inwards.rules]\nextend-select = ["INW014"]\n[tool.inwards.rules.ports-abstract]\n';
+    expect(withRules(`${on}interface = "protocol"\n`)).toEndWith(
+      "- INW014: `ports` modules hold only `typing.Protocol` classes whose methods have no body",
+    );
+    expect(withRules(`${on}interface = "protocol"\nallow-subclassing = false\n`)).toContain(
+      "- INW014: `ports` modules hold only `typing.Protocol` classes whose methods have no body; adapters never subclass them",
+    );
+  });
+
   test("leaves out INW015 without a role, since it then checks nothing", () => {
     expect(withRules('[tool.inwards.rules]\nextend-select = ["INW015"]\n')).not.toContain("INW015");
   });

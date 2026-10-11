@@ -389,9 +389,9 @@ app.include_router(make_auth_router())
     ]);
   });
 
-  test("FAPI005 doesn't read route order on a router a first-party class builds", async () => {
-    // Polar's VersionedAPIRoute dispatches two routes with one method and path by API version.
-    expect(await shadowed(twice("from app.routing import APIRouter"))).toBe(0);
+  test("FAPI005 reads route order on a first-party router class whose route class is FastAPI's", async () => {
+    // #392 reads the route class: only one that overrides `matches` (Polar's VersionedAPIRoute) hides the order.
+    expect(await shadowed(twice("from app.routing import APIRouter"))).toBe(1);
     expect(await shadowed(twice("from fastapi import APIRouter"))).toBe(1);
   });
 });

@@ -196,6 +196,13 @@ const namePatterns = listMatching(
   'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
 );
 
+/** The bases and decorators that exempt a class from INW014 and INW020. */
+const EXEMPT_CLASSES: Readonly<Record<string, OptionParser>> = {
+  "allow-bases": namePatterns,
+  "extend-allow-bases": namePatterns,
+  "allow-decorators": namePatterns,
+};
+
 /** The keys of one entry of INW005's `deny`. */
 const DENY_KEYS: ReadonlySet<string> = new Set(["modules", "libraries"]);
 
@@ -308,17 +315,12 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
       moduleEntries(value, where, true),
   },
   "ports-abstract": {
-    "allow-bases": namePatterns,
-    "extend-allow-bases": namePatterns,
-    "allow-decorators": namePatterns,
+    ...EXEMPT_CLASSES,
+    interface: oneOf(["any", "protocol"]),
+    "allow-subclassing": boolean,
   },
   "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
-  "adapter-conformance": {
-    ports: moduleEntries,
-    "allow-bases": namePatterns,
-    "extend-allow-bases": namePatterns,
-    "allow-decorators": namePatterns,
-  },
+  "adapter-conformance": { ports: moduleEntries, ...EXEMPT_CLASSES },
   "orm-naming": {
     "table-name": oneOf(["snake", "snake_singular", false]),
     "datetime-suffix": suffix,

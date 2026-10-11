@@ -98,7 +98,11 @@ export function checkEndpointMetadata(
     const shown = gaps.filter(
       (g) => g.noun !== "tags" || placed?.tagged === false || object.kind === "app",
     );
-    return shown.length === 0 || placed?.hidden ? [] : [report(op, src, shown)];
+    if (shown.length === 0 || placed?.hidden) {
+      return [];
+    }
+    // A route class may keep the route out of the schema by its tags (#392).
+    return scope.routeClasses.visibility(op, object) === "shown" ? [report(op, src, shown)] : [];
   });
 }
 

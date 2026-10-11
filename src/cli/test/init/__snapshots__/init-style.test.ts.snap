@@ -128,7 +128,7 @@ layers = [
 ]
 
 [tool.inwards.rules]
-# Port modules hold only ABCs and Protocols (INW014), only bootstrap imports and builds the driven adapters (INW015), and each driven adapter declares its port under TYPE_CHECKING (INW020), as warnings to start with: make them errors once the project is clean.
+# Port modules hold only Protocols, which adapters never subclass (INW014), only bootstrap imports and builds the driven adapters (INW015), and each driven adapter declares its port under TYPE_CHECKING (INW020), as warnings to start with: make them errors once the project is clean.
 extend-select = ["INW014", "INW015", "INW020"]
 
 # Delete a line to report that rule at its own severity, an error for most findings.
@@ -136,6 +136,11 @@ extend-select = ["INW014", "INW015", "INW020"]
 INW014 = "warning"
 INW015 = "warning"
 INW020 = "warning"
+
+# Ports are typing.Protocol classes, never ABCs, and adapters implement them without subclassing them.
+[tool.inwards.rules.ports-abstract]
+interface = "protocol"
+allow-subclassing = false
 
 # The driven adapters, and the composition root, the one module that may import and build them.
 [tool.inwards.rules.construct-only-in]
@@ -230,7 +235,7 @@ layers = [
 ]
 
 [tool.inwards.rules]
-# Port modules hold only ABCs and Protocols (INW014), only bootstrap imports and builds the driven adapters (INW015), and each driven adapter declares its port under TYPE_CHECKING (INW020), as warnings to start with: make them errors once the project is clean.
+# Port modules hold only Protocols, which adapters never subclass (INW014), only bootstrap imports and builds the driven adapters (INW015), and each driven adapter declares its port under TYPE_CHECKING (INW020), as warnings to start with: make them errors once the project is clean.
 extend-select = ["INW014", "INW015", "INW020"]
 
 # Delete a line to report that rule at its own severity, an error for most findings.
@@ -238,6 +243,11 @@ extend-select = ["INW014", "INW015", "INW020"]
 INW014 = "warning"
 INW015 = "warning"
 INW020 = "warning"
+
+# Ports are typing.Protocol classes, never ABCs, and adapters implement them without subclassing them.
+[tool.inwards.rules.ports-abstract]
+interface = "protocol"
+allow-subclassing = false
 
 # The driven adapters, and the composition root, the one module that may import and build them.
 [tool.inwards.rules.construct-only-in]

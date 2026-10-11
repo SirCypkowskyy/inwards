@@ -3,7 +3,7 @@
  * per opt-in rule the config turns on (INW012 to INW016, INW020, the FAPI family),
  * worded as what to do while writing code, with the rule's key setting
  * (INW012's `delegate-to`, INW015's `role` and `allowed-in`, INW014's port
- * modules) and the modules it is scoped to. It also owns the inline-code
+ * modules, `interface` and `allow-subclassing`) and the modules it is scoped to. It also owns the inline-code
  * helpers the brief formats names with. Pure: it reads the parsed config only.
  */
 import { type InwardsConfig, RULES, type RuleSettings, ruleLevel } from "@inwards/core";
@@ -32,7 +32,10 @@ const INSTRUCTIONS: Readonly<Record<string, Instruction>> = {
   INW014: (table: RuleTable | undefined): string | undefined => {
     const modules = strings(table, "modules");
     const ports = modules === undefined ? "`ports` modules" : list(modules);
-    return `${ports} hold only ABCs and Protocols whose methods have no body`;
+    const kinds =
+      table?.["interface"] === "protocol" ? "`typing.Protocol` classes" : "ABCs and Protocols";
+    const shape = table?.["allow-subclassing"] === false ? "; adapters never subclass them" : "";
+    return `${ports} hold only ${kinds} whose methods have no body${shape}`;
   },
   INW015: (table: RuleTable | undefined): string | undefined => {
     const role = strings(table, "role");

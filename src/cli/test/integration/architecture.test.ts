@@ -3,24 +3,18 @@
  * reading: invocation state doesn't leak between two invocations in one
  * process, the policy folders really can't reach node:fs or the `process`
  * global (Biome rejects a probe file), and every source folder has a fallow
- * zone that keeps policy away from the concrete adapters.
+ * zone that keeps policy away from the concrete adapters. A module named
+ * `_x.ts` is private to its folder, and a migrated slice keeps the names of
+ * ADR-047.
  * These tests would fail if a refactor put a cache back into a module global or
  * let a policy folder reach the filesystem directly.
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { join, resolve } from "node:path";
 import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
+import { lintAs, misnamed } from "../../../core/test/support/architecture.ts";
 import { compose, nodePlatform } from "../../src/adapters/compose.ts";
 import { baselineCommand } from "../../src/commands/baseline.ts";
 import { checkCommand } from "../../src/commands/check.ts";
@@ -29,11 +23,9 @@ import { statsCommand } from "../../src/commands/stats.ts";
 import { createRunLog } from "../../src/runlog/record.ts";
 import { createStartIdentity } from "../../src/session/start-identity.ts";
 import { project } from "../support/run.ts";
-import { tempDir } from "../support/temp.ts";
 
 const REPO = resolve(import.meta.dir, "../../../..");
 const SRC = join(REPO, "src/cli/src");
-const BIOME = join(REPO, "node_modules/.bin/biome");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /** Folders that hold policy: no I/O of their own, no concrete adapters. */
 const POLICY = [
@@ -50,6 +42,11 @@ const POLICY = [
   "runlog",
   "session",
 ];
+/**
+ * Folders under src/cli/src already moved to the slice layout of ADR-047.
+ * Each migration step adds its folders, so a moved slice can't drift back.
+ */
+const MIGRATED_SLICES: readonly string[] = [];
 /** The run-log fields these tests read. */
 interface LogLine {
   files: string[];
@@ -78,27 +75,6 @@ const FINDING: Diagnostic = {
   fix: { summary: "", steps: [] },
   docs: "",
 };
-
-/**
- * Lints some source as if it were a file at a path, with the repo's Biome
- * config. Biome shows no rule findings for stdin, so the text goes into a
- * temporary copy of the tree next to a copy of biome.jsonc.
- *
- * @param path - repo-relative path the text pretends to live at.
- * @param text - the source.
- * @returns Biome's exit code and output.
- */
-function lintAs(path: string, text: string): { code: number | null; out: string } {
-  const root = tempDir("inwards-arch-");
-  copyFileSync(join(REPO, "biome.jsonc"), join(root, "biome.jsonc"));
-  mkdirSync(dirname(join(root, path)), { recursive: true });
-  writeFileSync(join(root, path), text);
-  const run = Bun.spawnSync(
-    [BIOME, "lint", "--vcs-enabled=false", `--config-path=${root}`, join(root, path)],
-    { cwd: root },
-  );
-  return { code: run.exitCode, out: `${run.stdout.toString()}${run.stderr.toString()}` };
-}
 
 describe("invocation state", () => {
   test("two run logs in one process keep their own notes", () => {
@@ -202,7 +178,8 @@ setDefaultTimeout(30_000);
 
 describe("boundaries", () => {
   test("a policy folder can't import node:fs or use the process global", () => {
-    for (const folder of ["session", "claude-code", "project"]) {
+    // newslice: a folder nobody listed gets the ban too (ADR-047).
+    for (const folder of ["session", "claude-code", "project", "newslice"]) {
       const imports = lintAs(
         `src/cli/src/${folder}/probe.ts`,
         'import { readFileSync } from "node:fs";\nexport const read = readFileSync;\n',
@@ -272,12 +249,14 @@ describe("boundaries", () => {
     expect(adapter.out).not.toContain("noRestrictedGlobals");
   });
 
-  test("an adapter may import node:fs", () => {
-    const adapter = lintAs(
-      "src/cli/src/adapters/probe.ts",
-      'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',
-    );
-    expect(adapter.out).not.toContain("noRestrictedImports");
+  test("an adapter, shared or a slice's own, may import node:fs", () => {
+    for (const path of ["src/cli/src/adapters/probe.ts", "src/cli/src/lsp/adapters/probe.ts"]) {
+      const adapter = lintAs(
+        path,
+        'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',
+      );
+      expect(adapter.out).not.toContain("noRestrictedImports");
+    }
   });
 
   test("a file in a new source folder has no zone, so fallow reports it", () => {
@@ -306,5 +285,27 @@ describe("boundaries", () => {
       expect(rule.allow).not.toContain("cli-adapters");
       expect(rule.allow).not.toContain("cli-main");
     }
+  });
+});
+
+describe("slices (ADR-047)", () => {
+  test("policy may import a private _x.ts only from its own folder or its parent", () => {
+    for (const from of ["src/cli/src/lsp/probe.ts", "src/cli/src/newslice/mini/probe.ts"]) {
+      const refused = lintAs(
+        from,
+        'import { serve } from "../mcp/_serve.ts";\nexport { serve };\n',
+      );
+      expect(refused.code).not.toBe(0);
+      expect(refused.out).toContain("noRestrictedImports");
+      const own = lintAs(
+        from,
+        'import { serve } from "./_serve.ts";\nimport { up } from "../_up.ts";\nexport { serve, up };\n',
+      );
+      expect(own.out).not.toContain("noRestrictedImports");
+    }
+  });
+
+  test("every migrated slice keeps the slice names", () => {
+    expect(misnamed(SRC, MIGRATED_SLICES)).toEqual([]);
   });
 });
