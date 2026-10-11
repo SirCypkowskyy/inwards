@@ -31,6 +31,7 @@ import {
   resolveName,
   topLevel,
 } from "../../diagram/names.ts";
+import { notationOf } from "../../diagram/notation.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { distance } from "../shared/edit-distance.ts";
 import { matchesAny } from "../shared/entry-matches.ts";
@@ -166,7 +167,7 @@ function unknownSubgraphs(diagram: Diagram, names: Names): Diagnostic[] {
     .filter(
       (s) => s.parent === undefined && !external.has(s.id) && !isDeclared(diagram, s.id, names),
     )
-    .map((s) => nameFinding(diagram, s, names, "subgraph"));
+    .map((s) => nameFinding(diagram, s, names, notationOf(diagram.notation).group));
 }
 
 /**
@@ -207,7 +208,7 @@ function unknownLabels(diagram: Diagram, modules: ReadonlySet<string>): Diagnost
         diagnostic(RULES.INW017, diagramFile(diagram), {
           span: mentionSpan(node),
           message: `"${node.id}" is labelled "${label}" in this ${diagram.kind} diagram, and no module matches "${label}".`,
-          fix: labelFix(label, modules),
+          fix: labelFix(label, modules, notationOf(diagram.notation).caption),
         }),
       );
     }
@@ -221,7 +222,7 @@ function unknownLabels(diagram: Diagram, modules: ReadonlySet<string>): Diagnost
  * @param diagram - a marked diagram, read.
  * @param named - the node or subgraph, at its first mention.
  * @param names - what the id may be.
- * @param what - "node" or "subgraph", for the message.
+ * @param what - "node", or what the notation calls a group ("subgraph", "package"), for the message.
  * @returns the INW017 warning, on the id's first mention.
  */
 function nameFinding(
@@ -231,6 +232,7 @@ function nameFinding(
   what: string,
 ): Diagnostic {
   const { declared, noun } = names;
+  const syntax = notationOf(diagram.notation);
   const listed =
     declared.length === 0
       ? `[tool.inwards] declares no ${noun}s`
@@ -245,15 +247,15 @@ function nameFinding(
       : `Rename the ${what} to "${near}", the ${noun} it most likely means.`;
   return diagnostic(RULES.INW017, diagramFile(diagram), {
     span: mentionSpan(named),
-    message: `${what === "node" ? "Node" : "Subgraph"} "${named.id}" in this ${diagram.kind} diagram names no ${noun}: ${listed}.`,
+    message: `${what === "node" ? "Node" : capitalized(what)} "${named.id}" in this ${diagram.kind} diagram names no ${noun}: ${listed}.`,
     fix: {
       summary:
         near === undefined
-          ? `Rename "${named.id}" or mark it :::external.`
+          ? `Rename "${named.id}" or mark it ${syntax.externalClass}.`
           : `Rename "${named.id}" to "${near}".`,
       steps: [
         rename,
-        `If it stands for something outside [tool.inwards] (a database, a third-party service), mark it ${named.id}:::${EXTERNAL}.`,
+        `If it stands for something outside [tool.inwards] (a database, a third-party service), mark it ${syntax.external(named.id)}.`,
         ASK_USER,
       ],
     },
@@ -265,9 +267,10 @@ function nameFinding(
  *
  * @param label - the quoted label.
  * @param modules - every first-party module; the closest of their prefixes is suggested.
+ * @param caption - how the diagram's notation turns the label into a caption, for the hint.
  * @returns the summary and steps.
  */
-function labelFix(label: string, modules: ReadonlySet<string>): Fix {
+function labelFix(label: string, modules: ReadonlySet<string>, caption: string): Fix {
   const prefixes = new Set<string>();
   for (const module of modules) {
     const parts = module.split(".");
@@ -280,7 +283,7 @@ function labelFix(label: string, modules: ReadonlySet<string>): Fix {
     summary: near === undefined ? `Fix the label "${label}".` : `Change the label to "${near}".`,
     steps: [
       near === undefined
-        ? "Use the module prefix the node stands for, as [tool.inwards] spells it, or drop the quotes to make the label a caption."
+        ? `Use the module prefix the node stands for, as [tool.inwards] spells it, or ${caption}.`
         : `"${near}" exists; if that is the module meant, use it.`,
       "If the module was moved or renamed, update the diagram to match the code.",
       ASK_USER,
@@ -316,4 +319,14 @@ function nearest(name: string, candidates: readonly string[]): string | undefine
     }
   }
   return best?.name;
+}
+
+/**
+ * Starts a word with a capital letter, for the start of a message.
+ *
+ * @param word - such as `subgraph`.
+ * @returns such as `Subgraph`.
+ */
+function capitalized(word: string): string {
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
 }

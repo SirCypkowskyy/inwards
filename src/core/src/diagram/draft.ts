@@ -1,9 +1,10 @@
 /**
- * @file What `inwards import-diagram` reads out of marked diagrams (ADR-045):
- * the layers of a `layers` diagram, ranked by the longest path of solid
- * arrows to a sink, with same-rank layers as siblings, and the contexts of a
- * `contexts` diagram, with `depends-on` from the arrows between them and
- * `public` from their `:::public` nodes. A node's quoted label is its module.
+ * @file What `inwards import-diagram` reads out of marked Mermaid and PlantUML
+ * diagrams (ADR-045, #346): the layers of a `layers` diagram, ranked by the
+ * longest path of solid arrows to a sink, with same-rank layers as siblings,
+ * and the contexts of a `contexts` diagram, with `depends-on` from the
+ * arrows between them and `public` from their `:::public` (`<<public>>`)
+ * nodes. A node's quoted label (a PlantUML alias's name) is its module.
  * It refuses what has no config: a cycle, a context or public node without a
  * module, two diagrams of one kind. Pure: the CLI renders, checks and writes
  * the table.
@@ -14,10 +15,10 @@ import type {
   DraftDiagramContext,
   DraftDiagramLayer,
 } from "../contracts/records.ts";
-import { markedBlocks } from "./blocks.ts";
-import { readFlowchart } from "./mermaid.ts";
 import type { Diagram } from "./model.ts";
 import { EXTERNAL, idsWithClass, PUBLIC, quotedLabel, topLevel } from "./names.ts";
+import { notationOf } from "./notation.ts";
+import { readDiagrams } from "./read.ts";
 
 /** The layer that holds every context when a file draws no layers diagram. */
 const ONE_LAYER = "app";
@@ -34,9 +35,9 @@ const WHITESPACE = /\s/u;
  * @returns the draft, or why there is none, starting with `path:line`.
  */
 export function draftFromSource(source: DiagramSource): DiagramDraft | string {
-  const diagrams = markedBlocks(source).map((block) => readFlowchart(block, source.path));
+  const diagrams = readDiagrams(source);
   if (diagrams.length === 0) {
-    return `${source.path}: no marked diagram; a diagram counts when it opens with %% inwards: layers or %% inwards: contexts.`;
+    return `${source.path}: no marked diagram; a diagram counts when it opens with %% inwards: layers or %% inwards: contexts (Mermaid), or ' inwards: layers or ' inwards: contexts (PlantUML).`;
   }
   const byKind = new Map<string, Diagram>();
   for (const diagram of diagrams) {
@@ -97,6 +98,7 @@ function draftLayers(diagram: Diagram): Pick<DiagramDraft, "layers" | "notes"> |
   const places: DraftDiagramLayer[][] = [];
   const notes: string[] = [];
   const pkg = examplePackage(diagram);
+  const syntax = notationOf(diagram.notation);
   for (const id of ids) {
     const module = moduleLabel(diagram, id);
     const rank = rankOf(id, targets, ranks);
@@ -108,7 +110,7 @@ function draftLayers(diagram: Diagram): Pick<DiagramDraft, "layers" | "notes"> |
   for (const layer of layers.flat()) {
     if (layer.modules.length === 0) {
       notes.push(
-        `Layer "${layer.name}" has no module: give its node a quoted label such as ${layer.name}["${pkg}.${layer.name}"], or fill in its modules by hand.`,
+        `Layer "${layer.name}" has no module: give its node ${syntax.moduleLabel} such as ${syntax.node(layer.name, `${pkg}.${layer.name}`)}, or fill in its modules by hand.`,
       );
     }
   }
@@ -214,10 +216,11 @@ function draftContexts(diagram: Diagram): DraftDiagramContext[] | string {
     }
     const module = moduleLabel(diagram, name);
     if (module === undefined) {
+      const syntax = notationOf(diagram.notation);
       const how = diagram.subgraphs.some((s) => s.id === name)
-        ? `subgraph ${name}["${pkg}.${name}"]`
-        : `${name}["${pkg}.${name}"]`;
-      return `${diagram.path}:${line}: context "${name}" has no module: give it a quoted label such as ${how}.`;
+        ? syntax.groupNode(name, `${pkg}.${name}`)
+        : syntax.node(name, `${pkg}.${name}`);
+      return `${diagram.path}:${line}: context "${name}" has no module: give it ${syntax.moduleLabel} such as ${how}.`;
     }
     contexts.push({ name, modules: [module], public: [], dependsOn: [] });
   }
@@ -268,7 +271,9 @@ function addPublic(
     }
     const module = id === context.name ? context.modules[0] : moduleLabel(diagram, id);
     if (module === undefined) {
-      return `${diagram.path}:${firstLine.get(id) ?? diagram.markerLine}: public node "${id}" in context "${context.name}" has no module: give it a quoted label such as ${id}["${context.modules[0] ?? EXAMPLE_PACKAGE}.${id}"].`;
+      const syntax = notationOf(diagram.notation);
+      const example = syntax.node(id, `${context.modules[0] ?? EXAMPLE_PACKAGE}.${id}`);
+      return `${diagram.path}:${firstLine.get(id) ?? diagram.markerLine}: public node "${id}" in context "${context.name}" has no module: give it ${syntax.moduleLabel} such as ${example}.`;
     }
     context.public.push(module);
   }

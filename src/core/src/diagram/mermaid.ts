@@ -64,6 +64,7 @@ export function readFlowchart(block: MarkedBlock, path: string): Diagram {
   });
   return {
     kind: block.kind,
+    notation: "mermaid",
     path,
     markerLine: block.markerLine,
     nodes: state.nodes,

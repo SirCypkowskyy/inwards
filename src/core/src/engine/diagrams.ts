@@ -1,6 +1,6 @@
 /**
  * @file The engine's entry for the diagram rules (ADR-045): it reads the
- * marked Mermaid diagrams out of the files the adapter passes and runs
+ * marked Mermaid and PlantUML diagrams out of the files the adapter passes and runs
  * INW017 (with the `diagrams` entries that matched no file) and INW018 on
  * them, and reads the config a diagram stands for, for `inwards
  * import-diagram`. The adapter does the reading and the globbing
@@ -9,9 +9,8 @@
 import type { InwardsConfig } from "../config/parse.ts";
 import type { ConfigFile } from "../config/source-span.ts";
 import type { Diagnostic, DiagramDraft, DiagramSource } from "../contracts/records.ts";
-import { markedBlocks } from "../diagram/blocks.ts";
 import { draftFromSource } from "../diagram/draft.ts";
-import { readFlowchart } from "../diagram/mermaid.ts";
+import { readDiagrams } from "../diagram/read.ts";
 import { checkDiagramEdges } from "../rules/diagram-forbidden-edge/check.ts";
 import { checkDiagramEntries, checkDiagramNames } from "../rules/diagram-unknown-name/check.ts";
 
@@ -35,9 +34,7 @@ export interface DiagramInput {
  * @returns INW017's and INW018's findings, after `[tool.inwards.rules]`.
  */
 export function checkDiagrams(config: InwardsConfig, input: DiagramInput): Diagnostic[] {
-  const diagrams = input.sources.flatMap((source) =>
-    markedBlocks(source).map((block) => readFlowchart(block, source.path)),
-  );
+  const diagrams = input.sources.flatMap(readDiagrams);
   return [
     ...checkDiagramEntries(config, input.unmatched, input.configFile),
     ...checkDiagramNames({ config, modules: input.modules, diagrams }),
