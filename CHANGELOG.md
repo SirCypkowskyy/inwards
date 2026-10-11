@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.7.0](https://github.com/SirCypkowskyy/inwards/compare/v0.6.0...v0.7.0) (2026-10-11)
+
+
+### Added
+
+* **cli:** add inwards diagram to print the config as Mermaid or PlantUML ([#383](https://github.com/SirCypkowskyy/inwards/issues/383)) ([f83375a](https://github.com/SirCypkowskyy/inwards/commit/f83375a01a36c09536ed1bbaf0a0c46143db6260))
+* **cli:** show diagram findings in the hook, the editor and MCP ([#385](https://github.com/SirCypkowskyy/inwards/issues/385)) ([06c400d](https://github.com/SirCypkowskyy/inwards/commit/06c400d6351a77d57e93086e534bbb8b9939caa9))
+* **rules:** add INW019 diagram-missing-dependency ([#384](https://github.com/SirCypkowskyy/inwards/issues/384)) ([cdac53f](https://github.com/SirCypkowskyy/inwards/commit/cdac53f4da9187819e2c228ca21db8f01e9da064))
+* **rules:** recognise FastAPI routers built at run time and in router factories ([#394](https://github.com/SirCypkowskyy/inwards/issues/394)) ([2008c3e](https://github.com/SirCypkowskyy/inwards/commit/2008c3eae67f49994628faa1e1976d3592de4083)), closes [#358](https://github.com/SirCypkowskyy/inwards/issues/358)
+* **rules:** skip test modules in the opt-in content rules ([#389](https://github.com/SirCypkowskyy/inwards/issues/389)) ([a8c282a](https://github.com/SirCypkowskyy/inwards/commit/a8c282a42e93a0f43e2df33c55fcc7f9b8fc5d87))
+
+
+### Fixed
+
+* **rules:** report a project's own INW016 naming scheme once ([#390](https://github.com/SirCypkowskyy/inwards/issues/390)) ([0596d16](https://github.com/SirCypkowskyy/inwards/commit/0596d16713a99f0d4c3a65eff7d4bd9456e713d5)), closes [#361](https://github.com/SirCypkowskyy/inwards/issues/361)
+* **rules:** stop INW012 flagging markup trees, HTMX error answers and health checks ([#396](https://github.com/SirCypkowskyy/inwards/issues/396)) ([cf127b7](https://github.com/SirCypkowskyy/inwards/commit/cf127b7397939c91f85158835964efebf5a08d31)), closes [#360](https://github.com/SirCypkowskyy/inwards/issues/360)
+
+
+### Changed
+
+* **rules:** parse each file once per run across the content rules ([#393](https://github.com/SirCypkowskyy/inwards/issues/393)) ([c38c5ae](https://github.com/SirCypkowskyy/inwards/commit/c38c5aececc57c14042f7efb8892d50e67fb10f3)), closes [#387](https://github.com/SirCypkowskyy/inwards/issues/387)
+* **rules:** skip INW013 files that can't reach a blocking name in large runs ([#386](https://github.com/SirCypkowskyy/inwards/issues/386)) ([36acccc](https://github.com/SirCypkowskyy/inwards/commit/36acccc3a339ed74bec3efc4119d6eb21b13dd0a)), closes [#369](https://github.com/SirCypkowskyy/inwards/issues/369)
+
+
+### Documentation
+
+* show the rules as a category tree in the sidebar ([#382](https://github.com/SirCypkowskyy/inwards/issues/382)) ([223efd9](https://github.com/SirCypkowskyy/inwards/commit/223efd9a28c221cbc65d029229f005c47b70f95e)), closes [#381](https://github.com/SirCypkowskyy/inwards/issues/381)
+
 ## [0.6.0](https://github.com/SirCypkowskyy/inwards/compare/v0.5.0...v0.6.0) (2026-10-11)
 
 
