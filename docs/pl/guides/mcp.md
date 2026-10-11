@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/mcp.md
-source_hash: cf0a492498f4f3870ddfc328706f08687f208a3d42920616baf8c72f0df04d7f
+source_hash: ab73fd96a59c5c8c8804c2386022b868f762eaefef5482bf3b4b0ab66f0f8237
 ---
 
 # Serwer MCP { #mcp-server }
@@ -80,7 +80,7 @@ Uruchamia `inwards check` z katalogu projektu i zwraca [raport `inwards/diagnost
 | Argument | Typ | Znaczenie |
 |---|---|---|
 | `paths` | lista napisów | Pliki lub katalogi, względem katalogu projektu albo bezwzględne |
-| `contents` | obiekt: ścieżka → tekst | Kod Pythona do sprawdzenia zamiast tego, co jest na dysku, według ścieżki `.py` lub `.pyi`. Plik nie musi jeszcze istnieć |
+| `contents` | obiekt: ścieżka → tekst | Kod Pythona do sprawdzenia zamiast tego, co jest na dysku, według ścieżki `.py` lub `.pyi`, albo diagram wymieniony w kluczu [`diagrams`](configuration.md#diagrams), według ścieżki pliku Markdown, Mermaid lub PlantUML. Plik nie musi jeszcze istnieć |
 | `maxDiagnostics` | dodatnia liczba całkowita | Najwyżej tyle diagnostyk, najpierw błędy; podsumowanie nadal liczy wszystkie |
 
 Bez `paths` i `contents` sprawdza cały projekt, łącznie z regułami dla całego projektu, takimi jak cykle importów (INW004). Z nimi sprawdza te pliki tak, jak robi to `inwards check PATHS`. Każda ścieżka trafia do najbliższego `[tool.inwards]` nad nią, a członkowie workspace'u uv używają własnych konfiguracji.
@@ -110,7 +110,9 @@ narzędzie odpowiada diagnostyką, którą hook zgłosiłby po edycji (skrócone
 }
 ```
 
-Baseline działa jak w `inwards check`. Zepsuta konfiguracja albo ścieżka w `contents`, która nie jest plikiem Pythona, wraca jako błąd narzędzia z powodem.
+Diagram działa tak samo, przez ścieżkę albo jako tekst: gdy [INW017 albo INW018](diagrams.md#check) jest włączona, plik wymieniony w kluczu `diagrams` dostaje ich zgłoszenia na własnych liniach, więc agent może sprawdzić rysunek, zanim go zapisze. Plik Markdown, Mermaid albo PlantUML, którego klucz nie wymienia, nie jest sprawdzany, a mówi o tym `notChecked` w raporcie.
+
+Baseline działa jak w `inwards check`. Zepsuta konfiguracja albo ścieżka w `contents`, która nie jest ani plikiem Pythona, ani nie nosi nazwy diagramu (`.md`, `.markdown`, `.mmd`, `.mermaid`, `.puml`, `.plantuml`, `.pu`, `.iuml`), wraca jako błąd narzędzia z powodem.
 
 ## `explain_rule` { #explain_rule }
 
@@ -176,4 +178,4 @@ Treść strukturalna ma `config`, `layers` (każda z `name`, `modules` i `mayImp
 - Agent wywołuje narzędzie wtedy, gdy sam tak zdecyduje. Hooki i Stop gate nadal łapią to, o co nie zapytał, a CI łapie resztę.
 - `where_should_this_go` proponuje jeden nowy moduł na warstwę, pod pierwszym dosłownym prefiksem warstwy. Warstwa zadeklarowana tylko selektorami (`shop.*.domain`) nie dostaje kandydata; podaj `module`, żeby ocenić moduł w jednym wycinku.
 - Słów o roli kodu jest niewiele i są po angielsku. Opis innymi słowami nie daje podpowiedzi, a sugestia wraca do najbardziej wewnętrznej warstwy, w której przechodzą importy.
-- `contents` przyjmuje tylko pliki Pythona. Niezapisany `pyproject.toml` ani baseline nie są sprawdzane; liczą się te na dysku.
+- `contents` przyjmuje tylko pliki Pythona i pliki diagramów. Niezapisany `pyproject.toml` ani baseline nie są sprawdzane; liczą się te na dysku.

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/editors.md
-source_hash: 445c90bc85a6787dfdd307f4b17a6348ec5e1c66f28a038f5f61293f8ca95d16
+source_hash: 8268aa4a6d229a596808be6b5e2cc169c5fe3968aa2a095411de4beac10e08c0
 ---
 
 # Neovim, Zed i Helix { #neovim-zed-and-helix }
@@ -183,6 +183,16 @@ Sprawdź, czy działa:
 - Naruszenie warstw pojawia się na marginesie i w selektorze diagnostyk (`Space` `d`) z kodem reguły.
 - `:lsp-restart` restartuje serwery po zmianie konfiguracji; `:log-open` pokazuje, dlaczego któryś się nie uruchomił.
 
+## Diagramy architektury { #diagrams }
+
+Gdy [INW017 albo INW018](diagrams.md#check) jest włączona, serwer sprawdza też pliki Markdown, Mermaid i PlantUML wymienione w kluczu [`diagrams`](configuration.md#diagrams): zamknięty przy każdym przebiegu dla całego projektu, otwarty przy każdej zmianie, z niezapisanego tekstu. Zapis diagramu nie uruchamia przebiegu, bo nic innego od niego nie zależy. Pozostałe pliki Markdown serwer pomija. Edytor musi wysyłać serwerowi te pliki, więc dopisz ich typy tam, gdzie dopisałeś `python`, tak jak robi to [rozszerzenie VS Code](install.md#vs-code):
+
+- **Neovim:** `filetypes = { "python", "markdown", "mermaid", "plantuml" }`.
+- **Zed:** `languages = ["Python", "Markdown"]` w `extension.toml`.
+- **Helix:** dopisz `inwards` także do `language-servers` języka `markdown`.
+
+Te linie opierają się na dokumentacji każdego edytora i nie były sprawdzane ręcznie.
+
 ## Rozwiązywanie problemów { #troubleshooting }
 
 | Objaw | Przyczyna i rozwiązanie |
@@ -191,4 +201,5 @@ Sprawdź, czy działa:
 | Serwer od razu kończy pracę, a w logu edytora widać opis użycia Inwards | Plik binarny jest starszy niż 0.5.0 i nie ma komendy `server`. Zainstaluj nowsze wydanie. |
 | Błąd konfiguracji na `pyproject.toml` i nic w plikach Pythona | `[tool.inwards]` się nie parsuje. Komunikat podaje klucz; pliki są sprawdzane ponownie, gdy zapiszesz poprawioną konfigurację. |
 | Diagnostyki z innych plików (na przykład cykl importów) nie nadążają za pisaniem | Naciśnięcie klawisza sprawdza plik, w którym piszesz; diagnostyki wymagające całego projektu odświeżają się przy następnym zapisie. |
+| Diagram nic nie pokazuje | Pliku nie ma w `diagrams`, INW017 i INW018 są wyłączone albo edytor nie wysyła serwerowi plików Markdown ([Diagramy architektury](#diagrams)). |
 | Z uv: "Failed to spawn: `inwards`" | Serwer wystartował poza projektem albo Inwards nie ma w zależnościach deweloperskich projektu. Sprawdź katalog główny, który podaje edytor, i uruchom `uv add --dev inwards`. |

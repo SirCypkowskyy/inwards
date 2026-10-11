@@ -3,7 +3,8 @@
  * payloads in `support/fixtures/claude-code`. The exit codes and output are
  * pinned in a snapshot, and garbage on stdin is a clean exit 1. A PreToolUse
  * Write of a Python file the package shape forbids is denied (#96), and a
- * whole-project check reads the marked diagrams `diagrams` lists (#344). The
+ * whole-project check reads the marked diagrams `diagrams` lists (#344), and
+ * PostToolUse checks an edit of one of them (#348). The
  * Stop gate accepts hooks that live only in the committed
  * `.claude/settings.json` (`init --shared`, #342) and refuses once they are gone.
  */
@@ -21,6 +22,8 @@ import { git, ID } from "../support/stop-helpers.ts";
 const files = { "shop/domain/order.py": "import shop.infrastructure.db\n", "README.md": "hi" };
 const root = project({ "pyproject.toml": LAYERS, ...files });
 const DURATION = /"durationMs":[\d.]+/gu;
+/** The same inside a JSON string, as in a hook's `additionalContext`. */
+const QUOTED_DURATION = /\\"durationMs\\":[\d.]+/gu;
 const TEXT_DURATION = /\([\d.]+ ms\)/gu;
 const JSON_SUFFIX = /\.json$/u;
 
@@ -33,6 +36,7 @@ const JSON_SUFFIX = /\.json$/u;
 function stable(s: string): string {
   return s
     .replace(DURATION, '"durationMs":0')
+    .replace(QUOTED_DURATION, '\\"durationMs\\":0')
     .replace(TEXT_DURATION, "(0 ms)")
     .replaceAll(`"${VERSION}"`, '"<version>"');
 }
@@ -85,6 +89,51 @@ extend-select = ["INW017"]
     ].join("\n"),
   });
   expect(run(drawn, ["check", "--format", "json"])).toMatchSnapshot();
+});
+
+test("PostToolUse checks an edited diagram that `diagrams` lists, and only that one", () => {
+  /**
+   * Builds a project whose config lists docs/architecture.md, with a typo in its diagram.
+   *
+   * @param rules - the `[tool.inwards.rules]` table.
+   * @returns the project directory.
+   */
+  function drawn(rules: string): string {
+    return project({
+      "pyproject.toml": `${LAYERS}diagrams = ["docs/architecture.md"]\n\n[tool.inwards.rules]\n${rules}`,
+      ...files,
+      "shop/infrastructure/db.py": "",
+      "docs/architecture.md": [
+        "```mermaid",
+        "%% inwards: layers",
+        "flowchart LR",
+        '  infrastructure --> domain["shop.domian"]',
+        "```",
+        "",
+      ].join("\n"),
+      "docs/notes.md": "# Notes\n",
+    });
+  }
+  /**
+   * Sends the recorded PostToolUse Write, pointed at one file of the project.
+   *
+   * @param dir - the project.
+   * @param rel - the written file, relative to the project.
+   * @returns the hook's exit code and output.
+   */
+  function wrote(dir: string, rel: string): RunResult {
+    const stdin = payload("post-write-readme", dir, {
+      tool_input: { file_path: join(dir, rel) },
+    });
+    return run(dir, ["hook", "claude-code"], stdin);
+  }
+  const warned = drawn('extend-select = ["INW017", "INW018"]\n');
+  expect(wrote(warned, "docs/architecture.md")).toMatchSnapshot("a warning is context");
+  expect(wrote(warned, "docs/notes.md")).toEqual({ code: 0, stdout: "", stderr: "" });
+  const raised = drawn('extend-select = ["INW017"]\nseverity = { INW017 = "error" }\n');
+  expect(wrote(raised, "docs/architecture.md")).toMatchSnapshot("an error blocks");
+  const off = drawn("");
+  expect(wrote(off, "docs/architecture.md")).toEqual({ code: 0, stdout: "", stderr: "" });
 });
 
 test.each([

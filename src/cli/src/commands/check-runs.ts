@@ -40,7 +40,7 @@ export interface Outcome {
  * @param options - how to run.
  * @param options.cache - whether the extraction cache on disk may be used.
  * @param options.log - `--log`: log the run even when the run log is off.
- * @param options.texts - Python source to check instead of the disk's, by absolute path.
+ * @param options.texts - Python source and diagrams to check instead of the disk's, by absolute path.
  * @returns the merged report, the per-config lines and the exit code.
  * @throws {ConfigError} when the only config, or its baseline, is invalid.
  */
@@ -103,7 +103,7 @@ export async function runPlan(
  * @param options - how to run it.
  * @param options.cache - whether the extraction cache on disk may be used.
  * @param options.several - true when other configs run too.
- * @param options.texts - Python source to check instead of the disk's, by absolute path.
+ * @param options.texts - Python source and diagrams to check instead of the disk's, by absolute path.
  * @returns the report, or undefined for an invalid config in a run over several.
  * @throws {ConfigError} when the config or its baseline is invalid and it runs alone.
  */

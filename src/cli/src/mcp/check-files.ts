@@ -1,6 +1,8 @@
 /**
  * @file The `check_files` tool: `inwards check` for an agent, over named paths,
- * the whole project, or Python source it hasn't written yet. Paths resolve
+ * the whole project, or Python source it hasn't written yet. A named path or
+ * a given text can also be a diagram the `diagrams` key lists (#348), which
+ * INW017 and INW018 check. Paths resolve
  * against the server's working directory, the checks route as
  * `inwards check` routes them, and the answer is the
  * `inwards/diagnostics@1` report, so an agent reads the same fields as from
@@ -8,10 +10,11 @@
  */
 import { ConfigError, render } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
+import { DIAGRAM_FILE } from "../project/diagrams.ts";
 import { absoluteFrom, failure } from "./answers.ts";
 import type { CheckFilesInput, McpCheck, ToolAnswer } from "./contracts.ts";
 
-/** The files a check reads, and so the only ones whose text may be given. */
+/** Python sources and stubs, whose text may be given. */
 const PYTHON = /\.pyi?$/u;
 
 /**
@@ -33,8 +36,9 @@ function asObject(json: string): Record<string, unknown> {
  * @param cwd - the server's working directory, which relative paths and the report's paths start from.
  * @param input - the tool's arguments.
  * @returns the `inwards/diagnostics@1` report as JSON text and as data, with
- *   any notes appended to the text; an error answer for a text that isn't
- *   Python or a broken config.
+ *   any notes appended to the text; an error answer for a text that is
+ *   neither Python nor named like a diagram, or a broken config. A diagram
+ *   text the config doesn't list is reported as not checked.
  * @throws when the check fails for a reason other than its config.
  */
 export async function checkFiles(
@@ -44,8 +48,10 @@ export async function checkFiles(
 ): Promise<ToolAnswer> {
   const texts = new Map<string, string>();
   for (const [path, text] of Object.entries(input.contents ?? {})) {
-    if (!PYTHON.test(path)) {
-      return failure(`contents takes Python files only (.py or .pyi): ${path} is not one.`);
+    if (!(PYTHON.test(path) || DIAGRAM_FILE.test(path))) {
+      return failure(
+        `contents takes Python files (.py, .pyi) and diagrams (.md, .mmd, .puml and the like) only: ${path} is neither.`,
+      );
     }
     texts.set(absoluteFrom(cwd, path), text);
   }

@@ -12,7 +12,7 @@ import type { Report } from "@inwards/core";
 export interface CheckFilesInput {
   /** Files or directories to check, relative to the server's working directory or absolute. */
   paths?: string[] | undefined;
-  /** Python source to check instead of what is on disk, by path; the file need not exist. */
+  /** Python source, or a listed diagram, to check instead of what is on disk, by path; the file need not exist. */
   contents?: Record<string, string> | undefined;
   /** At most this many diagnostics in the answer, errors first; the summary counts all. */
   maxDiagnostics?: number | undefined;
@@ -78,7 +78,7 @@ export interface McpTools {
  * with Python texts laid over the disk, every config they route to included.
  *
  * @param targets - absolute files or directories; undefined for the whole project.
- * @param texts - Python source to check instead of the disk's, by absolute
+ * @param texts - Python source and diagrams to check instead of the disk's, by absolute
  *   path; such a file need not exist.
  * @returns the merged report, with paths relative to the working directory,
  *   and what the run had to say besides its findings (a config that couldn't

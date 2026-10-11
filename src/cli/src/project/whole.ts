@@ -52,6 +52,8 @@ interface WholeProject {
  * @param run.listing - the listing the index was built on.
  * @param run.base - directory that report paths are made relative to.
  * @param run.shownRoot - the config root as report paths show it.
+ * @param run.texts - content to read instead of what is on disk, by absolute
+ *   path: a listed diagram open in the editor is checked as it reads there.
  * @returns the findings about the config and the diagrams (reported first),
  *   and the missing members (reported last).
  * @throws when a listed diagram can't be read.
@@ -64,13 +66,20 @@ export function wholeProjectFindings(
     listing,
     base,
     shownRoot,
-  }: { files: readonly SourceFile[]; listing: ProjectFiles; base: string; shownRoot: string },
+    texts,
+  }: {
+    files: readonly SourceFile[];
+    listing: ProjectFiles;
+    base: string;
+    shownRoot: string;
+    texts: ReadonlyMap<string, string> | undefined;
+  },
 ): { config: Diagnostic[]; required: Diagnostic[] } {
   const modules = new Set(files.map((file) => file.module));
   const pyproject = { path: posix(relative(base, project.configPath)), text: project.configText };
   const paths = files.map(rootPathOf);
   const packages = packagesOf(paths);
-  const diagrams = readDiagrams(io, project.configPath, project.config, base);
+  const diagrams = readDiagrams(io, project.configPath, project.config, { base, texts });
   return {
     config: [
       ...checkPrefixes(project.config, modules, pyproject),
