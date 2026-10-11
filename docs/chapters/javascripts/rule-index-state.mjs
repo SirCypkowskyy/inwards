@@ -15,7 +15,7 @@ const LARGE_PAGE_SIZE = 50;
 export const PAGE_SIZES = [10, DEFAULT_PAGE_SIZE, LARGE_PAGE_SIZE, 0];
 
 /** The sort keys, each also allowed with a leading "-" for descending. */
-const SORT_KEYS = ["code", "name", "status"];
+const SORT_KEYS = ["code", "name", "category", "status"];
 
 /** A leading minus, which makes a sort descending. */
 const DESCENDING = /^-/u;
@@ -46,7 +46,8 @@ const SPACES = /\s+/u;
  * @property {string[]} category - the category path, parent first.
  * @property {string} status - one of STATUSES.
  * @property {boolean} autofix - whether a fix applies unattended.
- * @property {string} default - the index table's Default cell.
+ * @property {string} default - on by default or opt-in, and the severity, from the index table.
+ * @property {string} presets - the `inwards init` presets that turn the rule on, from the index table.
  * @property {string} url - the rule page, relative to the index.
  */
 
@@ -126,11 +127,24 @@ export function toSearch(state, search) {
 }
 
 /**
+ * Lists the top-level categories in the order rules.json first uses them,
+ * which is the order of the index's sections (issue #337).
+ *
+ * @param {RuleRecord[]} rules - the rules, in rules.json order.
+ * @returns {string[]} the categories, "imports" first.
+ */
+function categoryOrder(rules) {
+  return [...new Set(rules.map((rule) => rule.category[0] ?? ""))];
+}
+
+/**
  * Lists every category path the rules use, each parent before its children:
  * a rule tagged `[imports, contexts]` adds "imports" and "imports/contexts".
+ * The top-level categories keep the index's order; the paths below each one
+ * are sorted.
  *
- * @param {RuleRecord[]} rules - the rules.
- * @returns {string[]} the paths, sorted.
+ * @param {RuleRecord[]} rules - the rules, in rules.json order.
+ * @returns {string[]} the paths, grouped by category.
  */
 export function categoryPaths(rules) {
   const paths = new Set();
@@ -139,7 +153,9 @@ export function categoryPaths(rules) {
       paths.add(rule.category.slice(0, depth + 1).join("/"));
     });
   }
-  return [...paths].sort();
+  return categoryOrder(rules).flatMap((top) =>
+    [...paths].filter((path) => path === top || path.startsWith(`${top}/`)).sort(),
+  );
 }
 
 /**
@@ -182,7 +198,8 @@ export function matches(rule, state) {
 /**
  * Builds the comparison for a sort key. Sorting by code keeps the families in
  * the order the rules come in (INW, then FAPI) and numbers ascending inside
- * each; ties under the other keys fall back to that order.
+ * each; sorting by category follows the index's sections. Ties under the
+ * other keys fall back to the code order.
  *
  * @param {RuleRecord[]} rules - the rules, in rules.json order.
  * @param {string} sort - the sort key, "-" first for descending.
@@ -190,6 +207,7 @@ export function matches(rule, state) {
  */
 function comparison(rules, sort) {
   const families = [...new Set(rules.map((rule) => family(rule.code)))];
+  const categories = categoryOrder(rules);
   const direction = sort.startsWith("-") ? -1 : 1;
   const key = sort.replace(DESCENDING, "");
   /**
@@ -205,6 +223,12 @@ function comparison(rules, sort) {
   }
   if (key === "name") {
     return (a, b) => direction * a.name.localeCompare(b.name) || byCode(a, b);
+  }
+  if (key === "category") {
+    return (a, b) =>
+      direction *
+        (categories.indexOf(a.category[0] ?? "") - categories.indexOf(b.category[0] ?? "")) ||
+      byCode(a, b);
   }
   if (key === "status") {
     return (a, b) =>

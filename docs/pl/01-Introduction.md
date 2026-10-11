@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/01-Introduction.md
-source_hash: 87901a1f553feb268654cd9ec26d4e7b150ae1f0bd73bc9084151fba6d3cfdfb
+source_hash: 6bb7295c2c30f6f8092341fe4c2fd6031a232bcad6236862ae230b17ec98d555
 ---
 
 # :material-layers-triple: Wprowadzenie { #introduction }
@@ -85,10 +85,11 @@ Ta diagnostyka pochodzi z działającego scaffoldu w tym repozytorium, uruchomio
 [tool.inwards.rules]
 ignore = ["INW007", "INW008"]      # these rules never report (optional)
 severity = { INW005 = "warning" }  # reported, but doesn't fail a check or block the agent (optional)
-# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule)
+# extend-select = ["INW012"]       # turn opt-in rules on, next to the defaults (optional)
+# select = ["INW001", "INW011"]    # or: only these rules report (default: every rule that is on by default)
 ```
 
-Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją ponownie przy każdej zmianie `pyproject.toml` i pokazuje błąd konfiguracji (na przykład nieznany kod) na `pyproject.toml`. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
+Kody muszą być dokładne, nie są prefiksami, a nieznany kod to błąd konfiguracji (kod wyjścia 2). `ignore` ma pierwszeństwo przed `select` i `extend-select`. Większość reguł jest domyślnie włączona; reguły opt-in (reguły [ról](rules/index.md#roles), [diagramów](rules/index.md#diagrams) i [FastAPI](rules/index.md#fastapi)) zgłaszają dopiero wtedy, gdy wymienia je `extend-select` albo `select`. INW000 zawsze zgłasza błąd, bo plik, którego zadeklarowane kodowanie może ukryć importy, w ogóle nie jest sprawdzany, a sprawdzenie Stop gate, czy w trakcie sesji nie przeniesiono warstwy, też pomija tabelę. Tabelę stosują `inwards check`, hooki, Stop gate i rozszerzenie VS Code; rozszerzenie czyta ją ponownie przy każdej zmianie `pyproject.toml` i pokazuje błąd konfiguracji (na przykład nieznany kod) na `pyproject.toml`. Jest częścią `[tool.inwards]`, więc config guard nie pozwala agentowi jej zmienić. [ADR-027](05-ADR.md#adr-027-per-rule-select-ignore-and-severity-in-a-toolinwardsrules-table) opisuje, jak działa z baseline'em i SARIF.
 
 `generated` wymienia moduły, które zapisuje krok budowania, na przykład `orders_pb2` z protoc albo moduł `_version` zapisywany przez setuptools-scm. Checkout programisty je ma, a świeży checkout w CI nie, więc INW010 nie zgłasza importu takiego modułu, którego nie ma na dysku. Wzorce pasują do całych segmentów nazwy w dowolnym miejscu, tak jak `ignore`, a segment może używać `*` i `?`: `*_pb2` obejmuje `shop.api.orders_pb2`, a `shop.gen` wszystko w `shop/gen/`. Bez tego klucza lista to `["*_pb2", "*_pb2_grpc", "_version"]`; ustawienie klucza zastępuje tę listę, a `generated = []` ją wyłącza. Zbiór w nawiasach albo wzorzec złożony z samych symboli wieloznacznych to błąd konfiguracji. Szczegóły są w [GitHub Actions](guides/ci.md#generated-modules) i w [ADR-029](05-ADR.md#adr-029-generated-modules-pass-inw010-protoc-and-version-modules-by-default).
 
@@ -157,7 +158,7 @@ Struktura opiera się na C4 dla architektury i na zwykłych ADR-ach dla decyzji.
 
 !!! info "Stan"
     Pre-alpha.
-    Reguły INW000–INW016 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) mówi, co sprawdza każda z nich.
+    Reguły INW000–INW018 i reguły FastAPI FAPI001–FAPI009 (FAPI004 nie jest używany) działają od początku do końca w CLI, w silniku i w edytorze (`inwards server`); [indeks reguł](rules/index.md) grupuje je według kategorii i mówi, co sprawdza każda z nich.
     `inwards init --agent claude` instaluje hooki Claude Code: sprawdzenie po każdej edycji, Stop gate obejmujący to, co zmieniła sesja, config guard oraz eskalację do użytkownika. Dla Aidera `init` wypisuje linię `lint-cmd` do dodania, a dla innych agentów zapisuje sekcję w `AGENTS.md`. W nowym projekcie `inwards init --style layered|clean|hexagonal|vertical-slices|bounded-contexts|django|fastapi` zapisuje warstwy, a `--scaffold` dodaje przykładowy pakiet, który przechodzi sprawdzenie.
     Najnowsze wydanie to 0.5.0 (2026-10-10). Każde wydanie trafia na [PyPI](https://pypi.org/project/inwards/) jako pięć wheeli platformowych (`uv add --dev inwards`) oraz do GitHub Releases z plikami binarnymi dla sześciu platform, tymi samymi wheelami i rozszerzeniem VS Code, po jednym VSIX na platformę z plikiem binarnym w środku. Szczegóły są w [Instalacji](guides/install.md).
     Wszystko, co w tej dokumentacji jest oznaczone :material-progress-clock:, jest zaplanowane, a nie zbudowane.

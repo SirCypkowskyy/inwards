@@ -1,20 +1,6 @@
 {
   "rules": [
     {
-      "code": "INW000",
-      "name": "unsupported-encoding",
-      "title": "INW000 unsupported-encoding",
-      "summary": "Zadeklarowane kodowanie źródła, w którym komentarz może być prawdziwym importem",
-      "description": "Plik w warstwie deklaruje kodowanie źródła, w którym tekst, jaki Inwards czyta jako komentarz, może być dla Pythona prawdziwym importem. Plik jest zgłaszany zamiast sprawdzany.",
-      "category": ["imports", "encoding"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "błąd",
-      "url": "INW000/"
-    },
-    {
       "code": "INW001",
       "name": "layer-dependency",
       "title": "INW001 layer-dependency",
@@ -26,6 +12,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "błąd",
+      "presets": "wszystkie",
       "url": "INW001/"
     },
     {
@@ -40,6 +27,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "błąd",
+      "presets": "wszystkie oprócz django, fastapi",
       "url": "INW002/"
     },
     {
@@ -54,6 +42,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "błąd",
+      "presets": "wszystkie",
       "url": "INW003/"
     },
     {
@@ -68,6 +57,7 @@
       "severity": "error",
       "suppressible": false,
       "default": "błąd",
+      "presets": "wszystkie",
       "url": "INW004/"
     },
     {
@@ -82,63 +72,8 @@
       "severity": "error",
       "suppressible": true,
       "default": "błąd",
+      "presets": "wszystkie",
       "url": "INW005/"
-    },
-    {
-      "code": "INW006",
-      "name": "unassigned-module",
-      "title": "INW006 unassigned-module",
-      "summary": "Własny kod poza wszystkimi warstwami i prefiksy warstw, do których nie pasuje żaden moduł",
-      "description": "Własny kod musi należeć do warstwy, a każdy prefiks warstwy musi pasować do modułów. Zgłasza importy kodu spoza wszystkich warstw, pakiety spoza wszystkich warstw i martwe prefiksy.",
-      "category": ["layout", "layers"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": true,
-      "default": "błąd, część diagnostyk to ostrzeżenia",
-      "url": "INW006/"
-    },
-    {
-      "code": "INW007",
-      "name": "package-shape",
-      "title": "INW007 package-shape",
-      "summary": "Element pakietu, na który jego kształt nie pozwala, albo nazwa poza pakietami, do których należy",
-      "description": "Pakiet zawiera tylko elementy, na które pozwala jego skonfigurowany kształt, a nazwy zostają w pakietach, do których należą.",
-      "category": ["layout", "shape"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "błąd, część diagnostyk to ostrzeżenia",
-      "url": "INW007/"
-    },
-    {
-      "code": "INW008",
-      "name": "missing-member",
-      "title": "INW008 missing-member",
-      "summary": "Brakuje elementu, którego wymaga kształt pakietu",
-      "description": "Pakiet zawiera każdy element, którego wymaga jego skonfigurowany kształt.",
-      "category": ["layout", "shape"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "błąd",
-      "url": "INW008/"
-    },
-    {
-      "code": "INW009",
-      "name": "suppression-comment",
-      "title": "INW009 suppression-comment",
-      "summary": "Wyciszenie w linii, które niczego nie ukrywa albo nie pasuje do żadnej diagnostyki",
-      "description": "Wyciszenie w linii wymienia reguły, które można wyciszyć, podaje powód i ukrywa diagnostykę.",
-      "category": ["suppressions"],
-      "status": "stable",
-      "autofix": false,
-      "severity": "error",
-      "suppressible": false,
-      "default": "błąd, nieużywane to ostrzeżenia",
-      "url": "INW009/"
     },
     {
       "code": "INW010",
@@ -152,6 +87,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "błąd",
+      "presets": "wszystkie",
       "url": "INW010/"
     },
     {
@@ -166,7 +102,53 @@
       "severity": "error",
       "suppressible": true,
       "default": "błąd",
+      "presets": "wszystkie",
       "url": "INW011/"
+    },
+    {
+      "code": "INW006",
+      "name": "unassigned-module",
+      "title": "INW006 unassigned-module",
+      "summary": "Własny kod poza wszystkimi warstwami i prefiksy warstw, do których nie pasuje żaden moduł",
+      "description": "Własny kod musi należeć do warstwy, a każdy prefiks warstwy musi pasować do modułów. Zgłasza importy kodu spoza wszystkich warstw, pakiety spoza wszystkich warstw i martwe prefiksy.",
+      "category": ["layout", "layers"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": true,
+      "default": "błąd, część diagnostyk to ostrzeżenia",
+      "presets": "wszystkie",
+      "url": "INW006/"
+    },
+    {
+      "code": "INW007",
+      "name": "package-shape",
+      "title": "INW007 package-shape",
+      "summary": "Element pakietu, na który jego kształt nie pozwala, albo nazwa poza pakietami, do których należy",
+      "description": "Pakiet zawiera tylko elementy, na które pozwala jego skonfigurowany kształt, a nazwy zostają w pakietach, do których należą.",
+      "category": ["layout", "shape"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "błąd, część diagnostyk to ostrzeżenia",
+      "presets": "wszystkie",
+      "url": "INW007/"
+    },
+    {
+      "code": "INW008",
+      "name": "missing-member",
+      "title": "INW008 missing-member",
+      "summary": "Brakuje elementu, którego wymaga kształt pakietu",
+      "description": "Pakiet zawiera każdy element, którego wymaga jego skonfigurowany kształt.",
+      "category": ["layout", "shape"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "błąd",
+      "presets": "wszystkie",
+      "url": "INW008/"
     },
     {
       "code": "INW012",
@@ -174,12 +156,13 @@
       "title": "INW012 thin-endpoint",
       "summary": "Endpoint HTTP, który sam wykonuje pracę: za dużo instrukcji, gałęzi albo pętli, własne wywołania bazy danych albo HTTP, albo brak wywołania warstwy, którą wskazuje `delegate-to`",
       "description": "Endpoint HTTP czyta żądanie, wywołuje jeden przypadek użycia i kształtuje odpowiedź; logika, zapytania i wywołania na zewnątrz mieszkają w innych warstwach.",
-      "category": ["layers", "endpoints"],
+      "category": ["roles", "endpoints"],
       "status": "stable",
       "autofix": false,
       "severity": "warning",
       "suppressible": true,
       "default": "opt-in, ostrzeżenie",
+      "presets": "fastapi",
       "url": "INW012/"
     },
     {
@@ -188,12 +171,13 @@
       "title": "INW013 async-blocking",
       "summary": "Synchroniczne wywołanie bazy danych, cache'u albo chmury wewnątrz `async def`: synchroniczny `Session` SQLAlchemy, `redis.Redis`, boto3 albo blokujący sterownik",
       "description": "Funkcja async def nie wykonuje synchronicznych wywołań bazy danych, cache'u ani chmury, ani sama, ani przez wywoływaną synchroniczną funkcję pomocniczą; synchroniczny Session SQLAlchemy, redis.Redis, boto3 albo blokujący sterownik zatrzymuje pętlę zdarzeń.",
-      "category": ["async", "roles"],
+      "category": ["roles", "async"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "INW013/"
     },
     {
@@ -202,12 +186,13 @@
       "title": "INW014 ports-abstract",
       "summary": "Klasa w module portu, która nie jest ABC ani Protocol, albo metoda portu, której ciało wykonuje pracę",
       "description": "Moduł portu zawiera tylko klasy ABC i Protocol, których metody nie mają ciała; implementacje należą do adapterów.",
-      "category": ["ports", "roles"],
+      "category": ["roles", "ports"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "clean, hexagonal",
       "url": "INW014/"
     },
     {
@@ -216,12 +201,13 @@
       "title": "INW015 construct-only-in",
       "summary": "Moduł spoza korzenia kompozycji, który w czasie działania importuje adapter wyjściowy albo inną chronioną rolę lub buduje jedną z jej klas",
       "description": "Tylko korzeń kompozycji importuje i buduje moduły chronionej roli, takie jak adaptery wyjściowe; reszta kodu dostaje je przez port.",
-      "category": ["roles", "ports-and-adapters"],
+      "category": ["roles", "composition-root"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "clean, hexagonal",
       "url": "INW015/"
     },
     {
@@ -230,13 +216,44 @@
       "title": "INW016 orm-naming",
       "summary": "Nazwa tabeli, która nie jest w lower_case_snake i w liczbie pojedynczej, albo kolumna daty i czasu bez `_at` lub `_date`; uruchomienie dla całego projektu wymaga też konwencji nazw w `MetaData`",
       "description": "Nazwy tabel ORM oraz nazwy kolumn daty i czasu trzymają się schematu projektu, domyślnie tabele w lower_case_snake i w liczbie pojedynczej, _at dla daty z czasem i _date dla samej daty, a modele SQLAlchemy mają konwencję nazw w MetaData.",
-      "category": ["naming", "roles"],
+      "category": ["roles", "naming"],
       "status": "stable",
       "autofix": false,
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "INW016/"
+    },
+    {
+      "code": "INW000",
+      "name": "unsupported-encoding",
+      "title": "INW000 unsupported-encoding",
+      "summary": "Zadeklarowane kodowanie źródła, w którym komentarz może być prawdziwym importem",
+      "description": "Plik w warstwie deklaruje kodowanie źródła, w którym tekst, jaki Inwards czyta jako komentarz, może być dla Pythona prawdziwym importem. Plik jest zgłaszany zamiast sprawdzany.",
+      "category": ["integrity", "encoding"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "błąd",
+      "presets": "wszystkie",
+      "url": "INW000/"
+    },
+    {
+      "code": "INW009",
+      "name": "suppression-comment",
+      "title": "INW009 suppression-comment",
+      "summary": "Wyciszenie w linii, które niczego nie ukrywa albo nie pasuje do żadnej diagnostyki",
+      "description": "Wyciszenie w linii wymienia reguły, które można wyciszyć, podaje powód i ukrywa diagnostykę.",
+      "category": ["integrity", "suppressions"],
+      "status": "stable",
+      "autofix": false,
+      "severity": "error",
+      "suppressible": false,
+      "default": "błąd, nieużywane to ostrzeżenia",
+      "presets": "wszystkie",
+      "url": "INW009/"
     },
     {
       "code": "INW017",
@@ -250,6 +267,7 @@
       "severity": "warning",
       "suppressible": false,
       "default": "opt-in, ostrzeżenie",
+      "presets": "żaden",
       "url": "INW017/"
     },
     {
@@ -264,6 +282,7 @@
       "severity": "warning",
       "suppressible": false,
       "default": "opt-in, ostrzeżenie",
+      "presets": "żaden",
       "url": "INW018/"
     },
     {
@@ -278,6 +297,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI001/"
     },
     {
@@ -292,6 +312,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI002/"
     },
     {
@@ -306,6 +327,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI003/"
     },
     {
@@ -320,6 +342,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI005/"
     },
     {
@@ -334,6 +357,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI006/"
     },
     {
@@ -348,6 +372,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI007/"
     },
     {
@@ -362,6 +387,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI008/"
     },
     {
@@ -376,6 +402,7 @@
       "severity": "error",
       "suppressible": true,
       "default": "opt-in, błąd",
+      "presets": "fastapi",
       "url": "FAPI009/"
     }
   ]
