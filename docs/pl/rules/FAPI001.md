@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI001.md
-source_hash: 6dee19f72e3b66f9a60eb2f1ec9b2eced41c8df27b4cbad02de61074f1951892
+source_hash: 248c41b2d725d6588cb4bd178878c55aa4aedb1b705f630b1630dd988fb508b5
 type: rule
 title: FAPI001 endpoint-metadata
 description: Operacja ścieżki FastAPI w schemacie OpenAPI nie ma metadanych, których wymaga projekt, na przykład podsumowania, modelu odpowiedzi albo jawnego kodu statusu.
@@ -151,6 +151,8 @@ require-operation-id = false              # an explicit operation_id=, for gener
 - Reguła sprawdza, czy podsumowanie istnieje, a nie czy jest dobre.
 - `include_in_schema=False` na `include_router(...)` gdzie indziej jest brane pod uwagę tylko przez dołączenia, które Inwards umie rozwiązać.
 - Trasy dodawane w czasie działania (`add_api_route`, pętle po konfiguracji) nie są widoczne.
+- **Aplikacja, która nie serwuje schematu** (`FastAPI(openapi_url=None)`), jest pomijana razem ze wszystkimi swoimi trasami, jak przy `include_in_schema=False`.
+- **Zmierzona na korpusie** ([#182](https://github.com/SirCypkowskyy/inwards/issues/182), [rozdział 6](../06-Constraints-and-Quality.md#precision-of-the-opt-in-rules)): 22 zgłoszenia przed regułą o `openapi_url`, 21 po niej, wszystkie obejrzane: 19 trafnych (`POST` albo `DELETE` bez jawnego kodu statusu, trasa bez podsumowania) i 2 na małych aplikacjach, które budują testy Polara ([#362](https://github.com/SirCypkowskyy/inwards/issues/362)). 450 endpointów Polara i 15 z fastapi-clean-example nie jest w ogóle widocznych ([#358](https://github.com/SirCypkowskyy/inwards/issues/358)).
 
 ## Źródła { #references }
 

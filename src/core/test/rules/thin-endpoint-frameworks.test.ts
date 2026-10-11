@@ -10,7 +10,25 @@
 import { describe, expect, test } from "bun:test";
 import type { Diagnostic } from "../../src/index.ts";
 import { Engine, parseConfig } from "../../src/index.ts";
+import { mayHoldEndpoints } from "../../src/rules/thin-endpoint/endpoints.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
+
+/** File texts that remember which paths were read. */
+class ReadsCounted extends Map<string, string> {
+  /** The paths `get` was asked for, in order. */
+  readonly read: string[] = [];
+
+  /**
+   * Returns a file's text and records the read.
+   *
+   * @param path - the file's path.
+   * @returns its text, if any.
+   */
+  override get(path: string): string | undefined {
+    this.read.push(path);
+    return super.get(path);
+  }
+}
 
 /** The endpoint's name a finding's message opens with. */
 const QUOTED_NAME = /^`(?<name>[^`]+)`/u;
@@ -336,6 +354,63 @@ ${fat("def get(self):", "    ")}`;
     expect(await names(text, 'base-classes = ["shop.http.Resource"]')).toEqual([
       `${lineOf(text, "def get(")} Orders.get`,
     ]);
+  });
+
+  test("a class with no handler methods doesn't read its bases' modules", async () => {
+    // Saleor (#182 corpus run): every model and type class read the modules
+    // of its first-party bases, and the full check went from 1.1 to 8 s.
+    const models = `from django.db import models
+
+from shop.core.models import TimeStamped
+
+
+class Order(TimeStamped):
+    total = models.IntegerField()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+`;
+    const texts = new ReadsCounted([
+      ["shop/api/models.py", models],
+      ["shop/core/models.py", "class TimeStamped:\n    pass\n"],
+    ]);
+    const disk = new Map<string, "file" | "dir">([
+      ["shop", "dir"],
+      ["shop/__init__.py", "file"],
+      ["shop/api", "dir"],
+      ["shop/api/__init__.py", "file"],
+      ["shop/api/models.py", "file"],
+      ["shop/core", "dir"],
+      ["shop/core/__init__.py", "file"],
+      ["shop/core/models.py", "file"],
+    ]);
+    const engine = await Engine.create(grammars(), parseConfig(CONFIG));
+    const found = engine.checkFiles([file("shop/api/models.py", models)], indexOn(disk, texts));
+    expect(found.filter((d) => d.code === "INW012")).toEqual([]);
+    expect(texts.read).not.toContain("shop/core/models.py");
+  });
+
+  test("a Django file with no view shape isn't parsed for endpoints", () => {
+    // Saleor (#182 corpus run): nearly every file mentions Django, and a full
+    // parse of each made a check with INW012 on 4 times slower.
+    const recognise = { decorators: [], frameworks: undefined, baseClasses: [], scoped: false };
+    const model =
+      "from django.db import models\n\n\nclass Order(models.Model):\n    total = models.IntegerField()\n";
+    expect(mayHoldEndpoints(model, recognise)).toBe(false);
+    expect(mayHoldEndpoints(`${model}    """Who triggered this action."""\n`, recognise)).toBe(
+      false,
+    );
+    expect(mayHoldEndpoints(model, { ...recognise, scoped: true })).toBe(true);
+    for (const shape of [
+      "from django.views import View\n\nclass V(View):\n    def get(self, request): ...\n",
+      "from rest_framework.decorators import api_view\n",
+      "from rest_framework import decorators\n\nclass V:\n    @decorators.action(detail=True)\n    def x(self): ...\n",
+      "from django.urls import path\n\nurlpatterns = [path('x', v)]\n",
+      "from django.urls import re_path\n\nurlpatterns = [re_path(r'x', v)]\n",
+      "from fastapi import APIRouter\n",
+    ]) {
+      expect(mayHoldEndpoints(shape, recognise)).toBe(true);
+    }
   });
 
   test("a view base defined in another first-party module is followed", async () => {

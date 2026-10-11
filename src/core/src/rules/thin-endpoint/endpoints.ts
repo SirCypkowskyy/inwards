@@ -28,6 +28,7 @@ import {
   REGISTER_METHODS,
   ROUTERS,
   standaloneDecorator,
+  VIEW_METHODS,
 } from "./frameworks.ts";
 import type { Recognise } from "./settings.ts";
 
@@ -87,17 +88,33 @@ export interface EndpointContext {
 type Routers = ReadonlyMap<"fastapi" | "flask", ReadonlySet<string>>;
 
 /**
+ * What a Django file must spell to hold an endpoint: `@api_view`, `@action`,
+ * a `path(...)` or `re_path(...)` registration, or a method a view class
+ * handles requests with (`def get(`, `def list(`).
+ */
+const DJANGO_SHAPE = new RegExp(
+  `\\bapi_view\\b|@(?:\\w+\\.)*action\\b|\\b(?:re_)?path\\s*\\(|\\bdef\\s+(?:${[...VIEW_METHODS.django].join("|")})\\s*\\(`,
+  "u",
+);
+
+/**
  * Tells whether a file may hold an endpoint, before any parse: it mentions a
  * recognised framework, or the last literal segment of a configured
  * decorator or base class (a pattern whose last segment has a wildcard
- * can't be filtered, so any file passes).
+ * can't be filtered, so any file passes). A file that mentions only Django
+ * also needs a view's shape (`DJANGO_SHAPE`), unless `modules` scopes the
+ * rule and lets plain function views count: nearly every file of a Django
+ * project mentions it, and parsing each one made Saleor's full check 4 times
+ * slower (#182 corpus run).
  *
  * @param text - the file's text.
  * @param recognise - the configured decorators, base classes and frameworks.
  * @returns true when the file needs the full parse.
  */
 export function mayHoldEndpoints(text: string, recognise: Recognise): boolean {
-  if (frameworksIn(text, recognise.frameworks).size > 0) {
+  const active = frameworksIn(text, recognise.frameworks);
+  const django = recognise.scoped || DJANGO_SHAPE.test(text);
+  if ([...active].some((framework) => framework !== "django" || django)) {
     return true;
   }
   return [...recognise.decorators, ...recognise.baseClasses].some((pattern) => {

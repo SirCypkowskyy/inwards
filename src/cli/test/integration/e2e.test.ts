@@ -59,7 +59,7 @@ test.each(fixtures)("hook claude-code < %s", (name) => {
   expect(run(root, ["hook", "claude-code"], payload(name, root))).toMatchSnapshot();
 });
 
-test.each(["json", "sarif", "concise"])("check --format %s", (format) => {
+test.each(["json", "sarif", "concise", "github"])("check --format %s", (format) => {
   expect(run(root, ["check", "--format", format])).toMatchSnapshot();
 });
 
@@ -91,9 +91,23 @@ test.each([
   ["json", "0"],
   ["concise", "0"],
   ["sarif", "1"],
+  ["github", "0"],
   ["text", "some"],
 ])("check --format %s --max-diagnostics %s", (format, max) => {
   expect(run(root, ["check", "--format", format, "--max-diagnostics", max])).toMatchSnapshot();
+});
+
+test("check --format github names files from GITHUB_WORKSPACE", () => {
+  const repo = project({
+    "packages/api/pyproject.toml": LAYERS,
+    "packages/api/shop/domain/order.py": "import shop.infrastructure.db\n",
+    "packages/api/shop/infrastructure/db.py": "",
+  });
+  const { code, stdout } = inwards(["check", "--format", "github"], {
+    cwd: join(repo, "packages/api"),
+    env: { GITHUB_WORKSPACE: repo },
+  });
+  expect({ code, stdout: stable(stdout) }).toMatchSnapshot();
 });
 
 test.each([

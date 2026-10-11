@@ -4,7 +4,9 @@
  * `app.adapters.outbound`) and `allowed-in` the modules that may import and
  * build them (such as `app.di` and `app.main`). A module outside both that
  * imports a role module at runtime is reported on the import; an import in
- * an `if TYPE_CHECKING:` block is exempt, since it builds nothing. A call
+ * an `if TYPE_CHECKING:` block is exempt, since it builds nothing, and so is
+ * `from <role module> import SomeError`: an exception class is caught or
+ * mapped to HTTP, not built as an adapter. A call
  * that builds a role class reached through a module outside the role (a
  * re-export) is reported on the call (`calls.ts`). INW001 and INW015 can
  * both see an outward import; the engine passes `deferred` so INW001 keeps
@@ -19,7 +21,7 @@ import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.
 import { identifierName } from "../../python/nodes.ts";
 import { extractImports, importStatements, parsePython } from "../../python/parser.ts";
 import type { FirstPartySource } from "../shared/first-party.ts";
-import { constructions, inEntries } from "./calls.ts";
+import { constructions, inEntries, isExceptionName } from "./calls.ts";
 import { reportConstruction, reportImport, type Scope } from "./wording.ts";
 
 /** Any import statement, which both forms need: nothing else can reach a role module. */
@@ -147,7 +149,8 @@ export function checkConstructOnlyIn(
         continue;
       }
       covered.push(ref.target);
-      if (!deferred(ref)) {
+      const caught = ref.from !== undefined && isExceptionName(ref.target);
+      if (!(caught || deferred(ref))) {
         found.push(reportImport(src, ref, owner, scope));
       }
     }
