@@ -194,7 +194,7 @@ handled-counts-as-documented = false  # true: codes from app exception handlers 
 explicit-422 = "ignore"               # "report": a raised 422 must be declared too
 ```
 
-An unknown key or a wrong value is a config error that names the key. Like every rule, it also takes `modules` ([options tables](index.md#opt-in-rules)). A finding can be suppressed on the decorator's line with `# inwards: ignore[FAPI002] reason="..."`.
+An unknown key or a wrong value is a config error that names the key. Like every rule, it also takes `modules`, and like every content rule `check-tests`, which makes it report in test modules too ([options tables](index.md#opt-in-rules)). A finding can be suppressed on the decorator's line with `# inwards: ignore[FAPI002] reason="..."`.
 
 Ruff's `FAST004` (in review) covers ring 0 with same-file `responses=`. When it ships, `report-direct-raises = false` keeps the two from reporting the same `raise`.
 

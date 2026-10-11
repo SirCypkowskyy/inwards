@@ -144,7 +144,7 @@ No automatic fix (`autofix: false`). Whether the error should reach the client u
 
 ## Configuration
 
-Severity error. Opt-in: turn it on with `extend-select`. It has no options of its own; `modules` works as for every rule ([options tables](index.md#opt-in-rules)).
+Severity error. Opt-in: turn it on with `extend-select`. It has no options of its own; `modules` works as for every rule, and `check-tests` as for every content rule ([options tables](index.md#opt-in-rules)).
 
 Every finding can be suppressed inline with `# inwards: ignore[FAPI007] reason="..."` on the `except` line.
 
