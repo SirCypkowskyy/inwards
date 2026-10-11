@@ -243,13 +243,14 @@ test("a preset whose ports layer became a selector names no ports module", () =>
 });
 
 describe("inwards context", () => {
-  test("prints the brief for the example config, under 300 tokens", () => {
+  test("prints the brief for the example config, under 450 tokens", () => {
     const out = run(REPO, "context");
     expect(out.code).toBe(0);
     expect(out.stdout).toMatchSnapshot();
-    // examples/clean-app keeps its Protocol in shop/domain/ports.py.
-    expect(out.stdout).toContain("`shop.domain.ports`");
-    expect(tokens(out.stdout)).toBeLessThan(300);
+    // examples/clean-app keeps each slice's Protocols in its ports module.
+    expect(out.stdout).toContain("- INW014: `shop.*.ports` hold only ABCs and Protocols");
+    // Nine layers, three contexts and two opt-in rules: more than a preset's 300.
+    expect(tokens(out.stdout)).toBeLessThan(450);
   });
 
   test("--write adds the section, updates it in place, and then has nothing to do", () => {

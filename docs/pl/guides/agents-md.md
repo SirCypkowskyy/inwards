@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: 88a19230f5a63d75f421db17c5574673412f74959d524d2a7a742a6669b7f405
+source_hash: a128cd6e877bb4392d956d55423c81b0f42089b9c3086b1baa24dfcf5bc868d3
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -58,27 +58,41 @@ Sekcja powyżej każe agentowi sprawdzić pracę po fakcie. Opis architektury (b
 inwards context
 ```
 
-Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`) ma 678 znaków, około 170 tokenów; test pilnuje, żeby przykład i każdy preset mieściły się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540), i presetem vertical-slices, który z pięcioma rolami wycinka i INW021 ma się zmieścić poniżej 350 (z `--scaffold` ma około 334). Ze znacznikami, które dodaje `--write`, wygląda tak:
+Wymienia warstwy od najbardziej wewnętrznej, z tym, co każda może importować, miejsce, w którym leżą porty, a jeśli są skonfigurowane, także reguły bibliotek (INW005), konteksty z ich publicznymi modułami i zależnościami (INW002, INW003) oraz reguły opt-in włączone w konfiguracji. Reguły wyłączone w `[tool.inwards.rules]` są pomijane. Warstwa, która ma pod sobą więcej niż trzy warstwy, podaje je numerami z listy (`may import layers 1-9`); brief, który tak robi, wymienia grupy warstw sąsiednich raz, w pierwszym zdaniu (`sibling groups: 2-4; 5-6`), a nie w każdej linii. Publiczne moduły kontekstu leżące w jego jedynym module dzielą ten prefiks (`` `app.posts.{router,service}` ``), podobnie jak moduły wpisu `deny` o wspólnym rodzicu (`` `app.*.{models,service}` ``). Gdy INW002 jest wyłączona, konteksty nie podają swoich zależności. Dla przykładowej konfiguracji repozytorium (`examples/clean-app`), z dziewięcioma warstwami, trzema kontekstami i dwiema regułami opt-in, ma 1671 znaków, około 418 tokenów. Test pilnuje, żeby każdy preset mieścił się poniżej 300 tokenów (przy czterech znakach na token), poza presetem fastapi, który z jedenastoma warstwami, wpisem `deny` i jedenastoma regułami opt-in ma się zmieścić poniżej 550 (ma około 540), presetem vertical-slices, który z pięcioma rolami wycinka i INW021 ma się zmieścić poniżej 350 (z `--scaffold` ma około 334), a przykład poniżej 450. Ze znacznikami, które dodaje `--write`, wygląda tak:
 
 ```markdown
 <!-- inwards-brief:begin -->
 ## Architecture brief (Inwards)
 
-`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own.
+`[tool.inwards]` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of your own layer (sibling groups: 4-6).
 
-1. domain (`shop.domain`): imports no other layer
-2. application (`shop.application`): may import domain
-3. infrastructure (`shop.infrastructure`): may import domain, application
-4. interface (`shop.api`, `shop.cli`): may import every other layer
+1. slice.models (`shop.*.models`): imports no other layer
+2. slice.ports (`shop.*.ports`): may import slice.models
+3. slice.services (`shop.*.services`): may import slice.models, slice.ports
+4. slice.commands (`shop.*.commands`): may import slice.models, slice.ports, slice.services
+5. slice.queries (`shop.*.queries`): may import slice.models, slice.ports, slice.services
+6. slice.adapters (`shop.*.adapters`): may import slice.models, slice.ports, slice.services
+7. slice.api (`shop.*.api`): may import layers 1-6
+8. slice.factory (`shop.*.factory`): may import layers 1-7
+9. bootstrap (`shop.main`): may import every other layer
 
-Ports: when an inner layer needs something from an outer one, declare a `typing.Protocol` in `shop.domain.ports` and implement it in the outer layer.
+Ports: when an inner layer needs something from an outer one, declare a `typing.Protocol` in the inner layer and implement it in the outer layer.
 
 Libraries (INW005):
-- domain: no web frameworks, database or network clients, `subprocess` or `socket`
+- slice.models: no web frameworks, database or network clients, `subprocess` or `socket`
+
+Contexts (INW002, INW003): import another context only when yours depends on it, and only its public modules.
+- catalog (`shop.catalog`): public `shop.catalog.{api,factory}`; depends on shared
+- orders (`shop.orders`): public `shop.orders.{api,factory}`; depends on shared
+- shared (`shop.shared`): public `shop.shared`; no dependencies
+
+Opt-in rules:
+- INW014: `shop.*.ports` hold only ABCs and Protocols whose methods have no body
+- INW015: only `shop.*.factory`, `shop.main` may import or build `shop.*.adapters`; elsewhere take it through a port
 <!-- inwards-brief:end -->
 ```
 
-Porty to pakiet albo moduł `ports` leżący bezpośrednio w module warstwy na dysku (tutaj `shop/domain/ports.py`). Dla konfiguracji zapisanej przez `inwards init --style` opis podaje też nazwę presetu i jego moduł portów (`app.application.ports` dla clean i hexagonal), zanim `--scaffold` go utworzy; preset rozpoznaje po komentarzu, który init umieszcza w tabeli, więc usunięcie tego komentarza usuwa też nazwę.
+Porty to pakiet albo moduł `ports` leżący bezpośrednio w module warstwy na dysku, na przykład `shop/domain/ports.py` dla warstwy `shop.domain`. Warstwa zapisana selektorem (`shop.*.models`) nie ma jednego takiego modułu, więc brief mówi wtedy „the inner layer”, jak tutaj; moduły portów wymienia linia INW014. Dla konfiguracji zapisanej przez `inwards init --style` opis podaje też nazwę presetu i jego moduł portów (`app.application.ports` dla clean i hexagonal), zanim `--scaffold` go utworzy; preset rozpoznaje po komentarzu, który init umieszcza w tabeli, więc usunięcie tego komentarza usuwa też nazwę.
 
 Każda reguła opt-in włączona w konfiguracji (INW012 do INW016 i reguły FAPI, przez `extend-select`, `select` albo [regułę dla roli](configuration.md#template-rules)) dodaje jedną linię pod „Opt-in rules:”. Linia mówi, co robić przy pisaniu kodu, i podaje kluczowe ustawienie reguły: `delegate-to` dla INW012, moduły portów dla INW014 (jej `modules`, a bez nich każdy moduł `ports`), `role` i `allowed-in` dla INW015, schemat nazw dla INW016, wymagane metadane dla FAPI001, `codes` dla FAPI002 i `entrypoints` dla FAPI003. Reguła zawężona przez `modules` je wymienia (`INW013 in app.*.router`). INW015 bez `role` niczego nie sprawdza, więc wtedy nie dostaje linii. Po `inwards init --style fastapi` wyglądają tak:
 

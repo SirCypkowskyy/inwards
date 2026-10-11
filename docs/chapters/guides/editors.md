@@ -1,7 +1,7 @@
 # Neovim, Zed and Helix
 
 !!! info "Verified 2026-10-10"
-    Neovim 0.12.5 on macOS (arm64), headless, with the compiled binary on `examples/broken-app`: both Neovim configs below started `inwards server` with the project as root, and `shop/domain/order.py` showed its INW001 diagnostic. The Zed extension compiles (`cargo check`) against `zed_extension_api` 0.7.0, but it hasn't been loaded in Zed. The Helix config follows the docs and source of Helix 25.07.1 and hasn't been run. Linux and Windows haven't been tried by hand.
+    Neovim 0.12.5 on macOS (arm64), headless, with the compiled binary on `examples/broken-app`: both Neovim configs below started `inwards server` with the project as root, and the planted import showed its INW001 diagnostic. The Zed extension compiles (`cargo check`) against `zed_extension_api` 0.7.0, but it hasn't been loaded in Zed. The Helix config follows the docs and source of Helix 25.07.1 and hasn't been run. Linux and Windows haven't been tried by hand.
 
 `inwards server` is a language server over stdio, in the binary from Inwards 0.5.0 on. An editor with an LSP client starts it and shows, for every file in the workspace, what `inwards check` reports there: the file you type in is checked on every change, and the whole workspace again on every save. [VS Code](install.md#vs-code) has an extension; this page sets up the editors that take a language server from their config.
 
