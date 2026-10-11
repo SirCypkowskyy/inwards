@@ -23,8 +23,8 @@ Still on GitHub-hosted runners:
   (these runners are Ubuntu 26.04, so a 24.04 row here would test nothing new).
 
 `sarif.yml` runs here although it holds `security-events: write`: it is a
-per-PR job, and that token can't upload anything while the repository is
-private.
+per-PR job; a fork's run goes to a GitHub-hosted runner, where GitHub gives
+the token read access only.
 
 ## How it works
 
@@ -42,8 +42,10 @@ private.
 - **The token never enters a job container.** `runner.sh` runs on the host,
   holds the PAT from `.env` and hands it to `curl` on stdin, so it doesn't
   show in `ps`. The container only gets the single-use JIT config.
-- **Private repositories only.** Before each registration `runner.sh` reads
-  the repository and refuses to register while it isn't private.
+- **Private repositories only (irysek setup).** Before each registration
+  `runner.sh` reads the repository and refuses to register while it isn't
+  private. A public repository needs the fork routing described under
+  Security instead.
 - **Two slots**, each capped at 2 GB RAM with no swap, 2 CPUs and 4096
   processes, with OOM score 500 so the kernel kills a job before a host
   service. The host has about 3.4 GB free next to its other services.
@@ -153,11 +155,18 @@ day, or delete them under Settings > Actions > Runners.
 
 ## Security
 
-- **Private repository only.** These runners execute pull request code. The
-  repository is private and doesn't run workflows from fork pull requests
-  (Settings > Actions > General), and `runner.sh` stops registering if the
-  repository becomes public. Never turn on fork pull request workflows while
-  these runners are attached.
+- **Fork pull requests never run here** (#333). The repository is public
+  (checked 2026-10-11). Every workflow job that a `pull_request` event can
+  start picks `ubuntu-24.04-arm` (GitHub-hosted) when the pull request comes
+  from a fork, and these runners only otherwise (see the `runs-on`
+  expression in `ci.yml`, `bench.yml`, `sarif.yml` and `corpus.yml`). A
+  fork's run also needs a maintainer's approval first (Settings > Actions >
+  General: "Require approval for all external contributors"), and every
+  action is pinned to a commit SHA, which the repository's Actions settings
+  require. The runners attached in October 2026 are `inwards-dell-1` to `-3`
+  (ARM64), not the irysek setup this page describes; on that host,
+  `runner.sh`'s "refuse unless private" check must be off or the runners
+  would not register, so this routing is what keeps fork code off them.
 - **Jobs are root inside their container** (sudo, like hosted runners), but the
   container is unprivileged, has no Docker socket, no host mounts and no
   network path to the host or the LAN, and is deleted after the job. A
