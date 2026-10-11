@@ -186,6 +186,25 @@ describe("INW017 diagram-unknown-name", () => {
     ]);
   });
 
+  test("a name that can't be a Mermaid id is named by a quoted label from its modules; one that can stays strict", () => {
+    const pyproject = PYPROJECT.replace(
+      '{ name = "domain", modules = ["shop.domain"] }',
+      '{ name = "core.domain", modules = ["shop.domain"] }',
+    );
+    expect(
+      check(
+        ["%% inwards: layers", "flowchart LR", '  application --> d["shop.domain"]'],
+        pyproject,
+      ),
+    ).toEqual([]);
+    const strict = check([
+      "%% inwards: layers",
+      "flowchart LR",
+      '  application --> domian["shop.domain"]',
+    ]);
+    expect(strict.map((d) => d.fix.summary)).toEqual(['Rename "domian" to "domain".']);
+  });
+
   test("the rule is opt-in, and [tool.inwards.rules] can raise it to an error", () => {
     const lines = ["%% inwards: layers", "flowchart LR", "  web --> domain"];
     expect(check(lines, PYPROJECT.replace('extend-select = ["INW017"]', ""))).toEqual([]);
