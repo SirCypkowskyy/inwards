@@ -30,7 +30,7 @@ import { hideTopLevel } from "./absent.ts";
 import { applyBaseline, readBaseline } from "./baseline.ts";
 import type { ExtractionPool, ProjectIo } from "./contracts.ts";
 import { checkNamedDiagrams, DIAGRAM_FILE, readDiagrams, splitTargets } from "./diagrams.ts";
-import { atOrInside, type PlannedFile, planSources, readSources } from "./sources.ts";
+import { atOrInside, diskTexts, type PlannedFile, planSources, readSources } from "./sources.ts";
 import { checkOnThreads, openPool } from "./threads.ts";
 import { wholeProjectFindings } from "./whole.ts";
 import { otherPortions, workspacePackages } from "./workspace.ts";
@@ -207,35 +207,6 @@ function projectFiles(
     listDir: (rel: string): ReturnType<ListDir> => io.read.list(join(root, rel)),
     ...(project.portions ? { portions: project.portions } : {}),
   };
-}
-
-/**
- * Collects the texts the check read from disk, by absolute path, leaving out
- * the files whose content `texts` replaced: the index reads those from disk.
- *
- * @param run - the planned files, in order, and the content that replaced some.
- * @param run.planned - the files from `planSources`.
- * @param run.texts - content checked instead of what is on disk, by absolute path.
- * @param files - the source files `readSources` gave, one per planned source, in order.
- * @returns each file's text as read from disk.
- */
-function diskTexts(
-  {
-    planned,
-    texts,
-  }: { planned: readonly PlannedFile[]; texts: ReadonlyMap<string, string> | undefined },
-  files: readonly SourceFile[],
-): Map<string, string> {
-  const read = new Map<string, string>();
-  let at = 0;
-  for (const { abs, sources } of planned) {
-    const file = files[at];
-    at += sources.length;
-    if (file !== undefined && sources.length > 0 && texts?.has(abs) !== true) {
-      read.set(abs, file.text);
-    }
-  }
-  return read;
 }
 
 /** What `checkPlanned` gives back to `runCheck`. */
