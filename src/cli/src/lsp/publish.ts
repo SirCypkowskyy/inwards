@@ -7,7 +7,7 @@
  */
 import { pathToFileURL } from "node:url";
 import type { ConfigError, Diagnostic } from "@inwards/core";
-import { PYTHON } from "./checks.ts";
+import { checkedAlone } from "./checks.ts";
 import type { Editor, LspDiagnostic } from "./contracts.ts";
 import { configDiagnostic, toLsp } from "./convert.ts";
 
@@ -46,7 +46,7 @@ export interface View {
  * @returns true when it has changes the pass didn't see.
  */
 function live(doc: OpenDoc): boolean {
-  return PYTHON.test(doc.path) && doc.basis !== undefined && doc.text !== doc.basis;
+  return checkedAlone(doc.path) && doc.basis !== undefined && doc.text !== doc.basis;
 }
 
 /**

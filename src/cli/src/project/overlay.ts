@@ -1,6 +1,6 @@
 /**
- * @file Python sources a caller holds in memory, laid over the disk for one
- * check: the MCP server's `check_files` and `where_should_this_go` check text
+ * @file Python sources, and diagram files (#348), a caller holds in memory,
+ * laid over the disk for one check: the MCP server's `check_files` and `where_should_this_go` check text
  * an agent hasn't written yet. A file whose text is given reads as that text;
  * a file that doesn't exist yet also shows up in the probe, the directory
  * listings, the real paths and the walk, with any missing directories above
@@ -19,6 +19,9 @@ import type {
 } from "../platform/contracts.ts";
 import type { ProjectIo } from "./contracts.ts";
 import { atOrInside } from "./sources.ts";
+
+/** A Python source or stub, which the walk for sources may find. */
+const PYTHON = /\.pyi?$/u;
 
 /** The I/O a check and its routing read, which the overlay wraps. */
 type Overlaid = Pick<ProjectIo, "probe" | "read" | "walk">;
@@ -178,8 +181,8 @@ function overlayRead(read: FileReader, layer: Layer): FileReader {
 }
 
 /**
- * Walks for Python sources with the overlay's new files: those under a walked
- * path join what the disk gives, and a path that exists only in the overlay
+ * Walks for Python sources with the overlay's new files: the Python ones under a walked
+ * path join what the disk gives (a new diagram file is read, never walked as a source), and a path that exists only in the overlay
  * isn't handed to the disk's walk, which would fail on it.
  *
  * @param io - the disk's walk and the overlaid probe.
@@ -200,7 +203,10 @@ function sourcesOf(
   const found = onDisk.length === 0 ? [] : io.walk.pythonSources(onDisk, open);
   const seen = new Set(found.map((file) => file.path));
   const added = [...layer.files]
-    .filter((file) => !seen.has(file) && paths.some((path) => atOrInside(path, file)))
+    .filter(
+      (file) =>
+        PYTHON.test(file) && !seen.has(file) && paths.some((path) => atOrInside(path, file)),
+    )
     .map((path) => ({ path, real: io.probe.realpath(path) }));
   return [...found, ...added].sort((a, b) => (a.path < b.path ? -1 : Number(a.path > b.path)));
 }
@@ -224,12 +230,12 @@ function overlayWalk(walk: FileWalker, probe: PathProbe, layer: Layer): FileWalk
 }
 
 /**
- * Lays Python texts over the disk for one check: each given file reads as
+ * Lays Python and diagram texts over the disk for one check: each given file reads as
  * its text, and a file that doesn't exist yet appears to exist, with any
  * missing directories above it. Without texts the I/O is returned as it is.
  *
  * @param io - the I/O to wrap.
- * @param texts - Python source texts, by absolute path.
+ * @param texts - Python source and diagram texts, by absolute path.
  * @returns the same I/O, with the texts laid over the probe, the reader and the walk.
  */
 export function overlayTexts<T extends Overlaid>(io: T, texts: ReadonlyMap<string, string>): T {

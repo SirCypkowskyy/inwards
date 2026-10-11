@@ -3,7 +3,8 @@
  * opened, a keystroke checked against unsaved text, INW010 clearing once a
  * module is created on disk, a broken config shown once and cleared when
  * fixed, a workspace folder added later, a save rerunning the pass for an
- * editor without file watching, and stdout carrying nothing but LSP. Each
+ * editor without file watching, a listed diagram's findings following its
+ * unsaved text (#348), and stdout carrying nothing but LSP. Each
  * test runs its own server on a throwaway project.
  */
 import { afterEach, expect, test } from "bun:test";
@@ -125,6 +126,53 @@ test("without file watching, a save checks the workspace again", async () => {
   client.open(order, "");
   client.save(order);
   expect(await client.diagnostics(other, (f) => f.length === 0)).toEqual([]);
+}, 30_000);
+
+test("a listed diagram shows its findings, and an open one follows its unsaved text", async () => {
+  /**
+   * Draws a marked layers diagram whose domain node carries a label.
+   *
+   * @param label - the quoted label of the domain node.
+   * @returns the Markdown text.
+   */
+  function diagram(label: string): string {
+    return [
+      "```mermaid",
+      "%% inwards: layers",
+      "flowchart LR",
+      `  infrastructure --> domain["${label}"]`,
+      "```",
+      "",
+    ].join("\n");
+  }
+  const root = project({
+    "pyproject.toml": `${LAYERS}diagrams = ["docs/*.md"]\n\n[tool.inwards.rules]\nextend-select = ["INW017"]\n`,
+    "shop/domain/order.py": "",
+    "shop/infrastructure/db.py": "",
+    "docs/architecture.md": diagram("shop.domian"),
+    "README.md": diagram("shop.domian"),
+  });
+  const client = await serve([root]);
+  const drawn = join(root, "docs/architecture.md");
+  const shown = await client.diagnostics(drawn, (f) => f.length > 0);
+  expect(codes(shown)).toEqual(["INW017"]);
+  expect(shown[0]?.range.start.line).toBe(3);
+  expect(shown[0]?.severity).toBe(2);
+
+  client.open(drawn, diagram("shop.domian"));
+  client.change(drawn, diagram("shop.domain"));
+  expect(await client.diagnostics(drawn, (f) => f.length === 0)).toEqual([]);
+  client.change(drawn, `# Layers\n\n${diagram("shop.domian")}`);
+  const moved = await client.diagnostics(drawn, (f) => f.length > 0);
+  expect(moved[0]?.range.start.line).toBe(5);
+
+  const readme = join(root, "README.md");
+  client.open(readme, diagram("shop.domian"));
+  client.change(readme, diagram("shop.nowhere"));
+  // Checks run in order, so once this one is published the README's has run.
+  client.change(drawn, diagram("shop.domain"));
+  await client.diagnostics(drawn, (f) => f.length === 0);
+  expect(client.published.get(uri(readme)) ?? []).toEqual([]);
 }, 30_000);
 
 test("inwards server with an argument is a usage error on stderr, not stdout", () => {

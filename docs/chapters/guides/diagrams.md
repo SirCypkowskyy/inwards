@@ -69,7 +69,15 @@ diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 extend-select = ["INW017", "INW018"]
 ```
 
-Both are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. They run on whole-project runs: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`.
+Both are warnings, so a drawing that drifted doesn't block an agent's Stop gate; `severity = { INW017 = "error", INW018 = "error" }` makes them block. They run wherever a listed diagram is checked:
+
+- **A whole-project run**: `inwards check` without paths, or the Stop gate with `stop-gate = "project"`. Only this run reports a `diagrams` entry that matches no file.
+- **A named file**: `inwards check docs/architecture.md`. A Markdown, Mermaid or PlantUML file the key doesn't list isn't checked, and the report says so.
+- **The [Claude Code hook](claude-code.md)**, after the agent edits a listed diagram (PostToolUse). A warning goes back to the agent as context; an error blocks the edit, as a code violation does. An edit of any other non-Python file costs a look at the config and nothing more. On the benchmark's 2,100-file synthetic project, on an M1 Pro, the hook took 37 ms p50 one-shot for a listed diagram (it lists the project's modules for INW017's labels) and 16.5 ms for another Markdown file, against 16.1 ms before.
+- **The editor**: `inwards server` checks an open listed diagram on every keystroke, from the unsaved text ([Editors](editors.md#diagrams)).
+- **[MCP `check_files`](mcp.md#check_files)**, by path or as text in `contents`.
+
+The Stop gate's default scope (`stop-gate = "changed"`) checks the Python files the session changed, and no diagrams. A warning never blocks, so there is nothing to gate on by default; with the rules raised to errors, a diagram the agent broke has already blocked its own edit, and `stop-gate = "project"` checks every listed diagram at Stop as well. Editing Python code doesn't check a diagram again: a package renamed in the code shows up in the drawing on the next whole-project run, in CI or at a project-scope Stop.
 
 ## Start from a diagram { #import-diagram }
 
@@ -341,4 +349,5 @@ Where Inwards differs:
 - **PlantUML is read one line at a time.** A statement split over lines (a component description that runs onto the next line) isn't followed, and a link to a component by its display name, rather than its alias, names a different node.
 - **What a diagram can't say stays out.** Library lists, shapes, selectors other than a node's label, rule options and `ignore` are written by hand after the import.
 - **Imports the diagram doesn't draw** aren't reported yet; that is INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
-- **Whole-project runs only.** The per-edit hook and the editor don't show diagram findings.
+- **A code edit doesn't check the diagrams.** The hook and the editor check a diagram when it is edited; a rename in the Python code reaches the drawing on the next whole-project run.
+- **Paths are matched as written.** A `diagrams` entry is compared with the path the agent or the editor gives, letter case included, so on a case-insensitive file system (macOS, Windows) `Docs/Architecture.md` doesn't match `docs/architecture.md` in the hook or the editor. The whole-project run walks the disk and isn't affected.

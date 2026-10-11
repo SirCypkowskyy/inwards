@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 34e03a1509a1e853f8cb6e991847c30ae26bbf260e80691140123971b665e34a
+source_hash: 10229c8b9c9ed6c671bb487c265050e642cd9c999a215fef344b3ce3b5c2b2c9
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -416,7 +416,7 @@ Reguły są pogrupowane według kategorii, w kolejności, której używa [indeks
 
 | Kod | Nazwa | Co wyłapuje | Włączona | Poziom | Włącza ją preset | Stan |
 |---|---|---|---|---|---|---|
-| INW017 | `diagram-unknown-name` | W plikach Markdown i `.mmd`, które wymienia `diagrams`, `flowchart` albo `graph` w Mermaid oznaczony `%% inwards: layers` lub `%% inwards: contexts`: identyfikator węzła, który nie nazywa żadnej zadeklarowanej warstwy (albo, w diagramie kontekstów, węzeł lub subgraph na najwyższym poziomie, który nie nazywa żadnego kontekstu), i etykieta w cudzysłowie, do której nie pasuje żaden moduł. Węzły `:::external` są pomijane. Tylko przy sprawdzaniu całego projektu; CLI czyta pliki, a `engine/diagrams.ts` przekazuje je do ręcznie napisanego parsera linii w `diagram/`. Wpis `diagrams`, do którego nie pasuje żaden plik, jest zgłaszany w pyproject.toml. Zobacz [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
+| INW017 | `diagram-unknown-name` | W plikach Markdown i `.mmd`, które wymienia `diagrams`, `flowchart` albo `graph` w Mermaid oznaczony `%% inwards: layers` lub `%% inwards: contexts`: identyfikator węzła, który nie nazywa żadnej zadeklarowanej warstwy (albo, w diagramie kontekstów, węzeł lub subgraph na najwyższym poziomie, który nie nazywa żadnego kontekstu), i etykieta w cudzysłowie, do której nie pasuje żaden moduł. Węzły `:::external` są pomijane. Przy sprawdzaniu całego projektu oraz dla wymienionego pliku, który jest edytowany (hook), otwarty (serwer języka) albo podany (`check_files`, `inwards check FILE`); CLI czyta pliki, a `engine/diagrams.ts` przekazuje je do ręcznie napisanego parsera linii w `diagram/`. Wpis `diagrams`, do którego nie pasuje żaden plik, jest zgłaszany w pyproject.toml. Zobacz [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 | INW018 | `diagram-forbidden-edge` | W tych samych oznaczonych diagramach ciągła albo pogrubiona strzałka w jedną stronę, która rysuje import zabroniony przez konfigurację: na zewnątrz albo między warstwami sąsiednimi w diagramie warstw; w diagramie kontekstów z jednego kontekstu do innego, którego nie wymienia jego `depends-on`, albo do węzła, którego etykieta w cudzysłowie nie jest jednym z modułów `public` tamtego kontekstu. Przerywane krawędzie i węzły `:::external` są pomijane; każda zabroniona para jest zgłaszana raz na diagram. `inwards import-diagram` zapisuje konfigurację, którą przedstawia diagram. Zob. [ADR-045](05-ADR.md#adr-045-architecture-diagrams-are-checked-against-toolinwards-never-read-as-config) | opt-in | ostrzeżenie | żaden | :material-check-circle: |
 
 ### FastAPI { #catalogue-fastapi }

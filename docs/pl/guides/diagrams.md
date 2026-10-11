@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/diagrams.md
-source_hash: 59ad460d9c3a836343dce561def8eb01f21e948dde049f96e06626e9c4b9f888
+source_hash: 24f137e462e83d226926f25b308e02b76b14da30420afcf9c2633120097c2b30
 ---
 
 # Diagramy architektury { #architecture-diagrams }
@@ -74,7 +74,15 @@ diagrams = ["README.md", "docs/**/*.md", "docs/**/*.mmd", "docs/**/*.puml"]
 extend-select = ["INW017", "INW018"]
 ```
 
-Obie reguły dają ostrzeżenia, więc rysunek, który się rozjechał, nie blokuje Stop gate agenta; `severity = { INW017 = "error", INW018 = "error" }` sprawia, że blokują. Działają przy sprawdzaniu całego projektu: `inwards check` bez ścieżek albo Stop gate z `stop-gate = "project"`.
+Obie reguły dają ostrzeżenia, więc rysunek, który się rozjechał, nie blokuje Stop gate agenta; `severity = { INW017 = "error", INW018 = "error" }` sprawia, że blokują. Działają wszędzie tam, gdzie sprawdzany jest wymieniony diagram:
+
+- **Sprawdzenie całego projektu**: `inwards check` bez ścieżek albo Stop gate z `stop-gate = "project"`. Tylko ono zgłasza wpis `diagrams`, do którego nie pasuje żaden plik.
+- **Plik podany z nazwy**: `inwards check docs/architecture.md`. Plik Markdown, Mermaid albo PlantUML, którego klucz nie wymienia, nie jest sprawdzany, a raport to mówi.
+- **[Hook Claude Code](claude-code.md)**, po tym jak agent zmieni wymieniony diagram (PostToolUse). Ostrzeżenie wraca do agenta jako kontekst; błąd blokuje edycję, tak jak naruszenie w kodzie. Edycja każdego innego pliku, który nie jest Pythonem, kosztuje tylko zajrzenie do konfiguracji. Na syntetycznym projekcie benchmarku (2100 plików), na M1 Pro, hook uruchamiany jednorazowo zajął 37 ms p50 dla wymienionego diagramu (listuje moduły projektu dla etykiet INW017) i 16,5 ms dla innego pliku Markdown, wobec 16,1 ms wcześniej.
+- **Edytor**: `inwards server` sprawdza otwarty wymieniony diagram przy każdym naciśnięciu klawisza, z niezapisanego tekstu ([Edytory](editors.md#diagrams)).
+- **[MCP `check_files`](mcp.md#check_files)**, przez ścieżkę albo jako tekst w `contents`.
+
+Domyślny zakres Stop gate (`stop-gate = "changed"`) sprawdza pliki Pythona zmienione w sesji i żadnych diagramów. Ostrzeżenie nigdy nie blokuje, więc domyślnie nie ma czego pilnować; gdy reguły podniesiesz do błędów, diagram zepsuty przez agenta zablokował już własną edycję, a `stop-gate = "project"` sprawdza dodatkowo przy Stop każdy wymieniony diagram. Edycja kodu Pythona nie sprawdza diagramu ponownie: pakiet przemianowany w kodzie pojawi się na rysunku przy następnym sprawdzeniu całego projektu, w CI albo przy Stop z zakresem projektu.
 
 ## Zacznij od diagramu { #import-diagram }
 
@@ -346,4 +354,5 @@ Czym Inwards się różni:
 - **PlantUML jest czytany linia po linii.** Instrukcja rozbita na kilka linii (opis komponentu, który przechodzi do następnej linii) nie jest śledzona, a połączenie z komponentem przez jego wyświetlaną nazwę zamiast aliasu nazywa inny węzeł.
 - **To, czego diagram nie wyrazi, zostaje poza tabelą.** Listy bibliotek, kształty, selektory inne niż etykieta węzła, opcje reguł i `ignore` dopisuje się ręcznie po imporcie.
 - **Importy, których diagram nie rysuje**, nie są jeszcze zgłaszane; to będzie INW019 ([#332](https://github.com/SirCypkowskyy/inwards/issues/332)).
-- **Tylko uruchomienia dla całego projektu.** Hook po edycji i edytor nie pokazują zgłoszeń z diagramów.
+- **Edycja kodu nie sprawdza diagramów.** Hook i edytor sprawdzają diagram, gdy jest edytowany; zmiana nazwy w kodzie Pythona dociera do rysunku przy następnym sprawdzeniu całego projektu.
+- **Ścieżki są porównywane tak, jak je zapisano.** Wpis `diagrams` jest porównywany ze ścieżką, którą podaje agent albo edytor, z wielkością liter włącznie, więc na systemie plików bez rozróżniania wielkości liter (macOS, Windows) `Docs/Architecture.md` nie pasuje w hooku ani w edytorze do `docs/architecture.md`. Sprawdzenie całego projektu przechodzi po dysku i tego problemu nie ma.
