@@ -7,7 +7,7 @@
  * Each fixture is `eval/fixtures/<RULE>/<case>/`: a `task.md` prompt (or a
  * `task.<agent>.md` for one agent), a `check.py` that exercises the result
  * (exit 0 means the task was done), and an optional `files/` overlay on top
- * of `examples/clean-app`. The harness compiles `inwards` from this checkout,
+ * of `eval/app`, a small layered shop. The harness compiles `inwards` from this checkout,
  * copies the app into a scratch git repo, runs `inwards init --agent <agent>`
  * there (the hooks as a user gets them), runs the agent on the task with the
  * run log on and a clean environment (Claude Code in agent.ts, OpenCode in
@@ -118,7 +118,7 @@ function setUp(
   inwards: string,
   agent: AgentName,
 ): { violationsAtStart: number; settings: string } {
-  cpSync(join(REPO, "examples/clean-app/shop"), join(work, "shop"), { recursive: true });
+  cpSync(join(REPO, "eval/app/shop"), join(work, "shop"), { recursive: true });
   cpSync(CONFIG, join(work, "pyproject.toml"));
   if (existsSync(join(fixture, "files"))) {
     cpSync(join(fixture, "files"), work, { recursive: true });

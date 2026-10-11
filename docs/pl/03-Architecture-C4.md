@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: cb13e21eb518a4a456488fc1a2dc23107f5f2095c29ed86f124c5d650392d784
+source_hash: dd5e626f89b02f4cca4214efd3d87e063fcb0f311916cc72d43049d08573f261
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -550,4 +550,4 @@ src/
     └── test/              # the binary lookup, boundaries, packaged.test.ts on the built VSIX
 ```
 
-Poza `src/`: `scripts/` buduje pliki binarne i wheele oraz sprawdza wersje i nawigację dokumentacji, `packaging/` zawiera README wheela i rezerwacje nazw, `eval/` to środowisko ewaluacji agentów, `bench/` generuje syntetyczne repozytorium do benchmarków i porównuje na nim dwa buildy dla bramki regresji w PR-ach, a `examples/clean-app` to aplikacja, którą sprawdza CI.
+Poza `src/`: `scripts/` buduje pliki binarne i wheele oraz sprawdza wersje i nawigację dokumentacji, `packaging/` zawiera README wheela i rezerwacje nazw, `eval/` to środowisko ewaluacji agentów (z `eval/app`, warstwowym sklepem, na którym budują jego fixture'y), `bench/` generuje syntetyczne repozytorium do benchmarków i porównuje na nim dwa buildy dla bramki regresji w PR-ach, a `examples/clean-app` to aplikacja w pionowych wycinkach, którą CI sprawdza najnowszym wydaniem, Ruffem i Ty.

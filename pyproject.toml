@@ -38,14 +38,55 @@ docs = ["zensical>=0.0.65"]
 package = false
 default-groups = ["docs"]
 
-# Reference configuration, consumed by `inwards check`.
+# Reference configuration, consumed by `inwards check`. CI also checks it with
+# the latest release from PyPI (ci.yml, job "dogfood"), which pins the version.
+# No required-version here: develop's own build reports 0.1.0 (ADR-019) and
+# would refuse the config.
 [tool.inwards]
 root = "examples/clean-app"
+cycles = ["modules", "contexts"]
 # Layers are listed from the innermost (most stable) to the outermost.
 # A module may import its own layer or any layer listed before it.
+# Every package under shop is a slice (shop.shared too), laid out by the
+# "slice" template; shop.main is the composition root.
 layers = [
-  { name = "domain", modules = ["shop.domain"] },
-  { name = "application", modules = ["shop.application"] },
-  { name = "infrastructure", modules = ["shop.infrastructure"] },
-  { name = "interface", modules = ["shop.api", "shop.cli"] },
+  { name = "slice", modules = ["shop.*"], template = "slice" },
+  { name = "bootstrap", modules = ["shop.main"] },
 ]
+
+# One template says what every slice looks like: its modules innermost first
+# ("a | b" are siblings that may not import each other), and the modules other
+# code may import.
+[tool.inwards.templates.slice]
+roles = ["models", "ports", "services", "commands | queries | adapters", "api", "factory"]
+public = ["api", "factory"]
+allow = []
+require = ["__init__", "models", "ports"]
+hints = ["Code more than one slice uses goes in shop.shared."]
+
+[tool.inwards.templates.slice.rules]
+ports = { ports-abstract = true }
+adapters = { construct-only-in = { allowed-in = ["shop.*.factory", "shop.main"] } }
+
+[[tool.inwards.shape]]
+packages = ["shop.*"]
+template = "slice"
+
+# Slices never import each other; shop.main passes one slice's API to another
+# as a port (the catalog is the orders' PriceList).
+[[tool.inwards.contexts]]
+name = "catalog"
+modules = ["shop.catalog"]
+depends-on = ["shared"]
+template = "slice"
+
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["shop.orders"]
+depends-on = ["shared"]
+template = "slice"
+
+[[tool.inwards.contexts]]
+name = "shared"
+modules = ["shop.shared"]
+public = ["shop.shared"]

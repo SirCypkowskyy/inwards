@@ -1,12 +1,12 @@
 ---
 source: docs/chapters/guides/editors.md
-source_hash: 8268aa4a6d229a596808be6b5e2cc169c5fe3968aa2a095411de4beac10e08c0
+source_hash: 587ba7131b2c5acb0d3fca51aed55efe050d9810ee29a963af5ee632a0f0a914
 ---
 
 # Neovim, Zed i Helix { #neovim-zed-and-helix }
 
 !!! info "Zweryfikowano 2026-10-10"
-    Neovim 0.12.5 na macOS (arm64), bez interfejsu (headless), ze skompilowanym plikiem binarnym na `examples/broken-app`: obie poniższe konfiguracje Neovima uruchomiły `inwards server` z projektem jako katalogiem głównym, a `shop/domain/order.py` pokazał swoją diagnostykę INW001. Rozszerzenie dla Zeda kompiluje się (`cargo check`) z `zed_extension_api` 0.7.0, ale nie załadowano go w Zedzie. Konfiguracja Helixa opiera się na dokumentacji i kodzie Helixa 25.07.1 i nie była uruchamiana. Linuksa i Windows nie sprawdzano ręcznie.
+    Neovim 0.12.5 na macOS (arm64), bez interfejsu (headless), ze skompilowanym plikiem binarnym na `examples/broken-app`: obie poniższe konfiguracje Neovima uruchomiły `inwards server` z projektem jako katalogiem głównym, a podłożony import pokazał swoją diagnostykę INW001. Rozszerzenie dla Zeda kompiluje się (`cargo check`) z `zed_extension_api` 0.7.0, ale nie załadowano go w Zedzie. Konfiguracja Helixa opiera się na dokumentacji i kodzie Helixa 25.07.1 i nie była uruchamiana. Linuksa i Windows nie sprawdzano ręcznie.
 
 `inwards server` to serwer języka przez stdio, dostępny w pliku binarnym od Inwards 0.5.0. Edytor z klientem LSP uruchamia go i pokazuje dla każdego pliku w obszarze roboczym to, co zgłasza dla niego `inwards check`: plik, w którym piszesz, jest sprawdzany przy każdej zmianie, a cały obszar roboczy ponownie przy każdym zapisie. [VS Code](install.md#vs-code) ma rozszerzenie; ta strona opisuje edytory, które biorą serwer języka z własnej konfiguracji.
 

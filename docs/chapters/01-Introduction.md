@@ -47,7 +47,7 @@ Every key is described in the [configuration reference](guides/configuration.md)
 
 <figure markdown="span">
   ![inwards check on a clean codebase](assets/screens/check-clean.svg){ loading=lazy }
-  <figcaption>The example app as shipped: every import points inward.</figcaption>
+  <figcaption>The layered example shop (`eval/app`) as shipped: every import points inward.</figcaption>
 </figure>
 
 Layers are listed innermost first. A module may import its own layer and anything listed before it. `required-version` makes an older binary (or a shim that isn't Inwards) fail with exit 2 instead of checking the project with rules it may not know. Code outside every layer isn't checked, so INW006 makes that gap visible: importing first-party code that belongs to no layer from a layer is an error (so is importing from the package above the layers, whose `__init__.py` no layer owns), a package outside every layer (unless `ignore` names it) gets a warning, and a prefix that matches no module is reported against `pyproject.toml`. `ignore` entries match whole name segments anywhere, so `migrations` covers `shop.orders.migrations`. Unknown keys and a prefix listed in two layers are config errors (exit 2). Warnings don't change the exit code. When the domain imports infrastructure, you get this (abridged, one diagnostic out of the `diagnostics` array):
@@ -70,7 +70,7 @@ Layers are listed innermost first. A module may import its own layer and anythin
 }
 ```
 
-The diagnostic comes from the working scaffold in this repository, run on a copy of `examples/clean-app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
+The diagnostic comes from the working scaffold in this repository, run on a copy of the layered shop now in `eval/app` with one bad import added. Long strings are cut with `...` here. The real output has them in full.
 
 To phase rules in, a `[tool.inwards.rules]` table sets which rules report and how loudly:
 

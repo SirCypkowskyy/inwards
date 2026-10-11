@@ -545,4 +545,4 @@ src/
     └── test/              # the binary lookup, boundaries, packaged.test.ts on the built VSIX
 ```
 
-Outside `src/`: `scripts/` builds binaries and wheels and checks versions and the docs nav, `packaging/` holds the wheel README and the name placeholders, `eval/` is the agent eval harness, `bench/` generates the synthetic benchmark repo and compares two builds on it for the PR regression gate, and `examples/clean-app` is the app CI checks.
+Outside `src/`: `scripts/` builds binaries and wheels and checks versions and the docs nav, `packaging/` holds the wheel README and the name placeholders, `eval/` is the agent eval harness (with `eval/app`, the layered shop its fixtures build on), `bench/` generates the synthetic benchmark repo and compares two builds on it for the PR regression gate, and `examples/clean-app` is the vertical-slice app CI checks with the latest release, Ruff and Ty.

@@ -4,7 +4,7 @@
     uv run --with rich python scripts/screenshots.py
 
 Every screenshot is the actual output of the command shown in it, run against a
-scratch copy of examples/clean-app. The only liberty taken: `jq` runs with `-C`
+scratch copy of eval/app, the layered shop. The only liberty taken: `jq` runs with `-C`
 so the JSON keeps its colours. Output: docs/chapters/assets/screens/*.svg
 """
 
@@ -86,7 +86,7 @@ def main() -> None:
         bindir = Path(tmp) / "bin"
         bindir.mkdir()
         (bindir / "inwards").symlink_to(BINARY)
-        shutil.copytree(REPO / "examples" / "clean-app", work / "clean-app")
+        shutil.copytree(REPO / "eval" / "app", work / "clean-app")
         (work / "pyproject.toml").write_text(CONFIG)
         (work / ".claude").mkdir()
         (work / ".claude" / "settings.json").write_text(SETTINGS)
