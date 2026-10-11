@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 491b18111c20115994a3a23258c8ed362559f630073c8691ec239464459e9b4e
+source_hash: 0b7b2005c0710e035665b97a7d2feefa3c0a416ecc2c97b0db60f48bccaea569
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -391,7 +391,7 @@ modules = ["src.*.models"]
 - **Jedna wartość na opcję.** Dwie role albo dwa szablony, które dają tej samej regule różne wartości jednej opcji albo różne poziomy, to błąd konfiguracji podający oba miejsca; ustaw wtedy wartość raz w tabeli najwyższego poziomu.
 - **Błędy konfiguracji podają klucz**, na przykład `tool.inwards.templates.domain.rules.router.async-blocking.modules`: rola, której szablon nie wymienia, szablon bez `roles`, nieznana reguła albo kod reguły zamiast nazwy, reguła domyślnie włączona (i tak zgłasza wszędzie, więc żeby ją zawęzić, ustaw jej `modules` w tabeli najwyższego poziomu), wartość inna niż `true`, poziom albo tabela, `modules` (albo `role` przy INW015) w tabeli szablonu oraz opcja, której reguła nie przyjmuje. Błędem jest też szablon z `rules`, z którego nie korzysta żaden wpis `layers`, bo do jego ról nie pasuje żaden moduł.
 
-Szablon, z którego nikt nie korzysta, jest dozwolony. Cztery presety zapisują szablon i konteksty za ciebie: `inwards init --style vertical-slices`, `bounded-contexts`, `django` i `fastapi`, ten ostatni jako szablon fastapi-best-practices z przykładu powyżej ([Instalacja](install.md#a-new-project-start-from-a-preset)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
+Szablon, z którego nikt nie korzysta, jest dozwolony. Cztery presety zapisują szablon i konteksty za ciebie: `inwards init --style vertical-slices`, `bounded-contexts`, `django` i `fastapi`, ten ostatni jako szablon fastapi-best-practices z przykładu powyżej ([Instalacja](install.md#a-new-project-start-from-a-preset)). Szablon `slice` presetu `vertical-slices` ma `roles = ["models", "services", "commands | queries", "api"]`, więc komendy i zapytania wycinka są warstwami sąsiednimi, a INW001 zgłasza import między nimi ([ADR-046](../05-ADR.md#adr-046-structural-ports-conformance-lines-and-private-modules-are-opt-in-rules-cqrs-slices-a-template)). [ADR-036](../05-ADR.md#adr-036-package-templates-expand-into-config-a-user-could-write-by-hand) opisuje projekt.
 
 ### `cycles` { #cycles }
 

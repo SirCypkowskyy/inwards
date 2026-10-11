@@ -273,14 +273,14 @@ exports[`inwards init --style X --scaffold on a fresh uv project vertical-slices
     "src/my_app/features/__init__.py",
     "src/my_app/features/orders/__init__.py",
     "src/my_app/features/orders/api.py",
-    "src/my_app/features/orders/cli.py",
     "src/my_app/features/orders/commands/__init__.py",
     "src/my_app/features/orders/commands/_place_order.py",
-    "src/my_app/features/orders/in_memory_orders.py",
     "src/my_app/features/orders/models.py",
-    "src/my_app/features/orders/ports.py",
     "src/my_app/features/orders/queries/__init__.py",
     "src/my_app/features/orders/queries/_get_order.py",
+    "src/my_app/features/orders/services/__init__.py",
+    "src/my_app/features/orders/services/in_memory_orders.py",
+    "src/my_app/features/orders/services/ports.py",
     "src/my_app/shared/__init__.py",
     "tests/test_place_order.py",
   ],
@@ -288,9 +288,15 @@ exports[`inwards init --style X --scaffold on a fresh uv project vertical-slices
 "inwards init: wrote the vertical-slices preset to pyproject.toml and 14 example files.
 
 src/my_app/  (vertical-slices)
-├── bootstrap.py  bootstrap: may import every other layer
-├── features/     features: may import shared
-└── shared/       shared: imports no other layer
+├── bootstrap.py       bootstrap: may import every other layer
+├── features/
+│   └── */
+│       ├── api.py     features.api: may import shared, features.models, features.services, features.commands, features.queries
+│       ├── commands/  features.commands: may import shared, features.models, features.services; not its sibling features.queries
+│       ├── models.py  features.models: may import shared
+│       ├── queries/   features.queries: may import shared, features.models, features.services; not its sibling features.commands
+│       └── services/  features.services: may import shared, features.models
+└── shared/            shared: imports no other layer
 
 inwards check: 0 violations, 0 warnings.
 
@@ -302,6 +308,7 @@ Wire an agent: inwards init --agent claude|opencode|aider|agents-md
 "[tool.inwards]
 # Preset "vertical-slices" (inwards init --style vertical-slices, Inwards <VERSION>).
 # Layers are listed innermost first: each may import itself and the layers above it.
+# An entry with a template becomes one layer per role, inside each package it matches.
 # Not enforced by this preset: code only one slice uses may still move into shared, where every slice can reach it.
 root = "src"
 required-version = "<VERSION>"
@@ -309,13 +316,14 @@ ignore = ["tests", "scripts", "migrations", "conftest"]
 # INW004 reports import cycles between modules and between contexts; inwards baseline accepts existing ones.
 cycles = ["modules", "contexts"]
 layers = [
-  { name = "shared", modules = ["my_app.shared"] },        # the shared kernel: code every slice may use
-  { name = "features", modules = ["my_app.features"] },    # one package per slice, each a context
-  { name = "bootstrap", modules = ["my_app.bootstrap"] },  # composition root: wires the adapters into the use cases
+  { name = "shared", modules = ["my_app.shared"] },                            # the shared kernel: code every slice may use
+  { name = "features", modules = ["my_app.features.*"], template = "slice" },  # every slice, layered by the slice template
+  { name = "bootstrap", modules = ["my_app.bootstrap"] },                      # composition root: wires the adapters into the use cases
 ]
 
-# What every slice has in common: other code may import only its api module.
+# The layers inside every slice, innermost first, and the one module other code may import.
 [tool.inwards.templates.slice]
+roles = ["models", "services", "commands | queries", "api"]
 public = ["api"]
 
 # Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
@@ -337,10 +345,10 @@ allow = ["__main__.py", "_version.py"]
 packages = ["my_app.features"]
 allow = ["*/"]
 
-# my_app.features.*: every slice has its public api module.
+# my_app.features.*: every slice is a regular package with its public api module.
 [[tool.inwards.shape]]
 packages = ["my_app.features.*"]
-require = ["api"]
+require = ["__init__", "api"]
 "
 ,
 }
@@ -693,15 +701,19 @@ hexagonal: ports and adapters: the application talks to the world only through p
     shop.adapters     requires inbound/, outbound/: the inbound and outbound layers only; anything else is an error, since no layer would hold it
 
 vertical-slices: one package per feature, independent of each other, on a shared kernel
-  1. shared     shop.shared     the shared kernel: code every slice may use
-  2. features   shop.features   one package per slice, each a context
-  3. bootstrap  shop.bootstrap  composition root: wires the adapters into the use cases
+  1. shared             shop.shared               the shared kernel: code every slice may use
+  2. features.models    shop.features.*.models    the slice's entities
+  3. features.services  shop.features.*.services  what the use cases call: ports and their adapters
+  4. features.commands  shop.features.*.commands  use cases that change state
+  4. features.queries   shop.features.*.queries   use cases that only read
+  5. features.api       shop.features.*.api       the slice's public module and driving adapter
+  6. bootstrap          shop.bootstrap            composition root: wires the adapters into the use cases
   Each slice is a context: it imports another slice only when its depends-on names it, and then only that slice's api.
   Gap: code only one slice uses may still move into shared, where every slice can reach it.
   Shapes, with --scaffold:
     shop             requires shared/, features/, bootstrap.py; allows __main__.py, _version.py: the layers and the composition root only; anything else is an error, since no layer would hold it
     shop.features    allows */: slice packages only; a module here would belong to no slice
-    shop.features.*  requires api: every slice has its public api module
+    shop.features.*  requires __init__, api: every slice is a regular package with its public api module
 
 bounded-contexts: one package per bounded context, each layered inside, crossing only through its api
   1. context.domain          shop.*.domain          entities and business rules, no I/O

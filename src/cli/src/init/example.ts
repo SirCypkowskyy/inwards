@@ -14,6 +14,7 @@ import { type ExampleModules, expandLayers, type Style } from "./styles.ts";
 /** Docstrings for packages the scaffold creates that are not a layer themselves. */
 const PACKAGE_DOCS: Readonly<Record<string, string>> = {
   adapters: "Adapters: the code that connects the application to the outside world.",
+  features: "Features: one package per slice, each layered inside and kept apart from the others.",
   ports: "Ports: what the application needs from the outside, as typing.Protocol classes.",
   use_cases: "Use cases: what the application does, written against ports.",
   orders: "Orders: placing and storing orders, kept apart from the rest of the code.",
@@ -125,31 +126,53 @@ function outsideImports(
   );
 }
 
+/** The driving adapter's one function: the command line calls the command. */
+const RUN = `def run(place_order: PlaceOrder, argv: list[str]) -> int:
+    """Places the order that argv describes and prints it."""
+    parser = argparse.ArgumentParser(prog="place-order", description="Place an order.")
+    parser.add_argument("item")
+    parser.add_argument("quantity", type=int)
+    args = parser.parse_args(argv)
+    order = place_order(args.item, args.quantity)
+    print(f"Placed order {order.id}: {order.quantity} x {order.item}")
+    return 0
+`;
+
 /**
  * Writes the public module of the example's context: it re-exports what the
  * composition root needs, so code outside imports nothing else (INW003).
+ * When the preset puts the driving adapter in the same module (a slice's
+ * `api` role is its outermost layer), `run` is defined here instead.
  *
  * @param m - where each part of the example lives, `api` included.
  * @param pkg - the package.
  * @returns the module text.
  */
 function apiModule(m: ExampleModules, pkg: string): string {
-  return `"""The public module of this package: code outside it imports only this (INW003).
+  const driving = m.driving === m.api;
+  const doc = driving
+    ? `"""The public module of this package: code outside it imports only this (INW003).
+
+It is also the driving adapter, running the command line, and it re-exports what the
+composition root needs, so the modules behind it can change freely.
+"""`
+    : `"""The public module of this package: code outside it imports only this (INW003).
 
 It re-exports what the composition root needs, so the modules behind it can change freely.
-"""
+"""`;
+  return `${doc}
 
 from __future__ import annotations
 
-${imports(
+${driving ? "import argparse\n\n" : ""}${imports(
   `from ${pkg}.${m.adapter} import InMemoryOrderRepository`,
   `from ${pkg}.${m.commands} import PlaceOrder`,
-  `from ${pkg}.${m.driving} import run`,
+  ...(driving ? [] : [`from ${pkg}.${m.driving} import run`]),
   `from ${pkg}.${m.queries} import GetOrder`,
 )}
 
 __all__ = ["GetOrder", "InMemoryOrderRepository", "PlaceOrder", "run"]
-`;
+${driving ? `\n\n${RUN}` : ""}`;
 }
 
 /**
@@ -339,16 +362,7 @@ import argparse
 from ${pkg}.${m.commands} import PlaceOrder
 
 
-def run(place_order: PlaceOrder, argv: list[str]) -> int:
-    """Places the order that argv describes and prints it."""
-    parser = argparse.ArgumentParser(prog="place-order", description="Place an order.")
-    parser.add_argument("item")
-    parser.add_argument("quantity", type=int)
-    args = parser.parse_args(argv)
-    order = place_order(args.item, args.quantity)
-    print(f"Placed order {order.id}: {order.quantity} x {order.item}")
-    return 0
-`,
+${RUN}`,
     ],
     [
       m.bootstrap,
