@@ -566,6 +566,10 @@ layers = [
 roles = ["constants | exceptions | config", "models | schemas", "utils", "service", "dependencies", "router"]
 public = ["router", "service", "schemas", "dependencies", "constants", "exceptions"]
 
+# fastapi-best-practices' table and column names in every domain's models (INW016), as a warning to start with.
+[tool.inwards.templates.fastapi-domain.rules]
+models = { orm-naming = "warning" }
+
 [tool.inwards.rules]
 # Domains may use each other's public modules without declaring it; INW003 keeps them to those.
 ignore = ["INW002"]
@@ -592,6 +596,12 @@ report-direct-raises = false
 # An endpoint hands its work to its domain's service module.
 [tool.inwards.rules.thin-endpoint]
 delegate-to = ["domain.service"]
+
+# The business logic and what it uses don't import the web framework: raise the domain's exceptions, and leave HTTP to the router and dependencies (INW005).
+[tool.inwards.rules.pure-domain]
+deny = [
+  { modules = ["my_app.*.models", "my_app.*.schemas", "my_app.*.utils", "my_app.*.service"], libraries = ["fastapi", "starlette"] },
+]
 
 # Each domain is a context: other domains and main.py may import only its public modules.
 # Add an entry like this for every domain; one without an entry is not kept apart.
@@ -704,6 +714,8 @@ fastapi: fastapi-best-practices: one package per domain on a kernel of shared mo
   Each domain is a context: other domains and main.py may import only its public modules.
   Turns off INW002. Domains may use each other's public modules without declaring it; INW003 keeps them to those.
   Turns on FAPI001, FAPI002, FAPI003, FAPI005, FAPI006, FAPI007, FAPI008, FAPI009, INW012, INW013 as warnings.
+  Turns on INW016 in fastapi-domain's models, as a warning.
+  Denies fastapi, starlette to shop.*.models, shop.*.schemas, shop.*.utils, shop.*.service (INW005).
   Gap: a router may use the models directly instead of going through the service.
   Shapes, with --scaffold:
     shop    requires main.py; allows */, config.py, database.py, exceptions.py, models.py, pagination.py, __main__.py, _version.py: domain packages, the kernel's shared modules and the app only; anything else is an error

@@ -45,12 +45,17 @@ const INSTRUCTIONS: Readonly<Record<string, Instruction>> = {
   },
   INW016: (table: RuleTable | undefined): string | undefined => {
     const tables = table?.["table-name"] ?? "snake_singular";
+    const suffixes = [
+      suffix("datetime", table?.["datetime-suffix"], "_at"),
+      suffix("date", table?.["date-suffix"], "_date"),
+    ].filter((pair) => pair !== undefined);
     const parts = [
-      tables === false ? "" : `${tables === "snake" ? "" : "singular "}snake_case table names`,
-      suffixPart("datetime", table?.["datetime-suffix"], "_at"),
-      suffixPart("date", table?.["date-suffix"], "_date"),
+      tables === false ? "" : `${tables === "snake" ? "" : "singular "}snake_case tables`,
+      suffixes.length === 0
+        ? ""
+        : `${suffixes.map(([kind]) => kind).join("/")} columns end in ${suffixes.map(([, end]) => code(end)).join("/")}`,
     ].filter((part) => part !== "");
-    return parts.length === 0 ? undefined : parts.join(", ");
+    return parts.length === 0 ? undefined : parts.join("; ");
   },
   FAPI001: (table: RuleTable | undefined): string | undefined => {
     const parts = metadataParts(table);
@@ -130,18 +135,22 @@ function metadataParts(table: RuleTable | undefined): string[] {
 }
 
 /**
- * Words one of INW016's column suffixes.
+ * Reads one of INW016's column suffixes.
  *
  * @param kind - `datetime` or `date`.
  * @param value - the stored option, if set.
  * @param fallback - the rule's default suffix.
- * @returns e.g. `` datetime columns end in `_at` ``, or empty when the check is off.
+ * @returns the kind and its suffix, e.g. `["datetime", "_at"]`, or undefined when the check is off.
  */
-function suffixPart(kind: string, value: RuleTable[string], fallback: string): string {
+function suffix(
+  kind: string,
+  value: RuleTable[string],
+  fallback: string,
+): [string, string] | undefined {
   if (value === false) {
-    return "";
+    return undefined;
   }
-  return `${kind} columns end in \`${typeof value === "string" ? value : fallback}\``;
+  return [kind, typeof value === "string" ? value : fallback];
 }
 
 /**
