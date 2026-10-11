@@ -1,16 +1,17 @@
 /**
- * @file `inwards init --agent claude|opencode|aider|agents-md [--launcher CMD] [--brief] [--dry-run]`:
- * wires Inwards into a coding agent. Every change is computed first as
+ * @file `inwards init --agent claude|opencode|aider|agents-md [--launcher CMD] [--shared] [--brief] [--dry-run]`:
+ * wires Inwards into a coding agent, for Claude Code either on this machine
+ * (`.claude/settings.local.json`) or for the team (`--shared`: the committed
+ * `.claude/settings.json` and `.mcp.json`). Every change is computed first as
  * (file, before, after), so `--dry-run` can print it and a second run finds nothing to do. Anything init
  * can't edit safely stops it with exit 2 instead of being rewritten.
  */
 import { dirname, join } from "node:path";
 import { type InwardsConfig, parseConfig, VERSION } from "@inwards/core";
-import { isInwardsHook } from "../claude-code/settings.ts";
-import { isRecord } from "../json/guards.ts";
 import { print } from "../platform/print.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import { withBrief } from "./brief.ts";
+import { localClaude, sharedClaude } from "./claude.ts";
 import type { Agent, Change, InitContext } from "./contracts.ts";
 import { lineDiff } from "./diff.ts";
 import { gitignore } from "./gitignore.ts";
@@ -18,27 +19,6 @@ import { type Exec, inwardsExec, launcherWords, shellQuoter, warnIfCached } from
 import { opencodePlugin } from "./opencode.ts";
 import { readIfThere, upsertSection } from "./section.ts";
 
-/**
- * Claude Code hook events Inwards handles, with the tool matcher each needs.
- * Only events the hook implements are installed, so init never swaps a
- * working setup for a no-op.
- */
-const CLAUDE_HOOKS: readonly [event: string, matcher: string | undefined][] = [
-  ["SessionStart", undefined],
-  ["PreToolUse", ["Edit", "Write", "MultiEdit", "Bash"].join("|")],
-  ["PostToolUse", "Edit|Write|MultiEdit"],
-  ["Stop", undefined],
-];
-/**
- * Permission rules init adds, so Claude Code itself refuses edits to the
- * hooks and the session state even if a hook is gone (`/` anchors at the project).
- */
-const DENY_RULES = [
-  "Edit(/.claude/settings*.json)",
-  "Edit(/.inwards/**)",
-  "Edit(/**/inwards-baseline.json)",
-];
-const HOOK_ARGS = ["hook", "claude-code"];
 export const PRERELEASE: RegExp = /-.*$/u;
 /** What `init` puts in `ignore`: tooling that belongs to no layer. */
 export const DEFAULT_IGNORE: readonly string[] = ["tests", "scripts", "migrations", "conftest"];
@@ -54,6 +34,7 @@ const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\][ \t]*(?:#
  * @param wiring - what to set up.
  * @param wiring.agent - which agent to wire up; undefined for `--brief` alone.
  * @param wiring.launcher - `--launcher`, the command that starts Inwards in the project (`uv run`).
+ * @param wiring.shared - `--shared`: wire Claude Code through the committed files.
  * @param wiring.brief - `--brief`: also write the architecture brief into AGENTS.md.
  * @param dryRun - print the changes instead of writing them.
  * @returns 0 on success, 2 without a config, with a bad `--launcher`, or with a file init can't edit safely.
@@ -61,7 +42,12 @@ const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\][ \t]*(?:#
  */
 export function initCommand(
   ctx: InitContext,
-  wiring: { agent: Agent | undefined; launcher: string | undefined; brief: boolean },
+  wiring: {
+    agent: Agent | undefined;
+    launcher: string | undefined;
+    shared: boolean;
+    brief: boolean;
+  },
   dryRun: boolean,
 ): number {
   const { streams } = ctx.io;
@@ -70,9 +56,9 @@ export function initCommand(
     return print(streams, "inwards init: no pyproject.toml with [tool.inwards] here or above.", 2);
   }
   const pinned = pinDefaults(ctx, configPath);
-  const { agent, launcher } = wiring;
+  const { agent, launcher, shared } = wiring;
   const wired =
-    agent === undefined ? [] : agentChanges(ctx, { agent, launcher }, dirname(configPath));
+    agent === undefined ? [] : agentChanges(ctx, { agent, launcher, shared }, dirname(configPath));
   const changes =
     typeof wired === "string" || !wiring.brief
       ? wired
@@ -94,25 +80,32 @@ export function initCommand(
  *
  * Without a launcher, Claude Code and Aider get this binary's absolute path,
  * with a warning when that path is in a tool cache. With one, every agent
- * gets `<launcher> inwards` and no path.
+ * gets `<launcher> inwards` and no path. `--shared` (Claude Code only) never
+ * records a path: it takes the launcher, or a bare `inwards` when one is on `PATH`.
  *
  * @param ctx - the platform, for reading the files and printing Aider's line.
  * @param wiring - what to wire up.
  * @param wiring.agent - which agent.
  * @param wiring.launcher - `--launcher`, e.g. `uv run`; undefined for the binary's path.
+ * @param wiring.shared - `--shared`: the committed `.claude/settings.json` and `.mcp.json`.
  * @param project - the directory of the project's pyproject.toml.
  * @returns the changes (some may change nothing), or an error for a bad launcher or a file that can't be edited safely.
  * @throws when a file exists but can't be read.
  */
 export function agentChanges(
   ctx: InitContext,
-  wiring: { agent: Agent; launcher: string | undefined },
+  wiring: { agent: Agent; launcher: string | undefined; shared: boolean },
   project: string,
 ): Change[] | string {
   const { agent } = wiring;
   const words = wiring.launcher === undefined ? undefined : launcherWords(wiring.launcher);
   if (typeof words === "string") {
     return words;
+  }
+  if (wiring.shared) {
+    return agent === "claude"
+      ? sharedClaude(ctx, words, project)
+      : "--shared works with --agent claude only.";
   }
   const launcher = words?.join(" ");
   const exec = inwardsExec(ctx);
@@ -162,8 +155,7 @@ function agentFile(
 ): Change | string {
   const { exec, launcher } = start;
   if (agent === "claude") {
-    // settings.local.json: the default hook holds this machine's binary path, so it must not be committed.
-    return claudeSettings(ctx, join(project, ".claude", "settings.local.json"), launcher ?? exec);
+    return localClaude(ctx, project, launcher ?? exec);
   }
   if (agent === "opencode") {
     return launcher === undefined
@@ -272,88 +264,6 @@ function safeParse(text: string): ReturnType<typeof parseConfig> | undefined {
   } catch {
     return undefined;
   }
-}
-
-/**
- * Merges the Inwards hooks and deny rules into Claude Code's local project
- * settings. Our old hook entries are removed wherever they are and one fresh
- * group per event is appended, so matchers stay right and duplicates go away;
- * deny rules are added once. Anything that isn't the documented shape stops
- * init rather than being rewritten.
- *
- * @param ctx - reads the current file.
- * @param path - `.claude/settings.local.json`.
- * @param start - how to start Inwards: this binary (exec form), or a launcher
- *   such as `uv run` (shell form, run from `$CLAUDE_PROJECT_DIR`).
- * @returns the change, or an error message.
- */
-function claudeSettings(ctx: InitContext, path: string, start: Exec | string): Change | string {
-  const before = readIfThere(ctx.io, path);
-  let settings: unknown;
-  try {
-    settings = before === undefined ? {} : JSON.parse(before);
-  } catch {
-    return `${path} is not valid JSON; fix it first`;
-  }
-  if (!isRecord(settings)) {
-    return `${path} is not a JSON object`;
-  }
-  const hooks = settings["hooks"] ?? {};
-  if (!isRecord(hooks)) {
-    return `"hooks" in ${path} is not an object; fix it first`;
-  }
-  for (const [event, matcher] of CLAUDE_HOOKS) {
-    const groups = hooks[event] ?? [];
-    if (!Array.isArray(groups)) {
-      return `"hooks.${event}" in ${path} is not a list; fix it first`;
-    }
-    const hook =
-      typeof start === "string"
-        ? {
-            type: "command",
-            command: `cd "$CLAUDE_PROJECT_DIR" && ${start} inwards ${HOOK_ARGS.join(" ")}`,
-          }
-        : { type: "command", command: start.command, args: [...start.args, ...HOOK_ARGS] };
-    const kept = groups.map(withoutOurHook).filter((g) => g !== undefined);
-    kept.push(matcher === undefined ? { hooks: [hook] } : { matcher, hooks: [hook] });
-    hooks[event] = kept;
-  }
-  settings["hooks"] = hooks;
-  const denied = withDenyRules(settings["permissions"]);
-  if (denied === undefined) {
-    return `"permissions.deny" in ${path} is not a list; fix it first`;
-  }
-  settings["permissions"] = denied;
-  return { path, before, after: `${JSON.stringify(settings, null, 2)}\n` };
-}
-
-/**
- * Adds the Inwards deny rules to a `permissions` value, once each.
- *
- * @param permissions - the current `permissions`, possibly absent.
- * @returns the updated object, or undefined when it or its `deny` has the wrong shape.
- */
-function withDenyRules(permissions: unknown): Record<string, unknown> | undefined {
-  const table = permissions ?? {};
-  const deny = isRecord(table) ? (table["deny"] ?? []) : undefined;
-  if (!(isRecord(table) && Array.isArray(deny))) {
-    return undefined;
-  }
-  return { ...table, deny: [...deny, ...DENY_RULES.filter((rule) => !deny.includes(rule))] };
-}
-
-/**
- * Removes Inwards hook entries from one matcher group.
- *
- * @param group - one element of an event's list.
- * @returns the group without our entries, or undefined when nothing else was in it.
- */
-function withoutOurHook(group: unknown): unknown {
-  if (!(isRecord(group) && Array.isArray(group["hooks"]))) {
-    return group;
-  }
-  const others = group["hooks"].filter((entry) => !isInwardsHook(entry));
-  return others.length === 0 ? undefined : { ...group, hooks: others };
 }
 
 /**
