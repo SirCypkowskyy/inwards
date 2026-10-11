@@ -26,6 +26,16 @@ const DEFAULT_DENY_CALLS: readonly string[] = [
   "django.db.connection.*",
 ];
 
+/**
+ * SQLAlchemy's loader options, which are never a denied call: they only tell
+ * a statement what to load with its rows (`Select.options()`), and an
+ * endpoint passes them to a repository to shape its response
+ * (`get_by_id(id, options=(joinedload(Payout.account),))`). The #182 corpus
+ * run found that call alone behind 6 of Polar's INW012 findings.
+ */
+const LOADER_OPTION =
+  /^sqlalchemy\.orm\.(?:strategy_options\.)?(?:joinedload|selectinload|subqueryload|lazyload|immediateload|noload|raiseload|defaultload|contains_eager|selectin_polymorphic|load_only|defer|undefer|undefer_group|with_expression)$/u;
+
 /** Parameter types whose methods are database work: SQLAlchemy's and SQLModel's sessions. */
 const DEFAULT_DENY_RECEIVER_TYPES: readonly string[] = [
   "sqlalchemy.orm.Session",
@@ -108,6 +118,16 @@ function frameworkList(value: OptionValue | undefined): Framework[] | undefined 
 }
 
 /**
+ * Wraps the configured call patterns so a SQLAlchemy loader option never matches.
+ *
+ * @param listed - matches `deny-calls` (or the default list) plus `extend-deny-calls`.
+ * @returns a matcher that is false for `sqlalchemy.orm.joinedload` and the other loader options.
+ */
+function deniedCall(listed: NameMatch): NameMatch {
+  return (qualified: string): boolean => !LOADER_OPTION.test(qualified) && listed(qualified);
+}
+
+/**
  * Reads `[tool.inwards.rules.thin-endpoint]` with INW012's defaults.
  *
  * @param raw - the parsed options table, if any.
@@ -123,7 +143,7 @@ export function thinSettings(raw: RuleOptions | undefined): ThinSettings {
     maxNesting: threshold(raw, "max-nesting", 2),
     allowLoops: flag(raw, "allow-loops", false),
     allowComprehensions: flag(raw, "allow-comprehensions", true),
-    denyCalls: nameMatcher([...deny, ...extend]),
+    denyCalls: deniedCall(nameMatcher([...deny, ...extend])),
     denyReceiverTypes: nameMatcher(types),
     denyReceiverParams: new Set(stringList(raw?.["deny-receiver-params"]) ?? []),
     delegateTo: stringList(raw?.["delegate-to"]),
