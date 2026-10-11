@@ -4,7 +4,9 @@
  * interface is an ABC (`abc.ABC` among its bases or `metaclass=abc.ABCMeta`)
  * or a `typing.Protocol`; a derived class extends a class from a port
  * module; an exempt class has a base or decorator the options allow
- * (exceptions, DTOs, dataclasses); anything else is concrete. It reads one
+ * (exceptions, DTOs, dataclasses); anything else is concrete. Outside the
+ * port modules it lists the bases that subclass a port, for
+ * `allow-subclassing = false`. It reads one
  * parsed tree and decides nothing about wording; the caller parses and frees
  * the tree.
  */
@@ -235,6 +237,56 @@ export function portClasses(root: Node, module: string, context: ClassContext): 
     }
   }
   return classes;
+}
+
+/** A base outside the port modules that names a class from a port module. */
+export interface PortBase {
+  /** The subclass's name. */
+  readonly cls: string;
+  /** The base's expression node, where the finding goes. */
+  readonly node: Node;
+  /** The base's qualified name, e.g. `shop.application.ports.orders.OrderRepository`. */
+  readonly qualified: string;
+}
+
+/**
+ * Lists the bases of a module's top-level classes that name a class from a
+ * port module. A class the options exempt (an allowed decorator or base,
+ * such as an exception extending a port module's error) lists none, and so
+ * does a base the allowed bases match.
+ *
+ * @param root - the module node of a module outside the port modules.
+ * @param module - the module's dotted name, which qualifies its own classes.
+ * @param context - the file's qualifier and the options.
+ * @returns the bases in source order.
+ */
+export function portBases(root: Node, module: string, context: ClassContext): PortBase[] {
+  const found: PortBase[] = [];
+  for (const cls of portClasses(root, module, context)) {
+    const list = cls.kind === "exempt" ? null : cls.node.childForFieldName("superclasses");
+    for (const base of list ? namedChildren(list) : []) {
+      const qualified = portName(base, context);
+      if (qualified !== undefined) {
+        found.push({ cls: cls.name, node: base, qualified });
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Names the port class one base points at, if it points at one.
+ *
+ * @param base - one entry of a class's argument list.
+ * @param context - the file's qualifier and the options.
+ * @returns the base's qualified name when its module is a port module and no allowed base matches it, else undefined.
+ */
+function portName(base: Node, context: ClassContext): string | undefined {
+  const name = base.type === "keyword_argument" ? null : qualifiedHead(base, context.qualify);
+  const owner = name?.includes(".") ? name.slice(0, name.lastIndexOf(".")) : "";
+  return name && owner !== "" && context.inScope(owner) && !context.allowBase(name)
+    ? name
+    : undefined;
 }
 
 /**
