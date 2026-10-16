@@ -94,7 +94,7 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: inwards-${{ github.ref_name }}
           path: dist
@@ -140,7 +140,7 @@ jobs:
           cmp "$bin" "dist/${{ matrix.bin }}"
           chmod +x "$bin" # Python's zipfile drops the mode; VS Code's installer keeps it
           "$bin" --version
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: The wheel installs with uvx and runs
         shell: bash
         run: |
@@ -192,7 +192,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: inwards-${{ github.ref_name }}
           path: dist
