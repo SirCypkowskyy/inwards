@@ -23,12 +23,12 @@ import { diagramCommand } from "./commands/diagram.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
 import { importConfigCommand } from "./commands/import-config.ts";
 import { importDiagramCommand } from "./commands/import-diagram.ts";
-import { mcpCommand } from "./commands/mcp.ts";
 import { ruleCommand, rulesCommand } from "./commands/rules.ts";
 import { type Command, commandUsage, isCommand, overview } from "./commands/usage.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import { initMain } from "./init/style.ts";
 import { serverCommand } from "./lsp/index.ts";
+import { mcpCommand } from "./mcp/index.ts";
 import { print } from "./platform/print.ts";
 import { statsCommand } from "./runlog/index.ts";
 

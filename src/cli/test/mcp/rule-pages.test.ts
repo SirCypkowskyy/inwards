@@ -8,7 +8,7 @@
 import { expect, test } from "bun:test";
 import { RULES } from "@inwards/core";
 import { RULE_PAGES } from "../../src/adapters/rule-pages.ts";
-import { readRulePage } from "../../src/mcp/rule-page.ts";
+import { readRulePage } from "../../src/mcp/_rule-page.ts";
 
 test("every registered rule has an embedded page, and nothing else does", () => {
   expect([...RULE_PAGES.keys()].sort()).toEqual(Object.keys(RULES).sort());

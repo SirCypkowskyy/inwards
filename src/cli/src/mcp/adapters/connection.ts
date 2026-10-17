@@ -3,7 +3,7 @@
  * the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`): it declares the
  * three tools with their input schemas (Zod 4, which the SDK turns into the
  * JSON Schema `tools/list` shows), passes validated arguments to the policy
- * (`mcp/tools.ts`), and turns its answers into tool results. `serveStdio`
+ * (`../_tools.ts`), and turns its answers into tool results. `serveStdio`
  * serves both protocol eras from one factory: a client that opens with
  * `initialize` (the 2025 revisions) and one that opens with the 2026-07-28
  * revision. Stdout is the protocol's channel: nothing else may write there
@@ -15,7 +15,7 @@ import { VERSION } from "@inwards/core";
 import { type CallToolResult, McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
-import type { McpTools, ToolAnswer } from "../mcp/contracts.ts";
+import type { McpTools, ToolAnswer } from "../contracts.ts";
 
 /** What the client tells the model about the server, at the handshake. */
 const INSTRUCTIONS = [

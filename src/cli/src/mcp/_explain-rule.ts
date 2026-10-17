@@ -7,12 +7,9 @@
  * as text (`RulePages`); nothing here reads a file.
  */
 import { RULES } from "@inwards/core";
-import { failure } from "./answers.ts";
-import type { ExplainRuleInput, ToolAnswer } from "./contracts.ts";
-import { type RulePage, readRulePage } from "./rule-page.ts";
-
-/** The rule pages' Markdown, by code. */
-export type RulePages = ReadonlyMap<string, string>;
+import { failure } from "./_answers.ts";
+import { type RulePage, readRulePage } from "./_rule-page.ts";
+import type { ExplainRuleInput, RulePages, ToolAnswer } from "./contracts.ts";
 
 /** The sections an answer has without `full`, by anchor: what the issue asked for. */
 const CORE_SECTIONS: readonly string[] = [
