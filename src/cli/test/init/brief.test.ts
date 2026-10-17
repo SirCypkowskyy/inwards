@@ -56,11 +56,22 @@ const PRESET_PORTS: Readonly<Record<(typeof STYLE_NAMES)[number], string>> = {
   layered: "`app.persistence`",
   clean: "`app.application.ports`",
   hexagonal: "`app.application.ports`",
-  "vertical-slices": "`app.features.orders`",
   // Their layers are selectors, which name no one module.
+  "vertical-slices": "the inner layer",
   "bounded-contexts": "the inner layer",
   django: "the inner layer",
   fastapi: "the inner layer",
+};
+
+/**
+ * The most tokens a preset's brief may take, at four characters per token.
+ * fastapi has eleven layers, nine of them the template's roles, and ten opt-in
+ * rules on; vertical-slices has the slice template's five roles and turns on
+ * INW021, whose line the others don't have.
+ */
+const BUDGET: Readonly<Partial<Record<(typeof STYLE_NAMES)[number], number>>> = {
+  fastapi: 550,
+  "vertical-slices": 350,
 };
 
 /** A probe that finds nothing on disk. */
@@ -133,9 +144,7 @@ layers = [
 roles = ["models | schemas", "service"]
 `);
     const brief = architectureBrief({ config, style: undefined, ports: [] });
-    expect(brief).toContain(
-      "never import a layer listed after your own, nor a sibling of your own layer.",
-    );
+    expect(brief).toContain("never import a layer listed after your own, nor a sibling of yours.");
     expect(brief).toContain(
       "1. d.models (`app.*.models`): imports no other layer; not its sibling d.schemas",
     );
@@ -197,10 +206,23 @@ ignore = ["INW005"]
       const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
       expect(brief).toContain(`(the ${name} preset)`);
       expect(brief).toContain(`declare a \`typing.Protocol\` in ${PRESET_PORTS[name]}`);
-      // fastapi has eleven layers, nine of them the template's roles, and ten opt-in rules on.
-      expect(tokens(brief)).toBeLessThan(name === "fastapi" ? 550 : 300);
+      expect(tokens(brief)).toBeLessThan(BUDGET[name] ?? 300);
     },
   );
+
+  test.each([...STYLE_NAMES])("a %s preset config with --scaffold keeps its budget", (name) => {
+    const text = configTable(STYLES[name], {
+      pkg: "app",
+      root: "src",
+      version: "0.1.0",
+      ignore: [],
+      scaffold: true,
+      eol: "\n",
+    });
+    // --scaffold turns the contexts on, so the brief lists them too.
+    const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
+    expect(tokens(brief)).toBeLessThan(BUDGET[name] ?? 300);
+  });
 });
 
 test("a preset whose ports layer became a selector names no ports module", () => {

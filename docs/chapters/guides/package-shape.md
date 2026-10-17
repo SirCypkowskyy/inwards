@@ -133,7 +133,7 @@ The presets with contexts also shape their context packages, through a `*` selec
 | Preset | Package | Shape |
 |---|---|---|
 | `vertical-slices` | `app.features` | slice packages only (`allow = ["*/"]`) |
-| `vertical-slices` | `app.features.*` | requires `api`; allows any other member |
+| `vertical-slices` | `app.features.*` | requires `__init__` and `api`; allows any other member |
 | `bounded-contexts` | `app` | context packages, `bootstrap.py`, `__main__.py`, `_version.py` |
 | `bounded-contexts` | `app.*` | requires `domain/`, `application/`, `infrastructure/`, `api`; anything else is a warning |
 | `django` | `app` | requires `settings.py` and `urls.py`; allows apps, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |

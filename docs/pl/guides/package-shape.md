@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: c1506537a080f8114bd99a9b49fad7d07b23fcc3d284b3d4f58085c712f9b9d4
+source_hash: d17a2d097f9cbd84a3b4d6e0fa5667322eb0b2d596f13a489e5221714a888f66
 ---
 
 # Kształt pakietu { #package-shape }
@@ -138,7 +138,7 @@ Presety z kontekstami nadają kształt także swoim pakietom kontekstów, przez 
 | Preset | Pakiet | Kształt |
 |---|---|---|
 | `vertical-slices` | `app.features` | tylko pakiety wycinków (`allow = ["*/"]`) |
-| `vertical-slices` | `app.features.*` | wymaga `api`; dopuszcza każdy inny element |
+| `vertical-slices` | `app.features.*` | wymaga `__init__` i `api`; dopuszcza każdy inny element |
 | `bounded-contexts` | `app` | pakiety kontekstów, `bootstrap.py`, `__main__.py`, `_version.py` |
 | `bounded-contexts` | `app.*` | wymaga `domain/`, `application/`, `infrastructure/`, `api`; wszystko inne jest ostrzeżeniem |
 | `django` | `app` | wymaga `settings.py` i `urls.py`; dopuszcza aplikacje, `asgi.py`, `wsgi.py`, `__main__.py`, `_version.py` |

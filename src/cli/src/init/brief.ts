@@ -59,7 +59,7 @@ export function architectureBrief(input: BriefInput): string {
   const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
   const numbered = numbersLayers(config.layers);
   const groups = numbered ? ` (sibling groups: ${siblingGroups(config.layers).join("; ")})` : "";
-  const siblings = hasSiblings ? `, nor a sibling of your own layer${groups}` : "";
+  const siblings = hasSiblings ? `, nor a sibling of yours${groups}` : "";
   const lines = [
     "## Architecture brief (Inwards)",
     "",
