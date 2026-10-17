@@ -95,7 +95,7 @@ jobs:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       # Tests that run pinned Ruff and Ty through uv skip without it.
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Compile the binary for this OS (catches WASM embedding regressions)
         run: bun run scripts/build-binaries.ts ${{ matrix.target }}
       - name: Unit and end-to-end tests against the compiled binary
@@ -122,7 +122,7 @@ jobs:
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-24.04-arm' || fromJSON('["self-hosted","linux","ARM64","inwards"]') }} # forks: GitHub-hosted (#333)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       # What users get from PyPI, not this checkout: bump it after each release.
       - name: The latest release checks examples/clean-app with the reference config
         run: uvx inwards@0.7.0 check
@@ -148,7 +148,7 @@ jobs:
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-24.04-arm' || fromJSON('["self-hosted","linux","ARM64","inwards"]') }} # forks: GitHub-hosted (#333)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Every page under docs/chapters and docs/pl is in its nav
         run: uv run scripts/check-docs-nav.py
       # Before --mark-stale, which edits Polish pages; also fails on a stale rules.json.
