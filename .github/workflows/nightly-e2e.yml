@@ -35,7 +35,7 @@ jobs:
         if: env.HAS_KEY == 'true'
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: ./.github/actions/setup-bun
         if: env.HAS_KEY == 'true'
         with:
           bun-version-file: .bun-version
