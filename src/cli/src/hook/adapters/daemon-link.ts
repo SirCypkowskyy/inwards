@@ -3,7 +3,7 @@
  * running executable's identity from `stat`, reading the daemon's record,
  * one request over `node:net` (a Unix domain socket, or a named pipe on
  * Windows), and starting `inwards daemon` detached. What to send, and when
- * to fall back to a one-shot run, is decided in `daemon/client.ts`; this
+ * to fall back to a one-shot run, is decided in `hook/daemon/_client.ts`; this
  * module only moves the bytes. The daemon's own side is `daemon-host.ts`.
  */
 import { spawn } from "node:child_process";
@@ -11,8 +11,8 @@ import { readFileSync, statSync } from "node:fs";
 import { createConnection } from "node:net";
 import { basename } from "node:path";
 import process from "node:process";
+import { runtimeEnv } from "../../adapters/runtime.ts";
 import type { AskResult, DaemonLink } from "../daemon/contracts.ts";
-import { runtimeEnv } from "./runtime.ts";
 
 const EXE_SUFFIX = /\.exe$/iu;
 

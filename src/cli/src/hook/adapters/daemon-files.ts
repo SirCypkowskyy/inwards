@@ -4,7 +4,7 @@
  * random token in it, the record that tells hooks where it listens, written
  * atomically, and the note a daemon that couldn't listen leaves (#275).
  * All are owner-only. Used by `daemon-host.ts`; what
- * they contain is decided in `daemon/protocol.ts`, and whether a live
+ * they contain is decided in `hook/daemon/_protocol.ts`, and whether a live
  * process really holds a lock is asked over the socket by the caller.
  */
 import { linkSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";

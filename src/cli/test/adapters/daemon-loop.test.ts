@@ -10,10 +10,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { nodeDaemonHost } from "../../src/adapters/daemon-host.ts";
-import { nodeDaemonLink } from "../../src/adapters/daemon-link.ts";
-import type { AskResult, LineHandler } from "../../src/daemon/contracts.ts";
-import { daemonPlace } from "../../src/daemon/protocol.ts";
+import { nodeDaemonHost } from "../../src/hook/adapters/daemon-host.ts";
+import { nodeDaemonLink } from "../../src/hook/adapters/daemon-link.ts";
+import type { AskResult, LineHandler } from "../../src/hook/daemon/contracts.ts";
+import { daemonPlace } from "../../src/hook/daemon/index.ts";
 import { tempDir } from "../support/temp.ts";
 
 const LIMITS = { connectMs: 2000, answerMs: 10_000 };

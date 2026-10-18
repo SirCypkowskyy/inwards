@@ -8,8 +8,8 @@
  */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { isRecord } from "../json/guards.ts";
-import type { Runtime } from "../platform/contracts.ts";
+import { isRecord } from "../../json/guards.ts";
+import type { Runtime } from "../../platform/contracts.ts";
 
 /** The protocol tag on every request, answer and record. */
 export const PROTOCOL: string = "inwards-daemon/1";

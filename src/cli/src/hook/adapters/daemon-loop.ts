@@ -5,13 +5,13 @@
  * tool calls write the same session state, so hook runs never overlap; a
  * `status` or `stop` request skips the queue, and once stopping, the
  * requests still waiting are dropped so their hooks run one-shot (#277). What a
- * line means is the handler's (`daemon/server.ts`); `daemon-host.ts` owns
+ * line means is the handler's (`hook/daemon/_server.ts`); `daemon-host.ts` owns
  * the server and the files around it.
  */
 import type { Server, Socket } from "node:net";
 import process from "node:process";
 import type { LineHandler } from "../daemon/contracts.ts";
-import { MAX_REQUEST_BYTES } from "../daemon/protocol.ts";
+import { MAX_REQUEST_BYTES } from "../daemon/index.ts";
 
 /** How long a connection may take to send its request line. */
 const LINE_MS = 10_000;

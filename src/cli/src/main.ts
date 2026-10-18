@@ -15,10 +15,9 @@ import { compose } from "./adapters/compose.ts";
 import { processStreams } from "./adapters/stdio.ts";
 import { serveExtractions } from "./check/adapters/extraction-worker.ts";
 import { baselineCommand, checkCommand } from "./check/index.ts";
-import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { type Command, commandUsage, isCommand, overview } from "./commands/usage.ts";
-import { hookClaudeCode } from "./hook/index.ts";
+import { daemonCommand, hookClaudeCode } from "./hook/index.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import {
   contextCommand,

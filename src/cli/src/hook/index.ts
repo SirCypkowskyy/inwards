@@ -6,3 +6,4 @@
  * shared shapes through `contracts.ts`.
  */
 export { hookClaudeCode } from "./cli.ts";
+export { daemonCommand } from "./daemon/cli.ts";

@@ -8,7 +8,7 @@
  * the socket, the lock and the idle timer are the adapter's (`DaemonHost`).
  * No I/O of its own.
  */
-import type { LineHandler } from "./contracts.ts";
+
 import {
   type DaemonAnswer,
   type DaemonStatus,
@@ -17,7 +17,8 @@ import {
   PROTOCOL,
   parseRequest,
   toLine,
-} from "./protocol.ts";
+} from "./_protocol.ts";
+import type { LineHandler } from "./contracts.ts";
 
 /**
  * The longest line, in characters, that may be a `status` or `stop` request;

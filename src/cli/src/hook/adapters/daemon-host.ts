@@ -2,7 +2,7 @@
  * @file The daemon's side behind `DaemonHost` (ADR-039): the project's lock,
  * a `node:net` server on a fresh endpoint, the record that names it, and the
  * loop that hands request lines to the handler one at a time. What a request
- * means is decided in `daemon/server.ts`; this module only moves lines and
+ * means is decided in `hook/daemon/_server.ts`; this module only moves lines and
  * files.
  *
  * The socket directory is `$XDG_RUNTIME_DIR/inwards`, else
@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import process from "node:process";
 import type { DaemonHost, LineHandler, ServeOptions, ServeResult } from "../daemon/contracts.ts";
-import type { DaemonPlace } from "../daemon/protocol.ts";
+import type { DaemonPlace } from "../daemon/index.ts";
 import { noteFailure, publishRecord, releaseLock, removeIfOwn, takeLock } from "./daemon-files.ts";
 import { isEmitter } from "./daemon-link.ts";
 import { RequestLoop } from "./daemon-loop.ts";

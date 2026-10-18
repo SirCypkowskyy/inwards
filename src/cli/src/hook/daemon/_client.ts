@@ -10,9 +10,8 @@
  * It never decides a hook's result itself: either the daemon ran the same
  * handler, or the caller runs it here.
  */
-import type { Clock, PathProbe, Runtime, StateFiles, Streams } from "../platform/contracts.ts";
-import { parseTime } from "../platform/time.ts";
-import type { DaemonLink, LockHolder } from "./contracts.ts";
+import type { Clock, PathProbe, Runtime, StateFiles, Streams } from "../../platform/contracts.ts";
+import { parseTime } from "../../platform/time.ts";
 import {
   type DaemonAnswer,
   type DaemonFailure,
@@ -26,7 +25,8 @@ import {
   parseFailure,
   parseRecord,
   toLine,
-} from "./protocol.ts";
+} from "./_protocol.ts";
+import type { DaemonLink, LockHolder } from "./contracts.ts";
 
 /** How long a hook waits for the daemon's socket to accept it. */
 const CONNECT_MS = 100;

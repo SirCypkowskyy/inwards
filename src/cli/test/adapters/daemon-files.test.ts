@@ -10,8 +10,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { releaseLock, takeLock } from "../../src/adapters/daemon-files.ts";
-import type { LockHolder } from "../../src/daemon/contracts.ts";
+import { releaseLock, takeLock } from "../../src/hook/adapters/daemon-files.ts";
+import type { LockHolder } from "../../src/hook/daemon/contracts.ts";
 import { tempDir } from "../support/temp.ts";
 
 const dir = tempDir("inwards-lock-");

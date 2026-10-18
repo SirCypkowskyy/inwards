@@ -13,7 +13,7 @@ import type { Clock, Runtime } from "../platform/contracts.ts";
 
 /**
  * The environment variables `Runtime` is built from. The hook sends these to
- * the daemon (`daemon/client.ts`), which builds the request's `Runtime` from
+ * the daemon (`hook/daemon/_client.ts`), which builds the request's `Runtime` from
  * them as a one-shot run would from its own environment.
  */
 const RUNTIME_ENV: readonly string[] = [

@@ -12,19 +12,18 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
-| `commands/` | one module per command (`daemon`), `usage` for the help text, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
-| `hook/` | an ADR-047 slice: `index.ts` its face (`hookClaudeCode`), `cli.ts` the `inwards hook claude-code` handler, `contracts.ts` (`HookDeps`, `hookProject`, `ASK_USER`, and the session record's shapes `Start`, `SessionStart`, `Check`; the eval may import this module and nothing else), `adapters/state-files.ts` for the session and run-log state on disk. Two mini-domains, each with its `index.ts`. `claude-code/` is the hook adapter (`_dispatch`, `_session-start`, `_config-guard` with `_shell-reader` and `_edit-simulation`, `_shape-guard`, `_post-tool-use`, `_stop-gate` and `_changed-files`, `_escalation`, `_settings` and `_hook-host` (whether the agent still has Inwards wired in)); its `index.ts` re-exports `dispatch` and the pieces `init/` reads. `session/` splits into `commands/` (the session record `_record`, the start record with its witness `_start-record` (#88), the copies of dirty files `_start-copies`, start identity `_start-identity`) and `queries/` (old errors #134, agent suppressions #50, layout changes, the committed-config check, start content, the per-invocation `_lookups`); `session/index.ts` re-exports both for `claude-code/` | read files or run git itself (`session/` and `claude-code/`), or re-export `adapters/` from `index.ts`; let `session/commands/` import `queries/` |
+| `commands/` | `usage` for the help text, and `deps` (`AppDeps`, `DaemonDeps`); every command is a slice's `cli.ts` now, and `commands/` goes in step 14 | import `adapters/` |
+| `hook/` | an ADR-047 slice: `index.ts` its face (`hookClaudeCode`), `cli.ts` the `inwards hook claude-code` handler, `contracts.ts` (`HookDeps`, `hookProject`, `ASK_USER`, and the session record's shapes `Start`, `SessionStart`, `Check`; the eval may import this module and nothing else), `adapters/state-files.ts` for the session and run-log state on disk. Three mini-domains, each with its `index.ts`. `claude-code/` is the hook adapter (`_dispatch`, `_session-start`, `_config-guard` with `_shell-reader` and `_edit-simulation`, `_shape-guard`, `_post-tool-use`, `_stop-gate` and `_changed-files`, `_escalation`, `_settings` and `_hook-host` (whether the agent still has Inwards wired in)); its `index.ts` re-exports `dispatch` and the pieces `init/` reads. `session/` splits into `commands/` (the session record `_record`, the start record with its witness `_start-record` (#88), the copies of dirty files `_start-copies`, start identity `_start-identity`) and `queries/` (old errors #134, agent suppressions #50, layout changes, the committed-config check, start content, the per-invocation `_lookups`); `session/index.ts` re-exports both for `claude-code/`. `daemon/` is the hook daemon's side of ADR-039 (#429), a third mini-domain: `index.ts` re-exports the `inwards-daemon/1` wire format and the daemon's file names (`_protocol`), the hook's side (`viaDaemon` and `askDaemon` in `_client`), the request handler (`_server`) and the caches kept between requests (`_memory`); `contracts.ts` holds `DaemonLink` and `DaemonHost`; `cli.ts` is the `inwards daemon` handler (was `commands/daemon.ts`), which `hook/index.ts` re-exports, not `daemon/index.ts`. `adapters/daemon-link.ts`, `daemon-host.ts`, `daemon-loop.ts` and `daemon-files.ts` are the socket, the lock and the record | read files or run git itself (`session/` and `claude-code/`), or re-export `adapters/` from `index.ts`; let `session/commands/` import `queries/`; do I/O in `daemon/` (the socket, the record and the lock are `adapters/daemon-*.ts`) |
 | `check/` | an ADR-047 slice, formerly `project/`: `index.ts` its face (`checkCommand`, `baselineCommand`, `runCheck`, `runPlan`, `planCheck`, config discovery, the project snapshot, `overlayTexts`, `fingerprint`, and the diagram and baseline helpers the other slices read), `cli.ts` the `inwards check` and `inwards baseline` handlers, `contracts.ts` (`CheckRunner`, `CheckDeps`, `CheckRunNotes`, `BaselineWriter`, `ExtractionPool`, `ProjectIo`), and private modules for running a check (`_check`), which files it reads and under which module names, then reading them (`_sources`: one batch from 1,000 files, #281), config discovery and routing (`_config-discovery`, `_routing`, uv workspace members in `_workspace`), a check over several configs (`_runs`), project snapshots (`_snapshot`), layer-package symlinks (`_links`), virtualenv site-packages (`_site-packages`), hiding modules added since the start (`_absent`), how many threads parse a full check (`_threads`, ADR-040), texts laid over the disk for one check, files not yet written included (`_overlay`, for `inwards mcp`), the files `_diagrams` names, violation fingerprints (`_fingerprint`, shared by the session record, escalation and the run log), and the checks only a whole-project run makes (`_whole`). `baseline/` is a mini-domain (its `index.ts` and `_file.ts`: the baseline file's name, reader, writer and hashes) that `_check.ts` reads, so `inwards baseline` stays in `cli.ts`. `adapters/` holds `baseline-files.ts` and the extraction cache, store, entry, pool and worker (`extraction-*`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread outside `check/adapters/extraction-pool.ts`; import `runlog/` (`CheckRunNotes` stands in for the run log), or re-export an adapter from `index.ts` |
 | `runlog/` | an ADR-047 slice: `index.ts` its face (`statsCommand`, `createRunLog`, `RunLog`, and the readers the tests use), `cli.ts` the `inwards stats` handler, `contracts.ts` (`ExportFiles`, `StatsDeps`), `commands/` writing the run log (`_record`), `queries/` reading it back (`_runs`), the numbers (`_stats`) and `--export` (`_export`), and `adapters/export-files.ts` for the export key and file | keep notes in a module global, or let `queries/` import `commands/` |
 | `init/` | an ADR-047 slice: `index.ts` its face (the five handlers and `STYLE_NAMES` for the help text), `cli.ts` the `inwards init` handler, `contracts.ts` (`InitDeps`, `InitFiles`, `Picker`, `InitFlags`), and private modules for agent wiring (`_claude` with its `.mcp.json` in `_mcp-json`, `_opencode`, `_agents`), `--style auto`'s name table and command (`_auto`, `_auto-command`), the scaffold plan, the report, presets and the text their templates add (`_template-text`), marked sections in Markdown files (`_section`) and appending an imported table (`_append-table`). Three mini-domains, each with its `index.ts` and `cli.ts`: `brief/` (the architecture brief for `--brief` and `inwards context`, with its opt-in rules part), `diagram/` (`inwards diagram`, and `inwards import-diagram` with the table a read diagram becomes) and `import-linter/` (`inwards import-config`). `adapters/files.ts` writes, `adapters/picker.ts` asks on a terminal and loads `@clack/prompts` with a dynamic `import()` | write files itself (`InitFiles` does), or re-export an adapter from `index.ts` |
 | `rules/` | an ADR-047 slice: `index.ts` its face (`rulesCommand`, `ruleCommand`), `cli.ts` the `inwards rules` and `inwards rule` handlers, `_sources.ts` which config key turns each rule on, `page/` the rule-page reader (`readRulePage`, `RulePage`) with its own `index.ts`, and `adapters/pages.ts` embedding the English rule pages as text | import the SDK, or re-export `adapters/pages.ts` from `index.ts` |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
-| `daemon/` | the hook daemon's side of ADR-039: the `inwards-daemon/1` wire format and the daemon's file names (`protocol`), the hook's side (`viaDaemon` and `askDaemon` in `client`), the request handler (`server`), the caches kept between requests (`memory`), and the `DaemonLink` and `DaemonHost` contracts | do I/O (the socket, the record and the lock are `adapters/daemon-*.ts`) |
 | `lsp/` | the language server slice (`inwards server`, ADR-041), the first one in the ADR-047 layout: the `server` handler (`cli`, re-exported by `index`), when to run a whole pass or a one-document check (`_session`), the two checks through `planCheck` and `runCheck` (`_checks`), what each file shows (`_publish`), which file events matter (`_events`), the `Editor`, `LanguageServer` and `ServerCheck` contracts, and the LSP connection over stdio (`adapters/connection`) | import the protocol library or touch a stream outside `lsp/adapters/` |
 | `mcp/` | the MCP server slice (`inwards mcp`, ADR-042) in the ADR-047 layout: the `mcp` handler (`cli`), re-exported by `index` with `explainRule` for `inwards rules`, the three tools (`_check-files`, `_explain-rule` with `_rule-page`, `_where` with `_where-answer` and `_hints`), their arguments and answers and the `RulePages` type (`contracts`), running them one at a time (`_tools`), and the MCP connection over stdio with the SDK and Zod (`adapters/connection`) | import the SDK or Zod, or touch a stream, outside `mcp/adapters/` |
 | `platform/` | the contracts for everything outside the process, `print()`, and `time.ts`, the one place that may name `Date` to parse a recorded timestamp | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
-| `adapters/` | `node:fs`, git, the environment, stdio, state files, the grammars, TOML, the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`); `compose.ts` wires them into `AppDeps` | hold policy |
+| `adapters/` | `node:fs`, git, the environment, stdio, state files, the grammars, TOML, `compose.ts` wires them into `AppDeps` | hold policy |
 
 ## Dependency rules
 
@@ -36,9 +35,11 @@ narrowest `Pick<>` they need, so a signature says what it touches.
 
 Imports go downwards only: `platform`, `json` and `paths` are leaves, then
 `check`, then `runlog` (`runlog/` reads `check/`, and `check/` takes a run log through its own `CheckRunNotes`), then
-`hook` and `init`, then `commands`. `daemon/` sits beside them, below `commands/`, and imports
-only `platform` and `json` (and the engine's API); `commands/` and the
-`daemon-*` adapters use it. `lsp/` sits beside it too and imports `platform`,
+`hook` and `init`, then `commands`. `hook/daemon/` (a mini-domain of `hook/`) imports
+only `platform` and `json` (and the engine's API), except its `cli.ts`, which also
+reads `hook/cli.ts` and `commands/deps.ts`; `hook/cli.ts`, `commands/deps.ts`,
+`adapters/compose.ts` and the `hook/adapters/daemon-*` files use `daemon/index.ts`
+and `daemon/contracts.ts`. `lsp/` sits beside it too and imports `platform`,
 `json`, `paths` and `check` (for `planCheck`), and `commands/deps.ts` for
 `AppDeps` until step 14 moves it to the root; `main.ts` imports its
 `index.ts`, `commands/deps.ts` and `adapters/compose.ts` its `contracts.ts`. `mcp/` sits beside them with the same
@@ -49,7 +50,7 @@ imports as `lsp/`, plus `check/index.ts` for `runPlan`; `main.ts` and
 stay in a chunk only `inwards mcp` reads. Only the root (`main.ts`, and `adapters/compose.ts` until it moves up)
 imports `adapters/` or a slice's `adapters/`. `init/`'s handlers take `AppDeps`
 from `commands/deps.ts` too, until step 14, and `commands/usage.ts` reads
-`STYLE_NAMES` and `AGENTS` from `init/`. `rules/` imports `platform`, `json`, `check`, `commands/deps.ts` and `mcp/index.ts` (for `explainRule`); `mcp/` reads the page reader through `rules/page/index.ts`, not `rules/index.ts`, which would close a cycle; `main.ts` imports `rules/index.ts` and `compose.ts` loads `rules/adapters/pages.ts` with a dynamic `import()`. `hook/` imports `platform`, `json`, `paths`, `check`, `runlog` and `daemon/` (`cli.ts` forwards PostToolUse); `commands/deps.ts` and `commands/daemon.ts` read `hook/contracts.ts`, `main.ts` imports `hook/index.ts`, `init/` reads `hook/claude-code/index.ts` and `compose.ts` loads `hook/adapters/state-files.ts`. `eval/` may
+`STYLE_NAMES` and `AGENTS` from `init/`. `rules/` imports `platform`, `json`, `check`, `commands/deps.ts` and `mcp/index.ts` (for `explainRule`); `mcp/` reads the page reader through `rules/page/index.ts`, not `rules/index.ts`, which would close a cycle; `main.ts` imports `rules/index.ts` and `compose.ts` loads `rules/adapters/pages.ts` with a dynamic `import()`. `hook/` imports `platform`, `json`, `paths`, `check`, `runlog` and `daemon/` (`cli.ts` forwards PostToolUse through `daemon/index.ts`); `commands/deps.ts` reads `hook/contracts.ts`, `main.ts` imports `hook/index.ts`, `init/` reads `hook/claude-code/index.ts` and `compose.ts` loads `hook/adapters/state-files.ts`. `eval/` may
 import `hook/contracts.ts` and nothing else.
 
 Enforced by:
@@ -179,7 +180,21 @@ issue text:
 - `cli.ts` takes `HookDeps` plus a `DaemonLink` from `daemon/contracts.ts`, not `AppDeps`
   from `commands/deps.ts`, which already imports `hook/contracts.ts`: through `AppDeps` the
   slice and `commands/` would close a cycle. `AppDeps` satisfies the parameter as it is.
-- The daemon stays where it is (#429 moves it into `hook/daemon/`).
+
+`hook/daemon/` (#429) took `daemon/`, `commands/daemon.ts` and the `daemon-*` adapters
+(`hook/adapters/`). The wire format (`inwards-daemon/1`) and the file names don't change.
+The move script's command is in the PR description. Differences from the issue text:
+
+- `daemon/cli.ts` (`inwards daemon`) is not re-exported by `daemon/index.ts`. It calls
+  `hookClaudeCode` from `hook/cli.ts`, and `hook/cli.ts` reads `daemon/index.ts`
+  (`viaDaemon`): re-exporting `cli.ts` there would close the cycle `hook/index.ts`,
+  `hook/cli.ts`, `daemon/index.ts`, `daemon/cli.ts`, `hook/cli.ts`. `hook/index.ts` re-exports
+  `daemonCommand` instead, so `main.ts` still imports one face.
+- `daemon/cli.ts` keeps taking `AppDeps` and `DaemonDeps` from `commands/deps.ts` until
+  step 14 (`deps.ts` reads `hook/daemon/contracts.ts`, which imports no handler, so no cycle).
+- No new fallow zone: the old `cli-daemon` zone is gone and `hook/daemon/**` and
+  `hook/adapters/daemon-*` fall into `cli-hook` and `cli-hook-adapters`. `cli-test` may import
+  `cli-hook-adapters` (the adapter tests drive the real socket and lock).
 
 The worker thread entry (`adapters/extraction-worker.ts`, `serveExtractions`)
 is still started by `main.ts`, which is the same program a worker runs, so the
@@ -196,7 +211,7 @@ several invocations in one process. Mutable state is made per invocation:
 
 The hook daemon (ADR-039) is the one long-lived exception, and it is still
 an object, not a global: `nodeDaemon` in `adapters/compose.ts` makes its
-caches (`daemonExtractionCache` and `commitKeyedGit` from `daemon/memory.ts`)
+caches (`daemonExtractionCache` and `commitKeyedGit` from `hook/daemon/_memory.ts`, through `daemon/index.ts`)
 once per invocation, so they live as long as the daemon, and every request
 it serves gets its own runtime, clock, streams and run log, as a one-shot
 hook would.

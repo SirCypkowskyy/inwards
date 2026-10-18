@@ -8,9 +8,14 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { CachedExtraction, ExtractionIdentity } from "@inwards/core";
-import { commitKeyedGit, daemonExtractionCache } from "../../src/daemon/memory.ts";
-import { type HookRequest, PROTOCOL } from "../../src/daemon/protocol.ts";
-import { createHandler, type HookOutcome } from "../../src/daemon/server.ts";
+import {
+  commitKeyedGit,
+  createHandler,
+  daemonExtractionCache,
+  type HookOutcome,
+  type HookRequest,
+  PROTOCOL,
+} from "../../src/hook/daemon/index.ts";
 import type { Git } from "../../src/platform/contracts.ts";
 import { request, SELF } from "../support/daemon-helpers.ts";
 

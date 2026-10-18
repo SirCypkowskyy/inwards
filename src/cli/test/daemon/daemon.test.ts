@@ -24,7 +24,7 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import process from "node:process";
-import { daemonPlace, PROTOCOL, toLine } from "../../src/daemon/protocol.ts";
+import { daemonPlace, PROTOCOL, toLine } from "../../src/hook/daemon/index.ts";
 import {
   CMD,
   inwards,

@@ -10,11 +10,16 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { nodeDaemonHost } from "../../src/adapters/daemon-host.ts";
-import { nodeDaemonLink } from "../../src/adapters/daemon-link.ts";
-import { viaDaemon } from "../../src/daemon/client.ts";
-import type { LineHandler, ServeOptions } from "../../src/daemon/contracts.ts";
-import { daemonPlace, PROTOCOL, parseFailure, toLine } from "../../src/daemon/protocol.ts";
+import { nodeDaemonHost } from "../../src/hook/adapters/daemon-host.ts";
+import { nodeDaemonLink } from "../../src/hook/adapters/daemon-link.ts";
+import type { LineHandler, ServeOptions } from "../../src/hook/daemon/contracts.ts";
+import {
+  daemonPlace,
+  PROTOCOL,
+  parseFailure,
+  toLine,
+  viaDaemon,
+} from "../../src/hook/daemon/index.ts";
 import { POST } from "../support/daemon-helpers.ts";
 import { tempDir } from "../support/temp.ts";
 
