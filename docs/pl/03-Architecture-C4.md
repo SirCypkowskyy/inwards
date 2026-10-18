@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 3c50ca1f04fe58d2c5342e9fe46fefde8feb22e07a27c5d703f74b06894f01e1
+source_hash: 38c11a0805b4977c5af145873452f0c4004ed17a72a217a9d6f34d421ae4e2ec
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -523,16 +523,20 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, hook, daemon: thin, handed AppDeps
+│   │   ├── commands/      # hook, daemon: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
 │   │   ├── session/       # the session record, start identity and content, old errors,
 │   │   │                  #   agent suppressions, layout changes against the session start
-│   │   ├── project/       # running a check, the baseline, config discovery, project snapshots,
-│   │   │                  #   texts laid over the disk (overlay.ts), the whole-project checks
-│   │   │                  #   (whole.ts), the diagram files `diagrams` lists (diagrams.ts),
-│   │   │                  #   violation fingerprints (fingerprint.ts)
+│   │   ├── check/         # inwards check and inwards baseline, a slice (ADR-047): index.ts its
+│   │   │                  #   face, cli.ts the two handlers, running a check (_check.ts), config
+│   │   │                  #   discovery, routing (_routing.ts, _runs.ts), project snapshots, texts
+│   │   │                  #   laid over the disk (_overlay.ts), the whole-project checks
+│   │   │                  #   (_whole.ts), the diagram files `diagrams` lists (_diagrams.ts),
+│   │   │                  #   violation fingerprints (_fingerprint.ts); baseline/ the baseline
+│   │   │                  #   file; adapters/ the baseline writer, the extraction cache and the
+│   │   │                  #   worker threads
 │   │   ├── runlog/        # the opt-in run log, a slice (ADR-047): index.ts its face, cli.ts
 │   │   │                  #   inwards stats, commands/ writes the log, queries/ reads it back
 │   │   │                  #   (stats, --export), adapters/ the export key and file
@@ -558,7 +562,7 @@ src/
 │   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
-│   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
+│   │   └── adapters/      # node:fs, git, the environment, stdio, state files,
 │   │                      #   the grammars, the daemon's socket and files,
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/

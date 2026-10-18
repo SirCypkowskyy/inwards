@@ -18,7 +18,7 @@ import {
   type Report,
   stableMessage,
 } from "@inwards/core";
-import { projectPath } from "../project/snapshot.ts";
+import { projectPath } from "../check/index.ts";
 import type { Check, Start } from "./contracts.ts";
 import type { StartLookups } from "./lookups.ts";
 import { atStart, carried } from "./old-errors.ts";

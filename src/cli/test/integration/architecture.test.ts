@@ -16,8 +16,7 @@ import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
 import { lintAs, misnamed } from "../../../core/test/support/architecture.ts";
 import { compose, nodePlatform } from "../../src/adapters/compose.ts";
-import { baselineCommand } from "../../src/commands/baseline.ts";
-import { checkCommand } from "../../src/commands/check.ts";
+import { baselineCommand, checkCommand } from "../../src/check/index.ts";
 import type { AppDeps } from "../../src/commands/deps.ts";
 import { createRunLog, statsCommand } from "../../src/runlog/index.ts";
 import { createStartIdentity } from "../../src/session/start-identity.ts";
@@ -28,6 +27,7 @@ const SRC = join(REPO, "src/cli/src");
 const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /** Folders that hold policy: no I/O of their own, no concrete adapters. */
 const POLICY = [
+  "check",
   "claude-code",
   "commands",
   "daemon",
@@ -37,7 +37,6 @@ const POLICY = [
   "mcp",
   "paths",
   "platform",
-  "project",
   "runlog",
   "session",
 ];
@@ -45,7 +44,7 @@ const POLICY = [
  * Folders under src/cli/src already moved to the slice layout of ADR-047.
  * Each migration step adds its folders, so a moved slice can't drift back.
  */
-const MIGRATED_SLICES: readonly string[] = ["lsp", "runlog", "mcp", "init", "rules"];
+const MIGRATED_SLICES: readonly string[] = ["lsp", "runlog", "mcp", "init", "rules", "check"];
 /** The run-log fields these tests read. */
 interface LogLine {
   files: string[];
@@ -178,7 +177,7 @@ setDefaultTimeout(30_000);
 describe("boundaries", () => {
   test("a policy folder can't import node:fs or use the process global", () => {
     // newslice: a folder nobody listed gets the ban too (ADR-047).
-    for (const folder of ["session", "claude-code", "project", "newslice"]) {
+    for (const folder of ["session", "claude-code", "check", "newslice"]) {
       const imports = lintAs(
         `src/cli/src/${folder}/probe.ts`,
         'import { readFileSync } from "node:fs";\nexport const read = readFileSync;\n',

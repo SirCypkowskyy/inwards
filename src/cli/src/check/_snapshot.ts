@@ -18,8 +18,8 @@ import {
 } from "@inwards/core";
 import { posix } from "../paths/lexical.ts";
 import type { FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
-import { layerDirs } from "./check.ts";
-import { layerLinks } from "./links.ts";
+import { layerDirs } from "./_check.ts";
+import { layerLinks } from "./_links.ts";
 
 /** What taking a snapshot reads. */
 export interface SnapshotIo {

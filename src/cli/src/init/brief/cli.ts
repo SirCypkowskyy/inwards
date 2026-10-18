@@ -6,9 +6,9 @@
  * `_brief.ts`; this module only finds the config and picks the output.
  */
 
+import { commandConfig } from "../../check/index.ts";
 import type { AppDeps } from "../../commands/deps.ts";
 import { print } from "../../platform/print.ts";
-import { commandConfig } from "../../project/config-discovery.ts";
 import { briefFor, withBrief } from "./_brief.ts";
 
 /**

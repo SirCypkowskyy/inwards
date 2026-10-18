@@ -11,7 +11,7 @@
  * check lives longer. Checks run one at a time, in order. No I/O of its own.
  */
 import type { ConfigError, Diagnostic } from "@inwards/core";
-import { DIAGRAM_FILE } from "../project/diagrams.ts";
+import { DIAGRAM_FILE } from "../check/index.ts";
 import { checkAlone, checkWorkspace, type ServerDeps, without } from "./_checks.ts";
 import { messageOf } from "./_convert.ts";
 import { needsPass } from "./_events.ts";

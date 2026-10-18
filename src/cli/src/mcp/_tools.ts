@@ -5,7 +5,7 @@
  * two calls never share the kept parse at once. What each tool does is its
  * own module's; the protocol is `adapters/connection.ts`'s.
  */
-import type { ProjectIo } from "../project/contracts.ts";
+import type { ProjectIo } from "../check/contracts.ts";
 import { checkFiles } from "./_check-files.ts";
 import { explainRule } from "./_explain-rule.ts";
 import { whereShouldThisGo } from "./_where.ts";

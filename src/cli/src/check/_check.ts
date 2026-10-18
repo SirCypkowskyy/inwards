@@ -26,14 +26,14 @@ import {
 } from "@inwards/core";
 import { posix } from "../paths/lexical.ts";
 import type { PathProbe, Runtime } from "../platform/contracts.ts";
-import { hideTopLevel } from "./absent.ts";
-import { applyBaseline, readBaseline } from "./baseline.ts";
+import { hideTopLevel } from "./_absent.ts";
+import { checkNamedDiagrams, DIAGRAM_FILE, readDiagrams, splitTargets } from "./_diagrams.ts";
+import { atOrInside, diskTexts, type PlannedFile, planSources, readSources } from "./_sources.ts";
+import { checkOnThreads, openPool } from "./_threads.ts";
+import { wholeProjectFindings } from "./_whole.ts";
+import { otherPortions, workspacePackages } from "./_workspace.ts";
+import { applyBaseline, readBaseline } from "./baseline/index.ts";
 import type { ExtractionPool, ProjectIo } from "./contracts.ts";
-import { checkNamedDiagrams, DIAGRAM_FILE, readDiagrams, splitTargets } from "./diagrams.ts";
-import { atOrInside, diskTexts, type PlannedFile, planSources, readSources } from "./sources.ts";
-import { checkOnThreads, openPool } from "./threads.ts";
-import { wholeProjectFindings } from "./whole.ts";
-import { otherPortions, workspacePackages } from "./workspace.ts";
 
 /** A loaded project: its config, where its root is, and an engine for it. */
 interface Project {

@@ -16,6 +16,11 @@ import {
   type GrammarBinaries,
   type Report,
 } from "@inwards/core";
+import { nodeBaselineWriter } from "../check/adapters/baseline-files.ts";
+import { fileExtractionCache } from "../check/adapters/extraction-cache.ts";
+import { startExtractionPool } from "../check/adapters/extraction-pool.ts";
+import type { CheckRunner, ExtractionPool, ProjectIo } from "../check/contracts.ts";
+import { overlayTexts, runCheck } from "../check/index.ts";
 import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
@@ -24,17 +29,10 @@ import { terminalPicker } from "../init/adapters/picker.ts";
 import type { ServerCheck } from "../lsp/contracts.ts";
 import type { RulePages } from "../mcp/contracts.ts";
 import type { Clock, Platform, Streams } from "../platform/contracts.ts";
-import { runCheck } from "../project/check.ts";
-import type { ExtractionPool, ProjectIo } from "../project/contracts.ts";
-import { overlayTexts } from "../project/overlay.ts";
 import { nodeExportFiles } from "../runlog/adapters/export-files.ts";
 import { createRunLog } from "../runlog/index.ts";
-import type { CheckRunner } from "../session/contracts.ts";
-import { nodeBaselineWriter } from "./baseline-files.ts";
 import { nodeDaemonHost } from "./daemon-host.ts";
 import { nodeDaemonLink } from "./daemon-link.ts";
-import { fileExtractionCache } from "./extraction-cache.ts";
-import { startExtractionPool } from "./extraction-pool.ts";
 import { nodeFileWalker } from "./file-walk.ts";
 import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { budgetedGit, nodeGit } from "./git.ts";

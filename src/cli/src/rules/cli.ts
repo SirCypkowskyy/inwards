@@ -9,10 +9,10 @@
  */
 import { relative } from "node:path";
 import { inwardsTable, parseConfig, RULES } from "@inwards/core";
+import { commandConfig } from "../check/index.ts";
 import type { AppDeps } from "../commands/deps.ts";
 import { explainRule } from "../mcp/index.ts";
 import { print } from "../platform/print.ts";
-import { commandConfig } from "../project/config-discovery.ts";
 import { type RuleRow, type RuleSource, ruleRows } from "./_sources.ts";
 
 /** The flags both commands read. */

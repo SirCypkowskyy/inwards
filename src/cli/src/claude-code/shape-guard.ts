@@ -14,10 +14,9 @@
  */
 import { dirname, relative, resolve } from "node:path";
 import { checkShape, type Diagnostic, moduleNameFor, parseConfig } from "@inwards/core";
+import { findConfig, projectPath } from "../check/index.ts";
 import { isRecord } from "../json/guards.ts";
 import { isInside, posix } from "../paths/lexical.ts";
-import { findConfig } from "../project/config-discovery.ts";
-import { projectPath } from "../project/snapshot.ts";
 import { isSessionId, readSessionStart } from "../session/record.ts";
 import { landingPath, lexicalPath } from "./edit-simulation.ts";
 import { askUser } from "./escalation.ts";

@@ -18,12 +18,12 @@ import {
   type GrammarBinaries,
   type SourceFile,
 } from "@inwards/core";
-import { startExtractionPool } from "../../src/adapters/extraction-pool.ts";
-import { loadGrammars } from "../../src/adapters/grammars.ts";
+import { loadGrammars } from "../../../src/adapters/grammars.ts";
+import { startExtractionPool } from "../../../src/check/adapters/extraction-pool.ts";
 
 /** Both pools in the child answered every job, and the child exited 0. */
 const BOTH_EXITED = /^ok ok exit 0 after/u;
-const ENTRY = join(import.meta.dir, "../../src/main.ts");
+const ENTRY = join(import.meta.dir, "../../../src/main.ts");
 const WASM: GrammarBinaries = await loadGrammars();
 const run: (job: ExtractionJob) => ExtractionAnswer = await createExtractionWorker(WASM);
 
@@ -202,8 +202,8 @@ describe("the pool answers like this thread", () => {
 
   test("a process that used the pool exits, stuck workers and all", () => {
     // In its own process: the test runner would hide a worker that keeps the event loop alive.
-    const pool = join(import.meta.dir, "../../src/adapters/extraction-pool.ts");
-    const grammars = join(import.meta.dir, "../../src/adapters/grammars.ts");
+    const pool = join(import.meta.dir, "../../../src/check/adapters/extraction-pool.ts");
+    const grammars = join(import.meta.dir, "../../../src/adapters/grammars.ts");
     const script = `
       import { startExtractionPool } from ${JSON.stringify(pool)};
       import { loadGrammars } from ${JSON.stringify(grammars)};

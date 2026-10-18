@@ -19,7 +19,7 @@ import {
   type ExtractionJob,
   type GrammarBinaries,
 } from "@inwards/core";
-import type { ExtractionPool } from "../project/contracts.ts";
+import type { ExtractionPool } from "../contracts.ts";
 import { isExtraction, isRecord } from "./extraction-entry.ts";
 
 /** Jobs per message: big enough that posting is cheap, small enough to share the tail. */

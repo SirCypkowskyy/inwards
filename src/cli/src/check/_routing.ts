@@ -11,9 +11,9 @@ import { dirname, join, resolve } from "node:path";
 import { declaresInwards, inwardsTable } from "@inwards/core";
 import { isRecord } from "../json/guards.ts";
 import { isInside } from "../paths/lexical.ts";
-import { findConfig } from "./config-discovery.ts";
+import { findConfig } from "./_config-discovery.ts";
+import { workspaceMembers } from "./_workspace.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { workspaceMembers } from "./workspace.ts";
 
 /** What planning reads: path kinds, real paths, files, directory listings and TOML. */
 type RoutingIo = Pick<ProjectIo, "probe" | "read" | "toml">;

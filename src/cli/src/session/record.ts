@@ -38,17 +38,17 @@
  */
 import { join } from "node:path";
 import type { Diagnostic } from "@inwards/core";
-import { isRecord } from "../json/guards.ts";
-import type { Platform } from "../platform/contracts.ts";
-import { baselineHashes } from "../project/baseline.ts";
-import { fingerprint } from "../project/fingerprint.ts";
 import {
+  baselineHashes,
+  fingerprint,
   projectConfigs,
   projectLinks,
   projectManifest,
   projectPath,
   projectTopLevel,
-} from "../project/snapshot.ts";
+} from "../check/index.ts";
+import { isRecord } from "../json/guards.ts";
+import type { Platform } from "../platform/contracts.ts";
 import type { SessionStart } from "./contracts.ts";
 import { copiesName, startCopier } from "./start-copies.ts";
 import {

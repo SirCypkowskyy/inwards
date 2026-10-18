@@ -27,9 +27,9 @@ import {
   parseConfig,
   writeDiagram,
 } from "@inwards/core";
+import { commandConfig } from "../../check/index.ts";
 import type { AppDeps } from "../../commands/deps.ts";
 import { print } from "../../platform/print.ts";
-import { commandConfig } from "../../project/config-discovery.ts";
 import { appendTable, parsedTable } from "../_append-table.ts";
 import { shown, sourceRoot } from "../_target.ts";
 import { renderDiagramToml } from "./_table.ts";

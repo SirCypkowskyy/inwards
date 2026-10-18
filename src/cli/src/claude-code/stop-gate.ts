@@ -32,16 +32,16 @@
  */
 import { join } from "node:path";
 import { type Diagnostic, type InwardsConfig, type Report, render } from "@inwards/core";
-import type { Platform } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
-import { changedBaselines } from "../project/baseline.ts";
-import { fingerprint } from "../project/fingerprint.ts";
 import {
+  changedBaselines,
+  fingerprint,
   projectConfigs,
   projectLinks,
   projectManifest,
   projectTopLevel,
-} from "../project/snapshot.ts";
+} from "../check/index.ts";
+import type { Platform } from "../platform/contracts.ts";
+import { print } from "../platform/print.ts";
 import { rejectedNote } from "../session/agent-suppressions.ts";
 import { uncommittedConfigs } from "../session/committed-config.ts";
 import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";

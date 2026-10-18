@@ -6,7 +6,7 @@
 import { renameSync, rmSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { ConfigError } from "@inwards/core";
-import type { BaselineWriter } from "../project/contracts.ts";
+import type { BaselineWriter } from "../contracts.ts";
 
 /** Baseline replacement on the real filesystem. */
 export const nodeBaselineWriter: BaselineWriter = {

@@ -5,13 +5,14 @@
  * also notes each run in the run log. Planning which config checks what is
  * `project/routing.ts`; rendering is the engine's.
  */
+
 import { dirname, relative } from "node:path";
 import { ConfigError, type Report } from "@inwards/core";
 import { shownReport } from "../paths/display.ts";
 import { posix } from "../paths/lexical.ts";
-import type { CheckPlan, CheckUnit } from "../project/routing.ts";
-import { threadLimit } from "../project/threads.ts";
-import type { AppDeps } from "./deps.ts";
+import type { CheckPlan, CheckUnit } from "./_routing.ts";
+import { threadLimit } from "./_threads.ts";
+import type { CheckDeps } from "./contracts.ts";
 
 /** One config's check, with what it was asked to check. */
 interface Run extends CheckUnit {
@@ -45,7 +46,7 @@ export interface Outcome {
  * @throws {ConfigError} when the only config, or its baseline, is invalid.
  */
 export async function runPlan(
-  deps: Pick<AppDeps, "io" | "check"> & { runlog?: AppDeps["runlog"] | undefined },
+  deps: Pick<CheckDeps, "io" | "check" | "runlog">,
   plan: CheckPlan,
   {
     cache,
@@ -108,7 +109,7 @@ export async function runPlan(
  * @throws {ConfigError} when the config or its baseline is invalid and it runs alone.
  */
 async function checkUnit(
-  deps: Pick<AppDeps, "io" | "check">,
+  deps: Pick<CheckDeps, "io" | "check">,
   unit: CheckUnit,
   {
     cache,

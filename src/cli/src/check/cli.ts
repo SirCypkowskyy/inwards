@@ -1,20 +1,22 @@
 /**
- * @file `inwards check`: checks the Python files under the given paths (or the
+ * @file `inwards check` and `inwards baseline`. Check: checks the Python files under the given paths (or the
  * whole config root, or every uv workspace member's) against `[tool.inwards]`
  * and writes the report to stdout in the chosen format. Exit codes follow Ruff: 0 clean (warnings
  * allowed), 1 errors, 2 usage or config error, which includes a named path
  * that doesn't exist and paths that gave no file to check at all.
  */
 import { posix as posixPath, relative, resolve } from "node:path";
-import { type Format, type Report, render } from "@inwards/core";
+import { type Format, parseConfig, type Report, render } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
-import { diskCacheWanted } from "../project/check.ts";
-import { commandConfig, NO_CONFIG } from "../project/config-discovery.ts";
-import { type CheckPlan, planCheck } from "../project/routing.ts";
-import { runPlan } from "./check-runs.ts";
-import type { AppDeps } from "./deps.ts";
+import { diskCacheWanted } from "./_check.ts";
+import { commandConfig, NO_CONFIG } from "./_config-discovery.ts";
+import { type CheckPlan, planCheck } from "./_routing.ts";
+import { runPlan } from "./_runs.ts";
+import { threadLimit } from "./_threads.ts";
+import { BASELINE_FILE, writeBaseline } from "./baseline/index.ts";
+import type { CheckDeps } from "./contracts.ts";
 
 const FORMATS: readonly Format[] = ["text", "concise", "json", "sarif", "github"];
 const WHOLE_NUMBER = /^\d+$/u;
@@ -48,7 +50,7 @@ function isFormat(value: string): value is Format {
  * @returns the plan, or the usage error to print.
  * @throws when a pyproject.toml on the way can't be read.
  */
-function planOf(deps: AppDeps, paths: string[], config: string | undefined): CheckPlan | string {
+function planOf(deps: CheckDeps, paths: string[], config: string | undefined): CheckPlan | string {
   const { io } = deps;
   const { cwd } = io.runtime;
   const flagged = config === undefined ? undefined : commandConfig(io, config);
@@ -127,7 +129,7 @@ function fromWorkspace(
  * @throws {ConfigError} when the config or the baseline is invalid, and it is the only one.
  */
 export async function checkCommand(
-  deps: AppDeps,
+  deps: CheckDeps,
   paths: string[],
   { format = "text", config, "max-diagnostics": max, "no-cache": noCache }: CheckOptions,
   log: boolean,
@@ -167,4 +169,45 @@ export async function checkCommand(
     io.streams.out(`${lines.join("\n")}\n`);
   }
   return exit;
+}
+
+/**
+ * Runs `inwards baseline`. Later checks, hooks and the Stop gate then fail
+ * only on new violations.
+ *
+ * @param deps - the platform, the check runner and the baseline writer.
+ * @param config - the `--config` path, if given.
+ * @param noCache - `--no-cache`: parse every file, without `.inwards/cache`.
+ * @returns 0 once written, 2 without a config.
+ * @throws {ConfigError} when the config is invalid or the baseline can't be written.
+ */
+export async function baselineCommand(
+  deps: CheckDeps,
+  config: string | undefined,
+  noCache = false,
+): Promise<number> {
+  const { io } = deps;
+  const found = commandConfig(io, config);
+  if ("problem" in found) {
+    return print(io.streams, found.problem, 2);
+  }
+  const configPath = found.path;
+  const report = await deps.check(configPath, undefined, io.runtime.cwd, {
+    baseline: false,
+    cache: diskCacheWanted(io.runtime, noCache),
+    threads: threadLimit(io.runtime),
+  });
+  // The check has parsed the config already, so this can't throw.
+  const { rules } = parseConfig(io.read.text(configPath));
+  const accepted = writeBaseline(
+    { ...io, baselines: deps.baselines },
+    configPath,
+    report.diagnostics,
+    rules,
+  );
+  return print(
+    io.streams,
+    `Wrote ${BASELINE_FILE} with ${accepted} violation${accepted === 1 ? "" : "s"}. Commit it; new violations still fail.`,
+    0,
+  );
 }

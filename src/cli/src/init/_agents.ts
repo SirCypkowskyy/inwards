@@ -8,8 +8,8 @@
  */
 import { dirname, join } from "node:path";
 import { type InwardsConfig, parseConfig, VERSION } from "@inwards/core";
+import { findConfig } from "../check/index.ts";
 import { print } from "../platform/print.ts";
-import { findConfig } from "../project/config-discovery.ts";
 import { localClaude, sharedClaude } from "./_claude.ts";
 import { lineDiff } from "./_diff.ts";
 import { gitignore } from "./_gitignore.ts";

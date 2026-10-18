@@ -13,15 +13,12 @@
  */
 import { basename, dirname, join, resolve } from "node:path";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
+import { configListsDiagram, findConfig, fingerprint, projectPath } from "../check/index.ts";
 import { shownDiagnostics, shownReport } from "../paths/display.ts";
 import { isInside, PATH_SEPARATORS } from "../paths/lexical.ts";
 import { physicalRealpath } from "../paths/physical.ts";
 import type { Platform } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
-import { findConfig } from "../project/config-discovery.ts";
-import { configListsDiagram } from "../project/diagrams.ts";
-import { fingerprint } from "../project/fingerprint.ts";
-import { projectPath } from "../project/snapshot.ts";
 import { agentSuppressions, rejectedNote } from "../session/agent-suppressions.ts";
 import type { Start } from "../session/contracts.ts";
 import { createStartLookups } from "../session/lookups.ts";
