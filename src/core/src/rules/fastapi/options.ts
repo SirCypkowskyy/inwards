@@ -3,8 +3,7 @@
  * when a key is absent. `config/rule-options.ts` has already checked each
  * value, so these only narrow the type; they never report a bad value.
  */
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type RuleOptions, stringList } from "../../config/index.ts";
 
 /**
  * Reads a boolean option.

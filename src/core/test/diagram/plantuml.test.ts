@@ -6,8 +6,8 @@
  * built on the reader are tested in `test/rules/`.
  */
 import { describe, expect, test } from "bun:test";
-import type { Diagram } from "../../src/diagram/model.ts";
-import { readDiagrams } from "../../src/diagram/read.ts";
+import type { Diagram } from "../../src/diagram/_model.ts";
+import { readDiagrams } from "../../src/diagram/_read.ts";
 
 /**
  * Reads a `.puml` file made of a marked `@startuml` and the given body.

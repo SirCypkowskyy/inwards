@@ -5,8 +5,7 @@
  * has already checked every value, so this only narrows types and fills in
  * defaults; it never reports a bad value.
  */
-import { type OptionValue, stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type OptionValue, type RuleOptions, stringList } from "../../config/index.ts";
 import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
 import type { Framework } from "./frameworks.ts";
 

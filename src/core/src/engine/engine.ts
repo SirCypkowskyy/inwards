@@ -6,9 +6,12 @@
  * per config and call `checkFile` or `checkFiles`.
  */
 import type { Parser } from "web-tree-sitter";
-import type { InwardsConfig } from "../config/parse.ts";
-import { type LibraryDeny, libraryDenies } from "../config/rule-options.ts";
-import { applyRules } from "../config/rule-settings.ts";
+import {
+  applyRules,
+  type InwardsConfig,
+  type LibraryDeny,
+  libraryDenies,
+} from "../config/index.ts";
 import type { Diagnostic, ExtractionBatch, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
 import {

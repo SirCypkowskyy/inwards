@@ -17,17 +17,18 @@
  * (`shop.orders.domain`), so emptying one slice while another keeps the
  * selector alive is still caught (ADR-034).
  */
-import { isSelector, matchEntry } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
-import { applyRules } from "../../config/rule-settings.ts";
 import {
+  applyRules,
   type ConfigFile,
   entrySpan,
+  type InwardsConfig,
+  isSelector,
+  type LayerSpec,
+  matchEntry,
   spanOf,
   type TemplateRole,
   templateRole,
-} from "../../config/source-span.ts";
+} from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import type { PathKind } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";

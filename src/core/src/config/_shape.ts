@@ -9,9 +9,9 @@
  */
 
 import type { Severity } from "../contracts/records.ts";
-import { CONFIG_DEFAULTS } from "./defaults.ts";
-import { globMatches, isGlob } from "./glob.ts";
-import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { CONFIG_DEFAULTS } from "./_defaults.ts";
+import { globMatches, isGlob } from "./_glob.ts";
+import { ConfigError, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One `[[tool.inwards.shape]]` entry. */
 export interface ShapeSpec {

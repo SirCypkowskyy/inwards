@@ -5,7 +5,7 @@
  * contexts are declared, so turning the rule on doesn't fail every project
  * that lives with module cycles; `[]` turns it off.
  */
-import { ConfigError } from "./toml.ts";
+import { ConfigError } from "./_toml.ts";
 
 /** One kind of cycle INW004 can report. */
 export type CycleMode = "modules" | "contexts";

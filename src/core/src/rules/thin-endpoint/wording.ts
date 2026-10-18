@@ -5,8 +5,7 @@
  * signals an endpoint tripped. Plain strings from what `check.ts` measured;
  * it reads no syntax.
  */
-import { filledFrom } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
+import { filledFrom, type LayerSpec } from "../../config/index.ts";
 import type { Fix } from "../../contracts/records.ts";
 import { joined } from "../shared/words.ts";
 import type { Kind } from "./frameworks.ts";

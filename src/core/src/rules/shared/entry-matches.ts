@@ -3,7 +3,7 @@
  * module that exists: INW006 asks it of each layer prefix, INW017 of each
  * quoted diagram label. Pure; the caller passes the module names it found.
  */
-import { isSelector, matchEntry } from "../../config/layer-selector.ts";
+import { isSelector, matchEntry } from "../../config/index.ts";
 
 /**
  * Tells whether a layer entry matches any module, whatever the precedence.

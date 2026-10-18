@@ -10,9 +10,9 @@
  * equivalent hand-written config would give it. Pure: no I/O.
  */
 import type { Severity } from "../contracts/records.ts";
-import { memberPatterns, strings } from "./shape.ts";
-import { parseTemplateRules, type TemplateRules } from "./template-rules.ts";
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { memberPatterns, strings } from "./_shape.ts";
+import { parseTemplateRules, type TemplateRules } from "./_template-rules.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One validated template. */
 export interface TemplateSpec {

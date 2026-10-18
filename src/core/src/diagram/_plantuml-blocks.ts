@@ -9,7 +9,7 @@
  * `plantuml.ts` reads the body.
  */
 import type { DiagramSource } from "../contracts/records.ts";
-import { fencedBodies, type MarkedBlock } from "./blocks.ts";
+import { fencedBodies, type MarkedBlock } from "./_blocks.ts";
 
 /** A line break, either kind. */
 const NEWLINE = /\r?\n/u;

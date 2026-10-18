@@ -10,7 +10,7 @@
  * else an adapter module in general. Plain text from the records
  * `classes.ts` builds; it decides nothing about what is reported.
  */
-import type { LayerSpec } from "../../config/layers.ts";
+import type { LayerSpec } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { firstLine, nodeSpan } from "../shared/node-span.ts";

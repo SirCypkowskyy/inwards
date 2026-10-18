@@ -11,8 +11,7 @@
  * or resolves a name; the engine builds the model and the graph.
  */
 import type { Node } from "web-tree-sitter";
-import { matchEntry } from "../../config/layer-selector.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { matchEntry, type RuleOptions } from "../../config/index.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES, type RuleMeta } from "../../meta/registry.ts";
 import type { GraphEdge, GraphNode, WiringGraph } from "./graph.ts";

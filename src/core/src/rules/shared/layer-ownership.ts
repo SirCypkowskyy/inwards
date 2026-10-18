@@ -8,9 +8,12 @@
  * independent siblings (ADR-036): an import into a sibling of the same rank
  * counts as outward too.
  */
-import { matchEntry, topPackageOf } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
+import {
+  type InwardsConfig,
+  type LayerSpec,
+  matchEntry,
+  topPackageOf,
+} from "../../config/index.ts";
 import type { ImportRef, SourceFile } from "../../contracts/records.ts";
 
 /** Which layer owns a module, through which entry, and how deep it matched. */

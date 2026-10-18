@@ -14,8 +14,7 @@
  * adapters on purpose. I/O-free: the caller supplies the file, the options
  * and the run's trees, which find, read and parse the modules.
  */
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type RuleOptions, stringList } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import { extractImports } from "../../python/parser.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";

@@ -20,7 +20,7 @@
  * declared encoding a "comment" may be code.
  */
 import type { Node, Parser, Tree } from "web-tree-sitter";
-import { type RuleSettings, ruleLevel } from "../../config/rule-settings.ts";
+import { type RuleSettings, ruleLevel } from "../../config/index.ts";
 import type {
   Diagnostic,
   SourceFile,

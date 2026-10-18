@@ -5,7 +5,7 @@
  * TOML value and returns it as stored, or throws a `ConfigError` that names
  * the key. They know no rule and no key: `rule-options.ts` maps keys to them.
  */
-import { ConfigError } from "./toml.ts";
+import { ConfigError } from "./_toml.ts";
 
 /**
  * Tells whether a raw value is a list of strings.

@@ -8,7 +8,7 @@
  * rule reads its own with typed defaults. This module only validates, apart
  * from `stringList` and `libraryDenies`, which read a list back with its type.
  */
-import { isSelector, selectorProblem } from "./layer-selector.ts";
+import { isSelector, selectorProblem } from "./_layer-selector.ts";
 import {
   boolean,
   CLASS_EXEMPTIONS,
@@ -18,8 +18,8 @@ import {
   namePatterns,
   oneOf,
   suffix,
-} from "./option-parsers.ts";
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+} from "./_option-parsers.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /**
  * One entry of `[tool.inwards.rules.pure-domain].deny` (INW005, #219): the

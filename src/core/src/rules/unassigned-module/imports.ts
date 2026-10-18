@@ -13,9 +13,13 @@
  * so a package holds one only with evidence: a module below it that the
  * selector matches (`Evidence`, ADR-034).
  */
-import { deepestMatch, entryReach, isSelector } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
+import {
+  deepestMatch,
+  entryReach,
+  type InwardsConfig,
+  isSelector,
+  type LayerSpec,
+} from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";

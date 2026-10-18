@@ -7,8 +7,8 @@
  * imports the config parser.
  */
 import type { SourceFile, Span } from "../contracts/records.ts";
-import type { Diagram, NodeMention, SubgraphMention } from "./model.ts";
-import { ID } from "./syntax.ts";
+import type { Diagram, NodeMention, SubgraphMention } from "./_model.ts";
+import { ID } from "./_syntax.ts";
 
 /** The class that keeps a node out of every check: something outside `[tool.inwards]`. */
 export const EXTERNAL = "external";

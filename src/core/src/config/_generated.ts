@@ -15,8 +15,8 @@
  * name comes from an import an agent writes.
  */
 
-import { globMatches } from "./glob.ts";
-import { ConfigError } from "./toml.ts";
+import { globMatches } from "./_glob.ts";
+import { ConfigError } from "./_toml.ts";
 
 /**
  * What `generated` is when not set: protoc's modules (`orders_pb2`,

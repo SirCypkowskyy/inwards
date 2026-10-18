@@ -14,8 +14,7 @@
  * first-party modules.
  */
 import type { Parser } from "web-tree-sitter";
-import type { InwardsConfig } from "../config/parse.ts";
-import { ruleLevel } from "../config/rule-settings.ts";
+import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkAdapterConformance } from "../rules/adapter-conformance/check.ts";

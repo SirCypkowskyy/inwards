@@ -121,7 +121,7 @@ adds its folder there.
 - **Rule precedence lives in the engine.** An outward import gets INW001
   alone; a missing module gets INW010, not INW006 as well. Don't make a rule
   filter another rule's findings.
-- **The baseline shortcut.** `baseline/accepted.ts` lets the engine skip the
+- **The baseline shortcut.** `baseline/` (its `_accepted.ts`) lets the engine skip the
   confirming parse when a baseline accepts every skeleton finding of a
   module. A change to how findings are keyed must keep that answer exact.
 - **INW000, INW007, INW008 and INW009 can't be suppressed inline**, and

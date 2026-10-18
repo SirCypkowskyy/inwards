@@ -11,8 +11,7 @@
  * that is the type checker's job. A file with no `class` is never parsed.
  * I/O-free: the caller supplies the run's trees, the file and the options.
  */
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type RuleOptions, stringList } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { importedNames } from "../../python/parser.ts";
 import { classNames, classQualifier, exemptMatchers, moduleScope } from "../shared/classes.ts";

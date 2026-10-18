@@ -14,8 +14,8 @@
  */
 import type { Severity } from "../contracts/records.ts";
 import { RULES, ruleFor } from "../meta/registry.ts";
-import { type OptionValue, optionKeys, parseOptions } from "./rule-options.ts";
-import { ConfigError, isRecord } from "./toml.ts";
+import { type OptionValue, optionKeys, parseOptions } from "./_rule-options.ts";
+import { ConfigError, isRecord } from "./_toml.ts";
 
 /** What a template gives one rule on one role: on, on at a severity, or on with options. */
 export type TemplateRuleValue = true | Severity | Readonly<Record<string, OptionValue>>;

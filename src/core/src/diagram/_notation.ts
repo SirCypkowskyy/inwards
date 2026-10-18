@@ -5,7 +5,7 @@
  * INW019 and `import-diagram` take their examples from here, so a PlantUML
  * user is never told to write Mermaid. Pure strings; no reading.
  */
-import type { DiagramNotation } from "./model.ts";
+import type { DiagramNotation } from "./_model.ts";
 
 /** The pieces of diagram syntax a hint may show. */
 export interface Notation {

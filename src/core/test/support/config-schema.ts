@@ -8,8 +8,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import Ajv, { type ValidateFunction } from "ajv";
 import { parse, stringify } from "smol-toml";
-import { parseConfig } from "../../src/config/parse.ts";
-import { ConfigError, isRecord } from "../../src/config/toml.ts";
+import { parseConfig } from "../../src/config/_parse.ts";
+import { ConfigError, isRecord } from "../../src/config/_toml.ts";
 
 export const REPO: string = resolve(import.meta.dir, "../../../..");
 /** The smallest valid config a fragment is merged into. */

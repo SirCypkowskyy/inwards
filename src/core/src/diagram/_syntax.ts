@@ -5,7 +5,7 @@
  * statements with them. Pure string reading over a cursor; syntax per
  * https://mermaid.js.org/syntax/flowchart.html.
  */
-import type { DiagramEdge, NodeLabel } from "./model.ts";
+import type { DiagramEdge, NodeLabel } from "./_model.ts";
 
 /** A node or subgraph id: letters, digits and `_`, with single inner hyphens (`order-api`). */
 export const ID: RegExp = /^[\p{L}\p{N}_]+(?:-[\p{L}\p{N}_]+)*/u;

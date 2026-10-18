@@ -8,7 +8,7 @@
  * error must name, so an unrelated error can't pass for the intended one.
  */
 import { parse } from "smol-toml";
-import { isRecord } from "../../src/config/toml.ts";
+import { isRecord } from "../../src/config/_toml.ts";
 import { merged, parserError, schemaErrors } from "./config-schema.ts";
 
 /** A fence opening line: indent, three or more backticks or tildes, info string. */

@@ -15,13 +15,13 @@
  * show comes back as notes. Pure: it takes the layers and contexts as plain
  * records and never reads the config itself.
  */
-import type { MarkedBlock } from "./blocks.ts";
-import { readFlowchart } from "./mermaid.ts";
-import type { DiagramKind, DiagramNotation } from "./model.ts";
-import { PUBLIC } from "./names.ts";
-import { notationOf } from "./notation.ts";
-import { readPlantUml } from "./plantuml.ts";
-import { ID } from "./syntax.ts";
+import type { MarkedBlock } from "./_blocks.ts";
+import { readFlowchart } from "./_mermaid.ts";
+import type { DiagramKind, DiagramNotation } from "./_model.ts";
+import { PUBLIC } from "./_names.ts";
+import { notationOf } from "./_notation.ts";
+import { readPlantUml } from "./_plantuml.ts";
+import { ID } from "./_syntax.ts";
 
 /** A layer as the writer needs it: `LayerSpec` fits. */
 interface DiagramLayerInput {

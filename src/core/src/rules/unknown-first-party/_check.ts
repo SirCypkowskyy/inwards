@@ -12,7 +12,7 @@
  * a fresh checkout lacks it.
  */
 
-import { DEFAULT_GENERATED, isGenerated } from "../../config/generated.ts";
+import { DEFAULT_GENERATED, isGenerated } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ProjectIndex } from "../../lookup/project-index.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";

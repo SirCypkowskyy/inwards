@@ -6,8 +6,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { Parser } from "web-tree-sitter";
-import { parseConfig } from "../../src/config/parse.ts";
-import { applyRules } from "../../src/config/rule-settings.ts";
+import { parseConfig } from "../../src/config/_parse.ts";
+import { applyRules } from "../../src/config/_rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../../src/contracts/records.ts";
 import { ContentRun, contentFindings } from "../../src/engine/content-rules.ts";
 import { fastApiFindings } from "../../src/engine/fastapi.ts";

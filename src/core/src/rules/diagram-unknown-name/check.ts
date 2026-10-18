@@ -14,24 +14,30 @@
  * the adapter reads the files and the engine reads the diagrams.
  */
 
-import { isSelector, selectorProblem } from "../../config/layer-selector.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
-import { applyRules } from "../../config/rule-settings.ts";
-import { type ConfigFile, spanOf } from "../../config/source-span.ts";
-import { isDottedName } from "../../config/toml.ts";
+import {
+  applyRules,
+  type ConfigFile,
+  type InwardsConfig,
+  isDottedName,
+  isSelector,
+  selectorProblem,
+  spanOf,
+} from "../../config/index.ts";
 import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
-import type { Diagram, NodeMention, SubgraphMention } from "../../diagram/model.ts";
 import {
   type Declared,
+  type Diagram,
   diagramFile,
   EXTERNAL,
   idsWithClass,
   mentionSpan,
+  type NodeMention,
+  notationOf,
   quotedLabel,
   resolveName,
+  type SubgraphMention,
   topLevel,
-} from "../../diagram/names.ts";
-import { notationOf } from "../../diagram/notation.ts";
+} from "../../diagram/index.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { distance } from "../shared/edit-distance.ts";
 import { matchesAny } from "../shared/entry-matches.ts";

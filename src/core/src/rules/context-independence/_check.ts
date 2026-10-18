@@ -6,7 +6,7 @@
  * applies whether or not a layer owns the file: contexts and layers add up,
  * so one import can break both INW001 and INW002.
  */
-import { type ContextSpec, contextOf } from "../../config/contexts.ts";
+import { type ContextSpec, contextOf } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";

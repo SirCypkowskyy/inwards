@@ -10,7 +10,7 @@
  * prefixes for now (glob selectors are #191), and the longest matching prefix
  * decides a module's one owning context, so declaration order never matters.
  */
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One bounded context or slice, with every optional list filled in. */
 export interface ContextSpec {

@@ -8,7 +8,7 @@
  * parser and the JSON Schema alike (paired cases, as in `schema-negatives`).
  */
 import { describe, expect, test } from "bun:test";
-import { ruleLevel } from "../../src/config/rule-settings.ts";
+import { ruleLevel } from "../../src/config/_rule-settings.ts";
 import { ConfigError, parseConfig } from "../../src/index.ts";
 import { checkProject } from "../rules/fastapi/fixture.ts";
 import { MINIMAL, parserError, schemaErrors } from "../support/config-schema.ts";

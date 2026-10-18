@@ -11,9 +11,7 @@
  * exemption matchers from a rule's options.
  */
 import type { Node } from "web-tree-sitter";
-import { matchEntry } from "../../config/layer-selector.ts";
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { matchEntry, type RuleOptions, stringList } from "../../config/index.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { type Qualify, qualifierFor } from "../../python/qualify.ts";
 import { type NameMatch, nameMatcher } from "./name-patterns.ts";

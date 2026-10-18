@@ -7,8 +7,7 @@
  * bodies only; finding them is `view.ts`'s job and wording the finding `wording.ts`'s.
  */
 import type { Node } from "web-tree-sitter";
-import { matchEntry } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
+import { type LayerSpec, matchEntry } from "../../config/index.ts";
 import { identifierName } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";

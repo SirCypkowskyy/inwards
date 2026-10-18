@@ -26,9 +26,7 @@
  * first, so a library both deny keeps the layer's message, and with it the
  * baseline keys of existing configs.
  */
-import { matchEntry } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { LibraryDeny } from "../../config/rule-options.ts";
+import { type LayerSpec, type LibraryDeny, matchEntry } from "../../config/index.ts";
 import type { Diagnostic, Fix, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";

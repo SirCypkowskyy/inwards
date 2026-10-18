@@ -6,11 +6,11 @@
  * them `mermaid.ts` and `plantuml.ts`. No I/O.
  */
 import type { DiagramSource } from "../contracts/records.ts";
-import { markedBlocks } from "./blocks.ts";
-import { readFlowchart } from "./mermaid.ts";
-import type { Diagram } from "./model.ts";
-import { readPlantUml } from "./plantuml.ts";
-import { markedPlantUml } from "./plantuml-blocks.ts";
+import { markedBlocks } from "./_blocks.ts";
+import { readFlowchart } from "./_mermaid.ts";
+import type { Diagram } from "./_model.ts";
+import { readPlantUml } from "./_plantuml.ts";
+import { markedPlantUml } from "./_plantuml-blocks.ts";
 
 /**
  * Reads the marked diagrams of one file.

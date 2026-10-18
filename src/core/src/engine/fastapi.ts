@@ -20,8 +20,7 @@
  * check, FAPI002 builds the graph only for a route that has a code its own
  * decorator and router don't declare.
  */
-import type { InwardsConfig } from "../config/parse.ts";
-import { type RuleOptions, ruleLevel } from "../config/rule-settings.ts";
+import { type InwardsConfig, type RuleOptions, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
