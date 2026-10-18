@@ -11,7 +11,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
+import { PLUGIN_MARKER } from "../../src/hook/claude-code/index.ts";
 import {
   fire,
   type Hooks,

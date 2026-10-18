@@ -18,14 +18,14 @@
  */
 import { basename, dirname, join } from "node:path";
 import { inwardsTable } from "@inwards/core";
-import { BASELINE_FILE, findConfig } from "../check/index.ts";
-import { isRecord } from "../json/guards.ts";
-import { isInside } from "../paths/lexical.ts";
-import type { Platform } from "../platform/contracts.ts";
-import { applyEdit, landingPath, lexicalPath, normalised } from "./edit-simulation.ts";
-import { ASK_USER, hookProject } from "./protocol.ts";
-import { holdsInwardsHooks, userSettingsDir } from "./settings.ts";
-import { readsOnly, runsInwards } from "./shell-reader.ts";
+import { BASELINE_FILE, findConfig } from "../../check/index.ts";
+import { isRecord } from "../../json/guards.ts";
+import { isInside } from "../../paths/lexical.ts";
+import type { Platform } from "../../platform/contracts.ts";
+import { ASK_USER, hookProject } from "../contracts.ts";
+import { applyEdit, landingPath, lexicalPath, normalised } from "./_edit-simulation.ts";
+import { holdsInwardsHooks, userSettingsDir } from "./_settings.ts";
+import { readsOnly, runsInwards } from "./_shell-reader.ts";
 
 /** What the guard touches: path probes, file reads, the environment, stdout. */
 type GuardIo = Pick<Platform, "probe" | "read" | "runtime" | "streams">;

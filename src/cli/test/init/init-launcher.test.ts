@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import process from "node:process";
-import { holdsInwardsHooks } from "../../src/claude-code/settings.ts";
+import { holdsInwardsHooks } from "../../src/hook/claude-code/index.ts";
 import { CMD, inwards, LAYERS, payload, project, type RunResult } from "../support/run.ts";
 import { git } from "../support/stop-helpers.ts";
 

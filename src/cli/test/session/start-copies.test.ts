@@ -7,13 +7,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { createStartContent } from "../../src/session/start-content.ts";
 import {
+  createStartContent,
   MAX_COPIES_BYTES,
   MAX_COPY_BYTES,
   type StartCopier,
   startCopier,
-} from "../../src/session/start-copies.ts";
+} from "../../src/hook/session/index.ts";
 
 const HEAD = "a".repeat(40);
 

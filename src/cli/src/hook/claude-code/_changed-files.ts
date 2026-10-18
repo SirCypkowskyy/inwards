@@ -15,13 +15,11 @@
 import { dirname, join, resolve } from "node:path";
 import type { Diagnostic, InwardsConfig, Report } from "@inwards/core";
 import { CONFIG_DEFAULTS } from "@inwards/core";
-import { findConfig, projectPath } from "../check/index.ts";
-import { isInside } from "../paths/lexical.ts";
-import type { Platform } from "../platform/contracts.ts";
-import { agentSuppressions } from "../session/agent-suppressions.ts";
-import type { StartLookups } from "../session/lookups.ts";
-import { oldErrors } from "../session/old-errors.ts";
-import type { SessionState } from "../session/record.ts";
+import { findConfig, projectPath } from "../../check/index.ts";
+import { isInside } from "../../paths/lexical.ts";
+import type { Platform } from "../../platform/contracts.ts";
+import type { SessionState, StartLookups } from "../session/index.ts";
+import { agentSuppressions, oldErrors } from "../session/index.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 /** A config root and the top-level module names that appeared under it this session. */

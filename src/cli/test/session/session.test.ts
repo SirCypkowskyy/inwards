@@ -18,7 +18,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { nodePlatform } from "../../src/adapters/compose.ts";
-import { readSession } from "../../src/session/record.ts";
+import { readSession } from "../../src/hook/session/index.ts";
 
 import { inwards, inwardsAsync, LAYERS, payload, project, type RunResult } from "../support/run.ts";
 

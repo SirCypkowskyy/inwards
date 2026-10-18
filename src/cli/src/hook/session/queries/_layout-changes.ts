@@ -27,10 +27,10 @@ import {
   moduleNameFor,
   packagesOf,
 } from "@inwards/core";
-import { linksUnder } from "../check/index.ts";
-import { isInside, posix } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
-import type { StartIdentity } from "./start-identity.ts";
+import { linksUnder } from "../../../check/index.ts";
+import { isInside, posix } from "../../../paths/lexical.ts";
+import type { PathProbe } from "../../../platform/contracts.ts";
+import type { StartIdentity } from "../commands/index.ts";
 
 /**
  * Finds the layout errors this session introduced, per config: emptied

@@ -20,7 +20,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { PLUGIN_MARKER } from "../../src/claude-code/hook-host.ts";
+import { PLUGIN_MARKER } from "../../src/hook/claude-code/index.ts";
 import { INWARDS_LINE, initProject, load, PLUGIN, refusal } from "../support/opencode-helpers.ts";
 import { inwards, LAYERS, project } from "../support/run.ts";
 

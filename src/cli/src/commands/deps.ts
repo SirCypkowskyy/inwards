@@ -9,9 +9,9 @@
  */
 
 import type { BaselineWriter, CheckRunner } from "../check/contracts.ts";
-import type { HookDeps } from "../claude-code/protocol.ts";
 import type { DaemonHost, DaemonLink } from "../daemon/contracts.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
+import type { HookDeps } from "../hook/contracts.ts";
 import type { InitDeps } from "../init/contracts.ts";
 import type { Editor, LanguageServer, ServerCheck } from "../lsp/contracts.ts";
 import type { McpTools, RulePages } from "../mcp/contracts.ts";

@@ -12,9 +12,8 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
-| `commands/` | one module per command (`hook`, `daemon`), `usage` for the help text, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
-| `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings` and `hook-host` (whether the agent still has Inwards wired in), and `protocol` (shared by all of them) | read the environment or the filesystem itself |
-| `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
+| `commands/` | one module per command (`daemon`), `usage` for the help text, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
+| `hook/` | an ADR-047 slice: `index.ts` its face (`hookClaudeCode`), `cli.ts` the `inwards hook claude-code` handler, `contracts.ts` (`HookDeps`, `hookProject`, `ASK_USER`, and the session record's shapes `Start`, `SessionStart`, `Check`; the eval may import this module and nothing else), `adapters/state-files.ts` for the session and run-log state on disk. Two mini-domains, each with its `index.ts`. `claude-code/` is the hook adapter (`_dispatch`, `_session-start`, `_config-guard` with `_shell-reader` and `_edit-simulation`, `_shape-guard`, `_post-tool-use`, `_stop-gate` and `_changed-files`, `_escalation`, `_settings` and `_hook-host` (whether the agent still has Inwards wired in)); its `index.ts` re-exports `dispatch` and the pieces `init/` reads. `session/` splits into `commands/` (the session record `_record`, the start record with its witness `_start-record` (#88), the copies of dirty files `_start-copies`, start identity `_start-identity`) and `queries/` (old errors #134, agent suppressions #50, layout changes, the committed-config check, start content, the per-invocation `_lookups`); `session/index.ts` re-exports both for `claude-code/` | read files or run git itself (`session/` and `claude-code/`), or re-export `adapters/` from `index.ts`; let `session/commands/` import `queries/` |
 | `check/` | an ADR-047 slice, formerly `project/`: `index.ts` its face (`checkCommand`, `baselineCommand`, `runCheck`, `runPlan`, `planCheck`, config discovery, the project snapshot, `overlayTexts`, `fingerprint`, and the diagram and baseline helpers the other slices read), `cli.ts` the `inwards check` and `inwards baseline` handlers, `contracts.ts` (`CheckRunner`, `CheckDeps`, `CheckRunNotes`, `BaselineWriter`, `ExtractionPool`, `ProjectIo`), and private modules for running a check (`_check`), which files it reads and under which module names, then reading them (`_sources`: one batch from 1,000 files, #281), config discovery and routing (`_config-discovery`, `_routing`, uv workspace members in `_workspace`), a check over several configs (`_runs`), project snapshots (`_snapshot`), layer-package symlinks (`_links`), virtualenv site-packages (`_site-packages`), hiding modules added since the start (`_absent`), how many threads parse a full check (`_threads`, ADR-040), texts laid over the disk for one check, files not yet written included (`_overlay`, for `inwards mcp`), the files `_diagrams` names, violation fingerprints (`_fingerprint`, shared by the session record, escalation and the run log), and the checks only a whole-project run makes (`_whole`). `baseline/` is a mini-domain (its `index.ts` and `_file.ts`: the baseline file's name, reader, writer and hashes) that `_check.ts` reads, so `inwards baseline` stays in `cli.ts`. `adapters/` holds `baseline-files.ts` and the extraction cache, store, entry, pool and worker (`extraction-*`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread outside `check/adapters/extraction-pool.ts`; import `runlog/` (`CheckRunNotes` stands in for the run log), or re-export an adapter from `index.ts` |
 | `runlog/` | an ADR-047 slice: `index.ts` its face (`statsCommand`, `createRunLog`, `RunLog`, and the readers the tests use), `cli.ts` the `inwards stats` handler, `contracts.ts` (`ExportFiles`, `StatsDeps`), `commands/` writing the run log (`_record`), `queries/` reading it back (`_runs`), the numbers (`_stats`) and `--export` (`_export`), and `adapters/export-files.ts` for the export key and file | keep notes in a module global, or let `queries/` import `commands/` |
 | `init/` | an ADR-047 slice: `index.ts` its face (the five handlers and `STYLE_NAMES` for the help text), `cli.ts` the `inwards init` handler, `contracts.ts` (`InitDeps`, `InitFiles`, `Picker`, `InitFlags`), and private modules for agent wiring (`_claude` with its `.mcp.json` in `_mcp-json`, `_opencode`, `_agents`), `--style auto`'s name table and command (`_auto`, `_auto-command`), the scaffold plan, the report, presets and the text their templates add (`_template-text`), marked sections in Markdown files (`_section`) and appending an imported table (`_append-table`). Three mini-domains, each with its `index.ts` and `cli.ts`: `brief/` (the architecture brief for `--brief` and `inwards context`, with its opt-in rules part), `diagram/` (`inwards diagram`, and `inwards import-diagram` with the table a read diagram becomes) and `import-linter/` (`inwards import-config`). `adapters/files.ts` writes, `adapters/picker.ts` asks on a terminal and loads `@clack/prompts` with a dynamic `import()` | write files itself (`InitFiles` does), or re-export an adapter from `index.ts` |
@@ -36,8 +35,8 @@ Everything below `main.ts` receives what it touches as parameters: the
 narrowest `Pick<>` they need, so a signature says what it touches.
 
 Imports go downwards only: `platform`, `json` and `paths` are leaves, then
-`check`, then `session` and `runlog` (neither imports the other; `runlog/` reads `check/`, and `check/` takes a run log through its own `CheckRunNotes`), then
-`claude-code` and `init`, then `commands`. `daemon/` sits beside them, below `commands/`, and imports
+`check`, then `runlog` (`runlog/` reads `check/`, and `check/` takes a run log through its own `CheckRunNotes`), then
+`hook` and `init`, then `commands`. `daemon/` sits beside them, below `commands/`, and imports
 only `platform` and `json` (and the engine's API); `commands/` and the
 `daemon-*` adapters use it. `lsp/` sits beside it too and imports `platform`,
 `json`, `paths` and `check` (for `planCheck`), and `commands/deps.ts` for
@@ -50,8 +49,8 @@ imports as `lsp/`, plus `check/index.ts` for `runPlan`; `main.ts` and
 stay in a chunk only `inwards mcp` reads. Only the root (`main.ts`, and `adapters/compose.ts` until it moves up)
 imports `adapters/` or a slice's `adapters/`. `init/`'s handlers take `AppDeps`
 from `commands/deps.ts` too, until step 14, and `commands/usage.ts` reads
-`STYLE_NAMES` and `AGENTS` from `init/`. `rules/` imports `platform`, `json`, `check`, `commands/deps.ts` and `mcp/index.ts` (for `explainRule`); `mcp/` reads the page reader through `rules/page/index.ts`, not `rules/index.ts`, which would close a cycle; `main.ts` imports `rules/index.ts` and `compose.ts` loads `rules/adapters/pages.ts` with a dynamic `import()`. `eval/` may
-import `claude-code/protocol.ts` and nothing else.
+`STYLE_NAMES` and `AGENTS` from `init/`. `rules/` imports `platform`, `json`, `check`, `commands/deps.ts` and `mcp/index.ts` (for `explainRule`); `mcp/` reads the page reader through `rules/page/index.ts`, not `rules/index.ts`, which would close a cycle; `main.ts` imports `rules/index.ts` and `compose.ts` loads `rules/adapters/pages.ts` with a dynamic `import()`. `hook/` imports `platform`, `json`, `paths`, `check`, `runlog` and `daemon/` (`cli.ts` forwards PostToolUse); `commands/deps.ts` and `commands/daemon.ts` read `hook/contracts.ts`, `main.ts` imports `hook/index.ts`, `init/` reads `hook/claude-code/index.ts` and `compose.ts` loads `hook/adapters/state-files.ts`. `eval/` may
+import `hook/contracts.ts` and nothing else.
 
 Enforced by:
 
@@ -110,7 +109,7 @@ is off for every `index.ts`. `test/integration/architecture.test.ts` probes
 both, and its `MIGRATED_SLICES` list holds the folders the naming check
 walks: a move PR adds its folder there.
 
-`lsp/` moved first (#418), then `mcp/` (#419), and later steps copy them (`check/`, #427, is described below; `rules/`, #420, is the third mini-domain case: `page/` exists so `mcp/` can import the page reader without a cycle):
+`lsp/` moved first (#418), then `mcp/` (#419), and later steps copy them (`hook/`, #428, and `check/`, #427, are described below; `rules/`, #420, is the third mini-domain case: `page/` exists so `mcp/` can import the page reader without a cycle):
 
 1. Move the files and rewrite the imports with
    `bun run scripts/move-slice.ts OLD=NEW...` (repo-relative paths). It runs
@@ -163,6 +162,25 @@ issue text, both to keep `check:cycles` green:
   `baseline/index.ts`; a `baseline/cli.ts` that imported `_check.ts` would have
   made `baseline/index.ts` and `_check.ts` a cycle.
 
+`hook/` (#428) took `claude-code/`, `session/`, `commands/hook.ts` and
+`adapters/state-files.ts`; `claude-code/protocol.ts` became `contracts.ts`, which the eval
+and `commands/deps.ts` import directly. The move script's command is in the PR description
+(`move-slice.ts` with one `OLD=NEW` per module), so a rebase reruns it. Differences from the
+issue text:
+
+- `session/contracts.ts` is not a file of its own: its shapes (`Start`,
+  `SessionStart`, `Check`) live in `hook/contracts.ts`, because both mini-domains use them
+  and a shared type file inside `session/` would make `claude-code/` import its private module.
+- `session/` splits by direction, not by the old file names. `commands/` holds what writes
+  or derives the start (record, start record, copies, start identity); `queries/` holds
+  what asks about it and imports `commands/index.ts`, never the other way, so
+  `check:cycles` stays green (`lookups` needs the copies and the identity; the copies need
+  the identity, so identity sits with `commands/`).
+- `cli.ts` takes `HookDeps` plus a `DaemonLink` from `daemon/contracts.ts`, not `AppDeps`
+  from `commands/deps.ts`, which already imports `hook/contracts.ts`: through `AppDeps` the
+  slice and `commands/` would close a cycle. `AppDeps` satisfies the parameter as it is.
+- The daemon stays where it is (#429 moves it into `hook/daemon/`).
+
 The worker thread entry (`adapters/extraction-worker.ts`, `serveExtractions`)
 is still started by `main.ts`, which is the same program a worker runs, so the
 compiled binary's entry and the build script don't change.
@@ -202,8 +220,8 @@ A module-level `Map` or array that grows at run time is a bug.
   a change when the rule needs new project input: add it to `ProjectIo`
   (`check/contracts.ts`), implement it in an adapter, and wire it in
   `adapters/compose.ts`.
-- **A new hook event.** Add a handler module in `claude-code/`, route to it
-  in `dispatch.ts`, take `HookDeps`, and add E2E fixtures in
+- **A new hook event.** Add a `_handler.ts` in `hook/claude-code/`, route to it
+  in `_dispatch.ts`, take `HookDeps`, and add E2E fixtures in
   `test/support/fixtures/claude-code` with a case in
   `test/integration/e2e.test.ts`.
 - **A new CLI command.** Add a module to `commands/` that takes `AppDeps` (or, in a slice, a `cli.ts` that takes the slice's own deps),
@@ -233,7 +251,7 @@ A module-level `Map` or array that grows at run time is a bug.
 
 ## Traps that already cost review rounds
 
-- **Identity paths vs display paths** (#165, #171, #175). `session/start-identity.ts`
+- **Identity paths vs display paths** (#165, #171, #175). `hook/session/commands/_start-identity.ts`
   decides which file a path named at session start. A file has an identity
   only when its path as written equals its physical path and it isn't a
   symlink. Display helpers (`paths/display.ts`) respell paths for people;
@@ -242,7 +260,7 @@ A module-level `Map` or array that grows at run time is a bug.
 - **Start content comes from git without running anything the agent set up.**
   Only `cat-file blob` and `ls-tree`, both with `--no-lazy-fetch`, never
   `--filters` or `--textconv`, and `adapters/git.ts` turns off fsmonitor and
-  hooks. SessionStart's copies of dirty files (`session/start-copies.ts`) are
+  hooks. SessionStart's copies of dirty files (`hook/session/commands/_start-copies.ts`) are
   trusted only when their SHA-256 matches the start manifest.
 - **Escalation ordering is policy.** PostToolUse computes escalation before
   recording the edit, old and context findings don't count, and Stop counts
