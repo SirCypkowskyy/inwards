@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 191604eb27d1f695b9c820a65736f5fbd5eeb772991880c0593f7829e4b32661
+source_hash: 073c8d676a091f95eac2593f608ffb55d3d6451606af2a8019ee91bfa5955c82
 ---
 
 # Instalacja Inwards { #install-inwards }
