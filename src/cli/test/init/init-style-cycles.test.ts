@@ -25,7 +25,7 @@ const PAIRS: Readonly<Record<(typeof STYLES)[number], readonly [string, string]>
   layered: ["domain/alpha", "domain/beta"],
   clean: ["domain/alpha", "domain/beta"],
   hexagonal: ["domain/alpha", "domain/beta"],
-  "vertical-slices": ["features/orders/alpha", "features/orders/beta"],
+  "vertical-slices": ["features/orders/services/alpha", "features/orders/services/beta"],
   "bounded-contexts": ["orders/domain/alpha", "orders/domain/beta"],
   django: ["orders/admin", "orders/apps"],
   fastapi: ["database", "pagination"],

@@ -3,7 +3,7 @@
 exports[`inwards context prints the brief for the example config, under 450 tokens 1`] = `
 "## Architecture brief (Inwards)
 
-\`[tool.inwards]\` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of your own layer (sibling groups: 4-6).
+\`[tool.inwards]\` in pyproject.toml enforces these layers, innermost first. Imports point inwards: never import a layer listed after your own, nor a sibling of yours (sibling groups: 4-6).
 
 1. slice.models (\`shop.*.models\`): imports no other layer
 2. slice.ports (\`shop.*.ports\`): may import slice.models

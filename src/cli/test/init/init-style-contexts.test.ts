@@ -4,9 +4,9 @@
  * is added the way a user would (its package and its contexts entry), and a
  * planted import across the boundary fails with INW002 or INW003, one against
  * a role's order with INW001, while an import through the public module
- * passes. Hexagonal's adapters are sibling layers, so one importing the other
- * fails with INW001. The fastapi preset's own layout is
- * `init-style-fastapi.test.ts`'s.
+ * passes. Vertical-slices' commands and queries are sibling roles, and so
+ * are hexagonal's adapters: one importing the other fails with INW001. The
+ * fastapi preset's own layout is `init-style-fastapi.test.ts`'s.
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -19,7 +19,7 @@ import {
   UV_PROJECT,
   write,
 } from "../support/init-style-helpers.ts";
-import { project } from "../support/run.ts";
+import { inwards, project } from "../support/run.ts";
 
 /**
  * Lets a context depend on orders, as a user does once the dependency is decided.
@@ -81,6 +81,24 @@ describe("vertical-slices", () => {
       "src/my_app/bootstrap.py": "from my_app.features.orders.commands import PlaceOrder\n",
     });
     expect(findings(root)).toEqual({ code: 1, findings: ["INW003 src/my_app/bootstrap.py"] });
+  });
+
+  test("commands and queries are sibling roles: an import either way fails with INW001", () => {
+    const { root, result } = scaffolded("vertical-slices");
+    expect(result).toEqual(PASSING);
+    const slice = "src/my_app/features/orders";
+    write(root, {
+      [`${slice}/queries/_list.py`]: "from my_app.features.orders.commands import PlaceOrder\n",
+      [`${slice}/commands/_cancel.py`]: "from my_app.features.orders.queries import GetOrder\n",
+    });
+    expect(findings(root)).toEqual({
+      code: 1,
+      findings: [`INW001 ${slice}/commands/_cancel.py`, `INW001 ${slice}/queries/_list.py`],
+    });
+    const { stdout } = inwards(["check", "--format", "json"], { cwd: root });
+    for (const d of JSON.parse(stdout).diagnostics) {
+      expect(d.message).toContain("sibling layer");
+    }
   });
 });
 

@@ -154,7 +154,7 @@ test("a fastapi project's layers past the third name what they may import by num
     eol: "\n",
   });
   const brief = briefFor(NOTHING, "/p/pyproject.toml", text);
-  expect(brief).toContain("nor a sibling of your own layer (sibling groups: 2-4; 5-6).");
+  expect(brief).toContain("nor a sibling of yours (sibling groups: 2-4; 5-6).");
   expect(brief).toContain("2. domain.constants (`app.*.constants`): may import kernel\n");
   expect(brief).toContain("5. domain.models (`app.*.models`): may import layers 1-4\n");
   expect(brief).toContain("10. domain.router (`app.*.router`): may import layers 1-9\n");

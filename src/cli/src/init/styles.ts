@@ -81,6 +81,7 @@ export interface ExampleModules {
   /** The package of use cases that only read, laid out like `commands`. */
   queries: string;
   adapter: string;
+  /** The driving adapter; when it equals `api`, the public module defines `run` itself. */
   driving: string;
   bootstrap: string;
   /** A context's public module, which re-exports what the composition root needs (INW003). */
