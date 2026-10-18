@@ -7,12 +7,12 @@
  * is `imports.ts`'s job.
  */
 import type { Node, Parser } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { unreadableEncoding } from "../../python/encoding.ts";
-import { argumentAt, type Constants, literalSource } from "../../python/literals.ts";
-import { namedChildren } from "../../python/nodes.ts";
-import { extractImports, normalizeSource, parsePython } from "../../python/parser.ts";
+import type { SourceFile } from "../../shared/contracts/records.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import { unreadableEncoding } from "../../shared/python/encoding.ts";
+import { argumentAt, type Constants, literalSource } from "../../shared/python/literals.ts";
+import { namedChildren } from "../../shared/python/nodes.ts";
+import { extractImports, normalizeSource, parsePython } from "../../shared/python/parser.ts";
 import { type Bindings, collectBindings, qualify, syntaxOf } from "./_callees.ts";
 import { computedSource } from "./_computed-source.ts";
 import { moduleConstants } from "./_constants.ts";

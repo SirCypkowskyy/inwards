@@ -15,8 +15,8 @@
  * definitions; each rule's adapter reads and parses them. It reports nothing.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import {
   ownCallBindings,
   returnedCalls,

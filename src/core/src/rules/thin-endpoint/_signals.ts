@@ -8,8 +8,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import { type LayerSpec, matchEntry } from "../../config/index.ts";
-import { identifierName } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { identifierName } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";
 import type { Body, Params } from "./_helpers.ts";
 import type { Metrics } from "./_metrics.ts";

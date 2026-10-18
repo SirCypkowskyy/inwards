@@ -5,7 +5,7 @@
  * decides nothing about what is reported.
  */
 import type { Node } from "web-tree-sitter";
-import type { Span } from "../../contracts/records.ts";
+import type { Span } from "../../shared/contracts/records.ts";
 
 /** What a cut quote ends with. */
 const CUT = "...";

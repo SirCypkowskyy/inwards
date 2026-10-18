@@ -426,7 +426,7 @@ done until both match the code.
   - first line: a title that says what it does;
   - then 1-3 lines of description (what, and why when it isn't obvious);
   - a longer section when the behaviour has edge cases, invariants or a
-    non-obvious reason (see `importSkeleton` in `src/core/src/python/prescan.ts`);
+    non-obvious reason (see `importSkeleton` in `src/core/src/shared/python/prescan.ts`);
   - `@param` for every parameter and `@returns` for every non-void return,
     with a description that says more than the name; a destructured or
     object parameter documents each property (`@param opts.cwd - ...`);

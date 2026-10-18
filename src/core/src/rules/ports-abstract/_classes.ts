@@ -11,8 +11,8 @@
  * the tree.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, keywordOf, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { identifierName, keywordOf, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import { qualifiedHead, topLevelClasses } from "../shared/classes.ts";
 import type { NameMatch } from "../shared/name-patterns.ts";
 

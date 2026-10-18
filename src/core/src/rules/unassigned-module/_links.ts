@@ -16,9 +16,9 @@
  * then own.
  */
 import { applyRules, entryReach, type InwardsConfig, type LayerSpec } from "../../config/index.ts";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { moduleNameFor } from "../../python/module-names.ts";
+import type { Diagnostic, SourceFile, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { moduleNameFor } from "../../shared/python/module-names.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";
 import { type Evidence, holdsLayer, moduleEvidence } from "./_imports.ts";
 

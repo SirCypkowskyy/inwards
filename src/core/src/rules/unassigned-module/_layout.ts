@@ -29,9 +29,9 @@ import {
   type TemplateRole,
   templateRole,
 } from "../../config/index.ts";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import type { PathKind } from "../../lookup/module-lookup.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import type { PathKind } from "../../shared/lookup/module-lookup.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { matchesAny } from "../shared/entry-matches.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";
 import { holdsLayer, moduleEvidence, unassignedPackage } from "./_imports.ts";

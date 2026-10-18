@@ -51,11 +51,11 @@
       { "name": "core-api", "patterns": ["src/core/src/index.ts"] },
       // The engine, one zone per folder and one per rule (#176); see
       // src/core/AGENTS.md for what each owns.
-      { "name": "core-contracts", "patterns": ["src/core/src/contracts/**"] },
-      { "name": "core-meta", "patterns": ["src/core/src/meta/**"] },
+      { "name": "core-contracts", "patterns": ["src/core/src/shared/contracts/**"] },
+      { "name": "core-meta", "patterns": ["src/core/src/shared/meta/**"] },
       { "name": "core-config", "patterns": ["src/core/src/config/**"] },
-      { "name": "core-python", "patterns": ["src/core/src/python/**"] },
-      { "name": "core-lookup", "patterns": ["src/core/src/lookup/**"] },
+      { "name": "core-python", "patterns": ["src/core/src/shared/python/**"] },
+      { "name": "core-lookup", "patterns": ["src/core/src/shared/lookup/**"] },
       { "name": "core-rules-shared", "patterns": ["src/core/src/rules/shared/**"] },
       // The Mermaid and PlantUML readers for marked architecture diagrams (#344, #346, ADR-045).
       { "name": "core-diagram", "patterns": ["src/core/src/diagram/**"] },

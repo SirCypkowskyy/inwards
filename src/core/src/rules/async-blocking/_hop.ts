@@ -18,7 +18,7 @@
  */
 import type { Node } from "web-tree-sitter";
 import { entryReach, matchEntry } from "../../config/index.ts";
-import { identifierName } from "../../python/nodes.ts";
+import { identifierName } from "../../shared/python/nodes.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import { passedNames } from "../shared/arguments.ts";
 import { ParsedModules } from "../shared/first-party.ts";

@@ -15,8 +15,8 @@
  * and the run's trees, which find, read and parse the modules.
  */
 import { type RuleOptions, stringList } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import { extractImports } from "../../python/parser.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import { extractImports } from "../../shared/python/parser.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { constructions, inEntries, isExceptionName } from "./_calls.ts";
 import { reportConstruction, reportImport, type Scope } from "./_wording.ts";

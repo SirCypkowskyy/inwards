@@ -13,11 +13,11 @@
  * walk. The model reports nothing; deciding what is wrong is the rules' job.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../../contracts/records.ts";
-import type { ProjectIndex } from "../../../lookup/project-index.ts";
-import { moduleFunctions } from "../../../python/nodes.ts";
-import { importedNames, normalizeSource } from "../../../python/parser.ts";
-import { type Qualify, qualifierFor } from "../../../python/qualify.ts";
+import type { SourceFile } from "../../../shared/contracts/records.ts";
+import type { ProjectIndex } from "../../../shared/lookup/project-index.ts";
+import { moduleFunctions } from "../../../shared/python/nodes.ts";
+import { importedNames, normalizeSource } from "../../../shared/python/parser.ts";
+import { type Qualify, qualifierFor } from "../../../shared/python/qualify.ts";
 import { type ModuleDefinitions, moduleDefinitions } from "../../shared/definitions.ts";
 import { type FoundDefinition, RouterKinds } from "../../shared/fastapi-routers.ts";
 import type { FileTrees } from "../../shared/module-trees.ts";

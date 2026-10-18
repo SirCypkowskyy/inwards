@@ -27,10 +27,10 @@
  * baseline keys of existing configs.
  */
 import { type LayerSpec, type LibraryDeny, matchEntry } from "../../config/index.ts";
-import type { Diagnostic, Fix, ImportRef, SourceFile } from "../../contracts/records.ts";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { STDLIB } from "../../python/stdlib.ts";
+import type { Diagnostic, Fix, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { STDLIB } from "../../shared/python/stdlib.ts";
 import { layerIndexOf, portHome, rankOf } from "../shared/layer-ownership.ts";
 
 /** Frameworks, database and network clients, and stdlib I/O: what the domain gets by default. */

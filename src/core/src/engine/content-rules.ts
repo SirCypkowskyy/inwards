@@ -15,8 +15,6 @@
  */
 import type { Parser } from "web-tree-sitter";
 import { type InwardsConfig, ruleLevel } from "../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
-import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkAdapterConformance } from "../rules/adapter-conformance/index.ts";
 import { AsyncBlockingRun, checkAsyncBlocking } from "../rules/async-blocking/index.ts";
 import { checkConstructOnlyIn } from "../rules/construct-only-in/index.ts";
@@ -26,6 +24,8 @@ import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts
 import { ModuleTrees } from "../rules/shared/module-trees.ts";
 import { ThinEndpointRun } from "../rules/thin-endpoint/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../shared/contracts/records.ts";
+import type { ProjectIndex } from "../shared/lookup/project-index.ts";
 import { ormNamingFindings } from "./orm-naming.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
 

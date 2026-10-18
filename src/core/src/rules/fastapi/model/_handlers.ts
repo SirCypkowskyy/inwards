@@ -7,7 +7,12 @@
  * recorded by name only; `model.ts` resolves it.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, integerLiteral, keywordOf, namedChildren } from "../../../python/nodes.ts";
+import {
+  identifierName,
+  integerLiteral,
+  keywordOf,
+  namedChildren,
+} from "../../../shared/python/nodes.ts";
 import { dictKeys, dictsOf, entryOf, splattedDicts } from "./_kwargs.ts";
 import type { Context, ExceptionHandler, FastApiObject, Registration } from "./_records.ts";
 import { valueFrom } from "./_values.ts";

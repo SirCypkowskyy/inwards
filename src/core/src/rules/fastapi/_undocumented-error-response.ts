@@ -10,8 +10,8 @@
  * unknown, and nothing is reported for it.
  */
 import type { RuleOptions } from "../../config/index.ts";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { joined } from "../shared/words.ts";
 import { type CodeSource, CodeWalk } from "./_error-codes.ts";
 import { flag } from "./_options.ts";

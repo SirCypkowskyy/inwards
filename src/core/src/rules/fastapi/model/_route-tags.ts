@@ -7,8 +7,8 @@
  * leaves the set open. It reads no file; the project lookups do.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../../python/nodes.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import { identifierName, namedChildren } from "../../../shared/python/nodes.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 import type { Definition } from "./_model.ts";
 import type { FastApiObject, Wiring } from "./_records.ts";
 import { join, stringText, type TagSet } from "./_schema-rule.ts";

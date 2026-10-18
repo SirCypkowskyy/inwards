@@ -190,7 +190,7 @@
       // every reporter, the docs check and SARIF read it whole. Splitting it
       // by rule family would only move entries to a second table to keep in
       // step; it reached the 300-line limit with INW018 (#345).
-      "includes": ["src/core/src/meta/registry.ts"],
+      "includes": ["src/core/src/shared/meta/registry.ts"],
       "linter": {
         "rules": {
           "style": {

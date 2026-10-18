@@ -7,10 +7,15 @@
  * (`exec`, `eval`, `compile`) are read in `calls.ts`, not here.
  */
 import type { Node } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
-import { argumentAt, type Constants, hasSplat, literalString } from "../../python/literals.ts";
-import { moduleNameFor, packageOf, resolveRelative } from "../../python/module-names.ts";
-import { identifierName, integerLiteral, namedChildren } from "../../python/nodes.ts";
+import type { SourceFile } from "../../shared/contracts/records.ts";
+import {
+  argumentAt,
+  type Constants,
+  hasSplat,
+  literalString,
+} from "../../shared/python/literals.ts";
+import { moduleNameFor, packageOf, resolveRelative } from "../../shared/python/module-names.ts";
+import { identifierName, integerLiteral, namedChildren } from "../../shared/python/nodes.ts";
 import type { LoaderKind } from "./_loaders.ts";
 
 /** A loading call as its loader sees it. */

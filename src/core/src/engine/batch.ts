@@ -18,8 +18,8 @@ import type {
   ImportRef,
   SourceFile,
   Suppressed,
-} from "../contracts/records.ts";
-import type { ProjectIndex } from "../lookup/project-index.ts";
+} from "../shared/contracts/records.ts";
+import type { ProjectIndex } from "../shared/lookup/project-index.ts";
 import { ContentRun, contentFindings } from "./content-rules.ts";
 import { type Collected, projectCycles } from "./cycles.ts";
 import { projectDiagramImports } from "./diagrams.ts";

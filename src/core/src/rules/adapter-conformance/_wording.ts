@@ -5,8 +5,8 @@
  * port (on the annotation). Plain text from the records `lines.ts` builds;
  * it decides nothing about what is reported.
  */
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { firstLine, nodeSpan } from "../shared/node-span.ts";
 import type { AdapterClass, ConformanceLine } from "./_lines.ts";
 

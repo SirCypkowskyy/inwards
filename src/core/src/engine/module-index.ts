@@ -5,9 +5,9 @@
  * It reads nothing itself; the index asks the adapter's `ProjectFiles`.
  */
 import type { Parser } from "web-tree-sitter";
-import { type ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
-import { topLevelBindings } from "../python/bindings.ts";
-import { normalizeSource, parsePython } from "../python/parser.ts";
+import { type ProjectFiles, ProjectIndex } from "../shared/lookup/project-index.ts";
+import { topLevelBindings } from "../shared/python/bindings.ts";
+import { normalizeSource, parsePython } from "../shared/python/parser.ts";
 import type { Extractor } from "./extraction.ts";
 
 /**

@@ -3,7 +3,7 @@
  * finding (INW006 dead prefixes, INW007 unmatched selectors, options for a
  * rule that is off) can point at the line that caused it. It searches the text; it doesn't parse TOML.
  */
-import type { Span } from "../contracts/records.ts";
+import type { Span } from "../shared/contracts/records.ts";
 
 /** The `[tool.inwards]` header line, however it is spaced. */
 const TABLE_HEADER = /^[ \t]*\[[ \t]*tool[ \t]*\.[ \t]*inwards[ \t]*\]/mu;

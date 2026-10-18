@@ -7,9 +7,9 @@
  * definition; `model.ts` does that across files.
  */
 import type { Node } from "web-tree-sitter";
-import { hasSplat, literalString } from "../../../python/literals.ts";
-import { keywordOf, namedChildren, signedInteger } from "../../../python/nodes.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import { hasSplat, literalString } from "../../../shared/python/literals.ts";
+import { keywordOf, namedChildren, signedInteger } from "../../../shared/python/nodes.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 
 /**
  * An argument as written: a literal where it is one, a qualified name, a

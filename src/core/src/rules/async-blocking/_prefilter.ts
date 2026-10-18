@@ -21,7 +21,7 @@
  * Python reads them, and token edges are ASCII word characters, which every
  * Python identifier continues with.
  */
-import type { ImportRef, SourceFile } from "../../contracts/records.ts";
+import type { ImportRef, SourceFile } from "../../shared/contracts/records.ts";
 import type { ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { blockingHelpers } from "./_hop.ts";

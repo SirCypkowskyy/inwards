@@ -12,14 +12,6 @@ import {
   type LibraryDeny,
   libraryDenies,
 } from "../config/index.ts";
-import type { Diagnostic, ExtractionBatch, ImportRef, SourceFile } from "../contracts/records.ts";
-import type { ProjectFiles, ProjectIndex } from "../lookup/project-index.ts";
-import {
-  createPythonParser,
-  type GrammarBinaries,
-  normalizeSource,
-  parsePython,
-} from "../python/parser.ts";
 import { checkDynamicImports, extractDynamicImports } from "../rules/dynamic-import/index.ts";
 import { checkLayers } from "../rules/layer-dependency/index.ts";
 import { shapeFindings } from "../rules/package-shape/index.ts";
@@ -33,6 +25,19 @@ import {
 } from "../rules/unassigned-module/index.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
+import type {
+  Diagnostic,
+  ExtractionBatch,
+  ImportRef,
+  SourceFile,
+} from "../shared/contracts/records.ts";
+import type { ProjectFiles, ProjectIndex } from "../shared/lookup/project-index.ts";
+import {
+  createPythonParser,
+  type GrammarBinaries,
+  normalizeSource,
+  parsePython,
+} from "../shared/python/parser.ts";
 import {
   type CheckOptions,
   checkAll,

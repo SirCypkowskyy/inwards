@@ -12,8 +12,8 @@
  * run's trees, the files and the options.
  */
 import { type RuleOptions, stringList } from "../../config/index.ts";
-import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, Fix, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
 import {
   type Models,

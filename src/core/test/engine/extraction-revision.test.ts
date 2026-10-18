@@ -16,13 +16,13 @@ import { EXTRACTION_REVISION } from "../../src/engine/extraction.ts";
 const REPO = resolve(import.meta.dir, "../../../..");
 /** The files whose code decides what a text yields. */
 const FILES = [
-  "src/core/src/python/parser.ts",
-  "src/core/src/python/prescan.ts",
-  "src/core/src/python/type-checking.ts",
-  "src/core/src/python/reparse.ts",
-  "src/core/src/python/module-names.ts",
+  "src/core/src/shared/python/parser.ts",
+  "src/core/src/shared/python/prescan.ts",
+  "src/core/src/shared/python/type-checking.ts",
+  "src/core/src/shared/python/reparse.ts",
+  "src/core/src/shared/python/module-names.ts",
   "src/core/src/rules/suppression-comment/_check.ts",
-  "src/core/src/meta/registry.ts",
+  "src/core/src/shared/meta/registry.ts",
   "src/core/src/engine/extraction.ts",
 ];
 /** The fingerprint the current revision was recorded with. */
@@ -55,6 +55,7 @@ const RECORDED: Readonly<Record<string, string>> = {
   "26": "5872c7668977c14c106570b15c38d86f73f6c9c69dec39d9bcbe18e2c19826a8",
   "27": "2daf6072b7ded024d188ecd848367fe541b8ba3e77094712b8b3bf30024b2f50",
   "28": "3202ddaeebae77e2acf2595eab019d59331cf1befa7a8afe5149d65b31bd3596",
+  "29": "656af8293ad602a1c2f4d03bab920b1bf69bd4c06e2de94c4c0f79769726fb77",
 };
 
 test("the extraction revision changes with the code it describes", () => {

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: d432866d1cfa51bc24a396fd992e85f16c04a03fdfae1d603bcf467828eff302
+source_hash: 542f6978e62d7cc3462962cd36c6c7beb3532b87bb1cbc32cf73a6a3f62d933e
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -118,14 +118,14 @@ flowchart LR
 
     subgraph enginebox["Silnik: @inwards/core"]
         config["<b>Parser konfiguracji</b><br/><small>config/<br/>smol-toml, walidacja</small>"]
-        pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
-        parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
-        extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
-        rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>adapter-conformance: INW020<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
+        pre["<b>Prescan szkieletu importów</b><br/><small>shared/python/prescan.ts<br/>czyści linie niebędące importami</small>"]
+        parser["<b>Adapter parsera</b><br/><small>shared/python/parser.ts<br/>web-tree-sitter</small>"]
+        extract["<b>Ekstraktor i resolver importów</b><br/><small>shared/python/parser.ts<br/>względne → bezwzględne</small>"]
+        rules["<b>Reguły</b><br/><small>shared/meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>adapter-conformance: INW020<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
         report["<b>Reportery</b><br/><small>report/<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
-        modgraph["<b>Indeks modułów</b><br/><small>lookup/project-index.ts: własne moduły,<br/>moduły importujące na żądanie</small>"]
+        modgraph["<b>Indeks modułów</b><br/><small>shared/lookup/project-index.ts: własne moduły,<br/>moduły importujące na żądanie</small>"]
     end
 
     cfgtext --> config --> engine
@@ -147,7 +147,7 @@ flowchart LR
 | Prescan szkieletu importów | Zostawia tylko linie importów, usuwa im wcięcie, a resztę czyści, żeby numery linii się nie przesunęły | Odmawia przetworzenia pliku, gdy `import` pojawia się w miejscu, którego nie umie wyjaśnić, co wymusza pełne parsowanie. Zobacz [ADR-004](05-ADR.md#adr-004-parse-the-import-skeleton-confirm-with-a-full-parse) |
 | Adapter parsera | Inicjalizuje web-tree-sitter z bajtów i parsuje | Jawnie zwalnia każde drzewo, bo pamięć WASM nie jest odśmiecana |
 | Ekstraktor importów | Znajduje węzły `import` / `from ... import` w dowolnym miejscu drzewa i rozwiązuje importy względne | `from shop import infrastructure` jest zapisywane jako `shop.infrastructure`, więc nie prześlizgnie się |
-| Reguły | Czyste funkcje z `(file, imports, config)` do `Diagnostic[]`. Kod, nazwa, domyślny poziom, podsumowanie i link do dokumentacji każdej reguły żyją w jednym rejestrze (`meta/registry.ts`); z niego budowane jest `rules[]` w SARIF | INW001, INW005 dla bibliotek, które warstwa może importować, INW006 dla kodu poza wszystkimi warstwami, INW010 dla własnych modułów, które nie istnieją, INW007/INW008 dla kształtu pakietu, INW011 dla importów dynamicznych (dosłownych celów i niesprawdzalnych celów w warstwach wewnętrznych) i INW000 dla plików, których kodowanie mogłoby ukryć importy. Zaplanowane reguły są wymienione niżej |
+| Reguły | Czyste funkcje z `(file, imports, config)` do `Diagnostic[]`. Kod, nazwa, domyślny poziom, podsumowanie i link do dokumentacji każdej reguły żyją w jednym rejestrze (`shared/meta/registry.ts`); z niego budowane jest `rules[]` w SARIF | INW001, INW005 dla bibliotek, które warstwa może importować, INW006 dla kodu poza wszystkimi warstwami, INW010 dla własnych modułów, które nie istnieją, INW007/INW008 dla kształtu pakietu, INW011 dla importów dynamicznych (dosłownych celów i niesprawdzalnych celów w warstwach wewnętrznych) i INW000 dla plików, których kodowanie mogłoby ukryć importy. Zaplanowane reguły są wymienione niżej |
 | Kompozytor poprawek | Buduje ponumerowane kroki naprawy z faktycznych nazw importu i warstw | Kroki podają prawdziwe moduły, a nie symbole zastępcze |
 | Reportery | Tekst dla ludzi, JSON `inwards/diagnostics@1` dla agentów, SARIF 2.1.0 dla GitHuba | Pola JSON można dodawać, ale nigdy nie usuwać ani nie zmieniać ich nazw |
 | Fasada silnika | Koordynuje prescan, reguły i potwierdzające pełne parsowanie | Jedyne, co wywołują adaptery. Kształt pakietu (INW007) jest sprawdzany najpierw, na podstawie samej ścieżki. Plik poza wszystkimi warstwami nie jest parsowany (dostaje najwyżej ostrzeżenie INW006). Plik w warstwie, którego tekst wymienia loader modułów, pomija prescan (zobacz niżej). `checkWith` najpierw przekazuje parsowanie do `ExtractionBatch`, czyli wątków roboczych CLI, a potem sprawdza tak jak `check` ([ADR-040](05-ADR.md#adr-040-worker-threads-parse-a-large-full-check-the-main-thread-keeps-every-decision)) |
@@ -444,30 +444,31 @@ src/
 ├── core/                  # engine, no I/O; src/core/AGENTS.md explains the rules
 │   ├── src/
 │   │   ├── index.ts       # the public API adapters import (pinned by test/api.test.ts)
-│   │   ├── contracts/     # records.ts: SourceFile, ImportRef, Diagnostic, Fix, Span, Suppressed
-│   │   ├── meta/          # product.ts (VERSION, DOCS_BASE), registry.ts (every rule's code,
-│   │   │                  #   name, severity, docs link; diagnostic())
+│   │   ├── shared/        # the kernel every slice builds on; imports only flow down
+│   │   │   ├── contracts/ # records.ts: SourceFile, ImportRef, Diagnostic, Fix, Span, Suppressed
+│   │   │   ├── meta/      # product.ts (VERSION, DOCS_BASE), registry.ts (every rule's code,
+│   │   │   │          #   name, severity, docs link; diagnostic())
+│   │   │   ├── python/    # parser.ts (tree-sitter, import extraction), module-names.ts,
+│   │   │   │          #   prescan.ts (import skeleton), encoding.ts (PEP 263),
+│   │   │   │          #   literals.ts, stdlib.ts, qualify.ts (names through imports)
+│   │   │   │          #   private-modules.ts (which module names are private)
+│   │   │   ├── lookup/    # project-index.ts (the engine's project input), module-lookup.ts,
+│   │   │   │          #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── config/        # [tool.inwards]: index.ts (the face; the modules are _x.ts), _parse.ts, _rule-settings.ts ([tool.inwards.rules]),
 │   │   │                  #   _shape.ts (shapes and names), _generated.ts, _glob.ts (fnmatch),
 │   │   │                  #   _diagrams.ts (the diagrams key and its path globs),
 │   │   │                  #   _source-span.ts (where a value sits in pyproject.toml), _toml.ts
-│   │   ├── python/        # parser.ts (tree-sitter, import extraction), module-names.ts,
-│   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
-│   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
-│   │   │                  #   private-modules.ts (which module names are private)
 │   │   ├── diagram/       # index.ts (the face; the modules are _x.ts), _blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
 │   │   │                  #   _mermaid.ts and _syntax.ts (the flowchart reader), _plantuml-blocks.ts,
 │   │   │                  #   _plantuml.ts, _plantuml-syntax.ts and _plantuml-skip.ts (PlantUML),
 │   │   │                  #   _read.ts (either reader), _model.ts, _names.ts (what a node names),
 │   │   │                  #   _notation.ts (hints in the diagram's syntax), _draft.ts (import-diagram),
 │   │   │                  #   _write.ts (the config as a diagram, for inwards diagram)
-│   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
-│   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one folder per rule, named after it: index.ts its face, the logic in _ modules; they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
-│   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
-│   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)
-│   │   │   │              #   (parameter types), name-patterns.ts (fnmatch-style names)
+│   │   │   │          #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
+│   │   │   │          #   annotations.ts, classes.ts (top-level classes, exempt bases)
+│   │   │   │          #   (parameter types), name-patterns.ts (fnmatch-style names)
 │   │   │   ├── unsupported-encoding/  # INW000
 │   │   │   ├── layer-dependency/      # INW001 + fix composer
 │   │   │   ├── context-independence/  # INW002: depends-on between contexts

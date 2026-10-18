@@ -18,8 +18,8 @@
  * nothing and reads no file itself: the project lookups it is given do.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../../python/nodes.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import { identifierName, namedChildren } from "../../../shared/python/nodes.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 import { argumentFor, parameterNamed } from "./_callers.ts";
 import type { FastApiFile, FastApiObject, PathOperation } from "./_records.ts";
 import { RouteTags, type TagLookups } from "./_route-tags.ts";

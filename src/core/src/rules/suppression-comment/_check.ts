@@ -26,9 +26,9 @@ import type {
   SourceFile,
   Suppressed,
   SuppressionComment,
-} from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { parsePython } from "../../python/parser.ts";
+} from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { parsePython } from "../../shared/python/parser.ts";
 
 /** Cheap check before any parse: can the text hold a suppression at all? */
 const MARKER = /inwards:\s*ignore\b/u;

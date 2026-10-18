@@ -19,7 +19,6 @@
  * behind a finding with the full parse; this module only reads them. No I/O.
  */
 import { contextOf, type InwardsConfig } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile, Span } from "../../contracts/records.ts";
 import {
   type Diagram,
   diagramFile,
@@ -33,7 +32,8 @@ import {
   type SubgraphMention,
   topLevel,
 } from "../../diagram/index.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, ImportRef, SourceFile, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";
 
 /** One checked file and the imports read from it. */

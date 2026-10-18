@@ -17,8 +17,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import { type RuleOptions, stringList } from "../../config/index.ts";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { identifierName } from "../../python/nodes.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { identifierName } from "../../shared/python/nodes.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import type { ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";

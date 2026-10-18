@@ -6,7 +6,7 @@
  * the same way. Pure: it takes the declared names as plain records and never
  * imports the config parser.
  */
-import type { SourceFile, Span } from "../contracts/records.ts";
+import type { SourceFile, Span } from "../shared/contracts/records.ts";
 import type { Diagram, NodeMention, SubgraphMention } from "./_model.ts";
 import { ID } from "./_syntax.ts";
 

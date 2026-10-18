@@ -12,8 +12,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import { matchEntry, type RuleOptions } from "../../config/index.ts";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
-import { diagnostic, RULES, type RuleMeta } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES, type RuleMeta } from "../../shared/meta/registry.ts";
 import { list, optionalList } from "./_options.ts";
 import type { FastApiFile, GraphEdge, GraphNode, Wiring, WiringGraph } from "./model/index.ts";
 

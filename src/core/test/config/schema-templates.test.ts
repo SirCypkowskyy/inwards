@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { optionKeys } from "../../src/config/_rule-options.ts";
-import { RULES } from "../../src/meta/registry.ts";
+import { RULES } from "../../src/shared/meta/registry.ts";
 import {
   MINIMAL,
   parserError,

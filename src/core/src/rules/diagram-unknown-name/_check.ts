@@ -23,7 +23,6 @@ import {
   selectorProblem,
   spanOf,
 } from "../../config/index.ts";
-import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
 import {
   type Declared,
   type Diagram,
@@ -38,7 +37,8 @@ import {
   type SubgraphMention,
   topLevel,
 } from "../../diagram/index.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, Fix, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { distance } from "../shared/edit-distance.ts";
 import { matchesAny } from "../shared/entry-matches.ts";
 import { joined } from "../shared/words.ts";

@@ -9,9 +9,9 @@
  * exposes the imported name, when one does.
  */
 import { type ContextSpec, contextOf, isPublicModule, publicModule } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 
 /** What INW003 asks of the project: where a name lives, and what a module exposes. */
 export interface PublicLookup {

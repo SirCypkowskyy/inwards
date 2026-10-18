@@ -106,7 +106,8 @@ function sources(dir: string): string[] {
 /**
  * Names the zone a core source file must be in: `core-api` for index.ts,
  * `core-rule-<name>` for a rule's module or folder, `core-rules-shared` for
- * rules/shared, and `core-<folder>` for everything else.
+ * rules/shared, `core-<folder>` for the kernel folders under shared/, and
+ * `core-<folder>` for everything else.
  *
  * @param path - a repo-relative path under src/core/src.
  * @returns the expected zone name.
@@ -119,6 +120,9 @@ function expectedZone(path: string): string {
   if (top === "rules" && next !== undefined) {
     return next === "shared" ? "core-rules-shared" : `core-rule-${next.replace(TS_SUFFIX, "")}`;
   }
+  if (top === "shared" && next !== undefined) {
+    return `core-${next}`;
+  }
   return `core-${top}`;
 }
 
@@ -126,7 +130,7 @@ describe("no I/O in the engine", () => {
   test(
     "a core module can't import a Node module or use the process global",
     () => {
-      for (const folder of ["rules", "engine", "lookup"]) {
+      for (const folder of ["rules", "engine", "shared/lookup"]) {
         const imports = lintAs(
           `src/core/src/${folder}/probe.ts`,
           'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',

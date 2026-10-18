@@ -14,7 +14,7 @@ import {
   matchEntry,
   topPackageOf,
 } from "../../config/index.ts";
-import type { ImportRef, SourceFile } from "../../contracts/records.ts";
+import type { ImportRef, SourceFile } from "../../shared/contracts/records.ts";
 
 /** Which layer owns a module, through which entry, and how deep it matched. */
 export interface Membership {

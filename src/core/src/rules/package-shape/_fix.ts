@@ -8,7 +8,7 @@
  */
 
 import type { NameRule, ShapeSpec } from "../../config/index.ts";
-import type { Fix } from "../../contracts/records.ts";
+import type { Fix } from "../../shared/contracts/records.ts";
 import { distance } from "../shared/edit-distance.ts";
 
 /** Words that name the same kind of module. The first of a group is only a label. */

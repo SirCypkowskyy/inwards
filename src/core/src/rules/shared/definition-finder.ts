@@ -7,10 +7,10 @@
  * `fastapi-routers.ts` does.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
-import { moduleFunctions } from "../../python/nodes.ts";
-import { importedNames } from "../../python/parser.ts";
-import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import type { SourceFile } from "../../shared/contracts/records.ts";
+import { moduleFunctions } from "../../shared/python/nodes.ts";
+import { importedNames } from "../../shared/python/parser.ts";
+import { type Qualify, qualifierFor } from "../../shared/python/qualify.ts";
 import { moduleDefinitions } from "./definitions.ts";
 import type { FindDefinition, FoundDefinition } from "./fastapi-routers.ts";
 import { ParsedModules } from "./first-party.ts";

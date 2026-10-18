@@ -7,8 +7,8 @@
  * which per-name findings the one finding replaces; the caller drops them.
  * No parsing and no I/O: `check.ts` hands it the names it read.
  */
-import type { Diagnostic, Fix, SourceFile, Span } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, Fix, SourceFile, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import type { TableName, TimeColumn } from "./_models.ts";
 import { isSnake, singularOf, TIME_SUFFIXES } from "./_names.ts";
 

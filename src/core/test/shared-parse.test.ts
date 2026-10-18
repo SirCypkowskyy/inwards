@@ -10,14 +10,14 @@
 import { describe, expect, test } from "bun:test";
 import type { Parser } from "web-tree-sitter";
 import { parseConfig } from "../src/config/_parse.ts";
-import type { Diagnostic, SourceFile } from "../src/contracts/records.ts";
 import { ContentRun, contentFindings } from "../src/engine/content-rules.ts";
 import { fastApiFindings } from "../src/engine/fastapi.ts";
 import { ormProjectFindings } from "../src/engine/orm-naming.ts";
 import { Engine } from "../src/index.ts";
-import { moduleNodes } from "../src/python/nodes.ts";
-import { importedNames } from "../src/python/parser.ts";
-import { skeletonNames } from "../src/python/prescan.ts";
+import type { Diagnostic, SourceFile } from "../src/shared/contracts/records.ts";
+import { moduleNodes } from "../src/shared/python/nodes.ts";
+import { importedNames } from "../src/shared/python/parser.ts";
+import { skeletonNames } from "../src/shared/python/prescan.ts";
 import { file, grammars, indexOn, parser } from "./support/helpers.ts";
 
 const CONFIG = parseConfig(`[tool.inwards]

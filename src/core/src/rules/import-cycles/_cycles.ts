@@ -11,8 +11,8 @@
  * since one file can't show a cycle (ADR-032).
  */
 import { type ContextSpec, type CycleMode, contextOf } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { cyclicComponents, type Graph, shortestCycle } from "./_graph.ts";
 
 /** One checked file and the imports read from it. */

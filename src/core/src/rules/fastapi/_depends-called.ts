@@ -15,9 +15,9 @@
  * model, so a function in another module is read, one hop.
  */
 import type { Node } from "web-tree-sitter";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { namedChildren } from "../../python/nodes.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { namedChildren } from "../../shared/python/nodes.ts";
 import { isAsync, isGenerator, ownNodes } from "./_function-body.ts";
 import { spanOf } from "./_syntax.ts";
 import type { DependencyUse, FastApiFile, FastApiProject } from "./model/index.ts";

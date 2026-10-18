@@ -7,15 +7,16 @@
  * in source order, add the findings of rules that parse a file on their own
  * (FAPI, INW012), and keep each unassigned-package warning once across files.
  */
+
+import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
 import type {
   Diagnostic,
   ImportRef,
   SourceFile,
   Suppressed,
   SuppressionComment,
-} from "../contracts/records.ts";
-import { normalizeSource } from "../python/parser.ts";
-import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
+} from "../shared/contracts/records.ts";
+import { normalizeSource } from "../shared/python/parser.ts";
 
 /**
  * How a scan reads a file: not at all (outside every layer, nothing else

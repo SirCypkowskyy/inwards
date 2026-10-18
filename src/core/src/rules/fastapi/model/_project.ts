@@ -10,10 +10,10 @@
  * makes the edges into every router unknown, and the rules then stay quiet.
  */
 import type { Node } from "web-tree-sitter";
-import type { ProjectIndex } from "../../../lookup/project-index.ts";
-import { argumentAt } from "../../../python/literals.ts";
-import { identifierName, namedChildren } from "../../../python/nodes.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import type { ProjectIndex } from "../../../shared/lookup/project-index.ts";
+import { argumentAt } from "../../../shared/python/literals.ts";
+import { identifierName, namedChildren } from "../../../shared/python/nodes.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 import { WiringGraph } from "./_graph.ts";
 import { returnedStatusCodes } from "./_handlers.ts";
 import type { Definition, FastApiModel } from "./_model.ts";

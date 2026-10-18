@@ -9,9 +9,9 @@
  * file, so it reports that instead of passing it.
  */
 
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { unreadableEncoding } from "../../python/encoding.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { unreadableEncoding } from "../../shared/python/encoding.ts";
 
 /**
  * Reports a file whose declared encoding Inwards can't read faithfully.

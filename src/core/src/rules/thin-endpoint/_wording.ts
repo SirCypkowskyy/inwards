@@ -6,7 +6,7 @@
  * it reads no syntax.
  */
 import { filledFrom, type LayerSpec } from "../../config/index.ts";
-import type { Fix } from "../../contracts/records.ts";
+import type { Fix } from "../../shared/contracts/records.ts";
 import { joined } from "../shared/words.ts";
 import type { Kind } from "./_frameworks.ts";
 

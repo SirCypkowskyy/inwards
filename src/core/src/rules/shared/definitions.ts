@@ -8,7 +8,7 @@
  * in what it returns.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
 
 /** A file's module-level classes and simple `NAME = value` assignments, by name. */
 export interface ModuleDefinitions {

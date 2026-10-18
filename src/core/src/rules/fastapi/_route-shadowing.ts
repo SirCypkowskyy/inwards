@@ -14,8 +14,8 @@
  * several files, and an operation that is reachable through some other
  * inclusion all keep an operation from being reported.
  */
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { decoratorSpan, decoratorText } from "./_syntax.ts";
 import {
   covers,

@@ -12,7 +12,7 @@
  * templates, so the rules never see them.
  */
 import { parse } from "smol-toml";
-import { VERSION } from "../meta/product.ts";
+import { VERSION } from "../shared/meta/product.ts";
 import { type ContextSpec, parseContexts } from "./_contexts.ts";
 import { type CycleMode, parseCycles } from "./_cycles.ts";
 import { CONFIG_DEFAULTS } from "./_defaults.ts";

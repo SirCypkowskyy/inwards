@@ -5,7 +5,7 @@
  * other module's contents are known.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
 import { LOADERS } from "./_loaders.ts";
 
 /** A name an import statement binds, and what it refers to. */

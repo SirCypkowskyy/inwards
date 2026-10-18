@@ -14,8 +14,8 @@
  * An app-wide `generate_unique_id_function` changes nothing, as an explicit
  * `operation_id=` overrides it.
  */
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { decoratorSpan, decoratorText } from "./_syntax.ts";
 import {
   type FastApiFile,

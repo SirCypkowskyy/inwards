@@ -9,9 +9,9 @@
  * imported from another module are not read.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { argumentAt } from "../../shared/python/literals.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 
 /** How many aliases `typesOf` follows before it stops (an alias cycle ends here). */
 const MAX_ALIASES = 4;

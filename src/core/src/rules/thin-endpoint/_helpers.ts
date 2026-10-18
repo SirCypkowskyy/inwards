@@ -10,7 +10,7 @@
  * passed to them. It reads one file's syntax; the caller measures bodies.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName } from "../../python/nodes.ts";
+import { identifierName } from "../../shared/python/nodes.ts";
 import { passedNames } from "../shared/arguments.ts";
 import type { Metrics } from "./_metrics.ts";
 

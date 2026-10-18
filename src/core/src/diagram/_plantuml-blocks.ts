@@ -8,7 +8,7 @@
  * land on the diagram's own line. No I/O and no PlantUML parsing;
  * `plantuml.ts` reads the body.
  */
-import type { DiagramSource } from "../contracts/records.ts";
+import type { DiagramSource } from "../shared/contracts/records.ts";
 import { fencedBodies, type MarkedBlock } from "./_blocks.ts";
 
 /** A line break, either kind. */

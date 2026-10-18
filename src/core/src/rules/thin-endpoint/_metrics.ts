@@ -10,7 +10,7 @@
  * It reads syntax only; what is denied is `check.ts`'s question.
  */
 import type { Node } from "web-tree-sitter";
-import { namedChildren } from "../../python/nodes.ts";
+import { namedChildren } from "../../shared/python/nodes.ts";
 
 /** Nodes whose bodies run in another scope. */
 const SCOPES: ReadonlySet<string> = new Set([

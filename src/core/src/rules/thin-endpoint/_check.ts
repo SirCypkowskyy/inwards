@@ -15,8 +15,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import type { LayerSpec, RuleOptions } from "../../config/index.ts";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import { joined } from "../shared/words.ts";
 import { mayHoldEndpoints } from "./_endpoints.ts";

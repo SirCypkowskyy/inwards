@@ -22,8 +22,8 @@
  * is a known false positive.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt, literalString } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { argumentAt, literalString } from "../../shared/python/literals.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
 import { ATTRIBUTE, assignedNames, walrusName } from "./_assignments.ts";
 import { importBindings } from "./_import-bindings.ts";
 import { LOADERS, PARTIAL } from "./_loaders.ts";

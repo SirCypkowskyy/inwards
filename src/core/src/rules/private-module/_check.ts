@@ -8,10 +8,10 @@
  * (`from pkg import _helper`) and third-party private modules are left to
  * Ruff. The engine decides which imports another rule already reports.
  */
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { privateTo } from "../../python/private-modules.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { privateTo } from "../../shared/python/private-modules.ts";
 
 /** An import statement's names from one private module, reported once. */
 interface Reach {

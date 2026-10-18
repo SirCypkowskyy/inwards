@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { type Diagnostic, Engine, parseConfig, type SourceFile } from "../../src/index.ts";
-import { onlyImportsUpTo } from "../../src/python/prescan.ts";
+import { onlyImportsUpTo } from "../../src/shared/python/prescan.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 describe("a head of imports only", () => {

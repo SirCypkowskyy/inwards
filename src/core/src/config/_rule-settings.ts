@@ -14,8 +14,8 @@
  * moved away or linked around, so they ignore the table.
  */
 
-import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";
-import { diagnostic, RULES, ruleFor } from "../meta/registry.ts";
+import type { Diagnostic, Severity, SourceFile } from "../shared/contracts/records.ts";
+import { diagnostic, RULES, ruleFor } from "../shared/meta/registry.ts";
 import { matchEntry } from "./_layer-selector.ts";
 import {
   CHECK_TESTS,

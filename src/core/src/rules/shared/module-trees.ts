@@ -9,9 +9,9 @@
  * builds no rule's view of them (`first-party.ts` does).
  */
 import type { Parser, Tree } from "web-tree-sitter";
-import type { ImportRef, SourceFile } from "../../contracts/records.ts";
-import { importedNames, normalizeSource, parsePython } from "../../python/parser.ts";
-import { skeletonImports, skeletonNames } from "../../python/prescan.ts";
+import type { ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import { importedNames, normalizeSource, parsePython } from "../../shared/python/parser.ts";
+import { skeletonImports, skeletonNames } from "../../shared/python/prescan.ts";
 
 /** What reading first-party modules needs from the project; `ProjectIndex` provides it. */
 export interface FirstPartySource {

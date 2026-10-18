@@ -5,8 +5,8 @@
  * suppression comments are still in the tree.
  */
 import { describe, expect, test } from "bun:test";
-import { extractImports, flattenCommentRuns, parsePython } from "../../src/python/parser.ts";
 import { commentsIn } from "../../src/rules/suppression-comment/index.ts";
+import { extractImports, flattenCommentRuns, parsePython } from "../../src/shared/python/parser.ts";
 import { file, parser } from "../support/helpers.ts";
 
 /**

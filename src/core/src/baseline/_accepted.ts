@@ -4,7 +4,7 @@
  * it can skip the confirming parse of a module whose skeleton findings the
  * baseline accepts in full (see `acceptedModules`).
  */
-import type { Diagnostic } from "../contracts/records.ts";
+import type { Diagnostic } from "../shared/contracts/records.ts";
 
 /** INW001 and INW011 end with the whole layer order, which isn't part of the violation. */
 const DIRECTION = / Allowed direction: [^\n]*$/u;

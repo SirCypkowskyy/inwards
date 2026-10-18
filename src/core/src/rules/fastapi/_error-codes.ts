@@ -15,9 +15,9 @@
  * (ring 4) aren't followed.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { argumentAt } from "../../shared/python/literals.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import { ownNodes } from "./_function-body.ts";
 import { statusCode } from "./_status.ts";
 import {

@@ -12,8 +12,8 @@
  * I/O-free: the caller supplies the run's trees, the file and the options.
  */
 import { type RuleOptions, stringList } from "../../config/index.ts";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { importedNames } from "../../python/parser.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { importedNames } from "../../shared/python/parser.ts";
 import { classNames, classQualifier, exemptMatchers, moduleScope } from "../shared/classes.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
 import { adapterClasses, conformanceLines, type LineContext, portName } from "./_lines.ts";

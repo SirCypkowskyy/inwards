@@ -21,9 +21,15 @@ import {
   shapeFor,
   spanOf,
 } from "../../config/index.ts";
-import type { Diagnostic, Fix, Severity, SourceFile, Span } from "../../contracts/records.ts";
-import type { ListDir, ListMembers } from "../../lookup/directory-listing.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type {
+  Diagnostic,
+  Fix,
+  Severity,
+  SourceFile,
+  Span,
+} from "../../shared/contracts/records.ts";
+import type { ListDir, ListMembers } from "../../shared/lookup/directory-listing.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { type Misfit, missingFinding, nameFinding, shapeFinding } from "./_fix.ts";
 
 /** What a misplaced member is reported as. */

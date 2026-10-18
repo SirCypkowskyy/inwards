@@ -12,9 +12,9 @@
  * counts as a problem are the rules' decisions.
  */
 import type { Node } from "web-tree-sitter";
-import type { ModuleLookup } from "../../../lookup/module-lookup.ts";
-import { argumentAt } from "../../../python/literals.ts";
-import { identifierName } from "../../../python/nodes.ts";
+import type { ModuleLookup } from "../../../shared/lookup/module-lookup.ts";
+import { argumentAt } from "../../../shared/python/literals.ts";
+import { identifierName } from "../../../shared/python/nodes.ts";
 import { returnedNames } from "../../shared/function-returns.ts";
 import type { CallSite } from "./_call-sites.ts";
 import { argumentFor, enclosingParameter } from "./_callers.ts";

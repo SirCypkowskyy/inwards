@@ -14,8 +14,8 @@
  * `**kwargs` that may hide `lifespan=`, or an inclusion Inwards can't follow,
  * keeps a handler at a warning.
  */
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { decoratorSpan, spanOf } from "./_syntax.ts";
 import type {
   EventHandlerUse,
