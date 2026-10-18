@@ -43,6 +43,16 @@ ${handler}
 `;
 }
 
+/**
+ * Checks a project with FAPI007 on.
+ *
+ * @param paths - file texts by path.
+ * @returns the FAPI007 findings.
+ */
+async function fapi007(paths: Record<string, string>): Promise<unknown[]> {
+  return (await checkProject(paths, RULES)).filter((d) => d.code === "FAPI007");
+}
+
 describe("FAPI007", () => {
   test("is off by default", async () => {
     const files = {
@@ -168,6 +178,32 @@ def db():
         log()
 `;
     expect(await check(text)).toEqual([]);
+  });
+
+  test("skips a single-yield generator that a StreamingResponse streams, in the file or another (#329)", async () => {
+    const events = `async def events():
+    try:
+        yield "tick"
+    except StreamError:
+        log()
+`;
+    const files = {
+      "app/__init__.py": "",
+      "app/events.py": events,
+      "app/api.py": `from app.events import events
+
+
+def stream():
+    return StreamingResponse(events(), media_type="text/event-stream")
+`,
+    };
+    expect(await fapi007(files)).toEqual([]);
+    expect(await fapi007({ "app/__init__.py": "", "app/events.py": events })).toHaveLength(1);
+    const same = {
+      "app/__init__.py": "",
+      "app/events.py": `${events}\nr = EventSourceResponse(wrap(events()))\n`,
+    };
+    expect(await fapi007(same)).toEqual([]);
   });
 
   test("skips streams: a generator that yields in a loop or in its except", async () => {

@@ -36,6 +36,7 @@ import {
   type FastApiFile,
   FastApiModel,
   FastApiProject,
+  streamedNames,
 } from "../rules/fastapi/index.ts";
 import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
@@ -119,8 +120,10 @@ export function fastApiFindings(
     for (const { src, m } of own) {
       found.set(src.path, fileFindings({ src, m, scope }, { on, edit, rules, settings }));
     }
-    for (const src of on.yields ? scoped.filter((file) => !checkEncoding(file)) : []) {
-      const swallows = checkYieldSwallows(trees, src);
+    const yielding = on.yields ? scoped.filter((file) => !checkEncoding(file)) : [];
+    const streamed = new Set(yielding.flatMap((src) => [...streamedNames(trees, src)]));
+    for (const src of yielding) {
+      const swallows = checkYieldSwallows(trees, src, streamed);
       found.set(src.path, [...(found.get(src.path) ?? []), ...swallows]);
     }
     const extra = graphFindings(scope, own, { edit, on, settings }, found);
