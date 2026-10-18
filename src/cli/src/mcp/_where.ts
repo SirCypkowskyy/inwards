@@ -22,9 +22,8 @@ import {
 import { posix } from "../paths/lexical.ts";
 import { findConfig } from "../project/config-discovery.ts";
 import type { ProjectIo } from "../project/contracts.ts";
-import { absoluteFrom, failure } from "./answers.ts";
-import type { McpCheck, ToolAnswer, WhereInput } from "./contracts.ts";
-import { hintOf, leafOf } from "./hints.ts";
+import { absoluteFrom, failure } from "./_answers.ts";
+import { hintOf, leafOf } from "./_hints.ts";
 import {
   type Blocked,
   type Candidate,
@@ -33,7 +32,8 @@ import {
   type Named,
   prose,
   suggest,
-} from "./where-answer.ts";
+} from "./_where-answer.ts";
+import type { McpCheck, ToolAnswer, WhereInput } from "./contracts.ts";
 
 /** What the tool reads: the check, the working directory, and the config files. */
 export interface WhereDeps {

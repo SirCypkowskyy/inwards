@@ -2,7 +2,7 @@
  * @file What the MCP server (`inwards mcp`, ADR-042) exchanges with its
  * client, as plain data: each tool's arguments, already validated against the
  * schema the client saw, and the answer, as text for the model and as
- * structured data. The connection over stdio (`adapters/mcp-connection.ts`)
+ * structured data. The connection over stdio (`adapters/connection.ts`)
  * owns the schemas and the protocol; this folder never sees the SDK or a
  * stream. Types only.
  */
@@ -37,6 +37,9 @@ export interface WhereInput {
   /** A directory or file in the project, which picks its config; the working directory by default. */
   path?: string | undefined;
 }
+
+/** The rule pages' Markdown, by code: what `explain_rule` and `inwards rules` read. */
+export type RulePages = ReadonlyMap<string, string>;
 
 /** A tool's answer: text for the model, and the same as structured data. */
 export interface ToolAnswer {

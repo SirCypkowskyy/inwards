@@ -185,7 +185,9 @@
       // connection before the rest, since the first matching zone wins.
       { "name": "cli-lsp-adapters", "patterns": ["src/cli/src/lsp/adapters/**"] },
       { "name": "cli-lsp", "patterns": ["src/cli/src/lsp/**"] },
-      // The MCP server's policy (`inwards mcp`, ADR-043): the three tools.
+      // The MCP server slice (`inwards mcp`, ADR-042, ADR-047): its MCP
+      // connection, which loads the SDK and Zod, before the rest.
+      { "name": "cli-mcp-adapters", "patterns": ["src/cli/src/mcp/adapters/**"] },
       { "name": "cli-mcp", "patterns": ["src/cli/src/mcp/**"] },
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
@@ -746,7 +748,7 @@
         ]
       },
       {
-        "from": "cli-mcp",
+        "from": "cli-mcp-adapters",
         "allow": [
           "core-api",
           "core-contracts",
@@ -765,7 +767,32 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project"
+          "cli-mcp"
+        ]
+      },
+      {
+        "from": "cli-mcp",
+        // cli.ts takes AppDeps and runPlan from commands/ until step 14 moves deps.ts to the root.
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-commands"
         ]
       },
       {
@@ -823,8 +850,7 @@
           "cli-runlog",
           "cli-init",
           "cli-commands",
-          "cli-daemon",
-          "cli-mcp"
+          "cli-daemon"
         ]
       },
       {
@@ -855,12 +881,14 @@
           "cli-lsp",
           "cli-lsp-adapters",
           "cli-mcp",
+          "cli-mcp-adapters",
           "cli-runlog-adapters"
         ]
       },
       {
         "from": "cli-test",
         // core-dev: the slice naming check (src/core/test/support/architecture.ts) both packages share.
+        // cli-mcp-adapters: the in-memory MCP client (test/support/mcp-client.ts) serves the real connection.
         "allow": [
           "core-dev",
           "core-api",
@@ -891,7 +919,8 @@
           "cli-json",
           "cli-daemon",
           "cli-lsp",
-          "cli-mcp"
+          "cli-mcp",
+          "cli-mcp-adapters"
         ]
       },
       // The client talks to VS Code and the binary only.

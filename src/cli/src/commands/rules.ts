@@ -9,7 +9,7 @@
  */
 import { relative } from "node:path";
 import { inwardsTable, parseConfig, RULES } from "@inwards/core";
-import { explainRule } from "../mcp/explain-rule.ts";
+import { explainRule } from "../mcp/index.ts";
 import { print } from "../platform/print.ts";
 import { commandConfig } from "../project/config-discovery.ts";
 import type { AppDeps } from "./deps.ts";
