@@ -8,5 +8,5 @@ export { checkFileOperationIds, checkGraphOperationIds } from "./_duplicate-oper
 export { checkLifespan } from "./_lifespan-events.ts";
 export { checkFileShadowing, checkGraphShadowing } from "./_route-shadowing.ts";
 export { checkFileWiring, checkGraphWiring } from "./_router-wiring.ts";
-export { checkYieldSwallows } from "./_yield-dependency-swallows.ts";
+export { checkYieldSwallows, streamedNames } from "./_yield-dependency-swallows.ts";
 export { type FastApiFile, FastApiModel, FastApiProject } from "./model/index.ts";

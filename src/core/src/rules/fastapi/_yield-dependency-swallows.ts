@@ -12,7 +12,9 @@
  * `contextmanager`, `asynccontextmanager` or `fixture` are skipped, since
  * swallowing is how a context manager suppresses an error on purpose and a
  * test fixture never sees the test's exception. So are streams, generators
- * that yield more than once or in a loop: a dependency yields once. An `except` passes when
+ * that yield more than once or in a loop (a dependency yields once), and
+ * generators called inside a `StreamingResponse(...)` or
+ * `EventSourceResponse(...)` in the checked files (#329), matched by name. An `except` passes when
  * every path through it raises, as Inwards can tell: a `raise` in the block,
  * or an `if`/`else`, `with` or `try` whose every branch raises.
  */
@@ -30,6 +32,12 @@ const NOT_DEPENDENCY = /(?:contextmanager|fixture)\b/u;
 /** Source that can hold a dependency that swallows: it spells both words. */
 const YIELD = /\byield\b/u;
 const EXCEPT = /\bexcept\b/u;
+
+/** The responses whose body is a stream, not a dependency. */
+const STREAM_RESPONSE = /(?:^|\.)(?:StreamingResponse|EventSourceResponse)$/u;
+
+/** Source that can stream a generator: it spells one of the responses. */
+const STREAM_WORD = /StreamingResponse|EventSourceResponse/u;
 
 /** The node types of an `except` clause. */
 const EXCEPT_CLAUSES: ReadonlySet<string> = new Set(["except_clause", "except_group_clause"]);
@@ -188,15 +196,16 @@ function report(clause: Node, label: string, src: SourceFile): Diagnostic {
  *
  * @param fn - a `function_definition` node.
  * @param src - the file, for the diagnostics.
+ * @param streamed - names of functions called inside a streaming response.
  * @returns one finding per clause that doesn't raise on every path.
  */
-function swallowsIn(fn: Node, src: SourceFile): Diagnostic[] {
+function swallowsIn(fn: Node, src: SourceFile, streamed: ReadonlySet<string>): Diagnostic[] {
   const yields = ownNodes(fn, new Set(["yield"]));
-  if (yields.length === 0 || decoratedAway(fn) || isStream(fn, yields)) {
-    return [];
-  }
   const name = fn.childForFieldName("name");
   const label = name ? identifierName(name) : "the generator";
+  if (yields.length === 0 || decoratedAway(fn) || isStream(fn, yields) || streamed.has(label)) {
+    return [];
+  }
   return ownNodes(fn, new Set(["try_statement"])).flatMap((statement) => {
     const body = statement.childForFieldName("body");
     const around =
@@ -210,18 +219,52 @@ function swallowsIn(fn: Node, src: SourceFile): Diagnostic[] {
 }
 
 /**
+ * Names the functions called inside a `StreamingResponse(...)` or
+ * `EventSourceResponse(...)` in a file: the generators it streams. Matching is
+ * by name, with no import resolution (ceiling: two functions of one name).
+ *
+ * @param trees - the run's trees, which parse each text once per run.
+ * @param src - the file, with normalised text.
+ * @returns the callee names, `events` for `events()` and `m.events()` alike.
+ */
+export function streamedNames(trees: FileTrees, src: SourceFile): Set<string> {
+  const names = new Set<string>();
+  if (!STREAM_WORD.test(src.text)) {
+    return names;
+  }
+  for (const call of moduleNodes(trees.treeOf(src).rootNode, "call")) {
+    if (!STREAM_RESPONSE.test(call.childForFieldName("function")?.text ?? "")) {
+      continue;
+    }
+    for (const inner of call.childForFieldName("arguments")?.descendantsOfType("call") ?? []) {
+      const target = inner?.childForFieldName("function");
+      const last = target?.type === "attribute" ? target.childForFieldName("attribute") : target;
+      if (last) {
+        names.add(last.text);
+      }
+    }
+  }
+  return names;
+}
+
+/**
  * Checks one file for dependencies that swallow the endpoint's exceptions.
  * Parses the file only when it spells both `yield` and `except`.
  *
  * @param trees - the run's trees, which parse each text once per run.
  * @param src - the file, with normalised text.
+ * @param streamed - names of the generators the checked files stream (`streamedNames`).
  * @returns the findings, in source order.
  */
-export function checkYieldSwallows(trees: FileTrees, src: SourceFile): Diagnostic[] {
+export function checkYieldSwallows(
+  trees: FileTrees,
+  src: SourceFile,
+  streamed: ReadonlySet<string> = new Set(),
+): Diagnostic[] {
   if (!(YIELD.test(src.text) && EXCEPT.test(src.text))) {
     return [];
   }
   return moduleNodes(trees.treeOf(src).rootNode, "function_definition")
-    .flatMap((fn) => (fn ? swallowsIn(fn, src) : []))
+    .flatMap((fn) => (fn ? swallowsIn(fn, src, streamed) : []))
     .sort((a, b) => a.line - b.line);
 }
