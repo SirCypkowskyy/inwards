@@ -8,10 +8,10 @@
  * file and the run's trees.
  */
 import { type InwardsConfig, ruleLevel } from "../config/index.ts";
-import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ModuleTrees } from "../rules/shared/module-trees.ts";
 import { checkThinEndpoints, type ThinEndpointRun } from "../rules/thin-endpoint/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
+import type { Diagnostic, SourceFile } from "../shared/contracts/records.ts";
 
 /**
  * Finds INW012's findings in a file, whatever layer it is in. Nothing is

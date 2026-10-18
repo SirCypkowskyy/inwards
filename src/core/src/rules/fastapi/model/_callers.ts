@@ -15,7 +15,7 @@ import {
   keywordOf,
   moduleNodes,
   namedChildren,
-} from "../../../python/nodes.ts";
+} from "../../../shared/python/nodes.ts";
 
 /** Parameter nodes that end the positional ones: `*`, `*args` and `**kwargs`. */
 const KEYWORD_ONLY: ReadonlySet<string> = new Set([

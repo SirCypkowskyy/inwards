@@ -8,7 +8,7 @@
  * subpackage, `name/` a subpackage only, `name.py` a module only.
  */
 
-import type { Severity } from "../contracts/records.ts";
+import type { Severity } from "../shared/contracts/records.ts";
 import { CONFIG_DEFAULTS } from "./_defaults.ts";
 import { globMatches, isGlob } from "./_glob.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./_toml.ts";

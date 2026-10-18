@@ -5,8 +5,8 @@
  * only reads the syntax the model recorded.
  */
 import type { Node } from "web-tree-sitter";
-import type { Span } from "../../contracts/records.ts";
-import { argumentAt } from "../../python/literals.ts";
+import type { Span } from "../../shared/contracts/records.ts";
+import { argumentAt } from "../../shared/python/literals.ts";
 import type { PathOperation } from "./model/index.ts";
 
 /**

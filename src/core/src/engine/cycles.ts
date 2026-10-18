@@ -15,8 +15,6 @@
  * (`Extractor.importsUpTo`). Only the files the check parses take part.
  */
 import { CONFIG_DEFAULTS, type ContextSpec, type CycleMode } from "../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
-import { onlyImportsUpTo } from "../python/prescan.ts";
 import {
   cycleDiagnostic,
   type FileImports,
@@ -24,6 +22,8 @@ import {
   findCycles,
   searches,
 } from "../rules/import-cycles/index.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../shared/contracts/records.ts";
+import { onlyImportsUpTo } from "../shared/python/prescan.ts";
 
 /** A checked file's imports, and whether a full parse read them. */
 export interface Collected extends FileImports {

@@ -25,24 +25,6 @@ export {
   ruleLevel,
   type ShapeSpec,
 } from "./config/index.ts";
-export type {
-  CachedExtraction,
-  Diagnostic,
-  DiagramDraft,
-  DiagramSource,
-  ExtractionAnswer,
-  ExtractionBatch,
-  ExtractionCache,
-  ExtractionIdentity,
-  ExtractionJob,
-  Fix,
-  ImportRef,
-  Severity,
-  SourceFile,
-  Span,
-  Suppressed,
-  SuppressionComment,
-} from "./contracts/records.ts";
 export {
   type DiagramExport,
   type DiagramKind,
@@ -52,14 +34,6 @@ export {
 export { checkDiagrams, type DiagramInput, draftDiagrams } from "./engine/diagrams.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export { createExtractionWorker } from "./engine/extraction.ts";
-export type { ListDir, ListMembers } from "./lookup/directory-listing.ts";
-export { type PathKind, topLevelModules } from "./lookup/module-lookup.ts";
-export type { ProjectFiles, ProjectIndex } from "./lookup/project-index.ts";
-export { DOCS_BASE, VERSION } from "./meta/product.ts";
-export { RULES } from "./meta/registry.ts";
-export { moduleNameFor } from "./python/module-names.ts";
-export { extractImports, type GrammarBinaries } from "./python/parser.ts";
-export { createTreeReuse, type TreeReuse } from "./python/reparse.ts";
 export { type Format, type RenderOptions, type Report, render } from "./report/index.ts";
 export { checkLayers } from "./rules/layer-dependency/index.ts";
 export {
@@ -79,3 +53,29 @@ export {
   checkPrefixes,
   type LayerLink,
 } from "./rules/unassigned-module/index.ts";
+export type {
+  CachedExtraction,
+  Diagnostic,
+  DiagramDraft,
+  DiagramSource,
+  ExtractionAnswer,
+  ExtractionBatch,
+  ExtractionCache,
+  ExtractionIdentity,
+  ExtractionJob,
+  Fix,
+  ImportRef,
+  Severity,
+  SourceFile,
+  Span,
+  Suppressed,
+  SuppressionComment,
+} from "./shared/contracts/records.ts";
+export type { ListDir, ListMembers } from "./shared/lookup/directory-listing.ts";
+export { type PathKind, topLevelModules } from "./shared/lookup/module-lookup.ts";
+export type { ProjectFiles, ProjectIndex } from "./shared/lookup/project-index.ts";
+export { DOCS_BASE, VERSION } from "./shared/meta/product.ts";
+export { RULES } from "./shared/meta/registry.ts";
+export { moduleNameFor } from "./shared/python/module-names.ts";
+export { extractImports, type GrammarBinaries } from "./shared/python/parser.ts";
+export { createTreeReuse, type TreeReuse } from "./shared/python/reparse.ts";

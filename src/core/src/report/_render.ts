@@ -4,9 +4,9 @@
  * result, picks the paths (relative to the working directory, or to the
  * repository root for `github`), and asks for colour.
  */
-import type { Diagnostic, Suppressed } from "../contracts/records.ts";
-import { DOCS_BASE, VERSION } from "../meta/product.ts";
-import { RULES } from "../meta/registry.ts";
+import type { Diagnostic, Suppressed } from "../shared/contracts/records.ts";
+import { DOCS_BASE, VERSION } from "../shared/meta/product.ts";
+import { RULES } from "../shared/meta/registry.ts";
 import { renderGithub } from "./_github.ts";
 
 /** A line break with the spaces around it; Unicode line and paragraph separators count too. */

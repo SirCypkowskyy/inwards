@@ -10,11 +10,11 @@
  * the files and the run's trees.
  */
 import { type InwardsConfig, ruleLevel } from "../config/index.ts";
-import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { Models } from "../rules/orm-naming/index.ts";
 import { checkOrmNaming, foldKey, projectFindings } from "../rules/orm-naming/index.ts";
 import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
+import type { Diagnostic, SourceFile } from "../shared/contracts/records.ts";
 
 /**
  * Tells whether INW016 checks a file: on for its module, and an encoding Inwards can read.

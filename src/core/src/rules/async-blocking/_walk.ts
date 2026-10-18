@@ -7,10 +7,10 @@
  * out. It owns no tree: the caller parses and frees it.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
-import { descendantsOutside, identifierName, moduleFunctions } from "../../python/nodes.ts";
-import { importedNames } from "../../python/parser.ts";
-import { qualifierFor } from "../../python/qualify.ts";
+import type { SourceFile } from "../../shared/contracts/records.ts";
+import { descendantsOutside, identifierName, moduleFunctions } from "../../shared/python/nodes.ts";
+import { importedNames } from "../../shared/python/parser.ts";
+import { qualifierFor } from "../../shared/python/qualify.ts";
 import { moduleAliases, type TypeContext } from "../shared/annotations.ts";
 import type { Family } from "./_catalog.ts";
 import { moduleReceivers, NESTED_SCOPES, type Source, valueSource } from "./_receivers.ts";

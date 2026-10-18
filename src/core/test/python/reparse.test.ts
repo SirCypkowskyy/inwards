@@ -11,8 +11,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Tree } from "web-tree-sitter";
 import { Engine, parseConfig } from "../../src/index.ts";
-import { parsePython } from "../../src/python/parser.ts";
-import { createTreeReuse, editBetween, type TreeReuse } from "../../src/python/reparse.ts";
+import { parsePython } from "../../src/shared/python/parser.ts";
+import { createTreeReuse, editBetween, type TreeReuse } from "../../src/shared/python/reparse.ts";
 import { file, grammars, PROJECT, parser } from "../support/helpers.ts";
 
 /**

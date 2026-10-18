@@ -7,8 +7,14 @@
  * `check.ts` and `calls.ts` found; it decides nothing.
  */
 import type { Node } from "web-tree-sitter";
-import type { Diagnostic, Fix, ImportRef, SourceFile, Span } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type {
+  Diagnostic,
+  Fix,
+  ImportRef,
+  SourceFile,
+  Span,
+} from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { joined } from "../shared/words.ts";
 
 /** INW015's role and the modules that may import and build it. */

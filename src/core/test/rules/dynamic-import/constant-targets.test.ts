@@ -13,7 +13,7 @@ import {
   percentFormatted,
   repeated,
   sliced,
-} from "../../../src/python/string-ops.ts";
+} from "../../../src/shared/python/string-ops.ts";
 import { found, unverifiable } from "../../support/helpers.ts";
 
 const EXACT: [string, string][] = [["INW011", "shop.infrastructure.db"]];

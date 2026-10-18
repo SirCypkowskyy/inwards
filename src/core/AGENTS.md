@@ -14,11 +14,11 @@ can't lean on either runtime.
 | Folder | Owns | Must not |
 |---|---|---|
 | `index.ts` | the public API, the only module adapters import | export anything by accident (`test/api.test.ts` pins the list) |
-| `contracts/` | the records the engine and adapters exchange (`records.ts`) | hold behaviour or import anything |
-| `meta/` | product metadata (`product.ts`), the rule registry and `diagnostic()` (`registry.ts`) | know about config or rules' logic |
+| `shared/contracts/` | the records the engine and adapters exchange (`records.ts`) | hold behaviour or import anything |
+| `shared/meta/` | product metadata (`product.ts`), the rule registry and `diagnostic()` (`registry.ts`) | know about config or rules' logic |
+| `shared/python/` | tree-sitter parsing, import extraction, module names, the prescan, PEP 263 encodings, literals, stdlib names | know about layers or rules |
+| `shared/lookup/` | the module index (`ProjectIndex`), module lookup, the directory-listing ports | decide what is a violation |
 | `config/` | parsing `[tool.inwards]`: layers, rule settings, shapes, `generated`, globs, source spans | read files (it gets the text) |
-| `python/` | tree-sitter parsing, import extraction, module names, the prescan, PEP 263 encodings, literals, stdlib names | know about layers or rules |
-| `lookup/` | the module index (`ProjectIndex`), module lookup, the directory-listing ports | decide what is a violation |
 | `diagram/` | the readers for marked architecture diagrams (ADR-045): finding the blocks (`blocks`, `plantuml-blocks`), the Mermaid and PlantUML readers (`mermaid` with `syntax`, `plantuml` with `plantuml-syntax` and `plantuml-skip`), the one model both read into (`model`, `read`), what a node names (`names`), the notation a fix hint uses (`notation`), the config `inwards import-diagram` reads out of a diagram (`draft`), and the writer that draws the config as a diagram for `inwards diagram` (`write`) | know about layers' imports or report a finding (INW017 to INW019 do) |
 | `rules/` | one folder per rule, named after the rule (`index.ts` its face, `_` modules behind it; `fastapi/` also holds a `model/` mini-domain, the FAPI rules' shared model); `shared/` for what several rules need | import another rule |
 | `baseline/` | baseline keys and which modules a baseline accepts in full | render or write anything |
@@ -27,8 +27,8 @@ can't lean on either runtime.
 
 ## Dependency rules
 
-Imports go downwards: `contracts`, then `meta`, then `config`; `python` (on
-`contracts`), `lookup` (on `python`) and `diagram` (on `contracts`) beside
+Imports go downwards: `shared/contracts`, then `shared/meta`, then `config`; `shared/python` (on
+`contracts`), `shared/lookup` (on `python`) and `diagram` (on `contracts`) beside
 it; then `rules/shared`, then each rule (INW017 to INW019 also on
 `diagram`); then `baseline`, `engine` and `report`. `index.ts` may re-export
 any of them. Nothing in core imports the CLI, the extension, tests or
@@ -57,7 +57,7 @@ Enforced by:
   fallow actually applies), and pin every public export, types included.
 
 When a change seems to need a new edge, move the shared piece down (into
-`rules/shared/`, `lookup/` or `python/`) rather than widening a rule's zone.
+`rules/shared/`, `shared/lookup/` or `shared/python/`) rather than widening a rule's zone.
 
 ## Slice names (ADR-047)
 
@@ -85,7 +85,7 @@ adds its folder there.
 
 ## Lifetimes that are deliberate
 
-- **The grammar loads once per process** (`python/parser.ts`).
+- **The grammar loads once per process** (`shared/python/parser.ts`).
   `Parser.init` sets up a global WASM module, so concurrent loads race; a
   failed load clears the promise so the next call retries.
 - **Every tree is freed** with `tree.delete()` in a `finally`: WASM memory
@@ -98,7 +98,7 @@ adds its folder there.
 
 ## Where new code goes
 
-- **A new rule.** Add its entry to `meta/registry.ts`; write it in
+- **A new rule.** Add its entry to `shared/meta/registry.ts`; write it in
   `rules/<rule-name>/` (`index.ts` re-exporting, the logic in `_check.ts` and other `_` modules) using only
   `rules/shared/` and the lower folders; call it from `engine/engine.ts` and
   decide its precedence there; give it a zone and edges in `.fallowrc.jsonc`;
@@ -110,14 +110,14 @@ adds its folder there.
   document it where the other keys are (chapter 1's configuration section,
   and the guide for the feature it serves), EN and PL.
 - **A new project input.** Add a narrow port (a function type, like
-  `ListDir`) in `lookup/` or `contracts/`, take it through `ProjectFiles` or a
+  `ListDir`) in `shared/lookup/` or `shared/contracts/`, take it through `ProjectFiles` or a
   parameter, and implement it in every adapter.
 
 ## Traps that already cost review rounds
 
 - **Core stays I/O-free.** No `node:*`, no `Bun`, no `process`, no
   `console`. The grammars come in as bytes (`GrammarBinaries`).
-- **Prescan soundness.** `python/prescan.ts` must never miss an import: it
+- **Prescan soundness.** `shared/python/prescan.ts` must never miss an import: it
   returns null (full parse) whenever `import` shows up somewhere it can't
   account for. `src/core/scripts/prescan-diff.ts` checks it against the full
   parse on the stdlib and a generated corpus; keep it at 0 misses.

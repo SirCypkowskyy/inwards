@@ -6,8 +6,8 @@
  * is disposed; no behaviour lives here.
  */
 import type { Node } from "web-tree-sitter";
-import type { SourceFile } from "../../../contracts/records.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import type { SourceFile } from "../../../shared/contracts/records.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 import type { RouterKinds } from "../../shared/fastapi-routers.ts";
 import type { CallSyntax, Value } from "./_values.ts";
 

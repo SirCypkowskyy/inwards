@@ -17,9 +17,9 @@
  * or an `if`/`else`, `with` or `try` whose every branch raises.
  */
 import type { Node } from "web-tree-sitter";
-import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
+import type { Diagnostic, SourceFile, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../shared/python/nodes.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
 import { ownNodes } from "./_function-body.ts";
 import { spanOf } from "./_syntax.ts";

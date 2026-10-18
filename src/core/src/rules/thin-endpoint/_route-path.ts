@@ -5,7 +5,7 @@
  * literal string only; a path built at run time reads as none.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt, literalString } from "../../python/literals.ts";
+import { argumentAt, literalString } from "../../shared/python/literals.ts";
 
 /**
  * Reads the path a route decorator or registration spells as a literal:

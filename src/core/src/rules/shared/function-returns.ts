@@ -7,8 +7,8 @@
  * function's tree and resolves nothing.
  */
 import type { Node } from "web-tree-sitter";
-import { descendantsOutside, identifierName, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { descendantsOutside, identifierName, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 
 /** The nodes whose bodies belong to another scope. */
 const SCOPES: ReadonlySet<string> = new Set(["function_definition", "class_definition", "lambda"]);

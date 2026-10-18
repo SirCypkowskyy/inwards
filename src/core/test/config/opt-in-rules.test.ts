@@ -9,9 +9,9 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { applyRules, checkRuleOptions, ruleLevel } from "../../src/config/_rule-settings.ts";
-import type { Diagnostic } from "../../src/contracts/records.ts";
 import { ConfigError, Engine, parseConfig, RULES, render } from "../../src/index.ts";
-import { diagnostic, type RuleMeta } from "../../src/meta/registry.ts";
+import type { Diagnostic } from "../../src/shared/contracts/records.ts";
+import { diagnostic, type RuleMeta } from "../../src/shared/meta/registry.ts";
 import { file, grammars, PROJECT } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]

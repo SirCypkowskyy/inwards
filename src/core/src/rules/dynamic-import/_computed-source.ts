@@ -15,9 +15,9 @@
  * the builtin in place at the call turns it off, so it errs toward a report.
  */
 import type { Node } from "web-tree-sitter";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { argumentAt, literalSource } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import { argumentAt, literalSource } from "../../shared/python/literals.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
 import { type Bindings, holdsLoader, qualify } from "./_callees.ts";
 import { importBindings } from "./_import-bindings.ts";
 import { COMPUTED, type Loaded, type LoaderCall, loaderArgument } from "./_loader-targets.ts";

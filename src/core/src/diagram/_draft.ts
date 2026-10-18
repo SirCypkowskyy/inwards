@@ -15,7 +15,7 @@ import type {
   DiagramSource,
   DraftDiagramContext,
   DraftDiagramLayer,
-} from "../contracts/records.ts";
+} from "../shared/contracts/records.ts";
 import type { Diagram, NodeMention, SubgraphMention } from "./_model.ts";
 import { EXTERNAL, idsWithClass, PUBLIC, quotedLabel, topLevel } from "./_names.ts";
 import { notationOf } from "./_notation.ts";

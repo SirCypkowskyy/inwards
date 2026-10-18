@@ -5,8 +5,8 @@
  * module words the diagnostic and its fix.
  */
 import type { LayerSpec } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { allowedDirection, outwardImports, portSteps } from "../shared/layer-ownership.ts";
 
 /**

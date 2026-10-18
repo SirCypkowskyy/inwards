@@ -10,9 +10,9 @@
  * `model.ts` owns the parse and the lookups.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../../python/literals.ts";
-import { identifierName, moduleNodes, namedChildren } from "../../../python/nodes.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import { argumentAt } from "../../../shared/python/literals.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../../shared/python/nodes.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 import { type RouterBinding, routerBindings } from "../../shared/fastapi-routers.ts";
 import { enclosingParameter } from "./_callers.ts";
 import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./_handlers.ts";

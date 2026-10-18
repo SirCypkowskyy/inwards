@@ -21,7 +21,6 @@ import {
   type LayerSpec,
   publicModule,
 } from "../../config/index.ts";
-import type { Diagnostic, Fix, Span } from "../../contracts/records.ts";
 import {
   type Diagram,
   type DiagramEdge,
@@ -33,7 +32,8 @@ import {
   resolveName,
   topLevel,
 } from "../../diagram/index.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, Fix, Span } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { joined } from "../shared/words.ts";
 
 /** The step every fix ends with: the config is the user's. */

@@ -5,7 +5,7 @@
  * It pairs syntax only; deciding what a value means is `callees.ts`'s job.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
 
 /** Prefix of the keys under which attribute names are bound: `.load` for `x.load = loader`. */
 export const ATTRIBUTE = ".";

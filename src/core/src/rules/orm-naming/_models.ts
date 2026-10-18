@@ -14,11 +14,16 @@
  * owns no tree and decides nothing: `check.ts` holds the names to the scheme.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile, Span } from "../../contracts/records.ts";
-import { argumentAt, literalString } from "../../python/literals.ts";
-import { identifierName, keywordOf, moduleNodes, namedChildren } from "../../python/nodes.ts";
-import { importedNames } from "../../python/parser.ts";
-import { qualifierFor } from "../../python/qualify.ts";
+import type { SourceFile, Span } from "../../shared/contracts/records.ts";
+import { argumentAt, literalString } from "../../shared/python/literals.ts";
+import {
+  identifierName,
+  keywordOf,
+  moduleNodes,
+  namedChildren,
+} from "../../shared/python/nodes.ts";
+import { importedNames } from "../../shared/python/parser.ts";
+import { qualifierFor } from "../../shared/python/qualify.ts";
 import { moduleAliases, type TypeContext } from "../shared/annotations.ts";
 import {
   calleeOf,

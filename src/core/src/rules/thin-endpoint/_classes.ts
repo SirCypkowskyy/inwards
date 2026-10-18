@@ -7,8 +7,8 @@
  * are the endpoints. It reads one tree; the caller resolves other modules.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import type { NameMatch } from "../shared/name-patterns.ts";
 import {
   type Framework,

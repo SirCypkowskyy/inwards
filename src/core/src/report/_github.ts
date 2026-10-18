@@ -4,7 +4,7 @@
  * It escapes messages and properties as `@actions/core` does; the summary
  * lines come from `render.ts`, and the paths from the adapter.
  */
-import type { Diagnostic } from "../contracts/records.ts";
+import type { Diagnostic } from "../shared/contracts/records.ts";
 
 /**
  * Renders the report as workflow commands, one per diagnostic, after a

@@ -12,10 +12,10 @@
  */
 import type { Node } from "web-tree-sitter";
 import type { RuleOptions } from "../../config/index.ts";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import { joined } from "../shared/words.ts";
 import { flag, list } from "./_options.ts";
 import { hiddenBy, objectHidden, placementOf } from "./_placement.ts";

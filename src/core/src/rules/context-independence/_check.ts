@@ -7,9 +7,9 @@
  * so one import can break both INW001 and INW002.
  */
 import { type ContextSpec, contextOf } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 
 /**
  * Applies INW002 to a file's imports.

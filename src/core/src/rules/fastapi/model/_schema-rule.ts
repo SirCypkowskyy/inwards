@@ -8,8 +8,8 @@
  * reads syntax only; `tag-rule.ts` runs the rule for one route.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../../python/nodes.ts";
-import type { Qualify } from "../../../python/qualify.ts";
+import { identifierName, namedChildren } from "../../../shared/python/nodes.ts";
+import type { Qualify } from "../../../shared/python/qualify.ts";
 
 /** The nodes whose bodies are another scope. */
 const SCOPES: ReadonlySet<string> = new Set(["function_definition", "class_definition", "lambda"]);

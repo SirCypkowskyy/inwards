@@ -9,7 +9,7 @@
  * Nothing after the parser knows templates exist: every rule sees what the
  * equivalent hand-written config would give it. Pure: no I/O.
  */
-import type { Severity } from "../contracts/records.ts";
+import type { Severity } from "../shared/contracts/records.ts";
 import { memberPatterns, strings } from "./_shape.ts";
 import { parseTemplateRules, type TemplateRules } from "./_template-rules.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";

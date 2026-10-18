@@ -20,10 +20,10 @@ import {
   isSelector,
   type LayerSpec,
 } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import type { ProjectIndex } from "../../lookup/project-index.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import type { ModuleLookup } from "../../shared/lookup/module-lookup.ts";
+import type { ProjectIndex } from "../../shared/lookup/project-index.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
 import { layerIndexOf } from "../shared/layer-ownership.ts";
 
 /**

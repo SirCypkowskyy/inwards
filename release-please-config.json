@@ -63,7 +63,7 @@
     ".": {
       "package-name": "inwards",
       "extra-files": [
-        "src/core/src/meta/product.ts",
+        "src/core/src/shared/meta/product.ts",
         {
           "type": "json",
           "path": "src/core/package.json",

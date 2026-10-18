@@ -12,9 +12,9 @@
  * Nothing is evaluated beyond the folds in `python/literals.ts`.
  */
 import type { Node } from "web-tree-sitter";
-import type { Literal } from "../../python/folding.ts";
-import { type Constants, constantValue } from "../../python/literals.ts";
-import { identifierName } from "../../python/nodes.ts";
+import type { Literal } from "../../shared/python/folding.ts";
+import { type Constants, constantValue } from "../../shared/python/literals.ts";
+import { identifierName } from "../../shared/python/nodes.ts";
 import { type Bindings, qualify } from "./_callees.ts";
 import { rewritesNamespace } from "./_computed-source.ts";
 

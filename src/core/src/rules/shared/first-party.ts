@@ -11,7 +11,7 @@
  * files only through the run's trees.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
+import type { SourceFile } from "../../shared/contracts/records.ts";
 import type { ModuleTrees } from "./module-trees.ts";
 
 /** How many re-exports a name is followed through (a re-export cycle ends here). */

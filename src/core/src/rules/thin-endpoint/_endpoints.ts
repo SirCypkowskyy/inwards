@@ -14,9 +14,9 @@
  * their job.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../python/literals.ts";
-import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import { argumentAt } from "../../shared/python/literals.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../shared/python/nodes.ts";
+import type { Qualify } from "../../shared/python/qualify.ts";
 import { type RouterKinds, routerBindings } from "../shared/fastapi-routers.ts";
 import { type NameMatch, nameMatcher } from "../shared/name-patterns.ts";
 import { type ResolveBase, viewMethods } from "./_classes.ts";

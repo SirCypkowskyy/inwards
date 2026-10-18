@@ -13,10 +13,10 @@
  */
 
 import { DEFAULT_GENERATED, isGenerated } from "../../config/index.ts";
-import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
-import type { ProjectIndex } from "../../lookup/project-index.ts";
-import { diagnostic, RULES } from "../../meta/registry.ts";
-import { packageOf } from "../../python/module-names.ts";
+import type { Diagnostic, ImportRef, SourceFile } from "../../shared/contracts/records.ts";
+import type { ProjectIndex } from "../../shared/lookup/project-index.ts";
+import { diagnostic, RULES } from "../../shared/meta/registry.ts";
+import { packageOf } from "../../shared/python/module-names.ts";
 import { distance } from "../shared/edit-distance.ts";
 
 /** How many real modules the fix suggests. */

@@ -5,7 +5,7 @@
  * finding the blocks is `blocks.ts` and `plantuml-blocks.ts`, and reading
  * them `mermaid.ts` and `plantuml.ts`. No I/O.
  */
-import type { DiagramSource } from "../contracts/records.ts";
+import type { DiagramSource } from "../shared/contracts/records.ts";
 import { markedBlocks } from "./_blocks.ts";
 import { readFlowchart } from "./_mermaid.ts";
 import type { Diagram } from "./_model.ts";

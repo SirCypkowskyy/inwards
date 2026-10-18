@@ -4,8 +4,8 @@
  * It also covers what is deliberately not reported.
  */
 import { describe, expect, test } from "bun:test";
-import { skeletonImports } from "../../../src/python/prescan.ts";
 import { mentionsDynamicImport } from "../../../src/rules/dynamic-import/_imports.ts";
+import { skeletonImports } from "../../../src/shared/python/prescan.ts";
 import { check, file, found, parser } from "../../support/helpers.ts";
 
 describe("INW011 dynamic-import: call forms", () => {

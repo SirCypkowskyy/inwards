@@ -12,8 +12,8 @@
  */
 import type { Node } from "web-tree-sitter";
 import { matchEntry, type RuleOptions, stringList } from "../../config/index.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
+import { type Qualify, qualifierFor } from "../../shared/python/qualify.ts";
 import { type NameMatch, nameMatcher } from "./name-patterns.ts";
 
 /**

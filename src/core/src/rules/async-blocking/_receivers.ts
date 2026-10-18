@@ -10,7 +10,7 @@
  * through `self`.
  */
 import type { Node } from "web-tree-sitter";
-import { descendantsOutside, identifierName, namedChildren } from "../../python/nodes.ts";
+import { descendantsOutside, identifierName, namedChildren } from "../../shared/python/nodes.ts";
 import { parameterTypes, type TypeContext, typesOf } from "../shared/annotations.ts";
 import type { Family } from "./_catalog.ts";
 

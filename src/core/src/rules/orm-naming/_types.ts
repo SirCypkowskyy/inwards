@@ -8,7 +8,7 @@
  * or a column.
  */
 import type { Node } from "web-tree-sitter";
-import { keywordOf, namedChildren } from "../../python/nodes.ts";
+import { keywordOf, namedChildren } from "../../shared/python/nodes.ts";
 import { type TypeContext, typesOf } from "../shared/annotations.ts";
 
 /** Whether a column holds a datetime or a date. */

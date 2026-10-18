@@ -8,8 +8,8 @@
  * one call's syntax; the caller says what each name stands for.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../python/literals.ts";
-import { identifierName } from "../../python/nodes.ts";
+import { argumentAt } from "../../shared/python/literals.ts";
+import { identifierName } from "../../shared/python/nodes.ts";
 
 /**
  * Reads what the call passes to each parameter of the callee, where the

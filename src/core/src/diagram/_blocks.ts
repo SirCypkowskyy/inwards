@@ -6,7 +6,7 @@
  * each body line's number in the file, so findings land on the diagram's own
  * line. No I/O and no Mermaid parsing; `mermaid.ts` reads the body.
  */
-import type { DiagramSource } from "../contracts/records.ts";
+import type { DiagramSource } from "../shared/contracts/records.ts";
 import type { DiagramKind } from "./_model.ts";
 
 /** A marked flowchart: its kind and its body, the lines after the header. */

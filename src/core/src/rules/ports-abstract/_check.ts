@@ -16,8 +16,8 @@
  * the layers.
  */
 import { type LayerSpec, type RuleOptions, stringList } from "../../config/index.ts";
-import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
-import { importedNames } from "../../python/parser.ts";
+import type { Diagnostic, SourceFile } from "../../shared/contracts/records.ts";
+import { importedNames } from "../../shared/python/parser.ts";
 import { classNames, classQualifier, exemptMatchers, moduleScope } from "../shared/classes.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import {

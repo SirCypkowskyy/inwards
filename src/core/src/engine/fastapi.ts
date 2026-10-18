@@ -21,8 +21,6 @@
  * decorator and router don't declare.
  */
 import { type InwardsConfig, type RuleOptions, ruleLevel } from "../config/index.ts";
-import type { Diagnostic, SourceFile } from "../contracts/records.ts";
-import type { ProjectIndex } from "../lookup/project-index.ts";
 import {
   checkDependsCalled,
   checkEndpoints,
@@ -42,6 +40,8 @@ import {
 import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
+import type { Diagnostic, SourceFile } from "../shared/contracts/records.ts";
+import type { ProjectIndex } from "../shared/lookup/project-index.ts";
 import { type Confirmed, withFound } from "./stages.ts";
 
 /** The FAPI findings for a check, and the ones to drop after suppressions. */

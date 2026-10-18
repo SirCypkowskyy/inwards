@@ -7,10 +7,10 @@
  * helper's own module included, which reuses the tree its callers parsed.
  */
 import { describe, expect, test } from "bun:test";
-import type { SourceFile } from "../../src/contracts/records.ts";
 import { Engine, parseConfig } from "../../src/index.ts";
 import { type ModuleNames, ParsedModules } from "../../src/rules/shared/first-party.ts";
 import { ModuleTrees } from "../../src/rules/shared/module-trees.ts";
+import type { SourceFile } from "../../src/shared/contracts/records.ts";
 import { file, grammars, indexOn, parser } from "../support/helpers.ts";
 
 /** The test modules by name. */

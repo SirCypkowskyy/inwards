@@ -12,8 +12,8 @@
  * options and severities win; two template roles that disagree are an error.
  * It knows nothing of layers beyond the raw entries; no I/O.
  */
-import type { Severity } from "../contracts/records.ts";
-import { RULES, ruleFor } from "../meta/registry.ts";
+import type { Severity } from "../shared/contracts/records.ts";
+import { RULES, ruleFor } from "../shared/meta/registry.ts";
 import { type OptionValue, optionKeys, parseOptions } from "./_rule-options.ts";
 import { ConfigError, isRecord } from "./_toml.ts";
 

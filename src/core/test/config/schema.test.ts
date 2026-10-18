@@ -20,7 +20,7 @@ import { optionKeys } from "../../src/config/_rule-options.ts";
 import { RULE_KEYS } from "../../src/config/_rule-settings.ts";
 import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/_shape.ts";
 import { TEMPLATE_KEYS } from "../../src/config/_templates.ts";
-import { RULES } from "../../src/meta/registry.ts";
+import { RULES } from "../../src/shared/meta/registry.ts";
 import {
   fileSchemaErrors,
   MINIMAL,

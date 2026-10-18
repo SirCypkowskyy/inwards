@@ -15,10 +15,10 @@
  */
 import type { Node, Tree } from "web-tree-sitter";
 import { entryReach, matchEntry } from "../../config/index.ts";
-import type { SourceFile } from "../../contracts/records.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { importedNames } from "../../python/parser.ts";
-import { type Qualify, qualifierFor } from "../../python/qualify.ts";
+import type { SourceFile } from "../../shared/contracts/records.ts";
+import { identifierName, namedChildren } from "../../shared/python/nodes.ts";
+import { importedNames } from "../../shared/python/parser.ts";
+import { type Qualify, qualifierFor } from "../../shared/python/qualify.ts";
 import { type ModuleNames, ParsedModules } from "../shared/first-party.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";
 import type { Construction, Scope } from "./_wording.ts";
