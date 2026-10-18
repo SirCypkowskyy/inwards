@@ -13,7 +13,7 @@ import { join } from "node:path";
 import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
 import { settingsProblem } from "./settings.ts";
 
-/** The first line of the plugin `init` writes (`init/opencode.ts`), which marks it as ours. */
+/** The first line of the plugin `init` writes (`init/_opencode.ts`), which marks it as ours. */
 export const PLUGIN_MARKER = "// inwards: opencode plugin";
 
 /**

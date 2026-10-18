@@ -1,0 +1,123 @@
+/**
+ * @file What `inwards init --style` prints once it has written: the package as a
+ * tree annotated with each layer and what it may import, then the result of
+ * a check run in process, the config a preset suggests for another tool
+ * (Ruff, for fastapi), then what to try next.
+ * The check runs through the injected check runner with the baseline off, so
+ * the counts show every violation the new layers find.
+ */
+import { dirname, join, relative, resolve } from "node:path";
+import { posix } from "../paths/lexical.ts";
+import type { PathProbe } from "../platform/contracts.ts";
+import { print } from "../platform/print.ts";
+import { drawTree, MISSING } from "./_style-text.ts";
+import type { Style } from "./_styles.ts";
+import { AGENTS, type InitContext, type InitPlan } from "./contracts.ts";
+
+/** A project init has just configured: its pyproject.toml, the preset, the package and the config root. */
+export interface Setup {
+  configPath: string;
+  style: Style;
+  pkg: string;
+  root: string;
+}
+
+/**
+ * Prints what was set up: the annotated tree, the check's result, and what to run next.
+ *
+ * @param ctx - prints, looks at the tree, and runs the check.
+ * @param setup - the pyproject.toml just written, the preset, the package and the config root.
+ * @param plan - what was chosen, for the next steps.
+ * @returns 0.
+ * @throws {ConfigError} when the check can't run on the new config.
+ */
+export async function report(ctx: InitContext, setup: Setup, plan: InitPlan): Promise<number> {
+  const { configPath, style, pkg } = setup;
+  const { streams } = ctx.io;
+  const tree = annotatedTree(ctx.io.probe, setup);
+  print(streams, `\n${tree}`, 0);
+  const missing = tree.includes(MISSING)
+    ? " Each layer marked (missing) fails the check until it has a module; `--scaffold` on a fresh project adds them."
+    : "";
+  await printCheck(ctx, configPath, missing);
+  if (style.companion !== undefined) {
+    print(streams, `\n${style.companion(packagePath(setup))}`, 0);
+  }
+  const next = [
+    plan.scaffold ? `Try the example: ${style.tryIt(pkg)}` : "",
+    plan.agent === undefined ? `Wire an agent: inwards init --agent ${AGENTS.join("|")}` : "",
+  ].filter((line) => line !== "");
+  if (next.length > 0) {
+    print(streams, `\n${next.join("\n")}`, 0);
+  }
+  return 0;
+}
+
+/**
+ * Runs a check on the config just written, baseline off, and prints how many
+ * violations and warnings it found.
+ *
+ * @param ctx - prints and runs the check.
+ * @param configPath - the pyproject.toml just written.
+ * @param hint - a sentence added after "Run `inwards check` to see them." when there are findings, or "".
+ * @throws {ConfigError} when the check can't run on the new config.
+ */
+export async function printCheck(
+  ctx: InitContext,
+  configPath: string,
+  hint: string,
+): Promise<void> {
+  const result = await ctx.check(configPath, undefined, ctx.io.runtime.cwd, { baseline: false });
+  const errors = result.diagnostics.filter((d) => d.severity === "error").length;
+  const warnings = result.diagnostics.length - errors;
+  const more = errors + warnings > 0 ? ` Run \`inwards check\` to see them.${hint}` : "";
+  print(
+    ctx.io.streams,
+    `\ninwards check: ${plural(errors, "violation")}, ${plural(warnings, "warning")}.${more}`,
+    0,
+  );
+}
+
+/**
+ * Counts something in words.
+ *
+ * @param n - how many.
+ * @param word - the singular noun.
+ * @returns e.g. `1 warning`, `0 violations`.
+ */
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * Draws the package as a tree of the layer packages, each with its layer and
+ * what it may import, e.g. `├── domain/   domain: imports no other layer`.
+ * A layer module missing on disk is marked, since its prefix matches nothing.
+ *
+ * @param probe - tells what is on disk.
+ * @param setup - the pyproject.toml, the preset, the package and the config root.
+ * @returns the tree, headed by the package's path relative to the project.
+ */
+function annotatedTree(probe: Pick<PathProbe, "kind" | "exists">, setup: Setup): string {
+  const { style, pkg, root } = setup;
+  const project = dirname(setup.configPath);
+  const base = resolve(project, root, ...pkg.split("."));
+  return drawTree(style, `${packagePath(setup)}/  (${style.name})`, (parts) => {
+    const path = join(base, ...parts);
+    if (probe.kind(path) === "dir") {
+      return "dir";
+    }
+    return probe.exists(`${path}.py`) ? "file" : "missing";
+  });
+}
+
+/**
+ * Names the package's directory relative to the project.
+ *
+ * @param setup - the pyproject.toml, the package and the config root.
+ * @returns e.g. `src/app`, with forward slashes.
+ */
+function packagePath(setup: Setup): string {
+  const project = dirname(setup.configPath);
+  return posix(relative(project, resolve(project, setup.root, ...setup.pkg.split("."))));
+}
