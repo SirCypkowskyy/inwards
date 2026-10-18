@@ -458,7 +458,7 @@ src/
 │   │   │                  #   _write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
-│   │   ├── rules/         # one module or folder per rule, named after it (migrated: index.ts + _check.ts); they share only shared/
+│   │   ├── rules/         # one folder per rule, named after it: index.ts its face, the logic in _ modules (fastapi/ keeps its layout until its own step); they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
 │   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
 │   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)

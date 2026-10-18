@@ -6,12 +6,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { type PathKind, parseConfig } from "../../src/index.ts";
-import { unassignedWarning } from "../../src/rules/unassigned-module/imports.ts";
+import { unassignedWarning } from "../../src/rules/unassigned-module/_imports.ts";
 import {
   checkMoves,
   checkNestedProjects,
   checkPrefixes,
-} from "../../src/rules/unassigned-module/layout.ts";
+} from "../../src/rules/unassigned-module/_layout.ts";
 import { check, engine, file, indexOn, OWNERS, PROJECT } from "../support/helpers.ts";
 
 /**

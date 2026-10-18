@@ -20,7 +20,7 @@ can't lean on either runtime.
 | `python/` | tree-sitter parsing, import extraction, module names, the prescan, PEP 263 encodings, literals, stdlib names | know about layers or rules |
 | `lookup/` | the module index (`ProjectIndex`), module lookup, the directory-listing ports | decide what is a violation |
 | `diagram/` | the readers for marked architecture diagrams (ADR-045): finding the blocks (`blocks`, `plantuml-blocks`), the Mermaid and PlantUML readers (`mermaid` with `syntax`, `plantuml` with `plantuml-syntax` and `plantuml-skip`), the one model both read into (`model`, `read`), what a node names (`names`), the notation a fix hint uses (`notation`), the config `inwards import-diagram` reads out of a diagram (`draft`), and the writer that draws the config as a diagram for `inwards diagram` (`write`) | know about layers' imports or report a finding (INW017 to INW019 do) |
-| `rules/` | one module or folder per rule, named after the rule; `shared/` for what several rules need | import another rule |
+| `rules/` | one folder per rule, named after the rule (`index.ts` its face, `_` modules behind it; `fastapi/` keeps its layout until its own step); `shared/` for what several rules need | import another rule |
 | `baseline/` | baseline keys and which modules a baseline accepts in full | render or write anything |
 | `engine/` | the facade: order of the checks, rule precedence, suppressions, the baseline shortcut | hold a rule's logic |
 | `report/` | text, concise, JSON and SARIF rendering, and GitHub Actions workflow commands (`github.ts`) | decide severities or filter findings |
@@ -96,7 +96,7 @@ adds its folder there.
 ## Where new code goes
 
 - **A new rule.** Add its entry to `meta/registry.ts`; write it in
-  `rules/<rule-name>/` (`index.ts` re-exporting, the logic in `_check.ts` and other `_` modules; a single module until its slice migrates is fine) using only
+  `rules/<rule-name>/` (`index.ts` re-exporting, the logic in `_check.ts` and other `_` modules) using only
   `rules/shared/` and the lower folders; call it from `engine/engine.ts` and
   decide its precedence there; give it a zone and edges in `.fallowrc.jsonc`;
   add `test/rules/<rule-name>.test.ts`; add its page to

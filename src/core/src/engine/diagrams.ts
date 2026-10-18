@@ -10,9 +10,9 @@
 import { type ConfigFile, type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, DiagramDraft, DiagramSource } from "../contracts/records.ts";
 import { draftFromSource, readDiagrams } from "../diagram/index.ts";
-import { checkDiagramEdges } from "../rules/diagram-forbidden-edge/check.ts";
-import { missingDependencies } from "../rules/diagram-missing-dependency/check.ts";
-import { checkDiagramEntries, checkDiagramNames } from "../rules/diagram-unknown-name/check.ts";
+import { checkDiagramEdges } from "../rules/diagram-forbidden-edge/index.ts";
+import { missingDependencies } from "../rules/diagram-missing-dependency/index.ts";
+import { checkDiagramEntries, checkDiagramNames } from "../rules/diagram-unknown-name/index.ts";
 import { type Collected, type CycleInputs, confirmImports } from "./cycles.ts";
 
 /** What a whole-project run gives the diagram rules. */

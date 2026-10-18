@@ -22,10 +22,7 @@ import type { ImportRef } from "../src/contracts/records.ts";
 import { moduleNameFor } from "../src/python/module-names.ts";
 import { createPythonParser, extractImports, normalizeSource } from "../src/python/parser.ts";
 import { skeletonImports } from "../src/python/prescan.ts";
-import {
-  extractDynamicImports,
-  mentionsDynamicImport,
-} from "../src/rules/dynamic-import/imports.ts";
+import { extractDynamicImports, mentionsDynamicImport } from "../src/rules/dynamic-import/index.ts";
 
 /**
  * Reads a WASM file from an installed package.

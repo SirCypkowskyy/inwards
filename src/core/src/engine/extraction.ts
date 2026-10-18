@@ -30,7 +30,7 @@ import {
 } from "../python/parser.ts";
 import { skeletonImports } from "../python/prescan.ts";
 import type { TreeReuse } from "../python/reparse.ts";
-import { mentionsDynamicImport } from "../rules/dynamic-import/imports.ts";
+import { mentionsDynamicImport } from "../rules/dynamic-import/index.ts";
 import { commentsIn, mentionsSuppression } from "../rules/suppression-comment/index.ts";
 
 /**
@@ -40,7 +40,7 @@ import { commentsIn, mentionsSuppression } from "../rules/suppression-comment/in
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "27";
+export const EXTRACTION_REVISION = "28";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {

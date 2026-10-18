@@ -10,7 +10,7 @@
  * Every core function that returns diagnostics to an adapter applies these
  * settings (`applyRules`), so the CLI, the hooks, the Stop gate and the
  * language server agree. The exceptions are the session comparisons in
- * `rules/unassigned-module/layout.ts` and `links.ts`: they stop a layer being
+ * `rules/unassigned-module/index.ts` and `links.ts`: they stop a layer being
  * moved away or linked around, so they ignore the table.
  */
 

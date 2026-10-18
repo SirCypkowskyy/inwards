@@ -11,9 +11,8 @@
  */
 import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
-import { checkOrmNaming, projectFindings } from "../rules/orm-naming/check.ts";
-import type { Models } from "../rules/orm-naming/models.ts";
-import { foldKey } from "../rules/orm-naming/schemes.ts";
+import type { Models } from "../rules/orm-naming/index.ts";
+import { checkOrmNaming, foldKey, projectFindings } from "../rules/orm-naming/index.ts";
 import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 

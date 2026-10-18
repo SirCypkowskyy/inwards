@@ -10,7 +10,7 @@
 import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ModuleTrees } from "../rules/shared/module-trees.ts";
-import { checkThinEndpoints, type ThinEndpointRun } from "../rules/thin-endpoint/check.ts";
+import { checkThinEndpoints, type ThinEndpointRun } from "../rules/thin-endpoint/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 
 /**

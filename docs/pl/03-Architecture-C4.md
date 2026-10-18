@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: f35c0ebd7ba14fc8dd256549956f5e157d641afe662e9d78bd22b22c50793198
+source_hash: 3c50ca1f04fe58d2c5342e9fe46fefde8feb22e07a27c5d703f74b06894f01e1
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -463,7 +463,7 @@ src/
 │   │   │                  #   _write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
-│   │   ├── rules/         # one module or folder per rule, named after it (migrated: index.ts + _check.ts); they share only shared/
+│   │   ├── rules/         # one folder per rule, named after it: index.ts its face, the logic in _ modules (fastapi/ keeps its layout until its own step); they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
 │   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
 │   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)

@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import type { RuleOptions } from "../../src/config/_rule-settings.ts";
 import type { SourceFile } from "../../src/contracts/records.ts";
 import { Engine, parseConfig } from "../../src/index.ts";
-import { AsyncBlockingRun } from "../../src/rules/async-blocking/check.ts";
+import { AsyncBlockingRun } from "../../src/rules/async-blocking/_check.ts";
 import { ModuleTrees } from "../../src/rules/shared/module-trees.ts";
 import { file, grammars, indexOn, parser } from "../support/helpers.ts";
 

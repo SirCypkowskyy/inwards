@@ -6,7 +6,7 @@
  * also passes the loader hint, so the engine parses the file in full.
  */
 import { describe, expect, test } from "bun:test";
-import { mentionsDynamicImport } from "../../../src/rules/dynamic-import/imports.ts";
+import { mentionsDynamicImport } from "../../../src/rules/dynamic-import/_imports.ts";
 import { found, unverifiable } from "../../support/helpers.ts";
 
 const EXACT: [string, string][] = [["INW011", "shop.infrastructure.db"]];

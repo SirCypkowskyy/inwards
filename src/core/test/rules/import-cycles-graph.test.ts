@@ -10,7 +10,7 @@ import {
   cyclicComponents,
   type Graph,
   shortestCycle,
-} from "../../src/rules/import-cycles/graph.ts";
+} from "../../src/rules/import-cycles/_graph.ts";
 
 /**
  * Builds a graph from edges.
