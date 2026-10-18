@@ -518,7 +518,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # check, baseline, rules, hook, daemon, mcp: thin, handed AppDeps
+│   │   ├── commands/      # check, baseline, hook, daemon: thin, handed AppDeps
 │   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
 │   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
 │   │   │                  #   and its changed-file checks, escalation, settings
@@ -541,6 +541,10 @@ src/
 │   │   │                  #   (cli.ts); the three tools (_check-files.ts, _explain-rule.ts,
 │   │   │                  #   _where.ts), queued one at a time (_tools.ts);
 │   │   │                  #   adapters/connection.ts is the MCP connection over stdio
+│   │   ├── rules/         # inwards rules and inwards rule, a slice (ADR-047): index.ts its face,
+│   │   │                  #   cli.ts the handlers, _sources.ts the config key behind each rule,
+│   │   │                  #   page/ the rule-page reader mcp/ shares; adapters/pages.ts the
+│   │   │                  #   embedded rule pages
 │   │   ├── init/          # inwards init, a slice (ADR-047): index.ts its face, cli.ts the init
 │   │   │                  #   handler; agents, --style, the scaffold plan, the report, presets
 │   │   │                  #   (_*.ts); brief/ (inwards context), diagram/ (inwards diagram and
@@ -551,7 +555,6 @@ src/
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state and baseline files,
 │   │                      #   the grammars, the daemon's socket and files,
-│   │                      #   the embedded rule pages (rule-pages.ts);
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/

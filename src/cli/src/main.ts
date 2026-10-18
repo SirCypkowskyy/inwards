@@ -19,7 +19,6 @@ import { checkCommand } from "./commands/check.ts";
 import { daemonCommand } from "./commands/daemon.ts";
 import type { AppDeps } from "./commands/deps.ts";
 import { hookClaudeCode } from "./commands/hook.ts";
-import { ruleCommand, rulesCommand } from "./commands/rules.ts";
 import { type Command, commandUsage, isCommand, overview } from "./commands/usage.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import {
@@ -32,6 +31,7 @@ import {
 import { serverCommand } from "./lsp/index.ts";
 import { mcpCommand } from "./mcp/index.ts";
 import { print } from "./platform/print.ts";
+import { ruleCommand, rulesCommand } from "./rules/index.ts";
 import { statsCommand } from "./runlog/index.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.

@@ -7,8 +7,8 @@
  * as text (`RulePages`); nothing here reads a file.
  */
 import { RULES } from "@inwards/core";
+import { type RulePage, readRulePage } from "../rules/page/index.ts";
 import { failure } from "./_answers.ts";
-import { type RulePage, readRulePage } from "./_rule-page.ts";
 import type { ExplainRuleInput, RulePages, ToolAnswer } from "./contracts.ts";
 
 /** The sections an answer has without `full`, by anchor: what the issue asked for. */

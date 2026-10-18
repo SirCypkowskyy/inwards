@@ -197,6 +197,10 @@
       // connection, which loads the SDK and Zod, before the rest.
       { "name": "cli-mcp-adapters", "patterns": ["src/cli/src/mcp/adapters/**"] },
       { "name": "cli-mcp", "patterns": ["src/cli/src/mcp/**"] },
+      // The rules slice (`inwards rules`, `inwards rule`, ADR-047): the embedded
+      // rule pages before the rest.
+      { "name": "cli-rules-adapters", "patterns": ["src/cli/src/rules/adapters/**"] },
+      { "name": "cli-rules", "patterns": ["src/cli/src/rules/**"] },
       { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
       { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
       { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
@@ -810,6 +814,56 @@
         ]
       },
       {
+        "from": "cli-rules-adapters",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-rules"
+        ]
+      },
+      {
+        "from": "cli-rules",
+        // cli.ts takes AppDeps from commands/ until step 14 moves deps.ts to the root, and
+        // explainRule from mcp/, which reads pages through page/.
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-project",
+          "cli-commands",
+          "cli-mcp"
+        ]
+      },
+      {
         "from": "cli-mcp",
         // cli.ts takes AppDeps and runPlan from commands/ until step 14 moves deps.ts to the root.
         "allow": [
@@ -831,7 +885,8 @@
           "cli-json",
           "cli-paths",
           "cli-project",
-          "cli-commands"
+          "cli-commands",
+          "cli-rules"
         ]
       },
       {
@@ -920,6 +975,8 @@
           "cli-lsp-adapters",
           "cli-mcp",
           "cli-mcp-adapters",
+          "cli-rules",
+          "cli-rules-adapters",
           "cli-runlog-adapters",
           "cli-init-adapters"
         ]
@@ -959,7 +1016,9 @@
           "cli-daemon",
           "cli-lsp",
           "cli-mcp",
-          "cli-mcp-adapters"
+          "cli-mcp-adapters",
+          "cli-rules",
+          "cli-rules-adapters"
         ]
       },
       // The client talks to VS Code and the binary only.

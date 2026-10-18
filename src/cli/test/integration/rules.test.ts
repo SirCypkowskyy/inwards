@@ -7,8 +7,8 @@
  */
 import { expect, test } from "bun:test";
 import { RULES } from "@inwards/core";
-import { RULE_PAGES } from "../../src/adapters/rule-pages.ts";
 import { explainRule } from "../../src/mcp/_explain-rule.ts";
+import { RULE_PAGES } from "../../src/rules/adapters/pages.ts";
 import { inwards, project } from "../support/run.ts";
 
 const CONFIG = `[tool.inwards]
