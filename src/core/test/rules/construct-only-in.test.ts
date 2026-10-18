@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { Diagnostic } from "../../src/index.ts";
-import { Engine, parseConfig } from "../../src/index.ts";
+import { baselineKey, Engine, parseConfig } from "../../src/index.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]
@@ -77,6 +77,16 @@ async function check(
 }
 
 /**
+ * Wraps a `construct-only-in` body in a config that turns INW015 on.
+ *
+ * @param options - the `[tool.inwards.rules.construct-only-in]` body, TOML.
+ * @returns the rules config.
+ */
+function withOptions(options: string): string {
+  return `[tool.inwards.rules]\nextend-select = ["INW015"]\n\n[tool.inwards.rules.construct-only-in]\n${options}\n`;
+}
+
+/**
  * Checks one file with INW015 on and keeps its findings.
  *
  * @param path - the checked file.
@@ -125,7 +135,7 @@ describe("INW015 construct-only-in", () => {
 
   test("SqlRepo() in an inbound adapter fails, on the import", async () => {
     expect(await inw015(INBOUND, REST)).toEqual([
-      "3:39 error `app.adapters.inbound.rest` imports `SqlRepo` from `app.adapters.outbound.sql`, a module of the role `app.adapters.outbound`, which only `app.di` and `app.main` may import. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
+      "3:39 error `app.adapters.inbound.rest` imports `SqlRepo` from `app.adapters.outbound.sql`, a module of the role `app.adapters.outbound`. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
     ]);
   });
 
@@ -225,7 +235,7 @@ def build():
     return SqlRepo()
 `;
     expect(await inw015(INBOUND, text, ROLE, extra)).toEqual([
-      "6:12 error `SqlRepo()` in `app.adapters.inbound.rest` builds `app.adapters.outbound.sql.SqlRepo`, a class of the role `app.adapters.outbound`, which only `app.di` and `app.main` may build. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
+      "6:12 error `SqlRepo()` in `app.adapters.inbound.rest` builds `app.adapters.outbound.sql.SqlRepo`, a class of the role `app.adapters.outbound`. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
     ]);
   });
 
@@ -280,7 +290,7 @@ REPO = sql.SqlRepo()
   test("without allowed-in, only the role itself may import it", async () => {
     const found = await inw015("app/di.py", REST, 'role = ["app.adapters.outbound"]');
     expect(found).toEqual([
-      "3:39 error `app.di` imports `SqlRepo` from `app.adapters.outbound.sql`, a module of the role `app.adapters.outbound`, which no module outside it may import. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
+      "3:39 error `app.di` imports `SqlRepo` from `app.adapters.outbound.sql`, a module of the role `app.adapters.outbound`. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
     ]);
   });
 
@@ -304,5 +314,32 @@ REPO = sql.SqlRepo()
       'import SqlRepo  # inwards: ignore[INW015] reason="moving to Depends next sprint"',
     );
     expect(await inw015(INBOUND, text)).toEqual([]);
+  });
+
+  test("editing role or allowed-in keeps the message and the baseline key (#410)", async () => {
+    const first = (await check(INBOUND, REST, withOptions(ROLE))).find((d) => d.code === "INW015");
+    const edited = (
+      await check(
+        INBOUND,
+        REST,
+        withOptions(`role = ["app.adapters.outbound", "app.*._cache"]\nallowed-in = ["app.di"]`),
+      )
+    ).find((d) => d.code === "INW015");
+    expect(first?.message).toBe(edited?.message);
+    expect(first?.message).not.toContain("app.di");
+    expect(first?.message).toContain("the role `app.adapters.outbound`");
+    if (first === undefined || edited === undefined) {
+      throw new Error("INW015 did not report");
+    }
+    expect(baselineKey(edited)).toBe(baselineKey(first));
+    // A baseline written before #410, with every entry in the message, still matches.
+    const old = {
+      ...first,
+      message: first.message.replace(
+        "the role `app.adapters.outbound`",
+        "the role `app.adapters.outbound` and `app.*._cache`, which only `app.di` may import",
+      ),
+    };
+    expect(baselineKey(old)).toBe(baselineKey(first));
   });
 });

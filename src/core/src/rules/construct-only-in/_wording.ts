@@ -7,6 +7,7 @@
  * `check.ts` and `calls.ts` found; it decides nothing.
  */
 import type { Node } from "web-tree-sitter";
+import { matchEntry } from "../../config/index.ts";
 import type {
   Diagnostic,
   Fix,
@@ -35,27 +36,17 @@ export interface Construction {
 }
 
 /**
- * Lists names in backticks, joined with "and".
- *
- * @param names - dotted names.
- * @returns e.g. "`app.di` and `app.main`".
- */
-function ticked(names: readonly string[]): string {
-  return joined(names.map((name) => `\`${name}\``));
-}
-
-/**
- * Says who may import and build the role, for the message.
+ * Says which role entry the module matched, for the message. The full `role`
+ * and `allowed-in` lists stay out of it (they are in the fix), so editing
+ * them doesn't change the finding's text or revive a baselined one (#410).
  *
  * @param scope - the role and `allowed-in`.
- * @param verb - "import" or "build".
- * @returns e.g. "a module of the role `app.adapters.outbound` that only `app.di` may import".
+ * @param owner - the role module reached.
+ * @returns e.g. "the role `app.*._store`".
  */
-function roleClause(scope: Scope, verb: "import" | "build"): string {
-  const role = `the role ${ticked(scope.role)}`;
-  return scope.allowed.length === 0
-    ? `${role}, which no module outside it may ${verb}`
-    : `${role}, which only ${ticked(scope.allowed)} may ${verb}`;
+function roleClause(scope: Scope, owner: string): string {
+  const entry = scope.role.find((e) => matchEntry(e, owner) !== undefined);
+  return `the role \`${entry ?? owner}\``;
 }
 
 /** The message's closing sentence: why it matters. */
@@ -135,7 +126,7 @@ export function reportImport(
   };
   return diagnostic(RULES.INW015, src, {
     span,
-    message: `\`${src.module}\` imports ${imported(ref, owner)}, a module of ${roleClause(scope, "import")}. ${WHY}`,
+    message: `\`${src.module}\` imports ${imported(ref, owner)}, a module of ${roleClause(scope, owner)}. ${WHY}`,
     fix,
   });
 }
@@ -166,7 +157,7 @@ export function reportConstruction(src: SourceFile, found: Construction, scope: 
   };
   return diagnostic(RULES.INW015, src, {
     span,
-    message: `\`${found.written}()\` in \`${src.module}\` builds \`${found.defined}\`, a class of ${roleClause(scope, "build")}. ${WHY}`,
+    message: `\`${found.written}()\` in \`${src.module}\` builds \`${found.defined}\`, a class of ${roleClause(scope, found.defined)}. ${WHY}`,
     fix,
   });
 }
