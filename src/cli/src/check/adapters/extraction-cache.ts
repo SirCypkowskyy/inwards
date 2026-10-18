@@ -4,7 +4,7 @@
  * the full parse's static imports, the suppression comments) under
  * `.inwards/cache/`, keyed by a SHA-256 of everything the extraction depends
  * on. It is local acceleration, never trusted for enforcement: the Claude Code
- * hooks never get one (see `adapters/compose.ts`).
+ * hooks never get one (see `compose.ts`).
  *
  * Reads treat anything odd as a miss: a symlink at any level, a non-regular or
  * oversized file, malformed JSON, a mismatched identity or shape. Writes go

@@ -16,7 +16,7 @@ import {
   type HookRequest,
   PROTOCOL,
 } from "../../src/hook/daemon/index.ts";
-import type { Git } from "../../src/platform/contracts.ts";
+import type { Git } from "../../src/shared/platform/contracts.ts";
 import { request, SELF } from "../support/daemon-helpers.ts";
 
 /**

@@ -1,5 +1,5 @@
 /**
- * @file The project file walk (`adapters/file-walk.ts`): what it skips and what
+ * @file The project file walk (`shared/adapters/file-walk.ts`): what it skips and what
  * it keeps. It walks build/dist/site inside packages, skips virtualenvs and
  * hidden directories, lists a file under every name Python could import it by,
  * survives symlink cycles, and never follows a link out of the directory it was
@@ -15,7 +15,7 @@ import {
   collectPythonFiles,
   collectPythonSources,
   nodeFileWalker,
-} from "../../src/adapters/file-walk.ts";
+} from "../../src/shared/adapters/file-walk.ts";
 import { tempDir } from "../support/temp.ts";
 
 test("walks build/dist/site inside packages, skips venvs and hidden dirs", () => {

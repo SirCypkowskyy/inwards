@@ -15,7 +15,7 @@ import {
   parseConfig,
   ruleLevel,
 } from "@inwards/core";
-import type { FileReader, PathProbe } from "../../platform/contracts.ts";
+import type { FileReader, PathProbe } from "../../shared/platform/contracts.ts";
 import { STYLES } from "../_presets.ts";
 import { readIfThere, upsertSection } from "../_section.ts";
 import { allowedImports, expandLayers, isStyle, type Style } from "../_styles.ts";

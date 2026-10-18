@@ -7,9 +7,9 @@
  */
 import { posix as posixPath, relative, resolve } from "node:path";
 import { type Format, parseConfig, type Report, render } from "@inwards/core";
-import { isInside, posix } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
+import { isInside, posix } from "../shared/paths/lexical.ts";
+import type { PathProbe } from "../shared/platform/contracts.ts";
+import { print } from "../shared/platform/print.ts";
 import { diskCacheWanted } from "./_check.ts";
 import { commandConfig, NO_CONFIG } from "./_config-discovery.ts";
 import { type CheckPlan, planCheck } from "./_routing.ts";

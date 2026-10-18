@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { budgetedGit } from "../../src/adapters/git.ts";
+import { budgetedGit } from "../../src/shared/adapters/git.ts";
 import { tempDir } from "../support/temp.ts";
 
 const BUDGET_MS = 300;

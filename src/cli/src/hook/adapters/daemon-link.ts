@@ -11,7 +11,7 @@ import { readFileSync, statSync } from "node:fs";
 import { createConnection } from "node:net";
 import { basename } from "node:path";
 import process from "node:process";
-import { runtimeEnv } from "../../adapters/runtime.ts";
+import { runtimeEnv } from "../../shared/adapters/runtime.ts";
 import type { AskResult, DaemonLink } from "../daemon/contracts.ts";
 
 const EXE_SUFFIX = /\.exe$/iu;

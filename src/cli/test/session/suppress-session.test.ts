@@ -9,8 +9,8 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { appendFileSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { nodeGit } from "../../src/adapters/git.ts";
 import { createStartContent } from "../../src/hook/session/index.ts";
+import { nodeGit } from "../../src/shared/adapters/git.ts";
 import { inwards, payload, project } from "../support/run.ts";
 import { git, ID, put, session, stop } from "../support/stop-helpers.ts";
 import {

@@ -8,15 +8,15 @@
  * import an adapter themselves.
  */
 
-import type { BaselineWriter, CheckRunner } from "../check/contracts.ts";
-import type { HookDeps } from "../hook/contracts.ts";
-import type { DaemonHost, DaemonLink } from "../hook/daemon/contracts.ts";
-import type { HookRequest } from "../hook/daemon/index.ts";
-import type { InitDeps } from "../init/contracts.ts";
-import type { Editor, LanguageServer, ServerCheck } from "../lsp/contracts.ts";
-import type { McpTools, RulePages } from "../mcp/contracts.ts";
-import type { Platform } from "../platform/contracts.ts";
-import type { ExportFiles } from "../runlog/contracts.ts";
+import type { BaselineWriter, CheckRunner } from "./check/contracts.ts";
+import type { HookDeps } from "./hook/contracts.ts";
+import type { DaemonHost, DaemonLink } from "./hook/daemon/contracts.ts";
+import type { HookRequest } from "./hook/daemon/index.ts";
+import type { InitDeps } from "./init/contracts.ts";
+import type { Editor, LanguageServer, ServerCheck } from "./lsp/contracts.ts";
+import type { McpTools, RulePages } from "./mcp/contracts.ts";
+import type { ExportFiles } from "./runlog/contracts.ts";
+import type { Platform } from "./shared/platform/contracts.ts";
 
 /** What the hook and `inwards daemon` need for the resident process. */
 export interface DaemonDeps {

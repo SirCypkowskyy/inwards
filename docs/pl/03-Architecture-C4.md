@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 542f6978e62d7cc3462962cd36c6c7beb3532b87bb1cbc32cf73a6a3f62d933e
+source_hash: e5b32b00a35c4711332fa2bfe5d2849697e8c118b564bf247d471c07f94322a2
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -526,8 +526,10 @@ src/
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
-│   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # AppDeps and DaemonDeps, the usage text
+│   │   ├── main.ts        # argv, then a command with the wired adapters
+│   │   ├── compose.ts     # wires the adapters into AppDeps (the composition root with main.ts)
+│   │   ├── deps.ts        # AppDeps and DaemonDeps
+│   │   ├── usage.ts       # the help text
 │   │   ├── hook/          # inwards hook claude-code, a slice (ADR-047): index.ts its face, cli.ts
 │   │   │                  #   the handler, contracts.ts (HookDeps, hookProject, ASK_USER and the
 │   │   │                  #   session record's shapes; the eval reads it); claude-code/ the hook
@@ -567,12 +569,12 @@ src/
 │   │   │                  #   (_*.ts); brief/ (inwards context), diagram/ (inwards diagram and
 │   │   │                  #   import-diagram), import-linter/ (inwards import-config);
 │   │   │                  #   adapters/ the init file writer and the style picker
-│   │   ├── paths/         # lexical path text, the physical meaning of `..`, display paths
-│   │   ├── platform/      # the contracts for everything outside the process, and print()
-│   │   ├── json/          # type guards for parsed JSON and TOML
-│   │   └── adapters/      # node:fs, git, the environment, stdio, state files,
-│   │                      #   the grammars,
-│   │                      #   compose.ts wires them into AppDeps
+│   │   └── shared/        # the kernel every slice may use
+│   │       ├── paths/     # lexical path text, the physical meaning of `..`, display paths
+│   │       ├── platform/  # the contracts for everything outside the process, and print()
+│   │       ├── json/      # type guards for parsed JSON and TOML
+│   │       └── adapters/  # node:fs, git, the environment, stdio, TOML, the grammars,
+│   │                      #   the file walk, the .d.ts typings
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/
     ├── src/client/        # extension.ts (settings, starts inwards server), binary.ts (which

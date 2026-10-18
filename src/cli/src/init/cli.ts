@@ -9,7 +9,7 @@
  */
 import { dirname } from "node:path";
 import { parseConfig, VERSION } from "@inwards/core";
-import { print } from "../platform/print.ts";
+import { print } from "../shared/platform/print.ts";
 import { agentChanges, apply, DEFAULT_IGNORE, initCommand, PRERELEASE } from "./_agents.ts";
 import { autoCommand } from "./_auto-command.ts";
 import { STYLES } from "./_presets.ts";

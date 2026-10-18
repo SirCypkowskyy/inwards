@@ -14,7 +14,13 @@ import type {
   Report,
   TreeReuse,
 } from "@inwards/core";
-import type { Clock, FileReader, FileWalker, PathProbe, Platform } from "../platform/contracts.ts";
+import type {
+  Clock,
+  FileReader,
+  FileWalker,
+  PathProbe,
+  Platform,
+} from "../shared/platform/contracts.ts";
 
 /** Replacing a committed file in place without writing through a planted symlink. */
 export interface BaselineWriter {

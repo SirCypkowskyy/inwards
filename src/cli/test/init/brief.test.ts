@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseConfig } from "@inwards/core";
-import { nodePlatform } from "../../src/adapters/compose.ts";
+import { nodePlatform } from "../../src/compose.ts";
 import { STYLES } from "../../src/init/_presets.ts";
 import { configTable } from "../../src/init/_style-text.ts";
 import { STYLE_NAMES } from "../../src/init/_styles.ts";

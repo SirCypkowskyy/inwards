@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * @file The `inwards` command line: the composition root. It reads the process
- * environment once, has `adapters/compose.ts` build one invocation's
+ * environment once, has `compose.ts` build one invocation's
  * `AppDeps` from the real adapters, parses argv, and hands off to a command
  * (`commands/`). Nothing below it imports a concrete adapter; everything
  * receives what it needs as parameters. Run as a worker thread (a large
@@ -11,12 +11,10 @@ import process from "node:process";
 import { parseArgs } from "node:util";
 import { isMainThread } from "node:worker_threads";
 import { ConfigError, VERSION } from "@inwards/core";
-import { compose } from "./adapters/compose.ts";
-import { processStreams } from "./adapters/stdio.ts";
 import { serveExtractions } from "./check/adapters/extraction-worker.ts";
 import { baselineCommand, checkCommand } from "./check/index.ts";
-import type { AppDeps } from "./commands/deps.ts";
-import { type Command, commandUsage, isCommand, overview } from "./commands/usage.ts";
+import { compose } from "./compose.ts";
+import type { AppDeps } from "./deps.ts";
 import { daemonCommand, hookClaudeCode } from "./hook/index.ts";
 import type { InitFlags } from "./init/contracts.ts";
 import {
@@ -28,9 +26,11 @@ import {
 } from "./init/index.ts";
 import { serverCommand } from "./lsp/index.ts";
 import { mcpCommand } from "./mcp/index.ts";
-import { print } from "./platform/print.ts";
 import { ruleCommand, rulesCommand } from "./rules/index.ts";
 import { statsCommand } from "./runlog/index.ts";
+import { processStreams } from "./shared/adapters/stdio.ts";
+import { print } from "./shared/platform/print.ts";
+import { type Command, commandUsage, isCommand, overview } from "./usage.ts";
 
 // Exit codes follow Ruff: 0 clean (warnings allowed), 1 errors, 2 usage or config error.
 const OPTIONS = {

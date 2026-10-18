@@ -16,31 +16,31 @@ import {
   type GrammarBinaries,
   type Report,
 } from "@inwards/core";
-import { nodeBaselineWriter } from "../check/adapters/baseline-files.ts";
-import { fileExtractionCache } from "../check/adapters/extraction-cache.ts";
-import { startExtractionPool } from "../check/adapters/extraction-pool.ts";
-import type { CheckRunner, ExtractionPool, ProjectIo } from "../check/contracts.ts";
-import { overlayTexts, runCheck } from "../check/index.ts";
-import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
-import { nodeDaemonHost } from "../hook/adapters/daemon-host.ts";
-import { nodeDaemonLink } from "../hook/adapters/daemon-link.ts";
-import { nodeStateFiles } from "../hook/adapters/state-files.ts";
-import type { HookRequest } from "../hook/daemon/index.ts";
-import { commitKeyedGit, daemonExtractionCache } from "../hook/daemon/index.ts";
-import { nodeInitFiles } from "../init/adapters/files.ts";
-import { terminalPicker } from "../init/adapters/picker.ts";
-import type { ServerCheck } from "../lsp/contracts.ts";
-import type { RulePages } from "../mcp/contracts.ts";
-import type { Clock, Platform, Streams } from "../platform/contracts.ts";
-import { nodeExportFiles } from "../runlog/adapters/export-files.ts";
-import { createRunLog } from "../runlog/index.ts";
-import { nodeFileWalker } from "./file-walk.ts";
-import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
-import { budgetedGit, nodeGit } from "./git.ts";
-import { loadGrammars } from "./grammars.ts";
-import { readRuntime, runtimeFrom, systemClock } from "./runtime.ts";
-import { processStreams } from "./stdio.ts";
-import { parseToml } from "./toml.ts";
+import { nodeBaselineWriter } from "./check/adapters/baseline-files.ts";
+import { fileExtractionCache } from "./check/adapters/extraction-cache.ts";
+import { startExtractionPool } from "./check/adapters/extraction-pool.ts";
+import type { CheckRunner, ExtractionPool, ProjectIo } from "./check/contracts.ts";
+import { overlayTexts, runCheck } from "./check/index.ts";
+import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "./deps.ts";
+import { nodeDaemonHost } from "./hook/adapters/daemon-host.ts";
+import { nodeDaemonLink } from "./hook/adapters/daemon-link.ts";
+import { nodeStateFiles } from "./hook/adapters/state-files.ts";
+import type { HookRequest } from "./hook/daemon/index.ts";
+import { commitKeyedGit, daemonExtractionCache } from "./hook/daemon/index.ts";
+import { nodeInitFiles } from "./init/adapters/files.ts";
+import { terminalPicker } from "./init/adapters/picker.ts";
+import type { ServerCheck } from "./lsp/contracts.ts";
+import type { RulePages } from "./mcp/contracts.ts";
+import { nodeExportFiles } from "./runlog/adapters/export-files.ts";
+import { createRunLog } from "./runlog/index.ts";
+import { nodeFileWalker } from "./shared/adapters/file-walk.ts";
+import { nodeFileReader, nodePathProbe } from "./shared/adapters/filesystem.ts";
+import { budgetedGit, nodeGit } from "./shared/adapters/git.ts";
+import { loadGrammars } from "./shared/adapters/grammars.ts";
+import { readRuntime, runtimeFrom, systemClock } from "./shared/adapters/runtime.ts";
+import { processStreams } from "./shared/adapters/stdio.ts";
+import { parseToml } from "./shared/adapters/toml.ts";
+import type { Clock, Platform, Streams } from "./shared/platform/contracts.ts";
 
 /**
  * The platform on the real process: filesystem, git, clock, environment,
@@ -98,7 +98,7 @@ export function compose(workerEntry?: string): AppDeps {
   const io = nodePlatform();
   // One process runs one command, so the kept parse lives as long as this invocation.
   const project = { ...nodeProjectIo(io, workerEntry), reuse: createTreeReuse() };
-  const entry = resolve(import.meta.dir, "../main.ts");
+  const entry = resolve(import.meta.dir, "./main.ts");
   return {
     io,
     runlog: createRunLog(io),
@@ -164,7 +164,7 @@ function nodeLsp(io: Platform): LspDeps {
   return {
     serve: async (build: Parameters<LspDeps["serve"]>[0]): Promise<number> => {
       // A split chunk in the binary, loaded on use (as the init picker is, ADR-020).
-      const { serveLsp } = await import("../lsp/adapters/connection.ts");
+      const { serveLsp } = await import("./lsp/adapters/connection.ts");
       return await serveLsp(build);
     },
     check: (
@@ -192,10 +192,10 @@ function nodeMcp(io: Platform): McpDeps {
   return {
     io: platform,
     serve: async (tools: Parameters<McpDeps["serve"]>[0]): Promise<number> => {
-      const { serveMcp } = await import("../mcp/adapters/connection.ts");
+      const { serveMcp } = await import("./mcp/adapters/connection.ts");
       return await serveMcp(tools);
     },
-    pages: async (): Promise<RulePages> => (await import("../rules/adapters/pages.ts")).RULE_PAGES,
+    pages: async (): Promise<RulePages> => (await import("./rules/adapters/pages.ts")).RULE_PAGES,
     check: (
       configPath: string,
       targets: string[] | undefined,

@@ -7,7 +7,7 @@
  */
 import { expect, test } from "bun:test";
 import { VERSION } from "@inwards/core";
-import { COMMANDS } from "../../src/commands/usage.ts";
+import { COMMANDS } from "../../src/usage.ts";
 import { inwards, LAYERS, project, type RunResult } from "../support/run.ts";
 
 const empty = project({ "README.md": "hi" });

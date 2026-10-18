@@ -14,8 +14,8 @@
  * the `PathProbe` contract.
  */
 import { dirname, join, normalize, relative, resolve } from "node:path";
-import { posix } from "../../../paths/lexical.ts";
-import type { PathProbe } from "../../../platform/contracts.ts";
+import { posix } from "../../../shared/paths/lexical.ts";
+import type { PathProbe } from "../../../shared/platform/contracts.ts";
 import type { Check, Start } from "../../contracts.ts";
 
 /** Start identity questions, answered with a per-invocation cache. */

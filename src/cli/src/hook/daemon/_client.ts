@@ -10,8 +10,14 @@
  * It never decides a hook's result itself: either the daemon ran the same
  * handler, or the caller runs it here.
  */
-import type { Clock, PathProbe, Runtime, StateFiles, Streams } from "../../platform/contracts.ts";
-import { parseTime } from "../../platform/time.ts";
+import type {
+  Clock,
+  PathProbe,
+  Runtime,
+  StateFiles,
+  Streams,
+} from "../../shared/platform/contracts.ts";
+import { parseTime } from "../../shared/platform/time.ts";
 import {
   type DaemonAnswer,
   type DaemonFailure,

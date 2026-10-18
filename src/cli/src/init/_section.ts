@@ -6,7 +6,7 @@
  * and reader, and writing is left to the caller. It also says what goes
  * between a pyproject.toml and a `[tool.inwards]` table appended to it.
  */
-import type { FileReader, PathProbe } from "../platform/contracts.ts";
+import type { FileReader, PathProbe } from "../shared/platform/contracts.ts";
 
 /**
  * Adds a marked section at the end of a file's text, or replaces the one

@@ -28,8 +28,8 @@ import {
   packagesOf,
 } from "@inwards/core";
 import { linksUnder } from "../../../check/index.ts";
-import { isInside, posix } from "../../../paths/lexical.ts";
-import type { PathProbe } from "../../../platform/contracts.ts";
+import { isInside, posix } from "../../../shared/paths/lexical.ts";
+import type { PathProbe } from "../../../shared/platform/contracts.ts";
 import type { StartIdentity } from "../commands/index.ts";
 
 /**

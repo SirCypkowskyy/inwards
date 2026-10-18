@@ -10,17 +10,18 @@
  * let a policy folder reach the filesystem directly.
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import process from "node:process";
 import type { Diagnostic } from "@inwards/core";
 import { lintAs, misnamed } from "../../../core/test/support/architecture.ts";
-import { compose, nodePlatform } from "../../src/adapters/compose.ts";
 import { baselineCommand, checkCommand } from "../../src/check/index.ts";
-import type { AppDeps } from "../../src/commands/deps.ts";
+import { compose, nodePlatform } from "../../src/compose.ts";
+import type { AppDeps } from "../../src/deps.ts";
 import { createStartIdentity } from "../../src/hook/session/index.ts";
 import { createRunLog, statsCommand } from "../../src/runlog/index.ts";
 import { project } from "../support/run.ts";
+import { zonedFolders } from "../support/zones.ts";
 
 const REPO = resolve(import.meta.dir, "../../../..");
 const SRC = join(REPO, "src/cli/src");
@@ -28,7 +29,7 @@ const FALLOW = join(REPO, "node_modules/.bin/fallow");
 /** Folders that hold policy: no I/O of their own, no concrete adapters. */
 const POLICY = [
   "check",
-  "commands",
+  "deps",
   "hook",
   "init",
   "json",
@@ -239,14 +240,17 @@ describe("boundaries", () => {
     }
     // Adapters implement the Clock, so they may name Date.
     const adapter = lintAs(
-      "src/cli/src/adapters/probe.ts",
+      "src/cli/src/shared/adapters/probe.ts",
       "/** Stamps. */\nexport const now = (): string => new Date().toISOString();\n",
     );
     expect(adapter.out).not.toContain("noRestrictedGlobals");
   });
 
   test("an adapter, shared or a slice's own, may import node:fs", () => {
-    for (const path of ["src/cli/src/adapters/probe.ts", "src/cli/src/lsp/adapters/probe.ts"]) {
+    for (const path of [
+      "src/cli/src/shared/adapters/probe.ts",
+      "src/cli/src/lsp/adapters/probe.ts",
+    ]) {
       const adapter = lintAs(
         path,
         'import { readFileSync } from "node:fs";\n\n/** Reads. */\nexport const read = readFileSync;\n',
@@ -270,11 +274,8 @@ describe("boundaries", () => {
     const text = readFileSync(join(REPO, ".fallowrc.jsonc"), "utf8").replace(/^\s*\/\/.*$/gmu, "");
     const config: FallowConfig = JSON.parse(text);
     const patterns = config.boundaries.zones.flatMap((zone) => zone.patterns);
-    const folders = readdirSync(SRC, { withFileTypes: true }).filter((entry) =>
-      entry.isDirectory(),
-    );
-    for (const folder of folders) {
-      expect(patterns).toContain(`src/cli/src/${folder.name}/**`);
+    for (const folder of zonedFolders(SRC)) {
+      expect(patterns).toContain(`src/cli/src/${folder}/**`);
     }
     const policyZones = new Set(POLICY.map((folder) => `cli-${folder}`));
     for (const rule of config.boundaries.rules.filter((r) => policyZones.has(r.from))) {

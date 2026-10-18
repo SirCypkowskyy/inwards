@@ -7,7 +7,7 @@
  */
 import { basename } from "node:path";
 import { LAUNCHER } from "../hook/claude-code/index.ts";
-import { print } from "../platform/print.ts";
+import { print } from "../shared/platform/print.ts";
 import type { InitContext } from "./contracts.ts";
 
 /** How to start this Inwards without a shell: an executable and its leading arguments. */

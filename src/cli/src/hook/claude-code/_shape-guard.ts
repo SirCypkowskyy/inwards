@@ -15,8 +15,8 @@
 import { dirname, relative, resolve } from "node:path";
 import { checkShape, type Diagnostic, moduleNameFor, parseConfig } from "@inwards/core";
 import { findConfig, projectPath } from "../../check/index.ts";
-import { isRecord } from "../../json/guards.ts";
-import { isInside, posix } from "../../paths/lexical.ts";
+import { isRecord } from "../../shared/json/guards.ts";
+import { isInside, posix } from "../../shared/paths/lexical.ts";
 import { type HookDeps, hookProject } from "../contracts.ts";
 import { isSessionId, readSessionStart } from "../session/index.ts";
 import { landingPath, lexicalPath } from "./_edit-simulation.ts";

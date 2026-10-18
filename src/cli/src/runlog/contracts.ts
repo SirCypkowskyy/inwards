@@ -3,7 +3,7 @@
  * the project's export key, kept and read without following symlinks, and a
  * file written for the owner only. Types only.
  */
-import type { Platform } from "../platform/contracts.ts";
+import type { Platform } from "../shared/platform/contracts.ts";
 
 /** Storage for `--export`. */
 export interface ExportFiles {

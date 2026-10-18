@@ -8,8 +8,8 @@
  * (`DaemonHost`, `DaemonLink`); what a request means is `hook/daemon/_server.ts`.
  */
 import { ConfigError, VERSION } from "@inwards/core";
-import type { AppDeps, DaemonDeps } from "../../commands/deps.ts";
-import { print } from "../../platform/print.ts";
+import type { AppDeps, DaemonDeps } from "../../deps.ts";
+import { print } from "../../shared/platform/print.ts";
 import { hookClaudeCode } from "../cli.ts";
 import { hookProject } from "../contracts.ts";
 import { askDaemon, BACKOFF_MS, holdsLock } from "./_client.ts";

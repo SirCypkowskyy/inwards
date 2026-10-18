@@ -20,8 +20,8 @@ import {
   parseConfig,
   ruleLevel,
 } from "@inwards/core";
-import { isInside, posix } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
+import { isInside, posix } from "../shared/paths/lexical.ts";
+import type { PathProbe } from "../shared/platform/contracts.ts";
 import type { ProjectIo } from "./contracts.ts";
 
 /** The rules that read diagrams. */

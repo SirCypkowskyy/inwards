@@ -6,7 +6,7 @@
  * writes through init's file writer.
  */
 import { ConfigError, declaresInwards, parseConfig } from "@inwards/core";
-import type { AppDeps } from "../commands/deps.ts";
+import type { AppDeps } from "../deps.ts";
 import { appendSeparator } from "./_section.ts";
 import { shown } from "./_target.ts";
 

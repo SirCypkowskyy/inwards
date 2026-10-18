@@ -14,8 +14,8 @@
  */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { isRecord } from "../../../json/guards.ts";
-import type { FileReader, Git, PathProbe, StateFiles } from "../../../platform/contracts.ts";
+import { isRecord } from "../../../shared/json/guards.ts";
+import type { FileReader, Git, PathProbe, StateFiles } from "../../../shared/platform/contracts.ts";
 import { createStartIdentity } from "./_start-identity.ts";
 
 /** The largest file copied, in bytes (512 KiB). */

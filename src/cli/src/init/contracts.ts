@@ -9,7 +9,7 @@
  */
 
 import type { CheckRunner } from "../check/contracts.ts";
-import type { Platform } from "../platform/contracts.ts";
+import type { Platform } from "../shared/platform/contracts.ts";
 import type { StyleName } from "./_styles.ts";
 
 /** The agents `inwards init --agent` can wire Inwards into. */

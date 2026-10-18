@@ -9,8 +9,8 @@
 
 import type { InwardsConfig } from "@inwards/core";
 import type { CheckRunner } from "../check/contracts.ts";
-import type { Platform, Runtime } from "../platform/contracts.ts";
 import type { RunLog } from "../runlog/index.ts";
+import type { Platform, Runtime } from "../shared/platform/contracts.ts";
 
 /** Ends every denial. The agent eval (eval/evidence.ts) counts denials by it. */
 export const ASK_USER = "If this really must change, stop and ask the user to do it.";

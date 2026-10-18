@@ -14,11 +14,11 @@ import {
   type GrammarBinaries,
   type Report,
 } from "@inwards/core";
-import { nodePlatform, nodeProjectIo } from "../../src/adapters/compose.ts";
-import { loadGrammars } from "../../src/adapters/grammars.ts";
 import { runCheck } from "../../src/check/_check.ts";
 import { MIN_PARALLEL_FILES } from "../../src/check/_threads.ts";
 import type { ExtractionPool, ProjectIo } from "../../src/check/contracts.ts";
+import { nodePlatform, nodeProjectIo } from "../../src/compose.ts";
+import { loadGrammars } from "../../src/shared/adapters/grammars.ts";
 import { LAYERS, project } from "../support/run.ts";
 
 const local: (job: ExtractionJob) => ExtractionAnswer = await createExtractionWorker(

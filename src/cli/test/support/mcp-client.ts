@@ -8,7 +8,7 @@
  */
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { compose } from "../../src/adapters/compose.ts";
+import { compose } from "../../src/compose.ts";
 import { createMcpServer } from "../../src/mcp/adapters/connection.ts";
 import { mcpTools } from "../../src/mcp/cli.ts";
 import { CMD, TEST_ENV } from "./run.ts";

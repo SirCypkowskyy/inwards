@@ -8,10 +8,10 @@
  */
 import type { Report } from "@inwards/core";
 import { overlayTexts, planCheck, runPlan } from "../check/index.ts";
-import type { AppDeps } from "../commands/deps.ts";
+import type { AppDeps } from "../deps.ts";
 import type { McpCheck, McpTools } from "../mcp/contracts.ts";
-import type { Streams } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
+import type { Streams } from "../shared/platform/contracts.ts";
+import { print } from "../shared/platform/print.ts";
 import { createTools } from "./_tools.ts";
 
 /**

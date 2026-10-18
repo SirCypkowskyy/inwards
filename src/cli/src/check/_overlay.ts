@@ -16,7 +16,7 @@ import type {
   PathKind,
   PathProbe,
   WalkedFile,
-} from "../platform/contracts.ts";
+} from "../shared/platform/contracts.ts";
 import { atOrInside } from "./_sources.ts";
 import type { ProjectIo } from "./contracts.ts";
 

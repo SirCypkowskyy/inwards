@@ -16,8 +16,8 @@ import {
   parseConfig,
   topLevelModules,
 } from "@inwards/core";
-import { posix } from "../paths/lexical.ts";
-import type { FileReader, FileWalker, PathProbe } from "../platform/contracts.ts";
+import { posix } from "../shared/paths/lexical.ts";
+import type { FileReader, FileWalker, PathProbe } from "../shared/platform/contracts.ts";
 import { layerDirs } from "./_check.ts";
 import { layerLinks } from "./_links.ts";
 
