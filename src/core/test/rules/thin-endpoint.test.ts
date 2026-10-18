@@ -263,6 +263,32 @@ async def report(rows: list[int]):
     ).toEqual([`15 warning \`report\` is an HTTP endpoint with 3 loops over data. ${TAIL}`]);
   });
 
+  test("does not count loops that yield: a streaming endpoint's keep-alive (#415)", async () => {
+    const stream = `
+@router.get("/stream")
+async def stream(cursor: int = 0):
+    while True:
+        for event in await events_after(cursor):
+            cursor = event.id
+            yield event
+        await asyncio.sleep(1)
+`;
+    expect(await inw012(stream)).toEqual([]);
+    const plain = `
+@router.get("/")
+async def plain(rows: list[int]):
+    for row in rows:
+        total = row
+    def gen():
+        for r in rows:
+            yield r
+    return total
+`;
+    expect(await inw012(plain)).toEqual([
+      `15 warning \`plain\` is an HTTP endpoint with 1 loop over data. ${TAIL}`,
+    ]);
+  });
+
   test("counts a nested function as one statement and skips its body", async () => {
     const body = `
 @router.get("/")

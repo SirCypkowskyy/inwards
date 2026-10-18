@@ -188,6 +188,29 @@ function blocksOf(statement: Node, raisesHttp: RaisesHttp): { block: Node; branc
 }
 
 /**
+ * Tells whether a statement holds a `yield` of the endpoint's own scope. A
+ * loop that yields is how a streaming endpoint (server-sent events, a
+ * streamed download) produces its response, so it is the response's shape,
+ * not a loop over data; that goes for the keep-alive `while True:` around
+ * the `for ... yield` too (#415).
+ *
+ * @param statement - a compound statement.
+ * @returns true when a `yield` sits inside it, nested scopes left out.
+ */
+function yields(statement: Node): boolean {
+  const stack = [statement];
+  for (let node = stack.pop(); node; node = stack.pop()) {
+    if (node.type === "yield") {
+      return true;
+    }
+    if (!SCOPES.has(node.type)) {
+      stack.push(...namedChildren(node));
+    }
+  }
+  return false;
+}
+
+/**
  * Counts one compound statement: its nesting level, its own branch or loop,
  * and the blocks it holds, each walked one level deeper.
  *
@@ -199,7 +222,7 @@ function countCompound(statement: Node, depth: number, tally: Tally): void {
   tally.nesting = Math.max(tally.nesting, depth + 1);
   tally.branches += statement.type === "if_statement" ? 1 : 0;
   const loop = statement.type === "for_statement" || statement.type === "while_statement";
-  tally.loops += loop ? 1 : 0;
+  tally.loops += loop && !yields(statement) ? 1 : 0;
   for (const { block, branch } of blocksOf(statement, tally.raisesHttp)) {
     tally.branches += branch ? 1 : 0;
     walk(block, depth + 1, tally);
