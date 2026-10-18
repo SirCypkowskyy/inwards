@@ -32,6 +32,14 @@ const WORKSPACE_PACKAGE =
  */
 const IMPORT_LINE = /(?<head> in the code \([^\n]*?):\d+(?= imports )/u;
 
+/**
+ * INW015 named every `role` and `allowed-in` entry before #410, so editing
+ * either list changed the message. Only the role clause is dropped, and
+ * older baselines keep matching.
+ */
+const ROLE_CLAUSE =
+  /(?<head>, a (?:module|class) of the role)[^\n]*?(?=\. A module that uses the adapter)/u;
+
 /** The rules whose messages end with the layer order. */
 const WITH_DIRECTION: ReadonlySet<string> = new Set(["INW001", "INW011"]);
 
@@ -56,6 +64,9 @@ export function stableMessage({ code, message }: Pick<Diagnostic, "code" | "mess
   }
   if (code === "INW019") {
     return message.replace(IMPORT_LINE, "$<head>");
+  }
+  if (code === "INW015") {
+    return message.replace(ROLE_CLAUSE, "$<head>");
   }
   return code === "INW006" ? message.replace(UNCHECKED, ".") : message;
 }
