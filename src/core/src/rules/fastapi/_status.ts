@@ -6,7 +6,7 @@
  * quiet about it. Names are resolved by the caller's lookup; nothing here
  * reads a file.
  */
-import type { Value } from "./values.ts";
+import type { Value } from "./model/index.ts";
 
 /** A status constant such as `HTTP_404_NOT_FOUND`, which spells its code. */
 const STATUS_NAME = /^HTTP_(?<code>\d{3})(?:_|$)/u;

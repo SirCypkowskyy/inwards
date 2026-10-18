@@ -20,7 +20,7 @@ can't lean on either runtime.
 | `python/` | tree-sitter parsing, import extraction, module names, the prescan, PEP 263 encodings, literals, stdlib names | know about layers or rules |
 | `lookup/` | the module index (`ProjectIndex`), module lookup, the directory-listing ports | decide what is a violation |
 | `diagram/` | the readers for marked architecture diagrams (ADR-045): finding the blocks (`blocks`, `plantuml-blocks`), the Mermaid and PlantUML readers (`mermaid` with `syntax`, `plantuml` with `plantuml-syntax` and `plantuml-skip`), the one model both read into (`model`, `read`), what a node names (`names`), the notation a fix hint uses (`notation`), the config `inwards import-diagram` reads out of a diagram (`draft`), and the writer that draws the config as a diagram for `inwards diagram` (`write`) | know about layers' imports or report a finding (INW017 to INW019 do) |
-| `rules/` | one folder per rule, named after the rule (`index.ts` its face, `_` modules behind it; `fastapi/` keeps its layout until its own step); `shared/` for what several rules need | import another rule |
+| `rules/` | one folder per rule, named after the rule (`index.ts` its face, `_` modules behind it; `fastapi/` also holds a `model/` mini-domain, the FAPI rules' shared model); `shared/` for what several rules need | import another rule |
 | `baseline/` | baseline keys and which modules a baseline accepts in full | render or write anything |
 | `engine/` | the facade: order of the checks, rule precedence, suppressions, the baseline shortcut | hold a rule's logic |
 | `report/` | text, concise, JSON and SARIF rendering, and GitHub Actions workflow commands (`github.ts`) | decide severities or filter findings |
@@ -71,6 +71,9 @@ layout above. A migrated slice holds only these names:
   names (`_check.ts`, `_wording.ts`).
 - `contracts.ts`: the records and ports the slice owns.
 - `*.d.ts` typings, and subfolders (mini-domains) with their own `index.ts`.
+  `rules/fastapi/model/` is one: it holds the shared model and the extraction it
+  builds on (values, handlers, route classes), so the rules above it import
+  `model/index.ts` and nothing flows back down (no import cycle).
 
 Biome refuses an import of another folder's `_x.ts` (`noRestrictedImports`
 in the engine's override): `./_x.ts` and `../_x.ts` pass, `../other/_x.ts`

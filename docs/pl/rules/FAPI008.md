@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI008.md
-source_hash: 8d3ce0d198d4117ff1e13c22cdee11650f7cfea5db04a2a93303deb4d4cbc3e7
+source_hash: 3da2d6d758ab0d28735596f97c30be58a8fc2e66b79a1af5bbb6f765c9f75b99
 type: rule
 title: FAPI008 duplicate-operation-id
 description: Żadne dwie operacje ścieżki jednej aplikacji FastAPI nie mają tego samego jawnego operation_id, więc wygenerowani klienci dostają jedną metodę na operację.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/duplicate-operation-id.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_duplicate-operation-id.ts
 timestamp: 2026-10-09T18:00:00Z
 related_issues: [186, 184, 227]
 ---

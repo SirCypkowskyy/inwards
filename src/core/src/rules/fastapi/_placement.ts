@@ -11,10 +11,9 @@
  * Where several inclusions lead to one router, a code declared on any of them
  * counts, for the same reason.
  */
-import type { FastApiProject } from "./project.ts";
-import type { FastApiObject } from "./records.ts";
-import { statusCode } from "./status.ts";
-import type { Argument, CallSyntax, Value } from "./values.ts";
+
+import { statusCode } from "./_status.ts";
+import type { Argument, CallSyntax, FastApiObject, FastApiProject, Value } from "./model/index.ts";
 
 /** What sits above a path operation. */
 export interface Placement {

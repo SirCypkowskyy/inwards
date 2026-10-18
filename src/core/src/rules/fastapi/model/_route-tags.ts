@@ -7,12 +7,12 @@
  * leaves the set open. It reads no file; the project lookups do.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
-import type { Definition } from "./model.ts";
-import type { FastApiObject, Wiring } from "./records.ts";
-import { join, stringText, type TagSet } from "./schema-rule.ts";
-import type { Value } from "./values.ts";
+import { identifierName, namedChildren } from "../../../python/nodes.ts";
+import type { Qualify } from "../../../python/qualify.ts";
+import type { Definition } from "./_model.ts";
+import type { FastApiObject, Wiring } from "./_records.ts";
+import { join, stringText, type TagSet } from "./_schema-rule.ts";
+import type { Value } from "./_values.ts";
 
 /** How many inclusion paths above a router are read before its tags count as unknown. */
 const MAX_PATHS = 64;

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI006.md
-source_hash: 897edcf7d2d5186b131377a27b041a1b75b8eb900d9f7c62c739a0a601efcbda
+source_hash: be6d017b514d96683f2bc079184b77f9571592e32fbd4db9d00fc59c9c12a430
 type: rule
 title: FAPI006 lifespan-events
 description: Aplikacje FastAPI używają menedżera kontekstu lifespan, a nie przestarzałych handlerów on_event, i nigdy obu naraz, więc każdy handler startu i zamknięcia się wykonuje.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/lifespan-events.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_lifespan-events.ts
 timestamp: 2026-10-09T18:00:00Z
 related_issues: [186, 225]
 ---

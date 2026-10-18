@@ -423,14 +423,14 @@ The rules are grouped by category, in the order the [rules index](rules/index.md
 |---|---|---|---|---|---|---|
 | FAPI001 | `endpoint-metadata` | A FastAPI path operation in the schema without the OpenAPI metadata the project requires: a summary or docstring, a response model, an explicit status code on `POST` and `DELETE`, a `description` in each `responses=` entry, and optionally tags and `operation_id`. One finding per endpoint, on the decorator | opt-in | error | fastapi | :material-check-circle: |
 | FAPI002 | `undocumented-error-response` | A FastAPI path operation that can produce an error status code its OpenAPI entry doesn't declare: raised or returned in the endpoint, in same-file or imported helpers and dependencies up to `max-depth` calls, or from a first-party exception an app handler maps to a code. Declarations on the decorator, the router, the inclusions above it and the app count; anything Inwards can't read keeps it quiet | opt-in | error | fastapi | :material-check-circle: |
-| FAPI003 | `router-wiring` | An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | opt-in | error | fastapi | :material-check-circle: |
+| FAPI003 | `router-wiring` | An `APIRouter` with routes that no app reaches through `include_router` or `mount` (a warning when some `include_router` can't be resolved), routers that include each other in a cycle, and an `include_router` above the included router's routes in one file. Names are resolved across files through the model; the app and router graph (`rules/fastapi/model/_graph.ts`) is built only when a checked file holds a router or an inclusion. The per-edit hook reports only the one-file cases; the Stop gate reports unmounted routers the session created or changed | opt-in | error | fastapi | :material-check-circle: |
 | FAPI005 | `route-shadowing` | A path operation that an earlier one with the same method already answers: `/users/{id}` above `/users/me`, or the same method and path twice, on one router or across the routers an app includes with literal prefixes (full paths, in the order FastAPI holds the routes). Anything that is not a literal (a path, a method list, a prefix) is skipped. The per-edit hook reports only the one-router cases; the cross-router ones wait for the Stop gate | opt-in | error | fastapi | :material-check-circle: |
 | FAPI006 | `lifespan-events` | A deprecated startup or shutdown event: `@app.on_event(...)`, `add_event_handler` or `on_startup=` / `on_shutdown=` (a warning), and the same on an app, or a router an app includes, that sets `lifespan=`, where FastAPI never runs the handler (an error). The receiver is resolved across files through the model. The per-edit hook doesn't walk up the router graph, so a router's handler stays a warning there | opt-in | error | fastapi | :material-check-circle: |
 | FAPI007 | `yield-dependency-swallows` | A first-party generator function with a `yield` inside a `try` whose `except` clause doesn't raise on every path, so an error from the endpoint is hidden from the server. One function at a time, with no model and no call graph; context managers and fixtures are skipped. The finding is on the `except` line | opt-in | error | fastapi | :material-check-circle: |
 | FAPI008 | `duplicate-operation-id` | A path operation whose literal `operation_id=` an earlier operation of the same app already uses, across the routers the app includes (the route lists FAPI005 reads). The same id on two apps is fine; ids that aren't literals are skipped. The per-edit hook reports only the one-router cases | opt-in | error | fastapi | :material-check-circle: |
 | FAPI009 | `depends-called` | `Depends(f(...))` or `Security(f(...))`, in a default or in `Annotated[...]`, where `f` is a first-party generator, an `async def` or a function that returns only plain values; a factory that returns a function passes. The callee is resolved in the same file or one hop through the index | opt-in | error | fastapi | :material-check-circle: |
 
-The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model.ts`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go ([rules index](rules/index.md#fastapi)).
+The FAPI rules ([ADR-037](05-ADR.md#adr-037-framework-rule-families-opt-in-with-their-own-prefix)) read one shared model, `rules/fastapi/model/`: apps and routers, path operations, `include_router` and `mount` edges and exception handlers, from one parse per file that mentions FastAPI, with names resolved across files through `ProjectIndex`. FAPI004 is unused: the [#185](https://github.com/SirCypkowskyy/inwards/issues/185) spike said no-go ([rules index](rules/index.md#fastapi)).
 
 ## Code map
 
@@ -458,7 +458,7 @@ src/
 │   │   │                  #   _write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
-│   │   ├── rules/         # one folder per rule, named after it: index.ts its face, the logic in _ modules (fastapi/ keeps its layout until its own step); they share only shared/
+│   │   ├── rules/         # one folder per rule, named after it: index.ts its face, the logic in _ modules; they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
 │   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
 │   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)
@@ -495,16 +495,19 @@ src/
 │   │   │   ├── diagram-unknown-name/    # INW017: check.ts (names in marked diagrams)
 │   │   │   ├── diagram-forbidden-edge/  # INW018: check.ts (arrows in marked diagrams)
 │   │   │   ├── diagram-missing-dependency/  # INW019: check.ts (imports a diagram leaves out)
-│   │   │   └── fastapi/                 # FAPI family: model.ts (apps, routers, operations, wiring,
+│   │   │   └── fastapi/                 # FAPI family: index.ts (the face), model/ (the shared
+│   │   │                                #   model: _model.ts (apps, routers, operations, wiring,
 │   │   │                                #   handlers, events, dependencies, resolved across files),
-│   │   │                                #   graph.ts (app and router graph), route-list.ts (routes in
-│   │   │                                #   FastAPI's order) with path-match.ts, router-wiring.ts
-│   │   │                                #   (FAPI003), endpoint-metadata.ts (FAPI001),
-│   │   │                                #   undocumented-error-response.ts with error-codes.ts and
-│   │   │                                #   placement.ts (FAPI002), route-shadowing.ts (FAPI005),
-│   │   │                                #   lifespan-events.ts (FAPI006), yield-dependency-swallows.ts
-│   │   │                                #   (FAPI007), duplicate-operation-id.ts (FAPI008),
-│   │   │                                #   depends-called.ts (FAPI009), function-body.ts (a
+│   │   │                                #   _graph.ts (app and router graph), _route-list.ts (routes
+│   │   │                                #   in FastAPI's order) with _path-match.ts, _project.ts,
+│   │   │                                #   _records.ts and the extraction it builds on), then
+│   │   │                                #   _router-wiring.ts (FAPI003), _endpoint-metadata.ts
+│   │   │                                #   (FAPI001), _undocumented-error-response.ts with
+│   │   │                                #   _error-codes.ts and _placement.ts (FAPI002),
+│   │   │                                #   _route-shadowing.ts (FAPI005), _lifespan-events.ts
+│   │   │                                #   (FAPI006), _yield-dependency-swallows.ts (FAPI007),
+│   │   │                                #   _duplicate-operation-id.ts (FAPI008),
+│   │   │                                #   _depends-called.ts (FAPI009), _function-body.ts (a
 │   │   │                                #   function's own yield, return and try statements)
 │   │   ├── baseline/      # index.ts (the face), _accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;

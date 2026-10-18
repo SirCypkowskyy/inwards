@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI001.md
-source_hash: 350be2329d40006a7f30775fd1bfc2a921023f0ce51a30cbf18e3e927a3dd596
+source_hash: 63a33fcba5f99d59c7c18c628e5f030b05616ba7713f6b977c12e14b4dc35ccd
 type: rule
 title: FAPI001 endpoint-metadata
 description: Operacja ścieżki FastAPI w schemacie OpenAPI nie ma metadanych, których wymaga projekt, na przykład podsumowania, modelu odpowiedzi albo jawnego kodu statusu.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/endpoint-metadata.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_endpoint-metadata.ts
 timestamp: 2026-09-28T00:00:00Z
 related_issues: [186, 183]
 ---

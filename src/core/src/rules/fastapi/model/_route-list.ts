@@ -8,10 +8,10 @@
  * "unreachable" from "can't tell". `mount` is not followed: a mounted app
  * routes on its own.
  */
-import type { GraphEdge, GraphNode, WiringGraph } from "./graph.ts";
-import { type Segment, segmentsOf } from "./path-match.ts";
-import type { FastApiProject } from "./project.ts";
-import type { FastApiFile, FastApiObject, PathOperation } from "./records.ts";
+import type { GraphEdge, GraphNode, WiringGraph } from "./_graph.ts";
+import { type Segment, segmentsOf } from "./_path-match.ts";
+import type { FastApiProject } from "./_project.ts";
+import type { FastApiFile, FastApiObject, PathOperation } from "./_records.ts";
 
 /** A path operation as one list of routes holds it: where it answers, and to what. */
 export interface Route {

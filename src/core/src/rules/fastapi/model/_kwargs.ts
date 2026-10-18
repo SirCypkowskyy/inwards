@@ -13,9 +13,9 @@
  * handlers as unknown. It reads one tree; callers in other files aren't seen.
  */
 import type { Node } from "web-tree-sitter";
-import { literalString } from "../../python/literals.ts";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { parameterNamed, parameterValues } from "./callers.ts";
+import { literalString } from "../../../python/literals.ts";
+import { identifierName, namedChildren } from "../../../python/nodes.ts";
+import { parameterNamed, parameterValues } from "./_callers.ts";
 
 /** How many names `dictsOf` follows before it gives up. */
 const MAX_DEPTH = 4;

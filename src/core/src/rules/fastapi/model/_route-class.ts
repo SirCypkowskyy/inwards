@@ -18,11 +18,11 @@
  * nothing and reads no file itself: the project lookups it is given do.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
-import { argumentFor, parameterNamed } from "./callers.ts";
-import type { FastApiFile, FastApiObject, PathOperation } from "./records.ts";
-import { RouteTags, type TagLookups } from "./route-tags.ts";
+import { identifierName, namedChildren } from "../../../python/nodes.ts";
+import type { Qualify } from "../../../python/qualify.ts";
+import { argumentFor, parameterNamed } from "./_callers.ts";
+import type { FastApiFile, FastApiObject, PathOperation } from "./_records.ts";
+import { RouteTags, type TagLookups } from "./_route-tags.ts";
 import {
   type ClassSyntax,
   join,
@@ -30,8 +30,8 @@ import {
   schemaRule,
   stringText,
   type Visibility,
-} from "./schema-rule.ts";
-import { evaluate } from "./tag-rule.ts";
+} from "./_schema-rule.ts";
+import { evaluate } from "./_tag-rule.ts";
 
 /** FastAPI's own route class, the default of every router. */
 const FASTAPI_ROUTE: ReadonlySet<string> = new Set(["fastapi.routing.APIRoute"]);

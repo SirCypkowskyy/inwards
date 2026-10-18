@@ -6,10 +6,10 @@
  * through the project index, re-exports included, without importing anything.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { returnedStatusCodes } from "../../../src/rules/fastapi/handlers.ts";
-import { FastApiModel, mentionsFastApi } from "../../../src/rules/fastapi/model.ts";
-import type { FastApiFile } from "../../../src/rules/fastapi/records.ts";
-import type { Value } from "../../../src/rules/fastapi/values.ts";
+import { returnedStatusCodes } from "../../../src/rules/fastapi/model/_handlers.ts";
+import { FastApiModel, mentionsFastApi } from "../../../src/rules/fastapi/model/_model.ts";
+import type { FastApiFile } from "../../../src/rules/fastapi/model/_records.ts";
+import type { Value } from "../../../src/rules/fastapi/model/_values.ts";
 import { ModuleTrees } from "../../../src/rules/shared/module-trees.ts";
 import { file, indexOn, parser } from "../../support/helpers.ts";
 

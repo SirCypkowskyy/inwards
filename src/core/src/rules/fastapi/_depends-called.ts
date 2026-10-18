@@ -18,10 +18,9 @@ import type { Node } from "web-tree-sitter";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { namedChildren } from "../../python/nodes.ts";
-import { isAsync, isGenerator, ownNodes } from "./function-body.ts";
-import type { FastApiProject } from "./project.ts";
-import type { DependencyUse, FastApiFile } from "./records.ts";
-import { spanOf } from "./syntax.ts";
+import { isAsync, isGenerator, ownNodes } from "./_function-body.ts";
+import { spanOf } from "./_syntax.ts";
+import type { DependencyUse, FastApiFile, FastApiProject } from "./model/index.ts";
 
 /** The expressions that are never callable. */
 const PLAIN: ReadonlySet<string> = new Set([

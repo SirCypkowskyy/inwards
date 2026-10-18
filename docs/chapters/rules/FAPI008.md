@@ -9,7 +9,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/duplicate-operation-id.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_duplicate-operation-id.ts
 timestamp: 2026-10-09T18:00:00Z
 related_issues: [186, 184, 227]
 ---

@@ -23,19 +23,22 @@
 import { type InwardsConfig, type RuleOptions, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
-import { checkEndpoints, endpointRulesOn } from "../rules/fastapi/check.ts";
-import { checkDependsCalled } from "../rules/fastapi/depends-called.ts";
 import {
+  checkDependsCalled,
+  checkEndpoints,
   checkFileOperationIds,
+  checkFileShadowing,
+  checkFileWiring,
   checkGraphOperationIds,
-} from "../rules/fastapi/duplicate-operation-id.ts";
-import { checkLifespan } from "../rules/fastapi/lifespan-events.ts";
-import { FastApiModel } from "../rules/fastapi/model.ts";
-import { FastApiProject } from "../rules/fastapi/project.ts";
-import type { FastApiFile } from "../rules/fastapi/records.ts";
-import { checkFileShadowing, checkGraphShadowing } from "../rules/fastapi/route-shadowing.ts";
-import { checkFileWiring, checkGraphWiring } from "../rules/fastapi/router-wiring.ts";
-import { checkYieldSwallows } from "../rules/fastapi/yield-dependency-swallows.ts";
+  checkGraphShadowing,
+  checkGraphWiring,
+  checkLifespan,
+  checkYieldSwallows,
+  endpointRulesOn,
+  type FastApiFile,
+  FastApiModel,
+  FastApiProject,
+} from "../rules/fastapi/index.ts";
 import type { FileTrees } from "../rules/shared/module-trees.ts";
 import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";

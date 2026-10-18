@@ -144,7 +144,7 @@
     {
       // The HTTP status table (`http.HTTPStatus` member names to codes) is data:
       // naming each number would only repeat the member name next to it.
-      "includes": ["src/core/src/rules/fastapi/status.ts"],
+      "includes": ["src/core/src/rules/fastapi/_status.ts"],
       "linter": { "rules": { "style": { "noMagicNumbers": "off" } } }
     },
     {

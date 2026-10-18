@@ -9,7 +9,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/undocumented-error-response.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_undocumented-error-response.ts
 timestamp: 2026-09-28T00:00:00Z
 related_issues: [186, 183, 242]
 ---

@@ -12,14 +12,14 @@
  * counts as a problem are the rules' decisions.
  */
 import type { Node } from "web-tree-sitter";
-import type { ModuleLookup } from "../../lookup/module-lookup.ts";
-import { argumentAt } from "../../python/literals.ts";
-import { identifierName } from "../../python/nodes.ts";
-import { returnedNames } from "../shared/function-returns.ts";
-import type { CallSite } from "./call-sites.ts";
-import { argumentFor, enclosingParameter } from "./callers.ts";
-import type { FastApiModel } from "./model.ts";
-import type { FastApiFile, FastApiObject, PathOperation, Wiring } from "./records.ts";
+import type { ModuleLookup } from "../../../lookup/module-lookup.ts";
+import { argumentAt } from "../../../python/literals.ts";
+import { identifierName } from "../../../python/nodes.ts";
+import { returnedNames } from "../../shared/function-returns.ts";
+import type { CallSite } from "./_call-sites.ts";
+import { argumentFor, enclosingParameter } from "./_callers.ts";
+import type { FastApiModel } from "./_model.ts";
+import type { FastApiFile, FastApiObject, PathOperation, Wiring } from "./_records.ts";
 
 /** An app or router, where it is declared, and the path operations declared on it. */
 export interface GraphNode {
