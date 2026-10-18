@@ -5,13 +5,13 @@
  * (`daemon/client.ts`). Everything it touches comes in as `HookDeps` from `main.ts`.
  */
 import { VERSION } from "@inwards/core";
-import { dispatch } from "../claude-code/dispatch.ts";
-import { type HookDeps, hookProject } from "../claude-code/protocol.ts";
 import { viaDaemon } from "../daemon/client.ts";
+import type { DaemonLink } from "../daemon/contracts.ts";
 import { daemonPlace } from "../daemon/protocol.ts";
 import type { Streams } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
-import type { DaemonDeps } from "./deps.ts";
+import { dispatch } from "./claude-code/index.ts";
+import { type HookDeps, hookProject } from "./contracts.ts";
 
 /**
  * Runs the Claude Code hook for one event: SessionStart records the session,
@@ -38,7 +38,7 @@ import type { DaemonDeps } from "./deps.ts";
  * @returns the exit code for Claude Code: 0, 1 or 2 as above.
  */
 export async function hookClaudeCode(
-  deps: HookDeps & { daemon?: Pick<DaemonDeps, "link"> },
+  deps: HookDeps & { daemon?: { link: DaemonLink } },
   usage: string,
 ): Promise<number> {
   const { io } = deps;

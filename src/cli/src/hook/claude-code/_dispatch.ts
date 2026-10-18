@@ -4,12 +4,13 @@
  * PostToolUse and Stop (the gate). Any other event passes with exit 0, so a hook installed for more
  * events than Inwards handles never blocks the agent.
  */
-import { configGuard } from "./config-guard.ts";
-import { postToolUse } from "./post-tool-use.ts";
-import type { HookDeps } from "./protocol.ts";
-import { sessionStart } from "./session-start.ts";
-import { shapeGuard } from "./shape-guard.ts";
-import { stopGate } from "./stop-gate.ts";
+
+import type { HookDeps } from "../contracts.ts";
+import { configGuard } from "./_config-guard.ts";
+import { postToolUse } from "./_post-tool-use.ts";
+import { sessionStart } from "./_session-start.ts";
+import { shapeGuard } from "./_shape-guard.ts";
+import { stopGate } from "./_stop-gate.ts";
 
 /**
  * Hands a hook payload to the handler for its event.

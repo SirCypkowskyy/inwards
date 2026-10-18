@@ -155,10 +155,12 @@
       },
       { "name": "cli-adapters", "patterns": ["src/cli/src/adapters/**"] },
       { "name": "cli-commands", "patterns": ["src/cli/src/commands/**"] },
-      // Before the rest of claude-code/: the eval may import this module alone.
-      { "name": "cli-protocol", "patterns": ["src/cli/src/claude-code/protocol.ts"] },
-      { "name": "cli-claude-code", "patterns": ["src/cli/src/claude-code/**"] },
-      { "name": "cli-session", "patterns": ["src/cli/src/session/**"] },
+      // The hook slice (`inwards hook`, ADR-047): the contracts before the rest,
+      // since the eval may import that module alone, and its state files before
+      // the rest too (the first matching zone wins).
+      { "name": "cli-hook-contracts", "patterns": ["src/cli/src/hook/contracts.ts"] },
+      { "name": "cli-hook-adapters", "patterns": ["src/cli/src/hook/adapters/**"] },
+      { "name": "cli-hook", "patterns": ["src/cli/src/hook/**"] },
       // The check slice (`inwards check`, `inwards baseline`, ADR-047): the baseline
       // writer and the extraction cache and pool before the rest.
       { "name": "cli-check-adapters", "patterns": ["src/cli/src/check/adapters/**"] },
@@ -581,29 +583,6 @@
         ]
       },
       {
-        "from": "cli-session",
-        "allow": [
-          "core-api",
-          "core-contracts",
-          "core-meta",
-          "core-config",
-          "core-python",
-          "core-lookup",
-          "core-rules-shared",
-          "core-rule-layer-dependency",
-          "core-rule-package-shape",
-          "core-rule-unassigned-module",
-          "core-baseline",
-          "core-diagram",
-          "core-engine",
-          "core-report",
-          "cli-platform",
-          "cli-json",
-          "cli-paths",
-          "cli-check"
-        ]
-      },
-      {
         "from": "cli-runlog",
         "allow": [
           "core-api",
@@ -648,11 +627,31 @@
         ]
       },
       {
-        "from": "cli-protocol",
-        "allow": ["cli-platform", "cli-runlog", "cli-session", "cli-check"]
+        "from": "cli-hook-contracts",
+        // InwardsConfig for the session record's shapes comes through the engine's API.
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-runlog",
+          "cli-check"
+        ]
       },
       {
-        "from": "cli-claude-code",
+        "from": "cli-hook",
+        // cli.ts hands a PostToolUse payload to the daemon (`daemon/client.ts`).
         "allow": [
           "core-api",
           "core-contracts",
@@ -672,9 +671,35 @@
           "cli-json",
           "cli-paths",
           "cli-check",
-          "cli-session",
           "cli-runlog",
-          "cli-protocol"
+          "cli-daemon",
+          "cli-hook-contracts"
+        ]
+      },
+      // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
+      {
+        "from": "cli-hook-adapters",
+        // The state files wrap adapters/filesystem.ts's path probe.
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-adapters",
+          "cli-hook"
         ]
       },
       {
@@ -699,8 +724,7 @@
           "cli-json",
           "cli-paths",
           "cli-check",
-          "cli-session",
-          "cli-claude-code",
+          "cli-hook",
           "cli-commands"
         ]
       },
@@ -917,10 +941,9 @@
           "cli-json",
           "cli-paths",
           "cli-check",
-          "cli-session",
+          "cli-hook",
+          "cli-hook-contracts",
           "cli-runlog",
-          "cli-protocol",
-          "cli-claude-code",
           "cli-init",
           "cli-daemon",
           "cli-lsp",
@@ -947,7 +970,6 @@
           "cli-platform",
           "cli-paths",
           "cli-check",
-          "cli-session",
           "cli-runlog",
           "cli-commands",
           "cli-daemon"
@@ -975,7 +997,7 @@
           "cli-init",
           "cli-platform",
           "cli-check",
-          "cli-session",
+          "cli-hook",
           "cli-runlog",
           "cli-daemon",
           "cli-lsp",
@@ -986,7 +1008,8 @@
           "cli-check-adapters",
           "cli-rules-adapters",
           "cli-runlog-adapters",
-          "cli-init-adapters"
+          "cli-init-adapters",
+          "cli-hook-adapters"
         ]
       },
       {
@@ -1012,10 +1035,9 @@
           "cli-main",
           "cli-adapters",
           "cli-commands",
-          "cli-protocol",
-          "cli-claude-code",
-          "cli-session",
           "cli-check",
+          "cli-hook",
+          "cli-hook-contracts",
           "cli-runlog",
           "cli-init",
           "cli-paths",
@@ -1053,7 +1075,7 @@
           "core-baseline",
           "core-engine",
           "core-report",
-          "cli-protocol"
+          "cli-hook-contracts"
         ]
       },
       // The bench runs binaries as processes and imports nothing of ours.

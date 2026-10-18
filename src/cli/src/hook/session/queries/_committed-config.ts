@@ -9,8 +9,8 @@
  * git only outside a partial clone. git runs through the hardened `Git` contract.
  */
 import { declaresInwards, type InwardsConfig, parseConfig } from "@inwards/core";
-import type { Git } from "../platform/contracts.ts";
-import type { SessionStart } from "./contracts.ts";
+import type { Git } from "../../../platform/contracts.ts";
+import type { SessionStart } from "../../contracts.ts";
 
 /** What the comparison with the committed configs found. */
 export interface CommittedCheck {

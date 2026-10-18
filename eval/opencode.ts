@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
-import { ASK_USER } from "../src/cli/src/claude-code/protocol.ts";
+import { ASK_USER } from "../src/cli/src/hook/contracts.ts";
 import type { AgentRun, Driver } from "./agent.ts";
 import { type AgentSummary, isRecord, numberOrZero, objectsOf } from "./evidence.ts";
 

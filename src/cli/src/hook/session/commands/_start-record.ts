@@ -9,9 +9,9 @@
  */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { isRecord } from "../json/guards.ts";
-import type { Platform, Runtime } from "../platform/contracts.ts";
-import type { SessionStart } from "./contracts.ts";
+import { isRecord } from "../../../json/guards.ts";
+import type { Platform, Runtime } from "../../../platform/contracts.ts";
+import type { SessionStart } from "../../contracts.ts";
 
 /** Hex digits of the project path's SHA-256 that name its witness directory. */
 const KEY_LENGTH = 32;

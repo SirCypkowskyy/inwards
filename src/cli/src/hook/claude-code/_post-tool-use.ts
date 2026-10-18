@@ -13,25 +13,27 @@
  */
 import { basename, dirname, join, resolve } from "node:path";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
-import { configListsDiagram, findConfig, fingerprint, projectPath } from "../check/index.ts";
-import { shownDiagnostics, shownReport } from "../paths/display.ts";
-import { isInside, PATH_SEPARATORS } from "../paths/lexical.ts";
-import { physicalRealpath } from "../paths/physical.ts";
-import type { Platform } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
-import { agentSuppressions, rejectedNote } from "../session/agent-suppressions.ts";
-import type { Start } from "../session/contracts.ts";
-import { createStartLookups } from "../session/lookups.ts";
-import { oldErrors, oldNote } from "../session/old-errors.ts";
+import { configListsDiagram, findConfig, fingerprint, projectPath } from "../../check/index.ts";
+import { shownDiagnostics, shownReport } from "../../paths/display.ts";
+import { isInside, PATH_SEPARATORS } from "../../paths/lexical.ts";
+import { physicalRealpath } from "../../paths/physical.ts";
+import type { Platform } from "../../platform/contracts.ts";
+import { print } from "../../platform/print.ts";
+import type { Start } from "../contracts.ts";
+import { type HookDeps, hookProject } from "../contracts.ts";
 import {
+  agentSuppressions,
+  createStartLookups,
   isSessionId,
   isToolUseId,
+  oldErrors,
+  oldNote,
   readSession,
   readSessionStart,
   recordEdit,
-} from "../session/record.ts";
-import { askUser, DEFAULT_ESCALATE_AFTER } from "./escalation.ts";
-import { type HookDeps, hookProject } from "./protocol.ts";
+  rejectedNote,
+} from "../session/index.ts";
+import { askUser, DEFAULT_ESCALATE_AFTER } from "./_escalation.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 

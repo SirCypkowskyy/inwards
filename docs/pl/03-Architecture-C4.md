@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: b35ad3b80a6e5b1bfdcb08910397335f71d6510c8f2f6136f7be5d1c428b50ca
+source_hash: fc082baeb2864538dad07b35de736f36d952197c22849e8106f5df5cf01a52bf
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -526,12 +526,16 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # hook, daemon: thin, handed AppDeps
-│   │   ├── claude-code/   # the hook adapter: dispatch, SessionStart, the PreToolUse config
-│   │   │                  #   guard (Bash reader, edit simulation) and shape guard, PostToolUse, the Stop gate
-│   │   │                  #   and its changed-file checks, escalation, settings
-│   │   ├── session/       # the session record, start identity and content, old errors,
-│   │   │                  #   agent suppressions, layout changes against the session start
+│   │   ├── commands/      # daemon: thin, handed AppDeps
+│   │   ├── hook/          # inwards hook claude-code, a slice (ADR-047): index.ts its face, cli.ts
+│   │   │                  #   the handler, contracts.ts (HookDeps, hookProject, ASK_USER and the
+│   │   │                  #   session record's shapes; the eval reads it); claude-code/ the hook
+│   │   │                  #   adapter: dispatch, SessionStart, the PreToolUse config guard (Bash
+│   │   │                  #   reader, edit simulation) and shape guard, PostToolUse, the Stop gate
+│   │   │                  #   and its changed-file checks, escalation, settings; session/ commands/
+│   │   │                  #   (the session record, start record, copies, start identity) and
+│   │   │                  #   queries/ (old errors, agent suppressions, layout changes, committed
+│   │   │                  #   config, start content); adapters/state-files.ts the state files
 │   │   ├── check/         # inwards check and inwards baseline, a slice (ADR-047): index.ts its
 │   │   │                  #   face, cli.ts the two handlers, running a check (_check.ts), config
 │   │   │                  #   discovery, routing (_routing.ts, _runs.ts), project snapshots, texts

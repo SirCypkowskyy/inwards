@@ -6,7 +6,7 @@
  * tool cache. It writes no files; the agent modules use what it returns.
  */
 import { basename } from "node:path";
-import { LAUNCHER } from "../claude-code/settings.ts";
+import { LAUNCHER } from "../hook/claude-code/index.ts";
 import { print } from "../platform/print.ts";
 import type { InitContext } from "./contracts.ts";
 

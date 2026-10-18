@@ -46,11 +46,11 @@ import {
   projectManifest,
   projectPath,
   projectTopLevel,
-} from "../check/index.ts";
-import { isRecord } from "../json/guards.ts";
-import type { Platform } from "../platform/contracts.ts";
-import type { SessionStart } from "./contracts.ts";
-import { copiesName, startCopier } from "./start-copies.ts";
+} from "../../../check/index.ts";
+import { isRecord } from "../../../json/guards.ts";
+import type { Platform } from "../../../platform/contracts.ts";
+import type { SessionStart } from "../../contracts.ts";
+import { copiesName, startCopier } from "./_start-copies.ts";
 import {
   readStart,
   type StartRecord,
@@ -58,7 +58,7 @@ import {
   trustedStart,
   witnessPath,
   writeWitness,
-} from "./start-record.ts";
+} from "./_start-record.ts";
 
 /** What recording and reading a session touches. */
 export type SessionIo = Pick<

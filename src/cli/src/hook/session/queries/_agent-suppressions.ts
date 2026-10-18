@@ -18,10 +18,10 @@ import {
   type Report,
   stableMessage,
 } from "@inwards/core";
-import { projectPath } from "../check/index.ts";
-import type { Check, Start } from "./contracts.ts";
-import type { StartLookups } from "./lookups.ts";
-import { atStart, carried } from "./old-errors.ts";
+import { projectPath } from "../../../check/index.ts";
+import type { Check, Start } from "../../contracts.ts";
+import type { StartLookups } from "./_lookups.ts";
+import { atStart, carried } from "./_old-errors.ts";
 
 /**
  * Applies `agent-suppressions` to a hook's report. Under `"deny"`, the

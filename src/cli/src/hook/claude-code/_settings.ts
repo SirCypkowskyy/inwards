@@ -15,8 +15,8 @@
  * binary or `main.ts` passes, so it proves the configuration, not what runs.
  */
 import { basename, join } from "node:path";
-import { isRecord } from "../json/guards.ts";
-import type { FileReader, Runtime } from "../platform/contracts.ts";
+import { isRecord } from "../../json/guards.ts";
+import type { FileReader, Runtime } from "../../platform/contracts.ts";
 
 const HOOK_ARGS = ["hook", "claude-code"];
 const EXE_SUFFIX = /\.exe$/iu;

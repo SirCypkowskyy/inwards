@@ -7,7 +7,7 @@
  * It computes the change only; writing is the caller's.
  */
 
-import { INWARDS_BINARY, LAUNCHER } from "../claude-code/settings.ts";
+import { INWARDS_BINARY, LAUNCHER } from "../hook/claude-code/index.ts";
 import { isRecord } from "../json/guards.ts";
 import { readIfThere } from "./_section.ts";
 import type { Change, InitContext } from "./contracts.ts";

@@ -39,26 +39,27 @@ import {
   projectLinks,
   projectManifest,
   projectTopLevel,
-} from "../check/index.ts";
-import type { Platform } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
-import { rejectedNote } from "../session/agent-suppressions.ts";
-import { uncommittedConfigs } from "../session/committed-config.ts";
-import { newLayoutErrors, preexistingShape } from "../session/layout-changes.ts";
-import { createStartLookups } from "../session/lookups.ts";
-import { oldNote } from "../session/old-errors.ts";
+} from "../../check/index.ts";
+import type { Platform } from "../../platform/contracts.ts";
+import { print } from "../../platform/print.ts";
+import { type HookDeps, hookProject } from "../contracts.ts";
 import {
+  createStartLookups,
   isSessionId,
+  newLayoutErrors,
+  oldNote,
+  preexistingShape,
   readSession,
   recordPass,
   recordStop,
+  rejectedNote,
   type SessionState,
-} from "../session/record.ts";
-import { touchWitness } from "../session/start-record.ts";
-import { changedFiles, checkChanged, freshImporters, newTopLevel } from "./changed-files.ts";
-import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./escalation.ts";
-import { hookProblem } from "./hook-host.ts";
-import { type HookDeps, hookProject } from "./protocol.ts";
+  touchWitness,
+  uncommittedConfigs,
+} from "../session/index.ts";
+import { changedFiles, checkChanged, freshImporters, newTopLevel } from "./_changed-files.ts";
+import { askUser, DEFAULT_ESCALATE_AFTER, yieldTurn } from "./_escalation.ts";
+import { hookProblem } from "./_hook-host.ts";
 
 /**
  * Runs the Stop gate for one hook payload. An error inside the gate blocks

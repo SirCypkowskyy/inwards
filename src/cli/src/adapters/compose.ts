@@ -24,6 +24,7 @@ import { overlayTexts, runCheck } from "../check/index.ts";
 import type { AppDeps, DaemonDeps, LspDeps, McpDeps } from "../commands/deps.ts";
 import { commitKeyedGit, daemonExtractionCache } from "../daemon/memory.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
+import { nodeStateFiles } from "../hook/adapters/state-files.ts";
 import { nodeInitFiles } from "../init/adapters/files.ts";
 import { terminalPicker } from "../init/adapters/picker.ts";
 import type { ServerCheck } from "../lsp/contracts.ts";
@@ -38,7 +39,6 @@ import { nodeFileReader, nodePathProbe } from "./filesystem.ts";
 import { budgetedGit, nodeGit } from "./git.ts";
 import { loadGrammars } from "./grammars.ts";
 import { readRuntime, runtimeFrom, systemClock } from "./runtime.ts";
-import { nodeStateFiles } from "./state-files.ts";
 import { processStreams } from "./stdio.ts";
 import { parseToml } from "./toml.ts";
 

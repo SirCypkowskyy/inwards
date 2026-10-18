@@ -14,14 +14,14 @@
  */
 import { dirname, relative, resolve } from "node:path";
 import { checkShape, type Diagnostic, moduleNameFor, parseConfig } from "@inwards/core";
-import { findConfig, projectPath } from "../check/index.ts";
-import { isRecord } from "../json/guards.ts";
-import { isInside, posix } from "../paths/lexical.ts";
-import { isSessionId, readSessionStart } from "../session/record.ts";
-import { landingPath, lexicalPath } from "./edit-simulation.ts";
-import { askUser } from "./escalation.ts";
-import { escalationOf, rememberEdit, sessionConfig } from "./post-tool-use.ts";
-import { type HookDeps, hookProject } from "./protocol.ts";
+import { findConfig, projectPath } from "../../check/index.ts";
+import { isRecord } from "../../json/guards.ts";
+import { isInside, posix } from "../../paths/lexical.ts";
+import { type HookDeps, hookProject } from "../contracts.ts";
+import { isSessionId, readSessionStart } from "../session/index.ts";
+import { landingPath, lexicalPath } from "./_edit-simulation.ts";
+import { askUser } from "./_escalation.ts";
+import { escalationOf, rememberEdit, sessionConfig } from "./_post-tool-use.ts";
 
 const PYTHON_FILE = /\.pyi?$/u;
 /** The keys INW007 reads; a config that never spells them has no shape to check. */

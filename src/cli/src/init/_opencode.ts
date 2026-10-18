@@ -8,7 +8,7 @@
  * into `.gitignore` like Claude Code's `settings.local.json`.
  */
 import { VERSION } from "@inwards/core";
-import { PLUGIN_MARKER } from "../claude-code/hook-host.ts";
+import { PLUGIN_MARKER } from "../hook/claude-code/index.ts";
 import { PLUGIN_HELPERS } from "./_opencode-helpers.ts";
 import { PLUGIN_HOOKS } from "./_opencode-hooks.ts";
 import type { Change, InitContext } from "./contracts.ts";

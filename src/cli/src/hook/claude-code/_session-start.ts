@@ -7,12 +7,12 @@
  * Claude Code settings (#88). Otherwise silent, since SessionStart output
  * goes to the model.
  */
-import type { Platform } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
-import { isSessionId, recordStart } from "../session/record.ts";
-import { takeUnresolved } from "./escalation.ts";
-import { hookProject } from "./protocol.ts";
-import { stopHookProblem } from "./settings.ts";
+import type { Platform } from "../../platform/contracts.ts";
+import { print } from "../../platform/print.ts";
+import { hookProject } from "../contracts.ts";
+import { isSessionId, recordStart } from "../session/index.ts";
+import { takeUnresolved } from "./_escalation.ts";
+import { stopHookProblem } from "./_settings.ts";
 
 /**
  * Records where a session starts (at startup or /clear): HEAD, every

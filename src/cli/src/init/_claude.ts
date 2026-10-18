@@ -7,7 +7,7 @@
  * a shape init doesn't know stops it. It computes changes and writes nothing.
  */
 import { join } from "node:path";
-import { holdsInwardsHooks, isInwardsHook } from "../claude-code/settings.ts";
+import { holdsInwardsHooks, isInwardsHook } from "../hook/claude-code/index.ts";
 import { isRecord } from "../json/guards.ts";
 import { print } from "../platform/print.ts";
 import { gitignore } from "./_gitignore.ts";
