@@ -17,7 +17,7 @@ import {
   parseConfig,
   type SourceFile,
 } from "../../src/index.ts";
-import { type Cycle, cycleDiagnostic, type Edge } from "../../src/rules/import-cycles/cycles.ts";
+import { type Cycle, cycleDiagnostic, type Edge } from "../../src/rules/import-cycles/_cycles.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]

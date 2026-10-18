@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Diagnostic } from "../../src/index.ts";
 import { Engine, parseConfig } from "../../src/index.ts";
-import { mayHoldEndpoints } from "../../src/rules/thin-endpoint/endpoints.ts";
+import { mayHoldEndpoints } from "../../src/rules/thin-endpoint/_endpoints.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 /** File texts that remember which paths were read. */

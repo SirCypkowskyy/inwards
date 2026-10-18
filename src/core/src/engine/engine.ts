@@ -20,9 +20,9 @@ import {
   normalizeSource,
   parsePython,
 } from "../python/parser.ts";
-import { checkDynamicImports, extractDynamicImports } from "../rules/dynamic-import/imports.ts";
+import { checkDynamicImports, extractDynamicImports } from "../rules/dynamic-import/index.ts";
 import { checkLayers } from "../rules/layer-dependency/index.ts";
-import { shapeFindings } from "../rules/package-shape/shape.ts";
+import { shapeFindings } from "../rules/package-shape/index.ts";
 import { checkLibraries, coversModule, type LibraryInputs } from "../rules/pure-domain/index.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { mentionsSuppression, suppress } from "../rules/suppression-comment/index.ts";
@@ -30,7 +30,7 @@ import {
   checkUnassignedImports,
   indexEvidence,
   unassignedWarning,
-} from "../rules/unassigned-module/imports.ts";
+} from "../rules/unassigned-module/index.ts";
 import { checkUnknownImports } from "../rules/unknown-first-party/index.ts";
 import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 import {

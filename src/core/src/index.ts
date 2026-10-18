@@ -70,11 +70,12 @@ export {
   packagesOf,
   probeMembers,
   rootPathOf,
-} from "./rules/package-shape/shape.ts";
+} from "./rules/package-shape/index.ts";
 export { layerIndexOf, layerPackages } from "./rules/shared/layer-ownership.ts";
 export {
+  checkLinks,
   checkMoves,
   checkNestedProjects,
   checkPrefixes,
-} from "./rules/unassigned-module/layout.ts";
-export { checkLinks, type LayerLink } from "./rules/unassigned-module/links.ts";
+  type LayerLink,
+} from "./rules/unassigned-module/index.ts";

@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { type LayerLink, parseConfig } from "../../src/index.ts";
-import { checkLinks } from "../../src/rules/unassigned-module/links.ts";
+import { checkLinks } from "../../src/rules/unassigned-module/_links.ts";
 
 const CONFIG = parseConfig(`[tool.inwards]
 layers = [

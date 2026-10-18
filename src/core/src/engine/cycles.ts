@@ -23,7 +23,7 @@ import {
   fileEdges,
   findCycles,
   searches,
-} from "../rules/import-cycles/cycles.ts";
+} from "../rules/import-cycles/index.ts";
 
 /** A checked file's imports, and whether a full parse read them. */
 export interface Collected extends FileImports {

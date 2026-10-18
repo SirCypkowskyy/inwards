@@ -9,7 +9,7 @@
  * It is opt-in, `modules` narrows it, and a suppression hides it.
  */
 import { describe, expect, test } from "bun:test";
-import { isSnake, singularOf, toSnake, withSuffix } from "../../src/rules/orm-naming/names.ts";
+import { isSnake, singularOf, toSnake, withSuffix } from "../../src/rules/orm-naming/_names.ts";
 import { checkOrm, FIRST, HEAD, inw016, MODELS, models } from "../support/orm-naming.ts";
 
 /**

@@ -15,8 +15,8 @@ import {
   parseConfig,
   type SourceFile,
 } from "../../src/index.ts";
-import { indexEvidence } from "../../src/rules/unassigned-module/imports.ts";
-import { checkMoves, checkPrefixes } from "../../src/rules/unassigned-module/layout.ts";
+import { indexEvidence } from "../../src/rules/unassigned-module/_imports.ts";
+import { checkMoves, checkPrefixes } from "../../src/rules/unassigned-module/_layout.ts";
 import { file, grammars, indexOn } from "../support/helpers.ts";
 
 const TEXT = `[tool.inwards]

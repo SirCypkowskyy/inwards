@@ -11,7 +11,7 @@ import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkContextDependencies } from "../rules/context-independence/index.ts";
-import { checkPrivateModules } from "../rules/private-module.ts";
+import { checkPrivateModules } from "../rules/private-module/index.ts";
 import { checkPublicApi } from "../rules/public-api-only/index.ts";
 
 /**
