@@ -21,7 +21,7 @@ const FILES = [
   "src/core/src/python/type-checking.ts",
   "src/core/src/python/reparse.ts",
   "src/core/src/python/module-names.ts",
-  "src/core/src/rules/suppression-comment.ts",
+  "src/core/src/rules/suppression-comment/_check.ts",
   "src/core/src/meta/registry.ts",
   "src/core/src/engine/extraction.ts",
 ];
@@ -52,6 +52,7 @@ const RECORDED: Readonly<Record<string, string>> = {
   "23": "9feb579109386725bc03aace591f43aff85ed44932e4d19c72bcc74c4cb31e37",
   "24": "b611a8993104a8e59a07347925ba7d10c7edaf3a30197822fbc920cf422c9370",
   "25": "f7db648db54f743a30f0d86baf2b85fe918fa98a0bfe107c0c876d8c84df509f",
+  "26": "5872c7668977c14c106570b15c38d86f73f6c9c69dec39d9bcbe18e2c19826a8",
 };
 
 test("the extraction revision changes with the code it describes", () => {

@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { ruleLevel } from "../../../src/config/rule-settings.ts";
 import { ConfigError, Engine, parseConfig, RULES, render } from "../../../src/index.ts";
 import { diagnostic } from "../../../src/meta/registry.ts";
-import { suppress } from "../../../src/rules/suppression-comment.ts";
+import { suppress } from "../../../src/rules/suppression-comment/index.ts";
 import { file, grammars, PROJECT, parser } from "../../support/helpers.ts";
 
 const LAYERS = `[tool.inwards]

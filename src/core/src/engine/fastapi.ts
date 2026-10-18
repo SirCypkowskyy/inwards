@@ -38,8 +38,8 @@ import { checkFileShadowing, checkGraphShadowing } from "../rules/fastapi/route-
 import { checkFileWiring, checkGraphWiring } from "../rules/fastapi/router-wiring.ts";
 import { checkYieldSwallows } from "../rules/fastapi/yield-dependency-swallows.ts";
 import type { FileTrees } from "../rules/shared/module-trees.ts";
-import { mentionsSuppression } from "../rules/suppression-comment.ts";
-import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
+import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 import { type Confirmed, withFound } from "./stages.ts";
 
 /** The FAPI findings for a check, and the ones to drop after suppressions. */

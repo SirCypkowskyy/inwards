@@ -26,14 +26,14 @@
  * first, so a library both deny keeps the layer's message, and with it the
  * baseline keys of existing configs.
  */
-import { matchEntry } from "../config/layer-selector.ts";
-import type { LayerSpec } from "../config/layers.ts";
-import type { LibraryDeny } from "../config/rule-options.ts";
-import type { Diagnostic, Fix, ImportRef, SourceFile } from "../contracts/records.ts";
-import type { ModuleLookup } from "../lookup/module-lookup.ts";
-import { diagnostic, RULES } from "../meta/registry.ts";
-import { STDLIB } from "../python/stdlib.ts";
-import { layerIndexOf, portHome, rankOf } from "./shared/layer-ownership.ts";
+import { matchEntry } from "../../config/layer-selector.ts";
+import type { LayerSpec } from "../../config/layers.ts";
+import type { LibraryDeny } from "../../config/rule-options.ts";
+import type { Diagnostic, Fix, ImportRef, SourceFile } from "../../contracts/records.ts";
+import type { ModuleLookup } from "../../lookup/module-lookup.ts";
+import { diagnostic, RULES } from "../../meta/registry.ts";
+import { STDLIB } from "../../python/stdlib.ts";
+import { layerIndexOf, portHome, rankOf } from "../shared/layer-ownership.ts";
 
 /** Frameworks, database and network clients, and stdlib I/O: what the domain gets by default. */
 const DEFAULT_DENY: readonly string[] = [

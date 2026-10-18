@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { Tree } from "web-tree-sitter";
 import { IMPORT_HOLDERS, importStatements, parsePython } from "../../src/python/parser.ts";
-import { commentsIn } from "../../src/rules/suppression-comment.ts";
+import { commentsIn } from "../../src/rules/suppression-comment/index.ts";
 import { parser } from "../support/helpers.ts";
 
 /** One entry of tree-sitter's `node-types.json`. */

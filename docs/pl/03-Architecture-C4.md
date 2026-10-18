@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: 80d2e286d93916f4cc50a9eefd13200c700bb576feb8539accd4c6175b7b3ebf
+source_hash: c5bcc36ddb0e7b29c65dca384ce536f5c217f77fba47bd15139663114f7aa532
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -463,23 +463,23 @@ src/
 │   │   │                  #   write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
-│   │   ├── rules/         # one module or folder per rule, named after it; they share only shared/
+│   │   ├── rules/         # one module or folder per rule, named after it (migrated: index.ts + _check.ts); they share only shared/
 │   │   │   ├── shared/    # layer-ownership.ts (owning layer, outward imports, port steps),
 │   │   │   │              #   edit-distance.ts, words.ts (English lists), entry-matches.ts,
 │   │   │   │              #   annotations.ts, classes.ts (top-level classes, exempt bases)
 │   │   │   │              #   (parameter types), name-patterns.ts (fnmatch-style names)
-│   │   │   ├── unsupported-encoding.ts  # INW000
-│   │   │   ├── layer-dependency.ts      # INW001 + fix composer
-│   │   │   ├── context-independence.ts  # INW002: depends-on between contexts
-│   │   │   ├── public-api-only.ts       # INW003: a context's public modules
+│   │   │   ├── unsupported-encoding/  # INW000
+│   │   │   ├── layer-dependency/      # INW001 + fix composer
+│   │   │   ├── context-independence/  # INW002: depends-on between contexts
+│   │   │   ├── public-api-only/       # INW003: a context's public modules
 │   │   │   ├── private-module.ts        # INW021: _private modules stay in their package
 │   │   │   ├── import-cycles/           # INW004: graph.ts (Tarjan, shortest cycle), cycles.ts
-│   │   │   ├── pure-domain.ts           # INW005: libraries per layer, default deny list
+│   │   │   ├── pure-domain/           # INW005: libraries per layer, default deny list
 │   │   │   ├── unassigned-module/       # INW006: imports.ts (code outside every layer),
 │   │   │   │                            #   layout.ts (dead prefixes, layer code moved away)
 │   │   │   ├── package-shape/           # INW007 + INW008: shape.ts, fix.ts (wording, likely target)
-│   │   │   ├── suppression-comment.ts   # INW009: inline suppressions, what they hide
-│   │   │   ├── unknown-first-party.ts   # INW010: first-party modules that don't exist
+│   │   │   ├── suppression-comment/# INW009: inline suppressions, what they hide
+│   │   │   ├── unknown-first-party/# INW010: first-party modules that don't exist
 │   │   │   ├── dynamic-import/          # INW011: imports.ts, callees.ts (loaders through aliases),
 │   │   │   │                            #   loader-targets.ts, computed-source.ts
 │   │   │   ├── thin-endpoint/           # INW012: endpoints.ts (decorators, registrations),

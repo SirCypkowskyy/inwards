@@ -18,18 +18,18 @@ import {
   parsePython,
 } from "../python/parser.ts";
 import { checkDynamicImports, extractDynamicImports } from "../rules/dynamic-import/imports.ts";
-import { checkLayers } from "../rules/layer-dependency.ts";
+import { checkLayers } from "../rules/layer-dependency/index.ts";
 import { shapeFindings } from "../rules/package-shape/shape.ts";
-import { checkLibraries, coversModule, type LibraryInputs } from "../rules/pure-domain.ts";
+import { checkLibraries, coversModule, type LibraryInputs } from "../rules/pure-domain/index.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
-import { mentionsSuppression, suppress } from "../rules/suppression-comment.ts";
+import { mentionsSuppression, suppress } from "../rules/suppression-comment/index.ts";
 import {
   checkUnassignedImports,
   indexEvidence,
   unassignedWarning,
 } from "../rules/unassigned-module/imports.ts";
-import { checkUnknownImports } from "../rules/unknown-first-party.ts";
-import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { checkUnknownImports } from "../rules/unknown-first-party/index.ts";
+import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 import {
   type CheckOptions,
   checkAll,
@@ -127,7 +127,7 @@ export class Engine {
    * The text is normalised first (BOM dropped, lone \r turned into \n), so
    * reported lines and columns match what an editor shows. A file in a layer
    * that declares an encoding Inwards can't read faithfully gets one INW000
-   * diagnostic instead of a check (see `rules/unsupported-encoding.ts`).
+   * diagnostic instead of a check (see `rules/unsupported-encoding/index.ts`).
    *
    * The skeleton keeps import statements only, so it can't see
    * `importlib.import_module("...")` or `exec("import ...")`. A file in a layer
@@ -142,7 +142,7 @@ export class Engine {
    * too, layer or not (#219), and so is one INW021 is on for.
    *
    * Inline suppression comments then hide the findings they cover and add
-   * INW009 for the ones that are invalid or unused (see `rules/suppression-comment.ts`).
+   * INW009 for the ones that are invalid or unused (see `rules/suppression-comment/index.ts`).
    * `[tool.inwards.rules]` applies last: findings of rules that are off are
    * dropped, the rest get their configured severity (see `applyRules`).
    *
@@ -255,7 +255,7 @@ export class Engine {
 
   /**
    * Adds the package-shape findings to a file's confirmed ones and applies
-   * its suppression comments (see `rules/suppression-comment.ts`).
+   * its suppression comments (see `rules/suppression-comment/index.ts`).
    *
    * @param src - the source file, with normalised text.
    * @param confirmed - its confirmed findings, and its comments if the full parse read them.

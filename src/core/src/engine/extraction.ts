@@ -31,7 +31,7 @@ import {
 import { skeletonImports } from "../python/prescan.ts";
 import type { TreeReuse } from "../python/reparse.ts";
 import { mentionsDynamicImport } from "../rules/dynamic-import/imports.ts";
-import { commentsIn, mentionsSuppression } from "../rules/suppression-comment.ts";
+import { commentsIn, mentionsSuppression } from "../rules/suppression-comment/index.ts";
 
 /**
  * The extraction revision: part of every cache identity. Bump it whenever
@@ -40,7 +40,7 @@ import { commentsIn, mentionsSuppression } from "../rules/suppression-comment.ts
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "25";
+export const EXTRACTION_REVISION = "26";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {
