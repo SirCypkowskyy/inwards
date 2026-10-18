@@ -1,0 +1,21 @@
+name: Setup Bun in a job-private HOME
+description: >-
+  oven-sh/setup-bun always installs into $HOME/.bun/bin. Self-hosted runners
+  that share one /home/runner then rewrite the bun binary another job is
+  running ("Text file busy", #397), so each self-hosted job gets its own HOME
+  first. GitHub-hosted runners are fresh VMs and keep theirs.
+inputs:
+  bun-version-file:
+    description: File holding the Bun version, relative to the workspace.
+    default: .bun-version
+runs:
+  using: composite
+  steps:
+    - if: runner.environment == 'self-hosted'
+      shell: bash
+      run: |
+        home="$(mktemp -d "$RUNNER_TEMP/home.XXXXXX")"
+        echo "HOME=$home" >> "$GITHUB_ENV"
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      with:
+        bun-version-file: ${{ inputs.bun-version-file }}

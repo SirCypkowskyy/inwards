@@ -6,7 +6,7 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    directories: ["/", "/.github/actions/setup-bun"]
     schedule:
       interval: weekly
     commit-message:
