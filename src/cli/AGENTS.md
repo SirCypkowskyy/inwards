@@ -12,19 +12,20 @@ and the run log. The engine decides; the CLI feeds it and acts on its answer.
 | Folder | Owns | Must not |
 |---|---|---|
 | `main.ts` | argv parsing, picking a command, the process lifecycle; on a worker thread it runs `serveExtractions` instead (ADR-040) | hold logic a test would want to call |
-| `commands/` | one module per command (`check`, `baseline`, `hook`, `rules` for `inwards rules` and `inwards rule`, `daemon`), `rule-sources` for which config key turns each rule on, `usage` for the help text, `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
+| `commands/` | one module per command (`check`, `baseline`, `hook`, `daemon`), `usage` for the help text, `check-runs` for a check over several configs, and `deps` (`AppDeps`, `DaemonDeps`) | import `adapters/` |
 | `claude-code/` | the hook adapter: `dispatch`, `session-start`, `config-guard` (with `shell-reader` and `edit-simulation`), `shape-guard`, `post-tool-use`, `stop-gate` and `changed-files`, `escalation`, `settings` and `hook-host` (whether the agent still has Inwards wired in), and `protocol` (shared by all of them) | read the environment or the filesystem itself |
 | `session/` | the session record and the start record with its witness (`start-record`, #88), start identity and start content (with SessionStart's `start-copies`), the per-invocation `lookups`, the committed-config check (`committed-config`), old errors (#134), agent suppressions (#50), layout changes | read files or run git itself |
 | `project/` | running a check, which files it reads and under which module names, then reading them (`sources`: one batch from 1,000 files, #281), the baseline, config discovery and routing (uv workspace members, `routing`), project snapshots, layer-package symlinks (`links`), virtualenv site-packages, hiding modules added since the start (`absent`), how many threads parse a full check (`threads`, ADR-040), texts laid over the disk for one check, files not yet written included (`overlay`, for `inwards mcp`), the files `diagrams` names (`diagrams`), violation fingerprints (`fingerprint`, shared by the session record, escalation and the run log), and the checks only a whole-project run makes (`whole`) | own a filesystem walk (that is `adapters/file-walk.ts`) or start a thread (that is `adapters/extraction-pool.ts`) |
 | `runlog/` | an ADR-047 slice: `index.ts` its face (`statsCommand`, `createRunLog`, `RunLog`, and the readers the tests use), `cli.ts` the `inwards stats` handler, `contracts.ts` (`ExportFiles`, `StatsDeps`), `commands/` writing the run log (`_record`), `queries/` reading it back (`_runs`), the numbers (`_stats`) and `--export` (`_export`), and `adapters/export-files.ts` for the export key and file | keep notes in a module global, or let `queries/` import `commands/` |
 | `init/` | an ADR-047 slice: `index.ts` its face (the five handlers and `STYLE_NAMES` for the help text), `cli.ts` the `inwards init` handler, `contracts.ts` (`InitDeps`, `InitFiles`, `Picker`, `InitFlags`), and private modules for agent wiring (`_claude` with its `.mcp.json` in `_mcp-json`, `_opencode`, `_agents`), `--style auto`'s name table and command (`_auto`, `_auto-command`), the scaffold plan, the report, presets and the text their templates add (`_template-text`), marked sections in Markdown files (`_section`) and appending an imported table (`_append-table`). Three mini-domains, each with its `index.ts` and `cli.ts`: `brief/` (the architecture brief for `--brief` and `inwards context`, with its opt-in rules part), `diagram/` (`inwards diagram`, and `inwards import-diagram` with the table a read diagram becomes) and `import-linter/` (`inwards import-config`). `adapters/files.ts` writes, `adapters/picker.ts` asks on a terminal and loads `@clack/prompts` with a dynamic `import()` | write files itself (`InitFiles` does), or re-export an adapter from `index.ts` |
+| `rules/` | an ADR-047 slice: `index.ts` its face (`rulesCommand`, `ruleCommand`), `cli.ts` the `inwards rules` and `inwards rule` handlers, `_sources.ts` which config key turns each rule on, `page/` the rule-page reader (`readRulePage`, `RulePage`) with its own `index.ts`, and `adapters/pages.ts` embedding the English rule pages as text | import the SDK, or re-export `adapters/pages.ts` from `index.ts` |
 | `paths/` | path text (`lexical`), the physical meaning of `..` (`physical`), display paths (`display`) | feed a display path into an identity check |
 | `daemon/` | the hook daemon's side of ADR-039: the `inwards-daemon/1` wire format and the daemon's file names (`protocol`), the hook's side (`viaDaemon` and `askDaemon` in `client`), the request handler (`server`), the caches kept between requests (`memory`), and the `DaemonLink` and `DaemonHost` contracts | do I/O (the socket, the record and the lock are `adapters/daemon-*.ts`) |
 | `lsp/` | the language server slice (`inwards server`, ADR-041), the first one in the ADR-047 layout: the `server` handler (`cli`, re-exported by `index`), when to run a whole pass or a one-document check (`_session`), the two checks through `planCheck` and `runCheck` (`_checks`), what each file shows (`_publish`), which file events matter (`_events`), the `Editor`, `LanguageServer` and `ServerCheck` contracts, and the LSP connection over stdio (`adapters/connection`) | import the protocol library or touch a stream outside `lsp/adapters/` |
 | `mcp/` | the MCP server slice (`inwards mcp`, ADR-042) in the ADR-047 layout: the `mcp` handler (`cli`), re-exported by `index` with `explainRule` for `inwards rules`, the three tools (`_check-files`, `_explain-rule` with `_rule-page`, `_where` with `_where-answer` and `_hints`), their arguments and answers and the `RulePages` type (`contracts`), running them one at a time (`_tools`), and the MCP connection over stdio with the SDK and Zod (`adapters/connection`) | import the SDK or Zod, or touch a stream, outside `mcp/adapters/` |
 | `platform/` | the contracts for everything outside the process, `print()`, and `time.ts`, the one place that may name `Date` to parse a recorded timestamp | implement any of them |
 | `json/` | type guards for parsed JSON and TOML | import anything |
-| `adapters/` | `node:fs`, git, the environment, stdio, state and baseline files, the grammars, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`), and the rule pages `inwards mcp` serves (`rule-pages`, embedded as text); `compose.ts` wires them into `AppDeps` | hold policy |
+| `adapters/` | `node:fs`, git, the environment, stdio, state and baseline files, the grammars, TOML, the extraction cache on disk (`extraction-cache`, `extraction-store`, `extraction-entry`), the worker threads (`extraction-pool`, `extraction-worker`, ADR-040), the daemon's socket, lock and record (`daemon-link`, `daemon-host`, `daemon-loop`, `daemon-files`); `compose.ts` wires them into `AppDeps` | hold policy |
 
 ## Dependency rules
 
@@ -43,13 +44,13 @@ only `platform` and `json` (and the engine's API); `commands/` and the
 `AppDeps` until step 14 moves it to the root; `main.ts` imports its
 `index.ts`, `commands/deps.ts` and `adapters/compose.ts` its `contracts.ts`. `mcp/` sits beside them with the same
 imports as `lsp/`, plus `commands/check-runs.ts` for `runPlan`; `main.ts` and
-`commands/rules.ts` import its `index.ts`, `commands/deps.ts` and
+`rules/cli.ts` import its `index.ts`, `commands/deps.ts` and
 `adapters/compose.ts` its `contracts.ts`, and `compose.ts` loads
 `mcp/adapters/connection.ts` with a dynamic `import()`, so the SDK and Zod
 stay in a chunk only `inwards mcp` reads. Only the root (`main.ts`, and `adapters/compose.ts` until it moves up)
 imports `adapters/` or a slice's `adapters/`. `init/`'s handlers take `AppDeps`
 from `commands/deps.ts` too, until step 14, and `commands/usage.ts` reads
-`STYLE_NAMES` and `AGENTS` from `init/`. `eval/` may
+`STYLE_NAMES` and `AGENTS` from `init/`. `rules/` imports `platform`, `json`, `project`, `commands/deps.ts` and `mcp/index.ts` (for `explainRule`); `mcp/` reads the page reader through `rules/page/index.ts`, not `rules/index.ts`, which would close a cycle; `main.ts` imports `rules/index.ts` and `compose.ts` loads `rules/adapters/pages.ts` with a dynamic `import()`. `eval/` may
 import `claude-code/protocol.ts` and nothing else.
 
 Enforced by:
@@ -109,7 +110,7 @@ is off for every `index.ts`. `test/integration/architecture.test.ts` probes
 both, and its `MIGRATED_SLICES` list holds the folders the naming check
 walks: a move PR adds its folder there.
 
-`lsp/` moved first (#418), then `mcp/` (#419), and later steps copy them:
+`lsp/` moved first (#418), then `mcp/` (#419), and later steps copy them (`rules/`, #420, is the third mini-domain case: `page/` exists so `mcp/` can import the page reader without a cycle):
 
 1. Move the files and rewrite the imports with
    `bun run scripts/move-slice.ts OLD=NEW...` (repo-relative paths). It runs
@@ -196,7 +197,7 @@ A module-level `Map` or array that grows at run time is a bug.
   Zod schema and registration in `mcp/adapters/connection.ts`. Test it with
   `test/support/mcp-client.ts`: in process through the SDK's client, and over
   stdio against `run.ts`'s `CMD`, which is the compiled binary in CI.
-- **A new rule's page.** `adapters/rule-pages.ts` imports every page in
+- **A new rule's page.** `rules/adapters/pages.ts` imports every page in
   `docs/chapters/rules/` as text for `explain_rule`; add the new page's
   import there, or `test/mcp/rule-pages.test.ts` fails.
 - **A new config key.** The engine parses config (`src/core`). The CLI's

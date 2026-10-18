@@ -197,7 +197,7 @@ function nodeMcp(io: Platform): McpDeps {
       const { serveMcp } = await import("../mcp/adapters/connection.ts");
       return await serveMcp(tools);
     },
-    pages: async (): Promise<RulePages> => (await import("./rule-pages.ts")).RULE_PAGES,
+    pages: async (): Promise<RulePages> => (await import("../rules/adapters/pages.ts")).RULE_PAGES,
     check: (
       configPath: string,
       targets: string[] | undefined,

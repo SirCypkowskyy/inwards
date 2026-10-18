@@ -1,7 +1,7 @@
 /**
  * @file `inwards rules` and `inwards rule CODE|NAME` (#341): the rule list for
  * one project, with each rule's state, severity and the config key behind
- * them (`rule-sources.ts`), and one rule's docs page, the same text MCP's
+ * them (`_sources.ts`), and one rule's docs page, the same text MCP's
  * `explain_rule` returns, for agents without an MCP client. The pages come
  * through `McpDeps.pages`, which loads them only when asked, so no other
  * command pays for them. It reads the config through the platform and writes
@@ -9,11 +9,11 @@
  */
 import { relative } from "node:path";
 import { inwardsTable, parseConfig, RULES } from "@inwards/core";
+import type { AppDeps } from "../commands/deps.ts";
 import { explainRule } from "../mcp/index.ts";
 import { print } from "../platform/print.ts";
 import { commandConfig } from "../project/config-discovery.ts";
-import type { AppDeps } from "./deps.ts";
-import { type RuleRow, type RuleSource, ruleRows } from "./rule-sources.ts";
+import { type RuleRow, type RuleSource, ruleRows } from "./_sources.ts";
 
 /** The flags both commands read. */
 interface RulesFlags {

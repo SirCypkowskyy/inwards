@@ -45,7 +45,7 @@ const POLICY = [
  * Folders under src/cli/src already moved to the slice layout of ADR-047.
  * Each migration step adds its folders, so a moved slice can't drift back.
  */
-const MIGRATED_SLICES: readonly string[] = ["lsp", "runlog", "mcp", "init"];
+const MIGRATED_SLICES: readonly string[] = ["lsp", "runlog", "mcp", "init", "rules"];
 /** The run-log fields these tests read. */
 interface LogLine {
   files: string[];

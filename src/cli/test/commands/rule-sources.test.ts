@@ -6,7 +6,7 @@
  */
 import { expect, test } from "bun:test";
 import { inwardsTable, parseConfig } from "@inwards/core";
-import { type RuleRow, ruleRows } from "../../src/commands/rule-sources.ts";
+import { type RuleRow, ruleRows } from "../../src/rules/_sources.ts";
 
 const LAYERS = `[tool.inwards]
 layers = [
