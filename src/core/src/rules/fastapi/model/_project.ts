@@ -85,6 +85,7 @@ export class FastApiProject {
   private readonly resolved = new Map<string, Definition | null>();
   private files: readonly FastApiFile[] | undefined;
   private wiring: WiringGraph | undefined;
+  private edges: WiringGraph | undefined;
   private open: boolean | undefined;
 
   /**
@@ -114,18 +115,21 @@ export class FastApiProject {
    * @returns the graph of apps, routers and inclusions, cached for the check.
    */
   graph(): WiringGraph {
-    this.wiring ??= WiringGraph.build(this.model, this.projectFiles(), this.project.ownerOf);
+    this.wiring ??= WiringGraph.build(this.model, this.fastApiFiles(), this.project.ownerOf);
     return this.wiring;
   }
 
   /**
-   * Every FastAPI file of the project, read once, for the rules that need to
-   * know which file a graph record came from.
+   * Gives the graph for the inclusion questions, built from fewer files in a per-edit check (#404).
    *
-   * @returns the records of every project file that mentions FastAPI.
+   * @returns `graph()`'s edges, unresolved inclusions and schema servers.
    */
-  fastApiFiles(): readonly FastApiFile[] {
-    return this.projectFiles();
+  edgeGraph(): WiringGraph {
+    const slim = this.lazy && this.wiring === undefined;
+    this.edges ??= slim
+      ? WiringGraph.build(this.model, this.model.wiringModels(this.own), this.project.ownerOf)
+      : this.graph();
+    return this.edges;
   }
 
   /**
@@ -278,7 +282,7 @@ export class FastApiProject {
    *   target Inwards can't resolve, so an edge may be missing.
    */
   edgesTo(router: string): readonly Edge[] | null {
-    const graph = this.graph();
+    const graph = this.edgeGraph();
     this.open ??= graph.unresolved.some(({ wiring, file }) => this.mayBeFirstParty(wiring, file));
     const into = graph.into(router).filter((edge) => edge.kind === "include");
     return this.open ? null : into.map(({ wiring, from }) => ({ wiring, parent: from }));
@@ -320,7 +324,7 @@ export class FastApiProject {
    */
   private scanHandlers(): Map<string, AppHandlers> {
     const apps = new Map<string, { handlers: Map<string, HandlerInfo>; open: boolean }>();
-    const registered = this.projectFiles().flatMap((file) =>
+    const registered = this.fastApiFiles().flatMap((file) =>
       file.handlers.map((handler) => ({ file, handler })),
     );
     for (const { file, handler } of registered) {
@@ -411,18 +415,13 @@ export class FastApiProject {
 
   /**
    * Collects every FastAPI file of the project, once: the checked ones as the
-   * adapter handed them in, the rest through the index (text pre-filter first).
+   * adapter handed them in, the rest through the index (text pre-filter first);
+   * for the rules that need to know which file a graph record came from.
    *
    * @returns the records of every project file that mentions FastAPI.
    */
-  private projectFiles(): readonly FastApiFile[] {
-    const checked = new Set(this.own.map((file) => file.module));
-    this.files ??= [
-      ...this.own,
-      ...[...this.project.modules]
-        .filter((module) => !checked.has(module))
-        .flatMap((module) => this.model.moduleModel(module) ?? []),
-    ];
+  fastApiFiles(): readonly FastApiFile[] {
+    this.files ??= this.model.projectModels(this.own, false);
     return this.files;
   }
 }

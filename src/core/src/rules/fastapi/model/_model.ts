@@ -29,6 +29,9 @@ import type { FastApiFile, FastApiObject } from "./_records.ts";
 const MENTIONS =
   /fastapi|FastAPI|APIRouter|include_router|exception_handler|on_event|add_event_handler/u;
 
+/** What puts a record into the wiring graph's edges or schema servers: an inclusion, a mount, a schema route. */
+const WIRING = /include_router|\.[\s\\]*mount\b|openapi\.json/u;
+
 /** How many re-exports `resolve` follows before it gives up (a re-export cycle ends here). */
 const MAX_HOPS = 8;
 
@@ -130,14 +133,47 @@ export class FastApiModel {
    * `fileModel` was given for the same path wins over the one on disk.
    *
    * @param module - a dotted module name.
+   * @param wiringOnly - true to read it only when its text can hold an
+   *   inclusion, a mount or a schema route, the records the graph's edges
+   *   come from; a file that spells none of them adds nothing to the edges.
    * @returns its records, or null when no file holds it or it doesn't mention FastAPI.
    */
-  moduleModel(module: string): FastApiFile | null {
+  moduleModel(module: string, wiringOnly = false): FastApiFile | null {
     const src = this.project.sourceOf(module);
     const text = src === undefined ? "" : normalizeSource(src.text);
-    return src !== undefined && MENTIONS.test(text)
+    return src !== undefined && MENTIONS.test(text) && (!wiringOnly || WIRING.test(text))
       ? this.recordsOf(this.parse({ ...src, text }), src.path)
       : null;
+  }
+
+  /**
+   * Reads the checked files' records and those of the rest of the project's
+   * FastAPI files, through the project index.
+   *
+   * @param own - the checked files' records, which are kept as they are.
+   * @param wiringOnly - true to leave out the files that can't hold an
+   *   inclusion, a mount or a schema route (`moduleModel`).
+   * @returns the records, the checked files first.
+   */
+  projectModels(own: readonly FastApiFile[], wiringOnly: boolean): FastApiFile[] {
+    const checked = new Set(own.map((file) => file.module));
+    return [
+      ...own,
+      ...[...this.project.modules]
+        .filter((module) => !checked.has(module))
+        .flatMap((module) => this.moduleModel(module, wiringOnly) ?? []),
+    ];
+  }
+
+  /**
+   * Reads the checked files' records and those of the project's files that
+   * can hold an inclusion, a mount or a schema route (`projectModels`).
+   *
+   * @param own - the checked files' records.
+   * @returns the records, the checked files first.
+   */
+  wiringModels(own: readonly FastApiFile[]): FastApiFile[] {
+    return this.projectModels(own, true);
   }
 
   /**

@@ -184,7 +184,7 @@ function hiddenByKnown(
   scope: FastApiProject,
   seen: ReadonlySet<string>,
 ): boolean {
-  const into = seen.has(object.name) ? [] : scope.graph().into(object.name);
+  const into = seen.has(object.name) ? [] : scope.edgeGraph().into(object.name);
   const known = into.filter((edge) => edge.kind === "include");
   return (
     known.length > 0 &&
@@ -224,7 +224,7 @@ export function ownPlacement(object: FastApiObject, scope: FastApiProject): Plac
  */
 export function objectHidden(object: FastApiObject, scope: FastApiProject): boolean {
   const off = object.kind === "app" && object.keywords.get("openapi_url")?.value.kind === "none";
-  return hiddenBy(object, off && scope.graph().schemaServers.has(object.name));
+  return hiddenBy(object, off && scope.edgeGraph().schemaServers.has(object.name));
 }
 
 /**
