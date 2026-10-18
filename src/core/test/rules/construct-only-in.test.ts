@@ -229,6 +229,15 @@ def build():
     ]);
   });
 
+  test("a package facade re-exporting its own role module isn't reported (#409)", async () => {
+    const facade = "app/adapters/__init__.py";
+    const options = `role = ["app.adapters.outbound.*"]\nallowed-in = ["app.di", "app.main"]`;
+    const reexport = 'from .outbound.sql import SqlRepo\n\n__all__ = ["SqlRepo"]\n';
+    expect(await inw015(facade, reexport, options)).toEqual([]);
+    const builds = `${reexport}\nREPO = SqlRepo()\n`;
+    expect((await inw015(facade, builds, options)).map((f) => f.split(" ")[0])).toEqual(["5:8"]);
+  });
+
   test("a class reached through a module attribute is reported on the call", async () => {
     const text = "import app.adapters\n\nREPO = app.adapters.outbound.sql.SqlRepo()\n";
     expect((await inw015(INBOUND, text)).map((f) => f.split(" ")[0])).toEqual(["3:8"]);
