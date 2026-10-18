@@ -8,8 +8,8 @@
 
 import { dirname, relative } from "node:path";
 import { ConfigError, type Report } from "@inwards/core";
-import { shownReport } from "../paths/display.ts";
-import { posix } from "../paths/lexical.ts";
+import { shownReport } from "../shared/paths/display.ts";
+import { posix } from "../shared/paths/lexical.ts";
 import type { CheckPlan, CheckUnit } from "./_routing.ts";
 import { threadLimit } from "./_threads.ts";
 import type { CheckDeps } from "./contracts.ts";

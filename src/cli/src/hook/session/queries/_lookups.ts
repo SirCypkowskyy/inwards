@@ -9,7 +9,7 @@
  */
 
 import type { CheckRunner } from "../../../check/contracts.ts";
-import type { FileReader, Git, PathProbe, StateFiles } from "../../../platform/contracts.ts";
+import type { FileReader, Git, PathProbe, StateFiles } from "../../../shared/platform/contracts.ts";
 import { createStartIdentity, readStartCopies, type StartIdentity } from "../commands/index.ts";
 import { createStartContent, type StartContent } from "./_start-content.ts";
 

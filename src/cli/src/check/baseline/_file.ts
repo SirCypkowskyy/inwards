@@ -18,8 +18,8 @@ import {
   ruleLevel,
   stableMessage,
 } from "@inwards/core";
-import { isRecord } from "../../json/guards.ts";
-import type { FileReader, PathProbe } from "../../platform/contracts.ts";
+import { isRecord } from "../../shared/json/guards.ts";
+import type { FileReader, PathProbe } from "../../shared/platform/contracts.ts";
 import type { BaselineWriter } from "../contracts.ts";
 
 /** What reading a baseline needs. */

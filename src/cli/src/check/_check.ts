@@ -24,8 +24,8 @@ import {
   rootPathOf,
   type SourceFile,
 } from "@inwards/core";
-import { posix } from "../paths/lexical.ts";
-import type { PathProbe, Runtime } from "../platform/contracts.ts";
+import { posix } from "../shared/paths/lexical.ts";
+import type { PathProbe, Runtime } from "../shared/platform/contracts.ts";
 import { hideTopLevel } from "./_absent.ts";
 import { checkNamedDiagrams, DIAGRAM_FILE, readDiagrams, splitTargets } from "./_diagrams.ts";
 import { atOrInside, diskTexts, type PlannedFile, planSources, readSources } from "./_sources.ts";

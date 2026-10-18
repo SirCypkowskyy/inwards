@@ -24,9 +24,9 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { nodePathProbe } from "../../adapters/filesystem.ts";
-import { isInside } from "../../paths/lexical.ts";
-import type { StateFiles } from "../../platform/contracts.ts";
+import { nodePathProbe } from "../../shared/adapters/filesystem.ts";
+import { isInside } from "../../shared/paths/lexical.ts";
+import type { StateFiles } from "../../shared/platform/contracts.ts";
 
 /** Session files older than a week (in ms) are pruned when a new session starts. */
 const MAX_AGE_MS = 604_800_000;

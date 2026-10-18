@@ -10,7 +10,7 @@
  */
 import { ConfigError, render } from "@inwards/core";
 import { DIAGRAM_FILE } from "../check/index.ts";
-import { isRecord } from "../json/guards.ts";
+import { isRecord } from "../shared/json/guards.ts";
 import { absoluteFrom, failure } from "./_answers.ts";
 import type { CheckFilesInput, McpCheck, ToolAnswer } from "./contracts.ts";
 

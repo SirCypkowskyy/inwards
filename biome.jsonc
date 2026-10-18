@@ -215,7 +215,7 @@
     },
     {
       // The CLI's policy folders do no I/O of their own: files, git, the
-      // environment and the streams come in through platform/contracts.ts,
+      // environment and the streams come in through shared/platform/contracts.ts,
       // implemented in adapters/ and wired in main.ts (#176). The same goes for
       // the network and the clock: Date, performance and the global object are
       // denied outright, since pattern matching on their uses leaked (a clock
@@ -301,7 +301,7 @@
               "level": "error",
               "options": {
                 "deniedGlobals": {
-                  "Bun": "Bun's APIs belong in src/cli/src/adapters/; take what you need through a contract.",
+                  "Bun": "Bun's APIs belong in src/cli/src/shared/adapters/ or a slice's adapters/; take what you need through a contract.",
                   "process": "Take the environment, cwd and streams from the Runtime and Streams contracts.",
                   "Deno": "The CLI runs on Bun; take I/O through a contract.",
                   "fetch": "Policy code makes no network requests; add a contract and an adapter if it must.",
@@ -309,7 +309,7 @@
                   "XMLHttpRequest": "Policy code makes no network requests; add a contract and an adapter if it must.",
                   "EventSource": "Policy code makes no network connections; add a contract and an adapter if it must.",
                   "performance": "Take durations from the Clock contract (elapsed).",
-                  "Date": "Take the time from the Clock contract; parse a recorded timestamp with platform/time.ts.",
+                  "Date": "Take the time from the Clock contract; parse a recorded timestamp with shared/platform/time.ts.",
                   "globalThis": "Reach nothing through the global object; take what you need through a contract.",
                   "global": "Reach nothing through the global object; take what you need through a contract.",
                   "Function": "No code built from strings."

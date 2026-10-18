@@ -443,12 +443,13 @@ done until both match the code.
   test seam is just indirection.
 - **The CLI's policy does no I/O of its own.** Its feature folders get the
   filesystem, git, the environment, the clock and the streams through
-  `src/cli/src/platform/contracts.ts`; `src/cli/src/adapters/` implements
-  them and only `main.ts` (through `adapters/compose.ts`) wires them in.
+  `src/cli/src/shared/platform/contracts.ts`; `src/cli/src/shared/adapters/`
+  and each slice's `adapters/` implement them and only `main.ts` (through
+  `compose.ts`) wires them in.
   Biome refuses `node:fs`, `node:child_process`, `node:os`, the network
   modules, and the `process`, `Bun`, `fetch`, `performance`, `Date` and
   global-object globals in those folders: the time comes from `Clock`, and
-  `platform/time.ts` parses a recorded timestamp behind the one exception.
+  `shared/platform/time.ts` parses a recorded timestamp behind the one exception.
   fallow's zones refuse imports of `adapters/`.
   Relative paths from the command line resolve against `Runtime.cwd`, never
   the process's own working directory.

@@ -18,8 +18,8 @@
 import { createHmac } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { ConfigError } from "@inwards/core";
-import type { FileReader, PathProbe, Runtime } from "../../platform/contracts.ts";
-import { parseTime } from "../../platform/time.ts";
+import type { FileReader, PathProbe, Runtime } from "../../shared/platform/contracts.ts";
+import { parseTime } from "../../shared/platform/time.ts";
 import type { ExportFiles } from "../contracts.ts";
 import { parseLine, type RunLine } from "./_runs.ts";
 

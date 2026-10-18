@@ -6,9 +6,9 @@
  */
 import { dirname, join, relative } from "node:path";
 import { inwardsTable } from "@inwards/core";
-import { isRecord } from "../json/guards.ts";
-import { posix } from "../paths/lexical.ts";
-import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
+import { isRecord } from "../shared/json/guards.ts";
+import { posix } from "../shared/paths/lexical.ts";
+import type { FileReader, PathProbe, Runtime } from "../shared/platform/contracts.ts";
 import type { Target } from "./contracts.ts";
 
 /** What finding the target reads. */

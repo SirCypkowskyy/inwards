@@ -17,7 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { nodePlatform } from "../../src/adapters/compose.ts";
+import { nodePlatform } from "../../src/compose.ts";
 import { readSession } from "../../src/hook/session/index.ts";
 
 import { inwards, inwardsAsync, LAYERS, payload, project, type RunResult } from "../support/run.ts";

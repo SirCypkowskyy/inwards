@@ -12,9 +12,9 @@
  * `libs/qv_*`); `**`, `?` and character classes match nothing.
  */
 import { dirname, join } from "node:path";
-import { isRecord } from "../json/guards.ts";
-import { isInside } from "../paths/lexical.ts";
-import type { PathKind } from "../platform/contracts.ts";
+import { isRecord } from "../shared/json/guards.ts";
+import { isInside } from "../shared/paths/lexical.ts";
+import type { PathKind } from "../shared/platform/contracts.ts";
 import { sitePackages } from "./_site-packages.ts";
 import type { ProjectIo } from "./contracts.ts";
 

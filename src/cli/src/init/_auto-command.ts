@@ -9,7 +9,7 @@
  */
 import { dirname, join } from "node:path";
 import { parseConfig, VERSION } from "@inwards/core";
-import { print } from "../platform/print.ts";
+import { print } from "../shared/platform/print.ts";
 import { agentChanges, apply, DEFAULT_IGNORE, PRERELEASE } from "./_agents.ts";
 import { autoTable, describeProposal, type Member, type Proposal, propose } from "./_auto.ts";
 import { printCheck } from "./_report.ts";

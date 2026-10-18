@@ -6,8 +6,8 @@
  * decides when to print them and with which exit code.
  */
 import { VERSION } from "@inwards/core";
-import { AGENTS } from "../init/contracts.ts";
-import { STYLE_NAMES } from "../init/index.ts";
+import { AGENTS } from "./init/contracts.ts";
+import { STYLE_NAMES } from "./init/index.ts";
 
 /** Every command `main.ts` routes, in the order the overview lists them. */
 export const COMMANDS = [

@@ -21,7 +21,7 @@ import {
 } from "@inwards/core";
 import type { ProjectIo } from "../check/contracts.ts";
 import { findConfig } from "../check/index.ts";
-import { posix } from "../paths/lexical.ts";
+import { posix } from "../shared/paths/lexical.ts";
 import { absoluteFrom, failure } from "./_answers.ts";
 import { hintOf, leafOf } from "./_hints.ts";
 import {

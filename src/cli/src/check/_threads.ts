@@ -17,7 +17,7 @@ import type {
   ProjectIndex,
   SourceFile,
 } from "@inwards/core";
-import type { Runtime } from "../platform/contracts.ts";
+import type { Runtime } from "../shared/platform/contracts.ts";
 import type { ExtractionPool, ProjectIo } from "./contracts.ts";
 
 /**

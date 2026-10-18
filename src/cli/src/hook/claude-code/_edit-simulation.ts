@@ -8,9 +8,9 @@
  * instead, so a looser match can't slip a change past it.
  */
 import { basename, dirname, join, resolve } from "node:path";
-import { isRecord } from "../../json/guards.ts";
-import { physicalRealpath } from "../../paths/physical.ts";
-import type { PathProbe } from "../../platform/contracts.ts";
+import { isRecord } from "../../shared/json/guards.ts";
+import { physicalRealpath } from "../../shared/paths/physical.ts";
+import type { PathProbe } from "../../shared/platform/contracts.ts";
 
 /** Where a tool's path lands: resolves real paths and symlinks, and knows `~`. */
 export interface Landing {

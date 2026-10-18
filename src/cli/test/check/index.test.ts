@@ -7,8 +7,8 @@
  */
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { nodePlatform, nodeProjectIo } from "../../src/adapters/compose.ts";
 import { indexProject } from "../../src/check/_check.ts";
+import { nodePlatform, nodeProjectIo } from "../../src/compose.ts";
 
 import { LAYERS, project } from "../support/run.ts";
 

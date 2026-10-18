@@ -146,15 +146,14 @@
       { "name": "core-engine", "patterns": ["src/core/src/engine/**"] },
       { "name": "core-report", "patterns": ["src/core/src/report/**"] },
       { "name": "core-dev", "patterns": ["src/core/test/**", "src/core/scripts/**"] },
-      // The CLI, one zone per folder (#176); see src/cli/AGENTS.md for what each owns.
-      // The root (ADR-047): main.ts, and compose.ts until step 14 moves it up
-      // from adapters/. Only the root may import a slice's adapters zone.
+      // The root (ADR-047): main.ts and compose.ts. Only the root may import a
+      // slice's adapters zone. deps.ts and usage.ts (cli-deps) sit beside it.
       {
         "name": "cli-main",
-        "patterns": ["src/cli/src/main.ts", "src/cli/src/adapters/compose.ts"]
+        "patterns": ["src/cli/src/main.ts", "src/cli/src/compose.ts"]
       },
-      { "name": "cli-adapters", "patterns": ["src/cli/src/adapters/**"] },
-      { "name": "cli-commands", "patterns": ["src/cli/src/commands/**"] },
+      { "name": "cli-adapters", "patterns": ["src/cli/src/shared/adapters/**"] },
+      { "name": "cli-deps", "patterns": ["src/cli/src/deps.ts", "src/cli/src/usage.ts"] },
       // The hook slice (`inwards hook`, ADR-047): the contracts before the rest,
       // since the eval may import that module alone, and its state files before
       // the rest too (the first matching zone wins).
@@ -185,9 +184,9 @@
       // rule pages before the rest.
       { "name": "cli-rules-adapters", "patterns": ["src/cli/src/rules/adapters/**"] },
       { "name": "cli-rules", "patterns": ["src/cli/src/rules/**"] },
-      { "name": "cli-paths", "patterns": ["src/cli/src/paths/**"] },
-      { "name": "cli-platform", "patterns": ["src/cli/src/platform/**"] },
-      { "name": "cli-json", "patterns": ["src/cli/src/json/**"] },
+      { "name": "cli-paths", "patterns": ["src/cli/src/shared/paths/**"] },
+      { "name": "cli-platform", "patterns": ["src/cli/src/shared/platform/**"] },
+      { "name": "cli-json", "patterns": ["src/cli/src/shared/json/**"] },
       { "name": "cli-test", "patterns": ["src/cli/test/**"] },
       // The extension (#176, ADR-043): a thin client that starts `inwards server`
       // and shares nothing with it but the protocol. A file in a new src/ folder
@@ -650,7 +649,7 @@
       {
         "from": "cli-hook",
         // daemon/ is a mini-domain of this slice; its cli.ts takes AppDeps from
-        // commands/deps.ts until step 14 moves it to the root.
+        // deps.ts at the root.
         "allow": [
           "core-api",
           "core-contracts",
@@ -671,7 +670,7 @@
           "cli-paths",
           "cli-check",
           "cli-runlog",
-          "cli-commands",
+          "cli-deps",
           "cli-hook-contracts"
         ]
       },
@@ -703,7 +702,7 @@
       },
       {
         "from": "cli-init",
-        // The handlers take AppDeps from commands/deps.ts until step 14 moves it to the root.
+        // The handlers take AppDeps from deps.ts at the root.
         "allow": [
           "core-api",
           "core-contracts",
@@ -724,7 +723,7 @@
           "cli-paths",
           "cli-check",
           "cli-hook",
-          "cli-commands"
+          "cli-deps"
         ]
       },
       // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
@@ -776,7 +775,7 @@
       },
       {
         "from": "cli-lsp",
-        // cli.ts takes AppDeps from commands/deps.ts until step 14 moves it to the root.
+        // cli.ts takes AppDeps from deps.ts at the root.
         "allow": [
           "core-api",
           "core-contracts",
@@ -796,7 +795,7 @@
           "cli-json",
           "cli-paths",
           "cli-check",
-          "cli-commands"
+          "cli-deps"
         ]
       },
       {
@@ -847,7 +846,7 @@
       },
       {
         "from": "cli-rules",
-        // cli.ts takes AppDeps from commands/ until step 14 moves deps.ts to the root, and
+        // cli.ts takes AppDeps from deps.ts at the root, and
         // explainRule from mcp/, which reads pages through page/.
         "allow": [
           "core-api",
@@ -868,13 +867,13 @@
           "cli-json",
           "cli-paths",
           "cli-check",
-          "cli-commands",
+          "cli-deps",
           "cli-mcp"
         ]
       },
       {
         "from": "cli-mcp",
-        // cli.ts takes AppDeps and runPlan from commands/ until step 14 moves deps.ts to the root.
+        // cli.ts takes AppDeps and runPlan from deps.ts at the root.
         "allow": [
           "core-api",
           "core-contracts",
@@ -894,12 +893,12 @@
           "cli-json",
           "cli-paths",
           "cli-check",
-          "cli-commands",
+          "cli-deps",
           "cli-rules"
         ]
       },
       {
-        "from": "cli-commands",
+        "from": "cli-deps",
         "allow": [
           "core-api",
           "core-contracts",
@@ -948,7 +947,7 @@
           "cli-paths",
           "cli-check",
           "cli-runlog",
-          "cli-commands"
+          "cli-deps"
         ]
       },
       {
@@ -969,7 +968,7 @@
           "core-engine",
           "core-report",
           "cli-adapters",
-          "cli-commands",
+          "cli-deps",
           "cli-init",
           "cli-platform",
           "cli-check",
@@ -1009,7 +1008,7 @@
           "core-report",
           "cli-main",
           "cli-adapters",
-          "cli-commands",
+          "cli-deps",
           "cli-check",
           "cli-hook",
           "cli-hook-contracts",

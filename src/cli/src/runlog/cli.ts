@@ -6,8 +6,8 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { projectConfigs } from "../check/index.ts";
-import type { Platform } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
+import type { Platform } from "../shared/platform/contracts.ts";
+import { print } from "../shared/platform/print.ts";
 import type { StatsDeps } from "./contracts.ts";
 import { computeStats, exportRunLogs, logDirs, readRunLogs, type Stats } from "./queries/index.ts";
 

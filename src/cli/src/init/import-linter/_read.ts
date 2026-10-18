@@ -10,7 +10,7 @@
  * `;` comments, and errors on duplicates. It skips `%` interpolation, which
  * module names never need. No I/O: the caller supplies the text.
  */
-import { isRecord } from "../../json/guards.ts";
+import { isRecord } from "../../shared/json/guards.ts";
 
 /** One option's value: a single line, or the lines of a multi-line value or TOML array. */
 export type OptionValue = string | readonly string[];

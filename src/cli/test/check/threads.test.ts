@@ -17,7 +17,6 @@ import {
   parseConfig,
   type SourceFile,
 } from "@inwards/core";
-import { loadGrammars } from "../../src/adapters/grammars.ts";
 import {
   checkOnThreads,
   DEFAULT_MAX_THREADS,
@@ -27,6 +26,7 @@ import {
   threadLimit,
 } from "../../src/check/_threads.ts";
 import type { ExtractionPool } from "../../src/check/contracts.ts";
+import { loadGrammars } from "../../src/shared/adapters/grammars.ts";
 import { LAYERS } from "../support/run.ts";
 
 describe("threadLimit", () => {

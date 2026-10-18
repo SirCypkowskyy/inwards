@@ -18,8 +18,8 @@ import {
   type GrammarBinaries,
   type SourceFile,
 } from "@inwards/core";
-import { loadGrammars } from "../../../src/adapters/grammars.ts";
 import { startExtractionPool } from "../../../src/check/adapters/extraction-pool.ts";
+import { loadGrammars } from "../../../src/shared/adapters/grammars.ts";
 
 /** Both pools in the child answered every job, and the child exited 0. */
 const BOTH_EXITED = /^ok ok exit 0 after/u;
@@ -203,7 +203,7 @@ describe("the pool answers like this thread", () => {
   test("a process that used the pool exits, stuck workers and all", () => {
     // In its own process: the test runner would hide a worker that keeps the event loop alive.
     const pool = join(import.meta.dir, "../../../src/check/adapters/extraction-pool.ts");
-    const grammars = join(import.meta.dir, "../../../src/adapters/grammars.ts");
+    const grammars = join(import.meta.dir, "../../../src/shared/adapters/grammars.ts");
     const script = `
       import { startExtractionPool } from ${JSON.stringify(pool)};
       import { loadGrammars } from ${JSON.stringify(grammars)};

@@ -10,7 +10,7 @@
  */
 import { relative } from "node:path";
 import { BASELINE_FILE, DIAGRAM_FILE } from "../check/index.ts";
-import { isInside } from "../paths/lexical.ts";
+import { isInside } from "../shared/paths/lexical.ts";
 import type { FileChange } from "./contracts.ts";
 
 /** Files Python can import a module from. */

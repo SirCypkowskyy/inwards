@@ -7,9 +7,9 @@
  * the counts show every violation the new layers find.
  */
 import { dirname, join, relative, resolve } from "node:path";
-import { posix } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
+import { posix } from "../shared/paths/lexical.ts";
+import type { PathProbe } from "../shared/platform/contracts.ts";
+import { print } from "../shared/platform/print.ts";
 import { drawTree, MISSING } from "./_style-text.ts";
 import type { Style } from "./_styles.ts";
 import { AGENTS, type InitContext, type InitPlan } from "./contracts.ts";

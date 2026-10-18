@@ -7,8 +7,8 @@
  * files are read through the injected reader.
  */
 import { dirname, join } from "node:path";
-import type { FileReader } from "../../platform/contracts.ts";
-import { parseTime } from "../../platform/time.ts";
+import type { FileReader } from "../../shared/platform/contracts.ts";
+import { parseTime } from "../../shared/platform/time.ts";
 
 const LINE_BREAK = /\r?\n/u;
 

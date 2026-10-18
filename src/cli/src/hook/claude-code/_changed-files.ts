@@ -16,8 +16,8 @@ import { dirname, join, resolve } from "node:path";
 import type { Diagnostic, InwardsConfig, Report } from "@inwards/core";
 import { CONFIG_DEFAULTS } from "@inwards/core";
 import { findConfig, projectPath } from "../../check/index.ts";
-import { isInside } from "../../paths/lexical.ts";
-import type { Platform } from "../../platform/contracts.ts";
+import { isInside } from "../../shared/paths/lexical.ts";
+import type { Platform } from "../../shared/platform/contracts.ts";
 import type { SessionState, StartLookups } from "../session/index.ts";
 import { agentSuppressions, oldErrors } from "../session/index.ts";
 

@@ -19,9 +19,9 @@
 import { basename, dirname, join } from "node:path";
 import { inwardsTable } from "@inwards/core";
 import { BASELINE_FILE, findConfig } from "../../check/index.ts";
-import { isRecord } from "../../json/guards.ts";
-import { isInside } from "../../paths/lexical.ts";
-import type { Platform } from "../../platform/contracts.ts";
+import { isRecord } from "../../shared/json/guards.ts";
+import { isInside } from "../../shared/paths/lexical.ts";
+import type { Platform } from "../../shared/platform/contracts.ts";
 import { ASK_USER, hookProject } from "../contracts.ts";
 import { applyEdit, landingPath, lexicalPath, normalised } from "./_edit-simulation.ts";
 import { holdsInwardsHooks, userSettingsDir } from "./_settings.ts";

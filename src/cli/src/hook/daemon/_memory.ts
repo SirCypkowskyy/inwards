@@ -10,7 +10,7 @@
  */
 import { createHash } from "node:crypto";
 import type { CachedExtraction, ExtractionCache, ExtractionIdentity } from "@inwards/core";
-import type { Git } from "../../platform/contracts.ts";
+import type { Git } from "../../shared/platform/contracts.ts";
 
 /** How many extractions the daemon keeps, as the language server does. */
 const EXTRACTION_ENTRIES = 5000;

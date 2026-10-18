@@ -8,7 +8,7 @@
  * `extend-select` and `severity`. Pure: the caller reads and parses the file.
  */
 import { type InwardsConfig, RULES, ruleLevel, type Severity } from "@inwards/core";
-import { isRecord } from "../json/guards.ts";
+import { isRecord } from "../shared/json/guards.ts";
 
 /**
  * Why a rule is on or off: `fixed` (INW000, always on), `default` (on by

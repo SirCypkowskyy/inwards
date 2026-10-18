@@ -18,7 +18,7 @@
  * check share it. Git and file reads come in through the contracts.
  */
 import { createHash } from "node:crypto";
-import type { FileReader, Git } from "../../../platform/contracts.ts";
+import type { FileReader, Git } from "../../../shared/platform/contracts.ts";
 import type { Start } from "../../contracts.ts";
 
 /** Start content questions, answered with a per-invocation cache. */

@@ -8,8 +8,8 @@
  */
 import { dirname, resolve } from "node:path";
 import { declaresInwards } from "@inwards/core";
-import { isInside } from "../paths/lexical.ts";
-import type { FileReader, PathProbe, Runtime } from "../platform/contracts.ts";
+import { isInside } from "../shared/paths/lexical.ts";
+import type { FileReader, PathProbe, Runtime } from "../shared/platform/contracts.ts";
 
 /** What a command says when no config is found: the problem, then the next step. */
 export const NO_CONFIG =

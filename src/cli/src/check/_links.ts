@@ -6,8 +6,8 @@
  */
 import { dirname, join, relative, resolve } from "node:path";
 import { type InwardsConfig, type LayerLink, layerPackages } from "@inwards/core";
-import { isInside, posix } from "../paths/lexical.ts";
-import type { FileWalker, PathProbe } from "../platform/contracts.ts";
+import { isInside, posix } from "../shared/paths/lexical.ts";
+import type { FileWalker, PathProbe } from "../shared/platform/contracts.ts";
 
 /**
  * Lists the symlinks in every layer's top-level package (`layerPackages`),

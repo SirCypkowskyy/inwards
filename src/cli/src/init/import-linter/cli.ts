@@ -12,8 +12,8 @@
  */
 import { basename, dirname, join, resolve } from "node:path";
 import { ConfigError } from "@inwards/core";
-import type { AppDeps } from "../../commands/deps.ts";
-import { print } from "../../platform/print.ts";
+import type { AppDeps } from "../../deps.ts";
+import { print } from "../../shared/platform/print.ts";
 import { appendTable, type Pyproject, parsedTable } from "../_append-table.ts";
 import { shown, sourceRoot } from "../_target.ts";
 import { convert } from "./_convert.ts";

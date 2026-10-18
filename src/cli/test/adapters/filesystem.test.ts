@@ -8,7 +8,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { nodeFileReader } from "../../src/adapters/filesystem.ts";
+import { nodeFileReader } from "../../src/shared/adapters/filesystem.ts";
 import { tempDir } from "../support/temp.ts";
 
 const root = tempDir("inwards-fs-");

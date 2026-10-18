@@ -6,8 +6,8 @@
  * contract's job (`adapters/files.ts`).
  */
 import { dirname, join } from "node:path";
-import { isInside } from "../paths/lexical.ts";
-import type { PathProbe } from "../platform/contracts.ts";
+import { isInside } from "../shared/paths/lexical.ts";
+import type { PathProbe } from "../shared/platform/contracts.ts";
 import { scaffoldFiles } from "./_example.ts";
 import type { Style } from "./_styles.ts";
 import type { Change } from "./contracts.ts";

@@ -8,7 +8,7 @@
  */
 
 import { INWARDS_BINARY, LAUNCHER } from "../hook/claude-code/index.ts";
-import { isRecord } from "../json/guards.ts";
+import { isRecord } from "../shared/json/guards.ts";
 import { readIfThere } from "./_section.ts";
 import type { Change, InitContext } from "./contracts.ts";
 

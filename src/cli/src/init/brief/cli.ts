@@ -7,8 +7,8 @@
  */
 
 import { commandConfig } from "../../check/index.ts";
-import type { AppDeps } from "../../commands/deps.ts";
-import { print } from "../../platform/print.ts";
+import type { AppDeps } from "../../deps.ts";
+import { print } from "../../shared/platform/print.ts";
 import { briefFor, withBrief } from "./_brief.ts";
 
 /**

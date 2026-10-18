@@ -5,8 +5,8 @@
  * (`hook/daemon/_client.ts`). Everything it touches comes in as `HookDeps` from `main.ts`.
  */
 import { VERSION } from "@inwards/core";
-import type { Streams } from "../platform/contracts.ts";
-import { print } from "../platform/print.ts";
+import type { Streams } from "../shared/platform/contracts.ts";
+import { print } from "../shared/platform/print.ts";
 import { dispatch } from "./claude-code/index.ts";
 import { type HookDeps, hookProject } from "./contracts.ts";
 import type { DaemonLink } from "./daemon/contracts.ts";

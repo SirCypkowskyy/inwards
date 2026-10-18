@@ -9,8 +9,8 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { declaresInwards, inwardsTable } from "@inwards/core";
-import { isRecord } from "../json/guards.ts";
-import { isInside } from "../paths/lexical.ts";
+import { isRecord } from "../shared/json/guards.ts";
+import { isInside } from "../shared/paths/lexical.ts";
 import { findConfig } from "./_config-discovery.ts";
 import { workspaceMembers } from "./_workspace.ts";
 import type { ProjectIo } from "./contracts.ts";

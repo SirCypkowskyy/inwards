@@ -8,7 +8,7 @@
  */
 import { relative } from "node:path";
 import { moduleNameFor, type SourceFile } from "@inwards/core";
-import { isInside, posix } from "../paths/lexical.ts";
+import { isInside, posix } from "../shared/paths/lexical.ts";
 import { MIN_PARALLEL_FILES } from "./_threads.ts";
 import type { ProjectIo } from "./contracts.ts";
 

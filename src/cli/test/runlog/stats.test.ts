@@ -6,8 +6,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { nodeFileReader } from "../../src/adapters/filesystem.ts";
 import { computeStats, readRunLogs, type Stats } from "../../src/runlog/index.ts";
+import { nodeFileReader } from "../../src/shared/adapters/filesystem.ts";
 import { inwards, LAYERS, project } from "../support/run.ts";
 import { edit, LOG, line, statsOf, withLog } from "../support/stats-helpers.ts";
 
