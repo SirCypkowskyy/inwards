@@ -50,7 +50,7 @@ jobs:
           test "$status" -eq 1
           grep -q '^::error file=examples/broken-app/shop/orders/models.py,line=3,.*title=INW001::' annotations.txt
       - name: Upload to code scanning
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         continue-on-error: ${{ github.event.repository.private }}
         with:
           sarif_file: inwards.sarif
