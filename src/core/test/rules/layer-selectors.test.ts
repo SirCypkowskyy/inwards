@@ -6,6 +6,7 @@
  * moves out of every layer) are covered at the end.
  */
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   type Diagnostic,
   Engine,
@@ -78,6 +79,24 @@ describe("fix steps name the importing module's own slice", () => {
       "in `shop.orders.domain` (for example `shop.orders.domain.ports`)",
     );
     expect(JSON.stringify(d?.fix)).not.toContain("*");
+  });
+
+  test("INW001 points at the template's ports role when the config has one (#441)", async () => {
+    // The repository's own config: the slice template's roles, `ports` among them.
+    const reference = parseConfig(
+      readFileSync(`${import.meta.dir}/../../../../pyproject.toml`, "utf8"),
+    );
+    const refEngine = await Engine.create(grammars(), reference);
+    const services = file("shop/orders/services/place.py", "from shop.orders.api import routes\n");
+    const [d] = check(services, refEngine);
+    expect(d?.code).toBe("INW001");
+    expect(d?.fix.steps[1]).toContain(
+      'in `shop.orders.ports` (layer "slice.ports", the role that holds ports)',
+    );
+    // models sits inside ports, so it can't import a Protocol from there.
+    const models = file("shop/orders/models/order.py", "from shop.orders.api import routes\n");
+    const [m] = check(models, refEngine);
+    expect(m?.fix.steps[1]).not.toContain("holds ports");
   });
 
   test("INW001 from a single-file member invents no module beneath it", () => {
