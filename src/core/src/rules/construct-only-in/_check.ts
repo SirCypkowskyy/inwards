@@ -6,7 +6,8 @@
  * imports a role module at runtime is reported on the import; an import in
  * an `if TYPE_CHECKING:` block is exempt, since it builds nothing, and so is
  * `from <role module> import SomeError`: an exception class is caught or
- * mapped to HTTP, not built as an adapter. A call
+ * mapped to HTTP, not built as an adapter, and a package `__init__.py` that
+ * re-exports a class of its own submodule (INW003's facade, #409). A call
  * that builds a role class reached through a module outside the role (a
  * re-export) is reported on the call (`calls.ts`). INW001 and INW015 can
  * both see an outward import; the engine passes `deferred` so INW001 keeps
@@ -30,6 +31,22 @@ export interface ConstructInputs {
   readonly project: ModuleTrees;
   /** Tells whether another rule (INW001) reports an import in INW015's place. */
   readonly deferred: (ref: ImportRef) => boolean;
+}
+
+/**
+ * Tells whether an import is a package facade re-exporting a class of its own
+ * private module (`app/orders/__init__.py`: `from app.orders._store import
+ * OrderStore`). INW003 makes that the one way in, so it builds nothing; a call
+ * that builds the class in the facade is still reported by the call form, and
+ * so is every caller that builds it through the facade (#409).
+ *
+ * @param src - the checked file.
+ * @param ref - one of its imports.
+ * @param owner - the first-party module the import reaches.
+ * @returns true for a `from` import in `__init__.py` of a module below the package.
+ */
+function reexports(src: SourceFile, ref: ImportRef, owner: string): boolean {
+  return src.isPackage && ref.from !== undefined && owner.startsWith(`${src.module}.`);
 }
 
 /**
@@ -72,6 +89,9 @@ export function checkConstructOnlyIn(
   for (const ref of extractImports(tree, src)) {
     const owner = ref.target === "" ? undefined : project.ownerOf(ref.target);
     if (owner === undefined || !inEntries(scope.role, owner) || ref.typeChecking === true) {
+      continue;
+    }
+    if (reexports(src, ref, owner)) {
       continue;
     }
     covered.push(ref.target);
