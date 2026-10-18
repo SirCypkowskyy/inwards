@@ -55,7 +55,7 @@ interface BriefInput {
 export function architectureBrief(input: BriefInput): string {
   const { config, style, ports } = input;
   const preset = style === undefined ? "" : ` (the ${style.name} preset)`;
-  const where = ports.length === 0 ? "the inner layer" : ports.map(code).join(" or ");
+  const where = portsWhere(config, ports);
   const hasSiblings = config.layers.some((layer) => layer.rank !== undefined);
   const numbered = numbersLayers(config.layers);
   const groups = numbered ? ` (sibling groups: ${siblingGroups(config.layers).join("; ")})` : "";
@@ -76,6 +76,27 @@ export function architectureBrief(input: BriefInput): string {
     ...optInSection(config),
   ];
   return lines.join("\n");
+}
+
+/**
+ * Words where ports live: the probed modules, else the layers that hold ports
+ * (a `ports` role of a template, named with its selector), else the inner layer.
+ *
+ * @param config - the parsed config.
+ * @param ports - the modules the probe found, sorted.
+ * @returns the phrase after "declare a `typing.Protocol` in".
+ */
+function portsWhere(config: InwardsConfig, ports: readonly string[]): string {
+  if (ports.length > 0) {
+    return ports.map(code).join(" or ");
+  }
+  const roles = config.layers.filter((l) => l.name === "ports" || l.name.endsWith(".ports"));
+  if (roles.length === 0) {
+    return "the inner layer";
+  }
+  return roles
+    .map((l) => `the \`${l.name}\` layer (${l.modules.map(code).join(", ")})`)
+    .join(" or ");
 }
 
 /**

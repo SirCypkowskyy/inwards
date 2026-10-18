@@ -109,16 +109,58 @@ export function layerPackages(config: Pick<InwardsConfig, "layers">): string[] {
 }
 
 /**
- * Names where a file's layer should declare a port: the file's own matched
- * prefix (`shop.orders.domain`, never another slice's or the raw selector),
- * with `<prefix>.ports` as an example only when that prefix is a package. A
- * single-file member gets no invented child module.
+ * Finds the module of the layer that holds ports, for a file: an inner layer
+ * named `ports` or `<entry>.ports` (a template's role), its selector filled
+ * in from the file's own module (`shop.*.ports` becomes `shop.orders.ports`).
  *
  * @param file - the importing file, which a layer owns.
  * @param layers - the configured layers, innermost first.
- * @returns e.g. `` `shop.orders.domain` (for example `shop.orders.domain.ports`) ``.
+ * @returns the module and its layer's name, or undefined when no inner layer holds ports.
+ */
+function portsLayer(
+  file: SourceFile,
+  layers: readonly LayerSpec[],
+): { module: string; name: string } | undefined {
+  const own = layerIndexOf(file.module, layers);
+  const segments = file.module.split(".");
+  for (const [index, layer] of layers.entries()) {
+    if (!(layer.name === "ports" || layer.name.endsWith(".ports")) || index === own) {
+      continue;
+    }
+    if (rankOf(layers, index) >= rankOf(layers, own)) {
+      continue;
+    }
+    for (const entry of layer.modules) {
+      const parts = entry.split(".");
+      const fits =
+        !entry.includes("**") &&
+        parts.length <= segments.length &&
+        parts.every((part, i) => part === "*" || i === parts.length - 1 || part === segments[i]);
+      if (fits) {
+        const module = parts.map((part, i) => (part === "*" ? segments[i] : part)).join(".");
+        return { module, name: layer.name };
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Names where a file's layer should declare a port: the inner layer that
+ * holds ports when the config has one (a `ports` role), else the file's own
+ * matched prefix (`shop.orders.domain`, never another slice's or the raw
+ * selector), with `<prefix>.ports` as an example only when that prefix is a
+ * package. A single-file member gets no invented child module.
+ *
+ * @param file - the importing file, which a layer owns.
+ * @param layers - the configured layers, innermost first.
+ * @returns e.g. `` `shop.orders.ports` (layer "slice.ports", the role that holds ports) ``, or `` `shop.orders.domain` (for example `shop.orders.domain.ports`) ``.
  */
 export function portHome(file: SourceFile, layers: readonly LayerSpec[]): string {
+  const ports = portsLayer(file, layers);
+  if (ports !== undefined) {
+    return `\`${ports.module}\` (layer "${ports.name}", the role that holds ports)`;
+  }
   const own = layerMembership(file.module, layers);
   const home = own?.prefix ?? file.module;
   const isPackage = home !== file.module || file.isPackage;

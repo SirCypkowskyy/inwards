@@ -133,6 +133,19 @@ layers = [
     expect(brief).toContain("declare a `typing.Protocol` in the inner layer");
   });
 
+  test("names a template's ports role by layer and selector (#441)", () => {
+    const config = parseConfig(`[tool.inwards]
+layers = [{ name = "slice", modules = ["shop.*"], template = "slice" }]
+[tool.inwards.templates.slice]
+roles = ["models", "ports", "services"]
+`);
+    const brief = architectureBrief({ config, style: undefined, ports: [] });
+    expect(brief).toContain(
+      "declare a `typing.Protocol` in the `slice.ports` layer (`shop.*.ports`)",
+    );
+    expect(brief).not.toContain("the inner layer");
+  });
+
   test("says what sibling layers may import, and gives the innermost siblings the default", () => {
     const config = parseConfig(`[tool.inwards]
 layers = [

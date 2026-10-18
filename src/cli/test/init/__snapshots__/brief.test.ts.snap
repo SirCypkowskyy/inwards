@@ -15,7 +15,7 @@ exports[`inwards context prints the brief for the example config, under 450 toke
 8. slice.factory (\`shop.*.factory\`): may import layers 1-7
 9. bootstrap (\`shop.main\`): may import every other layer
 
-Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in the inner layer and implement it in the outer layer.
+Ports: when an inner layer needs something from an outer one, declare a \`typing.Protocol\` in the \`slice.ports\` layer (\`shop.*.ports\`) and implement it in the outer layer.
 
 Libraries (INW005):
 - slice.models: no web frameworks, database or network clients, \`subprocess\` or \`socket\`
