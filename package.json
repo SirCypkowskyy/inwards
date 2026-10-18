@@ -22,7 +22,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@types/bun": "^1.4.3",
-    "eslint-plugin-jsdoc": "65.3.2",
+    "eslint-plugin-jsdoc": "65.3.6",
     "fallow": "3.33.1",
     "oxlint": "1.88.0",
     "typescript": "^7.0.2"
