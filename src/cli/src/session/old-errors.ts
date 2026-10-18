@@ -13,7 +13,7 @@
  */
 import { resolve } from "node:path";
 import { type Diagnostic, type Report, stableMessage } from "@inwards/core";
-import { fingerprint } from "../project/fingerprint.ts";
+import { fingerprint } from "../check/index.ts";
 import type { Check, Start } from "./contracts.ts";
 import type { StartLookups } from "./lookups.ts";
 

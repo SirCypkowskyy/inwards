@@ -7,6 +7,8 @@
  * builds one `AppDeps` per invocation from the adapters; commands never
  * import an adapter themselves.
  */
+
+import type { BaselineWriter, CheckRunner } from "../check/contracts.ts";
 import type { HookDeps } from "../claude-code/protocol.ts";
 import type { DaemonHost, DaemonLink } from "../daemon/contracts.ts";
 import type { HookRequest } from "../daemon/protocol.ts";
@@ -14,9 +16,7 @@ import type { InitDeps } from "../init/contracts.ts";
 import type { Editor, LanguageServer, ServerCheck } from "../lsp/contracts.ts";
 import type { McpTools, RulePages } from "../mcp/contracts.ts";
 import type { Platform } from "../platform/contracts.ts";
-import type { BaselineWriter } from "../project/contracts.ts";
 import type { ExportFiles } from "../runlog/contracts.ts";
-import type { CheckRunner } from "../session/contracts.ts";
 
 /** What the hook and `inwards daemon` need for the resident process. */
 export interface DaemonDeps {

@@ -19,8 +19,8 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { fileExtractionCache } from "../../src/adapters/extraction-cache.ts";
-import { MAX_AGE_MS, MAX_SHARD_BYTES } from "../../src/adapters/extraction-store.ts";
+import { fileExtractionCache } from "../../../src/check/adapters/extraction-cache.ts";
+import { MAX_AGE_MS, MAX_SHARD_BYTES } from "../../../src/check/adapters/extraction-store.ts";
 import {
   entryFiles,
   id,
@@ -30,8 +30,8 @@ import {
   textsInShard,
   VALUE,
   WASM,
-} from "../support/cache-helpers.ts";
-import { tempDir } from "../support/temp.ts";
+} from "../../support/cache-helpers.ts";
+import { tempDir } from "../../support/temp.ts";
 
 /** A second-based timestamp from before the entry age limit. */
 const PAST: number = (Date.now() - MAX_AGE_MS - 60_000) / 1000;

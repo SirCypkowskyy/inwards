@@ -9,7 +9,7 @@ import { expect, test } from "bun:test";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { nodePlatform } from "../../src/adapters/compose.ts";
-import { overlayTexts } from "../../src/project/overlay.ts";
+import { overlayTexts } from "../../src/check/_overlay.ts";
 import { project } from "../support/run.ts";
 
 test("a new file and its missing directories appear in the probe, listings, reads and walk", async () => {

@@ -9,9 +9,8 @@
  * caches don't. Pure path text; nothing is read.
  */
 import { relative } from "node:path";
+import { BASELINE_FILE, DIAGRAM_FILE } from "../check/index.ts";
 import { isInside } from "../paths/lexical.ts";
-import { BASELINE_FILE } from "../project/baseline.ts";
-import { DIAGRAM_FILE } from "../project/diagrams.ts";
 import type { FileChange } from "./contracts.ts";
 
 /** Files Python can import a module from. */

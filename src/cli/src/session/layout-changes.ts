@@ -27,9 +27,9 @@ import {
   moduleNameFor,
   packagesOf,
 } from "@inwards/core";
+import { linksUnder } from "../check/index.ts";
 import { isInside, posix } from "../paths/lexical.ts";
 import type { PathProbe } from "../platform/contracts.ts";
-import { linksUnder } from "../project/links.ts";
 import type { StartIdentity } from "./start-identity.ts";
 
 /**

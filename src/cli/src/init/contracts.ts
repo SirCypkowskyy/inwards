@@ -7,8 +7,9 @@
  * parts (planning, target discovery, the picker, the report) depend on this
  * contract instead of on each other. Pure: no I/O.
  */
+
+import type { CheckRunner } from "../check/contracts.ts";
 import type { Platform } from "../platform/contracts.ts";
-import type { CheckRunner } from "../session/contracts.ts";
 import type { StyleName } from "./_styles.ts";
 
 /** The agents `inwards init --agent` can wire Inwards into. */

@@ -159,7 +159,10 @@
       { "name": "cli-protocol", "patterns": ["src/cli/src/claude-code/protocol.ts"] },
       { "name": "cli-claude-code", "patterns": ["src/cli/src/claude-code/**"] },
       { "name": "cli-session", "patterns": ["src/cli/src/session/**"] },
-      { "name": "cli-project", "patterns": ["src/cli/src/project/**"] },
+      // The check slice (`inwards check`, `inwards baseline`, ADR-047): the baseline
+      // writer and the extraction cache and pool before the rest.
+      { "name": "cli-check-adapters", "patterns": ["src/cli/src/check/adapters/**"] },
+      { "name": "cli-check", "patterns": ["src/cli/src/check/**"] },
       // The run log slice (ADR-047): its export storage before the rest, since the
       // first matching zone wins.
       { "name": "cli-runlog-adapters", "patterns": ["src/cli/src/runlog/adapters/**"] },
@@ -507,7 +510,7 @@
       // (rulePacks above) refuses the direct one (#262).
       //
       // The CLI's folders depend downwards: pure leaves (platform, json, paths), then
-      // project, session, runlog, then claude-code and init, then commands.
+      // check, session, runlog, then claude-code and init, then commands.
       // Only adapters/ implements the platform contracts, and only main.ts
       // (through adapters/compose.ts) wires adapters in (#176).
       { "from": "cli-platform", "allow": [] },
@@ -533,7 +536,30 @@
         ]
       },
       {
-        "from": "cli-project",
+        "from": "cli-check-adapters",
+        "allow": [
+          "core-api",
+          "core-contracts",
+          "core-meta",
+          "core-config",
+          "core-python",
+          "core-lookup",
+          "core-rules-shared",
+          "core-rule-layer-dependency",
+          "core-rule-package-shape",
+          "core-rule-unassigned-module",
+          "core-baseline",
+          "core-diagram",
+          "core-engine",
+          "core-report",
+          "cli-platform",
+          "cli-json",
+          "cli-paths",
+          "cli-check"
+        ]
+      },
+      {
+        "from": "cli-check",
         "allow": [
           "core-api",
           "core-contracts",
@@ -574,7 +600,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project"
+          "cli-check"
         ]
       },
       {
@@ -597,7 +623,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project"
+          "cli-check"
         ]
       },
       // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
@@ -623,7 +649,7 @@
       },
       {
         "from": "cli-protocol",
-        "allow": ["cli-platform", "cli-runlog", "cli-session"]
+        "allow": ["cli-platform", "cli-runlog", "cli-session", "cli-check"]
       },
       {
         "from": "cli-claude-code",
@@ -645,7 +671,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-session",
           "cli-runlog",
           "cli-protocol"
@@ -672,7 +698,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-session",
           "cli-claude-code",
           "cli-commands"
@@ -767,7 +793,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-commands"
         ]
       },
@@ -839,7 +865,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-commands",
           "cli-mcp"
         ]
@@ -865,7 +891,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-commands",
           "cli-rules"
         ]
@@ -890,7 +916,7 @@
           "cli-platform",
           "cli-json",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-session",
           "cli-runlog",
           "cli-protocol",
@@ -920,7 +946,7 @@
           "core-report",
           "cli-platform",
           "cli-paths",
-          "cli-project",
+          "cli-check",
           "cli-session",
           "cli-runlog",
           "cli-commands",
@@ -948,7 +974,7 @@
           "cli-commands",
           "cli-init",
           "cli-platform",
-          "cli-project",
+          "cli-check",
           "cli-session",
           "cli-runlog",
           "cli-daemon",
@@ -957,6 +983,7 @@
           "cli-mcp",
           "cli-mcp-adapters",
           "cli-rules",
+          "cli-check-adapters",
           "cli-rules-adapters",
           "cli-runlog-adapters",
           "cli-init-adapters"
@@ -988,7 +1015,7 @@
           "cli-protocol",
           "cli-claude-code",
           "cli-session",
-          "cli-project",
+          "cli-check",
           "cli-runlog",
           "cli-init",
           "cli-paths",
@@ -999,6 +1026,7 @@
           "cli-mcp",
           "cli-mcp-adapters",
           "cli-rules",
+          "cli-check-adapters",
           "cli-rules-adapters"
         ]
       },

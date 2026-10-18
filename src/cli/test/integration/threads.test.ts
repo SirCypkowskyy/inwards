@@ -10,8 +10,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BASELINE_FILE } from "../../src/project/baseline.ts";
-import { MIN_PARALLEL_FILES } from "../../src/project/threads.ts";
+import { MIN_PARALLEL_FILES } from "../../src/check/_threads.ts";
+import { BASELINE_FILE } from "../../src/check/baseline/_file.ts";
 import { inwards, LAYERS, project, type RunResult } from "../support/run.ts";
 
 /** The duration field, the one part of the output that may differ. */

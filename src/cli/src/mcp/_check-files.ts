@@ -9,8 +9,8 @@
  * `inwards check --format json`. The check itself is injected (`McpCheck`).
  */
 import { ConfigError, render } from "@inwards/core";
+import { DIAGRAM_FILE } from "../check/index.ts";
 import { isRecord } from "../json/guards.ts";
-import { DIAGRAM_FILE } from "../project/diagrams.ts";
 import { absoluteFrom, failure } from "./_answers.ts";
 import type { CheckFilesInput, McpCheck, ToolAnswer } from "./contracts.ts";
 

@@ -9,9 +9,8 @@
  */
 import { dirname, resolve } from "node:path";
 import type { ConfigError, Diagnostic } from "@inwards/core";
-import type { ProjectIo } from "../project/contracts.ts";
-import { configListsDiagram, DIAGRAM_FILE } from "../project/diagrams.ts";
-import { type CheckUnit, planCheck } from "../project/routing.ts";
+import type { ProjectIo } from "../check/contracts.ts";
+import { type CheckUnit, configListsDiagram, DIAGRAM_FILE, planCheck } from "../check/index.ts";
 import { isConfigError, messageOf } from "./_convert.ts";
 import type { Editor, ServerCheck } from "./contracts.ts";
 

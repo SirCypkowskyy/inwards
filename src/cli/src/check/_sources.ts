@@ -9,8 +9,8 @@
 import { relative } from "node:path";
 import { moduleNameFor, type SourceFile } from "@inwards/core";
 import { isInside, posix } from "../paths/lexical.ts";
+import { MIN_PARALLEL_FILES } from "./_threads.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { MIN_PARALLEL_FILES } from "./threads.ts";
 
 /** Where a project's modules live: what naming and walking its files needs. */
 interface Project {

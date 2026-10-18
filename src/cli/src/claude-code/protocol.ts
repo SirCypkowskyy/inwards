@@ -6,9 +6,10 @@
  * from `main.ts`; none of them reaches for the environment or the
  * filesystem on its own.
  */
+
+import type { CheckRunner } from "../check/contracts.ts";
 import type { Platform, Runtime } from "../platform/contracts.ts";
 import type { RunLog } from "../runlog/index.ts";
-import type { CheckRunner } from "../session/contracts.ts";
 
 /** Ends every denial. The agent eval (eval/evidence.ts) counts denials by it. */
 export const ASK_USER = "If this really must change, stop and ask the user to do it.";

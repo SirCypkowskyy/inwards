@@ -24,9 +24,9 @@ import {
   type SourceFile,
 } from "@inwards/core";
 import { posix } from "../paths/lexical.ts";
+import type { ListedDiagrams } from "./_diagrams.ts";
+import { layerLinks, linksUnder } from "./_links.ts";
 import type { ProjectIo } from "./contracts.ts";
-import type { ListedDiagrams } from "./diagrams.ts";
-import { layerLinks, linksUnder } from "./links.ts";
 
 /** What these checks need of a loaded project. */
 interface WholeProject {

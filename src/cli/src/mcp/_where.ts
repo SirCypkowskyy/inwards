@@ -19,9 +19,9 @@ import {
   layerIndexOf,
   parseConfig,
 } from "@inwards/core";
+import type { ProjectIo } from "../check/contracts.ts";
+import { findConfig } from "../check/index.ts";
 import { posix } from "../paths/lexical.ts";
-import { findConfig } from "../project/config-discovery.ts";
-import type { ProjectIo } from "../project/contracts.ts";
 import { absoluteFrom, failure } from "./_answers.ts";
 import { hintOf, leafOf } from "./_hints.ts";
 import {

@@ -18,7 +18,6 @@ import {
   type SourceFile,
 } from "@inwards/core";
 import { loadGrammars } from "../../src/adapters/grammars.ts";
-import type { ExtractionPool } from "../../src/project/contracts.ts";
 import {
   checkOnThreads,
   DEFAULT_MAX_THREADS,
@@ -26,7 +25,8 @@ import {
   openPool,
   poolSize,
   threadLimit,
-} from "../../src/project/threads.ts";
+} from "../../src/check/_threads.ts";
+import type { ExtractionPool } from "../../src/check/contracts.ts";
 import { LAYERS } from "../support/run.ts";
 
 describe("threadLimit", () => {

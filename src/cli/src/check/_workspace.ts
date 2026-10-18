@@ -15,8 +15,8 @@ import { dirname, join } from "node:path";
 import { isRecord } from "../json/guards.ts";
 import { isInside } from "../paths/lexical.ts";
 import type { PathKind } from "../platform/contracts.ts";
+import { sitePackages } from "./_site-packages.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { sitePackages } from "./site-packages.ts";
 
 /** What the discovery reads: files, directory listings, path kinds and TOML. */
 type WorkspaceIo = Pick<ProjectIo, "probe" | "read" | "toml">;

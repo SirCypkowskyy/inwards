@@ -7,13 +7,11 @@
  * client closes stdin. Nothing is noted in the run log.
  */
 import type { Report } from "@inwards/core";
-import { runPlan } from "../commands/check-runs.ts";
+import { overlayTexts, planCheck, runPlan } from "../check/index.ts";
 import type { AppDeps } from "../commands/deps.ts";
 import type { McpCheck, McpTools } from "../mcp/contracts.ts";
 import type { Streams } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
-import { overlayTexts } from "../project/overlay.ts";
-import { planCheck } from "../project/routing.ts";
 import { createTools } from "./_tools.ts";
 
 /**

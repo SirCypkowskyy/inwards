@@ -19,10 +19,10 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { fileExtractionCache } from "../../src/adapters/extraction-cache.ts";
-import { MAX_ENTRY_BYTES } from "../../src/adapters/extraction-store.ts";
-import { entryFiles, id, SPAN, VALUE, WASM } from "../support/cache-helpers.ts";
-import { tempDir } from "../support/temp.ts";
+import { fileExtractionCache } from "../../../src/check/adapters/extraction-cache.ts";
+import { MAX_ENTRY_BYTES } from "../../../src/check/adapters/extraction-store.ts";
+import { entryFiles, id, SPAN, VALUE, WASM } from "../../support/cache-helpers.ts";
+import { tempDir } from "../../support/temp.ts";
 
 describe("reading back", () => {
   test("an entry comes back for its identity only", () => {

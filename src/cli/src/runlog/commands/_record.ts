@@ -16,10 +16,8 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { CONFIG_DEFAULTS, type Diagnostic, parseConfig, type Report } from "@inwards/core";
+import { findConfig, fingerprint, projectPath } from "../../check/index.ts";
 import type { Platform } from "../../platform/contracts.ts";
-import { findConfig } from "../../project/config-discovery.ts";
-import { fingerprint } from "../../project/fingerprint.ts";
-import { projectPath } from "../../project/snapshot.ts";
 
 /** Size at which the log is rotated: 5 MiB. */
 const MAX_BYTES = 5_242_880;

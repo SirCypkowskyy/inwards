@@ -12,9 +12,9 @@ import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { parseConfig } from "@inwards/core";
 import { nodePlatform, nodeProjectIo } from "../../src/adapters/compose.ts";
-import { runCheck } from "../../src/project/check.ts";
-import type { ProjectIo } from "../../src/project/contracts.ts";
-import { configListsDiagram, listsDiagram } from "../../src/project/diagrams.ts";
+import { runCheck } from "../../src/check/_check.ts";
+import { configListsDiagram, listsDiagram } from "../../src/check/_diagrams.ts";
+import type { ProjectIo } from "../../src/check/contracts.ts";
 import { LAYERS, project } from "../support/run.ts";
 
 const ON = '\n[tool.inwards.rules]\nextend-select = ["INW017", "INW018"]\n';

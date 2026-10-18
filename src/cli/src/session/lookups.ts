@@ -7,8 +7,9 @@
  * SessionStart's copies of dirty files are read at most once, on the first
  * start content the git blob can't prove.
  */
+
+import type { CheckRunner } from "../check/contracts.ts";
 import type { FileReader, Git, PathProbe, StateFiles } from "../platform/contracts.ts";
-import type { CheckRunner } from "./contracts.ts";
 import { createStartContent, type StartContent } from "./start-content.ts";
 import { readStartCopies } from "./start-copies.ts";
 import { createStartIdentity, type StartIdentity } from "./start-identity.ts";

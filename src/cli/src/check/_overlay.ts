@@ -17,8 +17,8 @@ import type {
   PathProbe,
   WalkedFile,
 } from "../platform/contracts.ts";
+import { atOrInside } from "./_sources.ts";
 import type { ProjectIo } from "./contracts.ts";
-import { atOrInside } from "./sources.ts";
 
 /** A Python source or stub, which the walk for sources may find. */
 const PYTHON = /\.pyi?$/u;
