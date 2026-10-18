@@ -12,7 +12,7 @@ import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ModuleTrees } from "../rules/shared/module-trees.ts";
 import { checkThinEndpoints, type ThinEndpointRun } from "../rules/thin-endpoint/check.ts";
-import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 
 /**
  * Finds INW012's findings in a file, whatever layer it is in. Nothing is

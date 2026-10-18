@@ -11,9 +11,9 @@ import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
-import { checkContextDependencies } from "../rules/context-independence.ts";
+import { checkContextDependencies } from "../rules/context-independence/index.ts";
 import { checkPrivateModules } from "../rules/private-module.ts";
-import { checkPublicApi } from "../rules/public-api-only.ts";
+import { checkPublicApi } from "../rules/public-api-only/index.ts";
 
 /**
  * Tells whether INW021 reports in a file's module.

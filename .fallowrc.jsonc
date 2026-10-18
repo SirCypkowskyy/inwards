@@ -59,31 +59,19 @@
       { "name": "core-diagram", "patterns": ["src/core/src/diagram/**"] },
       {
         "name": "core-rule-unsupported-encoding",
-        "patterns": [
-          "src/core/src/rules/unsupported-encoding.ts",
-          "src/core/src/rules/unsupported-encoding/**"
-        ]
+        "patterns": ["src/core/src/rules/unsupported-encoding/**"]
       },
       {
         "name": "core-rule-layer-dependency",
-        "patterns": [
-          "src/core/src/rules/layer-dependency.ts",
-          "src/core/src/rules/layer-dependency/**"
-        ]
+        "patterns": ["src/core/src/rules/layer-dependency/**"]
       },
       {
         "name": "core-rule-context-independence",
-        "patterns": [
-          "src/core/src/rules/context-independence.ts",
-          "src/core/src/rules/context-independence/**"
-        ]
+        "patterns": ["src/core/src/rules/context-independence/**"]
       },
       {
         "name": "core-rule-public-api-only",
-        "patterns": [
-          "src/core/src/rules/public-api-only.ts",
-          "src/core/src/rules/public-api-only/**"
-        ]
+        "patterns": ["src/core/src/rules/public-api-only/**"]
       },
       {
         "name": "core-rule-private-module",
@@ -95,7 +83,7 @@
       },
       {
         "name": "core-rule-pure-domain",
-        "patterns": ["src/core/src/rules/pure-domain.ts", "src/core/src/rules/pure-domain/**"]
+        "patterns": ["src/core/src/rules/pure-domain/**"]
       },
       {
         "name": "core-rule-unassigned-module",
@@ -110,17 +98,11 @@
       },
       {
         "name": "core-rule-suppression-comment",
-        "patterns": [
-          "src/core/src/rules/suppression-comment.ts",
-          "src/core/src/rules/suppression-comment/**"
-        ]
+        "patterns": ["src/core/src/rules/suppression-comment/**"]
       },
       {
         "name": "core-rule-unknown-first-party",
-        "patterns": [
-          "src/core/src/rules/unknown-first-party.ts",
-          "src/core/src/rules/unknown-first-party/**"
-        ]
+        "patterns": ["src/core/src/rules/unknown-first-party/**"]
       },
       {
         "name": "core-rule-dynamic-import",

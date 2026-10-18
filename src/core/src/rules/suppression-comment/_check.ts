@@ -20,15 +20,15 @@
  * declared encoding a "comment" may be code.
  */
 import type { Node, Parser, Tree } from "web-tree-sitter";
-import { type RuleSettings, ruleLevel } from "../config/rule-settings.ts";
+import { type RuleSettings, ruleLevel } from "../../config/rule-settings.ts";
 import type {
   Diagnostic,
   SourceFile,
   Suppressed,
   SuppressionComment,
-} from "../contracts/records.ts";
-import { diagnostic, RULES } from "../meta/registry.ts";
-import { parsePython } from "../python/parser.ts";
+} from "../../contracts/records.ts";
+import { diagnostic, RULES } from "../../meta/registry.ts";
+import { parsePython } from "../../python/parser.ts";
 
 /** Cheap check before any parse: can the text hold a suppression at all? */
 const MARKER = /inwards:\s*ignore\b/u;

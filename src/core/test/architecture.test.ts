@@ -29,7 +29,15 @@ const CHILD_TOOL_TIMEOUT_MS = 30_000;
  * Folders under src/core/src already moved to the slice layout of ADR-047.
  * Each migration step adds its folders, so a moved slice can't drift back.
  */
-const MIGRATED_SLICES: readonly string[] = [];
+const MIGRATED_SLICES: readonly string[] = [
+  "rules/context-independence",
+  "rules/layer-dependency",
+  "rules/public-api-only",
+  "rules/pure-domain",
+  "rules/suppression-comment",
+  "rules/unknown-first-party",
+  "rules/unsupported-encoding",
+];
 /** The extension of a single-module rule. */
 const TS_SUFFIX = /\.ts$/u;
 

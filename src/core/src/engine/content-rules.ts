@@ -26,7 +26,7 @@ import { checkPortsAbstract } from "../rules/ports-abstract/check.ts";
 import { layerIndexOf, outwardImports } from "../rules/shared/layer-ownership.ts";
 import { ModuleTrees } from "../rules/shared/module-trees.ts";
 import { ThinEndpointRun } from "../rules/thin-endpoint/check.ts";
-import { checkEncoding } from "../rules/unsupported-encoding.ts";
+import { checkEncoding } from "../rules/unsupported-encoding/index.ts";
 import { ormNamingFindings } from "./orm-naming.ts";
 import { thinEndpointFindings } from "./thin-endpoint.ts";
 

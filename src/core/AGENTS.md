@@ -96,7 +96,7 @@ adds its folder there.
 ## Where new code goes
 
 - **A new rule.** Add its entry to `meta/registry.ts`; write it in
-  `rules/<rule-name>.ts` (or a folder when it has parts) using only
+  `rules/<rule-name>/` (`index.ts` re-exporting, the logic in `_check.ts` and other `_` modules; a single module until its slice migrates is fine) using only
   `rules/shared/` and the lower folders; call it from `engine/engine.ts` and
   decide its precedence there; give it a zone and edges in `.fallowrc.jsonc`;
   add `test/rules/<rule-name>.test.ts`; add its page to

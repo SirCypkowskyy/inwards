@@ -15,7 +15,7 @@ import type {
   SuppressionComment,
 } from "../contracts/records.ts";
 import { normalizeSource } from "../python/parser.ts";
-import { mentionsSuppression } from "../rules/suppression-comment.ts";
+import { mentionsSuppression } from "../rules/suppression-comment/index.ts";
 
 /**
  * How a scan reads a file: not at all (outside every layer, nothing else
