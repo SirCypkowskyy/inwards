@@ -7,7 +7,7 @@
 import type { Node } from "web-tree-sitter";
 import type { Span } from "../../contracts/records.ts";
 import { argumentAt } from "../../python/literals.ts";
-import type { PathOperation } from "./records.ts";
+import type { PathOperation } from "./model/index.ts";
 
 /**
  * Spans a syntax node, 1-based.

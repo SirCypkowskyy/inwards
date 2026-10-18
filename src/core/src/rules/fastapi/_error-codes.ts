@@ -18,12 +18,16 @@ import type { Node } from "web-tree-sitter";
 import { argumentAt } from "../../python/literals.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
-import { DEPENDS } from "./extract.ts";
-import { ownNodes } from "./function-body.ts";
-import type { FastApiProject, Lineage } from "./project.ts";
-import type { FastApiObject } from "./records.ts";
-import { statusCode } from "./status.ts";
-import { type Value, valueFrom } from "./values.ts";
+import { ownNodes } from "./_function-body.ts";
+import { statusCode } from "./_status.ts";
+import {
+  DEPENDS,
+  type FastApiObject,
+  type FastApiProject,
+  type Lineage,
+  type Value,
+  valueFrom,
+} from "./model/index.ts";
 
 /** One way an operation produces a status code. */
 export interface CodeSource {

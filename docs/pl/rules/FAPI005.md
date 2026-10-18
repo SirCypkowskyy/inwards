@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI005.md
-source_hash: d0b6be32fe0a610cd92e2d7b14ec658a126cabab44259aa3bee0fa24fcf110da
+source_hash: b9cf40f10aaa15aeacbabef35b5e68c43a8f92870776760aa076020eabdedb58
 type: rule
 title: FAPI005 route-shadowing
 description: Żadna operacja ścieżki FastAPI nie jest przesłonięta przez wcześniejszą z tą samą metodą, więc każda trasa jest osiągalna.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/route-shadowing.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_route-shadowing.ts
 timestamp: 2026-10-09T12:00:00Z
 related_issues: [186, 184, 224]
 ---

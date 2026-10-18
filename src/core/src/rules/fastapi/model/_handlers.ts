@@ -7,10 +7,10 @@
  * recorded by name only; `model.ts` resolves it.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, integerLiteral, keywordOf, namedChildren } from "../../python/nodes.ts";
-import { dictKeys, dictsOf, entryOf, splattedDicts } from "./kwargs.ts";
-import type { Context, ExceptionHandler, FastApiObject, Registration } from "./records.ts";
-import { valueFrom } from "./values.ts";
+import { identifierName, integerLiteral, keywordOf, namedChildren } from "../../../python/nodes.ts";
+import { dictKeys, dictsOf, entryOf, splattedDicts } from "./_kwargs.ts";
+import type { Context, ExceptionHandler, FastApiObject, Registration } from "./_records.ts";
+import { valueFrom } from "./_values.ts";
 
 /** A status constant such as `status.HTTP_404_NOT_FOUND`, which spells its code. */
 const STATUS_NAME = /^HTTP_(?<code>\d{3})(?:_|$)/u;

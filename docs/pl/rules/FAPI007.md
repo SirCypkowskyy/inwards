@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI007.md
-source_hash: 936df38a23cda5e2eb5ef21cc7df90fef24fce46fcc0250f7da8011f23e6e5e1
+source_hash: ad1add103a0eff391b2b199d593b75525d16ed6122d4c64226e5d2306f521a30
 type: rule
 title: FAPI007 yield-dependency-swallows
 description: Zależność z yield rzuca ponownie to, co łapią jej klauzule except, więc błąd w endpoincie nie jest ukryty przed serwerem.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/yield-dependency-swallows.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_yield-dependency-swallows.ts
 timestamp: 2026-10-09T18:00:00Z
 related_issues: [186, 226]
 ---

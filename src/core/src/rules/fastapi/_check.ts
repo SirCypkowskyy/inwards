@@ -7,10 +7,9 @@
 import { type RuleSettings, ruleLevel } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { RULES } from "../../meta/registry.ts";
-import { checkEndpointMetadata } from "./endpoint-metadata.ts";
-import type { FastApiProject } from "./project.ts";
-import type { FastApiFile } from "./records.ts";
-import { checkUndocumentedErrors } from "./undocumented-error-response.ts";
+import { checkEndpointMetadata } from "./_endpoint-metadata.ts";
+import { checkUndocumentedErrors } from "./_undocumented-error-response.ts";
+import type { FastApiFile, FastApiProject } from "./model/index.ts";
 
 /**
  * Tells whether FAPI001 or FAPI002 reports, so the engine can skip them whole.

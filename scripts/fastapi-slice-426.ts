@@ -1,12 +1,16 @@
 /**
- * @file Gives the engine's config/, diagram/, baseline/ and report/ folders a
- * public `index.ts` (ADR-047, #424). Renames each other module to `_name.ts`
- * (through `move-slice.ts`, so imports inside the folder follow), repoint every
- * import from outside the folder at the folder's `index.ts` (merged per file),
- * and write the index from the names those imports use. Tests keep importing
- * the private modules they probe. It is idempotent: rerun it after a rebase conflict.
+ * @file Turns the engine's rules/fastapi/ folder into a slice (ADR-047, #426).
+ * The shared model (model, graph, route-list, path-match, records, project and
+ * what they build on: values, callers, call-sites, extract, handlers, kwargs,
+ * route-class, route-tags, schema-rule, tag-rule) moves into the `model/`
+ * mini-domain with its own `index.ts`; every other module becomes `_name.ts`.
+ * Moves go through `move-slice.ts`, so imports follow. Outside importers are
+ * repointed at `rules/fastapi/index.ts` (merged per file), which re-exports the
+ * model's names too; inside the slice they import `model/index.ts`. Unit tests
+ * keep importing the private modules they probe. It is idempotent: rerun it
+ * after a rebase conflict.
  *
- * Usage: `bun run scripts/engine-indexes-424.ts`.
+ * Usage: `bun run scripts/fastapi-slice-426.ts`.
  */
 // biome-ignore-all lint: one-shot migration script, rerun after a rebase, not product code
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +19,28 @@ import process from "node:process";
 
 const ROOT = join(import.meta.dir, "..");
 const SRC = join(ROOT, "src/core/src");
-const FOLDERS = ["config", "diagram", "baseline", "report"];
+const SLICE = "rules/fastapi";
+const MODEL = "rules/fastapi/model";
+const FOLDERS = [SLICE, MODEL];
+/** The modules that move into `model/`: the shared model and what it builds on. */
+const MODEL_MODULES = [
+  "call-sites",
+  "callers",
+  "extract",
+  "graph",
+  "handlers",
+  "kwargs",
+  "model",
+  "path-match",
+  "project",
+  "records",
+  "route-class",
+  "route-list",
+  "route-tags",
+  "schema-rule",
+  "tag-rule",
+  "values",
+];
 /** An import or re-export with a braced name list, comments aside. */
 const STATEMENT =
   /^(?<kind>import|export)(?<type> type)?\s*\{(?<names>[^}]*)\}\s*from\s*"(?<spec>\.{1,2}\/[^"]+)";\n/gmu;
@@ -55,10 +80,14 @@ type Names = Map<string, boolean>;
  * @throws {Error} when `move-slice.ts` fails.
  */
 function renameModules(): void {
-  const moves = FOLDERS.flatMap((folder) =>
-    readdirSync(join(SRC, folder))
-      .filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_"))
-      .map((name) => `src/core/src/${folder}/${name}=src/core/src/${folder}/_${name}`),
+  const base = "src/core/src/rules/fastapi";
+  const plain = readdirSync(join(SRC, SLICE)).filter(
+    (name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_"),
+  );
+  const moves = plain.map((name) =>
+    MODEL_MODULES.includes(name.replace(/\.ts$/u, ""))
+      ? `${base}/${name}=${base}/model/_${name}`
+      : `${base}/${name}=${base}/_${name}`,
   );
   if (moves.length > 0) {
     const run = Bun.spawnSync(["bun", "run", "scripts/move-slice.ts", ...moves], { cwd: ROOT });
@@ -81,7 +110,10 @@ function repoint(file: string, used: Map<string, Names>): boolean {
   const next = text.replace(STATEMENT, (match, ...args) => {
     const { kind, type, names, spec } = args.at(-1) as Record<string, string | undefined>;
     const target = resolve(dirname(file), spec ?? "");
-    const folder = folderOf(target);
+    const own = folderOf(target);
+    // Outside the slice the model is reached through the slice's index.
+    const inside = file.startsWith(`${join(SRC, SLICE)}/`);
+    const folder = own === MODEL && !inside ? SLICE : own;
     if (!folder || folderOf(file) === folder || !/\/(_[^/]+|index)\.ts$/u.test(target)) {
       return match;
     }
@@ -96,9 +128,11 @@ function repoint(file: string, used: Map<string, Names>): boolean {
       const bare = part.replace(/^type\s+/u, "");
       entry.names.set(bare, (entry.names.get(bare) ?? true) && isType);
       const exported = bare.split(/\s+as\s+/u)[0] as string;
-      const all = used.get(folder) ?? new Map();
-      all.set(exported, (all.get(exported) ?? true) && isType);
-      used.set(folder, all);
+      for (const target of own === MODEL ? [folder, MODEL] : [folder]) {
+        const all = used.get(target) ?? new Map();
+        all.set(exported, (all.get(exported) ?? true) && isType);
+        used.set(target, all);
+      }
     }
     const first = !seen.has(key);
     seen.set(key, entry);
@@ -145,6 +179,20 @@ function writeIndex(folder: string, used: Names): void {
       }
     }
   }
+  if (folder === SLICE) {
+    // What no private module declares comes from the model mini-domain.
+    const found = new Set([...owners.values()].flatMap((names) => [...names.keys()]));
+    const rest = new Map<string, boolean>();
+    for (const [name, isType] of used) {
+      const bare = name.replace(/^type\s+/u, "");
+      if (!found.has(bare)) {
+        rest.set(bare, isType);
+      }
+    }
+    if (rest.size > 0) {
+      owners.set("model/index.ts", rest);
+    }
+  }
   const lines = [...owners]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([module, names]) => {
@@ -162,6 +210,9 @@ function writeIndex(folder: string, used: Names): void {
 renameModules();
 const used = new Map<string, Names>();
 for (const file of files(SRC)) {
+  if (file === join(SRC, SLICE, "index.ts") || file === join(SRC, MODEL, "index.ts")) {
+    continue;
+  }
   if (repoint(file, used)) {
     console.log(`rewrote ${relative(ROOT, file)}`);
   }

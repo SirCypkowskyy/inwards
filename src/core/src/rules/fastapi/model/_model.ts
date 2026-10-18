@@ -13,17 +13,17 @@
  * walk. The model reports nothing; deciding what is wrong is the rules' job.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
-import type { ProjectIndex } from "../../lookup/project-index.ts";
-import { moduleFunctions } from "../../python/nodes.ts";
-import { importedNames, normalizeSource } from "../../python/parser.ts";
-import { type Qualify, qualifierFor } from "../../python/qualify.ts";
-import { type ModuleDefinitions, moduleDefinitions } from "../shared/definitions.ts";
-import { type FoundDefinition, RouterKinds } from "../shared/fastapi-routers.ts";
-import type { FileTrees } from "../shared/module-trees.ts";
-import { type CallSite, CallSites } from "./call-sites.ts";
-import { extract } from "./extract.ts";
-import type { FastApiFile, FastApiObject } from "./records.ts";
+import type { SourceFile } from "../../../contracts/records.ts";
+import type { ProjectIndex } from "../../../lookup/project-index.ts";
+import { moduleFunctions } from "../../../python/nodes.ts";
+import { importedNames, normalizeSource } from "../../../python/parser.ts";
+import { type Qualify, qualifierFor } from "../../../python/qualify.ts";
+import { type ModuleDefinitions, moduleDefinitions } from "../../shared/definitions.ts";
+import { type FoundDefinition, RouterKinds } from "../../shared/fastapi-routers.ts";
+import type { FileTrees } from "../../shared/module-trees.ts";
+import { type CallSite, CallSites } from "./_call-sites.ts";
+import { extract } from "./_extract.ts";
+import type { FastApiFile, FastApiObject } from "./_records.ts";
 
 /** The text pre-filter: a file that spells none of these holds no FastAPI object or wiring. */
 const MENTIONS =

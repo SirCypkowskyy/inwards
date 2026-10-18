@@ -9,7 +9,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/router-wiring.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_router-wiring.ts
 timestamp: 2026-09-28T18:00:00Z
 related_issues: [186, 184]
 ---
@@ -131,7 +131,7 @@ Where it runs:
 - **`inwards check`**, `inwards baseline` and the **Stop gate** report all three kinds, but only in the files they check: a partial run checks its files against the whole project's graph. The Stop gate checks the files the session changed, so a router created or changed in the session blocks if it is still unmounted at the end, and a router that was already unmounted at session start doesn't.
 - **The PostToolUse hook** and the editor report only what one file shows: an inclusion above the routes, and a router that includes itself. Creating a router and wiring it into `main.py` are two edits, and blocking the first would be wrong.
 
-The graph is also what the FastAPI rules that need an inclusion path read ([#183](https://github.com/SirCypkowskyy/inwards/issues/183), [#224](https://github.com/SirCypkowskyy/inwards/issues/224), [#227](https://github.com/SirCypkowskyy/inwards/issues/227)): `rules/fastapi/graph.ts`.
+The graph is also what the FastAPI rules that need an inclusion path read ([#183](https://github.com/SirCypkowskyy/inwards/issues/183), [#224](https://github.com/SirCypkowskyy/inwards/issues/224), [#227](https://github.com/SirCypkowskyy/inwards/issues/227)): `rules/fastapi/model/_graph.ts`.
 
 ## How to fix
 

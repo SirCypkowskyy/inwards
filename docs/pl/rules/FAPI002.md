@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI002.md
-source_hash: 89fcbfa95ca774c1c79f6186014989a69e4c5c4de3e3da6fafa370c67a50a73d
+source_hash: ae5af608a22dff97ff8969aa6dcadc32ceaa647119b4bdf373dfb8c6c2526677
 type: rule
 title: FAPI002 undocumented-error-response
 description: Operacja ścieżki FastAPI może zwrócić kod błędu, bezpośrednio, przez funkcję pomocniczą albo zależność, albo przez handler wyjątków aplikacji, którego jej wpis OpenAPI nie deklaruje.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/undocumented-error-response.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_undocumented-error-response.ts
 timestamp: 2026-09-28T00:00:00Z
 related_issues: [186, 183, 242]
 ---

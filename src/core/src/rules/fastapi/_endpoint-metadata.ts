@@ -17,13 +17,17 @@ import { diagnostic, RULES } from "../../meta/registry.ts";
 import { namedChildren } from "../../python/nodes.ts";
 import type { Qualify } from "../../python/qualify.ts";
 import { joined } from "../shared/words.ts";
-import { flag, list } from "./options.ts";
-import { hiddenBy, objectHidden, placementOf } from "./placement.ts";
-import type { FastApiProject } from "./project.ts";
-import type { FastApiFile, FastApiObject, PathOperation } from "./records.ts";
-import { statusCode } from "./status.ts";
-import { decoratorSpan, decoratorText } from "./syntax.ts";
-import type { Value } from "./values.ts";
+import { flag, list } from "./_options.ts";
+import { hiddenBy, objectHidden, placementOf } from "./_placement.ts";
+import { statusCode } from "./_status.ts";
+import { decoratorSpan, decoratorText } from "./_syntax.ts";
+import type {
+  FastApiFile,
+  FastApiObject,
+  FastApiProject,
+  PathOperation,
+  Value,
+} from "./model/index.ts";
 
 /** FAPI001's options, with their defaults filled in. */
 interface Options {

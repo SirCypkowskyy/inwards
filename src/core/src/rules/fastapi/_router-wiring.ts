@@ -14,9 +14,8 @@ import type { Node } from "web-tree-sitter";
 import { matchEntry, type RuleOptions } from "../../config/index.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES, type RuleMeta } from "../../meta/registry.ts";
-import type { GraphEdge, GraphNode, WiringGraph } from "./graph.ts";
-import { list, optionalList } from "./options.ts";
-import type { FastApiFile, Wiring } from "./records.ts";
+import { list, optionalList } from "./_options.ts";
+import type { FastApiFile, GraphEdge, GraphNode, Wiring, WiringGraph } from "./model/index.ts";
 
 const RULE: RuleMeta = RULES.FAPI003;
 const DONT_DELETE = "Don't delete the router or its routes to make this finding go away.";

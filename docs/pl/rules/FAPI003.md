@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI003.md
-source_hash: f843dd0c76100e99b0d4269b605c672f421248dd0dca41d41f3fba8f2cf3fd2c
+source_hash: 0ea5208b02819f6533ee2dcc225e6cf2dfc88e105809248d0bf588477881371d
 type: rule
 title: FAPI003 router-wiring
 description: Każdy APIRouter z trasami jest dołączony do aplikacji, a routery nie dołączają się nawzajem w cyklu.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/router-wiring.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_router-wiring.ts
 timestamp: 2026-09-28T18:00:00Z
 related_issues: [186, 184]
 ---
@@ -133,7 +133,7 @@ Gdzie działa:
 - **`inwards check`**, `inwards baseline` i **Stop gate** zgłaszają wszystkie trzy rodzaje, ale tylko w plikach, które sprawdzają: częściowe sprawdzenie porównuje swoje pliki z grafem całego projektu. Stop gate sprawdza pliki zmienione w sesji, więc router utworzony lub zmieniony w sesji blokuje, jeśli na końcu wciąż nie jest podpięty, a router niepodpięty już na starcie sesji nie blokuje.
 - **Hook PostToolUse** i edytor zgłaszają tylko to, co widać w jednym pliku: dołączenie nad trasami i router dołączający sam siebie. Utworzenie routera i podpięcie go w `main.py` to dwie edycje, a blokowanie pierwszej byłoby błędem.
 
-Ten sam graf czytają reguły FastAPI, które potrzebują ścieżki dołączeń ([#183](https://github.com/SirCypkowskyy/inwards/issues/183), [#224](https://github.com/SirCypkowskyy/inwards/issues/224), [#227](https://github.com/SirCypkowskyy/inwards/issues/227)): `rules/fastapi/graph.ts`.
+Ten sam graf czytają reguły FastAPI, które potrzebują ścieżki dołączeń ([#183](https://github.com/SirCypkowskyy/inwards/issues/183), [#224](https://github.com/SirCypkowskyy/inwards/issues/224), [#227](https://github.com/SirCypkowskyy/inwards/issues/227)): `rules/fastapi/model/_graph.ts`.
 
 ## Jak naprawić { #how-to-fix }
 

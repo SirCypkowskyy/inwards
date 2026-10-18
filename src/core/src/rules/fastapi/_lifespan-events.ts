@@ -16,10 +16,14 @@
  */
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import type { FastApiProject } from "./project.ts";
-import type { EventHandlerUse, FastApiFile, FastApiObject } from "./records.ts";
-import { decoratorSpan, spanOf } from "./syntax.ts";
-import type { Value } from "./values.ts";
+import { decoratorSpan, spanOf } from "./_syntax.ts";
+import type {
+  EventHandlerUse,
+  FastApiFile,
+  FastApiObject,
+  FastApiProject,
+  Value,
+} from "./model/index.ts";
 
 /** An app or router and the file that builds it. */
 interface Located {

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/rules/FAPI009.md
-source_hash: 12a4b96d5085c499b6d7b531ed4d3b3645084eae27086c5edd74e488b4a4671e
+source_hash: d8b5c10b57ece3b11a15bf4fe84a61164d13e7b307ca3075f6fd789d16aad10e
 type: rule
 title: FAPI009 depends-called
 description: Depends i Security dostają funkcję zależności, a nie wynik jej wywołania przy imporcie.
@@ -11,7 +11,7 @@ suppressible: true
 autofix: false
 status: stable
 tags: [fastapi]
-resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/depends-called.ts
+resource: https://github.com/SirCypkowskyy/inwards/blob/develop/src/core/src/rules/fastapi/_depends-called.ts
 timestamp: 2026-10-09T18:00:00Z
 related_issues: [186, 228]
 ---

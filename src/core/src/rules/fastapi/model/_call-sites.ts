@@ -8,9 +8,9 @@
  * unknown. It reads files and resolves names only through the model's ports.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import type { SourceFile } from "../../contracts/records.ts";
-import { identifierName } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
+import type { SourceFile } from "../../../contracts/records.ts";
+import { identifierName } from "../../../python/nodes.ts";
+import type { Qualify } from "../../../python/qualify.ts";
 
 /** A call to a first-party function, as `callsTo` found it. */
 export interface CallSite {

@@ -9,9 +9,9 @@
  * Once followed, FAPI002 and FAPI003 judge those routers instead of staying quiet.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { WiringGraph } from "../../../src/rules/fastapi/graph.ts";
-import { FastApiModel } from "../../../src/rules/fastapi/model.ts";
-import type { FastApiFile } from "../../../src/rules/fastapi/records.ts";
+import { WiringGraph } from "../../../src/rules/fastapi/model/_graph.ts";
+import { FastApiModel } from "../../../src/rules/fastapi/model/_model.ts";
+import type { FastApiFile } from "../../../src/rules/fastapi/model/_records.ts";
 import { ModuleTrees } from "../../../src/rules/shared/module-trees.ts";
 import { indexOn, parser } from "../../support/helpers.ts";
 import { ERRORS, reported } from "./fixture.ts";

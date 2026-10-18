@@ -42,6 +42,8 @@ const MIGRATED_SLICES: readonly string[] = [
   "rules/diagram-missing-dependency",
   "rules/diagram-unknown-name",
   "rules/dynamic-import",
+  "rules/fastapi",
+  "rules/fastapi/model",
   "rules/import-cycles",
   "rules/layer-dependency",
   "rules/orm-naming",

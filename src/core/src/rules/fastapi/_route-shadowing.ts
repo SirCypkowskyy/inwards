@@ -16,11 +16,16 @@
  */
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
-import { covers } from "./path-match.ts";
-import type { FastApiProject } from "./project.ts";
-import type { FastApiFile, PathOperation } from "./records.ts";
-import { fileRoutes, graphRoutes, type Route } from "./route-list.ts";
-import { decoratorSpan, decoratorText } from "./syntax.ts";
+import { decoratorSpan, decoratorText } from "./_syntax.ts";
+import {
+  covers,
+  type FastApiFile,
+  type FastApiProject,
+  fileRoutes,
+  graphRoutes,
+  type PathOperation,
+  type Route,
+} from "./model/index.ts";
 
 /** Why an operation can't be reached. */
 interface Cover {

@@ -21,8 +21,8 @@ import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
 import type { FileTrees } from "../shared/module-trees.ts";
-import { ownNodes } from "./function-body.ts";
-import { spanOf } from "./syntax.ts";
+import { ownNodes } from "./_function-body.ts";
+import { spanOf } from "./_syntax.ts";
 
 /** The decorators that make a generator something other than a dependency. */
 const NOT_DEPENDENCY = /(?:contextmanager|fixture)\b/u;

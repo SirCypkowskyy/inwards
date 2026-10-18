@@ -10,12 +10,12 @@
  * `model.ts` owns the parse and the lookups.
  */
 import type { Node } from "web-tree-sitter";
-import { argumentAt } from "../../python/literals.ts";
-import { identifierName, moduleNodes, namedChildren } from "../../python/nodes.ts";
-import type { Qualify } from "../../python/qualify.ts";
-import { type RouterBinding, routerBindings } from "../shared/fastapi-routers.ts";
-import { enclosingParameter } from "./callers.ts";
-import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./handlers.ts";
+import { argumentAt } from "../../../python/literals.ts";
+import { identifierName, moduleNodes, namedChildren } from "../../../python/nodes.ts";
+import type { Qualify } from "../../../python/qualify.ts";
+import { type RouterBinding, routerBindings } from "../../shared/fastapi-routers.ts";
+import { enclosingParameter } from "./_callers.ts";
+import { constructorHandlers, handlerOf, splatsOnlyHandlers } from "./_handlers.ts";
 import type {
   Context,
   DependencyUse,
@@ -27,8 +27,8 @@ import type {
   Registration,
   SchemaRoute,
   Wiring,
-} from "./records.ts";
-import { type Argument, callSyntax, valueFrom } from "./values.ts";
+} from "./_records.ts";
+import { type Argument, callSyntax, valueFrom } from "./_values.ts";
 
 /** The names `Depends` and `Security` are imported under. */
 export const DEPENDS: ReadonlySet<string> = new Set([

@@ -9,8 +9,8 @@
  * evaluates syntax and resolves nothing; the caller reads each tag.
  */
 import type { Node } from "web-tree-sitter";
-import { identifierName, namedChildren } from "../../python/nodes.ts";
-import { type TagSet, type Visibility, writtenName } from "./schema-rule.ts";
+import { identifierName, namedChildren } from "../../../python/nodes.ts";
+import { type TagSet, type Visibility, writtenName } from "./_schema-rule.ts";
 
 /** Three-valued truth while a route class's `__init__` is read. */
 type Truth = boolean | "unknown";
