@@ -40,7 +40,7 @@ import { commentsIn, mentionsSuppression } from "../rules/suppression-comment/in
  * what a text yields. `test/engine/extraction-revision.test.ts` fails until
  * it is bumped with them.
  */
-export const EXTRACTION_REVISION = "26";
+export const EXTRACTION_REVISION = "27";
 
 /** The static imports and suppression comments of a full parse. */
 export interface FullExtraction {

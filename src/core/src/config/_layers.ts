@@ -4,9 +4,9 @@
  * template expanded into one layer per role (#97, ADR-036). It owns
  * `LayerSpec`; `parse.ts` calls it and re-exports the type. No I/O.
  */
-import { isSelector, selectorProblem } from "./layer-selector.ts";
-import { type TemplateSpec, templateOf } from "./templates.ts";
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+import { isSelector, selectorProblem } from "./_layer-selector.ts";
+import { type TemplateSpec, templateOf } from "./_templates.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 export interface LayerSpec {
   name: string;

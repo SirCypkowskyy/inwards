@@ -14,7 +14,7 @@
  * the project port reads the modules.
  */
 import type { Node, Tree } from "web-tree-sitter";
-import { entryReach, matchEntry } from "../../config/layer-selector.ts";
+import { entryReach, matchEntry } from "../../config/index.ts";
 import type { SourceFile } from "../../contracts/records.ts";
 import { identifierName, namedChildren } from "../../python/nodes.ts";
 import { importedNames } from "../../python/parser.ts";

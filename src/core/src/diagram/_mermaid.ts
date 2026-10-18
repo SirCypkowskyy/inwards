@@ -10,8 +10,8 @@
  * pure and reads one line at a time. Syntax per
  * https://mermaid.js.org/syntax/flowchart.html.
  */
-import type { MarkedBlock } from "./blocks.ts";
-import type { Diagram, DiagramEdge, NodeLabel, NodeMention, SubgraphMention } from "./model.ts";
+import type { MarkedBlock } from "./_blocks.ts";
+import type { Diagram, DiagramEdge, NodeLabel, NodeMention, SubgraphMention } from "./_model.ts";
 import {
   type Cursor,
   ID,
@@ -20,7 +20,7 @@ import {
   readLink,
   readShape,
   skipSpace,
-} from "./syntax.ts";
+} from "./_syntax.ts";
 
 /** The word a statement starts with. */
 const KEYWORD = /^[A-Za-z]+/u;

@@ -10,8 +10,7 @@
  * breaks a runtime cycle for type hints (#375). Whole-project runs only,
  * since one file can't show a cycle (ADR-032).
  */
-import { type ContextSpec, contextOf } from "../../config/contexts.ts";
-import type { CycleMode } from "../../config/cycles.ts";
+import { type ContextSpec, type CycleMode, contextOf } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { cyclicComponents, type Graph, shortestCycle } from "./graph.ts";

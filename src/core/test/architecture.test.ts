@@ -30,6 +30,10 @@ const CHILD_TOOL_TIMEOUT_MS = 30_000;
  * Each migration step adds its folders, so a moved slice can't drift back.
  */
 const MIGRATED_SLICES: readonly string[] = [
+  "baseline",
+  "config",
+  "diagram",
+  "report",
   "rules/context-independence",
   "rules/layer-dependency",
   "rules/public-api-only",

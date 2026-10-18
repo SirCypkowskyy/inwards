@@ -7,8 +7,7 @@
  * module. It also tells the engine when INW021 needs a file outside every
  * layer read. No I/O: the caller supplies the imports and the index.
  */
-import type { InwardsConfig } from "../config/parse.ts";
-import { ruleLevel } from "../config/rule-settings.ts";
+import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
 import { checkContextDependencies } from "../rules/context-independence/index.ts";

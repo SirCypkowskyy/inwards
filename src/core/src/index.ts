@@ -4,21 +4,27 @@
  * they exchange. Everything else in core is internal and may move; `test/api.test.ts`
  * pins this list, so a change to it is deliberate.
  */
-export { baselineKey, stableMessage } from "./baseline/accepted.ts";
-export { type ContextSpec, contextOf } from "./config/contexts.ts";
-export { CONFIG_DEFAULTS } from "./config/defaults.ts";
-export { diagramBase, diagramMatches } from "./config/diagrams.ts";
-export type { AgentSuppressions } from "./config/hook-keys.ts";
-export type { LayerSpec } from "./config/layers.ts";
-export { declaresInwards, type InwardsConfig, inwardsTable, parseConfig } from "./config/parse.ts";
-export { libraryDenies } from "./config/rule-options.ts";
+export { baselineKey, stableMessage } from "./baseline/index.ts";
 export {
+  type AgentSuppressions,
+  CONFIG_DEFAULTS,
+  ConfigError,
+  type ContextSpec,
   checkRuleOptions,
+  contextOf,
+  declaresInwards,
+  diagramBase,
+  diagramMatches,
+  type InwardsConfig,
+  inwardsTable,
+  type LayerSpec,
+  libraryDenies,
+  type NameRule,
+  parseConfig,
   type RuleSettings,
   ruleLevel,
-} from "./config/rule-settings.ts";
-export type { NameRule, ShapeSpec } from "./config/shape.ts";
-export { ConfigError } from "./config/toml.ts";
+  type ShapeSpec,
+} from "./config/index.ts";
 export type {
   CachedExtraction,
   Diagnostic,
@@ -37,8 +43,12 @@ export type {
   Suppressed,
   SuppressionComment,
 } from "./contracts/records.ts";
-export type { DiagramKind, DiagramNotation } from "./diagram/model.ts";
-export { type DiagramExport, writeDiagram } from "./diagram/write.ts";
+export {
+  type DiagramExport,
+  type DiagramKind,
+  type DiagramNotation,
+  writeDiagram,
+} from "./diagram/index.ts";
 export { checkDiagrams, type DiagramInput, draftDiagrams } from "./engine/diagrams.ts";
 export { type Checked, Engine } from "./engine/engine.ts";
 export { createExtractionWorker } from "./engine/extraction.ts";
@@ -50,7 +60,7 @@ export { RULES } from "./meta/registry.ts";
 export { moduleNameFor } from "./python/module-names.ts";
 export { extractImports, type GrammarBinaries } from "./python/parser.ts";
 export { createTreeReuse, type TreeReuse } from "./python/reparse.ts";
-export { type Format, type RenderOptions, type Report, render } from "./report/render.ts";
+export { type Format, type RenderOptions, type Report, render } from "./report/index.ts";
 export { checkLayers } from "./rules/layer-dependency/index.ts";
 export {
   checkRequired,

@@ -16,10 +16,10 @@ import type {
   DraftDiagramContext,
   DraftDiagramLayer,
 } from "../contracts/records.ts";
-import type { Diagram, NodeMention, SubgraphMention } from "./model.ts";
-import { EXTERNAL, idsWithClass, PUBLIC, quotedLabel, topLevel } from "./names.ts";
-import { notationOf } from "./notation.ts";
-import { readDiagrams } from "./read.ts";
+import type { Diagram, NodeMention, SubgraphMention } from "./_model.ts";
+import { EXTERNAL, idsWithClass, PUBLIC, quotedLabel, topLevel } from "./_names.ts";
+import { notationOf } from "./_notation.ts";
+import { readDiagrams } from "./_read.ts";
 
 /** The layer that holds every context when a file draws no layers diagram. */
 const ONE_LAYER = "app";

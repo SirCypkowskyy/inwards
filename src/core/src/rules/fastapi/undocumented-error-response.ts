@@ -9,7 +9,7 @@
  * can't read, or an inclusion it can't place makes the endpoint (or the code)
  * unknown, and nothing is reported for it.
  */
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import type { RuleOptions } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { joined } from "../shared/words.ts";

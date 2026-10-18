@@ -11,15 +11,15 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { CONTEXT_KEYS } from "../../src/config/contexts.ts";
-import { CONFIG_DEFAULTS } from "../../src/config/defaults.ts";
-import { DEFAULT_GENERATED } from "../../src/config/generated.ts";
-import { LAYER_KEYS } from "../../src/config/layers.ts";
-import { parseConfig, TABLE_KEYS } from "../../src/config/parse.ts";
-import { optionKeys } from "../../src/config/rule-options.ts";
-import { RULE_KEYS } from "../../src/config/rule-settings.ts";
-import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/shape.ts";
-import { TEMPLATE_KEYS } from "../../src/config/templates.ts";
+import { CONTEXT_KEYS } from "../../src/config/_contexts.ts";
+import { CONFIG_DEFAULTS } from "../../src/config/_defaults.ts";
+import { DEFAULT_GENERATED } from "../../src/config/_generated.ts";
+import { LAYER_KEYS } from "../../src/config/_layers.ts";
+import { parseConfig, TABLE_KEYS } from "../../src/config/_parse.ts";
+import { optionKeys } from "../../src/config/_rule-options.ts";
+import { RULE_KEYS } from "../../src/config/_rule-settings.ts";
+import { NAME_KEYS, SHAPE_KEYS } from "../../src/config/_shape.ts";
+import { TEMPLATE_KEYS } from "../../src/config/_templates.ts";
 import { RULES } from "../../src/meta/registry.ts";
 import {
   fileSchemaErrors,

@@ -14,9 +14,7 @@
  * full parse of any other file can stop after its last import line
  * (`Extractor.importsUpTo`). Only the files the check parses take part.
  */
-import type { ContextSpec } from "../config/contexts.ts";
-import type { CycleMode } from "../config/cycles.ts";
-import { CONFIG_DEFAULTS } from "../config/defaults.ts";
+import { CONFIG_DEFAULTS, type ContextSpec, type CycleMode } from "../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import { onlyImportsUpTo } from "../python/prescan.ts";
 import {

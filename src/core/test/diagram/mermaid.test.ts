@@ -6,9 +6,9 @@
  * tested in `test/rules/`.
  */
 import { describe, expect, test } from "bun:test";
-import { markedBlocks } from "../../src/diagram/blocks.ts";
-import { readFlowchart } from "../../src/diagram/mermaid.ts";
-import type { Diagram } from "../../src/diagram/model.ts";
+import { markedBlocks } from "../../src/diagram/_blocks.ts";
+import { readFlowchart } from "../../src/diagram/_mermaid.ts";
+import type { Diagram } from "../../src/diagram/_model.ts";
 
 /**
  * Reads a `.mmd` file made of a marked header and the given body.

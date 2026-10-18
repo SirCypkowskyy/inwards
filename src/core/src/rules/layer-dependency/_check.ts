@@ -4,7 +4,7 @@
  * is decided in `rules/shared/layer-ownership.ts`, shared with INW011; this
  * module words the diagnostic and its fix.
  */
-import type { LayerSpec } from "../../config/layers.ts";
+import type { LayerSpec } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { allowedDirection, outwardImports, portSteps } from "../shared/layer-ownership.ts";

@@ -13,21 +13,26 @@
  * a node that names nothing declared (INW017 reports it). Each forbidden pair
  * is reported once per diagram, at its first arrow. No I/O.
  */
-import { type ContextSpec, isPublicModule, publicModule } from "../../config/contexts.ts";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
-import { applyRules } from "../../config/rule-settings.ts";
-import type { Diagnostic, Fix, Span } from "../../contracts/records.ts";
-import type { Diagram, DiagramEdge } from "../../diagram/model.ts";
 import {
+  applyRules,
+  type ContextSpec,
+  type InwardsConfig,
+  isPublicModule,
+  type LayerSpec,
+  publicModule,
+} from "../../config/index.ts";
+import type { Diagnostic, Fix, Span } from "../../contracts/records.ts";
+import {
+  type Diagram,
+  type DiagramEdge,
   diagramFile,
   EXTERNAL,
   idsWithClass,
+  notationOf,
   quotedLabel,
   resolveName,
   topLevel,
-} from "../../diagram/names.ts";
-import { notationOf } from "../../diagram/notation.ts";
+} from "../../diagram/index.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { joined } from "../shared/words.ts";
 

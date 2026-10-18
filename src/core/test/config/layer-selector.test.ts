@@ -5,7 +5,7 @@
  * configuration guide; a change to either must change both.
  */
 import { describe, expect, test } from "bun:test";
-import { entryReach, filledFrom, matchEntry } from "../../src/config/layer-selector.ts";
+import { entryReach, filledFrom, matchEntry } from "../../src/config/_layer-selector.ts";
 import { ConfigError, layerIndexOf, layerPackages, parseConfig } from "../../src/index.ts";
 import { layerMembership } from "../../src/rules/shared/layer-ownership.ts";
 

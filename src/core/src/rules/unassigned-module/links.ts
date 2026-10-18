@@ -15,10 +15,7 @@
  * root: in the root, the walk names its code by the link, which the layers
  * then own.
  */
-import { entryReach } from "../../config/layer-selector.ts";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
-import { applyRules } from "../../config/rule-settings.ts";
+import { applyRules, entryReach, type InwardsConfig, type LayerSpec } from "../../config/index.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { moduleNameFor } from "../../python/module-names.ts";

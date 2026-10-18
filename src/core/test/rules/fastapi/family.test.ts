@@ -7,7 +7,7 @@
  * suppression tests live next to their checks (#183).
  */
 import { describe, expect, test } from "bun:test";
-import { ruleLevel } from "../../../src/config/rule-settings.ts";
+import { ruleLevel } from "../../../src/config/_rule-settings.ts";
 import { ConfigError, Engine, parseConfig, RULES, render } from "../../../src/index.ts";
 import { diagnostic } from "../../../src/meta/registry.ts";
 import { suppress } from "../../../src/rules/suppression-comment/index.ts";

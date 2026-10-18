@@ -13,24 +13,24 @@
  */
 import { parse } from "smol-toml";
 import { VERSION } from "../meta/product.ts";
-import { type ContextSpec, parseContexts } from "./contexts.ts";
-import { type CycleMode, parseCycles } from "./cycles.ts";
-import { CONFIG_DEFAULTS } from "./defaults.ts";
-import { parseDiagrams } from "./diagrams.ts";
-import { parseGenerated } from "./generated.ts";
+import { type ContextSpec, parseContexts } from "./_contexts.ts";
+import { type CycleMode, parseCycles } from "./_cycles.ts";
+import { CONFIG_DEFAULTS } from "./_defaults.ts";
+import { parseDiagrams } from "./_diagrams.ts";
+import { parseGenerated } from "./_generated.ts";
 import {
   type AgentSuppressions,
   agentSuppressionsKey,
   type StopGate,
   stopGateKey,
-} from "./hook-keys.ts";
-import { isModuleList, type LayerSpec, parseLayers } from "./layers.ts";
-import { delegateProblem, stringList } from "./rule-options.ts";
-import { parseRules, type RuleSettings } from "./rule-settings.ts";
-import { type NameRule, parseShapeKeys, type ShapeSpec } from "./shape.ts";
-import { templateUses, withTemplateRules } from "./template-rules.ts";
-import { parseTemplates, withContextTemplates, withShapeTemplates } from "./templates.ts";
-import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
+} from "./_hook-keys.ts";
+import { isModuleList, type LayerSpec, parseLayers } from "./_layers.ts";
+import { delegateProblem, stringList } from "./_rule-options.ts";
+import { parseRules, type RuleSettings } from "./_rule-settings.ts";
+import { type NameRule, parseShapeKeys, type ShapeSpec } from "./_shape.ts";
+import { templateUses, withTemplateRules } from "./_template-rules.ts";
+import { parseTemplates, withContextTemplates, withShapeTemplates } from "./_templates.ts";
+import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 export interface InwardsConfig {
   /** Directory, relative to the config file, that module names are computed from. */

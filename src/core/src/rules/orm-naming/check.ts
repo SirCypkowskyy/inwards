@@ -11,8 +11,7 @@
  * and neither is an Alembic migration. I/O-free: the caller supplies the
  * run's trees, the files and the options.
  */
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type RuleOptions, stringList } from "../../config/index.ts";
 import type { Diagnostic, Fix, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import type { FileTrees } from "../shared/module-trees.ts";

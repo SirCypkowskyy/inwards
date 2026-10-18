@@ -9,9 +9,8 @@
  * the steps the engine hands it.
  */
 import type { Parser } from "web-tree-sitter";
-import { acceptedModules } from "../baseline/accepted.ts";
-import type { InwardsConfig } from "../config/parse.ts";
-import { applyRules } from "../config/rule-settings.ts";
+import { acceptedModules } from "../baseline/index.ts";
+import { applyRules, type InwardsConfig } from "../config/index.ts";
 import type {
   Diagnostic,
   DiagramSource,

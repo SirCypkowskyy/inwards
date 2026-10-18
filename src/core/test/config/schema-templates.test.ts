@@ -5,7 +5,7 @@
  * the expansion can see fails the parser alone.
  */
 import { describe, expect, test } from "bun:test";
-import { optionKeys } from "../../src/config/rule-options.ts";
+import { optionKeys } from "../../src/config/_rule-options.ts";
 import { RULES } from "../../src/meta/registry.ts";
 import {
   MINIMAL,

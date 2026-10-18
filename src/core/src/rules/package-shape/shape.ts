@@ -12,10 +12,15 @@
  *
  * The exported checks apply `[tool.inwards.rules]` (`applyRules`).
  */
-import type { InwardsConfig } from "../../config/parse.ts";
-import { applyRules } from "../../config/rule-settings.ts";
-import { memberMatches, selects, shapeFor } from "../../config/shape.ts";
-import { type ConfigFile, spanOf } from "../../config/source-span.ts";
+import {
+  applyRules,
+  type ConfigFile,
+  type InwardsConfig,
+  memberMatches,
+  selects,
+  shapeFor,
+  spanOf,
+} from "../../config/index.ts";
 import type { Diagnostic, Fix, Severity, SourceFile, Span } from "../../contracts/records.ts";
 import type { ListDir, ListMembers } from "../../lookup/directory-listing.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";

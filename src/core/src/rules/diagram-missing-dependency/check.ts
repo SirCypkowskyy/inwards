@@ -18,20 +18,21 @@
  * source order. The engine hands over the imports and confirms the files
  * behind a finding with the full parse; this module only reads them. No I/O.
  */
-import { contextOf } from "../../config/contexts.ts";
-import type { InwardsConfig } from "../../config/parse.ts";
+import { contextOf, type InwardsConfig } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile, Span } from "../../contracts/records.ts";
-import type { Diagram, NodeMention, SubgraphMention } from "../../diagram/model.ts";
 import {
+  type Diagram,
   diagramFile,
   EXTERNAL,
   idsWithClass,
   mentionSpan,
+  type NodeMention,
+  notationOf,
   quotedLabel,
   resolveName,
+  type SubgraphMention,
   topLevel,
-} from "../../diagram/names.ts";
-import { notationOf } from "../../diagram/notation.ts";
+} from "../../diagram/index.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { layerMembership } from "../shared/layer-ownership.ts";
 

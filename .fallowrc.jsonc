@@ -13,6 +13,8 @@
     "scripts/claude-payload-drift.ts",
     // Run by hand after a schema change; src/core/test/config/schema.test.ts runs it with --check.
     "scripts/build-pyproject-schema.ts",
+    // Run by hand for #424 (and again after a rebase conflict), like the other migration steps.
+    "scripts/engine-indexes-424.ts",
     "packaging/placeholder/npm/bin.js",
     // VS Code loads dist/extension.js, which `bun run build` bundles from it.
     "src/vscode-extension/src/client/extension.ts",

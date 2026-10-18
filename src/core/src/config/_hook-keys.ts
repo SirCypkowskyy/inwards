@@ -4,7 +4,7 @@
  * `agent-suppressions` (whether the hooks honour a suppression the agent
  * added). `config/parse.ts` calls these validators.
  */
-import { ConfigError } from "./toml.ts";
+import { ConfigError } from "./_toml.ts";
 
 /** What the hooks do with a suppression the agent added, see `InwardsConfig.agentSuppressions`. */
 export type AgentSuppressions = "deny" | "allow";

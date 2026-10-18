@@ -16,8 +16,7 @@
  * modules, each parsed and read once per run (#359).
  */
 import type { Node } from "web-tree-sitter";
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type RuleOptions, stringList } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { parameterTypes } from "../shared/annotations.ts";

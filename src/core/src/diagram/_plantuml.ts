@@ -10,11 +10,11 @@
  * which gives no finding rather than an error. Pure, one line at a time.
  * Syntax per https://plantuml.com/component-diagram.
  */
-import type { MarkedBlock } from "./blocks.ts";
-import type { Diagram, DiagramEdge, NodeMention, SubgraphMention } from "./model.ts";
-import { KEYWORD, type SkipState, skipped } from "./plantuml-skip.ts";
-import { readArrowTo, readName, readRef, stereotypes } from "./plantuml-syntax.ts";
-import { type Cursor, skipSpace } from "./syntax.ts";
+import type { MarkedBlock } from "./_blocks.ts";
+import type { Diagram, DiagramEdge, NodeMention, SubgraphMention } from "./_model.ts";
+import { KEYWORD, type SkipState, skipped } from "./_plantuml-skip.ts";
+import { readArrowTo, readName, readRef, stereotypes } from "./_plantuml-syntax.ts";
+import { type Cursor, skipSpace } from "./_syntax.ts";
 
 /** A space or tab first. */
 const SPACE = /^\s/u;

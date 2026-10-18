@@ -17,7 +17,7 @@
  * view depends only on the options. The run owns the trees.
  */
 import type { Node } from "web-tree-sitter";
-import { entryReach, matchEntry } from "../../config/layer-selector.ts";
+import { entryReach, matchEntry } from "../../config/index.ts";
 import { identifierName } from "../../python/nodes.ts";
 import { parameterTypes } from "../shared/annotations.ts";
 import { passedNames } from "../shared/arguments.ts";

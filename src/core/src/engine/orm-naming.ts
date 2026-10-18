@@ -9,8 +9,7 @@
  * parsed for another rule is not parsed again. No I/O: the caller supplies
  * the files and the run's trees.
  */
-import type { InwardsConfig } from "../config/parse.ts";
-import { ruleLevel } from "../config/rule-settings.ts";
+import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import { checkOrmNaming, projectFindings } from "../rules/orm-naming/check.ts";
 import type { Models } from "../rules/orm-naming/models.ts";

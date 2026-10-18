@@ -10,8 +10,8 @@
  * file: the adapter walks from `diagramBase` and keeps the paths
  * `diagramMatches` accepts.
  */
-import { globMatches, isGlob } from "./glob.ts";
-import { ConfigError } from "./toml.ts";
+import { globMatches, isGlob } from "./_glob.ts";
+import { ConfigError } from "./_toml.ts";
 
 /** A segment that stands for any number of directories. */
 const ANY_DEPTH = "**";

@@ -8,9 +8,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Diagram } from "../../src/diagram/model.ts";
-import { markedPlantUml } from "../../src/diagram/plantuml-blocks.ts";
-import { readDiagrams } from "../../src/diagram/read.ts";
+import type { Diagram } from "../../src/diagram/_model.ts";
+import { markedPlantUml } from "../../src/diagram/_plantuml-blocks.ts";
+import { readDiagrams } from "../../src/diagram/_read.ts";
 
 /** The ArchUnitPython diagrams, copied with their license notice. */
 const FIXTURES = join(import.meta.dir, "fixtures", "archunitpython");

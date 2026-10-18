@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: c5bcc36ddb0e7b29c65dca384ce536f5c217f77fba47bd15139663114f7aa532
+source_hash: f35c0ebd7ba14fc8dd256549956f5e157d641afe662e9d78bd22b22c50793198
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -117,13 +117,13 @@ flowchart LR
     end
 
     subgraph enginebox["Silnik: @inwards/core"]
-        config["<b>Parser konfiguracji</b><br/><small>config/parse.ts<br/>smol-toml, walidacja</small>"]
+        config["<b>Parser konfiguracji</b><br/><small>config/<br/>smol-toml, walidacja</small>"]
         pre["<b>Prescan szkieletu importów</b><br/><small>python/prescan.ts<br/>czyści linie niebędące importami</small>"]
         parser["<b>Adapter parsera</b><br/><small>python/parser.ts<br/>web-tree-sitter</small>"]
         extract["<b>Ekstraktor i resolver importów</b><br/><small>python/parser.ts<br/>względne → bezwzględne</small>"]
         rules["<b>Reguły</b><br/><small>meta/registry.ts: rejestr<br/>rules/: jedna na regułę<br/>layer-dependency: INW001<br/>context-independence: INW002<br/>public-api-only: INW003<br/>import-cycles: INW004<br/>pure-domain: INW005<br/>unassigned-module: INW006<br/>package-shape: INW007 + INW008<br/>suppression-comment: INW009<br/>unknown-first-party: INW010<br/>dynamic-import: INW011<br/>thin-endpoint: INW012<br/>async-blocking: INW013<br/>ports-abstract: INW014<br/>construct-only-in: INW015<br/>orm-naming: INW016<br/>diagram-unknown-name: INW017<br/>diagram-forbidden-edge: INW018<br/>diagram-missing-dependency: INW019<br/>adapter-conformance: INW020<br/>private-module: INW021<br/>unsupported-encoding: INW000</small>"]
         fix["<b>Kompozytor poprawek</b><br/><small>kroki dla każdego naruszenia</small>"]
-        report["<b>Reportery</b><br/><small>report/render.ts<br/>text · concise · json · sarif · github</small>"]
+        report["<b>Reportery</b><br/><small>report/<br/>text · concise · json · sarif · github</small>"]
         engine["<b>Fasada silnika</b><br/><small>engine/engine.ts<br/>checkFile / checkFiles / check / checkWith / index</small>"]
         modgraph["<b>Indeks modułów</b><br/><small>lookup/project-index.ts: własne moduły,<br/>moduły importujące na żądanie</small>"]
     end
@@ -447,20 +447,20 @@ src/
 │   │   ├── contracts/     # records.ts: SourceFile, ImportRef, Diagnostic, Fix, Span, Suppressed
 │   │   ├── meta/          # product.ts (VERSION, DOCS_BASE), registry.ts (every rule's code,
 │   │   │                  #   name, severity, docs link; diagnostic())
-│   │   ├── config/        # [tool.inwards]: parse.ts, rule-settings.ts ([tool.inwards.rules]),
-│   │   │                  #   shape.ts (shapes and names), generated.ts, glob.ts (fnmatch),
-│   │   │                  #   diagrams.ts (the diagrams key and its path globs),
-│   │   │                  #   source-span.ts (where a value sits in pyproject.toml), toml.ts
+│   │   ├── config/        # [tool.inwards]: index.ts (the face; the modules are _x.ts), _parse.ts, _rule-settings.ts ([tool.inwards.rules]),
+│   │   │                  #   _shape.ts (shapes and names), _generated.ts, _glob.ts (fnmatch),
+│   │   │                  #   _diagrams.ts (the diagrams key and its path globs),
+│   │   │                  #   _source-span.ts (where a value sits in pyproject.toml), _toml.ts
 │   │   ├── python/        # parser.ts (tree-sitter, import extraction), module-names.ts,
 │   │   │                  #   prescan.ts (import skeleton), encoding.ts (PEP 263),
 │   │   │                  #   literals.ts, stdlib.ts, qualify.ts (names through imports)
 │   │   │                  #   private-modules.ts (which module names are private)
-│   │   ├── diagram/       # blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
-│   │   │                  #   mermaid.ts and syntax.ts (the flowchart reader), plantuml-blocks.ts,
-│   │   │                  #   plantuml.ts, plantuml-syntax.ts and plantuml-skip.ts (PlantUML),
-│   │   │                  #   read.ts (either reader), model.ts, names.ts (what a node names),
-│   │   │                  #   notation.ts (hints in the diagram's syntax), draft.ts (import-diagram),
-│   │   │                  #   write.ts (the config as a diagram, for inwards diagram)
+│   │   ├── diagram/       # index.ts (the face; the modules are _x.ts), _blocks.ts (marked Mermaid blocks in Markdown and .mmd files),
+│   │   │                  #   _mermaid.ts and _syntax.ts (the flowchart reader), _plantuml-blocks.ts,
+│   │   │                  #   _plantuml.ts, _plantuml-syntax.ts and _plantuml-skip.ts (PlantUML),
+│   │   │                  #   _read.ts (either reader), _model.ts, _names.ts (what a node names),
+│   │   │                  #   _notation.ts (hints in the diagram's syntax), _draft.ts (import-diagram),
+│   │   │                  #   _write.ts (the config as a diagram, for inwards diagram)
 │   │   ├── lookup/        # project-index.ts (the engine's project input), module-lookup.ts,
 │   │   │                  #   directory-listing.ts (the ListDir and ListMembers ports)
 │   │   ├── rules/         # one module or folder per rule, named after it (migrated: index.ts + _check.ts); they share only shared/
@@ -511,13 +511,13 @@ src/
 │   │   │                                #   (FAPI007), duplicate-operation-id.ts (FAPI008),
 │   │   │                                #   depends-called.ts (FAPI009), function-body.ts (a
 │   │   │                                #   function's own yield, return and try statements)
-│   │   ├── baseline/      # accepted.ts: baseline keys, which findings a baseline accepts
+│   │   ├── baseline/      # index.ts (the face), _accepted.ts: baseline keys, which findings a baseline accepts
 │   │   ├── engine/        # engine.ts: the facade, rule precedence, the baseline shortcut;
 │   │   │                  #   fastapi.ts runs the FAPI rules that are on, thin-endpoint.ts INW012,
 │   │   │                  #   content-rules.ts INW013 to INW015 and INW020, orm-naming.ts INW016,
 │   │   │                  #   diagrams.ts INW017 to INW019,
 │   │   │                  #   package-boundaries.ts INW002, INW003 and INW021
-│   │   └── report/        # render.ts: text / concise / json / sarif; github.ts
+│   │   └── report/        # index.ts (the face), _render.ts: text / concise / json / sarif; _github.ts
 │   ├── scripts/           # prescan-diff.ts: the differential test
 │   └── test/              # mirrors src/, plus api.test.ts and architecture.test.ts
 ├── cli/

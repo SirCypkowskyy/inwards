@@ -35,7 +35,7 @@
  * running that takes `exec` or `eval`, which are reported themselves.
  */
 import type { Parser, Tree } from "web-tree-sitter";
-import type { LayerSpec } from "../../config/layers.ts";
+import type { LayerSpec } from "../../config/index.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../../contracts/records.ts";
 import type { ModuleLookup } from "../../lookup/module-lookup.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";

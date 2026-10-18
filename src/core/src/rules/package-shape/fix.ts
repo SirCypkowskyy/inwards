@@ -7,7 +7,7 @@
  * names of 3 to 5 characters, 0 below that, so `db.py` isn't sent to `di.py`).
  */
 
-import type { NameRule, ShapeSpec } from "../../config/shape.ts";
+import type { NameRule, ShapeSpec } from "../../config/index.ts";
 import type { Fix } from "../../contracts/records.ts";
 import { distance } from "../shared/edit-distance.ts";
 

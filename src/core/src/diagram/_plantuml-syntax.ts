@@ -5,8 +5,8 @@
  * word. `plantuml.ts` reads statements with them. Pure string reading over a
  * cursor; syntax per https://plantuml.com/component-diagram.
  */
-import type { DiagramEdge, NodeLabel } from "./model.ts";
-import { type Cursor, skipSpace } from "./syntax.ts";
+import type { DiagramEdge, NodeLabel } from "./_model.ts";
+import { type Cursor, skipSpace } from "./_syntax.ts";
 
 /** A bare name: letters, digits and `_`. */
 const NAME = /^[\p{L}\p{N}_]+/u;

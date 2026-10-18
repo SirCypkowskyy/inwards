@@ -16,7 +16,7 @@
 
 import type { Diagnostic, Severity, SourceFile } from "../contracts/records.ts";
 import { diagnostic, RULES, ruleFor } from "../meta/registry.ts";
-import { matchEntry } from "./layer-selector.ts";
+import { matchEntry } from "./_layer-selector.ts";
 import {
   CHECK_TESTS,
   type OptionValue,
@@ -24,9 +24,9 @@ import {
   parseOptions,
   skipsTests,
   stringList,
-} from "./rule-options.ts";
-import { type ConfigFile, spanOfRuleTable } from "./source-span.ts";
-import { ConfigError, isRecord, rejectUnknownKeys } from "./toml.ts";
+} from "./_rule-options.ts";
+import { type ConfigFile, spanOfRuleTable } from "./_source-span.ts";
+import { ConfigError, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /**
  * One rule's options table, `[tool.inwards.rules.<rule-name>]`, as parsed:

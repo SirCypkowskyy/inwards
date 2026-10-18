@@ -11,7 +11,7 @@
  * `Depends` without `Annotated`, and unused path parameters.
  */
 import type { Node } from "web-tree-sitter";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import type { RuleOptions } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import { namedChildren } from "../../python/nodes.ts";

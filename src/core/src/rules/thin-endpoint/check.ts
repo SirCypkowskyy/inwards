@@ -14,8 +14,7 @@
  * when a registration names one.
  */
 import type { Node } from "web-tree-sitter";
-import type { LayerSpec } from "../../config/layers.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import type { LayerSpec, RuleOptions } from "../../config/index.ts";
 import type { Diagnostic, SourceFile, Span } from "../../contracts/records.ts";
 import { diagnostic, RULES } from "../../meta/registry.ts";
 import type { ModuleTrees } from "../shared/module-trees.ts";

@@ -4,7 +4,7 @@
  * engine (`engine/fastapi.ts`) builds the model and the project lookups once
  * per check and calls this for every checked file; nothing here reads a file.
  */
-import { type RuleSettings, ruleLevel } from "../../config/rule-settings.ts";
+import { type RuleSettings, ruleLevel } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { RULES } from "../../meta/registry.ts";
 import { checkEndpointMetadata } from "./endpoint-metadata.ts";

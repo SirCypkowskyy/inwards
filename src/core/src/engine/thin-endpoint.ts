@@ -7,8 +7,7 @@
  * before the suppression comments apply. No I/O: the caller supplies the
  * file and the run's trees.
  */
-import type { InwardsConfig } from "../config/parse.ts";
-import { ruleLevel } from "../config/rule-settings.ts";
+import { type InwardsConfig, ruleLevel } from "../config/index.ts";
 import type { Diagnostic, SourceFile } from "../contracts/records.ts";
 import type { ModuleTrees } from "../rules/shared/module-trees.ts";
 import { checkThinEndpoints, type ThinEndpointRun } from "../rules/thin-endpoint/check.ts";

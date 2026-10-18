@@ -15,9 +15,7 @@
  * I/O-free: the caller supplies the run's trees, the file, the options and
  * the layers.
  */
-import type { LayerSpec } from "../../config/layers.ts";
-import { stringList } from "../../config/rule-options.ts";
-import type { RuleOptions } from "../../config/rule-settings.ts";
+import { type LayerSpec, type RuleOptions, stringList } from "../../config/index.ts";
 import type { Diagnostic, SourceFile } from "../../contracts/records.ts";
 import { importedNames } from "../../python/parser.ts";
 import { classNames, classQualifier, exemptMatchers, moduleScope } from "../shared/classes.ts";
