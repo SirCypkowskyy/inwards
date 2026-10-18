@@ -5,17 +5,17 @@
  * and `inwards daemon stop` for that project. Hooks start it on their own and
  * it exits after 10 minutes without a request, so nobody has to run it by
  * hand. The socket, the lock and the record are the adapter's
- * (`DaemonHost`, `DaemonLink`); what a request means is `daemon/server.ts`.
+ * (`DaemonHost`, `DaemonLink`); what a request means is `hook/daemon/_server.ts`.
  */
 import { ConfigError, VERSION } from "@inwards/core";
-import { askDaemon, BACKOFF_MS, holdsLock } from "../daemon/client.ts";
-import type { LockHolder } from "../daemon/contracts.ts";
-import { daemonPlace, type HookRequest, PROTOCOL, toLine } from "../daemon/protocol.ts";
-import { createHandler, type HookOutcome } from "../daemon/server.ts";
-import { hookProject } from "../hook/contracts.ts";
-import { hookClaudeCode } from "../hook/index.ts";
-import { print } from "../platform/print.ts";
-import type { AppDeps, DaemonDeps } from "./deps.ts";
+import type { AppDeps, DaemonDeps } from "../../commands/deps.ts";
+import { print } from "../../platform/print.ts";
+import { hookClaudeCode } from "../cli.ts";
+import { hookProject } from "../contracts.ts";
+import { askDaemon, BACKOFF_MS, holdsLock } from "./_client.ts";
+import { daemonPlace, type HookRequest, PROTOCOL, toLine } from "./_protocol.ts";
+import { createHandler, type HookOutcome } from "./_server.ts";
+import type { LockHolder } from "./contracts.ts";
 
 /** How long the daemon waits for a request before it exits: 10 minutes. */
 const IDLE_SECONDS = 600;

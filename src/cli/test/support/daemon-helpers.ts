@@ -3,14 +3,14 @@
  * request, a published record, and a fake `DaemonLink` that plays any socket
  * outcome. Nothing here starts a process or opens a socket.
  */
-import type { AskResult, DaemonLink } from "../../src/daemon/contracts.ts";
+import type { AskResult, DaemonLink } from "../../src/hook/daemon/contracts.ts";
 import {
   type DaemonAnswer,
   daemonPlace,
   type HookRequest,
   PROTOCOL,
   toLine,
-} from "../../src/daemon/protocol.ts";
+} from "../../src/hook/daemon/index.ts";
 
 /** The daemon's version and executable identity. */
 export const SELF: { version: string; identity: string } = {

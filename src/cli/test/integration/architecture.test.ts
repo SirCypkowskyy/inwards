@@ -29,7 +29,6 @@ const FALLOW = join(REPO, "node_modules/.bin/fallow");
 const POLICY = [
   "check",
   "commands",
-  "daemon",
   "hook",
   "init",
   "json",
@@ -176,7 +175,7 @@ setDefaultTimeout(30_000);
 describe("boundaries", () => {
   test("a policy folder can't import node:fs or use the process global", () => {
     // newslice: a folder nobody listed gets the ban too (ADR-047).
-    for (const folder of ["hook/session", "hook/claude-code", "check", "newslice"]) {
+    for (const folder of ["hook/session", "hook/claude-code", "hook/daemon", "check", "newslice"]) {
       const imports = lintAs(
         `src/cli/src/${folder}/probe.ts`,
         'import { readFileSync } from "node:fs";\nexport const read = readFileSync;\n',

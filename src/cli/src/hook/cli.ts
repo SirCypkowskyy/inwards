@@ -2,16 +2,15 @@
  * @file `inwards hook claude-code`: the Claude Code hook command. It reads the hook
  * payload from stdin, hands it to the event dispatcher (`claude-code/`), and
  * logs the run, or hands a PostToolUse payload to the project's daemon
- * (`daemon/client.ts`). Everything it touches comes in as `HookDeps` from `main.ts`.
+ * (`hook/daemon/_client.ts`). Everything it touches comes in as `HookDeps` from `main.ts`.
  */
 import { VERSION } from "@inwards/core";
-import { viaDaemon } from "../daemon/client.ts";
-import type { DaemonLink } from "../daemon/contracts.ts";
-import { daemonPlace } from "../daemon/protocol.ts";
 import type { Streams } from "../platform/contracts.ts";
 import { print } from "../platform/print.ts";
 import { dispatch } from "./claude-code/index.ts";
 import { type HookDeps, hookProject } from "./contracts.ts";
+import type { DaemonLink } from "./daemon/contracts.ts";
+import { daemonPlace, viaDaemon } from "./daemon/index.ts";
 
 /**
  * Runs the Claude Code hook for one event: SessionStart records the session,

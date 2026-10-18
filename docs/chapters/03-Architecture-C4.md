@@ -521,7 +521,7 @@ src/
 ├── cli/
 │   ├── src/               # one folder per concern (#176); src/cli/AGENTS.md explains the rules
 │   │   ├── main.ts        # composition root: argv, then a command with the wired adapters
-│   │   ├── commands/      # daemon: thin, handed AppDeps
+│   │   ├── commands/      # AppDeps and DaemonDeps, the usage text
 │   │   ├── hook/          # inwards hook claude-code, a slice (ADR-047): index.ts its face, cli.ts
 │   │   │                  #   the handler, contracts.ts (HookDeps, hookProject, ASK_USER and the
 │   │   │                  #   session record's shapes; the eval reads it); claude-code/ the hook
@@ -530,7 +530,9 @@ src/
 │   │   │                  #   and its changed-file checks, escalation, settings; session/ commands/
 │   │   │                  #   (the session record, start record, copies, start identity) and
 │   │   │                  #   queries/ (old errors, agent suppressions, layout changes, committed
-│   │   │                  #   config, start content); adapters/state-files.ts the state files
+│   │   │                  #   config, start content); daemon/ inwards daemon, a mini-domain: the wire format,
+│   │   │                  #   the hook's side, request handling, the in-memory caches;
+│   │   │                  #   adapters/ the state files and the daemon's socket, lock and record
 │   │   ├── check/         # inwards check and inwards baseline, a slice (ADR-047): index.ts its
 │   │   │                  #   face, cli.ts the two handlers, running a check (_check.ts), config
 │   │   │                  #   discovery, routing (_routing.ts, _runs.ts), project snapshots, texts
@@ -542,8 +544,6 @@ src/
 │   │   ├── runlog/        # the opt-in run log, a slice (ADR-047): index.ts its face, cli.ts
 │   │   │                  #   inwards stats, commands/ writes the log, queries/ reads it back
 │   │   │                  #   (stats, --export), adapters/ the export key and file
-│   │   ├── daemon/        # inwards daemon: wire format, the hook's side, request handling,
-│   │   │                  #   the in-memory caches
 │   │   ├── lsp/           # inwards server, a slice (ADR-047): index.ts re-exports the handler
 │   │   │                  #   (cli.ts); when to check what (_session.ts), the whole pass and
 │   │   │                  #   the one-document check (_checks.ts), what each file shows;
@@ -565,7 +565,7 @@ src/
 │   │   ├── platform/      # the contracts for everything outside the process, and print()
 │   │   ├── json/          # type guards for parsed JSON and TOML
 │   │   └── adapters/      # node:fs, git, the environment, stdio, state files,
-│   │                      #   the grammars, the daemon's socket and files,
+│   │                      #   the grammars,
 │   │                      #   compose.ts wires them into AppDeps
 │   └── test/              # mirrors src/, plus integration/ (E2E, docs) and support/
 └── vscode-extension/

@@ -5,7 +5,7 @@
  * `inwards daemon` in the background. `adapters/daemon-link.ts` and
  * `adapters/daemon-host.ts` implement them; `main.ts` wires them in. Types only.
  */
-import type { DaemonPlace } from "./protocol.ts";
+import type { DaemonPlace } from "./_protocol.ts";
 
 /** How asking a daemon ended. */
 export type AskResult =

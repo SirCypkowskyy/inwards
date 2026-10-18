@@ -173,8 +173,6 @@
       // since the first matching zone wins.
       { "name": "cli-init-adapters", "patterns": ["src/cli/src/init/adapters/**"] },
       { "name": "cli-init", "patterns": ["src/cli/src/init/**"] },
-      // The resident process for PostToolUse (ADR-039): wire format, client and request handling.
-      { "name": "cli-daemon", "patterns": ["src/cli/src/daemon/**"] },
       // The language server slice (`inwards server`, ADR-041, ADR-047): its LSP
       // connection before the rest, since the first matching zone wins.
       { "name": "cli-lsp-adapters", "patterns": ["src/cli/src/lsp/adapters/**"] },
@@ -651,7 +649,8 @@
       },
       {
         "from": "cli-hook",
-        // cli.ts hands a PostToolUse payload to the daemon (`daemon/client.ts`).
+        // daemon/ is a mini-domain of this slice; its cli.ts takes AppDeps from
+        // commands/deps.ts until step 14 moves it to the root.
         "allow": [
           "core-api",
           "core-contracts",
@@ -672,14 +671,14 @@
           "cli-paths",
           "cli-check",
           "cli-runlog",
-          "cli-daemon",
+          "cli-commands",
           "cli-hook-contracts"
         ]
       },
       // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
       {
         "from": "cli-hook-adapters",
-        // The state files wrap adapters/filesystem.ts's path probe.
+        // The state files wrap adapters/filesystem.ts's path probe; daemon-link reads adapters/runtime.ts.
         "allow": [
           "core-api",
           "core-contracts",
@@ -726,27 +725,6 @@
           "cli-check",
           "cli-hook",
           "cli-commands"
-        ]
-      },
-      {
-        "from": "cli-daemon",
-        "allow": [
-          "core-api",
-          "core-contracts",
-          "core-meta",
-          "core-config",
-          "core-python",
-          "core-lookup",
-          "core-rules-shared",
-          "core-rule-layer-dependency",
-          "core-rule-package-shape",
-          "core-rule-unassigned-module",
-          "core-baseline",
-          "core-diagram",
-          "core-engine",
-          "core-report",
-          "cli-platform",
-          "cli-json"
         ]
       },
       // A slice's adapters: its own slice, the shared folders and the engine (ADR-047).
@@ -945,7 +923,6 @@
           "cli-hook-contracts",
           "cli-runlog",
           "cli-init",
-          "cli-daemon",
           "cli-lsp",
           "cli-mcp"
         ]
@@ -971,8 +948,7 @@
           "cli-paths",
           "cli-check",
           "cli-runlog",
-          "cli-commands",
-          "cli-daemon"
+          "cli-commands"
         ]
       },
       {
@@ -999,7 +975,6 @@
           "cli-check",
           "cli-hook",
           "cli-runlog",
-          "cli-daemon",
           "cli-lsp",
           "cli-lsp-adapters",
           "cli-mcp",
@@ -1043,13 +1018,13 @@
           "cli-paths",
           "cli-platform",
           "cli-json",
-          "cli-daemon",
           "cli-lsp",
           "cli-mcp",
           "cli-mcp-adapters",
           "cli-rules",
           "cli-check-adapters",
-          "cli-rules-adapters"
+          "cli-rules-adapters",
+          "cli-hook-adapters"
         ]
       },
       // The client talks to VS Code and the binary only.

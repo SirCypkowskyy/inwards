@@ -6,25 +6,23 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import type { AskResult, LockHolder } from "../../src/hook/daemon/contracts.ts";
 import {
   askDaemon,
   BACKOFF_MS,
   backingOff,
-  holdsLock,
-  viaDaemon,
-} from "../../src/daemon/client.ts";
-import type { AskResult, LockHolder } from "../../src/daemon/contracts.ts";
-import {
   type DaemonAnswer,
   type DaemonStatus,
   daemonEnabled,
+  holdsLock,
   MAX_PAYLOAD_BYTES,
   PROTOCOL,
   parseAnswer,
   parseRecord,
   parseRequest,
   toLine,
-} from "../../src/daemon/protocol.ts";
+  viaDaemon,
+} from "../../src/hook/daemon/index.ts";
 import {
   answered,
   fakeLink,
