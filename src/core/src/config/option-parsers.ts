@@ -106,3 +106,19 @@ export function suffix(value: unknown, where: string): string | false {
   }
   return value;
 }
+
+/** A qualified-name pattern: dotted identifiers, with fnmatch's `*` and `?`. */
+const NAME_PATTERN = /^[\p{XID_Continue}*?]+(?:\.[\p{XID_Continue}*?]+)*$/u;
+
+/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's and INW020's bases and decorators. */
+export const namePatterns: (value: unknown, where: string) => string[] = listMatching(
+  NAME_PATTERN,
+  'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
+);
+
+/** The keys that exempt classes from INW014 and INW020. */
+export const CLASS_EXEMPTIONS: Readonly<Record<string, typeof namePatterns>> = {
+  "allow-bases": namePatterns,
+  "extend-allow-bases": namePatterns,
+  "allow-decorators": namePatterns,
+};

@@ -9,7 +9,16 @@
  * from `stringList` and `libraryDenies`, which read a list back with its type.
  */
 import { isSelector, selectorProblem } from "./layer-selector.ts";
-import { boolean, isStringList, listMatching, listOf, oneOf, suffix } from "./option-parsers.ts";
+import {
+  boolean,
+  CLASS_EXEMPTIONS,
+  isStringList,
+  listMatching,
+  listOf,
+  namePatterns,
+  oneOf,
+  suffix,
+} from "./option-parsers.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./toml.ts";
 
 /**
@@ -74,7 +83,7 @@ function depth(value: unknown, where: string): number {
 /**
  * Parses a non-empty list of module prefixes or selectors, checked like
  * `layers[].modules`: `modules` in every table, FAPI003's `allow-unmounted`,
- * INW015's `role` and `allowed-in`. INW013's `follow-modules` may be empty.
+ * INW015's `role` and `allowed-in`, INW020's `ports`. INW013's `follow-modules` may be empty.
  *
  * @param value - the raw list.
  * @param where - the key's dotted path.
@@ -119,9 +128,6 @@ function entrypoints(value: unknown, where: string): string[] {
 
 /** The highest threshold INW012 accepts; a larger one would turn the signal off in all but name. */
 const MAX_LIMIT = 1000;
-
-/** A qualified-name pattern: dotted identifiers, with fnmatch's `*` and `?`. */
-const NAME_PATTERN = /^[\p{XID_Continue}*?]+(?:\.[\p{XID_Continue}*?]+)*$/u;
 
 /** A Python identifier. */
 const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u;
@@ -190,12 +196,6 @@ export function delegateProblem(
   return undefined;
 }
 
-/** Qualified names with fnmatch wildcards: INW012's calls, types and decorators, INW013's calls and types, INW014's bases and decorators. */
-const namePatterns = listMatching(
-  NAME_PATTERN,
-  'qualified names, with * and ? as wildcards, such as "httpx.*" or "sqlalchemy.orm.Session"',
-);
-
 /** The keys of one entry of INW005's `deny`. */
 const DENY_KEYS: ReadonlySet<string> = new Set(["modules", "libraries"]);
 
@@ -235,8 +235,8 @@ const SHARED: Readonly<Record<string, OptionParser>> = { modules: moduleEntries 
 
 /**
  * The opt-in rules that skip test modules unless their table sets
- * `check-tests = true` (#362): the content rules INW012 to INW016 and the
- * FAPI family, and the import rule INW021 (ADR-046). The other import,
+ * `check-tests = true` (#362): the content rules INW012 to INW016, INW020 and
+ * the FAPI family, and the import rule INW021 (ADR-046). The other import,
  * layout and diagram rules don't take the key.
  */
 const CONTENT_RULES: ReadonlySet<string> = new Set([
@@ -245,6 +245,7 @@ const CONTENT_RULES: ReadonlySet<string> = new Set([
   "ports-abstract",
   "construct-only-in",
   "orm-naming",
+  "adapter-conformance",
   "private-module",
   "endpoint-metadata",
   "undocumented-error-response",
@@ -263,7 +264,7 @@ export const CHECK_TESTS = "check-tests";
  * Tells whether a rule skips test modules by default.
  *
  * @param rule - the rule's kebab-case name.
- * @returns true for INW012 to INW016, INW021 and the FAPI rules.
+ * @returns true for INW012 to INW016, INW020, INW021 and the FAPI rules.
  */
 export function skipsTests(rule: string): boolean {
   return CONTENT_RULES.has(rule);
@@ -309,13 +310,12 @@ const RULE_OPTIONS: Readonly<Record<string, Readonly<Record<string, OptionParser
       moduleEntries(value, where, true),
   },
   "ports-abstract": {
-    "allow-bases": namePatterns,
-    "extend-allow-bases": namePatterns,
-    "allow-decorators": namePatterns,
+    ...CLASS_EXEMPTIONS,
     interface: oneOf(["any", "protocol"]),
     "allow-subclassing": boolean,
   },
   "construct-only-in": { role: moduleEntries, "allowed-in": moduleEntries },
+  "adapter-conformance": { ports: moduleEntries, ...CLASS_EXEMPTIONS },
   "orm-naming": {
     "table-name": oneOf(["snake", "snake_singular", false]),
     "datetime-suffix": suffix,

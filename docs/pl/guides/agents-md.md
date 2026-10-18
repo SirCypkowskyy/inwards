@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/agents-md.md
-source_hash: 2bd4bd14938983c0fdc32cd75a1911ef7e5c9dd86c5b64ffc2f99dce3d9286a3
+source_hash: 0937065d9b51138e74e51f2414ad6946b95d9a23e344467161ff0ef19bd989e3
 ---
 
 # AGENTS.md (Codex, Cursor i inni) { #agentsmd-codex-cursor-and-others }
@@ -94,7 +94,7 @@ Opt-in rules:
 
 Porty to pakiet albo moduł `ports` leżący bezpośrednio w module warstwy na dysku, na przykład `shop/domain/ports.py` dla warstwy `shop.domain`. Warstwa zapisana selektorem (`shop.*.models`) nie ma jednego takiego modułu, więc brief mówi wtedy „the inner layer”, jak tutaj; moduły portów wymienia linia INW014. Dla konfiguracji zapisanej przez `inwards init --style` opis podaje też nazwę presetu i jego moduł portów (`app.application.ports` dla clean i hexagonal), zanim `--scaffold` go utworzy; preset rozpoznaje po komentarzu, który init umieszcza w tabeli, więc usunięcie tego komentarza usuwa też nazwę.
 
-Każda reguła opt-in włączona w konfiguracji (INW012 do INW016 i reguły FAPI, przez `extend-select`, `select` albo [regułę dla roli](configuration.md#template-rules)) dodaje jedną linię pod „Opt-in rules:”. Linia mówi, co robić przy pisaniu kodu, i podaje kluczowe ustawienie reguły: `delegate-to` dla INW012, moduły portów dla INW014 (jej `modules`, a bez nich każdy moduł `ports`), `role` i `allowed-in` dla INW015, schemat nazw dla INW016, wymagane metadane dla FAPI001, `codes` dla FAPI002 i `entrypoints` dla FAPI003. Reguła zawężona przez `modules` je wymienia (`INW013 in app.*.router`). INW015 bez `role` niczego nie sprawdza, więc wtedy nie dostaje linii. Po `inwards init --style fastapi` wyglądają tak:
+Każda reguła opt-in włączona w konfiguracji (INW012 do INW016, INW020 i reguły FAPI, przez `extend-select`, `select` albo [regułę dla roli](configuration.md#template-rules)) dodaje jedną linię pod „Opt-in rules:”. Linia mówi, co robić przy pisaniu kodu, i podaje kluczowe ustawienie reguły: `delegate-to` dla INW012, moduły portów dla INW014 (jej `modules`, a bez nich każdy moduł `ports`), `role` i `allowed-in` dla INW015, schemat nazw dla INW016, wymagane metadane dla FAPI001, `codes` dla FAPI002 i `entrypoints` dla FAPI003. Reguła zawężona przez `modules` je wymienia (`INW013 in app.*.router`). INW015 bez `role` niczego nie sprawdza, więc wtedy nie dostaje linii. Po `inwards init --style fastapi` wyglądają tak:
 
 ```markdown
 Opt-in rules:

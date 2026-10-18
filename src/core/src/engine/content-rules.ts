@@ -1,8 +1,8 @@
 /**
  * @file Runs the per-file content rules for the engine: INW012
  * `thin-endpoint` (through `thin-endpoint.ts`), INW013 `async-blocking`,
- * INW014 `ports-abstract`, INW015 `construct-only-in` and INW016
- * `orm-naming` (through `orm-naming.ts`). Each decides whether a file needs
+ * INW014 `ports-abstract`, INW015 `construct-only-in`, INW016
+ * `orm-naming` (through `orm-naming.ts`) and INW020 `adapter-conformance`. Each decides whether a file needs
  * it at all, and only one whose text may hold a finding gets a tree; their
  * findings join the file's others before the suppression comments apply.
  * Every tree comes from the run's `ContentRun`, which parses each text once
@@ -18,6 +18,7 @@ import type { InwardsConfig } from "../config/parse.ts";
 import { ruleLevel } from "../config/rule-settings.ts";
 import type { Diagnostic, ImportRef, SourceFile } from "../contracts/records.ts";
 import type { ProjectIndex } from "../lookup/project-index.ts";
+import { checkAdapterConformance } from "../rules/adapter-conformance/check.ts";
 import { AsyncBlockingRun, checkAsyncBlocking } from "../rules/async-blocking/check.ts";
 import { checkConstructOnlyIn } from "../rules/construct-only-in/check.ts";
 import type { Models } from "../rules/orm-naming/models.ts";
@@ -144,6 +145,28 @@ function portsAbstractFindings(
 }
 
 /**
+ * Finds INW020's findings in a file. Nothing is parsed when the rule is off
+ * for the file's module or the file's encoding can hide code; the rule
+ * itself skips a module that isn't an adapter module.
+ *
+ * @param src - the source file, with normalised text.
+ * @param config - the project's config, for its rules table.
+ * @param trees - the run's trees.
+ * @returns the findings, before suppressions.
+ */
+function adapterConformanceFindings(
+  src: SourceFile,
+  config: InwardsConfig,
+  trees: ModuleTrees,
+): Diagnostic[] {
+  const { rules } = config;
+  if (ruleLevel("INW020", rules, src.module) === "off" || checkEncoding(src)) {
+    return [];
+  }
+  return checkAdapterConformance(trees, src, rules?.options?.["adapter-conformance"]);
+}
+
+/**
  * Finds INW015's findings in a file a layer owns; a module no layer owns,
  * such as a test or a script, builds adapters on purpose. Nothing is parsed
  * when the rule is off for the file's module or the file's encoding can hide
@@ -180,7 +203,7 @@ function constructOnlyInFindings(
 }
 
 /**
- * Finds the content rules' findings in a file: INW012's, INW013's, INW014's, INW015's, then INW016's.
+ * Finds the content rules' findings in a file: INW012's, INW013's, INW014's, INW015's, INW016's, then INW020's.
  *
  * @param src - the source file, with normalised text.
  * @param config - the project's config: its rules table and layers.
@@ -198,5 +221,6 @@ export function contentFindings(
     ...portsAbstractFindings(src, config, run.trees),
     ...constructOnlyInFindings(src, config, run.trees),
     ...ormNamingFindings(run.trees, src, config, run.ormModels),
+    ...adapterConformanceFindings(src, config, run.trees),
   ];
 }

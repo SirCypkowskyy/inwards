@@ -19,6 +19,7 @@ const CODES = [
   "INW013",
   "INW014",
   "INW016",
+  "INW020",
   "FAPI001",
   "FAPI002",
   "FAPI003",
@@ -106,6 +107,8 @@ layers = [{ name = "app", modules = ["app"] }]
 
 [tool.inwards.rules]
 extend-select = ${JSON.stringify(CODES)}
+[tool.inwards.rules.adapter-conformance]
+modules = ["app"]
 ${extra}`);
   const seen = { count: 0 };
   const project = indexOn(DISK, new Map([[PATH, TEST_APP]]));
