@@ -17,6 +17,7 @@ export {
   diagramMatches,
   type InwardsConfig,
   inwardsTable,
+  isSelector,
   type LayerSpec,
   libraryDenies,
   type NameRule,

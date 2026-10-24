@@ -65,7 +65,7 @@ The layers, innermost first. A module may import its own layer and any layer lis
 
 #### Selectors { #selectors }
 
-An entry with a `*` is a selector. Vertical slices repeat the same layers in every slice; `shop.*.domain` says once what `shop.orders.domain`, `shop.billing.domain` and every later slice would each need as a prefix:
+An entry with a `*`, `?` or `[` is a selector. Vertical slices repeat the same layers in every slice; `shop.*.domain` says once what `shop.orders.domain`, `shop.billing.domain` and every later slice would each need as a prefix:
 
 ```toml title="pyproject.toml"
 [tool.inwards]
@@ -76,15 +76,15 @@ layers = [
 ]
 ```
 
-- **Grammar.** `*` matches exactly one segment and `**` one or more, as in [shape selectors](package-shape.md). Every other segment is a package name. A selector owns every module equal to one of its matches, and everything under it: `shop.*.domain` owns `shop.orders.domain` and `shop.orders.domain.order`, but not `shop.orders` or `shop.a.b.domain`.
+- **Grammar.** `*` matches exactly one segment and `**` one or more, as in [shape selectors](package-shape.md). A segment can also be an fnmatch glob that matches inside one segment: `_*_store`, `test_?`, `*_[!t]*`, with `*`, `?`, `[seq]` and `[!seq]` as in [shape members](package-shape.md). `shop.*._*_store` owns `shop.orders._run_store` and every store a later slice adds, without a config edit. Every other segment is a package name. import-linter has only `*` and `**`, so globs inside a segment are an Inwards extension, which `inwards import-config` never produces. A selector owns every module equal to one of its matches, and everything under it: `shop.*.domain` owns `shop.orders.domain` and `shop.orders.domain.order`, but not `shop.orders` or `shop.a.b.domain`.
 - **It starts with a package name**: `shop.*.domain`, not `*.domain`. That top-level package is what `inwards check`, the Stop gate and the language server walk in full, skipping nothing but hidden entries, so a `node_modules` or virtualenv directory inside it can't hide layer code. A project with several top-level packages lists one selector per package.
-- **Config errors**: a selector with no package name (`*`, `**`, `*.domain`), a partial wildcard (`shop.dom*`), `?`, brackets, empty segments and path separators. An entry without a `*` is a literal prefix and is checked as leniently as before.
+- **Config errors**: a selector with no package name (`*`, `**`, `*.domain`, `_*.domain`), `**` inside a segment (`shop.dom**`), an unclosed bracket or reversed range (`shop.[ab`, `shop.[z-a]`), a glob character no package name can hold (`shop.my-*`), empty segments and path separators. An entry without a `*`, `?` or `[` is a literal prefix and is checked as leniently as before.
 
 When several entries match a module, the most specific wins, in this order:
 
-1. the deepest last literal segment of the match, so `shop.orders.domain` beats `shop.**`, which matches deeper but whose last literal segment is `shop`;
+1. the deepest last literal segment of the match, a glob segment counting as literal here, so `shop.orders.domain` beats `shop.**`, which matches deeper but whose last literal segment is `shop`;
 2. then the deeper match;
-3. then more literal segments;
+3. then more literal segments, not counting globs;
 4. then the layer listed first.
 
 For literal prefixes alone, this is the longest prefix, as it always was. The truth table, with layers `a` and `b` in that order:
@@ -104,6 +104,11 @@ For literal prefixes alone, this is the longest prefix, as it always was. The tr
 | `shop.orders.*` | `shop.*.domain` | `shop.orders.domain.order` | `b`: deeper last literal | `shop.orders.domain` |
 | `shop.orders.*` | `shop.orders.*.*` | `shop.orders.x.y` | `b`: deeper match | `shop.orders.x.y` |
 | `shop.*.domain` | `shop.orders.domain` | `shop.orders.domain.order` | `b`: more literal segments | `shop.orders.domain` |
+| `shop.*._*_store` | | `shop.orders._run_store.db` | `a` | `shop.orders._run_store` |
+| `shop.*._*_store` | | `shop.orders.store` | none: the glob doesn't match | |
+| `shop.orders.*` | `shop.*._*_store` | `shop.orders._run_store` | `b`: deeper last literal | `shop.orders._run_store` |
+| `shop.orders._*_store` | `shop.orders._run_store` | `shop.orders._run_store` | `b`: more literal segments | `shop.orders._run_store` |
+| `shop.orders._*_store` | `shop.*._run_store` | `shop.orders._run_store` | `a`: a tie, listed first | `shop.orders._run_store` |
 | `shop.**.domain` | `shop.*.domain` | `shop.orders.domain` | `a`: listed first | `shop.orders.domain` |
 | `shop` | `shop.domain` | `shop.domain.order` | `b`: longest prefix | `shop.domain` |
 
@@ -111,9 +116,9 @@ What changes with selectors:
 
 - **Fix steps name the slice.** INW001, INW005 and INW011 tell the agent to declare a port in the importing module's own matched prefix, `shop.billing.domain` for a file in billing, and suggest `shop.billing.domain.ports` only when that prefix is a package. A layer with several literal prefixes gets the same treatment, so its fix now names the prefix the file is in rather than the layer's first.
 - **INW006 needs evidence.** A package holds a selector's layer only when the project has a module below it that the selector matches: `shop.*.domain` doesn't make `shop/util.py` part of a layer, and `shop.**.domain` doesn't cover `shop.orders.core.order`. A selector that matches no module is dead, whatever the precedence.
-- **Sessions check each slice.** A slice is a matched module's prefix up to the selector's last literal segment: `shop.orders.domain` for `shop.*.domain`, `shop` for `shop.**`. A slice that held modules when the session started and holds none now fails the Stop gate, as a literal prefix does. So renaming or deleting a slice needs the user: `git mv shop/orders shop/sales`, moving a slice deeper under `shop.**.domain`, or deleting a slice whose only module is its `__init__.py`. Deleting or renaming modules inside a slice that keeps others doesn't.
+- **Sessions check each slice.** A slice is a matched module's prefix up to the selector's last literal segment, a glob segment counting like `*`: `shop.orders.domain` for `shop.*.domain`, `shop` for `shop.**` and for `shop.*._*_store`. A slice that held modules when the session started and holds none now fails the Stop gate, as a literal prefix does. So renaming or deleting a slice needs the user: `git mv shop/orders shop/sales`, moving a slice deeper under `shop.**.domain`, or deleting a slice whose only module is its `__init__.py`. Deleting or renaming modules inside a slice that keeps others doesn't.
 
-[ADR-034](../05-ADR.md#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) records the design.
+[ADR-034](../05-ADR.md#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) records the design. The same grammar holds wherever a rule option takes module selectors, such as INW014's `modules` and INW015's `role` and `allowed-in`.
 
 #### Sibling layers { #sibling-layers }
 

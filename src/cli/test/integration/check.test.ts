@@ -5,7 +5,8 @@
  * config root is reported in every format instead of passing as clean (#200),
  * and a uv workspace checked from its root warns about each member instead of
  * passing silently (#201). Layer selectors check every slice, including code
- * in a `node_modules` directory inside one (#191). A path-scoped check skips
+ * in a `node_modules` directory inside one (#191), and a glob inside a
+ * selector segment (`shop.*._*_store`) guards every module it fits (#411). A path-scoped check skips
  * the whole-project checks, as `--help` says (#86). The eval harness's app
  * (`eval/app`), whose ports module imports the order module back only under
  * `if TYPE_CHECKING:`, has no module or context cycle (#375).
@@ -275,6 +276,40 @@ layers = [
   expect(report.diagnostics[1]?.fix.steps[1]).toContain(
     "`shop.billing.domain` (for example `shop.billing.domain.ports`)",
   );
+});
+
+test("an INW015 role with a glob segment guards every store of every slice (#411)", () => {
+  const root = project({
+    "pyproject.toml": `[tool.inwards]
+layers = [{ name = "app", modules = ["shop"] }]
+
+[tool.inwards.rules]
+extend-select = ["INW015"]
+
+[tool.inwards.rules.construct-only-in]
+role = ["shop.*._*_store"]
+allowed-in = ["shop.di"]
+`,
+    "shop/__init__.py": "",
+    "shop/orders/__init__.py": "",
+    "shop/orders/_run_store.py": "class RunStore:\n    pass\n",
+    "shop/billing/__init__.py": "",
+    "shop/billing/_invoice_store.py": "class InvoiceStore:\n    pass\n",
+    "shop/billing/store.py": "class Store:\n    pass\n",
+    "shop/orders/api.py":
+      "from shop.orders._run_store import RunStore\nfrom shop.billing._invoice_store import InvoiceStore\nfrom shop.billing.store import Store\n",
+    "shop/di.py":
+      "from shop.orders._run_store import RunStore\nfrom shop.billing._invoice_store import InvoiceStore\n",
+  });
+  const { code, stdout } = inwards(["check", "--format", "json"], { cwd: root });
+  expect(code).toBe(1);
+  const report: { diagnostics: { code: string; file: string; line: number; message: string }[] } =
+    JSON.parse(stdout);
+  expect(report.diagnostics.map((d) => [d.code, d.file, d.line])).toEqual([
+    ["INW015", "shop/orders/api.py", 1],
+    ["INW015", "shop/orders/api.py", 2],
+  ]);
+  expect(report.diagnostics[1]?.message).toContain("a module of the role `shop.*._*_store`");
 });
 
 test("eval/app checks clean with module and context cycles on (#375)", () => {

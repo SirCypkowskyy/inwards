@@ -16,6 +16,7 @@ import {
   contextOf,
   type Diagnostic,
   type InwardsConfig,
+  isSelector,
   layerIndexOf,
   parseConfig,
 } from "@inwards/core";
@@ -137,7 +138,7 @@ async function candidatesOf(
 ): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
   for (const layer of project.config.layers) {
-    const prefix = layer.modules.find((m) => !m.includes("*"));
+    const prefix = layer.modules.find((m) => !isSelector(m));
     if (prefix === undefined) {
       continue;
     }

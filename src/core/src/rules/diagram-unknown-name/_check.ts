@@ -19,7 +19,6 @@ import {
   type ConfigFile,
   type InwardsConfig,
   isDottedName,
-  isSelector,
   selectorProblem,
   spanOf,
 } from "../../config/index.ts";
@@ -299,12 +298,15 @@ function labelFix(label: string, modules: ReadonlySet<string>, caption: string):
 
 /**
  * Tells whether a label is written like a module prefix or a layer selector.
+ * Only a `*` makes a label a selector: a `?` or `[` alone reads as caption
+ * punctuation (`"shop.domain?"`, `"shop.[draft]"`), as it did before glob
+ * segments (#411), while `"app.*._*_store"` still names modules.
  *
  * @param label - the quoted label.
  * @returns true for `shop.domain` or `shop.*.domain`, false for a caption.
  */
 function isModuleName(label: string): boolean {
-  return isSelector(label) ? selectorProblem(label) === undefined : isDottedName(label);
+  return label.includes("*") ? selectorProblem(label) === undefined : isDottedName(label);
 }
 
 /**

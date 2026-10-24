@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 8b7261df446829f904a88df95d78dfbed4ba8dd1a790c8b70a4e87fc02d06e33
+source_hash: 4813b303ffd9f9e73d924d458405f1464591332c26f11c003057c6a8ee1b5066
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -70,7 +70,7 @@ Warstwy, od najbardziej wewnętrznej. Moduł może importować własną warstwę
 
 #### Selektory { #selectors }
 
-Wpis z `*` to selektor. Pionowe wycinki powtarzają te same warstwy w każdym wycinku; `shop.*.domain` mówi raz to, czego `shop.orders.domain`, `shop.billing.domain` i każdy kolejny wycinek potrzebowałyby jako osobne prefiksy:
+Wpis z `*`, `?` albo `[` to selektor. Pionowe wycinki powtarzają te same warstwy w każdym wycinku; `shop.*.domain` mówi raz to, czego `shop.orders.domain`, `shop.billing.domain` i każdy kolejny wycinek potrzebowałyby jako osobne prefiksy:
 
 ```toml title="pyproject.toml"
 [tool.inwards]
@@ -81,15 +81,15 @@ layers = [
 ]
 ```
 
-- **Gramatyka.** `*` pasuje do dokładnie jednego segmentu, a `**` do jednego lub więcej, jak w [selektorach kształtu](package-shape.md). Każdy inny segment to nazwa pakietu. Selektor obejmuje każdy moduł równy jednemu z jego dopasowań i wszystko pod nim: `shop.*.domain` obejmuje `shop.orders.domain` i `shop.orders.domain.order`, ale nie `shop.orders` ani `shop.a.b.domain`.
+- **Gramatyka.** `*` pasuje do dokładnie jednego segmentu, a `**` do jednego lub więcej, jak w [selektorach kształtu](package-shape.md). Segment może też być globem fnmatch dopasowywanym wewnątrz jednego segmentu: `_*_store`, `test_?`, `*_[!t]*`, z `*`, `?`, `[seq]` i `[!seq]` jak w [elementach kształtu](package-shape.md). `shop.*._*_store` obejmuje `shop.orders._run_store` i każdy store, który doda kolejny wycinek, bez zmiany konfiguracji. Każdy inny segment to nazwa pakietu. import-linter zna tylko `*` i `**`, więc globy wewnątrz segmentu to rozszerzenie Inwards, którego `inwards import-config` nigdy nie generuje. Selektor obejmuje każdy moduł równy jednemu z jego dopasowań i wszystko pod nim: `shop.*.domain` obejmuje `shop.orders.domain` i `shop.orders.domain.order`, ale nie `shop.orders` ani `shop.a.b.domain`.
 - **Zaczyna się od nazwy pakietu**: `shop.*.domain`, nie `*.domain`. Ten pakiet najwyższego poziomu `inwards check`, Stop gate i serwer języka przechodzą w całości, pomijając tylko ukryte wpisy, więc katalog `node_modules` albo środowiska wirtualnego w jego wnętrzu nie ukryje kodu warstwy. Projekt z kilkoma pakietami najwyższego poziomu wymienia jeden selektor na pakiet.
-- **Błędy konfiguracji**: selektor bez nazwy pakietu (`*`, `**`, `*.domain`), częściowa gwiazdka (`shop.dom*`), `?`, nawiasy kwadratowe, puste segmenty i separatory ścieżek. Wpis bez `*` to dosłowny prefiks, sprawdzany tak łagodnie jak dotąd.
+- **Błędy konfiguracji**: selektor bez nazwy pakietu (`*`, `**`, `*.domain`, `_*.domain`), `**` wewnątrz segmentu (`shop.dom**`), niezamknięty nawias albo odwrócony zakres (`shop.[ab`, `shop.[z-a]`), znak globu, którego nie może mieć żadna nazwa pakietu (`shop.my-*`), puste segmenty i separatory ścieżek. Wpis bez `*`, `?` i `[` to dosłowny prefiks, sprawdzany tak łagodnie jak dotąd.
 
 Gdy do modułu pasuje kilka wpisów, wygrywa najbardziej szczegółowy, w tej kolejności:
 
-1. najgłębszy ostatni dosłowny segment dopasowania, więc `shop.orders.domain` wygrywa z `shop.**`, który pasuje głębiej, ale jego ostatni dosłowny segment to `shop`;
+1. najgłębszy ostatni dosłowny segment dopasowania, przy czym segment z globem liczy się tu jako dosłowny, więc `shop.orders.domain` wygrywa z `shop.**`, który pasuje głębiej, ale jego ostatni dosłowny segment to `shop`;
 2. potem głębsze dopasowanie;
-3. potem więcej dosłownych segmentów;
+3. potem więcej dosłownych segmentów, bez liczenia globów;
 4. potem warstwa wymieniona wcześniej.
 
 Dla samych dosłownych prefiksów to po prostu najdłuższy prefiks, jak zawsze. Tabela prawdy, z warstwami `a` i `b` w tej kolejności:
@@ -109,6 +109,11 @@ Dla samych dosłownych prefiksów to po prostu najdłuższy prefiks, jak zawsze.
 | `shop.orders.*` | `shop.*.domain` | `shop.orders.domain.order` | `b`: głębszy ostatni dosłowny segment | `shop.orders.domain` |
 | `shop.orders.*` | `shop.orders.*.*` | `shop.orders.x.y` | `b`: głębsze dopasowanie | `shop.orders.x.y` |
 | `shop.*.domain` | `shop.orders.domain` | `shop.orders.domain.order` | `b`: więcej dosłownych segmentów | `shop.orders.domain` |
+| `shop.*._*_store` | | `shop.orders._run_store.db` | `a` | `shop.orders._run_store` |
+| `shop.*._*_store` | | `shop.orders.store` | brak: glob nie pasuje | |
+| `shop.orders.*` | `shop.*._*_store` | `shop.orders._run_store` | `b`: głębszy ostatni dosłowny segment | `shop.orders._run_store` |
+| `shop.orders._*_store` | `shop.orders._run_store` | `shop.orders._run_store` | `b`: więcej dosłownych segmentów | `shop.orders._run_store` |
+| `shop.orders._*_store` | `shop.*._run_store` | `shop.orders._run_store` | `a`: remis, wymieniona wcześniej | `shop.orders._run_store` |
 | `shop.**.domain` | `shop.*.domain` | `shop.orders.domain` | `a`: wymieniona wcześniej | `shop.orders.domain` |
 | `shop` | `shop.domain` | `shop.domain.order` | `b`: najdłuższy prefiks | `shop.domain` |
 
@@ -116,9 +121,9 @@ Co zmieniają selektory:
 
 - **Kroki naprawy nazywają wycinek.** INW001, INW005 i INW011 każą agentowi zadeklarować port w dopasowanym prefiksie importującego modułu, `shop.billing.domain` dla pliku z billing, i podpowiadają `shop.billing.domain.ports` tylko wtedy, gdy ten prefiks jest pakietem. Warstwa z kilkoma dosłownymi prefiksami jest traktowana tak samo, więc jej naprawa nazywa teraz prefiks, w którym leży plik, a nie pierwszy prefiks warstwy.
 - **INW006 potrzebuje dowodu.** Pakiet zawiera warstwę selektora tylko wtedy, gdy projekt ma pod nim moduł, do którego selektor pasuje: `shop.*.domain` nie włącza `shop/util.py` do warstwy, a `shop.**.domain` nie obejmuje `shop.orders.core.order`. Selektor, do którego nie pasuje żaden moduł, jest martwy niezależnie od pierwszeństwa.
-- **Sesje sprawdzają każdy wycinek.** Wycinek to prefiks dopasowanego modułu aż do ostatniego dosłownego segmentu selektora: `shop.orders.domain` dla `shop.*.domain`, `shop` dla `shop.**`. Wycinek, który na starcie sesji miał moduły, a teraz nie ma żadnego, zatrzymuje Stop gate, tak jak dosłowny prefiks. Dlatego zmiana nazwy albo usunięcie wycinka wymaga użytkownika: `git mv shop/orders shop/sales`, przeniesienie wycinka głębiej pod `shop.**.domain` albo usunięcie wycinka, którego jedynym modułem jest `__init__.py`. Usuwanie albo zmiana nazwy modułów wewnątrz wycinka, który zachowuje inne, nie wymaga.
+- **Sesje sprawdzają każdy wycinek.** Wycinek to prefiks dopasowanego modułu aż do ostatniego dosłownego segmentu selektora, przy czym segment z globem liczy się jak `*`: `shop.orders.domain` dla `shop.*.domain`, `shop` dla `shop.**` i dla `shop.*._*_store`. Wycinek, który na starcie sesji miał moduły, a teraz nie ma żadnego, zatrzymuje Stop gate, tak jak dosłowny prefiks. Dlatego zmiana nazwy albo usunięcie wycinka wymaga użytkownika: `git mv shop/orders shop/sales`, przeniesienie wycinka głębiej pod `shop.**.domain` albo usunięcie wycinka, którego jedynym modułem jest `__init__.py`. Usuwanie albo zmiana nazwy modułów wewnątrz wycinka, który zachowuje inne, nie wymaga.
 
-[ADR-034](../05-ADR.md#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) opisuje projekt.
+[ADR-034](../05-ADR.md#adr-034-layer-selectors-anchored-in-a-top-level-package-with-slice-aware-session-checks) opisuje projekt. Ta sama gramatyka obowiązuje wszędzie, gdzie opcja reguły przyjmuje selektory modułów, na przykład w `modules` reguły INW014 oraz w `role` i `allowed-in` reguły INW015.
 
 #### Warstwy sąsiednie { #sibling-layers }
 

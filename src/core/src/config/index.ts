@@ -12,8 +12,10 @@ export {
   deepestMatch,
   entryReach,
   filledFrom,
+  isGlobSegment,
   isSelector,
   matchEntry,
+  segmentMatches,
   selectorProblem,
   topPackageOf,
 } from "./_layer-selector.ts";

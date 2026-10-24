@@ -226,12 +226,7 @@ describe("structural mistakes fail both the schema and the parser", () => {
       withLayer('{ name = "d", modules = ["*.domain"] }'),
     ],
     ["a layer selector that is only **", withLayer('{ name = "d", modules = ["**"] }')],
-    [
-      "a partial wildcard in a layer selector",
-      withLayer('{ name = "d", modules = ["shop.dom*"] }'),
-    ],
-    ["a ? in a layer selector", withLayer('{ name = "d", modules = ["shop.*?"] }')],
-    ["a bracket in a layer selector", withLayer('{ name = "d", modules = ["shop.[ab].*"] }')],
+    ["** inside a layer selector segment", withLayer('{ name = "d", modules = ["shop.a**"] }')],
     ["an empty layer selector segment", withLayer('{ name = "d", modules = ["shop..*"] }')],
     ["a path in a layer selector", withLayer('{ name = "d", modules = ["shop/*/domain"] }')],
     ["*** in a layer selector", withLayer('{ name = "d", modules = ["shop.***"] }')],

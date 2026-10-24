@@ -3,7 +3,8 @@
  * package may, must and must not hold, and where a member name may appear.
  *
  * Package selectors use import-linter's grammar (ADR-018): `a.b` is exact,
- * `a.*` is one segment, `a.**` is any depth below `a`. Member patterns are
+ * `a.*` is one segment, `a.**` is any depth below `a`; a segment may also be
+ * an fnmatch glob inside one segment (`a.*_store`, #411). Member patterns are
  * fnmatch globs (`*`, `?`, `[seq]`, `[!seq]`): `name` is a module or a
  * subpackage, `name/` a subpackage only, `name.py` a module only.
  */
@@ -11,6 +12,7 @@
 import type { Severity } from "../shared/contracts/records.ts";
 import { CONFIG_DEFAULTS } from "./_defaults.ts";
 import { globMatches, isGlob } from "./_glob.ts";
+import { isGlobSegment, segmentMatches, segmentProblem } from "./_layer-selector.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One `[[tool.inwards.shape]]` entry. */
@@ -50,8 +52,6 @@ export const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
 const MEMBER = /^(?<stem>[^/]+?)(?<kind>\.pyi?|\/)$/u;
 /** A member pattern: a glob stem, optionally ending in `.py` or `/`. */
 const PATTERN = /^(?<stem>[^/.]+)(?<kind>\.py|\/)?$/u;
-/** A Python identifier: one segment of a package name. */
-const IDENTIFIER = /^[\p{L}_][\p{L}\p{N}_]*$/u;
 /** Stands for one package segment no selector names, when comparing two selectors. */
 const ANY_SEGMENT = "\u0001";
 /** Up to how many segments `**` is tried with when comparing two selectors. */
@@ -85,10 +85,10 @@ export function parseShapeKeys(raw: Record<string, unknown>): {
  *
  * @param selector - e.g. `app.*` or `app.**.tests`.
  * @param pkg - a dotted package name.
- * @returns true when every segment matches, `*` one segment and `**` one or more.
+ * @returns true when every segment matches, `*` or a glob one segment and `**` one or more.
  */
 export function selects(selector: string, pkg: string): boolean {
-  return pkg !== "" && matchSegments(selector.split("."), pkg.split("."));
+  return pkg !== "" && matchSegments(selector.split("."), pkg.split("."), segmentMatches);
 }
 
 /**
@@ -124,23 +124,28 @@ export function shapeFor(shapes: readonly ShapeSpec[], pkg: string): ShapeSpec |
 }
 
 /**
- * Matches selector segments against name segments, `**` taking one or more.
+ * Matches selector segments against name segments, `**` taking one or more
+ * and every other segment one, as `matches` decides.
  *
  * @param selector - a selector split on dots, `*` and `**` included.
  * @param name - a dotted package name split on dots.
+ * @param matches - tells whether a selector segment other than `**` matches one name segment.
  * @returns true when the selector covers every segment of the name.
  */
-function matchSegments(selector: readonly string[], name: readonly string[]): boolean {
+function matchSegments(
+  selector: readonly string[],
+  name: readonly string[],
+  matches: (want: string, segment: string) => boolean,
+): boolean {
   const [head, ...rest] = selector;
   if (head === undefined) {
     return name.length === 0;
   }
   if (head === "**") {
-    return name.some((_, i) => matchSegments(rest, name.slice(i + 1)));
+    return name.some((_, i) => matchSegments(rest, name.slice(i + 1), matches));
   }
-  return (
-    name.length > 0 && (head === "*" || head === name[0]) && matchSegments(rest, name.slice(1))
-  );
+  const [first] = name;
+  return first !== undefined && matches(head, first) && matchSegments(rest, name.slice(1), matches);
 }
 
 /**
@@ -216,13 +221,18 @@ function parseName(entry: Record<string, unknown>, i: number): NameRule {
  */
 function selectors(value: unknown, where: string): string[] {
   const list = strings(value, where);
-  const bad = list.find((s) =>
-    s.split(".").some((seg) => seg !== "*" && seg !== "**" && !IDENTIFIER.test(seg)),
-  );
-  if (list.length === 0 || bad !== undefined) {
-    throw new ConfigError(
-      `${where} must list package selectors: a.b (exact), a.* (one level) or a.** (any depth)${bad === undefined ? "" : `, not "${bad}"`}.`,
-    );
+  const usage = `${where} must list package selectors: a.b (exact), a.* (one level), a.** (any depth) or a glob inside a segment (a.*_store)`;
+  if (list.length === 0) {
+    throw new ConfigError(`${usage}.`);
+  }
+  for (const selector of list) {
+    const problem = selector
+      .split(".")
+      .map(segmentProblem)
+      .find((p) => p !== undefined);
+    if (problem !== undefined) {
+      throw new ConfigError(`${usage}, not "${selector}": ${problem}.`);
+    }
   }
   return list;
 }
@@ -293,7 +303,9 @@ function rejectShadowed(shapes: readonly ShapeSpec[]): void {
 /**
  * Tells whether one selector matches every package another matches. Each `*`
  * of the narrower one is tried as a segment no selector names, and each `**`
- * as 1, 2 and 3 such segments.
+ * as 1, 2 and 3 such segments. A glob segment of the narrower one is covered
+ * only by `*` or the same glob, so a glob that merely overlaps (`a?` and
+ * `a*`) never rejects a config.
  *
  * @param wide - the earlier selector.
  * @param narrow - the later one.
@@ -301,15 +313,27 @@ function rejectShadowed(shapes: readonly ShapeSpec[]): void {
  */
 function covers(wide: string, narrow: string): boolean {
   return Array.from({ length: MAX_DEPTH }, (_, i) => i + 1).every((depth) => {
-    const expanded = narrow
-      .split(".")
-      .flatMap((seg) => {
-        if (seg === "**") {
-          return Array.from({ length: depth }, () => ANY_SEGMENT);
-        }
-        return [seg === "*" ? ANY_SEGMENT : seg];
-      })
-      .join(".");
-    return selects(wide, expanded);
+    const expanded = narrow.split(".").flatMap((seg) => {
+      if (seg === "**") {
+        return Array.from({ length: depth }, () => ANY_SEGMENT);
+      }
+      return [seg === "*" ? ANY_SEGMENT : seg];
+    });
+    return matchSegments(wide.split("."), expanded, coversSegment);
   });
+}
+
+/**
+ * Tells whether a segment of the wider selector matches every segment one of
+ * the narrower selector's segments stands for (see `covers`).
+ *
+ * @param want - a segment of the wider selector, other than `**`.
+ * @param segment - a segment of the narrower one: a literal, a glob, or `ANY_SEGMENT` for its `*`.
+ * @returns true when `want` covers `segment`.
+ */
+function coversSegment(want: string, segment: string): boolean {
+  if (want === "*" || want === segment) {
+    return true;
+  }
+  return segment !== ANY_SEGMENT && !isGlobSegment(segment) && segmentMatches(want, segment);
 }

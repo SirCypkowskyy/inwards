@@ -285,9 +285,9 @@ describe("shape config", () => {
       "tool.inwards.names[1].only_in",
     ],
     [
-      "a partial wildcard segment",
-      '[[tool.inwards.shape]]\npackages = ["app.svc_*"]\n',
-      '"app.svc_*"',
+      "** inside a segment",
+      '[[tool.inwards.shape]]\npackages = ["app.svc_**"]\n',
+      'not "app.svc_**": segment "svc_**" puts ** inside a segment',
     ],
     [
       "a member pattern with a path",
