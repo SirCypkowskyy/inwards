@@ -188,8 +188,10 @@ export interface PortBase {
   readonly cls: string;
   /** The base's expression node, where the finding goes. */
   readonly node: Node;
-  /** The base's qualified name, e.g. `shop.application.ports.orders.OrderRepository`. */
+  /** The port's qualified name, e.g. `shop.application.ports.orders.OrderRepository`. */
   readonly qualified: string;
+  /** When the base is a same-file Protocol that extends the port, its name as written. */
+  readonly via?: string;
 }
 
 /**
@@ -198,7 +200,10 @@ export interface PortBase {
  * such as an exception extending a port module's error) lists none, and so
  * does a base the allowed bases match. A class that lists `Protocol` among
  * its own bases lists none either: it is a narrower interface, not an
- * adapter, wherever it lives.
+ * adapter, wherever it lives. A base that names a same-file Protocol which
+ * reaches a port, directly or through other same-file Protocols, counts as
+ * that port, since the subclass inherits the port's default bodies through
+ * it.
  *
  * @param root - the module node of a module outside the port modules.
  * @param module - the module's dotted name, which qualifies its own classes.
@@ -207,17 +212,44 @@ export interface PortBase {
  */
 export function portBases(root: Node, module: string, context: ClassContext): PortBase[] {
   const found: PortBase[] = [];
+  const reached = new Map<string, string>();
   for (const cls of portClasses(root, module, context)) {
-    const skip = cls.kind === "exempt" || cls.kind === "protocol";
-    const list = skip ? null : cls.node.childForFieldName("superclasses");
+    const list = cls.kind === "exempt" ? null : cls.node.childForFieldName("superclasses");
     for (const base of list ? namedChildren(list) : []) {
       const qualified = portName(base, context);
-      if (qualified !== undefined) {
+      const local = qualified === undefined ? localPort(base, context, reached) : undefined;
+      if (cls.kind === "protocol") {
+        const port = qualified ?? local;
+        if (port !== undefined && !reached.has(`${module}.${cls.name}`)) {
+          reached.set(`${module}.${cls.name}`, port);
+        }
+      } else if (qualified !== undefined) {
         found.push({ cls: cls.name, node: base, qualified });
+      } else if (local !== undefined) {
+        found.push({ cls: cls.name, node: base, qualified: local, via: base.text });
       }
     }
   }
   return found;
+}
+
+/**
+ * Names the port a base reaches through a same-file Protocol, if it names
+ * one. Only Protocols defined above the class are known, so a chain is
+ * followed in source order and a cycle can't form.
+ *
+ * @param base - one entry of a class's argument list.
+ * @param context - the file's qualifier and the options.
+ * @param reached - the port each same-file Protocol read so far reaches, by its qualified name.
+ * @returns the port's qualified name, or undefined when the base names no such Protocol.
+ */
+function localPort(
+  base: Node,
+  context: ClassContext,
+  reached: ReadonlyMap<string, string>,
+): string | undefined {
+  const name = base.type === "keyword_argument" ? null : qualifiedHead(base, context.qualify);
+  return name === null ? undefined : reached.get(name);
 }
 
 /**

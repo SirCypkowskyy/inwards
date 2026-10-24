@@ -236,9 +236,11 @@ export function reportNotProtocol(cls: PortClass, src: SourceFile): Diagnostic {
 
 /**
  * Turns a base that is a port, on a class outside the port modules, into a
- * finding, under `allow-subclassing = false`.
+ * finding, under `allow-subclassing = false`. A base that reaches the port
+ * through a same-file Protocol is named as written, and the fix checks the
+ * class against that Protocol.
  *
- * @param base - the subclass, its base node and the base's qualified name.
+ * @param base - the subclass, its base node, the port's qualified name and the local Protocol it goes through, if any.
  * @param src - the checked file.
  * @returns the finding, on the base.
  */
@@ -246,14 +248,17 @@ export function reportSubclass(base: PortBase, src: SourceFile): Diagnostic {
   const cut = base.qualified.lastIndexOf(".");
   const port = base.qualified.slice(cut + 1);
   const owner = base.qualified.slice(0, cut);
+  const written = base.via ?? port;
+  const through = base.via === undefined ? "" : ` through the local Protocol \`${base.via}\``;
+  const importing = base.via === undefined ? `, importing \`${port}\` there` : "";
   return diagnostic(RULES.INW014, src, {
     span: nodeSpan(base.node),
-    message: `\`${base.cls}\` in \`${src.module}\` subclasses the port \`${port}\` from \`${owner}\`. Ports here are implemented by shape (\`allow-subclassing = false\`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.`,
+    message: `\`${base.cls}\` in \`${src.module}\` subclasses the port \`${port}\` from \`${owner}\`${through}. Ports here are implemented by shape (\`allow-subclassing = false\`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.`,
     fix: {
-      summary: `Remove \`${port}\` from the bases of \`${base.cls}\`, and check it against the port with a \`TYPE_CHECKING\` line.`,
+      summary: `Remove \`${written}\` from the bases of \`${base.cls}\`, and check it against the port with a \`TYPE_CHECKING\` line.`,
       steps: [
-        `Remove \`${port}\` from the bases of \`${base.cls}\`, and keep the methods it implements.`,
-        `Add \`_: ${port} = ${base.cls}(...)\` under \`if TYPE_CHECKING:\` (from \`typing\`) at the end of the module, importing \`${port}\` there, so the type checker checks \`${base.cls}\` against the port.`,
+        `Remove \`${written}\` from the bases of \`${base.cls}\`, and keep the methods it implements.`,
+        `Add \`_: ${written} = ${base.cls}(...)\` under \`if TYPE_CHECKING:\` (from \`typing\`) at the end of the module${importing}, so the type checker checks \`${base.cls}\` against the port.`,
       ],
     },
   });
