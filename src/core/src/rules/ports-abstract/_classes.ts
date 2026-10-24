@@ -6,9 +6,10 @@
  * module; an exempt class has a base or decorator the options allow
  * (exceptions, DTOs, dataclasses); anything else is concrete. Outside the
  * port modules it lists the bases that subclass a port, for
- * `allow-subclassing = false`, skipping a class that is a Protocol itself. It reads one
- * parsed tree and decides nothing about wording; the caller parses and frees
- * the tree.
+ * `allow-subclassing = false`, skipping a class that is a Protocol itself
+ * and following same-file Protocols that extend a port. It reads one parsed
+ * tree and decides nothing about wording; the caller parses and frees the
+ * tree.
  */
 import type { Node } from "web-tree-sitter";
 import { identifierName, keywordOf, namedChildren } from "../../shared/python/nodes.ts";
