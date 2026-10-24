@@ -456,9 +456,12 @@ class Users(Repository, Protocol):
     expect(await inw014(Subclass, Off, "tests/test_users.py")).toEqual([]);
   });
 
-  test("a Protocol outside the port modules may extend a port; a class that isn't one may not", async () => {
-    const text = `from typing import Protocol
+  test("a Protocol outside the port modules may extend a port, however it is imported; an ABC or plain class may not", async () => {
+    const text = `from abc import ABC
+from typing import Protocol
+from typing import Protocol as P
 import typing
+import typing_extensions
 from shop.application.ports.users import UserRepository
 
 class UserReader(UserRepository, Protocol):
@@ -467,11 +470,21 @@ class UserReader(UserRepository, Protocol):
 class UserLister(UserRepository, typing.Protocol[int]):
     def list(self): ...
 
+class UserCounter(UserRepository, P):
+    def count(self): ...
+
+class UserFinder(UserRepository, typing_extensions.Protocol):
+    def find(self): ...
+
 class SqlUsers(UserRepository):
+    pass
+
+class AbstractUsers(UserRepository, ABC):
     pass
 `;
     expect(await inw014(text, Off, "shop/application/services/users.py")).toEqual([
-      "11:16 `SqlUsers` in `shop.application.services.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+      "20:16 `SqlUsers` in `shop.application.services.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+      "23:21 `AbstractUsers` in `shop.application.services.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
     ]);
   });
 
