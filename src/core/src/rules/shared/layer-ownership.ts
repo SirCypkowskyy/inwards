@@ -10,8 +10,10 @@
  */
 import {
   type InwardsConfig,
+  isGlobSegment,
   type LayerSpec,
   matchEntry,
+  segmentMatches,
   topPackageOf,
 } from "../../config/index.ts";
 import type { ImportRef, SourceFile } from "../../shared/contracts/records.ts";
@@ -135,12 +137,19 @@ function portsLayer(
     }
     for (const entry of layer.modules) {
       const parts = entry.split(".");
+      // A glob segment is filled from the file's module like `*`, but can't be
+      // the last part: it names no one module to suggest.
       const fits =
         !entry.includes("**") &&
+        !isGlobSegment(parts.at(-1) ?? "") &&
         parts.length <= segments.length &&
-        parts.every((part, i) => part === "*" || i === parts.length - 1 || part === segments[i]);
+        parts.every(
+          (part, i) => i === parts.length - 1 || segmentMatches(part, segments[i] ?? ""),
+        );
       if (fits) {
-        const module = parts.map((part, i) => (part === "*" ? segments[i] : part)).join(".");
+        const module = parts
+          .map((part, i) => (part === "*" || isGlobSegment(part) ? segments[i] : part))
+          .join(".");
         return { module, name: layer.name };
       }
     }

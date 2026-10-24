@@ -1,8 +1,8 @@
 /**
  * @file fnmatch globs without regular expressions: `*`, `?`, `[seq]` and `[!seq]`,
  * matched as Python's `fnmatch.fnmatchcase` matches them, one code point per
- * character. Used for shape member patterns (INW007, INW008) and `generated`
- * (INW010).
+ * character. Used for shape member patterns (INW007, INW008), `generated`
+ * (INW010) and the glob segments of module selectors (`app.*._*_store`).
  *
  * Matching is the iterative two-pointer wildcard match: on a mismatch it goes
  * back only to the last `*`, so it costs O(pattern × text) at worst. A
@@ -142,6 +142,18 @@ function matchesOne(token: Token, c: string): boolean {
  */
 export function isGlob(glob: string): boolean {
   return parse(glob) !== undefined;
+}
+
+/**
+ * Lists the characters a glob matches literally: every character outside a
+ * bracket set that isn't `*` or `?`. A module selector checks them, since a
+ * segment glob can only ever match identifier characters.
+ *
+ * @param glob - e.g. `_*_store` or `test_[!a]`.
+ * @returns the literal characters in order, or undefined when the glob is malformed (see `parse`).
+ */
+export function globLiterals(glob: string): string[] | undefined {
+  return parse(glob)?.flatMap((token) => (token.kind === "char" ? [token.char] : []));
 }
 
 /**

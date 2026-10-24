@@ -287,6 +287,29 @@ REPO = sql.SqlRepo()
     expect((await inw015(INBOUND, REST, narrow)).map((f) => f.split(" ")[0])).toEqual(["3:39"]);
   });
 
+  test("a glob segment in role guards every store that fits it (#411)", async () => {
+    const stores = {
+      "app/adapters/_order_store.py": "class OrderStore:\n    pass\n",
+      "app/adapters/_conversation_store.py": "class ConversationStore:\n    pass\n",
+    };
+    const options = `role = ["app.*._*_store"]\nallowed-in = ["app.di"]`;
+    const text =
+      "from app.adapters._order_store import OrderStore\nfrom app.adapters._conversation_store import ConversationStore\n";
+    expect(await inw015(INBOUND, text, options, stores)).toEqual([
+      "1:39 error `app.adapters.inbound.rest` imports `OrderStore` from `app.adapters._order_store`, a module of the role `app.*._*_store`. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
+      "2:46 error `app.adapters.inbound.rest` imports `ConversationStore` from `app.adapters._conversation_store`, a module of the role `app.*._*_store`. A module that uses the adapter directly is tied to it and bypasses the port it implements.",
+    ]);
+    expect(await inw015("app/di.py", text, options, stores)).toEqual([]);
+  });
+
+  test("a bad glob segment in role is a config error that names it", () => {
+    expect(() =>
+      parseConfig(`${LAYERS}\n${withOptions('role = ["app.*.a**_store"]')}`),
+    ).toThrow(
+      'tool.inwards.rules.construct-only-in.role: "app.*.a**_store" is not a module prefix or selector: segment "a**_store" puts ** inside a segment',
+    );
+  });
+
   test("without allowed-in, only the role itself may import it", async () => {
     const found = await inw015("app/di.py", REST, 'role = ["app.adapters.outbound"]');
     expect(found).toEqual([

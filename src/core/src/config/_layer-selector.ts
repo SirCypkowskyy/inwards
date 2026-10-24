@@ -1,17 +1,26 @@
 /**
- * @file Layer entries in `layers[].modules`: a literal module prefix
- * (`shop.domain`) or a selector with wildcard segments (`shop.*.domain`,
- * `shop.**`), in the grammar of ADR-018 (ADR-034). It validates selectors and
- * matches an entry against a module name, reporting the depths precedence
- * needs. It knows nothing about layers or precedence itself; that lives in
- * `rules/shared/layer-ownership.ts`.
+ * @file Module selectors: a literal module prefix (`shop.domain`) or a
+ * selector with wildcard segments (`shop.*.domain`, `shop.**`), in the
+ * grammar of ADR-018 (ADR-034), extended with fnmatch globs inside one
+ * segment (`app.*._*_store`, #411). Layer `modules`, the rule options' module
+ * lists and shape `packages` share the segment grammar defined here. It
+ * validates selectors and matches an entry against a module name, reporting
+ * the depths precedence needs. It knows nothing about layers or precedence
+ * itself; that lives in `rules/shared/layer-ownership.ts`.
  *
  * Matching is dynamic programming over segments, O(entry × module) per call,
  * not the recursive `matchSegments` of shapes, since it runs per import.
  */
+import { globLiterals, globMatches } from "./_glob.ts";
 
 /** One segment of a selector: a Python identifier. */
 const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u;
+/** One character a Python identifier may hold after its first. */
+const IDENTIFIER_CHAR = /^\p{XID_Continue}$/u;
+/** The characters that make an entry a selector and a segment a glob: `*`, `?` and `[`. */
+const WILDCARD = /[*?[]/u;
+/** The two segments that stand for whole segments: one, or one or more. */
+const WHOLE_SEGMENT: ReadonlySet<string> = new Set(["*", "**"]);
 
 /**
  * How an entry matches a module. A selector may match a module's prefixes in
@@ -22,11 +31,12 @@ export interface EntryMatch {
   depth: number;
   /**
    * How many module segments reach up to and including the entry's last
-   * literal segment, e.g. 3 for `shop.*.domain` on `shop.orders.domain.x`
-   * and 1 for `shop.**`. For a literal entry it equals `depth`.
+   * named segment, a literal or a glob such as `_*_store`, e.g. 3 for
+   * `shop.*.domain` on `shop.orders.domain.x` and 1 for `shop.**`. For a
+   * literal entry it equals `depth`.
    */
   lastLiteral: number;
-  /** How many of the entry's segments are literal. */
+  /** How many of the entry's segments are literal; a glob segment isn't. */
   literals: number;
 }
 
@@ -34,31 +44,103 @@ export interface EntryMatch {
 export type EntryReach = "match" | "descend" | "prune";
 
 /**
- * Tells whether a layer entry is a selector: it has a `*` anywhere. Every
- * other entry is a literal prefix, validated as leniently as before (ADR-034).
+ * Tells whether a layer entry is a selector: it has a `*`, `?` or `[`
+ * anywhere. Every other entry is a literal prefix, validated as leniently as
+ * before (ADR-034).
  *
  * @param entry - one string from `layers[].modules`.
- * @returns true when the entry contains `*`.
+ * @returns true when the entry contains a wildcard character.
  */
 export function isSelector(entry: string): boolean {
-  return entry.includes("*");
+  return WILDCARD.test(entry);
 }
 
 /**
- * Says what is wrong with a selector, or nothing. Its segments are `*` (one
- * segment), `**` (one or more) or identifiers, and the first is an
- * identifier, the top-level package that anchors the directory walk.
+ * Tells whether a selector segment is a glob inside one segment, such as
+ * `_*_store` or `test_?`: it holds a wildcard and is neither `*` nor `**`.
+ *
+ * @param segment - one dot-separated segment of a selector.
+ * @returns true for a glob segment.
+ */
+export function isGlobSegment(segment: string): boolean {
+  return !WHOLE_SEGMENT.has(segment) && WILDCARD.test(segment);
+}
+
+/**
+ * Tells whether a selector segment names its module segment by itself: a
+ * literal, neither `*`, `**` nor a glob.
+ *
+ * @param segment - one segment of a selector.
+ * @returns true for a literal segment.
+ */
+function isLiteralSegment(segment: string): boolean {
+  return !(WHOLE_SEGMENT.has(segment) || isGlobSegment(segment));
+}
+
+/**
+ * Matches one selector segment other than `**` against one module segment:
+ * `*` takes any, a glob segment matches as `fnmatch.fnmatchcase` would, and a
+ * literal must be equal.
+ *
+ * @param want - a selector segment, `*`, a glob or a literal.
+ * @param segment - one segment of a module name.
+ * @returns true when `want` matches `segment`.
+ */
+export function segmentMatches(want: string, segment: string): boolean {
+  if (want === "*") {
+    return true;
+  }
+  return isGlobSegment(want) ? globMatches(want, segment) : want === segment;
+}
+
+/**
+ * Says what is wrong with one selector segment, or nothing. A segment is an
+ * identifier, `*` (one segment), `**` (one or more), or an fnmatch glob that
+ * matches inside one segment (`_*_store`, `test_?`, `[!_]*`), whose literal
+ * characters are ones an identifier may hold. Shape `packages` use it too,
+ * where the first segment may be a wildcard.
+ *
+ * @param segment - one dot-separated segment.
+ * @returns the reason it is invalid, or undefined when it is valid.
+ */
+export function segmentProblem(segment: string): string | undefined {
+  if (segment === "") {
+    return "it has an empty segment";
+  }
+  if (WHOLE_SEGMENT.has(segment) || IDENTIFIER.test(segment)) {
+    return undefined;
+  }
+  if (!WILDCARD.test(segment)) {
+    return `segment "${segment}" is neither an identifier, *, ** nor a glob such as _*_store`;
+  }
+  if (segment.includes("**")) {
+    return `segment "${segment}" puts ** inside a segment; ** stands alone for one or more segments, and * is the wildcard inside one`;
+  }
+  const literals = globLiterals(segment);
+  if (literals === undefined) {
+    return `segment "${segment}" is not a valid glob: a [ is never closed or a range is reversed, such as [z-a]`;
+  }
+  const odd = literals.find((c) => !IDENTIFIER_CHAR.test(c));
+  return odd === undefined
+    ? undefined
+    : `segment "${segment}" holds "${odd}", which no package name can`;
+}
+
+/**
+ * Says what is wrong with a selector, or nothing. Its segments are valid
+ * (see `segmentProblem`), and the first is an identifier, the top-level
+ * package that anchors the directory walk.
  *
  * @param entry - a selector (see `isSelector`).
  * @returns the reason it is invalid, or undefined when it is valid.
  */
 export function selectorProblem(entry: string): string | undefined {
   const segments = entry.split(".");
-  const bad = segments.find((seg) => seg !== "*" && seg !== "**" && !IDENTIFIER.test(seg));
-  if (bad !== undefined) {
-    return bad === ""
-      ? "it has an empty segment"
-      : `segment "${bad}" is neither an identifier, * nor **`;
+  for (const segment of segments) {
+    const problem = segmentProblem(segment);
+    if (problem !== undefined) {
+      return problem;
+    }
   }
   return IDENTIFIER.test(segments[0] ?? "")
     ? undefined
@@ -79,8 +161,9 @@ export function topPackageOf(entry: string): string {
 /**
  * Matches an entry against a module. A literal entry matches the module
  * itself and its descendants. A selector matches when it matches some
- * prefix of the module exactly, `*` taking one segment and `**` one or
- * more; the module is then that prefix or a descendant of it.
+ * prefix of the module exactly, `*` taking one segment, `**` one or more,
+ * and a glob segment one segment it matches; the module is then that prefix
+ * or a descendant of it.
  *
  * @param entry - a literal prefix or a selector.
  * @param module - a dotted module name.
@@ -97,7 +180,7 @@ export function matchEntry(entry: string, module: string): EntryMatch | undefine
   const pattern = entry.split(".");
   const last = lastLiterals(pattern, module.split("."));
   let best: EntryMatch | undefined;
-  const literals = pattern.filter((seg) => seg !== "*" && seg !== "**").length;
+  const literals = pattern.filter(isLiteralSegment).length;
   last.forEach((lastLiteral, depth) => {
     const better =
       best === undefined ||
@@ -146,7 +229,7 @@ export function entryReach(entry: string, segments: readonly string[]): EntryRea
       if (i > 0 && pattern[i - 1] === "**") {
         next.add(i); // `**` takes one more segment
       }
-      if (want === "*" || want === "**" || want === seg) {
+      if (want === "**" || (want !== undefined && segmentMatches(want, seg))) {
         next.add(i + 1);
       }
     }
@@ -160,9 +243,9 @@ export function entryReach(entry: string, segments: readonly string[]): EntryRea
 
 /**
  * The dynamic program behind `matchEntry`: for every prefix length of the
- * module, the deepest position of the pattern's last literal segment over all
- * ways the pattern matches that prefix exactly, `**` taking one or more
- * segments.
+ * module, the deepest position of the pattern's last literal or glob
+ * segment over all ways the pattern matches that prefix exactly, `**` taking
+ * one or more segments.
  *
  * @param pattern - the entry split on dots.
  * @param name - the module split on dots.
@@ -180,7 +263,7 @@ function lastLiterals(pattern: readonly string[], name: readonly string[]): numb
         next[j] = Math.max(from, next[j - 1] ?? -1);
       } else if (seg === "*") {
         next[j] = from;
-      } else if (from >= 0 && name[j - 1] === seg) {
+      } else if (from >= 0 && segmentMatches(seg, name[j - 1] ?? "")) {
         next[j] = j;
       }
     }
@@ -192,8 +275,8 @@ function lastLiterals(pattern: readonly string[], name: readonly string[]): numb
 /**
  * Fills a selector's wildcards from a module, keeping its literal tail: the
  * module `src.*.service` stands for next to `src.posts.router` is
- * `src.posts.service`. The part up to the last wildcard must match a prefix
- * of the module exactly; with `**`, which can match prefixes of several
+ * `src.posts.service`. The part up to the last wildcard or glob segment must
+ * match a prefix of the module exactly; with `**`, which can match prefixes of several
  * lengths, the longest one short of the module itself wins, so the result is
  * a sibling in the module's own package.
  *
@@ -204,7 +287,7 @@ function lastLiterals(pattern: readonly string[], name: readonly string[]): numb
 export function filledFrom(entry: string, module: string): string | undefined {
   const pattern = entry.split(".");
   let cut = pattern.length;
-  while (cut > 0 && pattern[cut - 1] !== "*" && pattern[cut - 1] !== "**") {
+  while (cut > 0 && isLiteralSegment(pattern[cut - 1] ?? "*")) {
     cut -= 1;
   }
   if (cut === 0 || cut === pattern.length) {

@@ -10,6 +10,7 @@
 import { dirname, join } from "node:path";
 import {
   type InwardsConfig,
+  isSelector,
   type LayerSpec,
   libraryDenies,
   parseConfig,
@@ -350,7 +351,7 @@ function portModules(
 ): string[] {
   const found = new Set<string>();
   // A selector (`shop.*.domain`) names no one directory to probe; its layer gets the generic hint.
-  const literal = config.layers.flatMap((layer) => layer.modules).filter((m) => !m.includes("*"));
+  const literal = config.layers.flatMap((layer) => layer.modules).filter((m) => !isSelector(m));
   for (const module of literal) {
     const base = join(project, config.root, ...module.split("."), "ports");
     if (probe.kind(base) === "dir" || probe.kind(`${base}.py`) === "file") {
@@ -384,7 +385,7 @@ function presetPorts(style: Style, config: InwardsConfig): string | undefined {
   // The layer's first literal prefix: a selector (`app.*.application`) names no one module.
   const module = config.layers
     .find((layer) => layer.name === owner?.name)
-    ?.modules.find((m) => !m.includes("*"));
+    ?.modules.find((m) => !isSelector(m));
   return owner === undefined || module === undefined
     ? undefined
     : `${module}${parent.slice(owner.module.length)}`;

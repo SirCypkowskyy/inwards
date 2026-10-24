@@ -26,20 +26,20 @@
       "pattern": "^=?[^.\\s*?\\[\\]/\\\\-]+(\\.[^.\\s*?\\[\\]/\\\\-]+)*$"
     },
     "selector": {
-      "description": "A package selector: a.b (exact), a.* (one level) or a.** (any depth).",
+      "description": "A package selector: a.b (exact), a.* (one level), a.** (any depth), or an fnmatch glob inside one segment (*, ?, [seq], [!seq]) such as a.*_store.",
       "type": "string",
-      "pattern": "^(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+)(\\.(\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+))*$"
+      "pattern": "^(?:\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+|(?=[^.]*[*?\\[])(?:[A-Za-z0-9_\\u0080-\\uffff?]|\\*(?!\\*)|\\[(?:!(?:\\][^\\].]*|[^\\].][^\\].]*)|\\][^\\].]*|[^\\].!][^\\].]*)\\])+)(?:\\.(?:\\*\\*?|[^.\\s*?\\[\\]/\\\\-]+|(?=[^.]*[*?\\[])(?:[A-Za-z0-9_\\u0080-\\uffff?]|\\*(?!\\*)|\\[(?:!(?:\\][^\\].]*|[^\\].][^\\].]*)|\\][^\\].]*|[^\\].!][^\\].]*)\\])+))*$"
     },
     "layerEntry": {
-      "description": "A layer entry: a module prefix such as shop.domain, or, with a *, a selector whose segments are identifiers, * (one segment) or ** (one or more), starting with a package name, such as shop.*.domain. Inwards also checks non-ASCII identifiers exactly.",
+      "description": "A layer entry: a module prefix such as shop.domain, or, with a *, ? or [, a selector whose segments are identifiers, * (one segment), ** (one or more) or fnmatch globs inside one segment, starting with a package name, such as shop.*.domain or app.*._*_store. Inwards also checks non-ASCII identifiers exactly.",
       "type": "string",
       "minLength": 1,
       "anyOf": [
         {
-          "pattern": "^[^*]+$"
+          "pattern": "^[^*?[]+$"
         },
         {
-          "pattern": "^[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*(\\.(\\*\\*?|[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*))+$"
+          "pattern": "^[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*(?:\\.(?:\\*\\*?|[A-Za-z_\\u0080-\\uffff][A-Za-z0-9_\\u0080-\\uffff]*|(?=[^.]*[*?\\[])(?:[A-Za-z0-9_\\u0080-\\uffff?]|\\*(?!\\*)|\\[(?:!(?:\\][^\\].]*|[^\\].][^\\].]*)|\\][^\\].]*|[^\\].!][^\\].]*)\\])+))+$"
         }
       ]
     },

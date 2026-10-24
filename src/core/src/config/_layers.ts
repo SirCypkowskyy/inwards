@@ -164,7 +164,7 @@ function parseLayer(layer: unknown, where: string): LayerSpec {
     const problem = isSelector(entry) ? selectorProblem(entry) : undefined;
     if (problem !== undefined) {
       throw new ConfigError(
-        `${where}.modules[${k}]: "${entry}" is not a valid selector: ${problem}. A selector's segments are package names, * (one segment) or ** (one or more), and it starts with a package name, such as "shop.*.domain".`,
+        `${where}.modules[${k}]: "${entry}" is not a valid selector: ${problem}. A selector's segments are package names, * (one segment), ** (one or more) or globs inside one segment (_*_store), and it starts with a package name, such as "shop.*.domain".`,
       );
     }
   });

@@ -285,9 +285,29 @@ describe("shape config", () => {
       "tool.inwards.names[1].only_in",
     ],
     [
-      "a partial wildcard segment",
-      '[[tool.inwards.shape]]\npackages = ["app.svc_*"]\n',
-      '"app.svc_*"',
+      "** inside a segment",
+      '[[tool.inwards.shape]]\npackages = ["app.svc_**"]\n',
+      'not "app.svc_**": segment "svc_**" puts ** inside a segment',
+    ],
+    [
+      "an unclosed bracket in a glob segment",
+      '[[tool.inwards.shape]]\npackages = ["app.[ab"]\n',
+      'segment "[ab" is not a valid glob',
+    ],
+    [
+      "a glob segment shadowed by an earlier *",
+      '[[tool.inwards.shape]]\npackages = ["app.*_svc"]\n',
+      "first match wins",
+    ],
+    [
+      "the same glob segment twice",
+      '[[tool.inwards.shape]]\npackages = ["lib.*_svc"]\n[[tool.inwards.shape]]\npackages = ["lib.*_svc"]\n',
+      'shape[2] repeats "lib.*_svc" from shape[1]',
+    ],
+    [
+      "a literal an earlier glob segment matches",
+      '[[tool.inwards.shape]]\npackages = ["lib.*_svc"]\n[[tool.inwards.shape]]\npackages = ["lib.orders_svc"]\n',
+      "already matches every package it does",
     ],
     [
       "a member pattern with a path",
@@ -304,6 +324,20 @@ describe("shape config", () => {
   test("a glob that only overlaps an earlier one is fine", () => {
     const text = `${FASTAPI}\n[[tool.inwards.shape]]\npackages = ["app.**"]\n`;
     expect(parseConfig(text).shape).toHaveLength(2);
+  });
+
+  test("glob segments that only overlap are fine, either way round", () => {
+    const text = `${FASTAPI}\n[[tool.inwards.shape]]\npackages = ["lib.a?"]\n[[tool.inwards.shape]]\npackages = ["lib.a*", "lib.[ab]*"]\n`;
+    expect(parseConfig(text).shape).toHaveLength(3);
+  });
+
+  test("a glob segment selects the packages whose segment it matches (#411)", () => {
+    const text = FASTAPI.replace('packages = ["app.*"]', 'packages = ["app.*_svc"]');
+    const globbed = parseConfig(text);
+    expect(checkShape(file("app/orders_svc/helpers.py", ""), globbed).map((d) => d.code)).toEqual([
+      "INW007",
+    ]);
+    expect(checkShape(file("app/orders/helpers.py", ""), globbed)).toEqual([]);
   });
 
   test("an exact entry before a glob that matches it is fine", () => {

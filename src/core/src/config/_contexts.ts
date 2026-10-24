@@ -10,6 +10,7 @@
  * prefixes for now (glob selectors are #191), and the longest matching prefix
  * decides a module's one owning context, so declaration order never matters.
  */
+import { isSelector } from "./_layer-selector.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One bounded context or slice, with every optional list filled in. */
@@ -173,7 +174,7 @@ function moduleList(value: unknown, where: string, exact = false): string[] | un
   }
   value.forEach((entry: unknown, k) => {
     if (!isModuleEntry(entry, exact)) {
-      const glob = typeof entry === "string" && entry.includes("*");
+      const glob = typeof entry === "string" && isSelector(entry);
       throw new ConfigError(
         glob
           ? `${where}[${k}] must be a dotted module name such as "shop.orders": contexts take literal prefixes, not wildcards.`
