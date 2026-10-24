@@ -8,7 +8,8 @@
  * - `checkRequired` asks a `ListMembers` port what a package holds. Adapters
  *   build one from a directory listing (`probeMembers`) or from the files they
  *   already have (`membersFrom`).
- * - `checkSelectors` warns about a shape selector that matches no package.
+ * - `checkSelectors` warns about a shape selector that matches no package,
+ *   unless its entry sets `allow-empty`.
  *
  * The exported checks apply `[tool.inwards.rules]` (`applyRules`).
  */
@@ -130,7 +131,8 @@ export function checkRequired(
 }
 
 /**
- * Warns about shape selectors that match no package, often a typo.
+ * Warns about shape selectors that match no package, often a typo. An entry
+ * with `allow-empty = true` is skipped: it was declared ahead of the code.
  *
  * @param config - the shapes.
  * @param packages - every package under the config root.
@@ -144,7 +146,7 @@ export function checkSelectors(
 ): Diagnostic[] {
   const source: SourceFile = { path: file.path, module: "", isPackage: false, text: file.text };
   const dead = (config.shape ?? [])
-    .flatMap((shape) => shape.packages)
+    .flatMap((shape) => (shape.allowEmpty === true ? [] : shape.packages))
     .filter((selector) => ![...packages].some((pkg) => selects(selector, pkg)));
   const found = [...new Set(dead)].map((selector) =>
     diagnostic(RULES.INW007, source, {
@@ -155,6 +157,7 @@ export function checkSelectors(
         summary: `Ask the user to fix or remove "${selector}" in [[tool.inwards.shape]].`,
         steps: [
           "Check the selector for a typo: a selector that matches nothing leaves those packages unshaped.",
+          "Declared ahead of the code? Ask the user to set allow-empty = true on that [[tool.inwards.shape]] entry.",
           "Don't edit [tool.inwards] yourself; tell the user.",
         ],
       },

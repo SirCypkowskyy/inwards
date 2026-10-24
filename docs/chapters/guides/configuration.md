@@ -238,6 +238,18 @@ Type: arrays of tables. Default: none.
 
 Which members a package may, must and must not hold (INW007, INW008), and where a member name may appear. The [package shape guide](package-shape.md) covers both tables and their selector and pattern syntax. A shape entry may also set `hints`, sentences added to the fix steps of its INW007 findings, and `template`, a [template](#templates) that supplies `allow`, `require`, `forbid`, `extra` and `hints`; a key the entry sets itself wins.
 
+A selector that matches no package is an INW007 warning, since it is often a typo. A shape declared ahead of the code sets `allow-empty = true` (boolean, default `false`) to skip that warning for its own selectors; other entries are still checked, and the entry applies as usual once a package matches. A template doesn't supply `allow-empty`.
+
+<!-- config: fragment -->
+
+```toml
+[[tool.inwards.shape]]
+packages = ["app.*.services", "app.*.commands", "app.*.queries"]
+allow = ["_*"]
+require = ["__init__"]
+allow-empty = true
+```
+
 ### `contexts` { #contexts }
 
 Type: array of tables. Default: none.

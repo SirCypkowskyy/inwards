@@ -11,6 +11,7 @@
 import type { Severity } from "../shared/contracts/records.ts";
 import { CONFIG_DEFAULTS } from "./_defaults.ts";
 import { globMatches, isGlob } from "./_glob.ts";
+import { boolean } from "./_option-parsers.ts";
 import { ConfigError, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One `[[tool.inwards.shape]]` entry. */
@@ -27,6 +28,12 @@ export interface ShapeSpec {
   extra: Severity;
   /** Project advice added to the INW007 fix steps (`hints`); absent when not set. */
   hints?: string[];
+  /**
+   * Whether a selector may match no package yet (`allow-empty`), for a shape
+   * declared ahead of the code: INW007 then doesn't warn that it is dead.
+   * Absent when not set.
+   */
+  allowEmpty?: boolean;
 }
 
 /** One `[[tool.inwards.names]]` entry: members matching `pattern` belong only in `onlyIn`. */
@@ -43,6 +50,7 @@ export const SHAPE_KEYS: ReadonlySet<string> = new Set([
   "forbid",
   "extra",
   "hints",
+  "allow-empty",
   "template",
 ]);
 export const NAME_KEYS: ReadonlySet<string> = new Set(["pattern", "only-in"]);
@@ -183,6 +191,9 @@ function parseShape(entry: Record<string, unknown>, i: number): ShapeSpec {
   }
   if (entry["hints"] !== undefined) {
     shape.hints = strings(entry["hints"], `${where}.hints`);
+  }
+  if (entry["allow-empty"] !== undefined) {
+    shape.allowEmpty = boolean(entry["allow-empty"], `${where}.allow-empty`);
   }
   return shape;
 }
