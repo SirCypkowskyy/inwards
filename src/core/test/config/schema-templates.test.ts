@@ -69,6 +69,12 @@ describe("template mistakes fail both the schema and the parser", () => {
       withExtra('[[tool.inwards.shape]]\npackages = ["shop"]\nhints = "x"\n'),
     ],
     [
+      "a shape allow-empty that isn't a boolean",
+      withExtra('[[tool.inwards.shape]]\npackages = ["shop.*"]\nallow-empty = "yes"\n'),
+    ],
+    // allow-empty belongs to one entry: a template can't supply it.
+    ["a template allow-empty", withExtra("[tool.inwards.templates.t]\nallow-empty = true\n")],
+    [
       "a template name that isn't a string",
       withLayer('{ name = "d", modules = ["shop"], template = 1 }'),
     ],

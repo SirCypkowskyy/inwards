@@ -4,7 +4,7 @@ Layer rules (INW001) look at imports. They can't see where code *lives*: a new `
 
 | Rule | Reports | Where |
 |---|---|---|
-| INW007 `package-shape` | a member the shape doesn't allow (`extra`, error by default) or forbids; a name outside its `only-in` packages; a shape selector matching no package (warning) | on the file, line 1; a dead selector in `pyproject.toml` |
+| INW007 `package-shape` | a member the shape doesn't allow (`extra`, error by default) or forbids; a name outside its `only-in` packages; a shape selector matching no package (warning, unless the entry sets `allow-empty`) | on the file, line 1; a dead selector in `pyproject.toml` |
 | INW008 `missing-member` | a member the shape requires is absent | on the package's `__init__.py`, or its first file without one |
 
 ## Configure it
@@ -28,6 +28,7 @@ only-in = ["tests", "tests.**"]
 - **The first matching entry wins.** Put exact entries before the globs that would also match them. An entry whose selector an earlier one already covers could never apply, so it is a config error: `app.orders` after `app.*`, a repeated selector, or `app.*` after `app.**`. A glob that only overlaps an earlier one (`app.**` after `app.*`) is fine. Selector segments are Python identifiers, `*` or `**`.
 - **Member patterns** are fnmatch globs (`*`, `?`, `[seq]`, `[!seq]`), matched as Python's `fnmatch.fnmatchcase` matches them: inside `[...]`, `*` and `?` are literal. A `[` that is never closed, or a reversed range such as `[z-a]`, is a config error. `name` is a module or a subpackage, `name/` a subpackage only, `name.py` a module only (`.pyi` stubs count as modules). `__init__` is always allowed, and so is everything in `require`. Without `allow`, any member is allowed and only `require` and `forbid` apply.
 - **A shape covers a package's direct members.** `app/orders/services/x.py` is member `services/` of `app.orders`; the files inside `services/` answer to a shape for `app.orders.services`, if one exists. Members are named from the file system: `utils.helpers.py` is one module member, not `utils/`, so it matches neither `utils` nor `helpers`. Hidden files and directories are skipped, as every Inwards file walk skips them.
+- **A selector that matches no package** is a warning, often a typo. A shape declared ahead of the code, for packages the next refactor will create, sets `allow-empty = true` (default `false`) to skip that warning; it applies to that entry only, and the entry is checked as usual once a package matches. `allow-empty` silences the warning for every selector of the entry, so a typo in a selector next to it goes unreported; put selectors declared ahead of the code in their own entry.
 - **Names rules** apply at every level: a member matching `pattern` anywhere outside the `only-in` packages is an INW007 error.
 
 Unknown keys, malformed selectors or patterns, and shadowed entries are config errors (exit 2). The [config guard](../04-AI-Integration.md) treats `shape` and `names` like the rest of `[tool.inwards]`: an agent's edit to them is denied.
@@ -46,7 +47,7 @@ app/orders/helpers.py:1:1: INW007 "helpers.py" is not an allowed member of packa
 - **Per edit (PostToolUse).** INW007 blocks (exit 2) when the edited file is new this session. For a file that already existed when the session started, it goes back as context only, so legacy layout never blocks an unrelated edit. INW008 for the edited package is always context: the agent creating `app/payments/router.py` hears that `service.py` is still missing, and can add it next.
 - **Stop gate.** INW008 findings that are new since the session started block the turn, so deleting a required `service.py` through Bash is caught. A package that already lacked it at session start doesn't block. INW007 on files that predate the session doesn't block either.
 - **Editor.** `inwards server` reports INW007 on the file you type in as you type. Its whole pass, which is `inwards check` in each workspace folder, puts INW007 on files you haven't opened and INW008 on the package's `__init__.py`; it runs when the editor starts the server, on every save, and once per burst of file events when files are created or deleted.
-- **CI.** A whole-project `inwards check` reports INW007 on every file, INW008 for every shaped package, and a warning for a selector that matches no package.
+- **CI.** A whole-project `inwards check` reports INW007 on every file, INW008 for every shaped package, and a warning for a selector that matches no package, except in an entry with `allow-empty = true`.
 
 ## Example: fastapi-best-practices
 

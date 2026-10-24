@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: 8b7261df446829f904a88df95d78dfbed4ba8dd1a790c8b70a4e87fc02d06e33
+source_hash: 7e93628b87b2b41d5e8ffc5ad889281c83d815c006ab72398887f98a54806e16
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -242,6 +242,18 @@ deny = [{ modules = ["shop.billing"], libraries = ["django"] }]
 Typ: tablice tabel. Domyślnie: brak.
 
 Jakie elementy pakiet może, musi i nie może zawierać (INW007, INW008) oraz gdzie może się pojawić nazwa elementu. Obie tabele oraz składnię ich selektorów i wzorców opisuje [przewodnik o kształcie pakietu](package-shape.md). Wpis kształtu może też ustawić `hints`, zdania dodawane do kroków naprawy jego diagnostyk INW007, oraz `template`, [szablon](#templates), który dostarcza `allow`, `require`, `forbid`, `extra` i `hints`; klucz ustawiony przez sam wpis wygrywa.
+
+Selektor, do którego nie pasuje żaden pakiet, to ostrzeżenie INW007, bo często jest literówką. Kształt zadeklarowany przed kodem ustawia `allow-empty = true` (typ: prawda albo fałsz, domyślnie `false`), żeby pominąć to ostrzeżenie dla własnych selektorów; inne wpisy nadal są sprawdzane, a gdy pakiet już pasuje, wpis działa jak zwykle. Szablon nie dostarcza `allow-empty`.
+
+<!-- config: fragment -->
+
+```toml
+[[tool.inwards.shape]]
+packages = ["app.*.services", "app.*.commands", "app.*.queries"]
+allow = ["_*"]
+require = ["__init__"]
+allow-empty = true
+```
 
 ### `contexts` { #contexts }
 

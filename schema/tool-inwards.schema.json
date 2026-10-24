@@ -329,6 +329,12 @@
           "markdownDescription": "Project advice added to the fix steps of an INW007 finding for this shape.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
           "$ref": "#/definitions/hints"
         },
+        "allow-empty": {
+          "description": "Declared ahead of the code: a selector of this entry that matches no package is not reported.",
+          "markdownDescription": "Declared ahead of the code: a selector of this entry that matches no package is not reported.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#shape)",
+          "type": "boolean",
+          "default": false
+        },
         "template": {
           "description": "A template that supplies allow, require, forbid, extra and hints; keys this entry sets win.",
           "markdownDescription": "A template that supplies allow, require, forbid, extra and hints; keys this entry sets win.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#templates)",

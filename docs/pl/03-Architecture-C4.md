@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/03-Architecture-C4.md
-source_hash: e5b32b00a35c4711332fa2bfe5d2849697e8c118b564bf247d471c07f94322a2
+source_hash: 6090663a7402e5c3ca559018b733869b70b81b555d788ae50b82e3fefc6e04eb
 ---
 
 # :material-sitemap-outline: Architektura (C4) { #architecture-c4 }
@@ -393,7 +393,7 @@ Reguły są pogrupowane według kategorii, w kolejności, której używa [indeks
 | Kod | Nazwa | Co wyłapuje | Włączona | Poziom | Włącza ją preset | Stan |
 |---|---|---|---|---|---|---|
 | INW006 | `unassigned-module` | Import z warstwy do własnego kodu, który nie należy do żadnej warstwy, w tym do pakietu nad warstwami (`from shop import x` uruchamia `shop/__init__.py`, który nie należy do żadnej warstwy), statyczny albo dynamiczny (błąd); kod warstwy przeniesiony w trakcie sesji poza wszystkie warstwy (błąd); pakiet poza wszystkimi warstwami i poza `ignore` (ostrzeżenie); prefiks warstwy, który nie pasuje do żadnego modułu (ostrzeżenie), warstwa bez żywego prefiksu albo prefiks opróżniony w trakcie sesji (błąd). Nieznane klucze i nakładające się prefiksy to błędy konfiguracji | domyślnie | błąd, część diagnostyk to ostrzeżenia | wszystkie | :material-check-circle: |
-| INW007 | `package-shape` | Element pakietu, na który `[[tool.inwards.shape]]` nie pozwala (błąd albo ostrzeżenie przy `extra = "warning"`) albo którego zabrania, taki jak nowy `helpers.py` obok `service.py`; nazwa elementu poza jej pakietami `only-in` z `[[tool.inwards.names]]`, taka jak `test_x.py` w aplikacji (błąd); selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie, w pyproject.toml). Komunikat nigdy nie wypisuje dozwolonych elementów; poprawka podaje prawdopodobny cel. Zobacz [Kształt pakietu](guides/package-shape.md) | domyślnie | błąd, część diagnostyk to ostrzeżenia | wszystkie | :material-check-circle: |
+| INW007 | `package-shape` | Element pakietu, na który `[[tool.inwards.shape]]` nie pozwala (błąd albo ostrzeżenie przy `extra = "warning"`) albo którego zabrania, taki jak nowy `helpers.py` obok `service.py`; nazwa elementu poza jej pakietami `only-in` z `[[tool.inwards.names]]`, taka jak `test_x.py` w aplikacji (błąd); selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie, w pyproject.toml; `allow-empty = true` pomija je dla kształtu zadeklarowanego przed kodem). Komunikat nigdy nie wypisuje dozwolonych elementów; poprawka podaje prawdopodobny cel. Zobacz [Kształt pakietu](guides/package-shape.md) | domyślnie | błąd, część diagnostyk to ostrzeżenia | wszystkie | :material-check-circle: |
 | INW008 | `missing-member` | Brakuje elementu, którego wymaga kształt pakietu; zgłaszane w jego `__init__.py`. Uruchomienia dla całego projektu zgłaszają każdy taki brak; Stop gate blokuje tylko te, które pojawiły się od początku sesji | domyślnie | błąd | wszystkie | :material-check-circle: |
 
 ### Role { #catalogue-roles }

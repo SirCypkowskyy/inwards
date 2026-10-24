@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: d17a2d097f9cbd84a3b4d6e0fa5667322eb0b2d596f13a489e5221714a888f66
+source_hash: daa56962bdb0110d33991559553548f8b3eab0f9ee6fc68455cd22b8f470eef6
 ---
 
 # Kształt pakietu { #package-shape }
@@ -9,7 +9,7 @@ Reguły warstw (INW001) patrzą na importy. Nie widzą, gdzie kod *leży*: nowy 
 
 | Reguła | Zgłasza | Gdzie |
 |---|---|---|
-| INW007 `package-shape` | element, na który kształt nie pozwala (`extra`, domyślnie błąd) albo którego zabrania; nazwę poza jej pakietami `only-in`; selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie) | w pliku, w linii 1; martwy selektor w `pyproject.toml` |
+| INW007 `package-shape` | element, na który kształt nie pozwala (`extra`, domyślnie błąd) albo którego zabrania; nazwę poza jej pakietami `only-in`; selektor kształtu, który nie pasuje do żadnego pakietu (ostrzeżenie, chyba że wpis ustawia `allow-empty`) | w pliku, w linii 1; martwy selektor w `pyproject.toml` |
 | INW008 `missing-member` | brakuje elementu, którego wymaga kształt | w `__init__.py` pakietu albo w jego pierwszym pliku, jeśli `__init__.py` nie ma |
 
 ## Konfiguracja { #configure-it }
@@ -33,6 +33,7 @@ only-in = ["tests", "tests.**"]
 - **Wygrywa pierwszy pasujący wpis.** Dokładne wpisy umieszczaj przed globami, które też by do nich pasowały. Wpis, którego selektor jest już pokryty przez wcześniejszy, nigdy nie mógłby zadziałać, więc jest błędem konfiguracji: `app.orders` po `app.*`, powtórzony selektor albo `app.*` po `app.**`. Glob, który tylko częściowo pokrywa się z wcześniejszym (`app.**` po `app.*`), jest w porządku. Segmenty selektora to identyfikatory Pythona, `*` albo `**`.
 - **Wzorce elementów** to globy fnmatch (`*`, `?`, `[seq]`, `[!seq]`), dopasowywane tak jak w Pythonowym `fnmatch.fnmatchcase`: wewnątrz `[...]` znaki `*` i `?` są dosłowne. Niezamknięty `[` albo odwrócony zakres, taki jak `[z-a]`, to błąd konfiguracji. `name` to moduł albo podpakiet, `name/` tylko podpakiet, `name.py` tylko moduł (zaślepki `.pyi` liczą się jako moduły). `__init__` jest zawsze dozwolony, podobnie jak wszystko z `require`. Bez `allow` każdy element jest dozwolony i działają tylko `require` oraz `forbid`.
 - **Kształt obejmuje bezpośrednie elementy pakietu.** `app/orders/services/x.py` jest elementem `services/` pakietu `app.orders`; pliki wewnątrz `services/` podlegają kształtowi dla `app.orders.services`, jeśli taki istnieje. Elementy są nazywane według systemu plików: `utils.helpers.py` to jeden element-moduł, a nie `utils/`, więc nie pasuje ani do `utils`, ani do `helpers`. Ukryte pliki i katalogi są pomijane, tak jak pomija je każde przeglądanie plików w Inwards.
+- **Selektor, do którego nie pasuje żaden pakiet**, to ostrzeżenie, często literówka. Kształt zadeklarowany przed kodem, dla pakietów, które utworzy następny refaktor, ustawia `allow-empty = true` (domyślnie `false`), żeby pominąć to ostrzeżenie; dotyczy to tylko tego wpisu, a gdy pakiet już pasuje, wpis jest sprawdzany jak zwykle. `allow-empty` wycisza to ostrzeżenie dla każdego selektora wpisu, więc literówka w selektorze obok nie zostanie zgłoszona; selektory zadeklarowane przed kodem umieść w osobnym wpisie.
 - **Reguły nazw** działają na każdym poziomie: element pasujący do `pattern` w dowolnym miejscu poza pakietami `only-in` to błąd INW007.
 
 Nieznane klucze, źle zbudowane selektory albo wzorce oraz przesłonięte wpisy to błędy konfiguracji (kod wyjścia 2). [Config guard](../04-AI-Integration.md) traktuje `shape` i `names` tak jak resztę `[tool.inwards]`: edycja ich przez agenta jest odrzucana.
@@ -51,7 +52,7 @@ app/orders/helpers.py:1:1: INW007 "helpers.py" is not an allowed member of packa
 - **Przy każdej edycji (PostToolUse).** INW007 blokuje (kod wyjścia 2), gdy edytowany plik jest nowy w tej sesji. Dla pliku, który istniał już na początku sesji, wraca tylko jako kontekst, więc stary układ nigdy nie blokuje niezwiązanej edycji. INW008 dla edytowanego pakietu jest zawsze kontekstem: agent, który tworzy `app/payments/router.py`, słyszy, że wciąż brakuje `service.py`, i może go dodać w następnym kroku.
 - **Stop gate.** Wyniki INW008, które są nowe od początku sesji, blokują turę, więc usunięcie wymaganego `service.py` przez Bash zostaje wyłapane. Pakiet, któremu tego pliku brakowało już na początku sesji, nie blokuje. INW007 w plikach starszych niż sesja też nie blokuje.
 - **Edytor.** `inwards server` zgłasza INW007 w pliku, w którym piszesz, na bieżąco. Jego przebieg całego projektu, czyli `inwards check` w każdym folderze obszaru roboczego, umieszcza INW007 w plikach, których nie otworzyłeś, i INW008 w `__init__.py` pakietu; rusza, gdy edytor uruchamia serwer, przy każdym zapisie i raz na serię zdarzeń, gdy pliki powstają albo znikają.
-- **CI.** Sprawdzenie całego projektu przez `inwards check` zgłasza INW007 w każdym pliku, INW008 dla każdego pakietu z kształtem i ostrzeżenie dla selektora, który nie pasuje do żadnego pakietu.
+- **CI.** Sprawdzenie całego projektu przez `inwards check` zgłasza INW007 w każdym pliku, INW008 dla każdego pakietu z kształtem i ostrzeżenie dla selektora, który nie pasuje do żadnego pakietu, poza wpisem z `allow-empty = true`.
 
 ## Przykład: fastapi-best-practices { #example-fastapi-best-practices }
 
