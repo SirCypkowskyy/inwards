@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: d17a2d097f9cbd84a3b4d6e0fa5667322eb0b2d596f13a489e5221714a888f66
+source_hash: 140a0b7ef48dda3bff669e2b185da8f95c39933d559809c57b02091c7ae66c25
 ---
 
 # Kształt pakietu { #package-shape }
