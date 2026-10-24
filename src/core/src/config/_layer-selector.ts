@@ -256,20 +256,34 @@ function lastLiterals(pattern: readonly string[], name: readonly string[]): numb
   row.push(-1);
   row[0] = 0;
   for (const seg of pattern) {
-    const next = row.map(() => -1);
-    for (let j = 1; j < row.length; j += 1) {
-      const from = row[j - 1] ?? -1;
-      if (seg === "**") {
-        next[j] = Math.max(from, next[j - 1] ?? -1);
-      } else if (seg === "*") {
-        next[j] = from;
-      } else if (from >= 0 && segmentMatches(seg, name[j - 1] ?? "")) {
-        next[j] = j;
-      }
-    }
-    row = next;
+    row = nextRow(seg, row, name);
   }
   return row;
+}
+
+/**
+ * One step of `lastLiterals`: the row after the pattern takes one more
+ * segment, `**` carrying the deepest position forward, `*` keeping it, and a
+ * literal or glob segment moving it to the module segment it matches.
+ *
+ * @param seg - the pattern segment taken.
+ * @param row - the row before it (see `lastLiterals`).
+ * @param name - the module split on dots.
+ * @returns the row after it.
+ */
+function nextRow(seg: string, row: readonly number[], name: readonly string[]): number[] {
+  const next = row.map(() => -1);
+  for (let j = 1; j < row.length; j += 1) {
+    const from = row[j - 1] ?? -1;
+    if (seg === "**") {
+      next[j] = Math.max(from, next[j - 1] ?? -1);
+    } else if (seg === "*") {
+      next[j] = from;
+    } else if (from >= 0 && segmentMatches(seg, name[j - 1] ?? "")) {
+      next[j] = j;
+    }
+  }
+  return next;
 }
 
 /**

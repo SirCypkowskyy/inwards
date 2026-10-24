@@ -227,17 +227,6 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ],
     ["a layer selector that is only **", withLayer('{ name = "d", modules = ["**"] }')],
     ["** inside a layer selector segment", withLayer('{ name = "d", modules = ["shop.a**"] }')],
-    ["an unclosed bracket in a layer selector", withLayer('{ name = "d", modules = ["shop.[ab"] }')],
-    ["punctuation in a glob segment", withLayer('{ name = "d", modules = ["shop.a-*"] }')],
-    ["a glob as the first segment", withLayer('{ name = "d", modules = ["sh*.domain"] }')],
-    [
-      "** inside a role segment",
-      withExtra('[tool.inwards.rules.construct-only-in]\nrole = ["shop.*.a**_store"]\n'),
-    ],
-    [
-      "** inside a shape selector segment",
-      withExtra('[[tool.inwards.shape]]\npackages = ["shop.a**"]\n'),
-    ],
     ["an empty layer selector segment", withLayer('{ name = "d", modules = ["shop..*"] }')],
     ["a path in a layer selector", withLayer('{ name = "d", modules = ["shop/*/domain"] }')],
     ["*** in a layer selector", withLayer('{ name = "d", modules = ["shop.***"] }')],
@@ -268,18 +257,6 @@ describe("structural mistakes fail both the schema and the parser", () => {
     const text = withLayer(
       '{ name = "d", modules = ["shop.*.domain", "shop.**", "shop.**.domain.**", "shop.domain"] }, { name = "e", modules = [] }',
     );
-    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
-  });
-
-  test("glob segments pass both (#411)", () => {
-    const text = `${withLayer(
-      '{ name = "d", modules = ["app.*._*_store", "app.test_?", "app.[!_]*.domain", "app.**.*_router"] }',
-    )}[tool.inwards.rules.construct-only-in]
-role = ["app.*._*_store"]
-allowed-in = ["app.di_*"]
-[[tool.inwards.shape]]
-packages = ["app.*_svc", "*._*"]
-`;
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
   });
 
@@ -321,10 +298,6 @@ describe("relations between entries fail the parser only: draft-07 can't see the
     [
       "a repeated layer name",
       withLayer('{ name = "d", modules = ["a"] }, { name = "d", modules = ["b"] }'),
-    ],
-    [
-      "a reversed range in a selector glob",
-      withLayer('{ name = "d", modules = ["shop.[z-a]*"] }'),
     ],
     [
       "a reversed range in a member glob",

@@ -140,12 +140,9 @@ function portsLayer(
       // A glob segment is filled from the file's module like `*`, but can't be
       // the last part: it names no one module to suggest.
       const fits =
-        !entry.includes("**") &&
-        !isGlobSegment(parts.at(-1) ?? "") &&
+        !(entry.includes("**") || isGlobSegment(parts.at(-1) ?? "")) &&
         parts.length <= segments.length &&
-        parts.every(
-          (part, i) => i === parts.length - 1 || segmentMatches(part, segments[i] ?? ""),
-        );
+        parts.every((part, i) => i === parts.length - 1 || segmentMatches(part, segments[i] ?? ""));
       if (fits) {
         const module = parts
           .map((part, i) => (part === "*" || isGlobSegment(part) ? segments[i] : part))

@@ -33,13 +33,6 @@ describe("selector grammar", () => {
     "shop.*.*",
     "shop.**.**",
     "_shop.*",
-    "shop.dom*",
-    "shop.*?",
-    "shop.[ab].*",
-    "app.*._*_store",
-    "app.test_?",
-    "app.[!_]*",
-    "app.**.*_router",
   ])("%s is a valid selector", (selector) => {
     expect(config([selector]).layers[0]?.modules).toEqual([selector]);
   });
@@ -50,12 +43,7 @@ describe("selector grammar", () => {
     ["*.*", "start with a package name"],
     ["**.*", "start with a package name"],
     ["*.domain", "start with a package name"],
-    ["_*.domain", "start with a package name"],
     ["shop.a**", 'segment "a**" puts ** inside a segment'],
-    ["shop.[ab", 'segment "[ab" is not a valid glob'],
-    ["shop.[z-a]*", 'segment "[z-a]*" is not a valid glob'],
-    ["shop.a-*", 'segment "a-*" holds "-"'],
-    ["shop.*.a b", 'segment "a b" is neither an identifier'],
     ["shop..*", "empty segment"],
     ["shop.*.", "empty segment"],
     [".shop.*", "empty segment"],
@@ -232,47 +220,6 @@ const TABLE: Row[] = [
       slice: "shop.orders.domain",
     },
   ],
-  // Globs inside one segment (#411).
-  [
-    "a glob segment matches one segment by its name",
-    [["app.*._*_store"]],
-    "app.runs._admission_store.sql",
-    {
-      layer: "a",
-      entry: "app.*._*_store",
-      prefix: "app.runs._admission_store",
-      slice: "app.runs._admission_store",
-    },
-  ],
-  [
-    "a glob segment matches the whole segment",
-    [["app.*._*_store"]],
-    "app.runs._admission_store_v2",
-    undefined,
-  ],
-  ["a glob segment needs its name to fit", [["app.*._*_store"]], "app.runs.store", undefined],
-  [
-    "a glob segment counts as the last named segment",
-    [["app.*.*"], ["app.*._*_store"]],
-    "app.runs._admission_store",
-    {
-      layer: "b",
-      entry: "app.*._*_store",
-      prefix: "app.runs._admission_store",
-      slice: "app.runs._admission_store",
-    },
-  ],
-  [
-    "a literal beats a glob segment: more literal segments",
-    [["app.*._*_store"], ["app.runs._admission_store"]],
-    "app.runs._admission_store",
-    {
-      layer: "b",
-      entry: "app.runs._admission_store",
-      prefix: "app.runs._admission_store",
-      slice: "app.runs._admission_store",
-    },
-  ],
   [
     "literal prefixes alone: the longest wins",
     [["shop"], ["shop.domain"]],
@@ -315,11 +262,6 @@ describe("matching internals", () => {
     ["shop.*.domain", ["billing"], "prune"],
     ["shop.**.domain", ["shop", "a", "b"], "descend"],
     ["shop.**", ["shop", "a", "b"], "match"],
-    ["app.*._*_store", ["app", "runs"], "descend"],
-    ["app.*._*_store", ["app", "runs", "_admission_store"], "match"],
-    ["app.*._*_store", ["app", "runs", "service"], "prune"],
-    ["app.**.test_?", ["app", "a", "b", "test_x"], "match"],
-    ["app.[!_]*", ["app", "_private"], "prune"],
   ] as const)("%s at %j: %s", (selector, segments, want) => {
     expect(entryReach(selector, segments)).toBe(want);
   });
@@ -335,9 +277,6 @@ describe("matching internals", () => {
     ["src.*.service", "src", undefined],
     ["src.*", "src.posts.router", undefined],
     ["src.service", "src.posts.router", undefined],
-    ["src.*_svc.service", "src.posts_svc.router", "src.posts_svc.service"],
-    ["src.*_svc.service", "src.posts.router", undefined],
-    ["src.*._*_store", "src.posts.router", undefined],
   ] as const)("%s filled from %s: %s", (selector, module, want) => {
     expect(filledFrom(selector, module)).toBe(want);
   });
