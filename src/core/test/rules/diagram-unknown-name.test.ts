@@ -120,12 +120,12 @@ describe("INW017 diagram-unknown-name", () => {
     expect(found[0]?.fix.summary).toBe('Change the label to "shop.domain".');
   });
 
-  test.each([
-    "shop.domain?",
-    "shop.[draft]",
-  ])("a quoted label with ? or [ but no * is a caption: %s", (label) => {
-    expect(check(["%% inwards: layers", "flowchart LR", `  domain["${label}"]`])).toEqual([]);
-  });
+  test.each(["shop.domain?", "shop.[draft]"])(
+    "a quoted label with ? or [ but no * is a caption: %s",
+    (label) => {
+      expect(check(["%% inwards: layers", "flowchart LR", `  domain["${label}"]`])).toEqual([]);
+    },
+  );
 
   test("a quoted label with a glob segment is a selector", () => {
     const found = check([
