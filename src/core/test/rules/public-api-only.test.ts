@@ -225,3 +225,69 @@ describe("the fix", () => {
     expect(found?.fix.steps.at(-1)).toContain("Don't edit [tool.inwards] yourself.");
   });
 });
+
+describe("public-by-name opens every module without a _ segment (#331)", () => {
+  const BY_NAME = { byName: ["billing"] };
+
+  test("the facade and plain modules pass, at any depth", async () => {
+    const { check }: ContextFixture = await contextFixture(BY_NAME);
+    for (const text of [
+      "import shop.billing\n",
+      "from shop.billing.api import total\n",
+      "from shop.billing.app.charge import refund\n",
+      "import shop.billing.domain.invoice\n",
+    ]) {
+      expect(codes(check(PLACE, text))).not.toContain("INW003");
+    }
+  });
+
+  test("a _private module is reported, and the message names the segment", async () => {
+    const { check }: ContextFixture = await contextFixture(BY_NAME);
+    const [found] = check(PLACE, "from shop.billing.domain._invoices import issue\n");
+    expect(found?.code).toBe("INW003");
+    expect(found?.message).toBe(
+      'Context "orders" imports "shop.billing.domain._invoices.issue" from context "billing", but "shop.billing.domain._invoices" isn\'t one of its public modules: "_invoices" starts with an underscore.',
+    );
+  });
+
+  test("a _ segment anywhere below the context's prefix keeps the module private", async () => {
+    const { check }: ContextFixture = await contextFixture(BY_NAME);
+    expect(codes(check(PLACE, "from shop.billing.app._fees import fee\n"))).toEqual(["INW003"]);
+    expect(codes(check(PLACE, "import shop.billing.domain._internal.ledger\n"))).toEqual(["INW003"]);
+  });
+
+  test("an explicit public entry still opens a _private module", async () => {
+    const { check }: ContextFixture = await contextFixture({
+      ...BY_NAME,
+      public: { billing: ["=shop.billing.domain._invoices"] },
+    });
+    expect(codes(check(PLACE, "from shop.billing.domain._invoices import issue\n"))).toEqual([]);
+    expect(codes(check(PLACE, "import shop.billing.domain._internal.ledger\n"))).toEqual(["INW003"]);
+  });
+
+  test("a nested context keeps its own rules", async () => {
+    const { check }: ContextFixture = await contextFixture({
+      ...BY_NAME,
+      dependsOn: { orders: ["tax"] },
+    });
+    expect(codes(check(PLACE, "from shop.billing.tax import rates\n"))).toEqual(["INW003"]);
+  });
+
+  test("the fix points at the package that holds the private module", async () => {
+    const texts = new Map([["shop/billing/app/__init__.py", "from shop.billing.app._fees import fee\n"]]);
+    const { check }: ContextFixture = await contextFixture({ ...BY_NAME, texts });
+    const [found] = check(PLACE, "from shop.billing.app._fees import fee\n");
+    expect(found?.fix.summary).toBe(
+      'Import "fee" from "shop.billing.app", the public module of "billing" that exposes it.',
+    );
+  });
+
+  test("with no home for the name, the fix doesn't call the module's package private", async () => {
+    const { check }: ContextFixture = await contextFixture(BY_NAME);
+    const [found] = check(PLACE, "from shop.billing.app._fees import fee\n");
+    expect(found?.fix.summary).toBe(
+      'Go through a public module of "billing": `shop.billing.app`, `shop.billing`, or any of its modules with no name segment starting with `_`.',
+    );
+    expect(found?.fix.steps[1]).toContain("in `shop.billing.app`");
+  });
+});

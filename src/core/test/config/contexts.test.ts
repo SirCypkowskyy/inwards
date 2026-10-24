@@ -5,6 +5,7 @@
  * another context owns more specifically is rejected.
  */
 import { describe, expect, test } from "bun:test";
+import { isPublicModule, privateParentOf } from "../../src/config/index.ts";
 import { ConfigError, parseConfig } from "../../src/index.ts";
 
 /** A valid `[tool.inwards]` head the context tables are appended to. */
@@ -230,5 +231,76 @@ name = "special"
 modules = ["shop.orders.api.internal"]
 `);
     expect(parsed?.map((c) => c.name)).toEqual(["orders", "special"]);
+  });
+});
+
+describe("public-by-name opens every module without a _ segment (#331)", () => {
+  const BY_NAME = `
+[[tool.inwards.contexts]]
+name = "catalog"
+modules = ["qv.catalog", "qv.catalog_jobs"]
+public = ["=qv.catalog._registry"]
+public-by-name = true
+
+[[tool.inwards.contexts]]
+name = "special"
+modules = ["qv.catalog.special"]
+`;
+
+  test("true is kept, false and absent leave the key out", () => {
+    expect(contexts(BY_NAME)?.[0]?.publicByName).toBe(true);
+    const off = contexts(
+      '[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.a"]\npublic-by-name = false\n',
+    );
+    expect(off?.[0]).toEqual({ name: "a", modules: ["shop.a"], public: [], dependsOn: [] });
+  });
+
+  test("a value that isn't a boolean names the key", () => {
+    expect(
+      error('[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.a"]\npublic-by-name = "yes"\n'),
+    ).toContain("tool.inwards.contexts[0].public-by-name must be true or false");
+  });
+
+  test("the facade, plain modules and dunders are public; a _ segment below the prefix is not", () => {
+    const [catalog] = contexts(BY_NAME) ?? [];
+    if (catalog === undefined) {
+      throw new Error("expected a context");
+    }
+    const open = (module: string): boolean => isPublicModule(catalog, module);
+    expect(
+      ["qv.catalog", "qv.catalog.router", "qv.catalog.sub.models", "qv.catalog.__main__"].map(open),
+    ).toEqual([true, true, true, true]);
+    expect(["qv.catalog_jobs", "qv.catalog_jobs.run"].map(open)).toEqual([true, true]);
+    expect(
+      ["qv.catalog._impl", "qv.catalog.sub._impl", "qv.catalog._sub.mod"].map(open),
+    ).toEqual([false, false, false]);
+    expect(open("qv.catalog._registry")).toBe(true);
+    expect(open("qv.catalog._registry.inner")).toBe(false);
+    expect(open("qv.other")).toBe(false);
+  });
+
+  test("the prefix itself never counts as private", () => {
+    const [core] =
+      contexts(
+        '[[tool.inwards.contexts]]\nname = "core"\nmodules = ["app._core"]\npublic-by-name = true\n',
+      ) ?? [];
+    if (core === undefined) {
+      throw new Error("expected a context");
+    }
+    expect([isPublicModule(core, "app._core"), isPublicModule(core, "app._core.api")]).toEqual([
+      true,
+      true,
+    ]);
+    expect(privateParentOf(core, "app._core.api._x.y")).toBe("app._core.api");
+  });
+
+  test("without the key, nothing is public by name", () => {
+    const [orders] = contexts(TWO) ?? [];
+    if (orders === undefined) {
+      throw new Error("expected a context");
+    }
+    expect([isPublicModule(orders, "shop.orders"), isPublicModule(orders, "shop.orders.models")]).toEqual(
+      [false, false],
+    );
   });
 });

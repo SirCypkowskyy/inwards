@@ -139,6 +139,7 @@ describe("the schema and the parser agree", () => {
     expect(props["generated"]?.default).toEqual([...DEFAULT_GENERATED]);
     expect(context["public"]?.default).toEqual([]);
     expect(context["depends-on"]?.default).toEqual([]);
+    expect(context["public-by-name"]?.default).toBe(false);
     const parsed = parseConfig(
       withExtra('[[tool.inwards.shape]]\npackages = ["shop.*"]\nallow = ["x"]\n'),
     );

@@ -3,7 +3,8 @@
  * `orders`, `billing` and `shipping`, a `tax` context nested in billing, a
  * shared kernel in no context, and `shop/shipping/api.py` in a context but in
  * no layer. Orders depends on billing; extra `depends-on` and `public`
- * entries, extra contexts and file contents can be added per test.
+ * entries, `public-by-name`, extra contexts and file contents can be added
+ * per test. Billing has `_private` modules for `public-by-name` to keep.
  */
 import {
   type Diagnostic,
@@ -20,10 +21,11 @@ import { file, grammars, indexOn } from "./helpers.ts";
  * @param extra - more `depends-on` and `public` by context name, and TOML appended at the end.
  * @param extra.dependsOn - extra dependencies, e.g. `{ billing: ["shipping"] }`.
  * @param extra.public - public prefixes, e.g. `{ billing: ["shop.billing.api"] }`.
+ * @param extra.byName - contexts that get `public-by-name = true`.
  * @param extra.toml - more tables, e.g. another context.
  * @returns the TOML text.
  */
-function configText({ dependsOn = {}, public: open = {}, toml = "" }: Extra): string {
+function configText({ dependsOn = {}, public: open = {}, byName = [], toml = "" }: Extra): string {
   /**
    * Writes one context's depends-on list.
    *
@@ -41,7 +43,8 @@ function configText({ dependsOn = {}, public: open = {}, toml = "" }: Extra): st
    * @returns the TOML array.
    */
   function pub(name: string): string {
-    return JSON.stringify(open[name] ?? []);
+    const list = JSON.stringify(open[name] ?? []);
+    return byName.includes(name) ? `${list}\npublic-by-name = true` : list;
   }
   return `
 [tool.inwards]
@@ -87,6 +90,9 @@ const MODULES = [
   "shop/shipping/api.py",
   "shop/shared/money.py",
   "shop/billing/api.py",
+  "shop/billing/domain/_invoices.py",
+  "shop/billing/app/_fees.py",
+  "shop/billing/domain/_internal/ledger.py",
 ];
 
 /**
@@ -116,6 +122,8 @@ const PROJECT: ProjectIndex = indexOn(DISK);
 interface Extra {
   dependsOn?: Record<string, string[]>;
   public?: Record<string, string[]>;
+  /** Contexts that open their modules by name (`public-by-name = true`). */
+  byName?: string[];
   toml?: string;
   /** File contents by path, for the rules that read other modules (INW003's fix). */
   texts?: ReadonlyMap<string, string>;

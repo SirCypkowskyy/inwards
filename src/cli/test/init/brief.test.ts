@@ -120,6 +120,28 @@ modules = ["shop.orders"]
     expect(brief).toContain("- orders (`shop.orders`): nothing public; no dependencies");
   });
 
+  test("says a context opens its modules by name (#331)", () => {
+    const config = parseConfig(`[tool.inwards]
+layers = [{ name = "domain", modules = ["shop"] }]
+[[tool.inwards.contexts]]
+name = "billing"
+modules = ["shop.billing"]
+public-by-name = true
+[[tool.inwards.contexts]]
+name = "orders"
+modules = ["shop.orders"]
+public = ["shop.orders._api"]
+public-by-name = true
+`);
+    const brief = architectureBrief({ config, style: undefined, ports: [] });
+    expect(brief).toContain(
+      "- billing (`shop.billing`): public: every module with no name segment starting with `_`; no dependencies",
+    );
+    expect(brief).toContain(
+      "- orders (`shop.orders`): public: every module with no name segment starting with `_`; also public `shop.orders._api`; no dependencies",
+    );
+  });
+
   test("lists layer selectors as written and probes no path for them", () => {
     const text = `[tool.inwards]
 layers = [

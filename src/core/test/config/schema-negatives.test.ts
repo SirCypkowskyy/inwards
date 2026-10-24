@@ -65,6 +65,10 @@ describe("structural mistakes fail both the schema and the parser", () => {
     ["rules that aren't a table", withExtra('rules = ["INW001"]\n')],
     ["a select that isn't a list", withExtra('[tool.inwards.rules]\nselect = "INW001"\n')],
     ["a context that isn't a table", withExtra("contexts = [3]\n")],
+    [
+      "a public-by-name that isn't a boolean",
+      withExtra('[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.a"]\npublic-by-name = "yes"\n'),
+    ],
     // Enums and formats.
     ["an unknown stop-gate", withExtra('stop-gate = "always"\n')],
     ["cycles that isn't a list", withExtra('cycles = "modules"\n')],
@@ -277,6 +281,15 @@ describe("structural mistakes fail both the schema and the parser", () => {
       '[[tool.inwards.shape]]\npackages = ["shop.*"]\nallow = ["test_*", "[!_]*", "[]x]y", "[]]", "[!]]", "?.py", "pkg/"]\n',
     );
     expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+  });
+
+  test("public-by-name true or false passes both", () => {
+    for (const value of ["true", "false"]) {
+      const text = withExtra(
+        `[[tool.inwards.contexts]]\nname = "a"\nmodules = ["shop.a"]\npublic-by-name = ${value}\n`,
+      );
+      expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+    }
   });
 });
 

@@ -269,3 +269,32 @@ test("where_should_this_go follows the description when it names a layer or a ro
   expect(outside.isError).toBe(true);
   expect(outside.text).toContain("No pyproject.toml with [tool.inwards]");
 });
+
+test("where_should_this_go marks a context that opens its modules by name (#331)", async () => {
+  const root = project({
+    "pyproject.toml": `${THREE_LAYERS}
+[[tool.inwards.contexts]]
+name = "domain"
+modules = ["shop.domain"]
+public-by-name = true
+
+[[tool.inwards.contexts]]
+name = "app"
+modules = ["shop.application"]
+`,
+    "shop/domain/order.py": "",
+    "shop/application/__init__.py": "",
+  });
+  const client = await connect(root);
+  const answer = await call(client, "where_should_this_go", { imports: ["shop.domain.order"] });
+  expect(answer.data["contexts"]).toEqual([
+    {
+      name: "domain",
+      modules: ["shop.domain"],
+      public: [],
+      dependsOn: [],
+      publicByName: true,
+    },
+    { name: "app", modules: ["shop.application"], public: [], dependsOn: [] },
+  ]);
+});

@@ -1062,6 +1062,12 @@
           },
           "default": []
         },
+        "public-by-name": {
+          "description": "Opens every module of this context whose name has no segment below the context's prefix starting with _ (dunders such as __main__ don't count), the package facade included. public entries still add to it.",
+          "markdownDescription": "Opens every module of this context whose name has no segment below the context's prefix starting with `_` (dunders such as `__main__` don't count), the package facade included. `public` entries still add to it.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#contexts)",
+          "type": "boolean",
+          "default": false
+        },
         "template": {
           "description": "A template whose public modules, under each of this context's prefixes, join its public list.",
           "markdownDescription": "A template whose public modules, under each of this context's prefixes, join its public list.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#templates)",
