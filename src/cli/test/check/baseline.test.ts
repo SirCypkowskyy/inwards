@@ -170,7 +170,9 @@ describe("inwards baseline", () => {
     writeFileSync(path, JSON.stringify(file));
     const { code, stderr } = inwards(["check"], { cwd: root });
     expect(code).toBe(2);
-    expect(stderr).toContain('violation 1 has a "reason" that is not a string');
+    expect(stderr).toContain(
+      'violation 1 (INW001 in shop.domain.order) has a "reason" that is not a string',
+    );
   });
 
   test("inwards baseline refuses a reason that isn't a string and leaves the file alone", () => {
@@ -185,7 +187,9 @@ describe("inwards baseline", () => {
     writeFileSync(path, text);
     const { code, stderr } = inwards(["baseline"], { cwd: root });
     expect(code).toBe(2);
-    expect(stderr).toContain('violation 2 has a "reason" that is not a string');
+    expect(stderr).toContain(
+      'violation 2 (INW001 in shop.domain.pay) has a "reason" that is not a string',
+    );
     expect(readFileSync(path, "utf8")).toBe(text);
   });
 

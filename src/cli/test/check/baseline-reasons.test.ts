@@ -167,7 +167,7 @@ describe("reading a baseline with reasons", () => {
       const { io } = memory(file([ORDER, { ...ORDER, module: "shop.domain.pay", reason }]));
       expect(() => readBaseline(io, CONFIG, undefined)).toThrow(ConfigError);
       expect(() => readBaseline(io, CONFIG, undefined)).toThrow(
-        'violation 2 has a "reason" that is not a string',
+        'violation 2 (INW001 in shop.domain.pay) has a "reason" that is not a string',
       );
     }
   });

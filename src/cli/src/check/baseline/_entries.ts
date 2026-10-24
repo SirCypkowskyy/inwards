@@ -112,7 +112,8 @@ function readViolations(io: BaselineReads, path: string): unknown[] | undefined 
 
 /**
  * Refuses a `reason` that is neither a string nor null, naming the first
- * entry that has one (1-based). A null reason counts as none: files written
+ * entry that has one (1-based, with its rule and module when they are
+ * strings). A null reason counts as none: files written
  * before reasons existed may have one as an unknown key.
  *
  * @param path - the baseline file, for the message.
@@ -123,11 +124,17 @@ function checkReasons(path: string, violations: readonly unknown[]): void {
   const index = violations.findIndex(
     (v) => isRecord(v) && "reason" in v && v["reason"] !== null && typeof v["reason"] !== "string",
   );
-  if (index !== -1) {
-    throw new ConfigError(
-      `${path}: violation ${index + 1} has a "reason" that is not a string. A reason is text, such as "Moves into bootstrap in #123"; fix it or remove it.`,
-    );
+  if (index === -1) {
+    return;
   }
+  const bad = violations[index];
+  const where =
+    isRecord(bad) && typeof bad["code"] === "string" && typeof bad["module"] === "string"
+      ? ` (${bad["code"]} in ${bad["module"]})`
+      : "";
+  throw new ConfigError(
+    `${path}: violation ${index + 1}${where} has a "reason" that is not a string. A reason is text, such as "Moves into bootstrap in #123"; fix it or remove it.`,
+  );
 }
 
 /**
