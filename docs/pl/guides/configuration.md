@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/configuration.md
-source_hash: cb474685cce56f2d9e4cebed2e5e9ba30da51b4c8c4fb7051ca9b031dfee5e7f
+source_hash: 4813b303ffd9f9e73d924d458405f1464591332c26f11c003057c6a8ee1b5066
 ---
 
 # Dokumentacja konfiguracji { #configuration-reference }
@@ -113,6 +113,7 @@ Dla samych dosłownych prefiksów to po prostu najdłuższy prefiks, jak zawsze.
 | `shop.*._*_store` | | `shop.orders.store` | brak: glob nie pasuje | |
 | `shop.orders.*` | `shop.*._*_store` | `shop.orders._run_store` | `b`: głębszy ostatni dosłowny segment | `shop.orders._run_store` |
 | `shop.orders._*_store` | `shop.orders._run_store` | `shop.orders._run_store` | `b`: więcej dosłownych segmentów | `shop.orders._run_store` |
+| `shop.orders._*_store` | `shop.*._run_store` | `shop.orders._run_store` | `a`: remis, wymieniona wcześniej | `shop.orders._run_store` |
 | `shop.**.domain` | `shop.*.domain` | `shop.orders.domain` | `a`: wymieniona wcześniej | `shop.orders.domain` |
 | `shop` | `shop.domain` | `shop.domain.order` | `b`: najdłuższy prefiks | `shop.domain` |
 

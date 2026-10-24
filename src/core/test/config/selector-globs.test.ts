@@ -129,6 +129,12 @@ describe("glob segment ownership", () => {
       "app.runs._admission_store",
       ["b", "app.runs._admission_store", "app.runs._admission_store"],
     ],
+    [
+      "a literal and a glob tie at the same depth: the earlier layer wins",
+      ["shop.orders._*_store", "shop.*._run_store"],
+      "shop.orders._run_store",
+      ["a", "shop.orders._*_store", "shop.orders._run_store"],
+    ],
   ] as const)("%s", (_, entries, module, want) => {
     const got = layerMembership(module, parseConfig(layered(...entries)).layers);
     expect(got && [got.layer.name, got.entry, got.slice]).toEqual(want && [...want]);

@@ -108,6 +108,7 @@ For literal prefixes alone, this is the longest prefix, as it always was. The tr
 | `shop.*._*_store` | | `shop.orders.store` | none: the glob doesn't match | |
 | `shop.orders.*` | `shop.*._*_store` | `shop.orders._run_store` | `b`: deeper last literal | `shop.orders._run_store` |
 | `shop.orders._*_store` | `shop.orders._run_store` | `shop.orders._run_store` | `b`: more literal segments | `shop.orders._run_store` |
+| `shop.orders._*_store` | `shop.*._run_store` | `shop.orders._run_store` | `a`: a tie, listed first | `shop.orders._run_store` |
 | `shop.**.domain` | `shop.*.domain` | `shop.orders.domain` | `a`: listed first | `shop.orders.domain` |
 | `shop` | `shop.domain` | `shop.domain.order` | `b`: longest prefix | `shop.domain` |
 
