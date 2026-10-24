@@ -19,7 +19,7 @@ import {
   type InwardsConfig,
   isPublicModule,
   type LayerSpec,
-  publicModule,
+  publicHomes,
 } from "../../config/index.ts";
 import {
   type Diagram,
@@ -204,12 +204,15 @@ function contextBreach(
  * @returns the summary and steps, naming its public modules.
  */
 function publicFix(diagram: Diagram, context: ContextSpec): Fix {
-  const listed = joined(context.public.map((entry) => `"${publicModule(entry)}"`));
+  const homes = publicHomes(context);
+  const listed = joined(homes.map((home) => `"${home}"`));
+  const others =
+    context.publicByName === true ? ", or a module with no name segment starting with `_`" : "";
   return {
     summary:
-      context.public.length === 0
+      homes.length === 0
         ? `"${context.name}" declares no public modules; remove the arrow or ask the user which of its modules other contexts may import.`
-        : `Point the arrow at a public module of "${context.name}": ${listed}.`,
+        : `Point the arrow at a public module of "${context.name}": ${listed}${others}.`,
     steps: [
       "Code in another context imports only the public modules (INW003 reports it in the code).",
       dotted(diagram),

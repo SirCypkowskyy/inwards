@@ -9,6 +9,7 @@
  */
 import { dirname, join } from "node:path";
 import {
+  type ContextSpec,
   type InwardsConfig,
   type LayerSpec,
   libraryDenies,
@@ -164,12 +165,28 @@ function contextSection(config: InwardsConfig): string[] {
     "",
     header,
     ...config.contexts.map((ctx) => {
-      const pub = ctx.public.length === 0 ? "nothing public" : `public ${publicList(ctx)}`;
+      const pub = publicPart(ctx);
       const deps =
         ctx.dependsOn.length === 0 ? "no dependencies" : `depends on ${ctx.dependsOn.join(", ")}`;
       return `- ${ctx.name} (${list(ctx.modules)}): ${independent ? `${pub}; ${deps}` : pub}`;
     }),
   ];
+}
+
+/**
+ * Says what a context opens to others: its `public` list, and with
+ * `public-by-name` every module without a `_` segment.
+ *
+ * @param ctx - one configured context.
+ * @returns the phrase for the brief, such as `nothing public`.
+ */
+function publicPart(ctx: ContextSpec): string {
+  const listed = ctx.public.length === 0 ? "" : `public ${publicList(ctx)}`;
+  if (ctx.publicByName !== true) {
+    return listed === "" ? "nothing public" : listed;
+  }
+  const byName = "public: every module with no name segment starting with `_`";
+  return listed === "" ? byName : `${byName}; also ${listed}`;
 }
 
 /**

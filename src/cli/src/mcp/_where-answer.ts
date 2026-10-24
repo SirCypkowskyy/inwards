@@ -77,7 +77,8 @@ function bestOf(
  * Words a context for the answer.
  *
  * @param context - a bounded context from the config.
- * @returns its name, modules, public modules and dependencies.
+ * @returns its name, modules, public modules and dependencies, and
+ *   `publicByName` when the context opens its modules by name.
  */
 export function contextView(context: ContextSpec): Record<string, unknown> {
   return {
@@ -85,6 +86,7 @@ export function contextView(context: ContextSpec): Record<string, unknown> {
     modules: context.modules,
     public: context.public,
     dependsOn: context.dependsOn,
+    ...(context.publicByName === true ? { publicByName: true } : {}),
   };
 }
 

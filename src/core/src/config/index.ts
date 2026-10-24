@@ -2,7 +2,13 @@
  * @file The public face of the config/ slice. Everything outside the folder
  * imports this module, never a private `_x.ts` behind it.
  */
-export { type ContextSpec, contextOf, isPublicModule, publicModule } from "./_contexts.ts";
+export {
+  type ContextSpec,
+  contextOf,
+  isPublicModule,
+  privateParentOf,
+  publicHomes,
+} from "./_contexts.ts";
 export type { CycleMode } from "./_cycles.ts";
 export { CONFIG_DEFAULTS } from "./_defaults.ts";
 export { diagramBase, diagramMatches } from "./_diagrams.ts";

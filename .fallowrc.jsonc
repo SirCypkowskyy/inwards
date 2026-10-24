@@ -205,12 +205,13 @@
     "rules": [
       // The engine imports nothing outside src/core; adapters come to it. Inside,
       // folders depend downwards: contracts, then meta (product metadata and the
-      // rule registry), then config; python and lookup beside it; then the rules,
-      // which share only rules/shared and never import each other; then baseline,
-      // engine and report. index.ts may re-export any of them (#176).
+      // rule registry), then config; python and lookup beside it (config reads
+      // python's private-name convention, #331); then the rules, which share
+      // only rules/shared and never import each other; then baseline, engine and
+      // report. index.ts may re-export any of them (#176).
       { "from": "core-contracts", "allow": [] },
       { "from": "core-meta", "allow": ["core-contracts"] },
-      { "from": "core-config", "allow": ["core-contracts", "core-meta"] },
+      { "from": "core-config", "allow": ["core-contracts", "core-meta", "core-python"] },
       { "from": "core-python", "allow": ["core-contracts"] },
       { "from": "core-lookup", "allow": ["core-contracts", "core-python"] },
       { "from": "core-diagram", "allow": ["core-contracts"] },

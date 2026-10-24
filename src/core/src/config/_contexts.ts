@@ -9,7 +9,10 @@
  * neither table assigns membership in the other. Entries are literal module
  * prefixes for now (glob selectors are #191), and the longest matching prefix
  * decides a module's one owning context, so declaration order never matters.
+ * A context can also open its modules by PEP 8's naming convention
+ * (`public-by-name`, #331), which this module decides too.
  */
+import { isPrivateSegment } from "../shared/python/private-modules.ts";
 import { ConfigError, isDottedName, isRecord, rejectUnknownKeys } from "./_toml.ts";
 
 /** One bounded context or slice, with every optional list filled in. */
@@ -26,6 +29,12 @@ export interface ContextSpec {
   public: string[];
   /** Contexts this one may import from directly: not transitive, not reverse. */
   dependsOn: string[];
+  /**
+   * True when every module whose segments below the context's prefix don't
+   * start with `_` is public too, the package facade included
+   * (`public-by-name`). Present only when the key is true.
+   */
+  publicByName?: true;
 }
 
 /** Keys one `[[tool.inwards.contexts]]` entry understands. */
@@ -34,6 +43,7 @@ export const CONTEXT_KEYS: ReadonlySet<string> = new Set([
   "modules",
   "public",
   "depends-on",
+  "public-by-name",
   "template",
 ]);
 
@@ -80,24 +90,83 @@ const EXACT_MARK = "=";
  * @param entry - a `public` entry, such as `shop.billing` or `=shop.billing`.
  * @returns the dotted module name.
  */
-export function publicModule(entry: string): string {
+function publicModule(entry: string): string {
   return entry.startsWith(EXACT_MARK) ? entry.slice(EXACT_MARK.length) : entry;
 }
 
 /**
- * Tells whether a context's `public` list opens a module: it lies at or under
- * a prefix entry, or is the very module of an exact (`=`) entry.
+ * Tells whether a context opens a module: it lies at or under a `public`
+ * prefix entry, is the very module of an exact (`=`) entry, or, with
+ * `public-by-name`, has no private segment below the context's prefix.
  *
  * @param context - the context that owns the module.
  * @param module - a dotted module name.
  * @returns true when other contexts may import the module.
  */
 export function isPublicModule(context: ContextSpec, module: string): boolean {
-  return context.public.some((entry) =>
+  const listed = context.public.some((entry) =>
     entry.startsWith(EXACT_MARK)
       ? module === publicModule(entry)
       : module === entry || module.startsWith(`${entry}.`),
   );
+  if (listed || context.publicByName !== true) {
+    return listed;
+  }
+  return prefixOf(context, module) !== undefined && privateParentOf(context, module) === undefined;
+}
+
+/**
+ * Finds where a module turns private by name in a context: the package that
+ * holds its first segment below the context's longest matching prefix that
+ * starts with `_` and isn't a dunder (`__init__`, `__main__`), as INW021
+ * reads PEP 8. The prefix itself never counts, so `modules = ["app._core"]`
+ * keeps its facade.
+ *
+ * @param context - a context; its `public-by-name` setting isn't consulted.
+ * @param module - a dotted module name.
+ * @returns the package holding the private segment, e.g. `shop.billing` for
+ *   `shop.billing._invoices.tax`; undefined when no segment below the
+ *   prefix is private, or no prefix of the context matches.
+ */
+export function privateParentOf(context: ContextSpec, module: string): string | undefined {
+  const prefix = prefixOf(context, module);
+  if (prefix === undefined || module === prefix) {
+    return undefined;
+  }
+  const below = module.slice(prefix.length + 1).split(".");
+  const k = below.findIndex(isPrivateSegment);
+  return k === -1 ? undefined : [prefix, ...below.slice(0, k)].join(".");
+}
+
+/**
+ * Finds a context's longest prefix that equals a module or one of its ancestors.
+ *
+ * @param context - a context.
+ * @param module - a dotted module name.
+ * @returns the prefix, or undefined when none matches.
+ */
+function prefixOf(context: ContextSpec, module: string): string | undefined {
+  let best: string | undefined;
+  for (const prefix of context.modules) {
+    const matches = module === prefix || module.startsWith(`${prefix}.`);
+    if (matches && prefix.length > (best?.length ?? -1)) {
+      best = prefix;
+    }
+  }
+  return best;
+}
+
+/**
+ * Lists the modules a fix may point an import at: with `public-by-name`, the
+ * context's package facades first (its `modules`), then the module of every
+ * `public` entry, each once.
+ *
+ * @param context - a context.
+ * @returns dotted module names, in that order; empty when nothing is public.
+ */
+export function publicHomes(context: ContextSpec): string[] {
+  const facades = context.publicByName === true ? context.modules : [];
+  return [...new Set([...facades, ...context.public.map(publicModule)])];
 }
 
 /**
@@ -115,12 +184,10 @@ export function contextOf(
   let best: ContextSpec | undefined;
   let bestLength = -1;
   for (const context of contexts) {
-    for (const prefix of context.modules) {
-      const matches = module === prefix || module.startsWith(`${prefix}.`);
-      if (matches && prefix.length > bestLength) {
-        best = context;
-        bestLength = prefix.length;
-      }
+    const prefix = prefixOf(context, module);
+    if (prefix !== undefined && prefix.length > bestLength) {
+      best = context;
+      bestLength = prefix.length;
     }
   }
   return best;
@@ -147,11 +214,18 @@ function parseContext(entry: Record<string, unknown>, i: number): ContextSpec {
       `${where}.modules must be a non-empty list of module names, such as ["shop.orders"].`,
     );
   }
+  const byName = entry["public-by-name"];
+  if (byName !== undefined && typeof byName !== "boolean") {
+    throw new ConfigError(
+      `${where}.public-by-name must be true or false: true makes every module whose name below the context has no segment starting with "_" public.`,
+    );
+  }
   return {
     name,
     modules,
     public: moduleList(entry["public"], `${where}.public`, true) ?? [],
     dependsOn: nameList(entry["depends-on"], `${where}.depends-on`) ?? [],
+    ...(byName === true ? { publicByName: true } : {}),
   };
 }
 

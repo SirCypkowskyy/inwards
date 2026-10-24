@@ -2,8 +2,8 @@
  * @file What makes a first-party module private by its name (ADR-046): a
  * segment below the top-level package that starts with an underscore and
  * isn't a dunder, as PEP 8's "single leading underscore" and Ruff's PLC2701
- * read it. INW021 uses it, and contexts made public by the same convention
- * (#331) are meant to share it. Names only: no I/O, and no view of which
+ * read it. INW021 uses it, and so do contexts made public by the same
+ * convention (`public-by-name`, #331). Names only: no I/O, and no view of which
  * modules exist.
  */
 
@@ -17,7 +17,7 @@ const DUNDER = /^__.+__$/u;
  * @param segment - one segment of a dotted module name.
  * @returns true when it starts with `_` and isn't a dunder.
  */
-function isPrivateSegment(segment: string): boolean {
+export function isPrivateSegment(segment: string): boolean {
   return segment.startsWith("_") && !DUNDER.test(segment);
 }
 
