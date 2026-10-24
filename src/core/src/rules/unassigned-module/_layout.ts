@@ -163,7 +163,8 @@ function emptiedSlices(
  * Names the slices a selector matches: each matched module's prefix up to the
  * selector's last literal segment. `shop.**` has the one slice `shop`, so
  * routine edits under it never empty a slice; `shop.*.infra.*` has
- * `shop.orders.infra`, not one slice per module.
+ * `shop.orders.infra`, not one slice per module. A glob segment counts like
+ * `*`: `shop.*._*_store` has the one slice `shop`.
  *
  * @param selector - a layer selector.
  * @param modules - module names.
@@ -174,7 +175,7 @@ function slicesOf(selector: string, modules: ReadonlySet<string>): Set<string> {
   for (const module of modules) {
     const match = matchEntry(selector, module);
     if (match !== undefined) {
-      slices.add(module.split(".").slice(0, match.lastLiteral).join("."));
+      slices.add(module.split(".").slice(0, match.slice).join("."));
     }
   }
   return slices;

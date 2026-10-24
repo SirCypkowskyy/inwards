@@ -38,6 +38,14 @@ export interface EntryMatch {
   lastLiteral: number;
   /** How many of the entry's segments are literal; a glob segment isn't. */
   literals: number;
+  /**
+   * How many module segments reach up to and including the entry's last
+   * literal segment, a glob counting like `*`: the depth of the session
+   * slice, 1 (`app`) for `app.*._*_store` as for `app.*.*`, so deleting one
+   * store while another remains doesn't empty a slice. For a literal entry it
+   * equals `depth`.
+   */
+  slice: number;
 }
 
 /** Where a path of module segments stands against an entry. */
@@ -175,10 +183,12 @@ export function matchEntry(entry: string, module: string): EntryMatch | undefine
       return undefined;
     }
     const depth = entry.split(".").length;
-    return { depth, lastLiteral: depth, literals: depth };
+    return { depth, lastLiteral: depth, literals: depth, slice: depth };
   }
   const pattern = entry.split(".");
-  const last = lastLiterals(pattern, module.split("."));
+  const name = module.split(".");
+  const last = lastLiterals(pattern, name, true);
+  const slices = lastLiterals(pattern, name, false);
   let best: EntryMatch | undefined;
   const literals = pattern.filter(isLiteralSegment).length;
   last.forEach((lastLiteral, depth) => {
@@ -187,7 +197,7 @@ export function matchEntry(entry: string, module: string): EntryMatch | undefine
       lastLiteral > best.lastLiteral ||
       (lastLiteral === best.lastLiteral && depth > best.depth);
     if (lastLiteral > 0 && better) {
-      best = { depth, lastLiteral, literals };
+      best = { depth, lastLiteral, literals, slice: slices[depth] ?? lastLiteral };
     }
   });
   return best;
@@ -205,7 +215,7 @@ export function deepestMatch(entry: string, module: string): number {
   if (!isSelector(entry)) {
     return matchEntry(entry, module)?.depth ?? 0;
   }
-  const last = lastLiterals(entry.split("."), module.split("."));
+  const last = lastLiterals(entry.split("."), module.split("."), true);
   return last.reduce((deepest, lastLiteral, depth) => (lastLiteral > 0 ? depth : deepest), 0);
 }
 
@@ -243,20 +253,26 @@ export function entryReach(entry: string, segments: readonly string[]): EntryRea
 
 /**
  * The dynamic program behind `matchEntry`: for every prefix length of the
- * module, the deepest position of the pattern's last literal or glob
- * segment over all ways the pattern matches that prefix exactly, `**` taking
- * one or more segments.
+ * module, the deepest position of the pattern's last named segment over all
+ * ways the pattern matches that prefix exactly, `**` taking one or more
+ * segments. Precedence counts a glob segment as named; the session slice
+ * counts only literals, so a glob keeps the position as `*` does.
  *
  * @param pattern - the entry split on dots.
  * @param name - the module split on dots.
+ * @param globsNamed - true to count a glob segment as named, false to treat it like `*`.
  * @returns index `j` holds that position for `name[0..j)`, or -1 when the pattern doesn't match it.
  */
-function lastLiterals(pattern: readonly string[], name: readonly string[]): number[] {
+function lastLiterals(
+  pattern: readonly string[],
+  name: readonly string[],
+  globsNamed: boolean,
+): number[] {
   let row = name.map(() => -1);
   row.push(-1);
   row[0] = 0;
   for (const seg of pattern) {
-    row = nextRow(seg, row, name);
+    row = nextRow(seg, row, name, globsNamed);
   }
   return row;
 }
@@ -264,15 +280,24 @@ function lastLiterals(pattern: readonly string[], name: readonly string[]): numb
 /**
  * One step of `lastLiterals`: the row after the pattern takes one more
  * segment, `**` carrying the deepest position forward, `*` keeping it, and a
- * literal or glob segment moving it to the module segment it matches.
+ * literal segment moving it to the module segment it matches. A glob segment
+ * moves it too when `globsNamed`, and otherwise keeps it, as `*` does, once it
+ * matches.
  *
  * @param seg - the pattern segment taken.
  * @param row - the row before it (see `lastLiterals`).
  * @param name - the module split on dots.
+ * @param globsNamed - whether a glob segment counts as named (see `lastLiterals`).
  * @returns the row after it.
  */
-function nextRow(seg: string, row: readonly number[], name: readonly string[]): number[] {
+function nextRow(
+  seg: string,
+  row: readonly number[],
+  name: readonly string[],
+  globsNamed: boolean,
+): number[] {
   const next = row.map(() => -1);
+  const keeps = !globsNamed && isGlobSegment(seg);
   for (let j = 1; j < row.length; j += 1) {
     const from = row[j - 1] ?? -1;
     if (seg === "**") {
@@ -280,7 +305,7 @@ function nextRow(seg: string, row: readonly number[], name: readonly string[]): 
     } else if (seg === "*") {
       next[j] = from;
     } else if (from >= 0 && segmentMatches(seg, name[j - 1] ?? "")) {
-      next[j] = j;
+      next[j] = keeps ? from : j;
     }
   }
   return next;

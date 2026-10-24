@@ -6,8 +6,8 @@
  * that use them. The grammar without globs lives in `layer-selector.test.ts`.
  */
 import { describe, expect, test } from "bun:test";
-import { entryReach, filledFrom } from "../../src/config/_layer-selector.ts";
-import { ConfigError, checkShape, parseConfig } from "../../src/index.ts";
+import { entryReach, filledFrom, matchEntry } from "../../src/config/_layer-selector.ts";
+import { ConfigError, checkPrefixes, checkShape, parseConfig } from "../../src/index.ts";
 import { layerMembership } from "../../src/rules/shared/layer-ownership.ts";
 import { MINIMAL, parserError, schemaErrors } from "../support/config-schema.ts";
 import { file } from "../support/helpers.ts";
@@ -144,6 +144,34 @@ describe("glob segment ownership", () => {
     ["src.*._*_store", "src.posts.router", undefined],
   ] as const)("%s filled from %s: %s", (selector, module, want) => {
     expect(filledFrom(selector, module)).toBe(want);
+  });
+});
+
+describe("glob segments in session slices", () => {
+  test.each([
+    ["app.*._*_store", "app.orders._run_store", 1],
+    ["app.*.*", "app.orders._run_store", 1],
+    ["app.orders._*_store", "app.orders._run_store.sql", 2],
+    ["app.*_svc.domain", "app.orders_svc.domain.x", 3],
+  ] as const)("%s on %s has a slice %d deep", (selector, module, want) => {
+    expect(matchEntry(selector, module)?.slice).toBe(want);
+  });
+
+  test("deleting one store while another remains empties no slice", () => {
+    const text = layered("app.*._*_store");
+    const pyproject = { path: "pyproject.toml", text };
+    const config = parseConfig(text);
+    const before = new Set(["app", "app.orders._run_store", "app.orders._cache_store"]);
+    const now = new Set(["app", "app.orders._cache_store"]);
+    expect(checkPrefixes(config, now, pyproject, before)).toEqual([]);
+  });
+
+  test("deleting the last store kills the selector", () => {
+    const text = layered("app.*._*_store");
+    const pyproject = { path: "pyproject.toml", text };
+    const before = new Set(["app", "app.orders._run_store"]);
+    const found = checkPrefixes(parseConfig(text), new Set(["app"]), pyproject, before);
+    expect(found.map((d) => d.code)).toEqual(["INW006"]);
   });
 });
 
