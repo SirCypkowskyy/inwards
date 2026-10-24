@@ -456,6 +456,25 @@ class Users(Repository, Protocol):
     expect(await inw014(Subclass, Off, "tests/test_users.py")).toEqual([]);
   });
 
+  test("a Protocol outside the port modules may extend a port; a class that isn't one may not", async () => {
+    const text = `from typing import Protocol
+import typing
+from shop.application.ports.users import UserRepository
+
+class UserReader(UserRepository, Protocol):
+    def all(self): ...
+
+class UserLister(UserRepository, typing.Protocol[int]):
+    def list(self): ...
+
+class SqlUsers(UserRepository):
+    pass
+`;
+    expect(await inw014(text, Off, "shop/application/services/users.py")).toEqual([
+      "11:16 `SqlUsers` in `shop.application.services.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+    ]);
+  });
+
   test("a base from a module that isn't a port passes", async () => {
     const text = "from shop.domain.model import Entity\n\nclass User(Entity):\n    pass\n";
     expect(await inw014(text, Off, Adapter)).toEqual([]);

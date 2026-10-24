@@ -6,7 +6,7 @@
  * module; an exempt class has a base or decorator the options allow
  * (exceptions, DTOs, dataclasses); anything else is concrete. Outside the
  * port modules it lists the bases that subclass a port, for
- * `allow-subclassing = false`. It reads one
+ * `allow-subclassing = false`, skipping a class that is a Protocol itself. It reads one
  * parsed tree and decides nothing about wording; the caller parses and frees
  * the tree.
  */
@@ -196,7 +196,9 @@ export interface PortBase {
  * Lists the bases of a module's top-level classes that name a class from a
  * port module. A class the options exempt (an allowed decorator or base,
  * such as an exception extending a port module's error) lists none, and so
- * does a base the allowed bases match.
+ * does a base the allowed bases match. A class that lists `Protocol` among
+ * its own bases lists none either: it is a narrower interface, not an
+ * adapter, wherever it lives.
  *
  * @param root - the module node of a module outside the port modules.
  * @param module - the module's dotted name, which qualifies its own classes.
@@ -206,7 +208,8 @@ export interface PortBase {
 export function portBases(root: Node, module: string, context: ClassContext): PortBase[] {
   const found: PortBase[] = [];
   for (const cls of portClasses(root, module, context)) {
-    const list = cls.kind === "exempt" ? null : cls.node.childForFieldName("superclasses");
+    const skip = cls.kind === "exempt" || cls.kind === "protocol";
+    const list = skip ? null : cls.node.childForFieldName("superclasses");
     for (const base of list ? namedChildren(list) : []) {
       const qualified = portName(base, context);
       if (qualified !== undefined) {
