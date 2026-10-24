@@ -79,6 +79,8 @@ All three are warnings, so a drawing that drifted doesn't block an agent's Stop 
 
 The Stop gate's default scope (`stop-gate = "changed"`) checks the Python files the session changed, and no diagrams. A warning never blocks, so there is nothing to gate on by default; with the rules raised to errors, a diagram the agent broke has already blocked its own edit, and `stop-gate = "project"` checks every listed diagram at Stop as well. Editing Python code doesn't check a diagram again: a package renamed in the code shows up in the drawing on the next whole-project run, in CI or at a project-scope Stop.
 
+In a uv workspace, a member can list a page at the repository root with `..` (`"../../docs/architecture.md"`), as far up as the git repository or workspace root ([`diagrams`](configuration.md#diagrams)). The hook, the editor, MCP `check_files` and `inwards check FILE` check that page with each member config that lists it.
+
 INW019 compares the diagram with the imports the run collects: in a layers diagram a path of arrows draws an import, in a contexts diagram it takes a direct arrow, and an import under `if TYPE_CHECKING:` counts. It runs on whole-project runs only, since one edited or named file doesn't show the imports of the rest of the project.
 
 ## Start from a diagram { #import-diagram }
@@ -91,7 +93,7 @@ inwards import-diagram docs/architecture.md --write    # append it to pyproject.
 ```
 
 - **Input.** One Markdown file (each marked `mermaid` and `plantuml` block in it), one `.mmd` file or one `.puml` file, with at most one layers diagram and one contexts diagram.
-- **Output.** The table lists the file in `diagrams` and turns INW017 and INW018 on, so the diagram stays checked. A file outside the working directory isn't listed, since `diagrams` entries can't climb out with `..`.
+- **Output.** The table lists the file in `diagrams` and turns INW017 and INW018 on, so the diagram stays checked. A file outside the working directory isn't listed; add it by hand with a `..` path, which may climb as far as the git repository or uv workspace root ([`diagrams`](configuration.md#diagrams)).
 - **`--write`** appends the table to `pyproject.toml` in the working directory. It refuses, with exit code 2 and nothing written, when there is no `pyproject.toml` or it already has `[tool.inwards]`: it never overwrites or merges. Print the table instead and merge it by hand.
 - **`root`.** When the packages live in `src/`, the table gets `root = "src"`, as `inwards init` would pick it.
 - **Checked first.** The table must parse as an Inwards config, or the command stops with exit code 2 and says why: two layers with the same quoted label, a `public` node outside its context's module.

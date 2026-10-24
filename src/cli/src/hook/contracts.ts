@@ -23,6 +23,14 @@ export interface HookDeps {
   runlog: RunLog;
   /** Runs a check with `io` bound (`project/check.ts`). */
   check: CheckRunner;
+  /**
+   * Parses TOML, for finding the uv workspace member whose config lists an
+   * edited diagram outside its directory (#413).
+   *
+   * @param text - a pyproject.toml's contents.
+   * @returns the document, or undefined when it doesn't parse.
+   */
+  toml: (text: string) => unknown;
 }
 
 /**

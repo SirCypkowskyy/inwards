@@ -282,6 +282,7 @@ function nodeDaemon(io: Platform, entry: string): DaemonDeps {
             options: Parameters<CheckRunner>[3],
           ): Promise<Report> =>
             runCheck(files, configPath, targets, { ...options, base, cache: true }),
+          toml: parseToml,
         },
         output: (): { stdout: string; stderr: string } => ({
           stdout: out.join(""),

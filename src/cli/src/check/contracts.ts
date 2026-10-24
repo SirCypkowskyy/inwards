@@ -18,6 +18,7 @@ import type {
   Clock,
   FileReader,
   FileWalker,
+  Git,
   PathProbe,
   Platform,
 } from "../shared/platform/contracts.ts";
@@ -47,6 +48,8 @@ export interface ProjectIo {
   probe: PathProbe;
   read: FileReader;
   walk: FileWalker;
+  /** Finds the git repository around a config whose `diagrams` climb with `..` (#413). */
+  git: Pick<Git, "run">;
   clock: Pick<Clock, "elapsed">;
   /**
    * Loads the tree-sitter runtime and Python grammar.

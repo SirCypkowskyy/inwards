@@ -1929,13 +1929,13 @@
           ]
         },
         "diagrams": {
-          "description": "Markdown, Mermaid and PlantUML files whose marked diagrams (%% inwards: layers or contexts in Mermaid, ' inwards: layers or contexts in PlantUML) INW017, INW018 and INW019 check against the config and the code: paths relative to the config file, with * and ? in a segment and ** for any number of directories.",
-          "markdownDescription": "Markdown, Mermaid and PlantUML files whose marked diagrams (`%% inwards: layers` or `contexts` in Mermaid, `' inwards: layers` or `contexts` in PlantUML) INW017, INW018 and INW019 check against the config and the code: paths relative to the config file, with `*` and `?` in a segment and `**` for any number of directories.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#diagrams)",
+          "description": "Markdown, Mermaid and PlantUML files whose marked diagrams (%% inwards: layers or contexts in Mermaid, ' inwards: layers or contexts in PlantUML) INW017, INW018 and INW019 check against the config and the code: paths relative to the config file, which may climb with leading .. as far as the git repository or uv workspace root, with * and ? in a segment and ** for any number of directories.",
+          "markdownDescription": "Markdown, Mermaid and PlantUML files whose marked diagrams (`%% inwards: layers` or `contexts` in Mermaid, `' inwards: layers` or `contexts` in PlantUML) INW017, INW018 and INW019 check against the config and the code: paths relative to the config file, which may climb with leading `..` as far as the git repository or uv workspace root, with `*` and `?` in a segment and `**` for any number of directories.\n\n[Reference](https://sircypkowskyy.github.io/inwards/guides/configuration/#diagrams)",
           "type": "array",
           "items": {
             "type": "string",
             "minLength": 1,
-            "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!(?:.*/)?\\.\\.(?:/|$))(?!.*//)"
+            "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?:\\.\\./)*(?!$)(?!\\.\\.(?:/|$))(?!.*/\\.\\.(?:/|$))"
           }
         },
         "shape": {

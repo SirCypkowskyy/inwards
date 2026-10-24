@@ -5,7 +5,12 @@
 export { type ContextSpec, contextOf, isPublicModule, publicModule } from "./_contexts.ts";
 export type { CycleMode } from "./_cycles.ts";
 export { CONFIG_DEFAULTS } from "./_defaults.ts";
-export { diagramBase, diagramMatches } from "./_diagrams.ts";
+export {
+  checkDiagramsRoot,
+  type DiagramsRoot,
+  diagramBase,
+  diagramMatches,
+} from "./_diagrams.ts";
 export { DEFAULT_GENERATED, isGenerated } from "./_generated.ts";
 export type { AgentSuppressions } from "./_hook-keys.ts";
 export {

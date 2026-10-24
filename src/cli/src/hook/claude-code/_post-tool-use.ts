@@ -1,7 +1,8 @@
 /**
  * @file The PostToolUse hook: after the agent writes a Python file, or a
  * diagram file `[tool.inwards].diagrams` lists (#348), check that one
- * file, split what it finds into what blocks (new errors) and what is context
+ * file (a diagram with the config that lists it, which may be a uv workspace
+ * member's reaching up with `..`, #413), split what it finds into what blocks (new errors) and what is context
  * (warnings, violations the file already had at session start, rejected
  * suppressions, errors that just reached the escalation limit), record the
  * edit in the session, and answer on stderr (blocking, exit 2) or as
@@ -13,7 +14,13 @@
  */
 import { basename, dirname, join, resolve } from "node:path";
 import { ConfigError, type Diagnostic, type Report, render } from "@inwards/core";
-import { configListsDiagram, findConfig, fingerprint, projectPath } from "../../check/index.ts";
+import {
+  configListsDiagram,
+  findConfig,
+  fingerprint,
+  projectPath,
+  workspaceListers,
+} from "../../check/index.ts";
 import { shownDiagnostics, shownReport } from "../../shared/paths/display.ts";
 import { isInside, PATH_SEPARATORS } from "../../shared/paths/lexical.ts";
 import { physicalRealpath } from "../../shared/paths/physical.ts";
@@ -64,10 +71,11 @@ export async function postToolUse(deps: HookDeps, input: Record<string, unknown>
   // project doesn't use Inwards (the hook may be user-wide).
   const id = input["session_id"];
   const start = isSessionId(id) ? readSessionStart(io, target.project, id) : undefined;
-  const configPath = sessionConfig(io, dirname(target.file), target.project, start);
-  if (
-    !(configPath && (PYTHON_FILE.test(file) || configListsDiagram(io, configPath, target.file)))
-  ) {
+  const nearest = sessionConfig(io, dirname(target.file), target.project, start);
+  const configPath = PYTHON_FILE.test(file)
+    ? nearest
+    : diagramConfig(deps, { file: target.file, project: target.project, nearest }, start);
+  if (configPath === undefined) {
     return 0;
   }
   try {
@@ -279,6 +287,41 @@ export function sessionConfig(
     project,
     (real) => known[projectPath(io.probe, project, real)] !== undefined,
   );
+}
+
+/**
+ * Finds the config that lists an edited file that isn't Python as a
+ * diagram: the nearest config when it does, else the first uv workspace
+ * member whose `diagrams` reach the file with `..` (a repository-level page,
+ * #413). A member's config counts only inside the project and, once the
+ * session has a start record, only when it was recorded there, as
+ * `sessionConfig` judges the nearest one.
+ *
+ * @param deps - the platform and the TOML parser.
+ * @param edit - the edited file, the real project root and the nearest config.
+ * @param edit.file - the edited file, absolute, as the agent named it.
+ * @param edit.project - the real project root.
+ * @param edit.nearest - the nearest config above the file, if any.
+ * @param start - the session's start record, if it has one.
+ * @returns the config path, or undefined when no config lists the file.
+ */
+function diagramConfig(
+  deps: Pick<HookDeps, "io" | "toml">,
+  { file, project, nearest }: { file: string; project: string; nearest: string | undefined },
+  start: { configs: Record<string, unknown> } | undefined,
+): string | undefined {
+  const { io } = deps;
+  if (nearest !== undefined && configListsDiagram(io, nearest, file)) {
+    return nearest;
+  }
+  return workspaceListers({ ...io, toml: deps.toml }, file).find((config) => {
+    const real = io.probe.realpath(config);
+    return (
+      real !== undefined &&
+      isInside(project, real) &&
+      (start === undefined || start.configs[projectPath(io.probe, project, real)] !== undefined)
+    );
+  });
 }
 
 /**

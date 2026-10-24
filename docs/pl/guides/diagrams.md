@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/diagrams.md
-source_hash: a6a6d1316f3306688a25e3cd7605bbe5833d9255dd03fcee9395815b21dce0c2
+source_hash: be739d8511d4b0d1584d31d3740455e312c2681d5271f8e903a94de332114ef4
 ---
 
 # Diagramy architektury { #architecture-diagrams }
@@ -84,6 +84,8 @@ Wszystkie trzy dają ostrzeżenia, więc rysunek, który się rozjechał, nie bl
 
 Domyślny zakres Stop gate (`stop-gate = "changed"`) sprawdza pliki Pythona zmienione w sesji i żadnych diagramów. Ostrzeżenie nigdy nie blokuje, więc domyślnie nie ma czego pilnować; gdy reguły podniesiesz do błędów, diagram zepsuty przez agenta zablokował już własną edycję, a `stop-gate = "project"` sprawdza dodatkowo przy Stop każdy wymieniony diagram. Edycja kodu Pythona nie sprawdza diagramu ponownie: pakiet przemianowany w kodzie pojawi się na rysunku przy następnym sprawdzeniu całego projektu, w CI albo przy Stop z zakresem projektu.
 
+W uv workspace członek może wymienić stronę w katalogu głównym repozytorium przez `..` (`"../../docs/architecture.md"`), najwyżej do katalogu głównego repozytorium git albo workspace'u ([`diagrams`](configuration.md#diagrams)). Hook, edytor, MCP `check_files` i `inwards check FILE` sprawdzają tę stronę każdą konfiguracją członka, która ją wymienia.
+
 INW019 porównuje diagram z importami, które zbiera uruchomienie: w diagramie warstw import rysuje ścieżka strzałek, w diagramie kontekstów potrzebna jest bezpośrednia strzałka, a import pod `if TYPE_CHECKING:` się liczy. Działa tylko przy sprawdzaniu całego projektu, bo jeden edytowany albo podany plik nie pokazuje importów reszty projektu.
 
 ## Zacznij od diagramu { #import-diagram }
@@ -96,7 +98,7 @@ inwards import-diagram docs/architecture.md --write    # append it to pyproject.
 ```
 
 - **Wejście.** Jeden plik Markdown (każdy oznaczony blok `mermaid` i `plantuml` w nim), jeden plik `.mmd` albo jeden plik `.puml`, z najwyżej jednym diagramem warstw i jednym diagramem kontekstów.
-- **Wyjście.** Tabela wymienia plik w `diagrams` i włącza INW017 oraz INW018, więc diagram dalej jest sprawdzany. Plik spoza katalogu roboczego nie trafia do listy, bo wpisy `diagrams` nie mogą wychodzić wyżej przez `..`.
+- **Wyjście.** Tabela wymienia plik w `diagrams` i włącza INW017 oraz INW018, więc diagram dalej jest sprawdzany. Plik spoza katalogu roboczego nie trafia do listy; dopisz go ręcznie ścieżką z `..`, która może sięgać najwyżej do katalogu głównego repozytorium git albo uv workspace'u ([`diagrams`](configuration.md#diagrams)).
 - **`--write`** dopisuje tabelę do `pyproject.toml` w katalogu roboczym. Odmawia, z kodem wyjścia 2 i bez zapisu, gdy nie ma `pyproject.toml` albo ma on już `[tool.inwards]`: nigdy niczego nie nadpisuje ani nie scala. Wtedy wypisz tabelę i scal ją ręcznie.
 - **`root`.** Gdy pakiety leżą w `src/`, tabela dostaje `root = "src"`, tak jak wybrałoby `inwards init`.
 - **Najpierw sprawdzenie.** Tabela musi się dać przeczytać jako konfiguracja Inwards, inaczej polecenie kończy się kodem wyjścia 2 i mówi dlaczego: dwie warstwy z tą samą etykietą w cudzysłowie, węzeł `public` poza modułem swojego kontekstu.
