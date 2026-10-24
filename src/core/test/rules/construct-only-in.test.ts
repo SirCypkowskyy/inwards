@@ -303,9 +303,7 @@ REPO = sql.SqlRepo()
   });
 
   test("a bad glob segment in role is a config error that names it", () => {
-    expect(() =>
-      parseConfig(`${LAYERS}\n${withOptions('role = ["app.*.a**_store"]')}`),
-    ).toThrow(
+    expect(() => parseConfig(`${LAYERS}\n${withOptions('role = ["app.*.a**_store"]')}`)).toThrow(
       'tool.inwards.rules.construct-only-in.role: "app.*.a**_store" is not a module prefix or selector: segment "a**_store" puts ** inside a segment',
     );
   });
