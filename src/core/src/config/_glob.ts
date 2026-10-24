@@ -157,6 +157,18 @@ export function globLiterals(glob: string): string[] | undefined {
 }
 
 /**
+ * Tells whether a glob holds `**` outside a bracket set: two stars in a row.
+ * Inside a set, as in `[**]`, the stars are literal members.
+ *
+ * @param glob - e.g. `a**_store` or `[**]`.
+ * @returns true when two star tokens are adjacent; false for a malformed glob (see `parse`).
+ */
+export function hasDoubleStar(glob: string): boolean {
+  const tokens = parse(glob) ?? [];
+  return tokens.some((token, i) => token.kind === "star" && tokens[i + 1]?.kind === "star");
+}
+
+/**
  * Matches a whole text against a glob, like `fnmatch.fnmatchcase`, in
  * O(glob × text) time: after a mismatch the match resumes one character
  * further past the last star, never further back.

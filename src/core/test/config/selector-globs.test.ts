@@ -77,6 +77,12 @@ describe("glob segment grammar", () => {
     expect(schemaErrors(text)).not.toEqual([]);
   });
 
+  test("** inside a bracket set is two literal stars, not a ** segment", () => {
+    const text = layered("app.[**]_x");
+    expect([parserError(text), schemaErrors(text)]).toEqual([undefined, []]);
+    expect(() => parseConfig(layered("app.[a]**"))).toThrow("puts ** inside a segment");
+  });
+
   test("a reversed range fails the parser only: the schema can't see it", () => {
     const text = layered("shop.[z-a]*");
     expect(parserError(text)).toBeDefined();

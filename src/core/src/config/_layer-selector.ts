@@ -11,7 +11,7 @@
  * Matching is dynamic programming over segments, O(entry × module) per call,
  * not the recursive `matchSegments` of shapes, since it runs per import.
  */
-import { globLiterals, globMatches } from "./_glob.ts";
+import { globLiterals, globMatches, hasDoubleStar } from "./_glob.ts";
 
 /** One segment of a selector: a Python identifier. */
 const IDENTIFIER = /^[\p{XID_Start}_]\p{XID_Continue}*$/u;
@@ -105,7 +105,8 @@ export function segmentMatches(want: string, segment: string): boolean {
  * Says what is wrong with one selector segment, or nothing. A segment is an
  * identifier, `*` (one segment), `**` (one or more), or an fnmatch glob that
  * matches inside one segment (`_*_store`, `test_?`, `[!_]*`), whose literal
- * characters are ones an identifier may hold. Shape `packages` use it too,
+ * characters are ones an identifier may hold. `**` outside a bracket set is
+ * refused; inside one (`[**]`) its stars are literal. Shape `packages` use it too,
  * where the first segment may be a wildcard.
  *
  * @param segment - one dot-separated segment.
@@ -121,12 +122,12 @@ export function segmentProblem(segment: string): string | undefined {
   if (!WILDCARD.test(segment)) {
     return `segment "${segment}" is neither an identifier, *, ** nor a glob such as _*_store`;
   }
-  if (segment.includes("**")) {
-    return `segment "${segment}" puts ** inside a segment; ** stands alone for one or more segments, and * is the wildcard inside one`;
-  }
   const literals = globLiterals(segment);
   if (literals === undefined) {
     return `segment "${segment}" is not a valid glob: a [ is never closed or a range is reversed, such as [z-a]`;
+  }
+  if (hasDoubleStar(segment)) {
+    return `segment "${segment}" puts ** inside a segment; ** stands alone for one or more segments, and * is the wildcard inside one`;
   }
   const odd = literals.find((c) => !IDENTIFIER_CHAR.test(c));
   return odd === undefined
