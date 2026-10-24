@@ -172,6 +172,15 @@ describe("reading a baseline with reasons", () => {
     }
   });
 
+  test("a leading byte order mark is skipped, and inwards baseline keeps the reason", () => {
+    const { io, written } = memory(
+      `${"\uFEFF"}${file([{ ...ORDER, reason: "Saved by PowerShell" }])}`,
+    );
+    expect(readBaseline(io, CONFIG, undefined)?.size).toBe(1);
+    writeBaseline(io, CONFIG, [error(ORDER.module)], undefined);
+    expect(written()).toEqual([{ ...ORDER, reason: "Saved by PowerShell" }]);
+  });
+
   test("other unknown keys are still tolerated", () => {
     const { io } = memory(
       JSON.stringify({ schema: "inwards/baseline@1", justification: {}, violations: [ORDER] }),
