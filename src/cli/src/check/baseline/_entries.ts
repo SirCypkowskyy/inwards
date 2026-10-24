@@ -111,16 +111,17 @@ function readViolations(io: BaselineReads, path: string): unknown[] | undefined 
 }
 
 /**
- * Refuses a `reason` that isn't a string, naming the first entry that has
- * one (1-based).
+ * Refuses a `reason` that is neither a string nor null, naming the first
+ * entry that has one (1-based). A null reason counts as none: files written
+ * before reasons existed may have one as an unknown key.
  *
  * @param path - the baseline file, for the message.
  * @param violations - the raw `violations` elements.
- * @throws {ConfigError} when an entry's `reason` isn't a string.
+ * @throws {ConfigError} when an entry's `reason` is a number, boolean, array or object.
  */
 function checkReasons(path: string, violations: readonly unknown[]): void {
   const index = violations.findIndex(
-    (v) => isRecord(v) && "reason" in v && typeof v["reason"] !== "string",
+    (v) => isRecord(v) && "reason" in v && v["reason"] !== null && typeof v["reason"] !== "string",
   );
   if (index !== -1) {
     throw new ConfigError(
@@ -136,26 +137,42 @@ function checkReasons(path: string, violations: readonly unknown[]): void {
  * @returns the entries, or undefined when any element isn't an entry.
  */
 function entriesOf(violations: readonly unknown[]): Entry[] | undefined {
-  const entries = violations.filter(isEntry);
-  return entries.length === violations.length ? entries : undefined;
+  const entries: Entry[] = [];
+  for (const v of violations) {
+    const entry = entryOf(v);
+    if (entry === undefined) {
+      return undefined;
+    }
+    entries.push(entry);
+  }
+  return entries;
 }
 
 /**
- * Tells whether a parsed value is a baseline entry.
+ * Reads one baseline entry from a parsed value, leaving out any other key a
+ * hand edit added.
  *
  * @param value - one element of `violations`.
- * @returns true for `{code, module, message, count}` with a positive integer
- *   count, and a `reason` that is a string when there is one; other keys are allowed.
+ * @returns `{code, module, message, count}` with a positive integer count, plus
+ *   the `reason` when it is a string (a null or missing one gives none), or
+ *   undefined when the value isn't an entry.
  */
-function isEntry(value: unknown): value is Entry {
-  return (
-    isRecord(value) &&
-    typeof value["code"] === "string" &&
-    typeof value["module"] === "string" &&
-    typeof value["message"] === "string" &&
-    typeof value["count"] === "number" &&
-    Number.isInteger(value["count"]) &&
-    value["count"] > 0 &&
-    (!("reason" in value) || typeof value["reason"] === "string")
-  );
+function entryOf(value: unknown): Entry | undefined {
+  if (
+    !(
+      isRecord(value) &&
+      typeof value["code"] === "string" &&
+      typeof value["module"] === "string" &&
+      typeof value["message"] === "string" &&
+      typeof value["count"] === "number" &&
+      Number.isInteger(value["count"]) &&
+      value["count"] > 0
+    )
+  ) {
+    return undefined;
+  }
+  const { code, module, message, count, reason } = value;
+  return typeof reason === "string"
+    ? { code, module, message, count, reason }
+    : { code, module, message, count };
 }

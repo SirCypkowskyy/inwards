@@ -163,7 +163,7 @@ describe("reading a baseline with reasons", () => {
   });
 
   test("a reason that isn't a string is a config error naming the entry", () => {
-    for (const reason of [42, null, ["a"], { why: "x" }]) {
+    for (const reason of [42, true, ["a"], { why: "x" }]) {
       const { io } = memory(file([ORDER, { ...ORDER, module: "shop.domain.pay", reason }]));
       expect(() => readBaseline(io, CONFIG, undefined)).toThrow(ConfigError);
       expect(() => readBaseline(io, CONFIG, undefined)).toThrow(
@@ -179,6 +179,13 @@ describe("reading a baseline with reasons", () => {
     expect(readBaseline(io, CONFIG, undefined)?.size).toBe(1);
     writeBaseline(io, CONFIG, [error(ORDER.module)], undefined);
     expect(written()).toEqual([{ ...ORDER, reason: "Saved by PowerShell" }]);
+  });
+
+  test("a null reason counts as none, and inwards baseline drops it", () => {
+    const { io, raw } = memory(file([{ ...ORDER, reason: null }]));
+    expect(readBaseline(io, CONFIG, undefined)?.size).toBe(1);
+    writeBaseline(io, CONFIG, [error(ORDER.module)], undefined);
+    expect(JSON.parse(raw()).violations).toEqual([ORDER]);
   });
 
   test("other unknown keys are still tolerated", () => {
