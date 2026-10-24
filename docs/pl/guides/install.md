@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/install.md
-source_hash: 1d06e72110a59697854253db73d75792309dbafd671a791c54ad501f12b70af0
+source_hash: c506798a4a440a83d25687b53fc2966b8f2269f31feabe5ec730d007207aadf3
 ---
 
 # Instalacja Inwards { #install-inwards }
@@ -290,7 +290,7 @@ Akceptuj naruszenie tylko z powodu, który umiesz wskazać, i zapisz go: wpis mo
 }
 ```
 
-Powody przetrwają `inwards baseline`: przepisany wpis z tą samą regułą, modułem i komunikatem zachowuje swój powód, także gdy zmienia się jego liczba wystąpień. Wpis, którego naruszenia już nie ma, znika razem z powodem, a nowy wpis nie ma powodu, dopóki go nie dodasz. `inwards check` nie wypisuje powodów i kończy się błędem konfiguracji, gdy powód nie jest napisem. Każdy inny klucz dodany ręcznie `inwards check` pomija, a `inwards baseline` go usuwa.
+Powody przetrwają `inwards baseline`: przepisany wpis z tą samą regułą, modułem i komunikatem zachowuje swój powód, także gdy zmienia się jego liczba wystąpień. Powód zostaje tylko tak długo, jak reguła, moduł i komunikat jego wpisu się zgadzają: moduł o zmienionej nazwie albo inaczej sformułowany komunikat reguły daje nowy wpis bez powodu. Wpis, którego naruszenia już nie ma, znika razem z powodem, a nowy wpis nie ma powodu, dopóki go nie dodasz. `inwards check` nie wypisuje powodów. Zarówno on, jak i `inwards baseline` kończą się błędem konfiguracji, gdy powód nie jest ani napisem, ani `null`, a `inwards baseline` zostawia wtedy plik bez zmian. Każdy inny klucz dodany ręcznie `inwards check` pomija, a `inwards baseline` go usuwa.
 
 Uruchom je też, zanim włączysz hooki agenta. Hooki Claude Code już traktują naruszenie, które plik miał na początku sesji, jako kontekst, a nie blokadę ([rozdział 4](../04-AI-Integration.md)), ale plik z niezacommitowanymi zmianami, zbyt duży, żeby hooki zachowały jego kopię (ponad 512 KiB albo ponad limit 4 MiB takich plików), nie ma znanej zawartości startowej, więc blokują wszystkie jego naruszenia, a agent, którego pcha się do ich naprawy, może przepisać kod niepotrzebny do zadania. Baseline utrzymuje też na zielono `inwards check` i CI.
 

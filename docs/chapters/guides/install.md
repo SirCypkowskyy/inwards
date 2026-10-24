@@ -285,7 +285,7 @@ Accept a violation only for a reason you can point to, and write it down: an ent
 }
 ```
 
-Reasons survive `inwards baseline`: the rewritten entry with the same rule, module and message keeps its reason, also when its count changes. An entry whose violation is gone takes its reason with it, and a new entry has none until you add one. `inwards check` doesn't print reasons, and stops with a config error when a reason isn't a string. It ignores any other key a hand edit adds, and `inwards baseline` drops those.
+Reasons survive `inwards baseline`: the rewritten entry with the same rule, module and message keeps its reason, also when its count changes. A reason stays only while its entry's rule, module and message match: a renamed module or a reworded rule message makes it a new entry without a reason. An entry whose violation is gone takes its reason with it, and a new entry has none until you add one. `inwards check` doesn't print reasons. It and `inwards baseline` stop with a config error when a reason is neither a string nor `null`, and `inwards baseline` then leaves the file as it is. `inwards check` ignores any other key a hand edit adds, and `inwards baseline` drops those.
 
 Run it before you turn on the agent hooks, too. The Claude Code hooks already treat a violation that a file had at session start as context, not a block ([chapter 4](../04-AI-Integration.md)), but a file with uncommitted changes that is too large for the hooks to keep a copy of (over 512 KiB, or past 4 MiB of such files) has no known start content, so all of its violations block, and an agent pushed to fix them may rewrite code its task didn't need. The baseline also keeps `inwards check` and CI green.
 
