@@ -273,6 +273,20 @@ git add inwards-baseline.json
 
 `inwards baseline` checks the whole project under one config and writes every violation to `inwards-baseline.json` next to its `pyproject.toml`. Commit it: `inwards check`, the agent hooks and CI all read it. In a monorepo, run it once per package that has its own `[tool.inwards]` (`inwards baseline --config packages/api/pyproject.toml`), since each file is checked against the baseline next to its own config. An accepted import can move to another line and still pass, because entries match by rule, module and message, without the message's "Allowed direction" sentence, so adding a layer doesn't bring them back. A second copy of it in the same module fails. When a whole-project check finds that accepted violations are gone, it says so. Run `inwards baseline` again to drop them. With `--format json` and a baseline present, the summary counts both: `baselined` on every run, `resolved` on a whole-project one. Agents can't edit the file or run the command: the Claude Code hooks deny both, and the Stop gate fails a session that changed it and checks that session's files with no baseline at all.
 
+Accept a violation only for a reason you can point to, and write it down: an entry can carry a `"reason"`, added by hand.
+
+```json
+{
+  "code": "INW001",
+  "module": "shop.domain.order",
+  "message": "Layer \"domain\" imports \"shop.infrastructure.sql_orders.SqlOrderRepository\" from outer layer \"infrastructure\".",
+  "count": 1,
+  "reason": "The repository moves behind a port in #123."
+}
+```
+
+Reasons survive `inwards baseline`: the rewritten entry with the same rule, module and message keeps its reason, also when its count changes. An entry whose violation is gone takes its reason with it, and a new entry has none until you add one. `inwards check` doesn't print reasons, and stops with a config error when a reason isn't a string. It ignores any other key a hand edit adds, and `inwards baseline` drops those.
+
 Run it before you turn on the agent hooks, too. The Claude Code hooks already treat a violation that a file had at session start as context, not a block ([chapter 4](../04-AI-Integration.md)), but a file with uncommitted changes that is too large for the hooks to keep a copy of (over 512 KiB, or past 4 MiB of such files) has no known start content, so all of its violations block, and an agent pushed to fix them may rewrite code its task didn't need. The baseline also keeps `inwards check` and CI green.
 
 Once a project has a baseline, `stop-gate = "project"` in `[tool.inwards]` makes the Claude Code Stop gate check the whole project against it instead of only the files the session changed, so a violation anywhere blocks the turn ([chapter 4](../04-AI-Integration.md)). A check skips the confirming parse where the baseline accepts everything the prescan found, so a fully baselined check costs about as much as a clean one.

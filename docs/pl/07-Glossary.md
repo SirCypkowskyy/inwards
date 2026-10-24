@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/07-Glossary.md
-source_hash: bb74ed3e63c5dbd52f70161fc985ecbe4e6541478240a628407398e2f6b9cef9
+source_hash: b406d60f6344e3cf1772c3ac06fd5f2d4eb7503203a133e8b4e203f02a287561
 ---
 
 # :material-book-alphabet: Słownik { #glossary }
@@ -73,7 +73,7 @@ Hook agenta (agent hook)
 :   Polecenie, które narzędzie AI do kodowania uruchamia automatycznie wokół własnych działań, na przykład hooki `PostToolUse` i `Stop` w Claude Code. Główny punkt integracji Inwards. `inwards init --agent claude` instaluje cztery takie hooki. Zobacz [rozdział 4](04-AI-Integration.md).
 
 Baseline
-:   Naruszenia, które projekt już miał, gdy wdrożył Inwards, zapisane przez `inwards baseline` w `inwards-baseline.json` obok `pyproject.toml`. Nie oblewają sprawdzenia; nowe naruszenia oblewają (UC6). Wpisy są dopasowywane po regule, module i komunikacie, a nie po linii.
+:   Naruszenia, które projekt już miał, gdy wdrożył Inwards, zapisane przez `inwards baseline` w `inwards-baseline.json` obok `pyproject.toml`. Nie oblewają sprawdzenia; nowe naruszenia oblewają (UC6). Wpisy są dopasowywane po regule, module i komunikacie, a nie po linii, i mogą mieć ręcznie wpisany powód (`reason`), który `inwards baseline` zachowuje.
 
 Config guard
 :   Hook `PreToolUse`, który z góry odrzuca edycje agenta w `[tool.inwards]`, w `.inwards/`, w `inwards-baseline.json` i w ustawieniach Claude Code zawierających hooki Inwards. Zobacz [rozdział 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).

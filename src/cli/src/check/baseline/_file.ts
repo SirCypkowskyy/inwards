@@ -5,7 +5,9 @@
  * list. Entries match by rule, module and message, never by line, so moving
  * an import doesn't bring it back. The message's closing "Allowed direction"
  * sentence names every layer, so it is left out: adding an unrelated layer
- * must not bring every accepted violation back.
+ * must not bring every accepted violation back. An entry may carry a
+ * hand-written `reason`, which `inwards baseline` keeps while the entry's key
+ * still matches; the check validates it but never reads it.
  */
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -32,12 +34,16 @@ export const BASELINE_FILE = "inwards-baseline.json";
 const SCHEMA = "inwards/baseline@1";
 const REGENERATE = "Ask the user to regenerate it with `inwards baseline`.";
 
-/** One accepted violation, with how many times the module has it. */
+/**
+ * One accepted violation, with how many times the module has it, and why it
+ * is accepted when someone wrote that down.
+ */
 interface Entry {
   code: string;
   module: string;
   message: string;
   count: number;
+  reason?: string;
 }
 
 /**
@@ -71,6 +77,10 @@ function byCodePoint(a: string, b: string): number {
  * down to a warning, which the check can't see) are kept, so that turning the
  * rule back on doesn't bring back violations the user had accepted.
  *
+ * Each written entry keeps the `reason` of the old entry with the same key
+ * (rule, module and stable message), whatever its count is now; an entry that
+ * no longer matches anything goes, reason and all, and a new one has none.
+ *
  * @param io - reads the old baseline and replaces it.
  * @param io.probe - tells whether the old baseline exists.
  * @param io.read - reads the old baseline.
@@ -87,8 +97,9 @@ export function writeBaseline(
   diagnostics: readonly Diagnostic[],
   rules: RuleSettings | undefined,
 ): number {
+  const old = previousEntries(io, configPath);
   const entries = new Map<string, Entry>();
-  for (const e of dormantEntries(io, configPath, rules)) {
+  for (const e of old.filter((entry) => dormant(entry, rules))) {
     entries.set(baselineKey(e), e);
   }
   for (const d of diagnostics.filter((x) => x.severity === "error")) {
@@ -101,12 +112,15 @@ export function writeBaseline(
     entry.count += 1;
     entries.set(baselineKey(d), entry);
   }
-  const violations = [...entries.values()].sort(
-    (a, b) =>
-      byCodePoint(a.module, b.module) ||
-      byCodePoint(a.code, b.code) ||
-      byCodePoint(a.message, b.message),
-  );
+  const reasons = reasonsByKey(old);
+  const violations = [...entries.entries()]
+    .map(([key, entry]) => withReason(entry, reasons.get(key)))
+    .sort(
+      (a, b) =>
+        byCodePoint(a.module, b.module) ||
+        byCodePoint(a.code, b.code) ||
+        byCodePoint(a.message, b.message),
+    );
   io.baselines.replace(
     baselinePath(configPath),
     `${JSON.stringify({ schema: SCHEMA, violations }, null, 2)}\n`,
@@ -115,24 +129,52 @@ export function writeBaseline(
 }
 
 /**
- * Reads the entries of the current baseline that `[tool.inwards.rules]` makes
- * dormant. A baseline this version can't read has none: it is being replaced.
+ * Reads the entries of the baseline `inwards baseline` is about to replace.
+ * A baseline this version can't read has none: it is being replaced.
  *
  * @param io - reads the baseline.
  * @param configPath - the pyproject.toml.
- * @param rules - the config's `[tool.inwards.rules]`, if any.
- * @returns the entries whose rule is off, or down to a warning, now.
+ * @returns the old entries, or none when there is no readable baseline.
  */
-function dormantEntries(
-  io: BaselineReads,
-  configPath: string,
-  rules: RuleSettings | undefined,
-): Entry[] {
+function previousEntries(io: BaselineReads, configPath: string): Entry[] {
   try {
-    return (readEntries(io, baselinePath(configPath)) ?? []).filter((e) => dormant(e, rules));
+    return readEntries(io, baselinePath(configPath)) ?? [];
   } catch {
     return [];
   }
+}
+
+/**
+ * Collects the reasons of the old entries by baseline key. When a hand-edited
+ * file has two entries with one key, the first reason wins.
+ *
+ * @param entries - the old baseline's entries.
+ * @returns each key's reason; keys without one are absent.
+ */
+function reasonsByKey(entries: readonly Entry[]): Map<string, string> {
+  const reasons = new Map<string, string>();
+  for (const e of entries) {
+    if (e.reason !== undefined && !reasons.has(baselineKey(e))) {
+      reasons.set(baselineKey(e), e.reason);
+    }
+  }
+  return reasons;
+}
+
+/**
+ * Builds the entry to write: rule, module, message, count and, when the old
+ * file had one for its key, the reason last, so that the file reads in that
+ * order. Anything else a hand edit added is dropped.
+ *
+ * @param entry - the entry with its new count.
+ * @param reason - the old entry's reason for the same key, if any.
+ * @returns a fresh entry in the written key order.
+ */
+function withReason(entry: Entry, reason: string | undefined): Entry {
+  const { code, module, message, count } = entry;
+  return reason === undefined
+    ? { code, module, message, count }
+    : { code, module, message, count, reason };
 }
 
 /**
@@ -159,6 +201,14 @@ function readEntries(io: BaselineReads, path: string): Entry[] | undefined {
   if (!(isRecord(value) && value["schema"] === SCHEMA && Array.isArray(violations))) {
     throw new ConfigError(`${path} is not an ${SCHEMA} file. ${REGENERATE}`);
   }
+  const badReason = violations.findIndex(
+    (v) => isRecord(v) && "reason" in v && typeof v["reason"] !== "string",
+  );
+  if (badReason !== -1) {
+    throw new ConfigError(
+      `${path}: violation ${badReason + 1} has a "reason" that is not a string. A reason is text, such as "Moves into bootstrap in #123"; fix it or remove it.`,
+    );
+  }
   const entries = violations.filter(isEntry);
   if (entries.length !== violations.length) {
     throw new ConfigError(`${path} has a malformed entry. ${REGENERATE}`);
@@ -170,7 +220,8 @@ function readEntries(io: BaselineReads, path: string): Entry[] | undefined {
  * Tells whether a parsed value is a baseline entry.
  *
  * @param value - one element of `violations`.
- * @returns true for `{code, module, message, count}` with a positive integer count.
+ * @returns true for `{code, module, message, count}` with a positive integer
+ *   count, and a `reason` that is a string when there is one; other keys are allowed.
  */
 function isEntry(value: unknown): value is Entry {
   return (
@@ -180,7 +231,8 @@ function isEntry(value: unknown): value is Entry {
     typeof value["message"] === "string" &&
     typeof value["count"] === "number" &&
     Number.isInteger(value["count"]) &&
-    value["count"] > 0
+    value["count"] > 0 &&
+    (!("reason" in value) || typeof value["reason"] === "string")
   );
 }
 

@@ -68,7 +68,7 @@ Agent hook
 :   A command that an AI coding tool runs automatically around its own actions, for example Claude Code's `PostToolUse` and `Stop` hooks. Inwards' main integration point. `inwards init --agent claude` installs four of them. See [chapter 4](04-AI-Integration.md).
 
 Baseline
-:   The violations a project already had when it adopted Inwards, recorded by `inwards baseline` in `inwards-baseline.json` next to `pyproject.toml`. They don't fail the check; new ones do (UC6). Entries match by rule, module and message, not by line.
+:   The violations a project already had when it adopted Inwards, recorded by `inwards baseline` in `inwards-baseline.json` next to `pyproject.toml`. They don't fail the check; new ones do (UC6). Entries match by rule, module and message, not by line, and may carry a hand-written `reason` that `inwards baseline` keeps.
 
 Config guard
 :   The `PreToolUse` hook that denies an agent's edits to `[tool.inwards]`, to `.inwards/`, to `inwards-baseline.json` and to the Claude Code settings that hold the Inwards hooks, before they happen. See [chapter 4](04-AI-Integration.md#stopping-the-agent-from-gaming-the-check).
