@@ -173,6 +173,22 @@ describe("inwards baseline", () => {
     expect(stderr).toContain('violation 1 has a "reason" that is not a string');
   });
 
+  test("inwards baseline refuses a reason that isn't a string and leaves the file alone", () => {
+    const root = legacy();
+    put(root, "shop/domain/pay.py", LEAK);
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    const path = join(root, BASELINE);
+    const file = JSON.parse(readFileSync(path, "utf8"));
+    file.violations[0].reason = "Moves into bootstrap in #123";
+    file.violations[1].reason = 7;
+    const text = JSON.stringify(file);
+    writeFileSync(path, text);
+    const { code, stderr } = inwards(["baseline"], { cwd: root });
+    expect(code).toBe(2);
+    expect(stderr).toContain('violation 2 has a "reason" that is not a string');
+    expect(readFileSync(path, "utf8")).toBe(text);
+  });
+
   test("no baseline file changes nothing, and a broken one is a config error", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
     expect(inwards(["check"], { cwd: root }).code).toBe(1);

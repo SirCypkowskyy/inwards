@@ -89,7 +89,8 @@ function byCodePoint(a: string, b: string): number {
  * @param diagnostics - the whole-project check's diagnostics.
  * @param rules - the config's `[tool.inwards.rules]`, if any.
  * @returns how many violations the baseline now accepts, dormant ones included.
- * @throws {ConfigError} when the baseline can't be written.
+ * @throws {ConfigError} when the baseline can't be written, or when the old
+ *   one has a `reason` that isn't a string (the file is then left as it is).
  */
 export function writeBaseline(
   io: BaselineReads & { baselines: BaselineWriter },
@@ -130,18 +131,30 @@ export function writeBaseline(
 
 /**
  * Reads the entries of the baseline `inwards baseline` is about to replace.
- * A baseline this version can't read has none: it is being replaced.
+ * A baseline this version can't read (not JSON, another schema, a malformed
+ * entry) has none: it is being replaced. A reason that isn't a string is the
+ * exception, because replacing the file would silently drop every other
+ * entry's reason, so the user fixes that one by hand first.
  *
  * @param io - reads the baseline.
  * @param configPath - the pyproject.toml.
  * @returns the old entries, or none when there is no readable baseline.
+ * @throws {ConfigError} when an entry has a `reason` that isn't a string; the
+ *   file is left as it is.
  */
 function previousEntries(io: BaselineReads, configPath: string): Entry[] {
+  const path = baselinePath(configPath);
+  let violations: unknown[] | undefined;
   try {
-    return readEntries(io, baselinePath(configPath)) ?? [];
+    violations = readViolations(io, path);
   } catch {
     return [];
   }
+  if (violations === undefined) {
+    return [];
+  }
+  checkReasons(path, violations);
+  return entriesOf(violations) ?? [];
 }
 
 /**
@@ -186,6 +199,27 @@ function withReason(entry: Entry, reason: string | undefined): Entry {
  * @throws {ConfigError} when the file isn't a baseline this version understands.
  */
 function readEntries(io: BaselineReads, path: string): Entry[] | undefined {
+  const violations = readViolations(io, path);
+  if (violations === undefined) {
+    return undefined;
+  }
+  checkReasons(path, violations);
+  const entries = entriesOf(violations);
+  if (entries === undefined) {
+    throw new ConfigError(`${path} has a malformed entry. ${REGENERATE}`);
+  }
+  return entries;
+}
+
+/**
+ * Reads a baseline's `violations` array, without checking its elements.
+ *
+ * @param io - tells whether the file exists and reads it.
+ * @param path - the baseline file.
+ * @returns the raw `violations` elements, or undefined when there is no baseline.
+ * @throws {ConfigError} when the file isn't JSON or isn't an `inwards/baseline@1` file.
+ */
+function readViolations(io: BaselineReads, path: string): unknown[] | undefined {
   if (!io.probe.exists(path)) {
     return undefined;
   }
@@ -201,19 +235,37 @@ function readEntries(io: BaselineReads, path: string): Entry[] | undefined {
   if (!(isRecord(value) && value["schema"] === SCHEMA && Array.isArray(violations))) {
     throw new ConfigError(`${path} is not an ${SCHEMA} file. ${REGENERATE}`);
   }
-  const badReason = violations.findIndex(
+  return violations;
+}
+
+/**
+ * Refuses a `reason` that isn't a string, naming the first entry that has
+ * one (1-based).
+ *
+ * @param path - the baseline file, for the message.
+ * @param violations - the raw `violations` elements.
+ * @throws {ConfigError} when an entry's `reason` isn't a string.
+ */
+function checkReasons(path: string, violations: readonly unknown[]): void {
+  const index = violations.findIndex(
     (v) => isRecord(v) && "reason" in v && typeof v["reason"] !== "string",
   );
-  if (badReason !== -1) {
+  if (index !== -1) {
     throw new ConfigError(
-      `${path}: violation ${badReason + 1} has a "reason" that is not a string. A reason is text, such as "Moves into bootstrap in #123"; fix it or remove it.`,
+      `${path}: violation ${index + 1} has a "reason" that is not a string. A reason is text, such as "Moves into bootstrap in #123"; fix it or remove it.`,
     );
   }
+}
+
+/**
+ * Turns the raw `violations` elements into entries, all or nothing.
+ *
+ * @param violations - the raw elements.
+ * @returns the entries, or undefined when any element isn't an entry.
+ */
+function entriesOf(violations: readonly unknown[]): Entry[] | undefined {
   const entries = violations.filter(isEntry);
-  if (entries.length !== violations.length) {
-    throw new ConfigError(`${path} has a malformed entry. ${REGENERATE}`);
-  }
-  return entries;
+  return entries.length === violations.length ? entries : undefined;
 }
 
 /**
