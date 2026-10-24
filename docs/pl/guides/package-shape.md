@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: 140a0b7ef48dda3bff669e2b185da8f95c39933d559809c57b02091c7ae66c25
+source_hash: 4d8042a132801adf2583091034b29580643944ffe2e2c3d110a42469f7be2728
 ---
 
 # Kształt pakietu { #package-shape }
@@ -30,7 +30,7 @@ only-in = ["tests", "tests.**"]
 ```
 
 - **Selektory** (`packages`, `only-in`) dopasowują pakiety, w [gramatyce import-lintera](../05-ADR.md#adr-018-package-selectors-take-globs-from-the-start-monorepos-follow-uv-workspaces): `a.b` to dokładne dopasowanie, `a.*` to jeden segment poniżej `a`, a `a.**` to dowolna głębokość poniżej `a` (bez samego `a`). Segment może też być globem fnmatch wewnątrz jednego segmentu, tak jak elementy: `app.*_svc` wybiera `app.orders_svc`, ale nie `app.orders`. Nową domenę, taką jak `app/payments/`, `app.*` obejmuje w chwili, gdy powstaje.
-- **Wygrywa pierwszy pasujący wpis.** Dokładne wpisy umieszczaj przed globami, które też by do nich pasowały. Wpis, którego selektor jest już pokryty przez wcześniejszy, nigdy nie mógłby zadziałać, więc jest błędem konfiguracji: `app.orders` po `app.*`, powtórzony selektor albo `app.*` po `app.**`. Glob, który tylko częściowo pokrywa się z wcześniejszym (`app.**` po `app.*`, `app.a*` po `app.a?`), jest w porządku. Segmenty selektora to identyfikatory Pythona, `*`, `**` albo globy wewnątrz jednego segmentu; `**` nigdy nie stoi wewnątrz segmentu.
+- **Wygrywa pierwszy pasujący wpis.** Dokładne wpisy umieszczaj przed globami, które też by do nich pasowały. Wpis, którego selektor jest już pokryty przez wcześniejszy, nigdy nie mógłby zadziałać, więc jest błędem konfiguracji: `app.orders` po `app.*`, powtórzony selektor albo `app.*` po `app.**`. Glob, który tylko częściowo pokrywa się z wcześniejszym (`app.**` po `app.*`, `app.a*` po `app.*b`), jest w porządku. Przesłanianie między dwoma globami wewnątrz segmentu nie jest wykrywane: `app.a?` po `app.a*` nigdy nie zadziała, ale nie jest zgłaszane, więc węższy glob umieszczaj pierwszy. Segmenty selektora to identyfikatory Pythona, `*`, `**` albo globy wewnątrz jednego segmentu; `**` nigdy nie stoi wewnątrz segmentu.
 - **Wzorce elementów** to globy fnmatch (`*`, `?`, `[seq]`, `[!seq]`), dopasowywane tak jak w Pythonowym `fnmatch.fnmatchcase`: wewnątrz `[...]` znaki `*` i `?` są dosłowne. Niezamknięty `[` albo odwrócony zakres, taki jak `[z-a]`, to błąd konfiguracji. `name` to moduł albo podpakiet, `name/` tylko podpakiet, `name.py` tylko moduł (zaślepki `.pyi` liczą się jako moduły). `__init__` jest zawsze dozwolony, podobnie jak wszystko z `require`. Bez `allow` każdy element jest dozwolony i działają tylko `require` oraz `forbid`.
 - **Kształt obejmuje bezpośrednie elementy pakietu.** `app/orders/services/x.py` jest elementem `services/` pakietu `app.orders`; pliki wewnątrz `services/` podlegają kształtowi dla `app.orders.services`, jeśli taki istnieje. Elementy są nazywane według systemu plików: `utils.helpers.py` to jeden element-moduł, a nie `utils/`, więc nie pasuje ani do `utils`, ani do `helpers`. Ukryte pliki i katalogi są pomijane, tak jak pomija je każde przeglądanie plików w Inwards.
 - **Reguły nazw** działają na każdym poziomie: element pasujący do `pattern` w dowolnym miejscu poza pakietami `only-in` to błąd INW007.

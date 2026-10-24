@@ -193,6 +193,10 @@ describe("glob segments in shape selectors", () => {
     expect(parseConfig(shaped("app.a?", "app.a*", "app.[ab]*")).shape).toHaveLength(3);
   });
 
+  test("shadowing between two glob segments is not detected", () => {
+    expect(parseConfig(shaped("app.a*", "app.a?")).shape).toHaveLength(2);
+  });
+
   test("a glob segment selects the packages whose segment it matches", () => {
     const globbed = parseConfig(shaped("app.*_svc"));
     expect(checkShape(file("app/orders_svc/helpers.py", ""), globbed).map((d) => d.code)).toEqual([
