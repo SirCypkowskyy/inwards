@@ -145,6 +145,54 @@ describe("inwards baseline", () => {
     expect(inwards(["check", "shop/domain/order.py"], { cwd: root }).code).toBe(0);
   });
 
+  test("a hand-written reason survives inwards baseline, run twice", () => {
+    const root = legacy();
+    const path = join(root, BASELINE);
+    const file = JSON.parse(readFileSync(path, "utf8"));
+    file.violations[0].reason = "Moves into bootstrap in #123";
+    writeFileSync(path, JSON.stringify(file));
+    expect(inwards(["check"], { cwd: root }).code).toBe(0);
+    put(root, "shop/domain/order.py", `${LEAK}from shop.infrastructure import db\n`);
+    for (const count of [2, 2]) {
+      expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+      expect(JSON.parse(readFileSync(path, "utf8")).violations).toEqual([
+        expect.objectContaining({ count, reason: "Moves into bootstrap in #123" }),
+      ]);
+    }
+    expect(inwards(["check"], { cwd: root }).code).toBe(0);
+  });
+
+  test("a reason that isn't a string is a config error", () => {
+    const root = legacy();
+    const path = join(root, BASELINE);
+    const file = JSON.parse(readFileSync(path, "utf8"));
+    file.violations[0].reason = 123;
+    writeFileSync(path, JSON.stringify(file));
+    const { code, stderr } = inwards(["check"], { cwd: root });
+    expect(code).toBe(2);
+    expect(stderr).toContain(
+      'violation 1 (INW001 in shop.domain.order) has a "reason" that is not a string',
+    );
+  });
+
+  test("inwards baseline refuses a reason that isn't a string and leaves the file alone", () => {
+    const root = legacy();
+    put(root, "shop/domain/pay.py", LEAK);
+    expect(inwards(["baseline"], { cwd: root }).code).toBe(0);
+    const path = join(root, BASELINE);
+    const file = JSON.parse(readFileSync(path, "utf8"));
+    file.violations[0].reason = "Moves into bootstrap in #123";
+    file.violations[1].reason = 7;
+    const text = JSON.stringify(file);
+    writeFileSync(path, text);
+    const { code, stderr } = inwards(["baseline"], { cwd: root });
+    expect(code).toBe(2);
+    expect(stderr).toContain(
+      'violation 2 (INW001 in shop.domain.pay) has a "reason" that is not a string',
+    );
+    expect(readFileSync(path, "utf8")).toBe(text);
+  });
+
   test("no baseline file changes nothing, and a broken one is a config error", () => {
     const root = project({ "pyproject.toml": LAYERS, "shop/domain/order.py": LEAK });
     expect(inwards(["check"], { cwd: root }).code).toBe(1);

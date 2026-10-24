@@ -307,7 +307,7 @@ baseline'u); multi-word names are left uninflected where possible.
 | start-up (process) | start (startu) |
 | string (Python) | napis |
 | suppression, inline suppression (`# inwards: ignore[...]`) | wyciszenie, wyciszenie w linii |
-| reason (of a suppression) | powód |
+| reason (of a suppression or a baseline entry) | powód |
 | path operation (FastAPI) | operacja ścieżki |
 | exception handler (FastAPI) | handler wyjątków |
 | helper (function) | funkcja pomocnicza |
