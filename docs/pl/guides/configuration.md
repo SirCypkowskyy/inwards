@@ -243,7 +243,7 @@ Typ: tablice tabel. Domyślnie: brak.
 
 Jakie elementy pakiet może, musi i nie może zawierać (INW007, INW008) oraz gdzie może się pojawić nazwa elementu. Obie tabele oraz składnię ich selektorów i wzorców opisuje [przewodnik o kształcie pakietu](package-shape.md). Wpis kształtu może też ustawić `hints`, zdania dodawane do kroków naprawy jego diagnostyk INW007, oraz `template`, [szablon](#templates), który dostarcza `allow`, `require`, `forbid`, `extra` i `hints`; klucz ustawiony przez sam wpis wygrywa.
 
-Selektor, do którego nie pasuje żaden pakiet, to ostrzeżenie INW007, bo często jest literówką. Kształt zadeklarowany przed kodem ustawia `allow-empty = true` (wartość logiczna, domyślnie `false`), żeby pominąć to ostrzeżenie dla własnych selektorów; inne wpisy nadal są sprawdzane, a gdy pakiet już pasuje, wpis działa jak zwykle. Szablon nie dostarcza `allow-empty`.
+Selektor, do którego nie pasuje żaden pakiet, to ostrzeżenie INW007, bo często jest literówką. Kształt zadeklarowany przed kodem ustawia `allow-empty = true` (typ: prawda albo fałsz, domyślnie `false`), żeby pominąć to ostrzeżenie dla własnych selektorów; inne wpisy nadal są sprawdzane, a gdy pakiet już pasuje, wpis działa jak zwykle. Szablon nie dostarcza `allow-empty`.
 
 <!-- config: fragment -->
 

@@ -1,6 +1,6 @@
 ---
 source: docs/chapters/guides/package-shape.md
-source_hash: 810d67835ae1d3e6cceec81ae5513af9a75b83a52a569c4eaaf3743a1a3fd373
+source_hash: daa56962bdb0110d33991559553548f8b3eab0f9ee6fc68455cd22b8f470eef6
 ---
 
 # Kształt pakietu { #package-shape }
@@ -33,7 +33,7 @@ only-in = ["tests", "tests.**"]
 - **Wygrywa pierwszy pasujący wpis.** Dokładne wpisy umieszczaj przed globami, które też by do nich pasowały. Wpis, którego selektor jest już pokryty przez wcześniejszy, nigdy nie mógłby zadziałać, więc jest błędem konfiguracji: `app.orders` po `app.*`, powtórzony selektor albo `app.*` po `app.**`. Glob, który tylko częściowo pokrywa się z wcześniejszym (`app.**` po `app.*`), jest w porządku. Segmenty selektora to identyfikatory Pythona, `*` albo `**`.
 - **Wzorce elementów** to globy fnmatch (`*`, `?`, `[seq]`, `[!seq]`), dopasowywane tak jak w Pythonowym `fnmatch.fnmatchcase`: wewnątrz `[...]` znaki `*` i `?` są dosłowne. Niezamknięty `[` albo odwrócony zakres, taki jak `[z-a]`, to błąd konfiguracji. `name` to moduł albo podpakiet, `name/` tylko podpakiet, `name.py` tylko moduł (zaślepki `.pyi` liczą się jako moduły). `__init__` jest zawsze dozwolony, podobnie jak wszystko z `require`. Bez `allow` każdy element jest dozwolony i działają tylko `require` oraz `forbid`.
 - **Kształt obejmuje bezpośrednie elementy pakietu.** `app/orders/services/x.py` jest elementem `services/` pakietu `app.orders`; pliki wewnątrz `services/` podlegają kształtowi dla `app.orders.services`, jeśli taki istnieje. Elementy są nazywane według systemu plików: `utils.helpers.py` to jeden element-moduł, a nie `utils/`, więc nie pasuje ani do `utils`, ani do `helpers`. Ukryte pliki i katalogi są pomijane, tak jak pomija je każde przeglądanie plików w Inwards.
-- **Selektor, do którego nie pasuje żaden pakiet**, to ostrzeżenie, często literówka. Kształt zadeklarowany przed kodem, dla pakietów, które utworzy następny refaktor, ustawia `allow-empty = true` (domyślnie `false`), żeby pominąć to ostrzeżenie; dotyczy to tylko tego wpisu, a gdy pakiet już pasuje, wpis jest sprawdzany jak zwykle.
+- **Selektor, do którego nie pasuje żaden pakiet**, to ostrzeżenie, często literówka. Kształt zadeklarowany przed kodem, dla pakietów, które utworzy następny refaktor, ustawia `allow-empty = true` (domyślnie `false`), żeby pominąć to ostrzeżenie; dotyczy to tylko tego wpisu, a gdy pakiet już pasuje, wpis jest sprawdzany jak zwykle. `allow-empty` wycisza to ostrzeżenie dla każdego selektora wpisu, więc literówka w selektorze obok nie zostanie zgłoszona; selektory zadeklarowane przed kodem umieść w osobnym wpisie.
 - **Reguły nazw** działają na każdym poziomie: element pasujący do `pattern` w dowolnym miejscu poza pakietami `only-in` to błąd INW007.
 
 Nieznane klucze, źle zbudowane selektory albo wzorce oraz przesłonięte wpisy to błędy konfiguracji (kod wyjścia 2). [Config guard](../04-AI-Integration.md) traktuje `shape` i `names` tak jak resztę `[tool.inwards]`: edycja ich przez agenta jest odrzucana.
