@@ -456,6 +456,81 @@ class Users(Repository, Protocol):
     expect(await inw014(Subclass, Off, "tests/test_users.py")).toEqual([]);
   });
 
+  test("a Protocol outside the port modules may extend a port, however it is imported; an ABC or plain class may not", async () => {
+    const text = `from abc import ABC
+from typing import Protocol
+from typing import Protocol as P
+import typing
+import typing_extensions
+from shop.application.ports.users import UserRepository
+
+class UserReader(UserRepository, Protocol):
+    def all(self): ...
+
+class UserLister(UserRepository, typing.Protocol[int]):
+    def list(self): ...
+
+class UserCounter(UserRepository, P):
+    def count(self): ...
+
+class UserFinder(UserRepository, typing_extensions.Protocol):
+    def find(self): ...
+
+class SqlUsers(UserRepository):
+    pass
+
+class AbstractUsers(UserRepository, ABC):
+    pass
+`;
+    expect(await inw014(text, Off, "shop/application/services/users.py")).toEqual([
+      "20:16 `SqlUsers` in `shop.application.services.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+      "23:21 `AbstractUsers` in `shop.application.services.users` subclasses the port `UserRepository` from `shop.application.ports.users`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+    ]);
+  });
+
+  test("a class that reaches a port through a same-file Protocol is reported on that base", async () => {
+    const text = `from typing import Protocol
+from shop.application.ports.users import UserRepository
+
+class Reader(UserRepository, Protocol): ...
+
+class NarrowReader(Reader, Protocol): ...
+
+class Impl(Reader):
+    def get(self):
+        return 1
+
+class DeepImpl(NarrowReader):
+    pass
+`;
+    const found = await check(
+      text,
+      `[tool.inwards.rules]\nextend-select = ["INW014"]\n[tool.inwards.rules.ports-abstract]\n${Off}`,
+      Adapter,
+    );
+    const inw = found.filter((d) => d.code === "INW014");
+    expect(inw.map((d) => `${d.line}:${d.column} ${d.message}`)).toEqual([
+      "8:12 `Impl` in `shop.adapters.users` subclasses the port `UserRepository` from `shop.application.ports.users` through the local Protocol `Reader`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+      "12:16 `DeepImpl` in `shop.adapters.users` subclasses the port `UserRepository` from `shop.application.ports.users` through the local Protocol `NarrowReader`. Ports here are implemented by shape (`allow-subclassing = false`): a subclass inherits the port's default bodies, and a missing method shows up only when the adapter is built.",
+    ]);
+    expect(inw[0]?.fix?.steps).toEqual([
+      "Remove `Reader` from the bases of `Impl`, and keep the methods it implements.",
+      "Add `_: Reader = Impl(...)` under `if TYPE_CHECKING:` (from `typing`) at the end of the module, so the type checker checks `Impl` against the port.",
+    ]);
+  });
+
+  test("a same-file Protocol that reaches no port passes as a base", async () => {
+    const text = `from typing import Protocol
+from shop.application.ports.users import UserRepository
+
+class Clock(Protocol): ...
+
+class SystemClock(Clock):
+    pass
+`;
+    expect(await inw014(text, Off, Adapter)).toEqual([]);
+  });
+
   test("a base from a module that isn't a port passes", async () => {
     const text = "from shop.domain.model import Entity\n\nclass User(Entity):\n    pass\n";
     expect(await inw014(text, Off, Adapter)).toEqual([]);

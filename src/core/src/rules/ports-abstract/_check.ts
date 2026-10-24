@@ -10,8 +10,9 @@
  * with it, the modules it selects. `interface = "protocol"` also reports an
  * ABC there, and a port that extends a port without listing `Protocol`;
  * `allow-subclassing = false` reports, in any other module, a base that
- * names a class from a port module, parsing only a file whose import
- * skeleton imports one. A file with no `class` is never parsed.
+ * names a class from a port module, on a class that isn't a Protocol
+ * itself, parsing only a file whose import skeleton imports one. A file
+ * with no `class` is never parsed.
  * I/O-free: the caller supplies the run's trees, the file, the options and
  * the layers.
  */

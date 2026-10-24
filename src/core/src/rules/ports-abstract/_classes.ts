@@ -6,9 +6,10 @@
  * module; an exempt class has a base or decorator the options allow
  * (exceptions, DTOs, dataclasses); anything else is concrete. Outside the
  * port modules it lists the bases that subclass a port, for
- * `allow-subclassing = false`. It reads one
- * parsed tree and decides nothing about wording; the caller parses and frees
- * the tree.
+ * `allow-subclassing = false`, skipping a class that is a Protocol itself
+ * and following same-file Protocols that extend a port. It reads one parsed
+ * tree and decides nothing about wording; the caller parses and frees the
+ * tree.
  */
 import type { Node } from "web-tree-sitter";
 import { identifierName, keywordOf, namedChildren } from "../../shared/python/nodes.ts";
@@ -188,15 +189,22 @@ export interface PortBase {
   readonly cls: string;
   /** The base's expression node, where the finding goes. */
   readonly node: Node;
-  /** The base's qualified name, e.g. `shop.application.ports.orders.OrderRepository`. */
+  /** The port's qualified name, e.g. `shop.application.ports.orders.OrderRepository`. */
   readonly qualified: string;
+  /** When the base is a same-file Protocol that extends the port, its name as written. */
+  readonly via?: string;
 }
 
 /**
  * Lists the bases of a module's top-level classes that name a class from a
  * port module. A class the options exempt (an allowed decorator or base,
  * such as an exception extending a port module's error) lists none, and so
- * does a base the allowed bases match.
+ * does a base the allowed bases match. A class that lists `Protocol` among
+ * its own bases lists none either: it is a narrower interface, not an
+ * adapter, wherever it lives. A base that names a same-file Protocol which
+ * reaches a port, directly or through other same-file Protocols, counts as
+ * that port, since the subclass inherits the port's default bodies through
+ * it.
  *
  * @param root - the module node of a module outside the port modules.
  * @param module - the module's dotted name, which qualifies its own classes.
@@ -205,16 +213,46 @@ export interface PortBase {
  */
 export function portBases(root: Node, module: string, context: ClassContext): PortBase[] {
   const found: PortBase[] = [];
+  const reached = new Map<string, string>();
   for (const cls of portClasses(root, module, context)) {
     const list = cls.kind === "exempt" ? null : cls.node.childForFieldName("superclasses");
-    for (const base of list ? namedChildren(list) : []) {
-      const qualified = portName(base, context);
-      if (qualified !== undefined) {
-        found.push({ cls: cls.name, node: base, qualified });
-      }
+    const bases = (list ? namedChildren(list) : []).flatMap((node) => {
+      const port = basePort(node, context, reached);
+      return port === undefined ? [] : [{ cls: cls.name, node, ...port }];
+    });
+    const [first] = bases;
+    if (cls.kind !== "protocol") {
+      found.push(...bases);
+    } else if (first !== undefined) {
+      reached.set(`${module}.${cls.name}`, first.qualified);
     }
   }
   return found;
+}
+
+/**
+ * Names the port one base reaches: a class from a port module, or a
+ * same-file Protocol that extends one. Only Protocols defined above the
+ * class are known, so a chain of them is followed in source order and a
+ * cycle can't form.
+ *
+ * @param base - one entry of a class's argument list.
+ * @param context - the file's qualifier and the options.
+ * @param reached - the port each same-file Protocol read so far reaches, by its qualified name.
+ * @returns the port's qualified name, with the Protocol as written when it goes through one, or undefined when the base reaches no port.
+ */
+function basePort(
+  base: Node,
+  context: ClassContext,
+  reached: ReadonlyMap<string, string>,
+): { qualified: string; via?: string } | undefined {
+  const direct = portName(base, context);
+  if (direct !== undefined) {
+    return { qualified: direct };
+  }
+  const name = base.type === "keyword_argument" ? null : qualifiedHead(base, context.qualify);
+  const local = name === null ? undefined : reached.get(name);
+  return local === undefined ? undefined : { qualified: local, via: base.text };
 }
 
 /**
