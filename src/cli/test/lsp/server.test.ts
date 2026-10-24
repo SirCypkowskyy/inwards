@@ -4,7 +4,8 @@
  * module is created on disk, a broken config shown once and cleared when
  * fixed, a workspace folder added later, a save rerunning the pass for an
  * editor without file watching, a listed diagram's findings following its
- * unsaved text (#348), and stdout carrying nothing but LSP. Each
+ * unsaved text (#348), a repository-level diagram a uv workspace member
+ * reaches with `..` (#413), and stdout carrying nothing but LSP. Each
  * test runs its own server on a throwaway project.
  */
 import { afterEach, expect, test } from "bun:test";
@@ -173,6 +174,40 @@ test("a listed diagram shows its findings, and an open one follows its unsaved t
   client.change(drawn, diagram("shop.domain"));
   await client.diagnostics(drawn, (f) => f.length === 0);
   expect(client.published.get(uri(readme)) ?? []).toEqual([]);
+}, 30_000);
+
+test("a repository-level diagram a workspace member lists with .. shows its findings (#413)", async () => {
+  /**
+   * Draws a marked layers diagram whose domain node carries a label.
+   *
+   * @param label - the quoted label of the domain node.
+   * @returns the Markdown text.
+   */
+  function diagram(label: string): string {
+    return [
+      "```mermaid",
+      "%% inwards: layers",
+      "flowchart LR",
+      `  infrastructure --> domain["${label}"]`,
+      "```",
+      "",
+    ].join("\n");
+  }
+  const root = project({
+    "pyproject.toml": '[project]\nname = "mono"\n\n[tool.uv.workspace]\nmembers = ["packages/*"]\n',
+    "packages/app/pyproject.toml": `[project]\nname = "app"\n\n${LAYERS}diagrams = ["../../docs/architecture.md"]\n\n[tool.inwards.rules]\nextend-select = ["INW017"]\n`,
+    "packages/app/shop/domain/order.py": "",
+    "packages/app/shop/infrastructure/db.py": "",
+    "docs/architecture.md": diagram("shop.domian"),
+  });
+  const client = await serve([root]);
+  const drawn = join(root, "docs/architecture.md");
+  expect(codes(await client.diagnostics(drawn, (f) => f.length > 0))).toEqual(["INW017"]);
+  client.open(drawn, diagram("shop.domian"));
+  client.change(drawn, diagram("shop.domain"));
+  expect(await client.diagnostics(drawn, (f) => f.length === 0)).toEqual([]);
+  client.change(drawn, diagram("shop.nowhere"));
+  expect(codes(await client.diagnostics(drawn, (f) => f.length > 0))).toEqual(["INW017"]);
 }, 30_000);
 
 test("inwards server with an argument is a usage error on stderr, not stdout", () => {

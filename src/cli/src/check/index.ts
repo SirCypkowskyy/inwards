@@ -6,7 +6,7 @@
  */
 export { runCheck } from "./_check.ts";
 export { commandConfig, findConfig } from "./_config-discovery.ts";
-export { configListsDiagram, DIAGRAM_FILE } from "./_diagrams.ts";
+export { configListsDiagram, DIAGRAM_FILE, workspaceListers } from "./_diagrams.ts";
 export { fingerprint } from "./_fingerprint.ts";
 export { linksUnder } from "./_links.ts";
 export { overlayTexts } from "./_overlay.ts";

@@ -27,7 +27,13 @@ import {
 import { posix } from "../shared/paths/lexical.ts";
 import type { PathProbe, Runtime } from "../shared/platform/contracts.ts";
 import { hideTopLevel } from "./_absent.ts";
-import { checkNamedDiagrams, DIAGRAM_FILE, readDiagrams, splitTargets } from "./_diagrams.ts";
+import {
+  checkDiagramPaths,
+  checkNamedDiagrams,
+  DIAGRAM_FILE,
+  readDiagrams,
+  splitTargets,
+} from "./_diagrams.ts";
 import { atOrInside, diskTexts, type PlannedFile, planSources, readSources } from "./_sources.ts";
 import { checkOnThreads, openPool } from "./_threads.ts";
 import { wholeProjectFindings } from "./_whole.ts";
@@ -78,7 +84,8 @@ export function diskCacheWanted(
  * @param parsed - the config to use instead of the one in `configPath`, whose
  *   text still places findings about the config itself.
  * @returns the engine and the config root, as written and resolved.
- * @throws {ConfigError} when the config is invalid.
+ * @throws {ConfigError} when the config is invalid, or a `diagrams` entry
+ *   climbs out of the project root (`checkDiagramPaths`).
  */
 async function openProject(
   io: ProjectIo,
@@ -88,6 +95,7 @@ async function openProject(
 ): Promise<Project> {
   const configText = io.read.text(configPath);
   const config = parsed ?? parseConfig(configText);
+  checkDiagramPaths(io, configPath, config);
   const lexicalRoot = resolve(dirname(configPath), config.root);
   const wasm = await io.grammars();
   const dir = dirname(configPath);

@@ -25,7 +25,8 @@ describe("diagrams", () => {
     ["an absolute path", diagrams('["/docs/a.md"]')],
     ["a Windows drive", diagrams('["C:/docs/a.md"]')],
     ["a backslash", diagrams(String.raw`['docs\a.md']`)],
-    ["a path that climbs out with ..", diagrams('["docs/../../a.md"]')],
+    [".. after a name", diagrams('["docs/../../a.md"]')],
+    ["nothing after the ..", diagrams('["../.."]')],
     ["an empty segment", diagrams('["docs//a.md"]')],
     [
       "INW017 options with an unknown key",
@@ -36,8 +37,10 @@ describe("diagrams", () => {
     expect(schemaErrors(text)).not.toEqual([]);
   });
 
-  test("paths, globs and the rule's switch pass both", () => {
-    const text = diagrams('["docs/architecture.md", "docs/**/*.md", "*.mmd"]').replace(
+  test("paths, globs, leading .. and the rule's switch pass both", () => {
+    const text = diagrams(
+      '["docs/architecture.md", "docs/**/*.md", "*.mmd", "../../docs/architecture.md"]',
+    ).replace(
       "[tool.inwards]\n",
       '[tool.inwards]\nrules = { extend-select = ["INW017"], severity = { INW017 = "error" } }\n',
     );

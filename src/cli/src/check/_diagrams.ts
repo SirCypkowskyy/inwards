@@ -1,27 +1,34 @@
 /**
  * @file Reading the files `[tool.inwards].diagrams` names, for INW017,
- * INW018 and INW019 (ADR-045): a plain entry is one file next to the config, a glob is
+ * INW018 and INW019 (ADR-045): a plain entry is one file relative to the config, a glob is
  * walked from its directory before the first wildcard with the CLI's usual
- * skip rules. A check of named files (the PostToolUse hook, the language
+ * skip rules. An entry may climb out of the config's directory with leading
+ * `..`, as far as the project root (#413): the git repository or the uv
+ * workspace around the config, whichever is outermost (`diagramsRoot`). A
+ * check of named files (the PostToolUse hook, the language
  * server, MCP `check_files`, #348) asks `listsDiagram` whether one of them is
  * a listed diagram, which is path text only. The engine decides what the
  * diagrams say (`checkDiagrams`); this module only finds and reads them,
  * through the injected `ProjectIo`, and only when one of the rules is on, so
  * a project that doesn't use diagrams pays nothing.
  */
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import {
   checkDiagrams,
+  checkDiagramsRoot,
   type Diagnostic,
   type DiagramSource,
+  type DiagramsRoot,
+  declaresInwards,
   diagramBase,
   diagramMatches,
   type InwardsConfig,
   parseConfig,
   ruleLevel,
 } from "@inwards/core";
-import { isInside, posix } from "../shared/paths/lexical.ts";
+import { posix } from "../shared/paths/lexical.ts";
 import type { PathProbe } from "../shared/platform/contracts.ts";
+import { workspaceMembers, workspaceRoot } from "./_workspace.ts";
 import type { ProjectIo } from "./contracts.ts";
 
 /** The rules that read diagrams. */
@@ -48,9 +55,67 @@ function diagramsOn(config: InwardsConfig): boolean {
 }
 
 /**
+ * Finds the project root a config's `diagrams` may climb to with `..`
+ * (#413): the top of the git repository (`git rev-parse --show-toplevel`,
+ * as `inwards stats` finds it) or the uv workspace root (as `inwards check`
+ * finds a member's workspace), whichever sits higher above the config. The
+ * config's directory is walked up as written, and git's answer, which has
+ * symlinks resolved, is matched against each ancestor's real path, so the
+ * count of `..` is the one the lexical path takes.
+ *
+ * @param io - runs git, probes real paths and reads the pyproject.toml files on the way up.
+ * @param configDir - absolute directory of the config's pyproject.toml.
+ * @returns how far up the root is and how a config error names it; undefined
+ *   outside both a git repository and a uv workspace.
+ */
+function diagramsRoot(
+  io: Pick<ProjectIo, "git" | "probe" | "read" | "toml">,
+  configDir: string,
+): DiagramsRoot | undefined {
+  const top = io.git.run(configDir, ["rev-parse", "--show-toplevel"])?.trim();
+  const gitRoot = top ? io.probe.realpath(top) : undefined;
+  let workspace: string | undefined;
+  try {
+    workspace = workspaceRoot(io, configDir)?.dir;
+  } catch {
+    // A pyproject.toml on the way that can't be read names no workspace.
+  }
+  let found: DiagramsRoot | undefined;
+  for (let dir = configDir, up = 0; ; dir = dirname(dir), up += 1) {
+    const climb = up === 0 ? "." : Array.from({ length: up }, () => "..").join("/");
+    if (gitRoot !== undefined && io.probe.realpath(dir) === gitRoot) {
+      found = { up, name: `the git repository root ("${climb}")` };
+    } else if (dir === workspace) {
+      found = { up, name: `the uv workspace root ("${climb}")` };
+    }
+    if (dirname(dir) === dir) {
+      return found;
+    }
+  }
+}
+
+/**
+ * Checks that a config's `diagrams` stay inside the project root
+ * (`diagramsRoot`), which is looked for only when an entry climbs with `..`.
+ *
+ * @param io - runs git, probes real paths and reads the pyproject.toml files on the way up.
+ * @param configPath - absolute path of the pyproject.toml.
+ * @param config - its parsed config.
+ * @throws {ConfigError} naming the first entry that leaves the root.
+ */
+export function checkDiagramPaths(
+  io: Pick<ProjectIo, "git" | "probe" | "read" | "toml">,
+  configPath: string,
+  config: InwardsConfig,
+): void {
+  checkDiagramsRoot(config.diagrams, () => diagramsRoot(io, dirname(configPath)));
+}
+
+/**
  * Tells whether a file is one the config's `diagrams` key lists, with a
  * diagram rule on, by path text alone: nothing is read. The path is taken
- * as written, as the whole-project walk takes it.
+ * as written, as the whole-project walk takes it; an entry that climbs with
+ * `..` matches a file outside the config's directory.
  *
  * @param configPath - absolute path of the pyproject.toml; entries are relative to its directory.
  * @param config - its parsed config.
@@ -59,11 +124,42 @@ function diagramsOn(config: InwardsConfig): boolean {
  */
 export function listsDiagram(configPath: string, config: InwardsConfig, file: string): boolean {
   const dir = dirname(configPath);
-  if (!(diagramsOn(config) && isInside(dir, file))) {
+  const native = relative(dir, file);
+  // On Windows a file on another drive gives an absolute path, which no entry names.
+  if (!diagramsOn(config) || native === "" || isAbsolute(native)) {
     return false;
   }
-  const rel = posix(relative(dir, file));
+  const rel = posix(native);
   return (config.diagrams ?? []).some((entry) => diagramMatches(entry, rel));
+}
+
+/**
+ * Finds the configs of a uv workspace's members that list a file as a
+ * diagram (`configListsDiagram`), for a check of one file whose nearest
+ * config isn't the one that lists it: a repository-level page that a
+ * member reaches with `..` (#413). Outside a workspace, or when the
+ * workspace can't be read, there are none.
+ *
+ * @param io - probes, reads and parses the pyproject.toml files.
+ * @param file - an absolute file path.
+ * @returns absolute paths of the members' pyproject.toml files that list it, in path order.
+ */
+export function workspaceListers(
+  io: Pick<ProjectIo, "probe" | "read" | "toml">,
+  file: string,
+): string[] {
+  try {
+    return (workspaceMembers(io, dirname(file))?.members ?? [])
+      .map((member) => join(member, "pyproject.toml"))
+      .filter(
+        (config) =>
+          io.probe.kind(config) === "file" &&
+          declaresInwards(io.read.text(config)) &&
+          configListsDiagram(io, config, file),
+      );
+  } catch {
+    return [];
+  }
 }
 
 /**

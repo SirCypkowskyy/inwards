@@ -122,7 +122,9 @@ export async function checkWorkspace(
  * Checks one document alone, as the PostToolUse hook checks an edit
  * (`edit: true`), with the config `inwards check` would route it to. A
  * document that isn't Python is checked only where its config lists it as a
- * diagram (#348), so its INW017 and INW018 findings follow the unsaved text.
+ * diagram (#348), so its INW017 and INW018 findings follow the unsaved text,
+ * and a repository-level diagram goes to each uv workspace member config
+ * that reaches it with `..` (#413, `planCheck`).
  *
  * @param deps - the check and what routing reads.
  * @param path - the document's absolute path.

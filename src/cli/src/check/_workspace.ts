@@ -111,7 +111,7 @@ export function workspaceMembers(
  * @param start - the directory to start from.
  * @returns the workspace root with its member and exclude globs, or undefined.
  */
-function workspaceRoot(
+export function workspaceRoot(
   io: WorkspaceIo,
   start: string,
 ): { dir: string; members: string[]; exclude: string[] } | undefined {

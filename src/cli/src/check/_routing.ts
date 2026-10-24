@@ -12,8 +12,12 @@ import { declaresInwards, inwardsTable } from "@inwards/core";
 import { isRecord } from "../shared/json/guards.ts";
 import { isInside } from "../shared/paths/lexical.ts";
 import { findConfig } from "./_config-discovery.ts";
+import { configListsDiagram, workspaceListers } from "./_diagrams.ts";
 import { workspaceMembers } from "./_workspace.ts";
 import type { ProjectIo } from "./contracts.ts";
+
+/** A Python file, which no `diagrams` entry routes elsewhere. */
+const PYTHON = /\.pyi?$/u;
 
 /** What planning reads: path kinds, real paths, files, directory listings and TOML. */
 type RoutingIo = Pick<ProjectIo, "probe" | "read" | "toml">;
@@ -43,7 +47,10 @@ export interface CheckPlan {
  * gets one whole-project check per such member, plus the nearest config
  * above them (if any) with the members' directories left out; anywhere else
  * it is the nearest config, as before. With paths, each one goes to its
- * nearest config, and a directory holding such members also to theirs. The
+ * nearest config, and a directory holding such members also to theirs. A
+ * file that isn't Python and that uv workspace members list as a diagram
+ * with `..` (a repository-level page, #413) goes to those members instead,
+ * and to the nearest config only when it lists the file too. The
  * workspace is looked for from each path (or the working directory), so the
  * answer doesn't depend on where the command runs.
  *
@@ -95,6 +102,10 @@ function planTarget(io: RoutingIo, target: string, whole: boolean, building: Bui
   const foreign =
     found !== undefined && inner.length > 0 && isInside(dirname(found), workspace.root);
   const nearest = foreign ? undefined : found;
+  // A file has no members under it, so nothing is left to skip.
+  if (!isDir && routeListedDiagram(io, target, nearest, building)) {
+    return;
+  }
   if (nearest !== undefined) {
     const unit = unitOf(building.units, nearest, whole);
     unit.targets?.push(target);
@@ -107,6 +118,39 @@ function planTarget(io: RoutingIo, target: string, whole: boolean, building: Bui
       building.skipped.add(member);
     }
   }
+}
+
+/**
+ * Routes a file that isn't Python to the uv workspace member configs that
+ * list it as a diagram, reaching it with `..` (#413), and to the nearest
+ * config only when that one lists it too: otherwise the nearest config would
+ * report the file as not checked, or walk it for Python.
+ *
+ * @param io - probes paths and reads pyproject.toml files.
+ * @param target - an absolute file.
+ * @param nearest - the nearest config above the file, if any.
+ * @param building - the plan so far; changed in place.
+ * @returns true when a member lists the file, which is then routed; false
+ *   for a Python file or one no member lists, left to the usual routing.
+ */
+function routeListedDiagram(
+  io: RoutingIo,
+  target: string,
+  nearest: string | undefined,
+  building: Building,
+): boolean {
+  const listers = PYTHON.test(target) ? [] : workspaceListers(io, target);
+  const configs =
+    nearest !== undefined &&
+    !listers.includes(nearest) &&
+    listers.length > 0 &&
+    configListsDiagram(io, nearest, target)
+      ? [...listers, nearest]
+      : listers;
+  for (const config of configs) {
+    unitOf(building.units, config, false).targets?.push(target);
+  }
+  return listers.length > 0;
 }
 
 /** A uv workspace as planning sees it: its root, its members, and those with a config. */
