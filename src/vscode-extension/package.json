@@ -61,7 +61,7 @@
     "package": "bun run scripts/package-target.ts"
   },
   "dependencies": {
-    "vscode-languageclient": "^10.1.2"
+    "vscode-languageclient": "^11.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
